@@ -80,6 +80,35 @@ export default async function EditarProductoPage({
             Disponible en el menú
           </label>
           <IngredientesField initial={producto.ingredientes} />
+
+          <div className="rounded-lg border border-neutral-200 p-3">
+            <label className="mb-1 block text-sm font-medium text-neutral-700">
+              Grupo "mitad y mitad" (opcional)
+            </label>
+            <p className="mb-2 text-xs text-neutral-500">
+              Escribí un nombre de grupo (ej: "Pizza Grande") para que el cliente pueda
+              combinar este producto mitad y mitad con otros del MISMO grupo. Dejalo vacío
+              si este producto no se combina.
+            </p>
+            <input
+              name="mitadYMitadGrupo"
+              defaultValue={producto.mitadYMitadGrupo ?? ""}
+              placeholder="Ej: Pizza Grande"
+              className="mb-2 w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
+            />
+            <select
+              name="mitadYMitadModo"
+              defaultValue={producto.mitadYMitadModo}
+              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
+            >
+              <option value="mayor">Precio mayor (cobra el sabor más caro)</option>
+              <option value="proporcional">Precio proporcional (mitad de cada uno)</option>
+            </select>
+            <p className="mt-1 text-xs text-neutral-400">
+              Usá el mismo modo en todos los productos de un mismo grupo.
+            </p>
+          </div>
+
           <button
             type="submit"
             className="rounded-lg bg-brand px-4 py-2 font-medium text-white hover:bg-brand-dark"

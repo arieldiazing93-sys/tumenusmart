@@ -61,6 +61,12 @@ export async function actualizarProducto(productId: string, formData: FormData) 
     throw new Error("Faltan datos obligatorios");
   }
 
+  const mitadYMitadGrupo = String(formData.get("mitadYMitadGrupo") ?? "").trim() || null;
+  const mitadYMitadModo =
+    String(formData.get("mitadYMitadModo") ?? "mayor") === "proporcional"
+      ? "proporcional"
+      : "mayor";
+
   await prisma.product.update({
     where: { id: productId },
     data: {
@@ -71,6 +77,8 @@ export async function actualizarProducto(productId: string, formData: FormData) 
       imagenUrl: String(formData.get("imagenUrl") ?? "") || null,
       disponible: formData.get("disponible") === "on",
       ingredientes: parsearIngredientes(formData),
+      mitadYMitadGrupo,
+      mitadYMitadModo,
     },
   });
 

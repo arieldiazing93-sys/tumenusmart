@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { useCart } from "./CartProvider";
 import { formatearGuarani } from "@/lib/format";
-import { calcularPrecioMitadYMitad, ModoPrecioMitad } from "@/lib/mitad-mitad";
+import { calcularPrecioMitadYMitad } from "@/lib/mitad-mitad";
 
 type Opcion = {
   id: string;
@@ -16,16 +16,16 @@ type ProductoBase = {
   id: string;
   nombre: string;
   precio: number;
+  mitadYMitadModo: string;
   opciones: Opcion[];
 };
 
 type Props = {
-  categoriaNombre: string;
-  modo: ModoPrecioMitad;
+  grupoNombre: string;
   productos: ProductoBase[];
 };
 
-export function MitadYMitadPicker({ categoriaNombre, modo, productos }: Props) {
+export function MitadYMitadPicker({ grupoNombre, productos }: Props) {
   const { agregarItem } = useCart();
   const [idA, setIdA] = useState<string>("");
   const [idB, setIdB] = useState<string>("");
@@ -36,8 +36,10 @@ export function MitadYMitadPicker({ categoriaNombre, modo, productos }: Props) {
   const productoA = productos.find((p) => p.id === idA);
   const productoB = productos.find((p) => p.id === idB);
 
-  // Agregados disponibles: la unión de los agregados de ambas mitades
-  // (ej: si "Borde relleno" está cargado en las dos pizzas, aparece una sola vez).
+  // El modo de precio lo define la "Mitad 1" elegida (debería ser el mismo
+  // en todos los productos del grupo, configurado así por el admin).
+  const modo = productoA?.mitadYMitadModo === "proporcional" ? "proporcional" : "mayor";
+
   const agregadosDisponibles = useMemo(() => {
     if (!productoA || !productoB) return [];
     const vistos = new Set<string>();
@@ -107,7 +109,7 @@ export function MitadYMitadPicker({ categoriaNombre, modo, productos }: Props) {
   return (
     <div className="rounded-xl border border-dashed border-brand bg-brand-light/30 p-4">
       <h4 className="mb-1 font-semibold text-neutral-900">
-        Armá tu mitad y mitad — {categoriaNombre}
+        Armá tu mitad y mitad — {grupoNombre}
       </h4>
       <p className="mb-3 text-xs text-neutral-500">
         {modo === "mayor"

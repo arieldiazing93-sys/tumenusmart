@@ -20,6 +20,33 @@ export default async function CatalogoPage() {
     }),
   ]);
 
+  // Agrupa TODOS los productos disponibles (de cualquier categoría) por su
+  // "grupo mitad y mitad" — así un "Pizza Grande" no se mezcla con un
+  // "Pizza Mediana" aunque convivan en la misma categoría del menú.
+  type ProductoMitad = {
+    id: string;
+    nombre: string;
+    precio: number;
+    mitadYMitadModo: string;
+    opciones: { id: string; nombre: string; tipo: string; precioExtra: number }[];
+  };
+  const gruposMitadYMitad = new Map<string, ProductoMitad[]>();
+  for (const categoria of categorias) {
+    for (const producto of categoria.productos) {
+      const grupo = producto.mitadYMitadGrupo?.trim();
+      if (!grupo) continue;
+      const lista = gruposMitadYMitad.get(grupo) ?? [];
+      lista.push({
+        id: producto.id,
+        nombre: producto.nombre,
+        precio: Number(producto.precio),
+        mitadYMitadModo: producto.mitadYMitadModo,
+        opciones: producto.opciones.map((o) => ({ ...o, precioExtra: Number(o.precioExtra) })),
+      });
+      gruposMitadYMitad.set(grupo, lista);
+    }
+  }
+
   return (
     <main className="mx-auto max-w-2xl px-4 pb-28 pt-8">
       <header className="mb-8 flex items-center gap-4">
@@ -70,27 +97,19 @@ export default async function CatalogoPage() {
                   />
                 ))}
               </div>
-
-              {categoria.permiteMitadYMitad && categoria.productos.length >= 2 && (
-                <div className="mt-3">
-                  <MitadYMitadPicker
-                    categoriaNombre={categoria.nombre}
-                    modo={categoria.modoPrecioMitad === "proporcional" ? "proporcional" : "mayor"}
-                    productos={categoria.productos.map((p) => ({
-                      id: p.id,
-                      nombre: p.nombre,
-                      precio: Number(p.precio),
-                      opciones: p.opciones.map((o) => ({
-                        ...o,
-                        precioExtra: Number(o.precioExtra),
-                      })),
-                    }))}
-                  />
-                </div>
-              )}
             </section>
           ))}
       </div>
+
+      {gruposMitadYMitad.size > 0 && (
+        <div className="mt-10 flex flex-col gap-4">
+          {[...gruposMitadYMitad.entries()]
+            .filter(([, productos]) => productos.length >= 2)
+            .map(([grupo, productos]) => (
+              <MitadYMitadPicker key={grupo} grupoNombre={grupo} productos={productos} />
+            ))}
+        </div>
+      )}
 
       <CartBar />
     </main>

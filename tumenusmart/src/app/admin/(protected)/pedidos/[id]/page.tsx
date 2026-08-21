@@ -48,7 +48,12 @@ export default async function DetallePedidoPage({
 
       <div className="mb-6">
         <h2 className="mb-2 text-sm font-semibold text-neutral-700">Estado del pedido</h2>
-        <EstadoBotones orderId={pedido.id} estadoActual={pedido.estado} />
+        <EstadoBotones
+          orderId={pedido.id}
+          estadoActual={pedido.estado}
+          tipoEntrega={pedido.tipoEntrega}
+          repartidorId={pedido.repartidorId}
+        />
       </div>
 
       <div className="mb-6 grid gap-4 sm:grid-cols-2">

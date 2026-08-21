@@ -16,6 +16,19 @@ export async function cambiarEstadoPedido(orderId: string, estado: string) {
   if (!ESTADOS_VALIDOS.includes(estado)) {
     throw new Error("Estado inválido");
   }
+
+  if (estado === "en_despacho") {
+    const pedido = await prisma.order.findUnique({
+      where: { id: orderId },
+      select: { tipoEntrega: true, repartidorId: true },
+    });
+    if (pedido?.tipoEntrega === "delivery" && !pedido.repartidorId) {
+      throw new Error(
+        'Asigná un repartidor antes de pasar el pedido a "En despacho".'
+      );
+    }
+  }
+
   await prisma.order.update({ where: { id: orderId }, data: { estado } });
   revalidatePath("/admin/pedidos");
   revalidatePath(`/admin/pedidos/${orderId}`);

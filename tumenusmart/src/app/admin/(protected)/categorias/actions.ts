@@ -15,21 +15,6 @@ export async function crearCategoria(formData: FormData) {
   revalidatePath("/admin/categorias");
 }
 
-export async function actualizarMitadYMitad(id: string, formData: FormData) {
-  const permiteMitadYMitad = formData.get("permiteMitadYMitad") === "on";
-  const modoPrecioMitad =
-    String(formData.get("modoPrecioMitad") ?? "mayor") === "proporcional"
-      ? "proporcional"
-      : "mayor";
-
-  await prisma.category.update({
-    where: { id },
-    data: { permiteMitadYMitad, modoPrecioMitad },
-  });
-  revalidatePath("/admin/categorias");
-  revalidatePath("/");
-}
-
 export async function eliminarCategoria(id: string) {
   const productosEnCategoria = await prisma.product.count({ where: { categoryId: id } });
   if (productosEnCategoria > 0) {

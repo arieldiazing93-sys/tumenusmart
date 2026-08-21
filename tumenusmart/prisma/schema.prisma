@@ -30,12 +30,6 @@ model Category {
   nombre    String
   orden     Int       @default(0)
   productos Product[]
-  // "Mitad y mitad": permite combinar dos productos de esta categoría en un
-  // mismo ítem del pedido (ej. media pizza de cada sabor).
-  permiteMitadYMitad Boolean @default(false)
-  // "mayor": cobra el precio del producto más caro de los dos.
-  // "proporcional": cobra la mitad del precio de cada uno, sumadas.
-  modoPrecioMitad    String  @default("mayor")
   createdAt DateTime  @default(now())
 }
 
@@ -52,6 +46,15 @@ model Product {
   // Ingredientes "de base" del producto, mostrados como etiquetas que el
   // cliente puede sacar (no agregar) al pedir — ej: ["tomate", "cebolla"].
   ingredientes String[]       @default([])
+  // "Mitad y mitad": si tiene un grupo cargado, este producto se puede
+  // combinar con cualquier otro producto que tenga EXACTAMENTE el mismo
+  // texto de grupo (ej: "Pizza Grande") — así conviven en el mismo menú
+  // productos de distinto tamaño sin mezclarse entre sí. Vacío = no aplica.
+  mitadYMitadGrupo String?
+  // "mayor": cobra el precio del más caro de los dos. "proporcional": la
+  // mitad de cada uno, sumadas. Debería ser el mismo valor en todos los
+  // productos de un mismo grupo.
+  mitadYMitadModo  String          @default("mayor")
   opciones    ProductOption[]
   orderItems  OrderItem[]
   createdAt   DateTime        @default(now())
