@@ -15,6 +15,20 @@ export async function crearCategoria(formData: FormData) {
   revalidatePath("/admin/categorias");
 }
 
+export async function renombrarCategoria(id: string, nombre: string) {
+  const nombreLimpio = nombre.trim();
+  if (!nombreLimpio) throw new Error("El nombre es obligatorio");
+  await prisma.category.update({ where: { id }, data: { nombre: nombreLimpio } });
+  revalidatePath("/admin/categorias");
+  revalidatePath("/");
+}
+
+export async function alternarActivaCategoria(id: string, activa: boolean) {
+  await prisma.category.update({ where: { id }, data: { activa } });
+  revalidatePath("/admin/categorias");
+  revalidatePath("/");
+}
+
 export async function eliminarCategoria(id: string) {
   const productosEnCategoria = await prisma.product.count({ where: { categoryId: id } });
   if (productosEnCategoria > 0) {

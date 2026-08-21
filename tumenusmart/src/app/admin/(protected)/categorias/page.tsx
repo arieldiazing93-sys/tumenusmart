@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { crearCategoria } from "./actions";
-import { EliminarCategoriaBoton } from "./EliminarBoton";
+import { CategoriaFila } from "./CategoriaFila";
 
 export const dynamic = "force-dynamic";
 
@@ -31,18 +31,13 @@ export default async function AdminCategoriasPage() {
 
       <div className="flex flex-col gap-2">
         {categorias.map((c) => (
-          <div
+          <CategoriaFila
             key={c.id}
-            className="flex items-center justify-between rounded-lg border border-neutral-200 bg-white px-4 py-3"
-          >
-            <span className="font-medium">{c.nombre}</span>
-            <div className="flex items-center gap-4">
-              <span className="text-sm text-neutral-500">
-                {c._count.productos} producto(s)
-              </span>
-              <EliminarCategoriaBoton id={c.id} />
-            </div>
-          </div>
+            id={c.id}
+            nombre={c.nombre}
+            activa={c.activa}
+            cantidadProductos={c._count.productos}
+          />
         ))}
       </div>
     </div>

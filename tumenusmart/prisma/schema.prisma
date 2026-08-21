@@ -29,6 +29,10 @@ model Category {
   id        String    @id @default(cuid())
   nombre    String
   orden     Int       @default(0)
+  // Si está en false, la categoría (y sus productos) no aparecen en el
+  // menú público, pero se conservan en el admin — útil para promos de un
+  // día sin tener que borrar nada.
+  activa    Boolean   @default(true)
   productos Product[]
   createdAt DateTime  @default(now())
 }

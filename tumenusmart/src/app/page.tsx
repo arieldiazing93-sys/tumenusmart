@@ -9,6 +9,7 @@ export default async function CatalogoPage() {
   const [store, categorias] = await Promise.all([
     prisma.store.findFirst(),
     prisma.category.findMany({
+      where: { activa: true },
       orderBy: { orden: "asc" },
       include: {
         productos: {
@@ -30,20 +31,26 @@ export default async function CatalogoPage() {
     mitadYMitadModo: string;
     opciones: { id: string; nombre: string; tipo: string; precioExtra: number }[];
   };
-  const gruposMitadYMitad = new Map<string, ProductoMitad[]>();
+  // La clave de agrupación ignora mayúsculas/minúsculas y espacios de más,
+  // para que "Pizza Grande" y "pizza grande " se traten como el mismo grupo.
+  const gruposMitadYMitad = new Map<
+    string,
+    { nombreVisible: string; productos: ProductoMitad[] }
+  >();
   for (const categoria of categorias) {
     for (const producto of categoria.productos) {
-      const grupo = producto.mitadYMitadGrupo?.trim();
-      if (!grupo) continue;
-      const lista = gruposMitadYMitad.get(grupo) ?? [];
-      lista.push({
+      const grupoOriginal = producto.mitadYMitadGrupo?.trim();
+      if (!grupoOriginal) continue;
+      const clave = grupoOriginal.toLowerCase();
+      const entrada = gruposMitadYMitad.get(clave) ?? { nombreVisible: grupoOriginal, productos: [] };
+      entrada.productos.push({
         id: producto.id,
         nombre: producto.nombre,
         precio: Number(producto.precio),
         mitadYMitadModo: producto.mitadYMitadModo,
         opciones: producto.opciones.map((o) => ({ ...o, precioExtra: Number(o.precioExtra) })),
       });
-      gruposMitadYMitad.set(grupo, lista);
+      gruposMitadYMitad.set(clave, entrada);
     }
   }
 
@@ -104,9 +111,13 @@ export default async function CatalogoPage() {
       {gruposMitadYMitad.size > 0 && (
         <div className="mt-10 flex flex-col gap-4">
           {[...gruposMitadYMitad.entries()]
-            .filter(([, productos]) => productos.length >= 2)
-            .map(([grupo, productos]) => (
-              <MitadYMitadPicker key={grupo} grupoNombre={grupo} productos={productos} />
+            .filter(([, entrada]) => entrada.productos.length >= 2)
+            .map(([clave, entrada]) => (
+              <MitadYMitadPicker
+                key={clave}
+                grupoNombre={entrada.nombreVisible}
+                productos={entrada.productos}
+              />
             ))}
         </div>
       )}
