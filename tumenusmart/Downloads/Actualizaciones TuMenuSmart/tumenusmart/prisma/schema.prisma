@@ -1,0 +1,122 @@
+// Esquema de base de datos — v1 de un solo negocio.
+// El modelo Store existe desde ya (aunque haya una sola fila) para que
+// pasar a multi-tenant más adelante sea agregar una FK, no rediseñar todo.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Store {
+  id             String   @id @default(cuid())
+  nombre         String
+  whatsappNumero String // formato internacional sin '+', ej: 595981234567
+  logoUrl        String?
+  direccion      String?
+  mensajeSaludo  String? // texto opcional al inicio del mensaje de WhatsApp
+  lat            Float? // ubicación del local, centro para calcular distancias de envío
+  lng            Float?
+  envioModo      String   @default("zonas") // "zonas" (radio + precio automático) | "coordinar" (el negocio lo define directo con el cliente)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+model Category {
+  id        String    @id @default(cuid())
+  nombre    String
+  orden     Int       @default(0)
+  productos Product[]
+  createdAt DateTime  @default(now())
+}
+
+model Product {
+  id          String          @id @default(cuid())
+  categoryId  String
+  category    Category        @relation(fields: [categoryId], references: [id])
+  nombre      String
+  descripcion String?
+  precio      Decimal         @db.Decimal(10, 2)
+  imagenUrl   String?
+  disponible  Boolean         @default(true)
+  orden       Int             @default(0)
+  opciones    ProductOption[]
+  orderItems  OrderItem[]
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+}
+
+// Cubre tanto variantes (tamaño, sabor — normalmente eliges una)
+// como agregados (extras — normalmente eliges varios).
+model ProductOption {
+  id          String  @id @default(cuid())
+  productId   String
+  product     Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  nombre      String
+  tipo        String // "variante" | "agregado"
+  precioExtra Decimal @db.Decimal(10, 2) @default(0)
+  orden       Int     @default(0)
+}
+
+// Solo se usa cuando Store.envioModo = "zonas". Cada zona es un anillo de
+// distancia desde el local: "hasta radioKm kilómetros, cuesta costoEnvio".
+// Se evalúan ordenadas de menor a mayor radio; la primera que alcanza la
+// distancia del cliente es la que se aplica.
+model DeliveryZone {
+  id         String  @id @default(cuid())
+  nombre     String // etiqueta libre, ej: "Zona 1" o "Centro"
+  radioKm    Decimal @db.Decimal(6, 2)
+  costoEnvio Decimal @db.Decimal(10, 2)
+  activo     Boolean @default(true)
+  orders     Order[]
+}
+
+model Customer {
+  id        String   @id @default(cuid())
+  nombre    String
+  telefono  String   @unique
+  orders    Order[]
+  createdAt DateTime @default(now())
+}
+
+model Order {
+  id                   String        @id @default(cuid())
+  customerId           String?
+  customer             Customer?     @relation(fields: [customerId], references: [id])
+  clienteNombre        String
+  clienteTelefono      String
+  estado               String        @default("pendiente") // pendiente | confirmado | en_preparacion | listo | entregado | cancelado
+  tipoEntrega          String // "delivery" | "retiro"
+  deliveryZoneId       String?
+  deliveryZone         DeliveryZone? @relation(fields: [deliveryZoneId], references: [id])
+  direccion            String?
+  clienteLat           Float? // pin que marcó el cliente en el mapa al hacer el pedido
+  clienteLng           Float?
+  metodoPagoReferencia String // "efectivo" | "transferencia" | "tarjeta" | "otro" — solo informativo, no se procesa
+  comprobanteTipo      String        @default("ticket") // "ticket" | "factura"
+  facturaRazonSocial   String?
+  facturaRuc           String?
+  facturaEmail         String?
+  notas                String?
+  subtotal             Decimal       @db.Decimal(10, 2)
+  costoEnvio           Decimal       @db.Decimal(10, 2) @default(0)
+  total                Decimal       @db.Decimal(10, 2)
+  items                OrderItem[]
+  createdAt            DateTime      @default(now())
+  updatedAt             DateTime      @updatedAt
+}
+
+model OrderItem {
+  id             String  @id @default(cuid())
+  orderId        String
+  order          Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId      String
+  product        Product @relation(fields: [productId], references: [id])
+  nombreProducto String // snapshot: el nombre al momento del pedido
+  cantidad       Int
+  precioUnitario Decimal @db.Decimal(10, 2)
+  opcionesTexto  String? // snapshot de las opciones elegidas, en texto legible
+}
