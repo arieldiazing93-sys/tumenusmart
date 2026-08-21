@@ -124,7 +124,15 @@ export default async function AdminConfiguracionPage() {
             </div>
           </div>
 
-          <StoreLocationField initialLat={store?.lat ?? null} initialLng={store?.lng ?? null} />
+          <StoreLocationField
+            initialLat={store?.lat ?? null}
+            initialLng={store?.lng ?? null}
+            zonas={zonas.map((z) => ({
+              id: z.id,
+              radioKm: Number(z.radioKm),
+              costoEnvio: Number(z.costoEnvio),
+            }))}
+          />
 
           <button
             type="submit"

@@ -44,6 +44,9 @@ export function MapPicker({
   const mapaRef = useRef<LeafletMap | null>(null);
   const markerRef = useRef<LeafletMarker | null>(null);
   const circulosRef = useRef<LeafletCircle[]>([]);
+  const resizeObserverRef = useRef<ResizeObserver | null>(null);
+  const timerInvalidarRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const redibujarCirculosRef = useRef<((centro: [number, number]) => void) | null>(null);
   const [cargando, setCargando] = useState(true);
   const [ubicando, setUbicando] = useState(false);
 
@@ -92,6 +95,35 @@ export function MapPicker({
         L.marker(centroLocal, { icon: iconoLocal, interactive: false }).addTo(mapa);
       }
 
+      // Cuando NO hay un local fijo (ej: la propia pantalla donde se está
+      // marcando la ubicación del local) pero sí hay zonas para previsualizar,
+      // los círculos se dibujan alrededor del pin arrastrable y se vuelven a
+      // dibujar cada vez que se mueve, para que el admin vea en vivo qué
+      // radio le corresponde a cada zona desde ese punto.
+      const circulosSiguenAlPin = !centroLocal && zonas.length > 0;
+
+      function redibujarCirculosEnPin(centro: [number, number]) {
+        circulosRef.current.forEach((c) => c.remove());
+        circulosRef.current = [];
+        const zonasOrdenadas = [...zonas].sort((a, b) => b.radioKm - a.radioKm);
+        zonasOrdenadas.forEach((z, i) => {
+          const color = COLORES_ZONA[(zonasOrdenadas.length - 1 - i) % COLORES_ZONA.length];
+          const circulo = L.circle(centro, {
+            radius: z.radioKm * 1000,
+            color,
+            weight: 2,
+            fillColor: color,
+            fillOpacity: 0.08,
+          }).addTo(mapa);
+          circulosRef.current.push(circulo);
+        });
+      }
+
+      if (circulosSiguenAlPin) {
+        redibujarCirculosEnPin(centroInicial);
+        redibujarCirculosRef.current = redibujarCirculosEnPin;
+      }
+
       // Pin del cliente dibujado a mano (un puntito rojo tipo "gota"), en vez
       // del ícono por defecto de Leaflet — ese depende de imágenes externas
       // que a veces tardan o no cargan, dejando el mapa sin marcador visible.
@@ -109,10 +141,12 @@ export function MapPicker({
       const marker = L.marker(centroInicial, { draggable: true, icon: iconoCliente }).addTo(mapa);
       marker.on("dragend", () => {
         const { lat: la, lng: ln } = marker.getLatLng();
+        if (circulosSiguenAlPin) redibujarCirculosEnPin([la, ln]);
         onChange(la, ln);
       });
       mapa.on("click", (e: { latlng: { lat: number; lng: number } }) => {
         marker.setLatLng(e.latlng);
+        if (circulosSiguenAlPin) redibujarCirculosEnPin([e.latlng.lat, e.latlng.lng]);
         onChange(e.latlng.lat, e.latlng.lng);
       });
 
@@ -123,14 +157,29 @@ export function MapPicker({
       if (lat == null || lng == null) {
         onChange(centroInicial[0], centroInicial[1]);
       }
+
+      // Arregla el mapa cuando queda "partido" o desalineado porque su
+      // contenedor cambió de tamaño después de que Leaflet ya había medido
+      // el espacio disponible (pasa seguido en formularios largos, donde el
+      // contenido de arriba termina de acomodarse un instante después).
+      const resizeObserver = new ResizeObserver(() => {
+        mapaRef.current?.invalidateSize();
+      });
+      resizeObserver.observe(contenedorRef.current);
+      resizeObserverRef.current = resizeObserver;
+      timerInvalidarRef.current = setTimeout(() => mapaRef.current?.invalidateSize(), 300);
     });
 
     return () => {
       cancelado = true;
+      resizeObserverRef.current?.disconnect();
+      resizeObserverRef.current = null;
+      if (timerInvalidarRef.current) clearTimeout(timerInvalidarRef.current);
       mapaRef.current?.remove();
       mapaRef.current = null;
       markerRef.current = null;
       circulosRef.current = [];
+      redibujarCirculosRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -143,6 +192,7 @@ export function MapPicker({
         const { latitude, longitude } = pos.coords;
         markerRef.current?.setLatLng([latitude, longitude]);
         mapaRef.current?.setView([latitude, longitude], zoom);
+        redibujarCirculosRef.current?.([latitude, longitude]);
         onChange(latitude, longitude);
         setUbicando(false);
       },
