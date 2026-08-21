@@ -1,3 +1,5 @@
+import { Suspense } from "react";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { formatearGuarani } from "@/lib/format";
@@ -5,6 +7,7 @@ import { actualizarProducto, agregarOpcion } from "../actions";
 import { EliminarProductoBoton, EliminarOpcionBoton } from "./EliminarBotones";
 import { IngredientesField } from "../IngredientesField";
 import { ImagenProductoField } from "../ImagenProductoField";
+import { GuardadoToast } from "@/components/GuardadoToast";
 
 export const dynamic = "force-dynamic";
 
@@ -30,7 +33,18 @@ export default async function EditarProductoPage({
 
   return (
     <div className="flex flex-col gap-8">
+      <Suspense fallback={null}>
+        <GuardadoToast />
+      </Suspense>
+
       <div>
+        <Link
+          href={`/admin/productos?categoria=${producto.categoryId}`}
+          className="mb-4 inline-flex items-center gap-1 text-sm text-neutral-500 hover:text-brand hover:underline"
+        >
+          ← Volver a {categorias.find((c) => c.id === producto.categoryId)?.nombre ?? "la categoría"}
+        </Link>
+
         <div className="mb-4 flex items-center justify-between">
           <h1 className="text-xl font-bold text-neutral-900">{producto.nombre}</h1>
           <EliminarProductoBoton productId={producto.id} />
@@ -120,10 +134,10 @@ export default async function EditarProductoPage({
 
       <div>
         <h2 className="mb-3 font-semibold text-neutral-800">
-          Variantes y agregados
+          Agregados
         </h2>
         <p className="mb-3 text-sm text-neutral-500">
-          Variante: el cliente elige una (ej. tamaño). Agregado: el cliente puede sumar varios (ej. extras).
+          Extras que el cliente puede sumar a este producto (ej: borde relleno, extra queso).
         </p>
 
         <div className="mb-4 flex flex-col gap-2">
@@ -133,20 +147,19 @@ export default async function EditarProductoPage({
               className="flex items-center justify-between rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm"
             >
               <span>
-                {o.nombre}{" "}
-                <span className="text-neutral-400">
-                  ({o.tipo}
-                  {Number(o.precioExtra) > 0
-                    ? ` · +${formatearGuarani(Number(o.precioExtra))}`
-                    : ""}
-                  )
-                </span>
+                {o.nombre}
+                {Number(o.precioExtra) > 0 && (
+                  <span className="text-neutral-400">
+                    {" "}
+                    · +{formatearGuarani(Number(o.precioExtra))}
+                  </span>
+                )}
               </span>
               <EliminarOpcionBoton productId={producto.id} optionId={o.id} />
             </div>
           ))}
           {producto.opciones.length === 0 && (
-            <p className="text-sm text-neutral-400">Sin variantes ni agregados todavía.</p>
+            <p className="text-sm text-neutral-400">Sin agregados todavía.</p>
           )}
         </div>
 
@@ -154,16 +167,9 @@ export default async function EditarProductoPage({
           <input
             name="nombre"
             required
-            placeholder="Nombre (ej: Grande, Extra queso)"
+            placeholder="Nombre (ej: Extra queso, Borde relleno)"
             className="min-w-[180px] flex-1 rounded-lg border border-neutral-300 px-3 py-2 text-sm"
           />
-          <select
-            name="tipo"
-            className="rounded-lg border border-neutral-300 px-3 py-2 text-sm"
-          >
-            <option value="variante">Variante</option>
-            <option value="agregado">Agregado</option>
-          </select>
           <input
             type="number"
             name="precioExtra"
@@ -177,7 +183,7 @@ export default async function EditarProductoPage({
             type="submit"
             className="rounded-lg bg-neutral-800 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-700"
           >
-            Agregar opción
+            Agregar
           </button>
         </form>
       </div>

@@ -22,6 +22,7 @@ export function CategoriaFila({
   const [editando, setEditando] = useState(false);
   const [nombreEditado, setNombreEditado] = useState(nombre);
   const [error, setError] = useState<string | null>(null);
+  const [guardado, setGuardado] = useState(false);
 
   function guardarNombre() {
     setError(null);
@@ -29,6 +30,8 @@ export function CategoriaFila({
       try {
         await renombrarCategoria(id, nombreEditado);
         setEditando(false);
+        setGuardado(true);
+        setTimeout(() => setGuardado(false), 2000);
       } catch (err) {
         setError(err instanceof Error ? err.message : "No se pudo guardar");
       }
@@ -75,6 +78,9 @@ export function CategoriaFila({
             {nombre}
             {!activa && (
               <span className="ml-2 text-xs font-normal text-neutral-400">(oculta)</span>
+            )}
+            {guardado && (
+              <span className="ml-2 text-xs font-normal text-green-600">✓ Guardado</span>
             )}
           </span>
         )}

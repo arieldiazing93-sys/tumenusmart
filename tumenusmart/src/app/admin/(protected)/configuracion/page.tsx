@@ -1,8 +1,10 @@
+import { Suspense } from "react";
 import { prisma } from "@/lib/prisma";
 import { formatearGuarani } from "@/lib/format";
 import { actualizarStore, crearZona } from "./actions";
 import { EliminarZonaBoton } from "./EliminarZonaBoton";
 import { StoreLocationField } from "./StoreLocationField";
+import { GuardadoToast } from "@/components/GuardadoToast";
 
 export const dynamic = "force-dynamic";
 
@@ -16,6 +18,10 @@ export default async function AdminConfiguracionPage() {
 
   return (
     <div className="flex flex-col gap-10">
+      <Suspense fallback={null}>
+        <GuardadoToast />
+      </Suspense>
+
       <div>
         <h1 className="mb-4 text-xl font-bold text-neutral-900">Datos del negocio</h1>
         <form action={actualizarStore} className="flex flex-col gap-3">

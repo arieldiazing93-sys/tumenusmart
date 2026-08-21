@@ -84,6 +84,7 @@ export async function actualizarProducto(productId: string, formData: FormData) 
 
   revalidatePath("/admin/productos");
   revalidatePath(`/admin/productos/${productId}`);
+  redirect(`/admin/productos/${productId}?guardado=1`);
 }
 
 export async function eliminarProducto(productId: string) {

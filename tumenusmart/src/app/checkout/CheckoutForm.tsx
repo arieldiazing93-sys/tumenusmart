@@ -46,7 +46,6 @@ export function CheckoutForm({ storeLat, storeLng, envioModo, zonas }: Props) {
   const [facturaRazonSocial, setFacturaRazonSocial] = useState("");
   const [facturaRuc, setFacturaRuc] = useState("");
   const [facturaEmail, setFacturaEmail] = useState("");
-  const [notas, setNotas] = useState("");
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -116,7 +115,6 @@ export function CheckoutForm({ storeLat, storeLng, envioModo, zonas }: Props) {
         facturaRazonSocial: comprobanteTipo === "factura" ? facturaRazonSocial : undefined,
         facturaRuc: comprobanteTipo === "factura" ? facturaRuc : undefined,
         facturaEmail: comprobanteTipo === "factura" ? facturaEmail || undefined : undefined,
-        notas: notas || undefined,
         items: items.map((i) => ({
           productId: i.mitadYMitad ? undefined : i.productId,
           nombreProducto: i.nombreProducto,
@@ -160,96 +158,6 @@ export function CheckoutForm({ storeLat, storeLng, envioModo, zonas }: Props) {
           className="w-full rounded-lg border border-neutral-300 px-3 py-2"
           placeholder="0981 234 567"
         />
-      </div>
-
-      <div>
-        <label className="mb-1 block text-sm font-medium text-neutral-700">
-          Entrega
-        </label>
-        <div className="flex gap-3">
-          <button
-            type="button"
-            onClick={() => setTipoEntrega("delivery")}
-            className={`flex-1 rounded-lg border px-3 py-2 text-sm ${
-              tipoEntrega === "delivery"
-                ? "border-brand bg-brand-light text-brand-dark"
-                : "border-neutral-300 text-neutral-600"
-            }`}
-          >
-            Delivery
-            <span className="block text-xs opacity-70">
-              {envioModo === "zonas" ? "Según zona" : "A coordinar"}
-            </span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setTipoEntrega("retiro")}
-            className={`flex-1 rounded-lg border px-3 py-2 text-sm ${
-              tipoEntrega === "retiro"
-                ? "border-brand bg-brand-light text-brand-dark"
-                : "border-neutral-300 text-neutral-600"
-            }`}
-          >
-            Retiro en el local
-          </button>
-        </div>
-      </div>
-
-      {tipoEntrega === "delivery" && (
-        <>
-          <div>
-            <label className="mb-1 block text-sm font-medium text-neutral-700">
-              ¿Dónde te lo llevamos?
-            </label>
-            <MapPicker
-              storeLat={storeLat}
-              storeLng={storeLng}
-              zonas={envioModo === "zonas" ? zonas : []}
-              lat={clienteLat}
-              lng={clienteLng}
-              onChange={(la, ln) => {
-                setClienteLat(la);
-                setClienteLng(ln);
-              }}
-            />
-            {fueraDeCobertura && (
-              <p className="mt-2 text-sm text-amber-700">
-                Tu ubicación está fuera de las zonas con precio automático — el local va a
-                coordinar el costo de envío directamente con vos por WhatsApp.
-              </p>
-            )}
-          </div>
-
-          <div>
-            <label className="mb-1 block text-sm font-medium text-neutral-700">
-              Referencia de la dirección
-            </label>
-            <input
-              required
-              value={direccion}
-              onChange={(e) => setDireccion(e.target.value)}
-              className="w-full rounded-lg border border-neutral-300 px-3 py-2"
-              placeholder="Casa, depto, entre calles, portón de color..."
-            />
-          </div>
-        </>
-      )}
-
-      <div>
-        <label className="mb-1 block text-sm font-medium text-neutral-700">
-          Método de pago (lo coordinás directamente con el local)
-        </label>
-        <select
-          value={metodoPago}
-          onChange={(e) => setMetodoPago(e.target.value)}
-          className="w-full rounded-lg border border-neutral-300 px-3 py-2"
-        >
-          {METODOS_PAGO.map((m) => (
-            <option key={m.value} value={m.value}>
-              {m.label}
-            </option>
-          ))}
-        </select>
       </div>
 
       <div>
@@ -325,16 +233,93 @@ export function CheckoutForm({ storeLat, storeLng, envioModo, zonas }: Props) {
 
       <div>
         <label className="mb-1 block text-sm font-medium text-neutral-700">
-          Nota (opcional)
+          Método de pago (lo coordinás directamente con el local)
         </label>
-        <textarea
-          value={notas}
-          onChange={(e) => setNotas(e.target.value)}
+        <select
+          value={metodoPago}
+          onChange={(e) => setMetodoPago(e.target.value)}
           className="w-full rounded-lg border border-neutral-300 px-3 py-2"
-          rows={2}
-          placeholder="Ej: sin cebolla, tocar timbre 2 veces..."
-        />
+        >
+          {METODOS_PAGO.map((m) => (
+            <option key={m.value} value={m.value}>
+              {m.label}
+            </option>
+          ))}
+        </select>
       </div>
+
+      <div>
+        <label className="mb-1 block text-sm font-medium text-neutral-700">
+          Entrega
+        </label>
+        <div className="flex gap-3">
+          <button
+            type="button"
+            onClick={() => setTipoEntrega("delivery")}
+            className={`flex-1 rounded-lg border px-3 py-2 text-sm ${
+              tipoEntrega === "delivery"
+                ? "border-brand bg-brand-light text-brand-dark"
+                : "border-neutral-300 text-neutral-600"
+            }`}
+          >
+            Delivery
+            <span className="block text-xs opacity-70">
+              {envioModo === "zonas" ? "Según zona" : "A coordinar"}
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setTipoEntrega("retiro")}
+            className={`flex-1 rounded-lg border px-3 py-2 text-sm ${
+              tipoEntrega === "retiro"
+                ? "border-brand bg-brand-light text-brand-dark"
+                : "border-neutral-300 text-neutral-600"
+            }`}
+          >
+            Retiro en el local
+          </button>
+        </div>
+      </div>
+
+      {tipoEntrega === "delivery" && (
+        <>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-neutral-700">
+              ¿Dónde te lo llevamos?
+            </label>
+            <MapPicker
+              storeLat={storeLat}
+              storeLng={storeLng}
+              zonas={envioModo === "zonas" ? zonas : []}
+              lat={clienteLat}
+              lng={clienteLng}
+              onChange={(la, ln) => {
+                setClienteLat(la);
+                setClienteLng(ln);
+              }}
+            />
+            {fueraDeCobertura && (
+              <p className="mt-2 text-sm text-amber-700">
+                Tu ubicación está fuera de las zonas con precio automático — el local va a
+                coordinar el costo de envío directamente con vos por WhatsApp.
+              </p>
+            )}
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-medium text-neutral-700">
+              Referencia de la dirección
+            </label>
+            <input
+              required
+              value={direccion}
+              onChange={(e) => setDireccion(e.target.value)}
+              className="w-full rounded-lg border border-neutral-300 px-3 py-2"
+              placeholder="Casa, depto, entre calles, portón de color..."
+            />
+          </div>
+        </>
+      )}
 
       <div className="rounded-lg bg-neutral-100 p-4 text-sm">
         <div className="flex justify-between">
