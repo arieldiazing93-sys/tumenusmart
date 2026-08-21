@@ -2,6 +2,9 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { Map as LeafletMap, Marker as LeafletMarker, Circle as LeafletCircle } from "leaflet";
+// Hoja de estilos propia de Leaflet — sin esto el mapa no tiene las reglas
+// de posicionamiento de sus capas internas y se ve descuadrado o cortado.
+import "leaflet/dist/leaflet.css";
 
 // Centro por defecto: Asunción (Plaza de los Héroes), para cuando todavía
 // no hay ubicación propia del local ni del cliente.
