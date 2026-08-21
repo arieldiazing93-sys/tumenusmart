@@ -3,6 +3,29 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { subirImagenProducto } from "@/lib/supabase-storage";
+
+export async function subirFotoProducto(formData: FormData): Promise<{ url: string }> {
+  const archivo = formData.get("archivo");
+  if (!(archivo instanceof File)) {
+    throw new Error("No se recibió ninguna imagen");
+  }
+  const url = await subirImagenProducto(archivo);
+  return { url };
+}
+
+function parsearIngredientes(formData: FormData): string[] {
+  const crudo = String(formData.get("ingredientes") ?? "[]");
+  try {
+    const lista = JSON.parse(crudo);
+    if (!Array.isArray(lista)) return [];
+    return lista
+      .map((x) => String(x).trim())
+      .filter((x) => x.length > 0);
+  } catch {
+    return [];
+  }
+}
 
 export async function crearProducto(formData: FormData) {
   const nombre = String(formData.get("nombre") ?? "").trim();
@@ -21,6 +44,7 @@ export async function crearProducto(formData: FormData) {
       descripcion: String(formData.get("descripcion") ?? "") || null,
       imagenUrl: String(formData.get("imagenUrl") ?? "") || null,
       disponible: formData.get("disponible") === "on",
+      ingredientes: parsearIngredientes(formData),
     },
   });
 
@@ -46,6 +70,7 @@ export async function actualizarProducto(productId: string, formData: FormData) 
       descripcion: String(formData.get("descripcion") ?? "") || null,
       imagenUrl: String(formData.get("imagenUrl") ?? "") || null,
       disponible: formData.get("disponible") === "on",
+      ingredientes: parsearIngredientes(formData),
     },
   });
 

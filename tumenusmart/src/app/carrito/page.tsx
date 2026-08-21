@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCart } from "@/components/CartProvider";
-import { precioUnitario, opcionesTexto } from "@/lib/cart-types";
+import { precioUnitario, opcionesTexto, ingredientesQuitadosTexto } from "@/lib/cart-types";
 import { formatearGuarani } from "@/lib/format";
 
 export default function CarritoPage() {
@@ -33,6 +33,9 @@ export default function CarritoPage() {
               <p className="font-medium text-neutral-900">{item.nombreProducto}</p>
               {item.opciones.length > 0 && (
                 <p className="text-sm text-neutral-500">{opcionesTexto(item)}</p>
+              )}
+              {ingredientesQuitadosTexto(item) && (
+                <p className="text-sm text-red-500">{ingredientesQuitadosTexto(item)}</p>
               )}
               <p className="text-sm text-neutral-500">
                 {formatearGuarani(precioUnitario(item))} c/u

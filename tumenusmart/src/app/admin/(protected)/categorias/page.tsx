@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { crearCategoria } from "./actions";
+import { crearCategoria, actualizarMitadYMitad } from "./actions";
 import { EliminarCategoriaBoton } from "./EliminarBoton";
 
 export const dynamic = "force-dynamic";
@@ -33,15 +33,44 @@ export default async function AdminCategoriasPage() {
         {categorias.map((c) => (
           <div
             key={c.id}
-            className="flex items-center justify-between rounded-lg border border-neutral-200 bg-white px-4 py-3"
+            className="rounded-lg border border-neutral-200 bg-white px-4 py-3"
           >
-            <span className="font-medium">{c.nombre}</span>
-            <div className="flex items-center gap-4">
-              <span className="text-sm text-neutral-500">
-                {c._count.productos} producto(s)
-              </span>
-              <EliminarCategoriaBoton id={c.id} />
+            <div className="flex items-center justify-between">
+              <span className="font-medium">{c.nombre}</span>
+              <div className="flex items-center gap-4">
+                <span className="text-sm text-neutral-500">
+                  {c._count.productos} producto(s)
+                </span>
+                <EliminarCategoriaBoton id={c.id} />
+              </div>
             </div>
+            <form
+              action={actualizarMitadYMitad.bind(null, c.id)}
+              className="mt-2 flex flex-wrap items-center gap-3 border-t border-neutral-100 pt-2 text-sm"
+            >
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  name="permiteMitadYMitad"
+                  defaultChecked={c.permiteMitadYMitad}
+                />
+                Permitir "mitad y mitad" en esta categoría
+              </label>
+              <select
+                name="modoPrecioMitad"
+                defaultValue={c.modoPrecioMitad}
+                className="rounded-lg border border-neutral-300 px-2 py-1"
+              >
+                <option value="mayor">Precio mayor (cobra el sabor más caro)</option>
+                <option value="proporcional">Precio proporcional (mitad de cada uno)</option>
+              </select>
+              <button
+                type="submit"
+                className="rounded-lg bg-neutral-800 px-3 py-1 text-white hover:bg-neutral-700"
+              >
+                Guardar
+              </button>
+            </form>
           </div>
         ))}
       </div>

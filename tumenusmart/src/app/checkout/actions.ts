@@ -4,11 +4,13 @@ import { prisma } from "@/lib/prisma";
 import { distanciaKm, encontrarZonaPorDistancia } from "@/lib/geo";
 
 type ItemEntrada = {
-  productId: string;
+  /** ausente cuando el ítem es un combo "mitad y mitad" (no corresponde a un único producto) */
+  productId?: string;
   nombreProducto: string;
   cantidad: number;
   precioUnitario: number;
   opcionesTexto?: string;
+  ingredientesQuitadosTexto?: string;
 };
 
 export type DatosCheckout = {
@@ -114,6 +116,7 @@ export async function crearPedido(datos: DatosCheckout): Promise<{ orderId: stri
           cantidad: i.cantidad,
           precioUnitario: i.precioUnitario,
           opcionesTexto: i.opcionesTexto,
+          ingredientesQuitadosTexto: i.ingredientesQuitadosTexto,
         })),
       },
     },

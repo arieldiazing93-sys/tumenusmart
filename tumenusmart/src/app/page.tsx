@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { ProductCard } from "@/components/ProductCard";
 import { CartBar } from "@/components/CartBar";
+import { MitadYMitadPicker } from "@/components/MitadYMitadPicker";
 
 export const dynamic = "force-dynamic";
 
@@ -69,6 +70,20 @@ export default async function CatalogoPage() {
                   />
                 ))}
               </div>
+
+              {categoria.permiteMitadYMitad && categoria.productos.length >= 2 && (
+                <div className="mt-3">
+                  <MitadYMitadPicker
+                    categoriaNombre={categoria.nombre}
+                    modo={categoria.modoPrecioMitad === "proporcional" ? "proporcional" : "mayor"}
+                    productos={categoria.productos.map((p) => ({
+                      id: p.id,
+                      nombre: p.nombre,
+                      precio: Number(p.precio),
+                    }))}
+                  />
+                </div>
+              )}
             </section>
           ))}
       </div>

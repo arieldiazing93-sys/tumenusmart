@@ -2,6 +2,8 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { formatearGuarani } from "@/lib/format";
 import { crearProducto } from "./actions";
+import { IngredientesField } from "./IngredientesField";
+import { ImagenProductoField } from "./ImagenProductoField";
 
 export const dynamic = "force-dynamic";
 
@@ -60,15 +62,12 @@ export default async function AdminProductosPage() {
               placeholder="Precio (Gs.)"
               className="rounded-lg border border-neutral-300 px-3 py-2"
             />
-            <input
-              name="imagenUrl"
-              placeholder="URL de la foto (opcional)"
-              className="rounded-lg border border-neutral-300 px-3 py-2"
-            />
+            <ImagenProductoField initialUrl={null} />
             <label className="flex items-center gap-2 text-sm">
               <input type="checkbox" name="disponible" defaultChecked />
               Disponible en el menú
             </label>
+            <IngredientesField initial={[]} />
             <button
               type="submit"
               className="rounded-lg bg-brand px-4 py-2 font-medium text-white hover:bg-brand-dark"

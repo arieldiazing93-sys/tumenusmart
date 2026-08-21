@@ -5,6 +5,7 @@ type ItemPedido = {
   cantidad: number;
   precioUnitario: number;
   opcionesTexto?: string | null;
+  ingredientesQuitadosTexto?: string | null;
 };
 
 type DatosMensaje = {
@@ -54,6 +55,7 @@ export function construirMensajePedido(datos: DatosMensaje): string {
     if (item.opcionesTexto) linea += ` (${item.opcionesTexto})`;
     linea += ` — ${formatearGuarani(item.cantidad * item.precioUnitario)}`;
     lineas.push(linea);
+    if (item.ingredientesQuitadosTexto) lineas.push(`   ${item.ingredientesQuitadosTexto}`);
   }
 
   lineas.push("");

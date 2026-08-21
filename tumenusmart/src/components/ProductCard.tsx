@@ -19,6 +19,7 @@ type Props = {
     descripcion: string | null;
     precio: number;
     imagenUrl: string | null;
+    ingredientes: string[];
     opciones: Opcion[];
   };
 };
@@ -28,10 +29,9 @@ export function ProductCard({ producto }: Props) {
   const variantes = producto.opciones.filter((o) => o.tipo === "variante");
   const agregados = producto.opciones.filter((o) => o.tipo === "agregado");
 
-  const [varianteId, setVarianteId] = useState<string | undefined>(
-    variantes[0]?.id
-  );
+  const [varianteId, setVarianteId] = useState<string | undefined>(undefined);
   const [agregadosIds, setAgregadosIds] = useState<string[]>([]);
+  const [ingredientesQuitados, setIngredientesQuitados] = useState<string[]>([]);
   const [cantidad, setCantidad] = useState(1);
   const [agregado, setAgregado] = useState(false);
 
@@ -55,18 +55,33 @@ export function ProductCard({ producto }: Props) {
     );
   }
 
+  function toggleIngrediente(nombre: string) {
+    setIngredientesQuitados((actuales) =>
+      actuales.includes(nombre) ? actuales.filter((x) => x !== nombre) : [...actuales, nombre]
+    );
+  }
+
+  const faltaElegirVariante = variantes.length > 0 && !varianteId;
+
   function handleAgregar() {
+    if (faltaElegirVariante) return;
     agregarItem({
-      key: construirKey(producto.id, opcionesSeleccionadas.map((o) => o.id)),
+      key: construirKey(
+        producto.id,
+        opcionesSeleccionadas.map((o) => o.id),
+        ingredientesQuitados
+      ),
       productId: producto.id,
       nombreProducto: producto.nombre,
       precioBase: producto.precio,
       opciones: opcionesSeleccionadas,
+      ingredientesQuitados: ingredientesQuitados.length > 0 ? ingredientesQuitados : undefined,
       cantidad,
       imagenUrl: producto.imagenUrl,
     });
     setAgregado(true);
     setCantidad(1);
+    setIngredientesQuitados([]);
     setTimeout(() => setAgregado(false), 1500);
   }
 
@@ -88,8 +103,32 @@ export function ProductCard({ producto }: Props) {
           )}
         </div>
 
+        {producto.ingredientes.length > 0 && (
+          <div className="flex flex-wrap gap-1.5">
+            {producto.ingredientes.map((ing) => {
+              const quitado = ingredientesQuitados.includes(ing);
+              return (
+                <button
+                  key={ing}
+                  type="button"
+                  onClick={() => toggleIngrediente(ing)}
+                  className={`rounded-full border px-2.5 py-0.5 text-xs transition ${
+                    quitado
+                      ? "border-neutral-200 text-neutral-400 line-through"
+                      : "border-neutral-300 text-neutral-600 hover:border-red-300 hover:text-red-500"
+                  }`}
+                  title={quitado ? "Volver a incluir" : "Sacar este ingrediente"}
+                >
+                  {quitado ? "+ " : "× "}
+                  {ing}
+                </button>
+              );
+            })}
+          </div>
+        )}
+
         {variantes.length > 0 && (
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             {variantes.map((v) => (
               <label
                 key={v.id}
@@ -110,6 +149,9 @@ export function ProductCard({ producto }: Props) {
                 {v.precioExtra > 0 && ` (+${formatearGuarani(v.precioExtra)})`}
               </label>
             ))}
+            {faltaElegirVariante && (
+              <span className="text-xs text-amber-600">Elegí una opción</span>
+            )}
           </div>
         )}
 
@@ -165,7 +207,8 @@ export function ProductCard({ producto }: Props) {
             <button
               type="button"
               onClick={handleAgregar}
-              className="rounded-lg bg-brand px-3 py-1.5 text-sm font-medium text-white transition hover:bg-brand-dark"
+              disabled={faltaElegirVariante}
+              className="rounded-lg bg-brand px-3 py-1.5 text-sm font-medium text-white transition hover:bg-brand-dark disabled:cursor-not-allowed disabled:bg-neutral-300"
             >
               {agregado ? "Agregado ✓" : "Agregar"}
             </button>

@@ -3,6 +3,8 @@ import { prisma } from "@/lib/prisma";
 import { formatearGuarani } from "@/lib/format";
 import { actualizarProducto, agregarOpcion } from "../actions";
 import { EliminarProductoBoton, EliminarOpcionBoton } from "./EliminarBotones";
+import { IngredientesField } from "../IngredientesField";
+import { ImagenProductoField } from "../ImagenProductoField";
 
 export const dynamic = "force-dynamic";
 
@@ -68,12 +70,7 @@ export default async function EditarProductoPage({
             defaultValue={Number(producto.precio)}
             className="rounded-lg border border-neutral-300 px-3 py-2"
           />
-          <input
-            name="imagenUrl"
-            defaultValue={producto.imagenUrl ?? ""}
-            placeholder="URL de la foto"
-            className="rounded-lg border border-neutral-300 px-3 py-2"
-          />
+          <ImagenProductoField initialUrl={producto.imagenUrl} />
           <label className="flex items-center gap-2 text-sm">
             <input
               type="checkbox"
@@ -82,6 +79,7 @@ export default async function EditarProductoPage({
             />
             Disponible en el menú
           </label>
+          <IngredientesField initial={producto.ingredientes} />
           <button
             type="submit"
             className="rounded-lg bg-brand px-4 py-2 font-medium text-white hover:bg-brand-dark"

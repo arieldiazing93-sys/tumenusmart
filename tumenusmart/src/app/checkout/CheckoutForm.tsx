@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import { useCart } from "@/components/CartProvider";
-import { precioUnitario, opcionesTexto } from "@/lib/cart-types";
+import { precioUnitario, opcionesTexto, ingredientesQuitadosTexto } from "@/lib/cart-types";
 import { formatearGuarani } from "@/lib/format";
 import { distanciaKm, encontrarZonaPorDistancia } from "@/lib/geo";
 import { crearPedido } from "./actions";
@@ -118,11 +118,12 @@ export function CheckoutForm({ storeLat, storeLng, envioModo, zonas }: Props) {
         facturaEmail: comprobanteTipo === "factura" ? facturaEmail || undefined : undefined,
         notas: notas || undefined,
         items: items.map((i) => ({
-          productId: i.productId,
+          productId: i.mitadYMitad ? undefined : i.productId,
           nombreProducto: i.nombreProducto,
           cantidad: i.cantidad,
           precioUnitario: precioUnitario(i),
           opcionesTexto: opcionesTexto(i) || undefined,
+          ingredientesQuitadosTexto: ingredientesQuitadosTexto(i) || undefined,
         })),
       });
       vaciarCarrito();

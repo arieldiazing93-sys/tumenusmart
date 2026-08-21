@@ -30,6 +30,12 @@ model Category {
   nombre    String
   orden     Int       @default(0)
   productos Product[]
+  // "Mitad y mitad": permite combinar dos productos de esta categoría en un
+  // mismo ítem del pedido (ej. media pizza de cada sabor).
+  permiteMitadYMitad Boolean @default(false)
+  // "mayor": cobra el precio del producto más caro de los dos.
+  // "proporcional": cobra la mitad del precio de cada uno, sumadas.
+  modoPrecioMitad    String  @default("mayor")
   createdAt DateTime  @default(now())
 }
 
@@ -43,6 +49,9 @@ model Product {
   imagenUrl   String?
   disponible  Boolean         @default(true)
   orden       Int             @default(0)
+  // Ingredientes "de base" del producto, mostrados como etiquetas que el
+  // cliente puede sacar (no agregar) al pedir — ej: ["tomate", "cebolla"].
+  ingredientes String[]       @default([])
   opciones    ProductOption[]
   orderItems  OrderItem[]
   createdAt   DateTime        @default(now())
@@ -110,13 +119,16 @@ model Order {
 }
 
 model OrderItem {
-  id             String  @id @default(cuid())
+  id             String   @id @default(cuid())
   orderId        String
-  order          Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  productId      String
-  product        Product @relation(fields: [productId], references: [id])
+  order          Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  // Nulo cuando el ítem es un combo "mitad y mitad" (no corresponde a un
+  // único producto) — el detalle queda igual en nombreProducto.
+  productId      String?
+  product        Product? @relation(fields: [productId], references: [id])
   nombreProducto String // snapshot: el nombre al momento del pedido
   cantidad       Int
   precioUnitario Decimal @db.Decimal(10, 2)
   opcionesTexto  String? // snapshot de las opciones elegidas, en texto legible
+  ingredientesQuitadosTexto String? // snapshot de ingredientes que el cliente sacó, ej: "tomate, cebolla"
 }

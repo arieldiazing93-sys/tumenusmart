@@ -73,6 +73,9 @@ export default async function AdminPedidosPage() {
                 <li key={item.id}>
                   {item.cantidad}x {item.nombreProducto}
                   {item.opcionesTexto ? ` (${item.opcionesTexto})` : ""}
+                  {item.ingredientesQuitadosTexto && (
+                    <span className="text-red-500"> · {item.ingredientesQuitadosTexto}</span>
+                  )}
                 </li>
               ))}
             </ul>

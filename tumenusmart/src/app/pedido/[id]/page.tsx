@@ -42,6 +42,7 @@ export default async function ConfirmacionPedidoPage({
       cantidad: i.cantidad,
       precioUnitario: Number(i.precioUnitario),
       opcionesTexto: i.opcionesTexto,
+      ingredientesQuitadosTexto: i.ingredientesQuitadosTexto,
     })),
     subtotal: Number(order.subtotal),
     costoEnvio: Number(order.costoEnvio),
