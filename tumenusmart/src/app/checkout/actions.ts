@@ -1,6 +1,7 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
+import { distanciaKm, encontrarZonaPorDistancia } from "@/lib/geo";
 
 type ItemEntrada = {
   productId: string;
@@ -14,9 +15,14 @@ export type DatosCheckout = {
   clienteNombre: string;
   clienteTelefono: string;
   tipoEntrega: "delivery" | "retiro";
-  deliveryZoneId?: string;
+  clienteLat?: number;
+  clienteLng?: number;
   direccion?: string;
   metodoPagoReferencia: string;
+  comprobanteTipo: "ticket" | "factura";
+  facturaRazonSocial?: string;
+  facturaRuc?: string;
+  facturaEmail?: string;
   notas?: string;
   items: ItemEntrada[];
 };
@@ -31,17 +37,43 @@ export async function crearPedido(datos: DatosCheckout): Promise<{ orderId: stri
   if (datos.tipoEntrega === "delivery" && !datos.direccion?.trim()) {
     throw new Error("Falta la dirección de entrega");
   }
+  if (
+    datos.comprobanteTipo === "factura" &&
+    (!datos.facturaRazonSocial?.trim() || !datos.facturaRuc?.trim())
+  ) {
+    throw new Error("Para factura hacen falta la razón social y el RUC");
+  }
 
+  // El costo de envío SIEMPRE se recalcula acá (nunca se confía en lo que
+  // mande el navegador), comparando la ubicación del cliente contra las
+  // zonas reales guardadas en la base de datos.
   let costoEnvio = 0;
   let zonaId: string | undefined;
-  if (datos.tipoEntrega === "delivery" && datos.deliveryZoneId) {
-    const zona = await prisma.deliveryZone.findUnique({
-      where: { id: datos.deliveryZoneId },
-    });
-    if (zona) {
-      costoEnvio = Number(zona.costoEnvio);
-      zonaId = zona.id;
+
+  if (datos.tipoEntrega === "delivery" && datos.clienteLat != null && datos.clienteLng != null) {
+    const store = await prisma.store.findFirst();
+
+    if (store?.envioModo === "zonas" && store.lat != null && store.lng != null) {
+      const zonas = await prisma.deliveryZone.findMany({ where: { activo: true } });
+      const distancia = distanciaKm(store.lat, store.lng, datos.clienteLat, datos.clienteLng);
+      const zona = encontrarZonaPorDistancia(
+        zonas.map((z) => ({
+          id: z.id,
+          nombre: z.nombre,
+          radioKm: Number(z.radioKm),
+          costoEnvio: Number(z.costoEnvio),
+        })),
+        distancia
+      );
+      if (zona) {
+        costoEnvio = zona.costoEnvio;
+        zonaId = zona.id;
+      }
+      // Si no matchea ninguna zona, queda costoEnvio = 0 y zonaId sin
+      // definir — el pedido pasa como "a coordinar" en vez de bloquearse.
     }
+    // Si el negocio usa envioModo "coordinar" (o no tiene ubicación propia
+    // configurada), costoEnvio queda en 0 y se coordina directo por WhatsApp.
   }
 
   const subtotal = datos.items.reduce(
@@ -64,7 +96,13 @@ export async function crearPedido(datos: DatosCheckout): Promise<{ orderId: stri
       tipoEntrega: datos.tipoEntrega,
       deliveryZoneId: zonaId,
       direccion: datos.direccion,
+      clienteLat: datos.clienteLat,
+      clienteLng: datos.clienteLng,
       metodoPagoReferencia: datos.metodoPagoReferencia,
+      comprobanteTipo: datos.comprobanteTipo,
+      facturaRazonSocial: datos.comprobanteTipo === "factura" ? datos.facturaRazonSocial : undefined,
+      facturaRuc: datos.comprobanteTipo === "factura" ? datos.facturaRuc : undefined,
+      facturaEmail: datos.comprobanteTipo === "factura" ? datos.facturaEmail : undefined,
       notas: datos.notas,
       subtotal,
       costoEnvio,

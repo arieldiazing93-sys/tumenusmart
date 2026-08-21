@@ -23,14 +23,17 @@ async function main() {
       whatsappNumero: "595981234567",
       direccion: "Av. Mariscal López 1234, Asunción",
       mensajeSaludo: "¡Hola! Te paso mi pedido:",
+      lat: -25.2867,
+      lng: -57.6349,
+      envioModo: "zonas",
     },
   });
 
   await prisma.deliveryZone.createMany({
     data: [
-      { nombre: "Centro", costoEnvio: 15000 },
-      { nombre: "Zona Norte", costoEnvio: 20000 },
-      { nombre: "Zona Sur", costoEnvio: 25000 },
+      { nombre: "Zona 1", radioKm: 3, costoEnvio: 15000 },
+      { nombre: "Zona 2", radioKm: 6, costoEnvio: 20000 },
+      { nombre: "Zona 3", radioKm: 10, costoEnvio: 25000 },
     ],
   });
 

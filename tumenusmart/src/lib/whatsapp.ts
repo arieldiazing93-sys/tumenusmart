@@ -14,7 +14,13 @@ type DatosMensaje = {
   tipoEntrega: string;
   direccion?: string | null;
   zonaNombre?: string | null;
+  clienteLat?: number | null;
+  clienteLng?: number | null;
   metodoPagoReferencia: string;
+  comprobanteTipo?: string | null;
+  facturaRazonSocial?: string | null;
+  facturaRuc?: string | null;
+  facturaEmail?: string | null;
   notas?: string | null;
   items: ItemPedido[];
   subtotal: number;
@@ -53,16 +59,32 @@ export function construirMensajePedido(datos: DatosMensaje): string {
   lineas.push("");
   lineas.push(`Subtotal: ${formatearGuarani(datos.subtotal)}`);
   if (datos.tipoEntrega === "delivery") {
-    lineas.push(`Envío (${datos.zonaNombre ?? "-"}): ${formatearGuarani(datos.costoEnvio)}`);
+    const envioTexto = datos.zonaNombre
+      ? `${formatearGuarani(datos.costoEnvio)} (${datos.zonaNombre})`
+      : "A coordinar";
+    lineas.push(`Envío: ${envioTexto}`);
   }
-  lineas.push(`Total: ${formatearGuarani(datos.total)}`);
+  lineas.push(`Total: ${formatearGuarani(datos.total)}${datos.tipoEntrega === "delivery" && !datos.zonaNombre ? " + envío" : ""}`);
   lineas.push("");
   lineas.push(
     datos.tipoEntrega === "delivery"
       ? `Entrega a domicilio: ${datos.direccion ?? "-"}`
       : "Retiro en el local"
   );
+  if (datos.tipoEntrega === "delivery" && datos.clienteLat != null && datos.clienteLng != null) {
+    lineas.push(
+      `Ubicación: https://www.google.com/maps?q=${datos.clienteLat},${datos.clienteLng}`
+    );
+  }
   lineas.push(`Método de pago: ${ETIQUETAS_PAGO[datos.metodoPagoReferencia] ?? datos.metodoPagoReferencia}`);
+
+  if (datos.comprobanteTipo === "factura") {
+    lineas.push("");
+    lineas.push("Comprobante: Factura");
+    if (datos.facturaRazonSocial) lineas.push(`Razón social: ${datos.facturaRazonSocial}`);
+    if (datos.facturaRuc) lineas.push(`RUC: ${datos.facturaRuc}`);
+    if (datos.facturaEmail) lineas.push(`Correo: ${datos.facturaEmail}`);
+  }
 
   if (datos.notas) {
     lineas.push("");

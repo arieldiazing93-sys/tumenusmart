@@ -29,7 +29,13 @@ export default async function ConfirmacionPedidoPage({
     tipoEntrega: order.tipoEntrega,
     direccion: order.direccion,
     zonaNombre: order.deliveryZone?.nombre,
+    clienteLat: order.clienteLat,
+    clienteLng: order.clienteLng,
     metodoPagoReferencia: order.metodoPagoReferencia,
+    comprobanteTipo: order.comprobanteTipo,
+    facturaRazonSocial: order.facturaRazonSocial,
+    facturaRuc: order.facturaRuc,
+    facturaEmail: order.facturaEmail,
     notas: order.notas,
     items: order.items.map((i) => ({
       nombreProducto: i.nombreProducto,

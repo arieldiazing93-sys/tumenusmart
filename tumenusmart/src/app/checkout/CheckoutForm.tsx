@@ -1,13 +1,21 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import dynamic from "next/dynamic";
 import { useCart } from "@/components/CartProvider";
 import { precioUnitario, opcionesTexto } from "@/lib/cart-types";
 import { formatearGuarani } from "@/lib/format";
+import { distanciaKm, encontrarZonaPorDistancia } from "@/lib/geo";
 import { crearPedido } from "./actions";
 
-type Zona = { id: string; nombre: string; costoEnvio: number };
+// Leaflet usa `window`, así que el mapa se carga solo en el navegador.
+const MapPicker = dynamic(
+  () => import("@/components/MapPicker").then((m) => m.MapPicker),
+  { ssr: false, loading: () => <div className="h-80 animate-pulse rounded-xl bg-neutral-100" /> }
+);
+
+type Zona = { id: string; nombre: string; radioKm: number; costoEnvio: number };
 
 const METODOS_PAGO = [
   { value: "efectivo", label: "Efectivo" },
@@ -16,23 +24,66 @@ const METODOS_PAGO = [
   { value: "otro", label: "A coordinar" },
 ];
 
-export function CheckoutForm({ zonas }: { zonas: Zona[] }) {
+type Props = {
+  storeLat: number | null;
+  storeLng: number | null;
+  envioModo: "zonas" | "coordinar";
+  zonas: Zona[];
+};
+
+export function CheckoutForm({ storeLat, storeLng, envioModo, zonas }: Props) {
   const router = useRouter();
   const { items, subtotal, vaciarCarrito } = useCart();
 
   const [nombre, setNombre] = useState("");
   const [telefono, setTelefono] = useState("");
   const [tipoEntrega, setTipoEntrega] = useState<"delivery" | "retiro">("delivery");
-  const [zonaId, setZonaId] = useState(zonas[0]?.id ?? "");
+  const [clienteLat, setClienteLat] = useState<number | null>(null);
+  const [clienteLng, setClienteLng] = useState<number | null>(null);
   const [direccion, setDireccion] = useState("");
   const [metodoPago, setMetodoPago] = useState("efectivo");
+  const [comprobanteTipo, setComprobanteTipo] = useState<"ticket" | "factura">("ticket");
+  const [facturaRazonSocial, setFacturaRazonSocial] = useState("");
+  const [facturaRuc, setFacturaRuc] = useState("");
+  const [facturaEmail, setFacturaEmail] = useState("");
   const [notas, setNotas] = useState("");
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const zonaSeleccionada = zonas.find((z) => z.id === zonaId);
-  const costoEnvio = tipoEntrega === "delivery" ? zonaSeleccionada?.costoEnvio ?? 0 : 0;
+  const hayUbicacionLocal = storeLat != null && storeLng != null;
+
+  const distancia = useMemo(() => {
+    if (!hayUbicacionLocal || clienteLat == null || clienteLng == null) return null;
+    return distanciaKm(storeLat!, storeLng!, clienteLat, clienteLng);
+  }, [hayUbicacionLocal, storeLat, storeLng, clienteLat, clienteLng]);
+
+  const zonaEncontrada =
+    envioModo === "zonas" && distancia != null
+      ? encontrarZonaPorDistancia(zonas, distancia)
+      : null;
+
+  const costoEnvio =
+    tipoEntrega === "delivery" && zonaEncontrada ? zonaEncontrada.costoEnvio : 0;
   const total = subtotal + costoEnvio;
+
+  const fueraDeCobertura =
+    tipoEntrega === "delivery" &&
+    envioModo === "zonas" &&
+    distancia != null &&
+    !zonaEncontrada;
+
+  let textoEnvio: string;
+  if (envioModo === "coordinar") {
+    textoEnvio = "A coordinar con el local";
+  } else if (!hayUbicacionLocal) {
+    textoEnvio = "A coordinar con el local";
+  } else if (clienteLat == null) {
+    textoEnvio = "Marcá tu ubicación en el mapa";
+  } else if (zonaEncontrada) {
+    textoEnvio = formatearGuarani(zonaEncontrada.costoEnvio);
+  } else {
+    textoEnvio = "Fuera de cobertura — a coordinar";
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -42,6 +93,14 @@ export function CheckoutForm({ zonas }: { zonas: Zona[] }) {
       setError("Tu carrito está vacío.");
       return;
     }
+    if (tipoEntrega === "delivery" && (clienteLat == null || clienteLng == null)) {
+      setError("Marcá tu ubicación en el mapa para poder entregarte el pedido.");
+      return;
+    }
+    if (comprobanteTipo === "factura" && (!facturaRazonSocial.trim() || !facturaRuc.trim())) {
+      setError("Para factura necesitamos la razón social y el RUC.");
+      return;
+    }
 
     setEnviando(true);
     try {
@@ -49,9 +108,14 @@ export function CheckoutForm({ zonas }: { zonas: Zona[] }) {
         clienteNombre: nombre,
         clienteTelefono: telefono,
         tipoEntrega,
-        deliveryZoneId: tipoEntrega === "delivery" ? zonaId : undefined,
+        clienteLat: tipoEntrega === "delivery" ? clienteLat ?? undefined : undefined,
+        clienteLng: tipoEntrega === "delivery" ? clienteLng ?? undefined : undefined,
         direccion: tipoEntrega === "delivery" ? direccion : undefined,
         metodoPagoReferencia: metodoPago,
+        comprobanteTipo,
+        facturaRazonSocial: comprobanteTipo === "factura" ? facturaRazonSocial : undefined,
+        facturaRuc: comprobanteTipo === "factura" ? facturaRuc : undefined,
+        facturaEmail: comprobanteTipo === "factura" ? facturaEmail || undefined : undefined,
         notas: notas || undefined,
         items: items.map((i) => ({
           productId: i.productId,
@@ -112,6 +176,9 @@ export function CheckoutForm({ zonas }: { zonas: Zona[] }) {
             }`}
           >
             Delivery
+            <span className="block text-xs opacity-70">
+              {envioModo === "zonas" ? "Según zona" : "A coordinar"}
+            </span>
           </button>
           <button
             type="button"
@@ -129,34 +196,39 @@ export function CheckoutForm({ zonas }: { zonas: Zona[] }) {
 
       {tipoEntrega === "delivery" && (
         <>
-          {zonas.length > 0 && (
-            <div>
-              <label className="mb-1 block text-sm font-medium text-neutral-700">
-                Zona de envío
-              </label>
-              <select
-                value={zonaId}
-                onChange={(e) => setZonaId(e.target.value)}
-                className="w-full rounded-lg border border-neutral-300 px-3 py-2"
-              >
-                {zonas.map((z) => (
-                  <option key={z.id} value={z.id}>
-                    {z.nombre} — {formatearGuarani(z.costoEnvio)}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
           <div>
             <label className="mb-1 block text-sm font-medium text-neutral-700">
-              Dirección
+              ¿Dónde te lo llevamos?
+            </label>
+            <MapPicker
+              storeLat={storeLat}
+              storeLng={storeLng}
+              zonas={envioModo === "zonas" ? zonas : []}
+              lat={clienteLat}
+              lng={clienteLng}
+              onChange={(la, ln) => {
+                setClienteLat(la);
+                setClienteLng(ln);
+              }}
+            />
+            {fueraDeCobertura && (
+              <p className="mt-2 text-sm text-amber-700">
+                Tu ubicación está fuera de las zonas con precio automático — el local va a
+                coordinar el costo de envío directamente con vos por WhatsApp.
+              </p>
+            )}
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-medium text-neutral-700">
+              Referencia de la dirección
             </label>
             <input
               required
               value={direccion}
               onChange={(e) => setDireccion(e.target.value)}
               className="w-full rounded-lg border border-neutral-300 px-3 py-2"
-              placeholder="Calle, número, referencia"
+              placeholder="Casa, depto, entre calles, portón de color..."
             />
           </div>
         </>
@@ -181,6 +253,77 @@ export function CheckoutForm({ zonas }: { zonas: Zona[] }) {
 
       <div>
         <label className="mb-1 block text-sm font-medium text-neutral-700">
+          Comprobante
+        </label>
+        <div className="flex gap-3">
+          <button
+            type="button"
+            onClick={() => setComprobanteTipo("ticket")}
+            className={`flex-1 rounded-lg border px-3 py-2 text-sm ${
+              comprobanteTipo === "ticket"
+                ? "border-brand bg-brand-light text-brand-dark"
+                : "border-neutral-300 text-neutral-600"
+            }`}
+          >
+            Ticket
+          </button>
+          <button
+            type="button"
+            onClick={() => setComprobanteTipo("factura")}
+            className={`flex-1 rounded-lg border px-3 py-2 text-sm ${
+              comprobanteTipo === "factura"
+                ? "border-brand bg-brand-light text-brand-dark"
+                : "border-neutral-300 text-neutral-600"
+            }`}
+          >
+            Factura
+          </button>
+        </div>
+
+        {comprobanteTipo === "factura" && (
+          <div className="mt-3 flex flex-col gap-3 rounded-lg border border-neutral-200 bg-neutral-50 p-3">
+            <div>
+              <label className="mb-1 block text-sm font-medium text-neutral-700">
+                Razón social
+              </label>
+              <input
+                required
+                value={facturaRazonSocial}
+                onChange={(e) => setFacturaRazonSocial(e.target.value)}
+                className="w-full rounded-lg border border-neutral-300 px-3 py-2"
+                placeholder="Nombre de la empresa o del titular"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-neutral-700">
+                RUC
+              </label>
+              <input
+                required
+                value={facturaRuc}
+                onChange={(e) => setFacturaRuc(e.target.value)}
+                className="w-full rounded-lg border border-neutral-300 px-3 py-2"
+                placeholder="80012345-6"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-neutral-700">
+                Correo electrónico <span className="font-normal text-neutral-400">(opcional)</span>
+              </label>
+              <input
+                type="email"
+                value={facturaEmail}
+                onChange={(e) => setFacturaEmail(e.target.value)}
+                className="w-full rounded-lg border border-neutral-300 px-3 py-2"
+                placeholder="nombre@correo.com"
+              />
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div>
+        <label className="mb-1 block text-sm font-medium text-neutral-700">
           Nota (opcional)
         </label>
         <textarea
@@ -200,12 +343,17 @@ export function CheckoutForm({ zonas }: { zonas: Zona[] }) {
         {tipoEntrega === "delivery" && (
           <div className="flex justify-between">
             <span>Envío</span>
-            <span>{formatearGuarani(costoEnvio)}</span>
+            <span>{textoEnvio}</span>
           </div>
         )}
         <div className="mt-1 flex justify-between border-t border-neutral-300 pt-1 font-semibold">
           <span>Total</span>
-          <span>{formatearGuarani(total)}</span>
+          <span>
+            {formatearGuarani(total)}
+            {tipoEntrega === "delivery" && !zonaEncontrada && envioModo === "zonas" && hayUbicacionLocal
+              ? " + envío"
+              : ""}
+          </span>
         </div>
       </div>
 

@@ -42,9 +42,31 @@ export default async function AdminPedidosPage() {
             </p>
             <p className="text-sm text-neutral-500">
               {pedido.tipoEntrega === "delivery"
-                ? `Delivery — ${pedido.deliveryZone?.nombre ?? ""} — ${pedido.direccion ?? ""}`
+                ? `Delivery — ${pedido.deliveryZone?.nombre ?? "a coordinar"} — ${pedido.direccion ?? ""}`
                 : "Retiro en el local"}
+              {pedido.tipoEntrega === "delivery" &&
+                pedido.clienteLat != null &&
+                pedido.clienteLng != null && (
+                  <>
+                    {" · "}
+                    <a
+                      href={`https://www.google.com/maps?q=${pedido.clienteLat},${pedido.clienteLng}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-brand hover:underline"
+                    >
+                      Ver ubicación
+                    </a>
+                  </>
+                )}
             </p>
+
+            {pedido.comprobanteTipo === "factura" && (
+              <p className="mt-1 rounded bg-amber-50 px-2 py-1 text-sm text-amber-800">
+                Factura — {pedido.facturaRazonSocial} · RUC {pedido.facturaRuc}
+                {pedido.facturaEmail ? ` · ${pedido.facturaEmail}` : ""}
+              </p>
+            )}
 
             <ul className="mt-2 text-sm text-neutral-600">
               {pedido.items.map((item) => (
