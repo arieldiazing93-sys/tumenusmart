@@ -47,6 +47,15 @@ export function construirMensajePedido(datos: DatosMensaje): string {
   lineas.push(`Pedido #${datos.pedidoId.slice(-6).toUpperCase()}`);
   lineas.push("");
   lineas.push(`Cliente: ${datos.clienteNombre}`);
+
+  if (datos.comprobanteTipo === "factura") {
+    lineas.push("Comprobante: Factura");
+    if (datos.facturaRazonSocial) lineas.push(`Razón social: ${datos.facturaRazonSocial}`);
+    if (datos.facturaRuc) lineas.push(`RUC: ${datos.facturaRuc}`);
+    if (datos.facturaEmail) lineas.push(`Correo: ${datos.facturaEmail}`);
+  }
+  lineas.push(`Método de pago: ${ETIQUETAS_PAGO[datos.metodoPagoReferencia] ?? datos.metodoPagoReferencia}`);
+
   lineas.push("");
   lineas.push("Detalle:");
 
@@ -77,15 +86,6 @@ export function construirMensajePedido(datos: DatosMensaje): string {
     lineas.push(
       `Ubicación: https://www.google.com/maps?q=${datos.clienteLat},${datos.clienteLng}`
     );
-  }
-  lineas.push(`Método de pago: ${ETIQUETAS_PAGO[datos.metodoPagoReferencia] ?? datos.metodoPagoReferencia}`);
-
-  if (datos.comprobanteTipo === "factura") {
-    lineas.push("");
-    lineas.push("Comprobante: Factura");
-    if (datos.facturaRazonSocial) lineas.push(`Razón social: ${datos.facturaRazonSocial}`);
-    if (datos.facturaRuc) lineas.push(`RUC: ${datos.facturaRuc}`);
-    if (datos.facturaEmail) lineas.push(`Correo: ${datos.facturaEmail}`);
   }
 
   if (datos.notas) {

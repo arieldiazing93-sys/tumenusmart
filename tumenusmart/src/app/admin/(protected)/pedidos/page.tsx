@@ -5,28 +5,103 @@ import { ESTADOS_PEDIDO, etiquetaEstado, colorEstado } from "@/lib/estados-pedid
 
 export const dynamic = "force-dynamic";
 
+type FiltrosFecha = "hoy" | "ayer" | "7dias" | "mes" | "rango";
+
+function sumarDias(fecha: Date, dias: number): Date {
+  const copia = new Date(fecha);
+  copia.setDate(copia.getDate() + dias);
+  return copia;
+}
+
+// Calcula el rango [gte, lt) según el filtro de fecha elegido. Usa la fecha
+// del servidor tal cual (sin conversión de huso horario) — igual criterio
+// que ya usa la columna "Hora" de esta misma tabla.
+function calcularRangoFecha(
+  fecha: string | undefined,
+  desde: string | undefined,
+  hasta: string | undefined
+): { gte: Date; lt: Date } | null {
+  const ahora = new Date();
+  const inicioHoy = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate());
+
+  switch (fecha as FiltrosFecha | undefined) {
+    case "hoy":
+      return { gte: inicioHoy, lt: sumarDias(inicioHoy, 1) };
+    case "ayer":
+      return { gte: sumarDias(inicioHoy, -1), lt: inicioHoy };
+    case "7dias":
+      return { gte: sumarDias(inicioHoy, -6), lt: sumarDias(inicioHoy, 1) };
+    case "mes": {
+      const inicioMes = new Date(ahora.getFullYear(), ahora.getMonth(), 1);
+      const inicioMesSiguiente = new Date(ahora.getFullYear(), ahora.getMonth() + 1, 1);
+      return { gte: inicioMes, lt: inicioMesSiguiente };
+    }
+    case "rango": {
+      if (!desde || !hasta) return null;
+      const inicio = new Date(`${desde}T00:00:00`);
+      const fin = new Date(`${hasta}T00:00:00`);
+      if (isNaN(inicio.getTime()) || isNaN(fin.getTime())) return null;
+      return { gte: inicio, lt: sumarDias(fin, 1) };
+    }
+    default:
+      return null;
+  }
+}
+
+const FILTROS_FECHA: { value: FiltrosFecha; label: string }[] = [
+  { value: "hoy", label: "Hoy" },
+  { value: "ayer", label: "Ayer" },
+  { value: "7dias", label: "Últimos 7 días" },
+  { value: "mes", label: "Este mes" },
+];
+
 export default async function AdminPedidosPage({
   searchParams,
 }: {
-  searchParams: Promise<{ estado?: string }>;
+  searchParams: Promise<{ estado?: string; fecha?: string; desde?: string; hasta?: string }>;
 }) {
-  const { estado } = await searchParams;
+  const { estado, fecha, desde, hasta } = await searchParams;
   const estadoActivo = estado && estado !== "todos" ? estado : null;
+  const rangoFecha = calcularRangoFecha(fecha, desde, hasta);
+  const fechaActiva = rangoFecha ? fecha : null;
 
   const pedidos = await prisma.order.findMany({
-    where: estadoActivo ? { estado: estadoActivo } : undefined,
+    where: {
+      ...(estadoActivo ? { estado: estadoActivo } : {}),
+      ...(rangoFecha ? { createdAt: rangoFecha } : {}),
+    },
     orderBy: { createdAt: "desc" },
     include: { items: true, deliveryZone: true, repartidor: true },
     take: 100,
   });
 
+  // Arma un querystring preservando los otros filtros activos, para que
+  // cambiar de estado no te haga perder el filtro de fecha y viceversa.
+  function hrefEstado(nuevoEstado: string | null) {
+    const params = new URLSearchParams();
+    if (nuevoEstado) params.set("estado", nuevoEstado);
+    if (fechaActiva) params.set("fecha", fechaActiva);
+    if (fechaActiva === "rango" && desde) params.set("desde", desde);
+    if (fechaActiva === "rango" && hasta) params.set("hasta", hasta);
+    const qs = params.toString();
+    return qs ? `/admin/pedidos?${qs}` : "/admin/pedidos";
+  }
+
+  function hrefFecha(nuevaFecha: FiltrosFecha | null) {
+    const params = new URLSearchParams();
+    if (estadoActivo) params.set("estado", estadoActivo);
+    if (nuevaFecha) params.set("fecha", nuevaFecha);
+    const qs = params.toString();
+    return qs ? `/admin/pedidos?${qs}` : "/admin/pedidos";
+  }
+
   return (
     <div>
       <h1 className="mb-6 text-xl font-bold text-neutral-900">Pedidos</h1>
 
-      <div className="mb-4 flex flex-wrap gap-2">
+      <div className="mb-3 flex flex-wrap gap-2">
         <Link
-          href="/admin/pedidos"
+          href={hrefEstado(null)}
           className={`rounded-full border px-3 py-1.5 text-sm font-medium ${
             !estadoActivo
               ? "border-brand bg-brand text-white"
@@ -38,7 +113,7 @@ export default async function AdminPedidosPage({
         {ESTADOS_PEDIDO.map((e) => (
           <Link
             key={e.value}
-            href={`/admin/pedidos?estado=${e.value}`}
+            href={hrefEstado(e.value)}
             className={`rounded-full border px-3 py-1.5 text-sm font-medium ${
               estadoActivo === e.value
                 ? "border-brand bg-brand text-white"
@@ -50,8 +125,68 @@ export default async function AdminPedidosPage({
         ))}
       </div>
 
+      <div className="mb-6 flex flex-wrap items-center gap-2 border-t border-neutral-200 pt-3">
+        <Link
+          href={hrefFecha(null)}
+          className={`rounded-full border px-3 py-1.5 text-sm font-medium ${
+            !fechaActiva
+              ? "border-brand bg-brand text-white"
+              : "border-neutral-300 text-neutral-600 hover:border-brand hover:text-brand"
+          }`}
+        >
+          Todas las fechas
+        </Link>
+        {FILTROS_FECHA.map((f) => (
+          <Link
+            key={f.value}
+            href={hrefFecha(f.value)}
+            className={`rounded-full border px-3 py-1.5 text-sm font-medium ${
+              fechaActiva === f.value
+                ? "border-brand bg-brand text-white"
+                : "border-neutral-300 text-neutral-600 hover:border-brand hover:text-brand"
+            }`}
+          >
+            {f.label}
+          </Link>
+        ))}
+
+        <form
+          method="get"
+          action="/admin/pedidos"
+          className={`flex items-center gap-1.5 rounded-full border px-2 py-1 text-sm ${
+            fechaActiva === "rango"
+              ? "border-brand bg-brand-light"
+              : "border-neutral-300"
+          }`}
+        >
+          {estadoActivo && <input type="hidden" name="estado" value={estadoActivo} />}
+          <input type="hidden" name="fecha" value="rango" />
+          <input
+            type="date"
+            name="desde"
+            defaultValue={fechaActiva === "rango" ? desde : ""}
+            required
+            className="rounded-md border border-neutral-300 px-1.5 py-1 text-xs"
+          />
+          <span className="text-neutral-400">–</span>
+          <input
+            type="date"
+            name="hasta"
+            defaultValue={fechaActiva === "rango" ? hasta : ""}
+            required
+            className="rounded-md border border-neutral-300 px-1.5 py-1 text-xs"
+          />
+          <button
+            type="submit"
+            className="rounded-full bg-neutral-800 px-3 py-1 text-xs font-medium text-white hover:bg-neutral-700"
+          >
+            Filtrar
+          </button>
+        </form>
+      </div>
+
       {pedidos.length === 0 && (
-        <p className="text-neutral-500">No hay pedidos en este estado.</p>
+        <p className="text-neutral-500">No hay pedidos con estos filtros.</p>
       )}
 
       {pedidos.length > 0 && (
@@ -82,6 +217,10 @@ export default async function AdminPedidosPage({
                   >
                     <td className="px-3 py-3">
                       <Link href={`/admin/pedidos/${pedido.id}`} className="block">
+                        {new Date(pedido.createdAt).toLocaleDateString("es-PY", {
+                          day: "2-digit",
+                          month: "2-digit",
+                        })}{" "}
                         {new Date(pedido.createdAt).toLocaleTimeString("es-PY", {
                           hour: "2-digit",
                           minute: "2-digit",

@@ -55,15 +55,6 @@ export function MapPicker({
     import("leaflet").then((L) => {
       if (cancelado || !contenedorRef.current || mapaRef.current) return;
 
-      // Arregla los íconos por defecto de Leaflet, que se rompen con bundlers.
-      delete (L.Icon.Default.prototype as unknown as { _getIconUrl?: unknown })
-        ._getIconUrl;
-      L.Icon.Default.mergeOptions({
-        iconRetinaUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
-        iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
-        shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
-      });
-
       const centroLocal: [number, number] | null =
         storeLat != null && storeLng != null ? [storeLat, storeLng] : null;
       const centroInicial: [number, number] =
@@ -101,7 +92,21 @@ export function MapPicker({
         L.marker(centroLocal, { icon: iconoLocal, interactive: false }).addTo(mapa);
       }
 
-      const marker = L.marker(centroInicial, { draggable: true }).addTo(mapa);
+      // Pin del cliente dibujado a mano (un puntito rojo tipo "gota"), en vez
+      // del ícono por defecto de Leaflet — ese depende de imágenes externas
+      // que a veces tardan o no cargan, dejando el mapa sin marcador visible.
+      const iconoCliente = L.divIcon({
+        html:
+          '<svg width="30" height="40" viewBox="0 0 30 40" xmlns="http://www.w3.org/2000/svg" style="display:block;filter:drop-shadow(0 1px 2px rgba(0,0,0,.4))">' +
+          '<path d="M15 0C6.716 0 0 6.716 0 15c0 10.5 15 25 15 25s15-14.5 15-25C30 6.716 23.284 0 15 0z" fill="#e11d2f"/>' +
+          '<circle cx="15" cy="15" r="5.5" fill="#ffffff"/>' +
+          "</svg>",
+        className: "",
+        iconSize: [30, 40],
+        iconAnchor: [15, 40],
+      });
+
+      const marker = L.marker(centroInicial, { draggable: true, icon: iconoCliente }).addTo(mapa);
       marker.on("dragend", () => {
         const { lat: la, lng: ln } = marker.getLatLng();
         onChange(la, ln);
