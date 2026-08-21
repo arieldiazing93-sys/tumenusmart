@@ -7,6 +7,7 @@ const LINKS = [
   { href: "/admin/pedidos", label: "Pedidos" },
   { href: "/admin/productos", label: "Productos" },
   { href: "/admin/categorias", label: "Categorías" },
+  { href: "/admin/repartidores", label: "Repartidores" },
   { href: "/admin/configuracion", label: "Configuración" },
 ];
 
@@ -23,7 +24,7 @@ export default async function AdminLayout({
   return (
     <div className="min-h-screen bg-neutral-50">
       <header className="border-b border-neutral-200 bg-white">
-        <div className="mx-auto flex max-w-4xl items-center justify-between px-4 py-3">
+        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
           <div className="flex items-center gap-6">
             <span className="font-semibold text-neutral-900">TuMenuSmart</span>
             <nav className="flex gap-4 text-sm font-medium text-neutral-600">
@@ -41,7 +42,7 @@ export default async function AdminLayout({
           </form>
         </div>
       </header>
-      <div className="mx-auto max-w-4xl px-4 py-6">{children}</div>
+      <div className="mx-auto max-w-6xl px-4 py-6">{children}</div>
     </div>
   );
 }

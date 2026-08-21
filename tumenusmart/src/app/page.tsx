@@ -80,6 +80,10 @@ export default async function CatalogoPage() {
                       id: p.id,
                       nombre: p.nombre,
                       precio: Number(p.precio),
+                      opciones: p.opciones.map((o) => ({
+                        ...o,
+                        precioExtra: Number(o.precioExtra),
+                      })),
                     }))}
                   />
                 </div>

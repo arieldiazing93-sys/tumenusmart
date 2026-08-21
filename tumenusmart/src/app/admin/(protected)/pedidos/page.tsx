@@ -1,13 +1,22 @@
+import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { formatearGuarani } from "@/lib/format";
-import { EstadoSelect } from "./EstadoSelect";
+import { ESTADOS_PEDIDO, etiquetaEstado, colorEstado } from "@/lib/estados-pedido";
 
 export const dynamic = "force-dynamic";
 
-export default async function AdminPedidosPage() {
+export default async function AdminPedidosPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ estado?: string }>;
+}) {
+  const { estado } = await searchParams;
+  const estadoActivo = estado && estado !== "todos" ? estado : null;
+
   const pedidos = await prisma.order.findMany({
+    where: estadoActivo ? { estado: estadoActivo } : undefined,
     orderBy: { createdAt: "desc" },
-    include: { items: true, deliveryZone: true },
+    include: { items: true, deliveryZone: true, repartidor: true },
     take: 100,
   });
 
@@ -15,77 +24,123 @@ export default async function AdminPedidosPage() {
     <div>
       <h1 className="mb-6 text-xl font-bold text-neutral-900">Pedidos</h1>
 
-      {pedidos.length === 0 && (
-        <p className="text-neutral-500">Todavía no llegaron pedidos.</p>
-      )}
-
-      <div className="flex flex-col gap-3">
-        {pedidos.map((pedido) => (
-          <div
-            key={pedido.id}
-            className="rounded-xl border border-neutral-200 bg-white p-4"
+      <div className="mb-4 flex flex-wrap gap-2">
+        <Link
+          href="/admin/pedidos"
+          className={`rounded-full border px-3 py-1.5 text-sm font-medium ${
+            !estadoActivo
+              ? "border-brand bg-brand text-white"
+              : "border-neutral-300 text-neutral-600 hover:border-brand hover:text-brand"
+          }`}
+        >
+          Todos
+        </Link>
+        {ESTADOS_PEDIDO.map((e) => (
+          <Link
+            key={e.value}
+            href={`/admin/pedidos?estado=${e.value}`}
+            className={`rounded-full border px-3 py-1.5 text-sm font-medium ${
+              estadoActivo === e.value
+                ? "border-brand bg-brand text-white"
+                : "border-neutral-300 text-neutral-600 hover:border-brand hover:text-brand"
+            }`}
           >
-            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-              <div>
-                <span className="font-semibold">
-                  #{pedido.id.slice(-6).toUpperCase()}
-                </span>{" "}
-                <span className="text-sm text-neutral-500">
-                  {new Date(pedido.createdAt).toLocaleString("es-PY")}
-                </span>
-              </div>
-              <EstadoSelect orderId={pedido.id} estadoActual={pedido.estado} />
-            </div>
-
-            <p className="text-sm text-neutral-700">
-              {pedido.clienteNombre} · {pedido.clienteTelefono}
-            </p>
-            <p className="text-sm text-neutral-500">
-              {pedido.tipoEntrega === "delivery"
-                ? `Delivery — ${pedido.deliveryZone?.nombre ?? "a coordinar"} — ${pedido.direccion ?? ""}`
-                : "Retiro en el local"}
-              {pedido.tipoEntrega === "delivery" &&
-                pedido.clienteLat != null &&
-                pedido.clienteLng != null && (
-                  <>
-                    {" · "}
-                    <a
-                      href={`https://www.google.com/maps?q=${pedido.clienteLat},${pedido.clienteLng}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-brand hover:underline"
-                    >
-                      Ver ubicación
-                    </a>
-                  </>
-                )}
-            </p>
-
-            {pedido.comprobanteTipo === "factura" && (
-              <p className="mt-1 rounded bg-amber-50 px-2 py-1 text-sm text-amber-800">
-                Factura — {pedido.facturaRazonSocial} · RUC {pedido.facturaRuc}
-                {pedido.facturaEmail ? ` · ${pedido.facturaEmail}` : ""}
-              </p>
-            )}
-
-            <ul className="mt-2 text-sm text-neutral-600">
-              {pedido.items.map((item) => (
-                <li key={item.id}>
-                  {item.cantidad}x {item.nombreProducto}
-                  {item.opcionesTexto ? ` (${item.opcionesTexto})` : ""}
-                  {item.ingredientesQuitadosTexto && (
-                    <span className="text-red-500"> · {item.ingredientesQuitadosTexto}</span>
-                  )}
-                </li>
-              ))}
-            </ul>
-
-            <p className="mt-2 text-right font-semibold">
-              {formatearGuarani(Number(pedido.total))}
-            </p>
-          </div>
+            {e.emoji} {e.label}
+          </Link>
         ))}
       </div>
+
+      {pedidos.length === 0 && (
+        <p className="text-neutral-500">No hay pedidos en este estado.</p>
+      )}
+
+      {pedidos.length > 0 && (
+        <div className="overflow-x-auto rounded-lg border border-neutral-200 bg-white">
+          <table className="w-full min-w-[900px] text-left text-sm">
+            <thead className="border-b border-neutral-200 bg-neutral-50 text-xs uppercase tracking-wide text-neutral-500">
+              <tr>
+                <th className="px-3 py-2">Hora</th>
+                <th className="px-3 py-2">Cliente</th>
+                <th className="px-3 py-2">Teléfono</th>
+                <th className="px-3 py-2">Productos</th>
+                <th className="px-3 py-2">Total</th>
+                <th className="px-3 py-2">Entrega</th>
+                <th className="px-3 py-2">Repartidor</th>
+                <th className="px-3 py-2">Pago</th>
+                <th className="px-3 py-2">Estado</th>
+              </tr>
+            </thead>
+            <tbody>
+              {pedidos.map((pedido) => {
+                const resumenProductos = pedido.items
+                  .map((i) => `${i.cantidad}x ${i.nombreProducto}`)
+                  .join(", ");
+                return (
+                  <tr
+                    key={pedido.id}
+                    className="cursor-pointer border-b border-neutral-100 last:border-0 hover:bg-neutral-50"
+                  >
+                    <td className="px-3 py-3">
+                      <Link href={`/admin/pedidos/${pedido.id}`} className="block">
+                        {new Date(pedido.createdAt).toLocaleTimeString("es-PY", {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </Link>
+                    </td>
+                    <td className="px-3 py-3">
+                      <Link href={`/admin/pedidos/${pedido.id}`} className="block font-medium">
+                        {pedido.clienteNombre}
+                      </Link>
+                    </td>
+                    <td className="px-3 py-3">
+                      <Link href={`/admin/pedidos/${pedido.id}`} className="block">
+                        {pedido.clienteTelefono}
+                      </Link>
+                    </td>
+                    <td className="px-3 py-3">
+                      <Link href={`/admin/pedidos/${pedido.id}`} className="block max-w-[220px] truncate">
+                        {resumenProductos}
+                      </Link>
+                    </td>
+                    <td className="px-3 py-3">
+                      <Link href={`/admin/pedidos/${pedido.id}`} className="block font-semibold">
+                        {formatearGuarani(Number(pedido.total))}
+                      </Link>
+                    </td>
+                    <td className="px-3 py-3">
+                      <Link href={`/admin/pedidos/${pedido.id}`} className="block">
+                        {pedido.tipoEntrega === "delivery"
+                          ? pedido.deliveryZone?.nombre ?? "A coordinar"
+                          : "Retiro"}
+                      </Link>
+                    </td>
+                    <td className="px-3 py-3">
+                      <Link href={`/admin/pedidos/${pedido.id}`} className="block">
+                        {pedido.repartidor?.nombre ?? "—"}
+                      </Link>
+                    </td>
+                    <td className="px-3 py-3">
+                      <Link href={`/admin/pedidos/${pedido.id}`} className="block">
+                        {pedido.metodoPagoReferencia}
+                      </Link>
+                    </td>
+                    <td className="px-3 py-3">
+                      <Link href={`/admin/pedidos/${pedido.id}`}>
+                        <span
+                          className={`rounded-full px-2.5 py-1 text-xs font-medium ${colorEstado(pedido.estado)}`}
+                        >
+                          {etiquetaEstado(pedido.estado)}
+                        </span>
+                      </Link>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }

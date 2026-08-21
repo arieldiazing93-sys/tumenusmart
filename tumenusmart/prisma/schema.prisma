@@ -91,16 +91,27 @@ model Customer {
   createdAt DateTime @default(now())
 }
 
+model Repartidor {
+  id        String   @id @default(cuid())
+  nombre    String
+  telefono  String?
+  activo    Boolean  @default(true)
+  orders    Order[]
+  createdAt DateTime @default(now())
+}
+
 model Order {
   id                   String        @id @default(cuid())
   customerId           String?
   customer             Customer?     @relation(fields: [customerId], references: [id])
   clienteNombre        String
   clienteTelefono      String
-  estado               String        @default("pendiente") // pendiente | confirmado | en_preparacion | listo | entregado | cancelado
+  estado               String        @default("pendiente") // pendiente | confirmado | en_preparacion | en_despacho | entregado | cancelado
   tipoEntrega          String // "delivery" | "retiro"
   deliveryZoneId       String?
   deliveryZone         DeliveryZone? @relation(fields: [deliveryZoneId], references: [id])
+  repartidorId         String? // solo aplica a pedidos "delivery" en camino
+  repartidor           Repartidor?   @relation(fields: [repartidorId], references: [id])
   direccion            String?
   clienteLat           Float? // pin que marcó el cliente en el mapa al hacer el pedido
   clienteLng           Float?

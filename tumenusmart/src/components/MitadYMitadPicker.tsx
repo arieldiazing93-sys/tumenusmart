@@ -5,10 +5,18 @@ import { useCart } from "./CartProvider";
 import { formatearGuarani } from "@/lib/format";
 import { calcularPrecioMitadYMitad, ModoPrecioMitad } from "@/lib/mitad-mitad";
 
+type Opcion = {
+  id: string;
+  nombre: string;
+  tipo: string;
+  precioExtra: number;
+};
+
 type ProductoBase = {
   id: string;
   nombre: string;
   precio: number;
+  opciones: Opcion[];
 };
 
 type Props = {
@@ -21,29 +29,63 @@ export function MitadYMitadPicker({ categoriaNombre, modo, productos }: Props) {
   const { agregarItem } = useCart();
   const [idA, setIdA] = useState<string>("");
   const [idB, setIdB] = useState<string>("");
+  const [agregadosIds, setAgregadosIds] = useState<string[]>([]);
   const [cantidad, setCantidad] = useState(1);
   const [agregado, setAgregado] = useState(false);
 
   const productoA = productos.find((p) => p.id === idA);
   const productoB = productos.find((p) => p.id === idB);
 
-  const precioCombo = useMemo(() => {
+  // Agregados disponibles: la unión de los agregados de ambas mitades
+  // (ej: si "Borde relleno" está cargado en las dos pizzas, aparece una sola vez).
+  const agregadosDisponibles = useMemo(() => {
+    if (!productoA || !productoB) return [];
+    const vistos = new Set<string>();
+    const lista: Opcion[] = [];
+    for (const p of [productoA, productoB]) {
+      for (const o of p.opciones) {
+        if (o.tipo !== "agregado") continue;
+        const clave = o.nombre.toLowerCase();
+        if (vistos.has(clave)) continue;
+        vistos.add(clave);
+        lista.push(o);
+      }
+    }
+    return lista;
+  }, [productoA, productoB]);
+
+  const agregadosSeleccionados = agregadosDisponibles.filter((o) =>
+    agregadosIds.includes(o.id)
+  );
+
+  const precioBase = useMemo(() => {
     if (!productoA || !productoB) return null;
     return calcularPrecioMitadYMitad(productoA.precio, productoB.precio, modo);
   }, [productoA, productoB, modo]);
 
+  const precioTotal =
+    precioBase != null
+      ? precioBase + agregadosSeleccionados.reduce((s, o) => s + o.precioExtra, 0)
+      : null;
+
   const mismoDoble = !!idA && idA === idB;
   const listo = !!productoA && !!productoB && !mismoDoble;
 
+  function toggleAgregado(id: string) {
+    setAgregadosIds((actuales) =>
+      actuales.includes(id) ? actuales.filter((x) => x !== id) : [...actuales, id]
+    );
+  }
+
   function handleAgregar() {
-    if (!listo || !productoA || !productoB || precioCombo == null) return;
+    if (!listo || !productoA || !productoB || precioBase == null) return;
     const parIds = [productoA.id, productoB.id].sort();
     agregarItem({
-      key: `mitad::${parIds.join("+")}`,
+      key: `mitad::${parIds.join("+")}::${[...agregadosIds].sort().join(",")}`,
       productId: `combo:${parIds.join("+")}`,
       nombreProducto: `Mitad ${productoA.nombre} / Mitad ${productoB.nombre}`,
-      precioBase: precioCombo,
-      opciones: [],
+      precioBase,
+      opciones: agregadosSeleccionados,
       mitadYMitad: {
         productIdA: productoA.id,
         nombreA: productoA.nombre,
@@ -58,6 +100,7 @@ export function MitadYMitadPicker({ categoriaNombre, modo, productos }: Props) {
     setCantidad(1);
     setIdA("");
     setIdB("");
+    setAgregadosIds([]);
     setTimeout(() => setAgregado(false), 1500);
   }
 
@@ -75,7 +118,10 @@ export function MitadYMitadPicker({ categoriaNombre, modo, productos }: Props) {
       <div className="flex flex-col gap-2 sm:flex-row">
         <select
           value={idA}
-          onChange={(e) => setIdA(e.target.value)}
+          onChange={(e) => {
+            setIdA(e.target.value);
+            setAgregadosIds([]);
+          }}
           className="flex-1 rounded-lg border border-neutral-300 px-3 py-2 text-sm"
         >
           <option value="">Mitad 1...</option>
@@ -87,7 +133,10 @@ export function MitadYMitadPicker({ categoriaNombre, modo, productos }: Props) {
         </select>
         <select
           value={idB}
-          onChange={(e) => setIdB(e.target.value)}
+          onChange={(e) => {
+            setIdB(e.target.value);
+            setAgregadosIds([]);
+          }}
           className="flex-1 rounded-lg border border-neutral-300 px-3 py-2 text-sm"
         >
           <option value="">Mitad 2...</option>
@@ -103,9 +152,32 @@ export function MitadYMitadPicker({ categoriaNombre, modo, productos }: Props) {
         <p className="mt-2 text-xs text-amber-600">Elegí dos sabores distintos.</p>
       )}
 
+      {agregadosDisponibles.length > 0 && (
+        <div className="mt-3 flex flex-wrap gap-2">
+          {agregadosDisponibles.map((a) => (
+            <label
+              key={a.id}
+              className={`cursor-pointer rounded-full border bg-white px-3 py-1 text-sm ${
+                agregadosIds.includes(a.id)
+                  ? "border-brand bg-brand-light text-brand-dark"
+                  : "border-neutral-300 text-neutral-600"
+              }`}
+            >
+              <input
+                type="checkbox"
+                className="hidden"
+                checked={agregadosIds.includes(a.id)}
+                onChange={() => toggleAgregado(a.id)}
+              />
+              + {a.nombre} ({formatearGuarani(a.precioExtra)})
+            </label>
+          ))}
+        </div>
+      )}
+
       <div className="mt-3 flex items-center justify-between">
         <span className="font-semibold text-neutral-900">
-          {precioCombo != null ? formatearGuarani(precioCombo) : "—"}
+          {precioTotal != null ? formatearGuarani(precioTotal) : "—"}
         </span>
 
         <div className="flex items-center gap-3">

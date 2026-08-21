@@ -7,7 +7,7 @@ const ESTADOS_VALIDOS = [
   "pendiente",
   "confirmado",
   "en_preparacion",
-  "listo",
+  "en_despacho",
   "entregado",
   "cancelado",
 ];
@@ -18,4 +18,14 @@ export async function cambiarEstadoPedido(orderId: string, estado: string) {
   }
   await prisma.order.update({ where: { id: orderId }, data: { estado } });
   revalidatePath("/admin/pedidos");
+  revalidatePath(`/admin/pedidos/${orderId}`);
+}
+
+export async function asignarRepartidor(orderId: string, repartidorId: string) {
+  await prisma.order.update({
+    where: { id: orderId },
+    data: { repartidorId: repartidorId || null },
+  });
+  revalidatePath("/admin/pedidos");
+  revalidatePath(`/admin/pedidos/${orderId}`);
 }
