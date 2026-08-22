@@ -112,6 +112,32 @@ export function construirLinkWhatsapp(numeroWhatsapp: string, mensaje: string): 
   return `https://wa.me/${numeroLimpio}?text=${encodeURIComponent(mensaje)}`;
 }
 
+/**
+ * Lleva un teléfono cargado por el cliente al formato internacional que
+ * necesita wa.me. Los clientes escriben "0984 792335", "0984792335" o
+ * "+595984792335" indistintamente, y todos tienen que terminar igual.
+ *
+ * Prefijo de Paraguay (595) por defecto, que es donde opera el sistema.
+ */
+export function normalizarTelefonoParaWhatsapp(telefono: string, paisPorDefecto = "595"): string {
+  const soloDigitos = telefono.replace(/[^\d]/g, "");
+  if (!soloDigitos) return "";
+
+  // Ya viene con código de país.
+  if (soloDigitos.startsWith(paisPorDefecto)) return soloDigitos;
+
+  // Formato local con 0 adelante: se reemplaza por el código de país.
+  if (soloDigitos.startsWith("0")) return paisPorDefecto + soloDigitos.slice(1);
+
+  return paisPorDefecto + soloDigitos;
+}
+
+/** Link para que el LOCAL le escriba al cliente (al revés del flujo normal). */
+export function linkWhatsappCliente(telefonoCliente: string, mensaje: string): string {
+  const numero = normalizarTelefonoParaWhatsapp(telefonoCliente);
+  return `https://wa.me/${numero}?text=${encodeURIComponent(mensaje)}`;
+}
+
 type DatosMensajeReserva = {
   numero: number;
   saludo?: string | null;

@@ -186,6 +186,9 @@ model HorarioReserva {
   hora   String // "HH:MM", ej: "12:30"
   activo Boolean @default(true)
   orden  Int     @default(0)
+  // Cuántas personas como máximo se pueden sentar en este horario.
+  // NULL = sin límite (comportamiento anterior, sigue siendo el default).
+  capacidadPersonas Int?
 
   @@unique([turno, hora])
 }
