@@ -86,7 +86,10 @@ export function ProductCard({ producto }: Props) {
   }
 
   return (
-    <div className="flex gap-4 rounded-xl border border-neutral-200 bg-white p-4">
+    <div
+      id={`producto-${producto.id}`}
+      className="flex scroll-mt-4 gap-4 rounded-xl border border-neutral-200 bg-white p-4"
+    >
       {producto.imagenUrl && (
         // eslint-disable-next-line @next/next/no-img-element
         <img

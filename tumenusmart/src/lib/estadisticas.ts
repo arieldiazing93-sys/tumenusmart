@@ -63,3 +63,39 @@ export async function calcularEstadisticas(rango: RangoFecha) {
     puntosCalor,
   };
 }
+
+// Mismo período que calcularEstadisticas, pero mirando Reservation.fecha
+// (el día de la mesa reservada) en vez de createdAt — así "Últimos 7 días"
+// muestra cuántas reservas hay agendadas para esos días, que es lo que le
+// interesa al encargado, no cuándo se cargaron.
+export async function calcularEstadisticasReservas(rango: RangoFecha) {
+  const reservas = await prisma.reservation.findMany({
+    where: { fecha: rango },
+    orderBy: { fecha: "asc" },
+  });
+
+  const total = reservas.length;
+  const personasTotales = reservas.reduce((s, r) => s + r.personas, 0);
+
+  const porEstado = {
+    pendiente: reservas.filter((r) => r.estado === "pendiente").length,
+    confirmada: reservas.filter((r) => r.estado === "confirmada").length,
+    cancelada: reservas.filter((r) => r.estado === "cancelada").length,
+  };
+
+  const porTurno = {
+    dia: reservas.filter((r) => r.turno === "dia").length,
+    tarde: reservas.filter((r) => r.turno === "tarde").length,
+    noche: reservas.filter((r) => r.turno === "noche").length,
+  };
+
+  const dias = listarDias(rango.gte, rango.lt);
+  const totalesPorDia = new Map<string, number>();
+  for (const d of dias) totalesPorDia.set(claveDia(d), 0);
+  for (const r of reservas) {
+    const clave = claveDia(new Date(r.fecha));
+    totalesPorDia.set(clave, (totalesPorDia.get(clave) ?? 0) + 1);
+  }
+
+  return { total, personasTotales, porEstado, porTurno, dias, totalesPorDia };
+}

@@ -51,7 +51,9 @@ export async function crearProducto(formData: FormData) {
 
   revalidatePath("/admin/productos");
   revalidatePath("/");
-  redirect(`/admin/productos/${producto.id}`);
+  // Vuelve a la lista de la misma categoría (no al detalle del producto)
+  // para poder seguir cargando productos sin ir y venir entre pantallas.
+  redirect(`/admin/productos?categoria=${producto.categoryId}&guardado=1`);
 }
 
 export async function actualizarProducto(productId: string, formData: FormData) {

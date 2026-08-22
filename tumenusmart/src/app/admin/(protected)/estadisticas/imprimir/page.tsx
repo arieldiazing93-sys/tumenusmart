@@ -1,7 +1,8 @@
 import { calcularRangoFecha, claveDia, type FiltroFecha } from "@/lib/rango-fecha";
-import { calcularEstadisticas } from "@/lib/estadisticas";
+import { calcularEstadisticas, calcularEstadisticasReservas } from "@/lib/estadisticas";
 import { formatearGuarani } from "@/lib/format";
 import { ZONA_NEGOCIO } from "@/lib/timezone";
+import { etiquetaTurno } from "@/lib/reservas";
 import { ImprimirBoton } from "./ImprimirBoton";
 
 export const dynamic = "force-dynamic";
@@ -17,7 +18,10 @@ export default async function ImprimirEstadisticasPage({
     calcularRangoFecha(fechaActiva, desde, hasta) ??
     calcularRangoFecha("30dias", undefined, undefined)!;
 
-  const stats = await calcularEstadisticas(rango);
+  const [stats, statsReservas] = await Promise.all([
+    calcularEstadisticas(rango),
+    calcularEstadisticasReservas(rango),
+  ]);
 
   const finRangoInclusive = new Date(rango.lt.getTime() - 24 * 60 * 60 * 1000);
   const opcionesFecha: Intl.DateTimeFormatOptions = {
@@ -37,6 +41,17 @@ export default async function ImprimirEstadisticasPage({
     ["Productos por pedido", stats.productosPorPedido.toFixed(1)],
     ["Clientes nuevos", String(stats.clientesNuevos)],
     ["Cancelados", String(stats.cancelados)],
+  ];
+
+  const filasKpiReservas: [string, string][] = [
+    ["Reservas totales", String(statsReservas.total)],
+    ["Personas esperadas", String(statsReservas.personasTotales)],
+    ["Confirmadas", String(statsReservas.porEstado.confirmada)],
+    ["Pendientes", String(statsReservas.porEstado.pendiente)],
+    ["Canceladas", String(statsReservas.porEstado.cancelada)],
+    [`Turno ${etiquetaTurno("dia")}`, String(statsReservas.porTurno.dia)],
+    [`Turno ${etiquetaTurno("tarde")}`, String(statsReservas.porTurno.tarde)],
+    [`Turno ${etiquetaTurno("noche")}`, String(statsReservas.porTurno.noche)],
   ];
 
   return (
@@ -97,6 +112,43 @@ export default async function ImprimirEstadisticasPage({
                 </td>
                 <td className="py-1.5 text-right text-neutral-900">
                   {formatearGuarani(Math.round(stats.totalesPorDia.get(clave) ?? 0))}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+
+      <h2 className="mb-3 mt-10 font-semibold text-neutral-800">Reservas</h2>
+      <table className="mb-10 w-full border-collapse text-sm">
+        <tbody>
+          {filasKpiReservas.map(([etiqueta, valor]) => (
+            <tr key={etiqueta} className="border-b border-neutral-200">
+              <td className="py-2 text-neutral-600">{etiqueta}</td>
+              <td className="py-2 text-right font-semibold text-neutral-900">{valor}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+
+      <h2 className="mb-3 font-semibold text-neutral-800">Reservas por día</h2>
+      <table className="w-full border-collapse text-sm">
+        <thead>
+          <tr className="border-b border-neutral-300 text-left text-xs uppercase tracking-wide text-neutral-500">
+            <th className="py-1.5">Fecha</th>
+            <th className="py-1.5 text-right">Reservas</th>
+          </tr>
+        </thead>
+        <tbody>
+          {statsReservas.dias.map((d) => {
+            const clave = claveDia(d);
+            return (
+              <tr key={clave} className="border-b border-neutral-100">
+                <td className="py-1.5 text-neutral-600">
+                  {d.toLocaleDateString("es-PY", { day: "2-digit", month: "2-digit", timeZone: ZONA_NEGOCIO })}
+                </td>
+                <td className="py-1.5 text-right text-neutral-900">
+                  {statsReservas.totalesPorDia.get(clave) ?? 0}
                 </td>
               </tr>
             );

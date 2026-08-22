@@ -112,6 +112,10 @@ model Repartidor {
 
 model Order {
   id                   String        @id @default(cuid())
+  // Número correlativo simple (1, 2, 3...) para mostrarle al cliente y al
+  // encargado — el id (cuid) sigue siendo la clave interna/URLs, pero un
+  // código con letras y números confunde al cliente al leerlo por teléfono.
+  numero               Int           @unique @default(autoincrement())
   customerId           String?
   customer             Customer?     @relation(fields: [customerId], references: [id])
   clienteNombre        String
@@ -169,6 +173,8 @@ model HorarioReserva {
 
 model Reservation {
   id              String   @id @default(cuid())
+  // Mismo criterio que Order.numero: código simple para el cliente/encargado.
+  numero          Int      @unique @default(autoincrement())
   fecha           DateTime // solo día, medianoche Asunción — la mesa/fecha reservada
   turno           String // "dia" | "tarde" | "noche"
   horario         String // "HH:MM" elegido dentro del turno

@@ -1,4 +1,4 @@
-import { formatearGuarani } from "./format";
+import { formatearGuarani, formatearNumero } from "./format";
 
 type ItemPedido = {
   nombreProducto: string;
@@ -9,7 +9,7 @@ type ItemPedido = {
 };
 
 type DatosMensaje = {
-  pedidoId: string;
+  numero: number;
   saludo?: string | null;
   clienteNombre: string;
   tipoEntrega: string;
@@ -44,7 +44,7 @@ export function construirMensajePedido(datos: DatosMensaje): string {
   const lineas: string[] = [];
 
   if (datos.saludo) lineas.push(datos.saludo);
-  lineas.push(`Pedido #${datos.pedidoId.slice(-6).toUpperCase()}`);
+  lineas.push(`Pedido ${formatearNumero(datos.numero)}`);
   lineas.push("");
   lineas.push(`Cliente: ${datos.clienteNombre}`);
 
@@ -106,7 +106,7 @@ export function construirLinkWhatsapp(numeroWhatsapp: string, mensaje: string): 
 }
 
 type DatosMensajeReserva = {
-  reservaId: string;
+  numero: number;
   saludo?: string | null;
   clienteNombre: string;
   clienteTelefono: string;
@@ -126,7 +126,7 @@ export function construirMensajeReserva(datos: DatosMensajeReserva): string {
   const lineas: string[] = [];
 
   if (datos.saludo) lineas.push(datos.saludo);
-  lineas.push(`Reserva #${datos.reservaId.slice(-6).toUpperCase()}`);
+  lineas.push(`Reserva ${formatearNumero(datos.numero)}`);
   lineas.push("");
   lineas.push(`Cliente: ${datos.clienteNombre}`);
   lineas.push(`Teléfono: ${datos.clienteTelefono}`);

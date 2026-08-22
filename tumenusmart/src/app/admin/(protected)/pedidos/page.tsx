@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
-import { formatearGuarani } from "@/lib/format";
+import { formatearGuarani, formatearNumero } from "@/lib/format";
 import { ESTADOS_PEDIDO, etiquetaEstado, colorEstado } from "@/lib/estados-pedido";
 import { calcularRangoFecha, type FiltroFecha } from "@/lib/rango-fecha";
 import { ZONA_NEGOCIO } from "@/lib/timezone";
@@ -153,6 +153,7 @@ export default async function AdminPedidosPage({
           <table className="w-full min-w-[900px] text-left text-sm">
             <thead className="border-b border-neutral-200 bg-neutral-50 text-xs uppercase tracking-wide text-neutral-500">
               <tr>
+                <th className="px-3 py-2">N°</th>
                 <th className="px-3 py-2">Hora</th>
                 <th className="px-3 py-2">Cliente</th>
                 <th className="px-3 py-2">Teléfono</th>
@@ -174,6 +175,11 @@ export default async function AdminPedidosPage({
                     key={pedido.id}
                     className="cursor-pointer border-b border-neutral-100 last:border-0 hover:bg-neutral-50"
                   >
+                    <td className="px-3 py-3">
+                      <Link href={`/admin/pedidos/${pedido.id}`} className="block font-medium text-neutral-500">
+                        {formatearNumero(pedido.numero)}
+                      </Link>
+                    </td>
                     <td className="px-3 py-3">
                       <Link href={`/admin/pedidos/${pedido.id}`} className="block">
                         {new Date(pedido.createdAt).toLocaleDateString("es-PY", {

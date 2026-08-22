@@ -2,7 +2,17 @@ type Punto = { etiqueta: string; total: number };
 
 // Gráfico de barras simple hecho a mano en SVG — no depende de ninguna
 // librería de gráficos, así que no hace falta instalar nada nuevo.
-export function VentasPorDiaChart({ datos }: { datos: Punto[] }) {
+// `sufijoTooltip` y `color` permiten reutilizarlo para cualquier serie
+// diaria (ventas en Gs., cantidad de reservas, etc.) sin duplicar el SVG.
+export function VentasPorDiaChart({
+  datos,
+  sufijoTooltip = "Gs.",
+  color = "#e05d2f",
+}: {
+  datos: Punto[];
+  sufijoTooltip?: string;
+  color?: string;
+}) {
   const alto = 160;
   const anchoBarra = 28;
   const espacio = 10;
@@ -29,14 +39,14 @@ export function VentasPorDiaChart({ datos }: { datos: Punto[] }) {
           const y = margenSup + (alto - alturaBarra);
           return (
             <g key={i}>
-              <title>{`${d.etiqueta}: ${d.total.toLocaleString("es-PY")} Gs.`}</title>
+              <title>{`${d.etiqueta}: ${d.total.toLocaleString("es-PY")} ${sufijoTooltip}`}</title>
               <rect
                 x={x}
                 y={y}
                 width={anchoBarra}
                 height={alturaBarra}
                 rx={4}
-                fill="#e05d2f"
+                fill={color}
                 fillOpacity={0.85}
               />
               <text

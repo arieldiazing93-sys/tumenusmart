@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { calcularRangoFecha, claveDia } from "@/lib/rango-fecha";
-import { calcularEstadisticas } from "@/lib/estadisticas";
+import { calcularEstadisticas, calcularEstadisticasReservas } from "@/lib/estadisticas";
 import { ZONA_NEGOCIO } from "@/lib/timezone";
+import { etiquetaTurno } from "@/lib/reservas";
 
 export const dynamic = "force-dynamic";
 
@@ -31,7 +32,10 @@ export async function GET(request: NextRequest) {
   const rango =
     calcularRangoFecha(fecha, desde, hasta) ?? calcularRangoFecha("30dias", undefined, undefined)!;
 
-  const stats = await calcularEstadisticas(rango);
+  const [stats, statsReservas] = await Promise.all([
+    calcularEstadisticas(rango),
+    calcularEstadisticasReservas(rango),
+  ]);
 
   const finRangoInclusive = new Date(rango.lt.getTime() - 24 * 60 * 60 * 1000);
   const opcionesFecha: Intl.DateTimeFormatOptions = {
@@ -80,6 +84,39 @@ export async function GET(request: NextRequest) {
   for (const d of stats.dias) {
     const clave = claveDia(d);
     filas.push(filaCsv([clave, Math.round(stats.totalesPorDia.get(clave) ?? 0)]));
+  }
+
+  filas.push("");
+  filas.push(
+    filaCsv([
+      "Reservas totales",
+      "Personas esperadas",
+      "Confirmadas",
+      "Pendientes",
+      "Canceladas",
+      `Turno ${etiquetaTurno("dia")}`,
+      `Turno ${etiquetaTurno("tarde")}`,
+      `Turno ${etiquetaTurno("noche")}`,
+    ])
+  );
+  filas.push(
+    filaCsv([
+      statsReservas.total,
+      statsReservas.personasTotales,
+      statsReservas.porEstado.confirmada,
+      statsReservas.porEstado.pendiente,
+      statsReservas.porEstado.cancelada,
+      statsReservas.porTurno.dia,
+      statsReservas.porTurno.tarde,
+      statsReservas.porTurno.noche,
+    ])
+  );
+
+  filas.push("");
+  filas.push(filaCsv(["Fecha", "Reservas"]));
+  for (const d of statsReservas.dias) {
+    const clave = claveDia(d);
+    filas.push(filaCsv([clave, statsReservas.totalesPorDia.get(clave) ?? 0]));
   }
 
   // BOM al inicio para que Excel detecte UTF-8 y no rompa los acentos/ñ.

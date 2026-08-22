@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { formatearGuarani } from "@/lib/format";
+import { formatearGuarani, formatearNumero } from "@/lib/format";
 import { EstadoBotones } from "../EstadoBotones";
 import { RepartidorSelect } from "../RepartidorSelect";
 import { ZONA_NEGOCIO } from "@/lib/timezone";
@@ -34,7 +34,7 @@ export default async function DetallePedidoPage({
       <div className="mb-6 flex flex-wrap items-start justify-between gap-2">
         <div>
           <h1 className="text-xl font-bold text-neutral-900">
-            Pedido #{pedido.id.slice(-6).toUpperCase()}
+            Pedido {formatearNumero(pedido.numero)}
           </h1>
           <p className="text-sm text-neutral-500">
             {new Date(pedido.createdAt).toLocaleString("es-PY", { timeZone: ZONA_NEGOCIO })}

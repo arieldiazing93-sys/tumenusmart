@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { construirMensajePedido, construirLinkWhatsapp } from "@/lib/whatsapp";
-import { formatearGuarani } from "@/lib/format";
+import { formatearGuarani, formatearNumero } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 
@@ -23,7 +23,7 @@ export default async function ConfirmacionPedidoPage({
   if (!order || !store) notFound();
 
   const mensaje = construirMensajePedido({
-    pedidoId: order.id,
+    numero: order.numero,
     saludo: store.mensajeSaludo,
     clienteNombre: order.clienteNombre,
     tipoEntrega: order.tipoEntrega,
@@ -55,7 +55,7 @@ export default async function ConfirmacionPedidoPage({
     <main className="mx-auto max-w-2xl px-4 py-10 text-center">
       <div className="mb-6 text-5xl">✅</div>
       <h1 className="mb-2 text-xl font-bold text-neutral-900">
-        Pedido #{order.id.slice(-6).toUpperCase()} generado
+        Pedido {formatearNumero(order.numero)} generado
       </h1>
       <p className="mb-8 text-neutral-600">
         Un último paso: enviá el pedido por WhatsApp para que {store.nombre} lo confirme.

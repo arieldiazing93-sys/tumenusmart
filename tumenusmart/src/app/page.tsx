@@ -24,6 +24,7 @@ export default async function CatalogoPage() {
     prisma.product.findMany({
       where: { destacado: true, disponible: true },
       orderBy: { orden: "asc" },
+      include: { opciones: true },
     }),
   ]);
 
@@ -96,6 +97,7 @@ export default async function CatalogoPage() {
           nombre: p.nombre,
           precio: Number(p.precio),
           imagenUrl: p.imagenUrl,
+          tieneVariantes: p.opciones.some((o) => o.tipo === "variante"),
         }))}
       />
 

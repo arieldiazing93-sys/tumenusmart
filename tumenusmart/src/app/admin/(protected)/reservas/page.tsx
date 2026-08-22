@@ -16,6 +16,7 @@ import {
   DIAS_SEMANA,
 } from "@/lib/calendario";
 import { etiquetaTurno, etiquetaMotivo } from "@/lib/reservas";
+import { formatearNumero } from "@/lib/format";
 import { EstadoReservaSelect } from "./EstadoReservaSelect";
 import { NotaReservaField } from "./NotaReservaField";
 
@@ -54,7 +55,7 @@ function TarjetaReserva({ r }: { r: ReservaFila }) {
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
           <p className="font-medium text-neutral-900">
-            {r.horario} · {etiquetaTurno(r.turno)} — {r.personas}{" "}
+            {formatearNumero(r.numero)} · {r.horario} · {etiquetaTurno(r.turno)} — {r.personas}{" "}
             {r.personas === 1 ? "persona" : "personas"}
           </p>
           <p className="text-sm text-neutral-600">

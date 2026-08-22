@@ -1,18 +1,23 @@
+import { Suspense } from "react";
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { formatearGuarani } from "@/lib/format";
 import { crearProducto } from "./actions";
 import { IngredientesField } from "./IngredientesField";
 import { ImagenProductoField } from "./ImagenProductoField";
+import { GuardadoToast } from "@/components/GuardadoToast";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminProductosPage({
   searchParams,
 }: {
-  searchParams: Promise<{ categoria?: string }>;
+  searchParams: Promise<{ categoria?: string; guardado?: string }>;
 }) {
-  const { categoria: categoriaId } = await searchParams;
+  const { categoria: categoriaId, guardado } = await searchParams;
+  // Si venimos de crear un producto, el formulario queda abierto para
+  // poder seguir cargando el siguiente sin tener que volver a desplegarlo.
+  const mantenerFormularioAbierto = guardado === "1";
 
   const categorias = await prisma.category.findMany({
     orderBy: { orden: "asc" },
@@ -32,6 +37,10 @@ export default async function AdminProductosPage({
 
   return (
     <div>
+      <Suspense fallback={null}>
+        <GuardadoToast />
+      </Suspense>
+
       <h1 className="mb-6 text-xl font-bold text-neutral-900">Productos</h1>
 
       {categorias.length === 0 ? (
@@ -59,7 +68,10 @@ export default async function AdminProductosPage({
             ))}
           </div>
 
-          <details className="mb-6 rounded-lg border border-neutral-200 bg-white p-4">
+          <details
+            open={mantenerFormularioAbierto}
+            className="mb-6 rounded-lg border border-neutral-200 bg-white p-4"
+          >
             <summary className="cursor-pointer font-medium">
               + Nuevo producto
             </summary>

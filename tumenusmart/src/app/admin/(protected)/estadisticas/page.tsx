@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { formatearGuarani } from "@/lib/format";
 import { calcularRangoFecha, claveDia, type FiltroFecha } from "@/lib/rango-fecha";
-import { calcularEstadisticas } from "@/lib/estadisticas";
+import { calcularEstadisticas, calcularEstadisticasReservas } from "@/lib/estadisticas";
 import { ZONA_NEGOCIO } from "@/lib/timezone";
+import { etiquetaTurno } from "@/lib/reservas";
 import { VentasPorDiaChart } from "@/components/VentasPorDiaChart";
 import { MapaCalor } from "@/components/MapaCalor";
 
@@ -49,12 +50,22 @@ export default async function AdminEstadisticasPage({
     return params.toString();
   }
 
-  const stats = await calcularEstadisticas(rango);
+  const [stats, statsReservas] = await Promise.all([
+    calcularEstadisticas(rango),
+    calcularEstadisticasReservas(rango),
+  ]);
 
   const datosChart = stats.dias.map((d) => ({
     etiqueta: d.toLocaleDateString("es-PY", { day: "2-digit", month: "2-digit", timeZone: ZONA_NEGOCIO }),
     total: stats.totalesPorDia.get(claveDia(d)) ?? 0,
   }));
+
+  const datosChartReservas = statsReservas.dias.map((d) => ({
+    etiqueta: d.toLocaleDateString("es-PY", { day: "2-digit", month: "2-digit", timeZone: ZONA_NEGOCIO }),
+    total: statsReservas.totalesPorDia.get(claveDia(d)) ?? 0,
+  }));
+
+  const maxPorTurno = Math.max(1, statsReservas.porTurno.dia, statsReservas.porTurno.tarde, statsReservas.porTurno.noche);
 
   return (
     <div>
@@ -140,6 +151,58 @@ export default async function AdminEstadisticasPage({
         <h2 className="mb-3 font-semibold text-neutral-800">Ventas por día</h2>
         <div className="rounded-lg border border-neutral-200 bg-white p-4">
           <VentasPorDiaChart datos={datosChart} />
+        </div>
+      </div>
+
+      <div className="mb-8">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <h2 className="font-semibold text-neutral-800">Reservas</h2>
+          <Link
+            href="/admin/reservas"
+            className="text-sm text-brand hover:underline"
+          >
+            Ver calendario →
+          </Link>
+        </div>
+
+        <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <Tarjeta etiqueta="Reservas" valor={String(statsReservas.total)} detalle="En este período" />
+          <Tarjeta etiqueta="Personas esperadas" valor={String(statsReservas.personasTotales)} />
+          <Tarjeta etiqueta="Confirmadas" valor={String(statsReservas.porEstado.confirmada)} />
+          <Tarjeta
+            etiqueta="Pendientes / canceladas"
+            valor={`${statsReservas.porEstado.pendiente} / ${statsReservas.porEstado.cancelada}`}
+          />
+        </div>
+
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+          <div className="rounded-lg border border-neutral-200 bg-white p-4 lg:col-span-2">
+            <p className="mb-2 text-sm font-medium text-neutral-700">Reservas por día</p>
+            <VentasPorDiaChart datos={datosChartReservas} sufijoTooltip="reservas" color="#0891b2" />
+          </div>
+
+          <div className="rounded-lg border border-neutral-200 bg-white p-4">
+            <p className="mb-3 text-sm font-medium text-neutral-700">Por turno</p>
+            <div className="flex flex-col gap-3">
+              {(["dia", "tarde", "noche"] as const).map((t) => (
+                <div key={t}>
+                  <div className="mb-1 flex justify-between text-xs text-neutral-500">
+                    <span>{etiquetaTurno(t)}</span>
+                    <span>{statsReservas.porTurno[t]}</span>
+                  </div>
+                  <div className="h-2 rounded-full bg-neutral-100">
+                    <div
+                      className="h-2 rounded-full bg-cyan-600"
+                      style={{ width: `${(statsReservas.porTurno[t] / maxPorTurno) * 100}%` }}
+                    />
+                  </div>
+                </div>
+              ))}
+              {statsReservas.total === 0 && (
+                <p className="text-xs text-neutral-400">Sin reservas en este período.</p>
+              )}
+            </div>
+          </div>
         </div>
       </div>
 

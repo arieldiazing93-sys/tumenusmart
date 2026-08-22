@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { construirMensajeReserva, construirLinkWhatsapp } from "@/lib/whatsapp";
 import { ZONA_NEGOCIO } from "@/lib/timezone";
 import { etiquetaTurno, etiquetaMotivo } from "@/lib/reservas";
+import { formatearNumero } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 
@@ -30,7 +31,7 @@ export default async function ConfirmacionReservaPage({
   const saludo = store.mensajeSaludoReserva?.trim() || "Hola, te paso mi reserva:";
 
   const mensaje = construirMensajeReserva({
-    reservaId: reserva.id,
+    numero: reserva.numero,
     saludo,
     clienteNombre: reserva.clienteNombre,
     clienteTelefono: reserva.clienteTelefono,
@@ -48,7 +49,7 @@ export default async function ConfirmacionReservaPage({
     <main className="mx-auto max-w-2xl px-4 py-10 text-center">
       <div className="mb-6 text-5xl">📅</div>
       <h1 className="mb-2 text-xl font-bold text-neutral-900">
-        Reserva #{reserva.id.slice(-6).toUpperCase()} generada
+        Reserva {formatearNumero(reserva.numero)} generada
       </h1>
       <p className="mb-8 text-neutral-600">
         Un último paso: enviá la reserva por WhatsApp para que {store.nombre} la confirme.
