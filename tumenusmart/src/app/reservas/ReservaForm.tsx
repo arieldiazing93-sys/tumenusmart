@@ -41,7 +41,10 @@ export function ReservaForm({
   const router = useRouter();
 
   const [fecha, setFecha] = useState("");
-  const [personas, setPersonas] = useState(2);
+  // Se guarda como texto, no como número: si fuera número, borrar el campo
+  // en el celular lo devolvería a 1 al instante y no se podría escribir otra
+  // cantidad. El número real se deriva abajo.
+  const [personasTexto, setPersonasTexto] = useState("2");
   const [turno, setTurno] = useState<string | null>(null);
   const [horario, setHorario] = useState("");
   const [motivo, setMotivo] = useState<string>(MOTIVOS_RESERVA[0].value);
@@ -52,6 +55,14 @@ export function ReservaForm({
   const [error, setError] = useState<string | null>(null);
   const [disponibilidad, setDisponibilidad] = useState<Disponibilidad[] | null>(null);
   const [cargandoCupos, setCargandoCupos] = useState(false);
+
+  // Cantidad real de personas: el campo vacío cuenta como 1 para los
+  // cálculos, pero en pantalla se lo deja vacío mientras el cliente escribe.
+  const personas = Math.max(1, parseInt(personasTexto, 10) || 1);
+
+  function cambiarPersonas(nuevo: number) {
+    setPersonasTexto(String(Math.max(1, nuevo)));
+  }
 
   // Día de la semana de la fecha elegida, para avisar si cae en un día
   // en que el local no abre.
@@ -145,10 +156,9 @@ export function ReservaForm({
       );
       return;
     }
-    if (!personas || personas < 1) {
-      setError("La cantidad de personas no es válida.");
-      return;
-    }
+    // Si quedó el campo vacío (se puede enviar sin que dispare el blur en el
+    // celular), se toma la cantidad derivada y se refleja en pantalla.
+    if (personasTexto !== String(personas)) setPersonasTexto(String(personas));
     if (!nombre.trim() || !telefono.trim()) {
       setError("Faltan tus datos de contacto.");
       return;
@@ -206,14 +216,46 @@ export function ReservaForm({
         <label className="mb-1 block text-sm font-medium text-neutral-700">
           Cantidad de personas
         </label>
-        <input
-          type="number"
-          min={1}
-          required
-          value={personas}
-          onChange={(e) => setPersonas(parseInt(e.target.value, 10) || 1)}
-          className="w-full rounded-lg border border-neutral-300 px-3 py-2"
-        />
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => cambiarPersonas(personas - 1)}
+            disabled={personas <= 1}
+            aria-label="Menos personas"
+            className="h-12 w-12 flex-none rounded-lg border border-neutral-300 text-xl font-semibold text-neutral-600 disabled:opacity-40"
+          >
+            −
+          </button>
+
+          {/* Se guarda como texto para que en el celular se pueda borrar y
+              escribir de nuevo; recién al salir del campo se normaliza. */}
+          <input
+            type="text"
+            inputMode="numeric"
+            pattern="[0-9]*"
+            required
+            value={personasTexto}
+            onChange={(e) => {
+              const soloDigitos = e.target.value.replace(/[^\d]/g, "");
+              setPersonasTexto(soloDigitos.slice(0, 3));
+            }}
+            onBlur={() => {
+              if (!personasTexto || Number(personasTexto) < 1) setPersonasTexto("1");
+            }}
+            onFocus={(e) => e.target.select()}
+            aria-label="Cantidad de personas"
+            className="h-12 w-full rounded-lg border border-neutral-300 px-3 text-center text-lg"
+          />
+
+          <button
+            type="button"
+            onClick={() => cambiarPersonas(personas + 1)}
+            aria-label="Más personas"
+            className="h-12 w-12 flex-none rounded-lg border border-neutral-300 text-xl font-semibold text-neutral-600"
+          >
+            +
+          </button>
+        </div>
       </div>
 
       <div>

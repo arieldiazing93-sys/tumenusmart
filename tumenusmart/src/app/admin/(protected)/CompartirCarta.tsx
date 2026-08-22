@@ -4,11 +4,10 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { generarMatrizQR } from "@/lib/qr";
 import { dibujarPoster, matrizASvg } from "@/lib/poster-qr";
 
-type Solapa = "whatsapp" | "link" | "qr";
+type Solapa = "link" | "qr";
 
 const SOLAPAS: { id: Solapa; etiqueta: string; icono: string }[] = [
-  { id: "whatsapp", etiqueta: "WhatsApp", icono: "💬" },
-  { id: "link", etiqueta: "Copiar", icono: "🔗" },
+  { id: "link", etiqueta: "Copiar link", icono: "🔗" },
   { id: "qr", etiqueta: "QR", icono: "▣" },
 ];
 
@@ -48,7 +47,8 @@ export function CompartirCarta({
     }
   }, [url]);
 
-  const mensajeWhatsapp = `¡Hola! Te paso la carta de ${nombreNegocio} para que pidas directo desde tu celular: ${url}`;
+  // Texto que acompaña al link cuando se usa el menú de compartir del sistema.
+  const mensajeCompartir = `¡Hola! Te paso la carta de ${nombreNegocio} para que pidas directo desde tu celular: ${url}`;
 
   // Cerrar con la tecla Escape, que es lo que uno espera de una ventana así.
   useEffect(() => {
@@ -75,7 +75,7 @@ export function CompartirCarta({
     setError(null);
     try {
       if (navigator.share) {
-        await navigator.share({ title: nombreNegocio, text: mensajeWhatsapp, url });
+        await navigator.share({ title: nombreNegocio, text: mensajeCompartir, url });
       } else {
         await copiarLink();
       }
@@ -167,29 +167,6 @@ export function CompartirCarta({
                 </button>
               ))}
             </div>
-
-            {solapa === "whatsapp" && (
-              <div>
-                <h3 className="mb-1 font-semibold text-neutral-900">Mandala por WhatsApp</h3>
-                <p className="mb-4 text-sm text-neutral-500">
-                  Se abre WhatsApp con el mensaje listo — elegí a quién mandárselo o pegalo en
-                  el estado de tu negocio.
-                </p>
-                <div className="mb-4 rounded-lg border border-neutral-200 bg-neutral-50 p-3 text-sm text-neutral-700">
-                  {mensajeWhatsapp}
-                </div>
-                {/* Sin número de destino: WhatsApp abre el selector de
-                    contacto con el mensaje ya escrito. */}
-                <a
-                  href={`https://wa.me/?text=${encodeURIComponent(mensajeWhatsapp)}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="block w-full rounded-xl bg-[#25D366] px-4 py-3 text-center font-semibold text-white hover:opacity-90"
-                >
-                  Abrir WhatsApp
-                </a>
-              </div>
-            )}
 
             {solapa === "link" && (
               <div>

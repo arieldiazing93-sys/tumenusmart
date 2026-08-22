@@ -90,7 +90,7 @@ export default async function AdminPedidosPage({
               nombreNegocio={store?.nombre ?? "Nuestra carta"}
               url={urlCarta}
             />
-            <p className="mt-1 text-xs text-neutral-400">WhatsApp · link · QR imprimible</p>
+            <p className="mt-1 text-xs text-neutral-400">Link público · QR imprimible</p>
           </div>
         )}
       </div>
