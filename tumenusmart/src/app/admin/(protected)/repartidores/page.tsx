@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { crearRepartidor } from "./actions";
 import { RepartidorAcciones } from "./RepartidorAcciones";
+import { LinkRepartidor } from "./LinkRepartidor";
 
 export const dynamic = "force-dynamic";
 
@@ -42,6 +43,7 @@ export default async function AdminRepartidoresPage() {
             <div>
               <p className="font-medium">{r.nombre}</p>
               {r.telefono && <p className="text-sm text-neutral-500">{r.telefono}</p>}
+              <LinkRepartidor id={r.id} />
             </div>
             <RepartidorAcciones id={r.id} activo={r.activo} />
           </div>

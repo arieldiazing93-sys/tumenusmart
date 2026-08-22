@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { formatearGuarani } from "@/lib/format";
 import { ESTADOS_PEDIDO, etiquetaEstado, colorEstado } from "@/lib/estados-pedido";
 import { calcularRangoFecha, type FiltroFecha } from "@/lib/rango-fecha";
+import { ZONA_NEGOCIO } from "@/lib/timezone";
 
 export const dynamic = "force-dynamic";
 
@@ -178,10 +179,12 @@ export default async function AdminPedidosPage({
                         {new Date(pedido.createdAt).toLocaleDateString("es-PY", {
                           day: "2-digit",
                           month: "2-digit",
+                          timeZone: ZONA_NEGOCIO,
                         })}{" "}
                         {new Date(pedido.createdAt).toLocaleTimeString("es-PY", {
                           hour: "2-digit",
                           minute: "2-digit",
+                          timeZone: ZONA_NEGOCIO,
                         })}
                       </Link>
                     </td>

@@ -1,7 +1,8 @@
 import Link from "next/link";
-import { prisma } from "@/lib/prisma";
 import { formatearGuarani } from "@/lib/format";
-import { calcularRangoFecha, listarDias, claveDia, type FiltroFecha } from "@/lib/rango-fecha";
+import { calcularRangoFecha, claveDia, type FiltroFecha } from "@/lib/rango-fecha";
+import { calcularEstadisticas } from "@/lib/estadisticas";
+import { ZONA_NEGOCIO } from "@/lib/timezone";
 import { VentasPorDiaChart } from "@/components/VentasPorDiaChart";
 import { MapaCalor } from "@/components/MapaCalor";
 
@@ -40,56 +41,42 @@ export default async function AdminEstadisticasPage({
     return `/admin/estadisticas?fecha=${nuevaFecha}`;
   }
 
-  const [store, pedidos, primerPedidoPorCliente] = await Promise.all([
-    prisma.store.findFirst(),
-    prisma.order.findMany({
-      where: { createdAt: rango },
-      include: { items: true },
-      orderBy: { createdAt: "asc" },
-    }),
-    prisma.order.groupBy({ by: ["clienteTelefono"], _min: { createdAt: true } }),
-  ]);
-
-  const validos = pedidos.filter((p) => p.estado !== "cancelado");
-  const cancelados = pedidos.filter((p) => p.estado === "cancelado");
-
-  const ingresos = validos.reduce((s, p) => s + Number(p.total), 0);
-  const pedidosTotales = pedidos.length;
-  const pedidosValidos = validos.length;
-  const ticketPromedio = pedidosValidos > 0 ? ingresos / pedidosValidos : 0;
-
-  const unidadesVendidas = validos.reduce(
-    (s, p) => s + p.items.reduce((si, it) => si + it.cantidad, 0),
-    0
-  );
-  const productosPorPedido = pedidosValidos > 0 ? unidadesVendidas / pedidosValidos : 0;
-
-  const clientesUnicos = new Set(pedidos.map((p) => p.clienteTelefono)).size;
-
-  const clientesNuevos = primerPedidoPorCliente.filter((c) => {
-    const primera = c._min.createdAt;
-    return primera && primera >= rango.gte && primera < rango.lt;
-  }).length;
-
-  const dias = listarDias(rango.gte, rango.lt);
-  const totalesPorDia = new Map<string, number>();
-  for (const d of dias) totalesPorDia.set(claveDia(d), 0);
-  for (const p of validos) {
-    const clave = claveDia(new Date(p.createdAt));
-    totalesPorDia.set(clave, (totalesPorDia.get(clave) ?? 0) + Number(p.total));
+  function querystringActual() {
+    const params = new URLSearchParams();
+    params.set("fecha", fechaActiva);
+    if (fechaActiva === "rango" && desde) params.set("desde", desde);
+    if (fechaActiva === "rango" && hasta) params.set("hasta", hasta);
+    return params.toString();
   }
-  const datosChart = dias.map((d) => ({
-    etiqueta: d.toLocaleDateString("es-PY", { day: "2-digit", month: "2-digit" }),
-    total: totalesPorDia.get(claveDia(d)) ?? 0,
-  }));
 
-  const puntosCalor = pedidos
-    .filter((p) => p.tipoEntrega === "delivery" && p.clienteLat != null && p.clienteLng != null)
-    .map((p) => ({ lat: p.clienteLat as number, lng: p.clienteLng as number }));
+  const stats = await calcularEstadisticas(rango);
+
+  const datosChart = stats.dias.map((d) => ({
+    etiqueta: d.toLocaleDateString("es-PY", { day: "2-digit", month: "2-digit", timeZone: ZONA_NEGOCIO }),
+    total: stats.totalesPorDia.get(claveDia(d)) ?? 0,
+  }));
 
   return (
     <div>
-      <h1 className="mb-6 text-xl font-bold text-neutral-900">Estadísticas</h1>
+      <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
+        <h1 className="text-xl font-bold text-neutral-900">Estadísticas</h1>
+        <div className="flex flex-wrap gap-2">
+          <a
+            href={`/admin/estadisticas/exportar?${querystringActual()}`}
+            className="rounded-lg border border-neutral-300 px-3 py-1.5 text-sm font-medium text-neutral-700 hover:border-brand hover:text-brand"
+          >
+            ⬇ Descargar CSV (Excel)
+          </a>
+          <a
+            href={`/admin/estadisticas/imprimir?${querystringActual()}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="rounded-lg border border-neutral-300 px-3 py-1.5 text-sm font-medium text-neutral-700 hover:border-brand hover:text-brand"
+          >
+            🖨 Ver reporte / Guardar como PDF
+          </a>
+        </div>
+      </div>
 
       <div className="mb-6 flex flex-wrap items-center gap-2">
         {FILTROS_FECHA.map((f) => (
@@ -139,14 +126,14 @@ export default async function AdminEstadisticasPage({
       </div>
 
       <div className="mb-8 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-        <Tarjeta etiqueta="Ingresos" valor={formatearGuarani(ingresos)} detalle="Sin contar cancelados" />
-        <Tarjeta etiqueta="Pedidos" valor={String(pedidosTotales)} detalle={`${pedidosValidos} válidos`} />
-        <Tarjeta etiqueta="Ticket promedio" valor={formatearGuarani(Math.round(ticketPromedio))} />
-        <Tarjeta etiqueta="Clientes únicos" valor={String(clientesUnicos)} />
-        <Tarjeta etiqueta="Unidades vendidas" valor={String(unidadesVendidas)} />
-        <Tarjeta etiqueta="Productos por pedido" valor={productosPorPedido.toFixed(1)} />
-        <Tarjeta etiqueta="Clientes nuevos" valor={String(clientesNuevos)} detalle="Su primer pedido fue en este período" />
-        <Tarjeta etiqueta="Cancelados" valor={String(cancelados.length)} />
+        <Tarjeta etiqueta="Ingresos" valor={formatearGuarani(stats.ingresos)} detalle="Sin contar cancelados" />
+        <Tarjeta etiqueta="Pedidos" valor={String(stats.pedidosTotales)} detalle={`${stats.pedidosValidos} válidos`} />
+        <Tarjeta etiqueta="Ticket promedio" valor={formatearGuarani(Math.round(stats.ticketPromedio))} />
+        <Tarjeta etiqueta="Clientes únicos" valor={String(stats.clientesUnicos)} />
+        <Tarjeta etiqueta="Unidades vendidas" valor={String(stats.unidadesVendidas)} />
+        <Tarjeta etiqueta="Productos por pedido" valor={stats.productosPorPedido.toFixed(1)} />
+        <Tarjeta etiqueta="Clientes nuevos" valor={String(stats.clientesNuevos)} detalle="Su primer pedido fue en este período" />
+        <Tarjeta etiqueta="Cancelados" valor={String(stats.cancelados)} />
       </div>
 
       <div className="mb-8">
@@ -162,12 +149,16 @@ export default async function AdminEstadisticasPage({
           Cada pedido con entrega a domicilio se marca como un círculo — donde se
           superponen varios, se ve más oscuro, mostrando las zonas con más pedidos.
         </p>
-        {puntosCalor.length === 0 ? (
+        {stats.puntosCalor.length === 0 ? (
           <p className="text-sm text-neutral-400">
             Todavía no hay pedidos de delivery con ubicación en este período.
           </p>
         ) : (
-          <MapaCalor storeLat={store?.lat ?? null} storeLng={store?.lng ?? null} puntos={puntosCalor} />
+          <MapaCalor
+            storeLat={stats.store?.lat ?? null}
+            storeLng={stats.store?.lng ?? null}
+            puntos={stats.puntosCalor}
+          />
         )}
       </div>
     </div>

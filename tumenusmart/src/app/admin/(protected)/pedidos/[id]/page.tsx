@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { formatearGuarani } from "@/lib/format";
 import { EstadoBotones } from "../EstadoBotones";
 import { RepartidorSelect } from "../RepartidorSelect";
+import { ZONA_NEGOCIO } from "@/lib/timezone";
 
 export const dynamic = "force-dynamic";
 
@@ -36,7 +37,7 @@ export default async function DetallePedidoPage({
             Pedido #{pedido.id.slice(-6).toUpperCase()}
           </h1>
           <p className="text-sm text-neutral-500">
-            {new Date(pedido.createdAt).toLocaleString("es-PY")}
+            {new Date(pedido.createdAt).toLocaleString("es-PY", { timeZone: ZONA_NEGOCIO })}
           </p>
         </div>
       </div>
