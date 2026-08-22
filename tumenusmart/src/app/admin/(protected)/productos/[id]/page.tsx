@@ -93,6 +93,14 @@ export default async function EditarProductoPage({
             />
             Disponible en el menú
           </label>
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              name="destacado"
+              defaultChecked={producto.destacado}
+            />
+            ⭐ Producto destacado (aparece en el carrusel de la cabecera del menú)
+          </label>
           <IngredientesField initial={producto.ingredientes} />
 
           <div className="rounded-lg border border-neutral-200 p-3">

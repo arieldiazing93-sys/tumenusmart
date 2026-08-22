@@ -14,6 +14,15 @@ const config: Config = {
           light: "#fbe9e1",
         },
       },
+      keyframes: {
+        "destacado-entrada": {
+          "0%": { transform: "translateX(-24px)", opacity: "0" },
+          "100%": { transform: "translateX(0)", opacity: "1" },
+        },
+      },
+      animation: {
+        "destacado-entrada": "destacado-entrada 0.5s ease-out",
+      },
     },
   },
   plugins: [],

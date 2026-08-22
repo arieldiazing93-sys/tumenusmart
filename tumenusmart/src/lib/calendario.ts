@@ -41,6 +41,21 @@ function claveUTC(d: Date): string {
   return d.toISOString().slice(0, 10);
 }
 
+/** Suma (o resta, con `dias` negativo) días a una clave "YYYY-MM-DD". */
+export function claveSumarDias(clave: string, dias: number): string {
+  const [y, m, d] = clave.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, d + dias)).toISOString().slice(0, 10);
+}
+
+/** Las 7 claves "YYYY-MM-DD" (lunes a domingo) de la semana que contiene `clave`. */
+export function diasDeLaSemana(clave: string): string[] {
+  const [y, m, d] = clave.split("-").map(Number);
+  const fecha = new Date(Date.UTC(y, m - 1, d));
+  const diaSemana = (fecha.getUTCDay() + 6) % 7; // 0 = lunes
+  const lunes = claveSumarDias(clave, -diaSemana);
+  return Array.from({ length: 7 }, (_, i) => claveSumarDias(lunes, i));
+}
+
 /** Genera la grilla completa (semanas de lunes a domingo) del mes `mes` (0-11) del `anio`. */
 export function construirGrillaMes(anio: number, mes: number): CeldaCalendario[] {
   const primerDia = new Date(Date.UTC(anio, mes, 1));

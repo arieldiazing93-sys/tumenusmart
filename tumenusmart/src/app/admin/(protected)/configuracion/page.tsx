@@ -61,12 +61,23 @@ export default async function AdminConfiguracionPage() {
           <LogoField initialUrl={store?.logoUrl ?? null} />
           <div>
             <label className="mb-1 block text-sm font-medium text-neutral-700">
-              Saludo inicial del mensaje de WhatsApp (opcional)
+              Saludo del mensaje de WhatsApp — pedidos (opcional)
             </label>
             <input
               name="mensajeSaludo"
               defaultValue={store?.mensajeSaludo ?? ""}
               placeholder="Ej: ¡Hola! Te paso mi pedido:"
+              className="w-full rounded-lg border border-neutral-300 px-3 py-2"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-neutral-700">
+              Saludo del mensaje de WhatsApp — reservas (opcional)
+            </label>
+            <input
+              name="mensajeSaludoReserva"
+              defaultValue={store?.mensajeSaludoReserva ?? ""}
+              placeholder="Ej: ¡Hola! Te paso mi reserva:"
               className="w-full rounded-lg border border-neutral-300 px-3 py-2"
             />
           </div>

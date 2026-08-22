@@ -32,3 +32,8 @@ export async function actualizarEstadoReserva(id: string, estado: string) {
   await prisma.reservation.update({ where: { id }, data: { estado } });
   revalidatePath("/admin/reservas");
 }
+
+export async function actualizarNotaReserva(id: string, nota: string) {
+  await prisma.reservation.update({ where: { id }, data: { nota: nota.trim() || null } });
+  revalidatePath("/admin/reservas");
+}

@@ -105,6 +105,10 @@ export default async function AdminProductosPage({
                 <input type="checkbox" name="disponible" defaultChecked />
                 Disponible en el menú
               </label>
+              <label className="flex items-center gap-2 text-sm">
+                <input type="checkbox" name="destacado" />
+                ⭐ Producto destacado (aparece en el carrusel de la cabecera del menú)
+              </label>
               <IngredientesField initial={[]} />
               <button
                 type="submit"
@@ -131,6 +135,7 @@ export default async function AdminProductosPage({
             className="flex items-center justify-between rounded-lg border border-neutral-200 bg-white px-4 py-3 hover:border-brand"
           >
             <p className="font-medium">
+              {p.destacado && <span title="Destacado">⭐ </span>}
               {p.nombre}{" "}
               {!p.disponible && (
                 <span className="text-xs text-neutral-400">(oculto)</span>

@@ -58,6 +58,7 @@ export async function actualizarStore(formData: FormData) {
     direccion: String(formData.get("direccion") ?? "") || null,
     logoUrl: String(formData.get("logoUrl") ?? "") || null,
     mensajeSaludo: String(formData.get("mensajeSaludo") ?? "") || null,
+    mensajeSaludoReserva: String(formData.get("mensajeSaludoReserva") ?? "") || null,
     envioModo,
     lat: lat != null && !isNaN(lat) ? lat : null,
     lng: lng != null && !isNaN(lng) ? lng : null,

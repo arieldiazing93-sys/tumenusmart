@@ -27,9 +27,11 @@ export default async function ConfirmacionReservaPage({
     timeZone: ZONA_NEGOCIO,
   });
 
+  const saludo = store.mensajeSaludoReserva?.trim() || "Hola, te paso mi reserva:";
+
   const mensaje = construirMensajeReserva({
     reservaId: reserva.id,
-    saludo: store.mensajeSaludo,
+    saludo,
     clienteNombre: reserva.clienteNombre,
     clienteTelefono: reserva.clienteTelefono,
     clienteEmail: reserva.clienteEmail,

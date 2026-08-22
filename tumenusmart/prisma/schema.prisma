@@ -17,7 +17,8 @@ model Store {
   whatsappNumero String // formato internacional sin '+', ej: 595981234567
   logoUrl        String?
   direccion      String?
-  mensajeSaludo  String? // texto opcional al inicio del mensaje de WhatsApp
+  mensajeSaludo  String? // texto opcional al inicio del mensaje de WhatsApp (pedidos)
+  mensajeSaludoReserva String? // texto opcional al inicio del mensaje de WhatsApp (reservas)
   lat            Float? // ubicación del local, centro para calcular distancias de envío
   lng            Float?
   envioModo      String   @default("zonas") // "zonas" (radio + precio automático) | "coordinar" (el negocio lo define directo con el cliente)
@@ -59,6 +60,8 @@ model Product {
   // mitad de cada uno, sumadas. Debería ser el mismo valor en todos los
   // productos de un mismo grupo.
   mitadYMitadModo  String          @default("mayor")
+  // Si está marcado, aparece en el carrusel de destacados del menú público.
+  destacado   Boolean         @default(false)
   opciones    ProductOption[]
   orderItems  OrderItem[]
   createdAt   DateTime        @default(now())
@@ -175,5 +178,8 @@ model Reservation {
   clienteTelefono String
   clienteEmail    String?
   estado          String   @default("pendiente") // pendiente | confirmada | cancelada
+  // Nota interna del encargado — ej: "pidió globos y velitas", cargada
+  // después de llamar al cliente para confirmar. No la ve el cliente.
+  nota            String?
   createdAt       DateTime @default(now())
 }

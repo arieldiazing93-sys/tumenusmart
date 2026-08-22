@@ -3,11 +3,12 @@ import { prisma } from "@/lib/prisma";
 import { ProductCard } from "@/components/ProductCard";
 import { CartBar } from "@/components/CartBar";
 import { MitadYMitadPicker } from "@/components/MitadYMitadPicker";
+import { CarruselDestacados } from "@/components/CarruselDestacados";
 
 export const dynamic = "force-dynamic";
 
 export default async function CatalogoPage() {
-  const [store, categorias] = await Promise.all([
+  const [store, categorias, destacados] = await Promise.all([
     prisma.store.findFirst(),
     prisma.category.findMany({
       where: { activa: true },
@@ -19,6 +20,10 @@ export default async function CatalogoPage() {
           include: { opciones: { orderBy: { orden: "asc" } } },
         },
       },
+    }),
+    prisma.product.findMany({
+      where: { destacado: true, disponible: true },
+      orderBy: { orden: "asc" },
     }),
   ]);
 
@@ -76,7 +81,7 @@ export default async function CatalogoPage() {
         </div>
       </header>
 
-      <div className="mb-8 flex justify-end">
+      <div className="mb-6 flex justify-end">
         <Link
           href="/reservas"
           className="inline-flex items-center gap-1.5 rounded-lg border border-brand px-3 py-1.5 text-sm font-medium text-brand hover:bg-brand-light"
@@ -84,6 +89,15 @@ export default async function CatalogoPage() {
           📅 Reservar mesa
         </Link>
       </div>
+
+      <CarruselDestacados
+        productos={destacados.map((p) => ({
+          id: p.id,
+          nombre: p.nombre,
+          precio: Number(p.precio),
+          imagenUrl: p.imagenUrl,
+        }))}
+      />
 
       {categorias.length === 0 && (
         <p className="text-neutral-500">

@@ -44,11 +44,13 @@ export async function crearProducto(formData: FormData) {
       descripcion: String(formData.get("descripcion") ?? "") || null,
       imagenUrl: String(formData.get("imagenUrl") ?? "") || null,
       disponible: formData.get("disponible") === "on",
+      destacado: formData.get("destacado") === "on",
       ingredientes: parsearIngredientes(formData),
     },
   });
 
   revalidatePath("/admin/productos");
+  revalidatePath("/");
   redirect(`/admin/productos/${producto.id}`);
 }
 
@@ -76,6 +78,7 @@ export async function actualizarProducto(productId: string, formData: FormData) 
       descripcion: String(formData.get("descripcion") ?? "") || null,
       imagenUrl: String(formData.get("imagenUrl") ?? "") || null,
       disponible: formData.get("disponible") === "on",
+      destacado: formData.get("destacado") === "on",
       ingredientes: parsearIngredientes(formData),
       mitadYMitadGrupo,
       mitadYMitadModo,
@@ -84,6 +87,7 @@ export async function actualizarProducto(productId: string, formData: FormData) 
 
   revalidatePath("/admin/productos");
   revalidatePath(`/admin/productos/${productId}`);
+  revalidatePath("/");
   redirect(`/admin/productos/${productId}?guardado=1`);
 }
 
