@@ -11,7 +11,30 @@ export async function subirFotoLogo(formData: FormData): Promise<{ url: string }
     throw new Error("No se recibió ninguna imagen");
   }
   const url = await subirLogoNegocio(archivo);
+
+  // Se guarda de una, sin esperar a que aprieten "Guardar" al pie del
+  // formulario grande — si no, la imagen se ve cargada en la vista previa
+  // pero el negocio (Store.logoUrl) se queda sin actualizar hasta que el
+  // usuario note que falta guardar el resto del formulario.
+  const store = await prisma.store.findFirst();
+  if (store) {
+    await prisma.store.update({ where: { id: store.id }, data: { logoUrl: url } });
+    revalidatePath("/admin/configuracion");
+    revalidatePath("/");
+    revalidatePath("/checkout");
+  }
+
   return { url };
+}
+
+export async function quitarLogoStore(): Promise<void> {
+  const store = await prisma.store.findFirst();
+  if (store) {
+    await prisma.store.update({ where: { id: store.id }, data: { logoUrl: null } });
+    revalidatePath("/admin/configuracion");
+    revalidatePath("/");
+    revalidatePath("/checkout");
+  }
 }
 
 export async function actualizarStore(formData: FormData) {

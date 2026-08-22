@@ -45,13 +45,28 @@ export default async function ImprimirEstadisticasPage({
         <ImprimirBoton />
       </div>
 
-      <h1 className="mb-1 text-2xl font-bold text-neutral-900">
-        {stats.store?.nombre ?? "Reporte de estadísticas"}
-      </h1>
-      <p className="mb-8 text-sm text-neutral-500">
-        Período: {rango.gte.toLocaleDateString("es-PY", opcionesFecha)} –{" "}
-        {finRangoInclusive.toLocaleDateString("es-PY", opcionesFecha)}
-      </p>
+      <div className="mb-8 flex items-center gap-4 border-b border-neutral-200 pb-6">
+        {stats.store?.logoUrl && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={stats.store.logoUrl}
+            alt={stats.store.nombre}
+            className="h-16 w-16 flex-none rounded-full object-cover"
+          />
+        )}
+        <div>
+          <h1 className="text-2xl font-bold text-neutral-900">
+            {stats.store?.nombre ?? "Reporte de estadísticas"}
+          </h1>
+          {stats.store?.direccion && (
+            <p className="text-sm text-neutral-500">{stats.store.direccion}</p>
+          )}
+          <p className="mt-1 text-sm text-neutral-500">
+            Período: {rango.gte.toLocaleDateString("es-PY", opcionesFecha)} –{" "}
+            {finRangoInclusive.toLocaleDateString("es-PY", opcionesFecha)}
+          </p>
+        </div>
+      </div>
 
       <table className="mb-10 w-full border-collapse text-sm">
         <tbody>

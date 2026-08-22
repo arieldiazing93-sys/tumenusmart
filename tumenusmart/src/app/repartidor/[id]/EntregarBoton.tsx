@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { marcarPedidoEntregado } from "./actions";
 
 export function EntregarBoton({
@@ -10,6 +11,7 @@ export function EntregarBoton({
   repartidorId: string;
   orderId: string;
 }) {
+  const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [hecho, setHecho] = useState(false);
@@ -21,6 +23,10 @@ export function EntregarBoton({
       try {
         await marcarPedidoEntregado(repartidorId, orderId);
         setHecho(true);
+        // Vuelve a pedirle al servidor la lista de pedidos — si no, esta
+        // tarjeta se queda marcada como entregada pero el resumen de abajo
+        // ("Entregados hoy") no se actualiza solo hasta recargar a mano.
+        router.refresh();
       } catch (err) {
         setError(err instanceof Error ? err.message : "No se pudo marcar como entregado");
       }

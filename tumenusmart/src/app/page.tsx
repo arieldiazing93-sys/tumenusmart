@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { ProductCard } from "@/components/ProductCard";
 import { CartBar } from "@/components/CartBar";
@@ -74,6 +75,15 @@ export default async function CatalogoPage() {
           )}
         </div>
       </header>
+
+      <div className="mb-8 flex justify-end">
+        <Link
+          href="/reservas"
+          className="inline-flex items-center gap-1.5 rounded-lg border border-brand px-3 py-1.5 text-sm font-medium text-brand hover:bg-brand-light"
+        >
+          📅 Reservar mesa
+        </Link>
+      </div>
 
       {categorias.length === 0 && (
         <p className="text-neutral-500">

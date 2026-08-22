@@ -1,12 +1,13 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { subirFotoLogo } from "./actions";
+import { subirFotoLogo, quitarLogoStore } from "./actions";
 
 export function LogoField({ initialUrl }: { initialUrl: string | null }) {
   const [url, setUrl] = useState(initialUrl ?? "");
   const [subiendo, setSubiendo] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [guardado, setGuardado] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   async function handleArchivo(e: React.ChangeEvent<HTMLInputElement>) {
@@ -14,16 +15,29 @@ export function LogoField({ initialUrl }: { initialUrl: string | null }) {
     if (!archivo) return;
     setError(null);
     setSubiendo(true);
+    setGuardado(false);
     try {
       const formData = new FormData();
       formData.set("archivo", archivo);
       const { url: nuevaUrl } = await subirFotoLogo(formData);
       setUrl(nuevaUrl);
+      setGuardado(true);
+      setTimeout(() => setGuardado(false), 3000);
     } catch (err) {
       setError(err instanceof Error ? err.message : "No se pudo subir la imagen");
     } finally {
       setSubiendo(false);
       if (inputRef.current) inputRef.current.value = "";
+    }
+  }
+
+  async function quitar() {
+    setUrl("");
+    setError(null);
+    try {
+      await quitarLogoStore();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No se pudo quitar el logo");
     }
   }
 
@@ -58,7 +72,7 @@ export function LogoField({ initialUrl }: { initialUrl: string | null }) {
           {url && (
             <button
               type="button"
-              onClick={() => setUrl("")}
+              onClick={quitar}
               className="text-left text-xs text-red-500 hover:underline"
             >
               Quitar logo
@@ -67,6 +81,7 @@ export function LogoField({ initialUrl }: { initialUrl: string | null }) {
         </div>
       </div>
 
+      {guardado && <p className="mt-1 text-xs text-green-600">✓ Logo guardado</p>}
       {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
 
       <input type="hidden" name="logoUrl" value={url} />

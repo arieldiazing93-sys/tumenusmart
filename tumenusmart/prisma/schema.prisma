@@ -150,3 +150,30 @@ model OrderItem {
   opcionesTexto  String? // snapshot de las opciones elegidas, en texto legible
   ingredientesQuitadosTexto String? // snapshot de ingredientes que el cliente sacó, ej: "tomate, cebolla"
 }
+
+// Horarios disponibles para reservar, agrupados por turno. Se configuran
+// desde el panel (Reservas → Horarios) y son los que ve el cliente en el
+// formulario público de reservas.
+model HorarioReserva {
+  id     String  @id @default(cuid())
+  turno  String // "dia" | "tarde" | "noche"
+  hora   String // "HH:MM", ej: "12:30"
+  activo Boolean @default(true)
+  orden  Int     @default(0)
+
+  @@unique([turno, hora])
+}
+
+model Reservation {
+  id              String   @id @default(cuid())
+  fecha           DateTime // solo día, medianoche Asunción — la mesa/fecha reservada
+  turno           String // "dia" | "tarde" | "noche"
+  horario         String // "HH:MM" elegido dentro del turno
+  personas        Int
+  motivo          String // "cumple" | "cita" | "reunion" | "aniversario" | "otro"
+  clienteNombre   String
+  clienteTelefono String
+  clienteEmail    String?
+  estado          String   @default("pendiente") // pendiente | confirmada | cancelada
+  createdAt       DateTime @default(now())
+}

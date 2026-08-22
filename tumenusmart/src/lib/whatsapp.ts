@@ -104,3 +104,38 @@ export function construirLinkWhatsapp(numeroWhatsapp: string, mensaje: string): 
   const numeroLimpio = numeroWhatsapp.replace(/[^\d]/g, "");
   return `https://wa.me/${numeroLimpio}?text=${encodeURIComponent(mensaje)}`;
 }
+
+type DatosMensajeReserva = {
+  reservaId: string;
+  saludo?: string | null;
+  clienteNombre: string;
+  clienteTelefono: string;
+  clienteEmail?: string | null;
+  fechaTexto: string; // ya formateada, ej: "22/08/2026"
+  turnoTexto: string; // etiqueta ya traducida, ej: "Tarde"
+  horario: string;
+  personas: number;
+  motivoTexto: string; // etiqueta ya traducida, ej: "Cumpleaños"
+};
+
+/**
+ * Arma el texto de la reserva, prolijo y legible, tal como lo va a
+ * recibir el restaurante en WhatsApp.
+ */
+export function construirMensajeReserva(datos: DatosMensajeReserva): string {
+  const lineas: string[] = [];
+
+  if (datos.saludo) lineas.push(datos.saludo);
+  lineas.push(`Reserva #${datos.reservaId.slice(-6).toUpperCase()}`);
+  lineas.push("");
+  lineas.push(`Cliente: ${datos.clienteNombre}`);
+  lineas.push(`Teléfono: ${datos.clienteTelefono}`);
+  if (datos.clienteEmail) lineas.push(`Correo: ${datos.clienteEmail}`);
+  lineas.push("");
+  lineas.push(`Fecha: ${datos.fechaTexto}`);
+  lineas.push(`Turno: ${datos.turnoTexto} — ${datos.horario}`);
+  lineas.push(`Personas: ${datos.personas}`);
+  lineas.push(`Motivo: ${datos.motivoTexto}`);
+
+  return lineas.join("\n");
+}
