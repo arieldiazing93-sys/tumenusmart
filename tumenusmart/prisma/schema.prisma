@@ -206,5 +206,9 @@ model Reservation {
   // Nota interna del encargado — ej: "pidió globos y velitas", cargada
   // después de llamar al cliente para confirmar. No la ve el cliente.
   nota            String?
+  // La reserva se guarda ANTES de que el cliente apriete "Enviar por
+  // WhatsApp". Hasta que no lo aprieta, no se muestra en el calendario:
+  // es una reserva que el cliente armó pero nunca llegó a pedir.
+  enviadoWhatsapp Boolean  @default(false)
   createdAt       DateTime @default(now())
 }

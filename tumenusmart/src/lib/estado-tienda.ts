@@ -1,5 +1,6 @@
 import { prisma } from "./prisma";
-import { calcularEstadoAtencion } from "./horario-atencion";
+import { calcularEstadoAtencion, resumenDia } from "./horario-atencion";
+import { diaSemanaAsuncion } from "./timezone";
 
 export type EstadoTienda = {
   /** true solo si está dentro de horario Y no está pausado a mano. */
@@ -8,6 +9,10 @@ export type EstadoTienda = {
   pausado: boolean;
   proximaApertura: string | null;
   mensajePausa: string | null;
+  /** Horario de hoy ya formateado, ej: "11:00 a 14:00 · 18:00 a 23:30". */
+  horarioDeHoy: string;
+  /** false cuando el negocio todavía no cargó ningún horario. */
+  tieneHorarios: boolean;
 };
 
 /**
@@ -30,6 +35,8 @@ export async function obtenerEstadoTienda(): Promise<EstadoTienda> {
     pausado,
     proximaApertura,
     mensajePausa: store?.mensajePausa?.trim() || null,
+    horarioDeHoy: resumenDia(horarios, diaSemanaAsuncion()),
+    tieneHorarios: horarios.length > 0,
   };
 }
 

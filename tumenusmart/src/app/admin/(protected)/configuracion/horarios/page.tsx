@@ -62,69 +62,81 @@ export default async function HorariosAtencionPage() {
         )}
       </div>
 
-      <div className="flex flex-col gap-3">
-        {DIAS_ORDENADOS.map((dia) => {
-          const delDia = tramos.filter((t) => t.diaSemana === dia);
-          const cerrado = delDia.length === 0;
-          return (
-            <div
-              key={dia}
-              className={`rounded-lg border p-4 ${
-                cerrado ? "border-neutral-200 bg-neutral-50" : "border-neutral-200 bg-white"
-              }`}
-            >
-              <div className="mb-3 flex items-center justify-between">
-                <p className="font-semibold text-neutral-900">{NOMBRES_DIA[dia]}</p>
-                {cerrado && (
-                  <span className="rounded-full bg-neutral-200 px-2.5 py-0.5 text-xs font-medium text-neutral-600">
-                    Cerrado
-                  </span>
-                )}
-              </div>
+      <div className="overflow-hidden rounded-lg border border-neutral-200 bg-white">
+        <div className="hidden border-b border-neutral-200 bg-neutral-50 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-neutral-500 sm:flex">
+          <span className="w-28 flex-none">Día</span>
+          <span className="flex-1">Horarios</span>
+          <span className="w-64 flex-none">Agregar tramo</span>
+        </div>
 
-              {delDia.length > 0 && (
-                <div className="mb-3 flex flex-wrap gap-2">
-                  {delDia.map((t) => (
-                    <div
-                      key={t.id}
-                      className="flex items-center gap-2 rounded-full border border-neutral-300 bg-white px-3 py-1.5 text-sm"
-                    >
-                      {t.abre} a {t.cierra}
-                      {t.cierra <= t.abre && (
-                        <span className="text-xs text-neutral-400">(del día siguiente)</span>
-                      )}
-                      <EliminarTramoBoton id={t.id} />
-                    </div>
-                  ))}
+        <div className="divide-y divide-neutral-100">
+          {DIAS_ORDENADOS.map((dia) => {
+            const delDia = tramos.filter((t) => t.diaSemana === dia);
+            const cerrado = delDia.length === 0;
+            return (
+              <div
+                key={dia}
+                className={`flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-3 sm:flex-nowrap ${
+                  cerrado ? "bg-neutral-50/60" : ""
+                }`}
+              >
+                <span className="w-28 flex-none font-medium text-neutral-900">
+                  {NOMBRES_DIA[dia]}
+                </span>
+
+                <div className="flex min-w-[160px] flex-1 flex-wrap items-center gap-1.5">
+                  {cerrado ? (
+                    <span className="rounded-full bg-neutral-200 px-2.5 py-0.5 text-xs font-medium text-neutral-600">
+                      Cerrado
+                    </span>
+                  ) : (
+                    delDia.map((t) => (
+                      <span
+                        key={t.id}
+                        className="inline-flex items-center gap-1.5 rounded-full border border-neutral-300 px-2.5 py-1 text-sm"
+                      >
+                        {t.abre}–{t.cierra}
+                        {t.cierra <= t.abre && (
+                          <span className="text-[10px] text-neutral-400">+1 día</span>
+                        )}
+                        <EliminarTramoBoton id={t.id} />
+                      </span>
+                    ))
+                  )}
                 </div>
-              )}
 
-              <form action={agregarTramoHorario} className="flex flex-wrap items-center gap-2">
-                <input type="hidden" name="diaSemana" value={dia} />
-                <label className="text-xs text-neutral-500">Abre</label>
-                <input
-                  type="time"
-                  name="abre"
-                  required
-                  className="rounded-lg border border-neutral-300 px-2 py-1.5 text-sm"
-                />
-                <label className="text-xs text-neutral-500">Cierra</label>
-                <input
-                  type="time"
-                  name="cierra"
-                  required
-                  className="rounded-lg border border-neutral-300 px-2 py-1.5 text-sm"
-                />
-                <button
-                  type="submit"
-                  className="rounded-lg bg-neutral-800 px-3 py-1.5 text-sm font-medium text-white hover:bg-neutral-700"
+                <form
+                  action={agregarTramoHorario}
+                  className="flex w-full flex-none items-center gap-1.5 sm:w-64"
                 >
-                  Agregar tramo
-                </button>
-              </form>
-            </div>
-          );
-        })}
+                  <input type="hidden" name="diaSemana" value={dia} />
+                  <input
+                    type="time"
+                    name="abre"
+                    required
+                    aria-label={`Hora de apertura del ${NOMBRES_DIA[dia]}`}
+                    className="w-full rounded-lg border border-neutral-300 px-2 py-1.5 text-sm"
+                  />
+                  <span className="text-neutral-400">–</span>
+                  <input
+                    type="time"
+                    name="cierra"
+                    required
+                    aria-label={`Hora de cierre del ${NOMBRES_DIA[dia]}`}
+                    className="w-full rounded-lg border border-neutral-300 px-2 py-1.5 text-sm"
+                  />
+                  <button
+                    type="submit"
+                    aria-label={`Agregar tramo al ${NOMBRES_DIA[dia]}`}
+                    className="flex-none rounded-lg bg-neutral-800 px-2.5 py-1.5 text-sm font-semibold text-white hover:bg-neutral-700"
+                  >
+                    +
+                  </button>
+                </form>
+              </div>
+            );
+          })}
+        </div>
       </div>
 
       <p className="mt-6 text-xs text-neutral-400">

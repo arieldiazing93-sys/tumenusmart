@@ -5,6 +5,7 @@ import { CartBar } from "@/components/CartBar";
 import { MitadYMitadPicker } from "@/components/MitadYMitadPicker";
 import { CarruselDestacados } from "@/components/CarruselDestacados";
 import { AvisoTienda } from "@/components/AvisoTienda";
+import { EstadoAperturaBadge } from "@/components/EstadoAperturaBadge";
 import { obtenerEstadoTienda } from "@/lib/estado-tienda";
 
 export const dynamic = "force-dynamic";
@@ -81,6 +82,7 @@ export default async function CatalogoPage() {
           {store?.direccion && (
             <p className="text-sm text-neutral-500">{store.direccion}</p>
           )}
+          <EstadoAperturaBadge estado={estadoTienda} />
         </div>
       </header>
 

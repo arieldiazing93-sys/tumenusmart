@@ -8,6 +8,8 @@ import { TURNOS, MOTIVOS_RESERVA } from "@/lib/reservas";
 type Props = {
   horariosPorTurno: Record<string, string[]>;
   hoy: string;
+  /** hora "HH:MM" del reloj de Asunción al cargar la página */
+  horaActual: string;
   /** días de la semana (0 = domingo) en los que el local no abre */
   diasCerrados: number[];
   nombresDia: string[];
@@ -22,7 +24,13 @@ function diaSemanaDe(clave: string): number | null {
   ).getUTCDay();
 }
 
-export function ReservaForm({ horariosPorTurno, hoy, diasCerrados, nombresDia }: Props) {
+export function ReservaForm({
+  horariosPorTurno,
+  hoy,
+  horaActual,
+  diasCerrados,
+  nombresDia,
+}: Props) {
   const router = useRouter();
 
   const [fecha, setFecha] = useState("");
@@ -40,6 +48,13 @@ export function ReservaForm({ horariosPorTurno, hoy, diasCerrados, nombresDia }:
   // en que el local no abre.
   const diaDeLaFecha = fecha ? diaSemanaDe(fecha) : null;
   const diaElegidoCerrado = diaDeLaFecha != null && diasCerrados.includes(diaDeLaFecha);
+
+  // Reservar para hoy solo tiene sentido a futuro: un horario que ya pasó
+  // no se puede elegir. Para otros días, todos los horarios están libres.
+  const esHoy = fecha === hoy;
+  function horarioYaPaso(hora: string): boolean {
+    return esHoy && hora <= horaActual;
+  }
 
   function elegirTurno(t: string) {
     setTurno(t);
@@ -64,6 +79,10 @@ export function ReservaForm({ horariosPorTurno, hoy, diasCerrados, nombresDia }:
     }
     if (!horario) {
       setError("Elegí un horario.");
+      return;
+    }
+    if (horarioYaPaso(horario)) {
+      setError("Ese horario ya pasó. Elegí uno más tarde u otra fecha.");
       return;
     }
     if (!personas || personas < 1) {
@@ -105,7 +124,12 @@ export function ReservaForm({ horariosPorTurno, hoy, diasCerrados, nombresDia }:
           required
           min={hoy}
           value={fecha}
-          onChange={(e) => setFecha(e.target.value)}
+          onChange={(e) => {
+            setFecha(e.target.value);
+            // Cambiar de fecha puede dejar inválido el horario ya elegido
+            // (ej: pasar a hoy y que ese horario ya haya pasado).
+            setHorario("");
+          }}
           className={`w-full rounded-lg border px-3 py-2 ${
             diaElegidoCerrado ? "border-red-400 bg-red-50" : "border-neutral-300"
           }`}
@@ -158,22 +182,37 @@ export function ReservaForm({ horariosPorTurno, hoy, diasCerrados, nombresDia }:
                 Todavía no hay horarios cargados para este turno. Probá con otro turno.
               </p>
             ) : (
-              <div className="flex flex-wrap gap-2">
-                {horariosDelTurno.map((h) => (
-                  <button
-                    key={h}
-                    type="button"
-                    onClick={() => setHorario(h)}
-                    className={`rounded-full border px-3 py-1.5 text-sm ${
-                      horario === h
-                        ? "border-brand bg-brand text-white"
-                        : "border-neutral-300 text-neutral-600"
-                    }`}
-                  >
-                    {h}
-                  </button>
-                ))}
-              </div>
+              <>
+                <div className="flex flex-wrap gap-2">
+                  {horariosDelTurno.map((h) => {
+                    const paso = horarioYaPaso(h);
+                    return (
+                      <button
+                        key={h}
+                        type="button"
+                        disabled={paso}
+                        title={paso ? "Ese horario ya pasó" : undefined}
+                        onClick={() => setHorario(h)}
+                        className={`rounded-full border px-3 py-1.5 text-sm ${
+                          paso
+                            ? "cursor-not-allowed border-neutral-200 text-neutral-300 line-through"
+                            : horario === h
+                              ? "border-brand bg-brand text-white"
+                              : "border-neutral-300 text-neutral-600"
+                        }`}
+                      >
+                        {h}
+                      </button>
+                    );
+                  })}
+                </div>
+                {esHoy && horariosDelTurno.every(horarioYaPaso) && (
+                  <p className="mt-2 text-sm text-amber-700">
+                    Todos los horarios de este turno ya pasaron por hoy. Elegí otro turno u
+                    otra fecha.
+                  </p>
+                )}
+              </>
             )}
           </div>
         )}

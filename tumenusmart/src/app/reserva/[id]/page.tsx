@@ -5,6 +5,7 @@ import { construirMensajeReserva, construirLinkWhatsapp } from "@/lib/whatsapp";
 import { ZONA_NEGOCIO } from "@/lib/timezone";
 import { etiquetaTurno, etiquetaMotivo } from "@/lib/reservas";
 import { formatearNumero } from "@/lib/format";
+import { BotonWhatsappReserva } from "./BotonWhatsappReserva";
 
 export const dynamic = "force-dynamic";
 
@@ -51,18 +52,27 @@ export default async function ConfirmacionReservaPage({
       <h1 className="mb-2 text-xl font-bold text-neutral-900">
         Reserva {formatearNumero(reserva.numero)} generada
       </h1>
-      <p className="mb-8 text-neutral-600">
-        Un último paso: enviá la reserva por WhatsApp para que {store.nombre} la confirme.
-      </p>
+      {reserva.enviadoWhatsapp ? (
+        <p className="mb-8 text-neutral-600">
+          Ya le enviaste la reserva a {store.nombre}. Te van a confirmar por WhatsApp.
+        </p>
+      ) : (
+        <div className="mx-auto mb-8 max-w-md rounded-xl border border-amber-300 bg-amber-50 p-4">
+          <p className="font-semibold text-amber-900">Todavía falta enviarla</p>
+          <p className="mt-0.5 text-sm text-amber-800">
+            La reserva se confirma recién cuando la mandás por WhatsApp — hasta entonces{" "}
+            {store.nombre} no la ve.
+          </p>
+        </div>
+      )}
 
-      <a
-        href={linkWhatsapp}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="mb-8 inline-flex items-center gap-2 rounded-lg bg-[#25D366] px-6 py-3 font-medium text-white hover:opacity-90"
-      >
-        Enviar por WhatsApp
-      </a>
+      <div className="mb-8">
+        <BotonWhatsappReserva
+          reservationId={reserva.id}
+          link={linkWhatsapp}
+          yaEnviado={reserva.enviadoWhatsapp}
+        />
+      </div>
 
       <div className="rounded-lg border border-neutral-200 bg-white p-4 text-left text-sm text-neutral-700">
         <pre className="whitespace-pre-wrap font-sans">{mensaje}</pre>

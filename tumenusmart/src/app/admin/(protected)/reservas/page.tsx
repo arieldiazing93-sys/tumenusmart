@@ -106,10 +106,18 @@ export default async function AdminReservasPage({
     lt = inicioDeMesSiguienteEnAsuncion(refMes);
   }
 
-  const reservas = await prisma.reservation.findMany({
-    where: { fecha: { gte, lt } },
-    orderBy: [{ fecha: "asc" }, { horario: "asc" }],
-  });
+  // Solo entran al calendario las reservas que el cliente realmente envió
+  // por WhatsApp. Las que quedaron a medio camino se cuentan aparte, para
+  // que el encargado sepa que existen sin que le ensucien la agenda.
+  const [reservas, sinEnviar] = await Promise.all([
+    prisma.reservation.findMany({
+      where: { fecha: { gte, lt }, enviadoWhatsapp: true },
+      orderBy: [{ fecha: "asc" }, { horario: "asc" }],
+    }),
+    prisma.reservation.count({
+      where: { fecha: { gte, lt }, enviadoWhatsapp: false },
+    }),
+  ]);
 
   const porDia = new Map<string, ReservaFila[]>();
   for (const r of reservas) {
@@ -130,6 +138,13 @@ export default async function AdminReservasPage({
           ⚙ Horarios
         </Link>
       </div>
+
+      {sinEnviar > 0 && (
+        <p className="mb-4 rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2 text-xs text-neutral-500">
+          {sinEnviar} {sinEnviar === 1 ? "persona empezó" : "personas empezaron"} una reserva en
+          este período pero nunca la envió por WhatsApp, así que no figura en el calendario.
+        </p>
+      )}
 
       <div className="mb-6 flex gap-2">
         {VISTAS.map((v) => (

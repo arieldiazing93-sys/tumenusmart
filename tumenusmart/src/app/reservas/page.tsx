@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
-import { claveDiaAsuncion } from "@/lib/timezone";
+import { claveDiaAsuncion, horaAsuncion } from "@/lib/timezone";
 import { diasCerrados, NOMBRES_DIA } from "@/lib/horario-atencion";
 import { ReservaForm } from "./ReservaForm";
 
@@ -38,6 +38,7 @@ export default async function ReservasPage() {
       <ReservaForm
         horariosPorTurno={horariosPorTurno}
         hoy={claveDiaAsuncion(new Date())}
+        horaActual={horaAsuncion(new Date())}
         diasCerrados={cerrados}
         nombresDia={NOMBRES_DIA}
       />

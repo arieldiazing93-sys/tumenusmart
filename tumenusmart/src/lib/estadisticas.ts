@@ -69,8 +69,10 @@ export async function calcularEstadisticas(rango: RangoFecha) {
 // muestra cuántas reservas hay agendadas para esos días, que es lo que le
 // interesa al encargado, no cuándo se cargaron.
 export async function calcularEstadisticasReservas(rango: RangoFecha) {
+  // Igual que el calendario: solo cuentan las reservas que el cliente
+  // llegó a enviar por WhatsApp.
   const reservas = await prisma.reservation.findMany({
-    where: { fecha: rango },
+    where: { fecha: rango, enviadoWhatsapp: true },
     orderBy: { fecha: "asc" },
   });
 

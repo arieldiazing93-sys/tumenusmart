@@ -1,7 +1,7 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
-import { fechaAsuncionDesdeTexto } from "@/lib/timezone";
+import { fechaAsuncionDesdeTexto, claveDiaAsuncion, horaAsuncion } from "@/lib/timezone";
 import { TURNOS, MOTIVOS_RESERVA } from "@/lib/reservas";
 import { diasCerrados, diaSemanaDeClave, NOMBRES_DIA } from "@/lib/horario-atencion";
 
@@ -35,6 +35,17 @@ export async function crearReserva(datos: DatosReserva): Promise<{ reservationId
 
   const fecha = fechaAsuncionDesdeTexto(datos.fecha);
   if (!fecha) throw new Error("Fecha inválida");
+
+  // Nada de reservar para atrás: ni un día pasado, ni un horario de hoy
+  // que ya transcurrió. Se compara siempre contra el reloj de Asunción.
+  const ahora = new Date();
+  const hoy = claveDiaAsuncion(ahora);
+  if (datos.fecha < hoy) {
+    throw new Error("Esa fecha ya pasó. Elegí una fecha de hoy en adelante.");
+  }
+  if (datos.fecha === hoy && datos.horario <= horaAsuncion(ahora)) {
+    throw new Error("Ese horario ya pasó. Elegí uno más tarde u otra fecha.");
+  }
 
   // No se acepta una reserva para un día en que el local no abre, aunque el
   // navegador se saltee el aviso del formulario.

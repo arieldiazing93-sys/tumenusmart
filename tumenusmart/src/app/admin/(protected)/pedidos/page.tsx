@@ -6,6 +6,7 @@ import { calcularRangoFecha, type FiltroFecha } from "@/lib/rango-fecha";
 import { ZONA_NEGOCIO } from "@/lib/timezone";
 import { obtenerEstadoTienda } from "@/lib/estado-tienda";
 import { PausaPedidosToggle } from "../PausaPedidosToggle";
+import { AvisoPedidosNuevos } from "./AvisoPedidosNuevos";
 
 export const dynamic = "force-dynamic";
 
@@ -26,7 +27,7 @@ export default async function AdminPedidosPage({
   const rangoFecha = calcularRangoFecha(fecha, desde, hasta);
   const fechaActiva = rangoFecha ? fecha : null;
 
-  const [pedidos, store, estadoTienda] = await Promise.all([
+  const [pedidos, store, estadoTienda, pedidosEnviados] = await Promise.all([
     prisma.order.findMany({
       where: {
         ...(estadoActivo ? { estado: estadoActivo } : {}),
@@ -38,6 +39,9 @@ export default async function AdminPedidosPage({
     }),
     prisma.store.findFirst(),
     obtenerEstadoTienda(),
+    // Punto de partida del vigilante de pedidos nuevos: si este número
+    // sube mientras la pantalla está abierta, es que entró un pedido.
+    prisma.order.count({ where: { enviadoWhatsapp: true } }),
   ]);
 
   // Arma un querystring preservando los otros filtros activos, para que
@@ -63,6 +67,8 @@ export default async function AdminPedidosPage({
   return (
     <div>
       <h1 className="mb-4 text-xl font-bold text-neutral-900">Pedidos</h1>
+
+      <AvisoPedidosNuevos enviadosIniciales={pedidosEnviados} />
 
       <div className="mb-6">
         <PausaPedidosToggle
