@@ -31,7 +31,7 @@ export default async function DetallePedidoPage({
         ← Volver a pedidos
       </Link>
 
-      <div className="mb-6 flex flex-wrap items-start justify-between gap-2">
+      <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-xl font-bold text-neutral-900">
             Pedido {formatearNumero(pedido.numero)}
@@ -39,6 +39,27 @@ export default async function DetallePedidoPage({
           <p className="text-sm text-neutral-500">
             {new Date(pedido.createdAt).toLocaleString("es-PY", { timeZone: ZONA_NEGOCIO })}
           </p>
+        </div>
+
+        {/* Se abren en una pestaña aparte y disparan la impresión solas, para
+            no perder de vista el pedido que se está atendiendo. */}
+        <div className="flex flex-wrap gap-2">
+          <a
+            href={`/admin/pedidos/${pedido.id}/comanda`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="rounded-lg bg-neutral-900 px-3 py-2 text-sm font-semibold text-white hover:bg-neutral-700"
+          >
+            👨‍🍳 Comanda de cocina
+          </a>
+          <a
+            href={`/admin/pedidos/${pedido.id}/ticket`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="rounded-lg border border-neutral-300 px-3 py-2 text-sm font-semibold text-neutral-700 hover:border-brand hover:text-brand"
+          >
+            🧾 Ticket
+          </a>
         </div>
       </div>
 
