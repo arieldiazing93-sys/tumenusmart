@@ -1,18 +1,45 @@
 "use client";
 
-import { useTransition } from "react";
-import { eliminarZona } from "./actions";
+import { useState, useTransition } from "react";
+import { eliminarZona, alternarActivaZona } from "./actions";
 
-export function EliminarZonaBoton({ id }: { id: string }) {
+export function EliminarZonaBoton({ id, activo }: { id: string; activo: boolean }) {
   const [pending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+
+  function borrar() {
+    setError(null);
+    if (!confirm("¿Borrar esta zona? No se puede deshacer.")) return;
+    startTransition(async () => {
+      try {
+        await eliminarZona(id);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "No se pudo borrar.");
+      }
+    });
+  }
+
   return (
-    <button
-      type="button"
-      disabled={pending}
-      onClick={() => startTransition(() => eliminarZona(id))}
-      className="text-sm text-red-500 hover:underline disabled:opacity-50"
-    >
-      Borrar
-    </button>
+    <div className="flex flex-col items-end gap-1">
+      <div className="flex items-center gap-3">
+        <button
+          type="button"
+          disabled={pending}
+          onClick={() => startTransition(() => alternarActivaZona(id, !activo))}
+          className="text-sm text-neutral-600 hover:underline disabled:opacity-50"
+        >
+          {activo ? "Desactivar" : "Activar"}
+        </button>
+        <button
+          type="button"
+          disabled={pending}
+          onClick={borrar}
+          className="text-sm text-red-500 hover:underline disabled:opacity-50"
+        >
+          Borrar
+        </button>
+      </div>
+      {error && <p className="max-w-xs text-right text-xs text-red-600">{error}</p>}
+    </div>
   );
 }

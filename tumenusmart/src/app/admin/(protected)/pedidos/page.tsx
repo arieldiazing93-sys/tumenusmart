@@ -2,53 +2,11 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { formatearGuarani } from "@/lib/format";
 import { ESTADOS_PEDIDO, etiquetaEstado, colorEstado } from "@/lib/estados-pedido";
+import { calcularRangoFecha, type FiltroFecha } from "@/lib/rango-fecha";
 
 export const dynamic = "force-dynamic";
 
-type FiltrosFecha = "hoy" | "ayer" | "7dias" | "mes" | "rango";
-
-function sumarDias(fecha: Date, dias: number): Date {
-  const copia = new Date(fecha);
-  copia.setDate(copia.getDate() + dias);
-  return copia;
-}
-
-// Calcula el rango [gte, lt) según el filtro de fecha elegido. Usa la fecha
-// del servidor tal cual (sin conversión de huso horario) — igual criterio
-// que ya usa la columna "Hora" de esta misma tabla.
-function calcularRangoFecha(
-  fecha: string | undefined,
-  desde: string | undefined,
-  hasta: string | undefined
-): { gte: Date; lt: Date } | null {
-  const ahora = new Date();
-  const inicioHoy = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate());
-
-  switch (fecha as FiltrosFecha | undefined) {
-    case "hoy":
-      return { gte: inicioHoy, lt: sumarDias(inicioHoy, 1) };
-    case "ayer":
-      return { gte: sumarDias(inicioHoy, -1), lt: inicioHoy };
-    case "7dias":
-      return { gte: sumarDias(inicioHoy, -6), lt: sumarDias(inicioHoy, 1) };
-    case "mes": {
-      const inicioMes = new Date(ahora.getFullYear(), ahora.getMonth(), 1);
-      const inicioMesSiguiente = new Date(ahora.getFullYear(), ahora.getMonth() + 1, 1);
-      return { gte: inicioMes, lt: inicioMesSiguiente };
-    }
-    case "rango": {
-      if (!desde || !hasta) return null;
-      const inicio = new Date(`${desde}T00:00:00`);
-      const fin = new Date(`${hasta}T00:00:00`);
-      if (isNaN(inicio.getTime()) || isNaN(fin.getTime())) return null;
-      return { gte: inicio, lt: sumarDias(fin, 1) };
-    }
-    default:
-      return null;
-  }
-}
-
-const FILTROS_FECHA: { value: FiltrosFecha; label: string }[] = [
+const FILTROS_FECHA: { value: FiltroFecha; label: string }[] = [
   { value: "hoy", label: "Hoy" },
   { value: "ayer", label: "Ayer" },
   { value: "7dias", label: "Últimos 7 días" },
@@ -87,7 +45,7 @@ export default async function AdminPedidosPage({
     return qs ? `/admin/pedidos?${qs}` : "/admin/pedidos";
   }
 
-  function hrefFecha(nuevaFecha: FiltrosFecha | null) {
+  function hrefFecha(nuevaFecha: FiltroFecha | null) {
     const params = new URLSearchParams();
     if (estadoActivo) params.set("estado", estadoActivo);
     if (nuevaFecha) params.set("fecha", nuevaFecha);

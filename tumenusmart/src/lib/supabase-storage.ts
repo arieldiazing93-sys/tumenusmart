@@ -15,10 +15,12 @@ function clienteAdmin() {
 }
 
 /**
- * Sube una imagen de producto a Supabase Storage (bucket público "productos")
- * y devuelve su URL pública. Se usa desde un Server Action del panel admin.
+ * Sube una imagen a Supabase Storage (bucket público "productos", opcionalmente
+ * dentro de una subcarpeta) y devuelve su URL pública. Se usa desde Server
+ * Actions del panel admin — tanto para fotos de producto como para el logo
+ * del negocio.
  */
-export async function subirImagenProducto(archivo: File): Promise<string> {
+async function subirImagen(archivo: File, carpeta = ""): Promise<string> {
   if (!archivo || archivo.size === 0) {
     throw new Error("No se seleccionó ninguna imagen");
   }
@@ -31,7 +33,7 @@ export async function subirImagenProducto(archivo: File): Promise<string> {
 
   const supabase = clienteAdmin();
   const extension = (archivo.name.split(".").pop() || "jpg").toLowerCase();
-  const nombreArchivo = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${extension}`;
+  const nombreArchivo = `${carpeta}${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${extension}`;
 
   const buffer = Buffer.from(await archivo.arrayBuffer());
   const { error } = await supabase.storage
@@ -44,4 +46,12 @@ export async function subirImagenProducto(archivo: File): Promise<string> {
 
   const { data } = supabase.storage.from(NOMBRE_BUCKET).getPublicUrl(nombreArchivo);
   return data.publicUrl;
+}
+
+export async function subirImagenProducto(archivo: File): Promise<string> {
+  return subirImagen(archivo);
+}
+
+export async function subirLogoNegocio(archivo: File): Promise<string> {
+  return subirImagen(archivo, "logos/");
 }

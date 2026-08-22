@@ -4,6 +4,7 @@ import { formatearGuarani } from "@/lib/format";
 import { actualizarStore, crearZona } from "./actions";
 import { EliminarZonaBoton } from "./EliminarZonaBoton";
 import { StoreLocationField } from "./StoreLocationField";
+import { LogoField } from "./LogoField";
 import { GuardadoToast } from "@/components/GuardadoToast";
 
 export const dynamic = "force-dynamic";
@@ -57,16 +58,7 @@ export default async function AdminConfiguracionPage() {
               className="w-full rounded-lg border border-neutral-300 px-3 py-2"
             />
           </div>
-          <div>
-            <label className="mb-1 block text-sm font-medium text-neutral-700">
-              URL del logo (opcional)
-            </label>
-            <input
-              name="logoUrl"
-              defaultValue={store?.logoUrl ?? ""}
-              className="w-full rounded-lg border border-neutral-300 px-3 py-2"
-            />
-          </div>
+          <LogoField initialUrl={store?.logoUrl ?? null} />
           <div>
             <label className="mb-1 block text-sm font-medium text-neutral-700">
               Saludo inicial del mensaje de WhatsApp (opcional)
@@ -187,16 +179,21 @@ export default async function AdminConfiguracionPage() {
           {zonas.map((z) => (
             <div
               key={z.id}
-              className="flex items-center justify-between rounded-lg border border-neutral-200 bg-white px-4 py-2"
+              className={`flex items-center justify-between rounded-lg border border-neutral-200 bg-white px-4 py-2 ${
+                z.activo ? "" : "opacity-60"
+              }`}
             >
               <span>
                 {z.nombre} <span className="text-neutral-400">— hasta {Number(z.radioKm)} km</span>
+                {!z.activo && (
+                  <span className="ml-2 text-xs font-normal text-neutral-400">(inactiva)</span>
+                )}
               </span>
               <div className="flex items-center gap-4">
                 <span className="text-sm text-neutral-500">
                   {formatearGuarani(Number(z.costoEnvio))}
                 </span>
-                <EliminarZonaBoton id={z.id} />
+                <EliminarZonaBoton id={z.id} activo={z.activo} />
               </div>
             </div>
           ))}
