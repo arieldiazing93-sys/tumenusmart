@@ -3,6 +3,7 @@
 import { prisma } from "@/lib/prisma";
 import { fechaAsuncionDesdeTexto } from "@/lib/timezone";
 import { TURNOS, MOTIVOS_RESERVA } from "@/lib/reservas";
+import { diasCerrados, diaSemanaDeClave, NOMBRES_DIA } from "@/lib/horario-atencion";
 
 export type DatosReserva = {
   fecha: string; // "YYYY-MM-DD"
@@ -34,6 +35,17 @@ export async function crearReserva(datos: DatosReserva): Promise<{ reservationId
 
   const fecha = fechaAsuncionDesdeTexto(datos.fecha);
   if (!fecha) throw new Error("Fecha inválida");
+
+  // No se acepta una reserva para un día en que el local no abre, aunque el
+  // navegador se saltee el aviso del formulario.
+  const horariosAtencion = await prisma.horarioAtencion.findMany();
+  const cerrados = diasCerrados(horariosAtencion);
+  const diaSemana = diaSemanaDeClave(datos.fecha);
+  if (diaSemana != null && cerrados.includes(diaSemana)) {
+    throw new Error(
+      `Los ${NOMBRES_DIA[diaSemana].toLowerCase()} el local está cerrado. Elegí otra fecha.`
+    );
+  }
 
   const reserva = await prisma.reservation.create({
     data: {

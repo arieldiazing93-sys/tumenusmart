@@ -4,6 +4,8 @@ import { formatearGuarani, formatearNumero } from "@/lib/format";
 import { ESTADOS_PEDIDO, etiquetaEstado, colorEstado } from "@/lib/estados-pedido";
 import { calcularRangoFecha, type FiltroFecha } from "@/lib/rango-fecha";
 import { ZONA_NEGOCIO } from "@/lib/timezone";
+import { obtenerEstadoTienda } from "@/lib/estado-tienda";
+import { PausaPedidosToggle } from "../PausaPedidosToggle";
 
 export const dynamic = "force-dynamic";
 
@@ -24,15 +26,19 @@ export default async function AdminPedidosPage({
   const rangoFecha = calcularRangoFecha(fecha, desde, hasta);
   const fechaActiva = rangoFecha ? fecha : null;
 
-  const pedidos = await prisma.order.findMany({
-    where: {
-      ...(estadoActivo ? { estado: estadoActivo } : {}),
-      ...(rangoFecha ? { createdAt: rangoFecha } : {}),
-    },
-    orderBy: { createdAt: "desc" },
-    include: { items: true, deliveryZone: true, repartidor: true },
-    take: 100,
-  });
+  const [pedidos, store, estadoTienda] = await Promise.all([
+    prisma.order.findMany({
+      where: {
+        ...(estadoActivo ? { estado: estadoActivo } : {}),
+        ...(rangoFecha ? { createdAt: rangoFecha } : {}),
+      },
+      orderBy: { createdAt: "desc" },
+      include: { items: true, deliveryZone: true, repartidor: true },
+      take: 100,
+    }),
+    prisma.store.findFirst(),
+    obtenerEstadoTienda(),
+  ]);
 
   // Arma un querystring preservando los otros filtros activos, para que
   // cambiar de estado no te haga perder el filtro de fecha y viceversa.
@@ -56,7 +62,21 @@ export default async function AdminPedidosPage({
 
   return (
     <div>
-      <h1 className="mb-6 text-xl font-bold text-neutral-900">Pedidos</h1>
+      <h1 className="mb-4 text-xl font-bold text-neutral-900">Pedidos</h1>
+
+      <div className="mb-6">
+        <PausaPedidosToggle
+          pausado={store?.pedidosPausados ?? false}
+          mensaje={store?.mensajePausa ?? null}
+          compacto
+        />
+        {!estadoTienda.abierto && !estadoTienda.pausado && (
+          <p className="mt-2 text-sm text-amber-700">
+            🕒 Fuera de horario: el menú no está tomando pedidos
+            {estadoTienda.proximaApertura ? ` — abre ${estadoTienda.proximaApertura}` : ""}.
+          </p>
+        )}
+      </div>
 
       <div className="mb-3 flex flex-wrap gap-2">
         <Link
@@ -178,6 +198,14 @@ export default async function AdminPedidosPage({
                     <td className="px-3 py-3">
                       <Link href={`/admin/pedidos/${pedido.id}`} className="block font-medium text-neutral-500">
                         {formatearNumero(pedido.numero)}
+                        {!pedido.enviadoWhatsapp && pedido.estado === "pendiente" && (
+                          <span
+                            title="El cliente armó el pedido pero nunca apretó 'Enviar por WhatsApp'"
+                            className="mt-0.5 block text-[10px] font-medium uppercase text-amber-600"
+                          >
+                            sin enviar
+                          </span>
+                        )}
                       </Link>
                     </td>
                     <td className="px-3 py-3">

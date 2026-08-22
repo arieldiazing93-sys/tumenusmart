@@ -30,7 +30,7 @@ export function GuardadoToast() {
   if (!visible) return null;
 
   return (
-    <div className="fixed bottom-4 right-4 z-50 flex items-center gap-2 rounded-lg bg-neutral-900 px-4 py-3 text-sm font-medium text-white shadow-lg">
+    <div className="fixed top-4 right-4 z-50 flex items-center gap-2 rounded-lg bg-neutral-900 px-4 py-3 text-sm font-medium text-white shadow-lg">
       <span>✓</span>
       Guardado
     </div>

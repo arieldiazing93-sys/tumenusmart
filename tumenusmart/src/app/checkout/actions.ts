@@ -2,6 +2,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { distanciaKm, encontrarZonaPorDistancia } from "@/lib/geo";
+import { obtenerEstadoTienda, motivoSinPedidos } from "@/lib/estado-tienda";
 
 type ItemEntrada = {
   /** ausente cuando el ítem es un combo "mitad y mitad" (no corresponde a un único producto) */
@@ -30,6 +31,13 @@ export type DatosCheckout = {
 };
 
 export async function crearPedido(datos: DatosCheckout): Promise<{ orderId: string }> {
+  // Se vuelve a chequear acá, no solo en el formulario: si el local cerró o
+  // pausó mientras el cliente completaba sus datos, el pedido no entra.
+  const estadoTienda = await obtenerEstadoTienda();
+  if (!estadoTienda.aceptaPedidos) {
+    throw new Error(motivoSinPedidos(estadoTienda) ?? "En este momento no se pueden tomar pedidos.");
+  }
+
   if (!datos.clienteNombre?.trim() || !datos.clienteTelefono?.trim()) {
     throw new Error("Faltan datos de contacto");
   }

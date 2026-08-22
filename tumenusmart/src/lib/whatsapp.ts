@@ -27,6 +27,8 @@ type DatosMensaje = {
   subtotal: number;
   costoEnvio: number;
   total: number;
+  /** link público donde el cliente sigue el estado del pedido en vivo */
+  linkSeguimiento?: string | null;
 };
 
 const ETIQUETAS_PAGO: Record<string, string> = {
@@ -91,6 +93,11 @@ export function construirMensajePedido(datos: DatosMensaje): string {
   if (datos.notas) {
     lineas.push("");
     lineas.push(`Nota: ${datos.notas}`);
+  }
+
+  if (datos.linkSeguimiento) {
+    lineas.push("");
+    lineas.push(`Seguí tu pedido acá: ${datos.linkSeguimiento}`);
   }
 
   return lineas.join("\n");

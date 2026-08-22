@@ -28,10 +28,20 @@ type Props = {
   storeLat: number | null;
   storeLng: number | null;
   envioModo: "zonas" | "coordinar";
+  /** false cuando el local está cerrado o con los pedidos pausados */
+  aceptaPedidos: boolean;
+  motivoBloqueo: string | null;
   zonas: Zona[];
 };
 
-export function CheckoutForm({ storeLat, storeLng, envioModo, zonas }: Props) {
+export function CheckoutForm({
+  storeLat,
+  storeLng,
+  envioModo,
+  aceptaPedidos,
+  motivoBloqueo,
+  zonas,
+}: Props) {
   const router = useRouter();
   const { items, subtotal, vaciarCarrito } = useCart();
 
@@ -88,6 +98,10 @@ export function CheckoutForm({ storeLat, storeLng, envioModo, zonas }: Props) {
     e.preventDefault();
     setError(null);
 
+    if (!aceptaPedidos) {
+      setError(motivoBloqueo ?? "En este momento no se pueden tomar pedidos.");
+      return;
+    }
     if (items.length === 0) {
       setError("Tu carrito está vacío.");
       return;
@@ -347,10 +361,14 @@ export function CheckoutForm({ storeLat, storeLng, envioModo, zonas }: Props) {
 
       <button
         type="submit"
-        disabled={enviando}
-        className="rounded-lg bg-brand px-6 py-3 font-medium text-white hover:bg-brand-dark disabled:opacity-60"
+        disabled={enviando || !aceptaPedidos}
+        className="rounded-lg bg-brand px-6 py-3 font-medium text-white hover:bg-brand-dark disabled:cursor-not-allowed disabled:bg-neutral-300"
       >
-        {enviando ? "Generando pedido..." : "Confirmar pedido"}
+        {!aceptaPedidos
+          ? "No disponible en este momento"
+          : enviando
+            ? "Generando pedido..."
+            : "Confirmar pedido"}
       </button>
     </form>
   );

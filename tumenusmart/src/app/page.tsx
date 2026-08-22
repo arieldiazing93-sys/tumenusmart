@@ -4,11 +4,13 @@ import { ProductCard } from "@/components/ProductCard";
 import { CartBar } from "@/components/CartBar";
 import { MitadYMitadPicker } from "@/components/MitadYMitadPicker";
 import { CarruselDestacados } from "@/components/CarruselDestacados";
+import { AvisoTienda } from "@/components/AvisoTienda";
+import { obtenerEstadoTienda } from "@/lib/estado-tienda";
 
 export const dynamic = "force-dynamic";
 
 export default async function CatalogoPage() {
-  const [store, categorias, destacados] = await Promise.all([
+  const [store, categorias, destacados, estadoTienda] = await Promise.all([
     prisma.store.findFirst(),
     prisma.category.findMany({
       where: { activa: true },
@@ -24,8 +26,8 @@ export default async function CatalogoPage() {
     prisma.product.findMany({
       where: { destacado: true, disponible: true },
       orderBy: { orden: "asc" },
-      include: { opciones: true },
     }),
+    obtenerEstadoTienda(),
   ]);
 
   // Agrupa TODOS los productos disponibles (de cualquier categoría) por su
@@ -82,6 +84,8 @@ export default async function CatalogoPage() {
         </div>
       </header>
 
+      <AvisoTienda estado={estadoTienda} />
+
       <div className="mb-6 flex justify-end">
         <Link
           href="/reservas"
@@ -97,7 +101,6 @@ export default async function CatalogoPage() {
           nombre: p.nombre,
           precio: Number(p.precio),
           imagenUrl: p.imagenUrl,
-          tieneVariantes: p.opciones.some((o) => o.tipo === "variante"),
         }))}
       />
 

@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { formatearGuarani } from "@/lib/format";
 import { actualizarStore, crearZona } from "./actions";
@@ -6,13 +7,16 @@ import { EliminarZonaBoton } from "./EliminarZonaBoton";
 import { StoreLocationField } from "./StoreLocationField";
 import { LogoField } from "./LogoField";
 import { GuardadoToast } from "@/components/GuardadoToast";
+import { PausaPedidosToggle } from "../PausaPedidosToggle";
+import { NOMBRES_DIA, DIAS_ORDENADOS, resumenDia } from "@/lib/horario-atencion";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminConfiguracionPage() {
-  const [store, zonas] = await Promise.all([
+  const [store, zonas, horarios] = await Promise.all([
     prisma.store.findFirst(),
     prisma.deliveryZone.findMany({ orderBy: { radioKm: "asc" } }),
+    prisma.horarioAtencion.findMany({ orderBy: [{ diaSemana: "asc" }, { abre: "asc" }] }),
   ]);
 
   const envioModo = store?.envioModo === "coordinar" ? "coordinar" : "zonas";
@@ -22,6 +26,53 @@ export default async function AdminConfiguracionPage() {
       <Suspense fallback={null}>
         <GuardadoToast />
       </Suspense>
+
+      <div>
+        <h1 className="mb-4 text-xl font-bold text-neutral-900">Disponibilidad</h1>
+        <div className="flex flex-col gap-4">
+          <PausaPedidosToggle
+            pausado={store?.pedidosPausados ?? false}
+            mensaje={store?.mensajePausa ?? null}
+          />
+
+          <div className="rounded-lg border border-neutral-200 bg-white p-4">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <p className="font-medium text-neutral-900">Horario de atención</p>
+              <Link
+                href="/admin/configuracion/horarios"
+                className="rounded-lg border border-neutral-300 px-3 py-1.5 text-sm font-medium text-neutral-600 hover:border-brand hover:text-brand"
+              >
+                Editar horarios
+              </Link>
+            </div>
+            {horarios.length === 0 ? (
+              <p className="text-sm text-neutral-500">
+                Sin horarios cargados — el menú acepta pedidos a cualquier hora.
+              </p>
+            ) : (
+              <div className="grid grid-cols-1 gap-1 text-sm sm:grid-cols-2">
+                {DIAS_ORDENADOS.map((dia) => {
+                  const texto = resumenDia(horarios, dia);
+                  return (
+                    <div key={dia} className="flex justify-between gap-3 py-0.5">
+                      <span className="text-neutral-600">{NOMBRES_DIA[dia]}</span>
+                      <span
+                        className={
+                          texto === "Cerrado"
+                            ? "text-neutral-400"
+                            : "font-medium text-neutral-900"
+                        }
+                      >
+                        {texto}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
 
       <div>
         <h1 className="mb-4 text-xl font-bold text-neutral-900">Datos del negocio</h1>

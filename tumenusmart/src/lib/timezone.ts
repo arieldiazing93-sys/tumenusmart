@@ -76,3 +76,32 @@ export function fechaAsuncionDesdeTexto(texto: string): Date | null {
 export function claveDiaAsuncion(instanteUTC: Date): string {
   return new Intl.DateTimeFormat("en-CA", { timeZone: ZONA_NEGOCIO }).format(instanteUTC);
 }
+
+const DIAS_EN_INGLES: Record<string, number> = {
+  Sun: 0,
+  Mon: 1,
+  Tue: 2,
+  Wed: 3,
+  Thu: 4,
+  Fri: 5,
+  Sat: 6,
+};
+
+/** Día de la semana en Asunción: 0 = domingo, 1 = lunes ... 6 = sábado. */
+export function diaSemanaAsuncion(fecha: Date = new Date()): number {
+  const nombre = new Intl.DateTimeFormat("en-US", {
+    timeZone: ZONA_NEGOCIO,
+    weekday: "short",
+  }).format(fecha);
+  return DIAS_EN_INGLES[nombre] ?? 0;
+}
+
+/** Hora del reloj en Asunción, en formato "HH:MM" de 24 horas. */
+export function horaAsuncion(fecha: Date = new Date()): string {
+  return new Intl.DateTimeFormat("en-GB", {
+    timeZone: ZONA_NEGOCIO,
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).format(fecha);
+}

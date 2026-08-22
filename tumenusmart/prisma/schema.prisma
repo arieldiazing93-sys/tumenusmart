@@ -22,8 +22,23 @@ model Store {
   lat            Float? // ubicación del local, centro para calcular distancias de envío
   lng            Float?
   envioModo      String   @default("zonas") // "zonas" (radio + precio automático) | "coordinar" (el negocio lo define directo con el cliente)
+  // Corte manual: el encargado apaga los pedidos aunque esté dentro del
+  // horario (cocina saturada, falta de personal, etc.).
+  pedidosPausados Boolean @default(false)
+  mensajePausa    String? // motivo opcional que ve el cliente al entrar
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
+}
+
+// Horario de atención del local, un registro por tramo. Un día SIN
+// registros = cerrado ese día (ej: cierra los lunes). Dos registros el
+// mismo día = turno partido (ej: 11:00-14:00 y 18:00-23:30).
+model HorarioAtencion {
+  id        String @id @default(cuid())
+  diaSemana Int // 0 = domingo, 1 = lunes ... 6 = sábado
+  abre      String // "HH:MM"
+  cierra    String // "HH:MM" — si es menor que `abre`, el cierre cae pasada la medianoche
+  createdAt DateTime @default(now())
 }
 
 model Category {
@@ -135,6 +150,10 @@ model Order {
   facturaRuc           String?
   facturaEmail         String?
   notas                String?
+  // El pedido se guarda ANTES de que el cliente apriete "Enviar por
+  // WhatsApp". Esta marca distingue los pedidos realmente enviados de los
+  // que el cliente armó y abandonó en el último paso.
+  enviadoWhatsapp      Boolean       @default(false)
   subtotal             Decimal       @db.Decimal(10, 2)
   costoEnvio           Decimal       @db.Decimal(10, 2) @default(0)
   total                Decimal       @db.Decimal(10, 2)

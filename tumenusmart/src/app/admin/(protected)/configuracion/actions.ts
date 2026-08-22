@@ -37,6 +37,62 @@ export async function quitarLogoStore(): Promise<void> {
   }
 }
 
+export async function alternarPausaPedidos(pausado: boolean): Promise<void> {
+  const store = await prisma.store.findFirst();
+  if (!store) throw new Error("Todavía no cargaste los datos del negocio");
+
+  await prisma.store.update({
+    where: { id: store.id },
+    data: { pedidosPausados: pausado },
+  });
+
+  revalidatePath("/admin/pedidos");
+  revalidatePath("/admin/configuracion");
+  revalidatePath("/");
+  revalidatePath("/checkout");
+}
+
+export async function guardarMensajePausa(mensaje: string): Promise<void> {
+  const store = await prisma.store.findFirst();
+  if (!store) throw new Error("Todavía no cargaste los datos del negocio");
+
+  await prisma.store.update({
+    where: { id: store.id },
+    data: { mensajePausa: mensaje.trim() || null },
+  });
+
+  revalidatePath("/admin/pedidos");
+  revalidatePath("/admin/configuracion");
+  revalidatePath("/");
+}
+
+export async function agregarTramoHorario(formData: FormData) {
+  const diaSemana = Number(formData.get("diaSemana"));
+  const abre = String(formData.get("abre") ?? "").trim();
+  const cierra = String(formData.get("cierra") ?? "").trim();
+
+  if (!Number.isInteger(diaSemana) || diaSemana < 0 || diaSemana > 6) {
+    throw new Error("Día inválido");
+  }
+  if (!abre || !cierra) throw new Error("Faltan las horas de apertura y cierre");
+
+  await prisma.horarioAtencion.create({ data: { diaSemana, abre, cierra } });
+
+  revalidatePath("/admin/configuracion/horarios");
+  revalidatePath("/");
+  revalidatePath("/checkout");
+  revalidatePath("/reservas");
+}
+
+export async function eliminarTramoHorario(id: string): Promise<void> {
+  await prisma.horarioAtencion.delete({ where: { id } });
+
+  revalidatePath("/admin/configuracion/horarios");
+  revalidatePath("/");
+  revalidatePath("/checkout");
+  revalidatePath("/reservas");
+}
+
 export async function actualizarStore(formData: FormData) {
   const nombre = String(formData.get("nombre") ?? "").trim();
   const whatsappNumero = String(formData.get("whatsappNumero") ?? "").replace(/[^\d]/g, "");

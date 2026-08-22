@@ -8,9 +8,21 @@ import { TURNOS, MOTIVOS_RESERVA } from "@/lib/reservas";
 type Props = {
   horariosPorTurno: Record<string, string[]>;
   hoy: string;
+  /** días de la semana (0 = domingo) en los que el local no abre */
+  diasCerrados: number[];
+  nombresDia: string[];
 };
 
-export function ReservaForm({ horariosPorTurno, hoy }: Props) {
+/** Día de la semana (0 = domingo) de una fecha "YYYY-MM-DD". */
+function diaSemanaDe(clave: string): number | null {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(clave);
+  if (!match) return null;
+  return new Date(
+    Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3]))
+  ).getUTCDay();
+}
+
+export function ReservaForm({ horariosPorTurno, hoy, diasCerrados, nombresDia }: Props) {
   const router = useRouter();
 
   const [fecha, setFecha] = useState("");
@@ -24,6 +36,11 @@ export function ReservaForm({ horariosPorTurno, hoy }: Props) {
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Día de la semana de la fecha elegida, para avisar si cae en un día
+  // en que el local no abre.
+  const diaDeLaFecha = fecha ? diaSemanaDe(fecha) : null;
+  const diaElegidoCerrado = diaDeLaFecha != null && diasCerrados.includes(diaDeLaFecha);
+
   function elegirTurno(t: string) {
     setTurno(t);
     setHorario("");
@@ -35,6 +52,10 @@ export function ReservaForm({ horariosPorTurno, hoy }: Props) {
 
     if (!fecha) {
       setError("Elegí una fecha para la reserva.");
+      return;
+    }
+    if (diaElegidoCerrado) {
+      setError(`Ese día el local está cerrado. Elegí otra fecha.`);
       return;
     }
     if (!turno) {
@@ -85,8 +106,16 @@ export function ReservaForm({ horariosPorTurno, hoy }: Props) {
           min={hoy}
           value={fecha}
           onChange={(e) => setFecha(e.target.value)}
-          className="w-full rounded-lg border border-neutral-300 px-3 py-2"
+          className={`w-full rounded-lg border px-3 py-2 ${
+            diaElegidoCerrado ? "border-red-400 bg-red-50" : "border-neutral-300"
+          }`}
         />
+        {diaElegidoCerrado && diaDeLaFecha != null && (
+          <p className="mt-1 text-sm text-red-600">
+            Los {nombresDia[diaDeLaFecha].toLowerCase()} el local está cerrado — elegí otra
+            fecha.
+          </p>
+        )}
       </div>
 
       <div>
@@ -206,8 +235,8 @@ export function ReservaForm({ horariosPorTurno, hoy }: Props) {
 
       <button
         type="submit"
-        disabled={enviando}
-        className="rounded-lg bg-brand px-6 py-3 font-medium text-white hover:bg-brand-dark disabled:opacity-60"
+        disabled={enviando || diaElegidoCerrado}
+        className="rounded-lg bg-brand px-6 py-3 font-medium text-white hover:bg-brand-dark disabled:cursor-not-allowed disabled:bg-neutral-300"
       >
         {enviando ? "Generando reserva..." : "Reservar"}
       </button>
