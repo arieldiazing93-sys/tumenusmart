@@ -1,9 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { crearReserva } from "./actions";
 import { TURNOS, MOTIVOS_RESERVA } from "@/lib/reservas";
+
+type Disponibilidad = {
+  hora: string;
+  capacidad: number | null;
+  ocupado: number;
+  lugaresLibres: number | null;
+};
 
 type Props = {
   horariosPorTurno: Record<string, string[]>;
@@ -43,6 +50,8 @@ export function ReservaForm({
   const [correo, setCorreo] = useState("");
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [disponibilidad, setDisponibilidad] = useState<Disponibilidad[] | null>(null);
+  const [cargandoCupos, setCargandoCupos] = useState(false);
 
   // Día de la semana de la fecha elegida, para avisar si cae en un día
   // en que el local no abre.
@@ -54,6 +63,48 @@ export function ReservaForm({
   const esHoy = fecha === hoy;
   function horarioYaPaso(hora: string): boolean {
     return esHoy && hora <= horaActual;
+  }
+
+  // Los cupos dependen de la fecha, así que se consultan cada vez que
+  // cambia. Sin fecha (o en un día cerrado) no hay nada que consultar.
+  useEffect(() => {
+    if (!fecha || diaElegidoCerrado) {
+      setDisponibilidad(null);
+      return;
+    }
+
+    let cancelado = false;
+    setCargandoCupos(true);
+
+    fetch(`/api/reservas/disponibilidad?fecha=${fecha}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((datos: { disponibilidad: Disponibilidad[] } | null) => {
+        if (cancelado) return;
+        setDisponibilidad(datos?.disponibilidad ?? null);
+      })
+      .catch(() => {
+        // Si no se pudo consultar, no se bloquea nada: el servidor vuelve a
+        // verificar el cupo al confirmar la reserva.
+        if (!cancelado) setDisponibilidad(null);
+      })
+      .finally(() => {
+        if (!cancelado) setCargandoCupos(false);
+      });
+
+    return () => {
+      cancelado = true;
+    };
+  }, [fecha, diaElegidoCerrado]);
+
+  function cupoDe(hora: string): Disponibilidad | null {
+    return disponibilidad?.find((d) => d.hora === hora) ?? null;
+  }
+
+  /** true si en ese horario no entra la cantidad de personas pedida. */
+  function sinLugar(hora: string): boolean {
+    const cupo = cupoDe(hora);
+    if (!cupo || cupo.lugaresLibres == null) return false;
+    return cupo.lugaresLibres < personas;
   }
 
   function elegirTurno(t: string) {
@@ -83,6 +134,15 @@ export function ReservaForm({
     }
     if (horarioYaPaso(horario)) {
       setError("Ese horario ya pasó. Elegí uno más tarde u otra fecha.");
+      return;
+    }
+    if (sinLugar(horario)) {
+      const cupo = cupoDe(horario);
+      setError(
+        cupo?.lugaresLibres === 0
+          ? "Ese horario ya está completo. Elegí otro horario u otra fecha."
+          : `En ese horario quedan ${cupo?.lugaresLibres} lugares y estás pidiendo para ${personas}.`
+      );
       return;
     }
     if (!personas || personas < 1) {
@@ -186,32 +246,78 @@ export function ReservaForm({
                 <div className="flex flex-wrap gap-2">
                   {horariosDelTurno.map((h) => {
                     const paso = horarioYaPaso(h);
+                    const completo = sinLugar(h);
+                    const bloqueado = paso || completo;
+                    const cupo = cupoDe(h);
                     return (
                       <button
                         key={h}
                         type="button"
-                        disabled={paso}
-                        title={paso ? "Ese horario ya pasó" : undefined}
+                        disabled={bloqueado}
+                        title={
+                          paso
+                            ? "Ese horario ya pasó"
+                            : completo
+                              ? "No quedan lugares para esa cantidad de personas"
+                              : undefined
+                        }
                         onClick={() => setHorario(h)}
                         className={`rounded-full border px-3 py-1.5 text-sm ${
-                          paso
-                            ? "cursor-not-allowed border-neutral-200 text-neutral-300 line-through"
+                          bloqueado
+                            ? `cursor-not-allowed border-neutral-200 text-neutral-300 ${
+                                paso ? "line-through" : ""
+                              }`
                             : horario === h
                               ? "border-brand bg-brand text-white"
                               : "border-neutral-300 text-neutral-600"
                         }`}
                       >
                         {h}
+                        {/* Solo se avisa cuando queda poco: mostrar "quedan 40"
+                            en un salón vacío es ruido, no información. */}
+                        {!paso &&
+                          cupo?.lugaresLibres != null &&
+                          cupo.lugaresLibres <= 10 && (
+                            <span
+                              className={`ml-1.5 text-[11px] ${
+                                bloqueado
+                                  ? "text-neutral-300"
+                                  : horario === h
+                                    ? "text-white/80"
+                                    : "text-amber-600"
+                              }`}
+                            >
+                              {cupo.lugaresLibres === 0
+                                ? "completo"
+                                : `quedan ${cupo.lugaresLibres}`}
+                            </span>
+                          )}
                       </button>
                     );
                   })}
                 </div>
+
+                {cargandoCupos && (
+                  <p className="mt-2 text-xs text-neutral-400">Consultando disponibilidad...</p>
+                )}
+
                 {esHoy && horariosDelTurno.every(horarioYaPaso) && (
                   <p className="mt-2 text-sm text-amber-700">
                     Todos los horarios de este turno ya pasaron por hoy. Elegí otro turno u
                     otra fecha.
                   </p>
                 )}
+
+                {!cargandoCupos &&
+                  horariosDelTurno.length > 0 &&
+                  horariosDelTurno.every((h) => horarioYaPaso(h) || sinLugar(h)) &&
+                  !horariosDelTurno.every(horarioYaPaso) && (
+                    <p className="mt-2 text-sm text-amber-700">
+                      No quedan lugares en este turno para {personas}{" "}
+                      {personas === 1 ? "persona" : "personas"}. Probá otro turno, otra fecha,
+                      o consultanos por WhatsApp.
+                    </p>
+                  )}
               </>
             )}
           </div>

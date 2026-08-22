@@ -1,5 +1,9 @@
 import { calcularRangoFecha, claveDia, type FiltroFecha } from "@/lib/rango-fecha";
-import { calcularEstadisticas, calcularEstadisticasReservas } from "@/lib/estadisticas";
+import {
+  calcularEstadisticas,
+  calcularEstadisticasReservas,
+  calcularRankingProductos,
+} from "@/lib/estadisticas";
 import { formatearGuarani } from "@/lib/format";
 import { ZONA_NEGOCIO } from "@/lib/timezone";
 import { etiquetaTurno } from "@/lib/reservas";
@@ -18,9 +22,10 @@ export default async function ImprimirEstadisticasPage({
     calcularRangoFecha(fechaActiva, desde, hasta) ??
     calcularRangoFecha("30dias", undefined, undefined)!;
 
-  const [stats, statsReservas] = await Promise.all([
+  const [stats, statsReservas, ranking] = await Promise.all([
     calcularEstadisticas(rango),
     calcularEstadisticasReservas(rango),
+    calcularRankingProductos(rango, 20),
   ]);
 
   const finRangoInclusive = new Date(rango.lt.getTime() - 24 * 60 * 60 * 1000);
@@ -118,6 +123,43 @@ export default async function ImprimirEstadisticasPage({
           })}
         </tbody>
       </table>
+
+      <h2 className="mb-3 mt-10 font-semibold text-neutral-800">Productos más vendidos</h2>
+      {ranking.masVendidos.length === 0 ? (
+        <p className="mb-10 text-sm text-neutral-400">Sin ventas en este período.</p>
+      ) : (
+        <table className="mb-10 w-full border-collapse text-sm">
+          <thead>
+            <tr className="border-b border-neutral-300 text-left text-xs uppercase tracking-wide text-neutral-500">
+              <th className="py-1.5">#</th>
+              <th className="py-1.5">Producto</th>
+              <th className="py-1.5 text-right">Unidades</th>
+              <th className="py-1.5 text-right">Facturación</th>
+            </tr>
+          </thead>
+          <tbody>
+            {ranking.masVendidos.map((fila, i) => (
+              <tr key={fila.nombre} className="border-b border-neutral-100">
+                <td className="py-1.5 text-neutral-400">{i + 1}</td>
+                <td className="py-1.5 text-neutral-800">{fila.nombre}</td>
+                <td className="py-1.5 text-right font-semibold text-neutral-900">
+                  {fila.unidades}
+                </td>
+                <td className="py-1.5 text-right text-neutral-700">
+                  {formatearGuarani(Math.round(fila.facturacion))}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+
+      {ranking.sinVentas.length > 0 && (
+        <div className="mb-10">
+          <h2 className="mb-2 font-semibold text-neutral-800">Sin ventas en el período</h2>
+          <p className="text-sm text-neutral-600">{ranking.sinVentas.join(" · ")}</p>
+        </div>
+      )}
 
       <h2 className="mb-3 mt-10 font-semibold text-neutral-800">Reservas</h2>
       <table className="mb-10 w-full border-collapse text-sm">

@@ -17,6 +17,8 @@ import {
 } from "@/lib/calendario";
 import { etiquetaTurno, etiquetaMotivo } from "@/lib/reservas";
 import { formatearNumero } from "@/lib/format";
+import { linkWhatsappCliente } from "@/lib/whatsapp";
+import { calcularDisponibilidad } from "@/lib/cupos-reserva";
 import { EstadoReservaSelect } from "./EstadoReservaSelect";
 import { NotaReservaField } from "./NotaReservaField";
 
@@ -64,7 +66,21 @@ function TarjetaReserva({ r }: { r: ReservaFila }) {
           {r.clienteEmail && <p className="text-sm text-neutral-500">{r.clienteEmail}</p>}
           <p className="text-sm text-neutral-500">Motivo: {etiquetaMotivo(r.motivo)}</p>
         </div>
-        <EstadoReservaSelect id={r.id} estado={r.estado} />
+        <div className="flex items-center gap-2">
+          <a
+            href={linkWhatsappCliente(
+              r.clienteTelefono,
+              `Hola ${r.clienteNombre}, te escribimos por tu reserva ${formatearNumero(r.numero)} para el ${r.horario}.`
+            )}
+            target="_blank"
+            rel="noopener noreferrer"
+            title={`Escribirle a ${r.clienteNombre} por WhatsApp`}
+            className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-[#25D366]/10 text-base text-[#128C7E] hover:bg-[#25D366]/20"
+          >
+            💬
+          </a>
+          <EstadoReservaSelect id={r.id} estado={r.estado} />
+        </div>
       </div>
       <NotaReservaField id={r.id} nota={r.nota} />
     </div>
@@ -109,7 +125,7 @@ export default async function AdminReservasPage({
   // Solo entran al calendario las reservas que el cliente realmente envió
   // por WhatsApp. Las que quedaron a medio camino se cuentan aparte, para
   // que el encargado sepa que existen sin que le ensucien la agenda.
-  const [reservas, sinEnviar] = await Promise.all([
+  const [reservas, sinEnviar, ocupacionDia] = await Promise.all([
     prisma.reservation.findMany({
       where: { fecha: { gte, lt }, enviadoWhatsapp: true },
       orderBy: [{ fecha: "asc" }, { horario: "asc" }],
@@ -117,7 +133,15 @@ export default async function AdminReservasPage({
     prisma.reservation.count({
       where: { fecha: { gte, lt }, enviadoWhatsapp: false },
     }),
+    // La ocupación por horario solo tiene sentido mirando un día puntual.
+    vista === "dia" ? calcularDisponibilidad(diaAncla) : Promise.resolve([]),
   ]);
+
+  // Solo se muestran los horarios que tienen cupo definido o alguna reserva:
+  // listar horarios vacíos y sin límite no le dice nada al encargado.
+  const ocupacionVisible = ocupacionDia.filter(
+    (o) => o.capacidad != null || o.ocupado > 0
+  );
 
   const porDia = new Map<string, ReservaFila[]>();
   for (const r of reservas) {
@@ -179,6 +203,45 @@ export default async function AdminReservasPage({
               Siguiente ›
             </Link>
           </div>
+
+          {ocupacionVisible.length > 0 && (
+            <div className="mb-4 rounded-lg border border-neutral-200 bg-white p-4">
+              <p className="mb-3 text-sm font-medium text-neutral-700">Ocupación del día</p>
+              <div className="flex flex-col gap-2">
+                {ocupacionVisible.map((o) => {
+                  const lleno = o.lugaresLibres === 0;
+                  const proporcion =
+                    o.capacidad && o.capacidad > 0
+                      ? Math.min(100, (o.ocupado / o.capacidad) * 100)
+                      : 0;
+                  return (
+                    <div key={`${o.turno}-${o.hora}`} className="flex items-center gap-3">
+                      <span className="w-14 flex-none text-sm font-medium text-neutral-800">
+                        {o.hora}
+                      </span>
+                      <div className="h-2 flex-1 rounded-full bg-neutral-100">
+                        {o.capacidad != null && (
+                          <div
+                            className={`h-2 rounded-full ${lleno ? "bg-red-500" : "bg-brand"}`}
+                            style={{ width: `${proporcion}%` }}
+                          />
+                        )}
+                      </div>
+                      <span
+                        className={`w-32 flex-none text-right text-sm ${
+                          lleno ? "font-semibold text-red-600" : "text-neutral-600"
+                        }`}
+                      >
+                        {o.capacidad == null
+                          ? `${o.ocupado} personas`
+                          : `${o.ocupado}/${o.capacidad}${lleno ? " · completo" : ""}`}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           <div className="flex flex-col gap-2">
             {(porDia.get(diaAncla) ?? []).map((r) => (

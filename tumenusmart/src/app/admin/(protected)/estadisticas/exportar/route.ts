@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { calcularRangoFecha, claveDia } from "@/lib/rango-fecha";
-import { calcularEstadisticas, calcularEstadisticasReservas } from "@/lib/estadisticas";
+import {
+  calcularEstadisticas,
+  calcularEstadisticasReservas,
+  calcularRankingProductos,
+} from "@/lib/estadisticas";
 import { ZONA_NEGOCIO } from "@/lib/timezone";
 import { etiquetaTurno } from "@/lib/reservas";
 
@@ -32,9 +36,11 @@ export async function GET(request: NextRequest) {
   const rango =
     calcularRangoFecha(fecha, desde, hasta) ?? calcularRangoFecha("30dias", undefined, undefined)!;
 
-  const [stats, statsReservas] = await Promise.all([
+  const [stats, statsReservas, ranking] = await Promise.all([
     calcularEstadisticas(rango),
     calcularEstadisticasReservas(rango),
+    // En la planilla conviene el ranking completo, no solo el top 10.
+    calcularRankingProductos(rango, 500),
   ]);
 
   const finRangoInclusive = new Date(rango.lt.getTime() - 24 * 60 * 60 * 1000);
@@ -84,6 +90,28 @@ export async function GET(request: NextRequest) {
   for (const d of stats.dias) {
     const clave = claveDia(d);
     filas.push(filaCsv([clave, Math.round(stats.totalesPorDia.get(clave) ?? 0)]));
+  }
+
+  filas.push("");
+  filas.push(filaCsv(["Puesto", "Producto", "Unidades", "Facturación (Gs.)", "% de unidades"]));
+  ranking.masVendidos.forEach((fila, i) => {
+    filas.push(
+      filaCsv([
+        i + 1,
+        fila.nombre,
+        fila.unidades,
+        Math.round(fila.facturacion),
+        fila.porcentaje.toFixed(1),
+      ])
+    );
+  });
+
+  if (ranking.sinVentas.length > 0) {
+    filas.push("");
+    filas.push(filaCsv(["Productos sin ventas en el período"]));
+    for (const nombre of ranking.sinVentas) {
+      filas.push(filaCsv([nombre]));
+    }
   }
 
   filas.push("");

@@ -137,7 +137,7 @@ export function AvisoPedidosNuevos({ enviadosIniciales }: Props) {
   }
 
   return (
-    <div className="mb-3 flex flex-wrap items-center gap-2">
+    <div className="flex flex-wrap items-center gap-2">
       <button
         type="button"
         onClick={alternarSonido}

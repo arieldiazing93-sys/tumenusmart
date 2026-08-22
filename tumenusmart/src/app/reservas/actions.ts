@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { fechaAsuncionDesdeTexto, claveDiaAsuncion, horaAsuncion } from "@/lib/timezone";
 import { TURNOS, MOTIVOS_RESERVA } from "@/lib/reservas";
 import { diasCerrados, diaSemanaDeClave, NOMBRES_DIA } from "@/lib/horario-atencion";
+import { motivoSinCupo } from "@/lib/cupos-reserva";
 
 export type DatosReserva = {
   fecha: string; // "YYYY-MM-DD"
@@ -57,6 +58,11 @@ export async function crearReserva(datos: DatosReserva): Promise<{ reservationId
       `Los ${NOMBRES_DIA[diaSemana].toLowerCase()} el local está cerrado. Elegí otra fecha.`
     );
   }
+
+  // Chequeo real del cupo. Se hace acá y no solo en el formulario porque
+  // dos personas pueden estar reservando el mismo horario al mismo tiempo.
+  const sinCupo = await motivoSinCupo(datos.fecha, datos.horario, datos.personas);
+  if (sinCupo) throw new Error(sinCupo);
 
   const reserva = await prisma.reservation.create({
     data: {

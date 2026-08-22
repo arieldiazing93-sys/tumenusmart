@@ -1,7 +1,11 @@
 import Link from "next/link";
 import { formatearGuarani } from "@/lib/format";
 import { calcularRangoFecha, claveDia, type FiltroFecha } from "@/lib/rango-fecha";
-import { calcularEstadisticas, calcularEstadisticasReservas } from "@/lib/estadisticas";
+import {
+  calcularEstadisticas,
+  calcularEstadisticasReservas,
+  calcularRankingProductos,
+} from "@/lib/estadisticas";
 import { ZONA_NEGOCIO } from "@/lib/timezone";
 import { etiquetaTurno } from "@/lib/reservas";
 import { VentasPorDiaChart } from "@/components/VentasPorDiaChart";
@@ -50,9 +54,10 @@ export default async function AdminEstadisticasPage({
     return params.toString();
   }
 
-  const [stats, statsReservas] = await Promise.all([
+  const [stats, statsReservas, ranking] = await Promise.all([
     calcularEstadisticas(rango),
     calcularEstadisticasReservas(rango),
+    calcularRankingProductos(rango),
   ]);
 
   const datosChart = stats.dias.map((d) => ({
@@ -152,6 +157,87 @@ export default async function AdminEstadisticasPage({
         <div className="rounded-lg border border-neutral-200 bg-white p-4">
           <VentasPorDiaChart datos={datosChart} />
         </div>
+      </div>
+
+      <div className="mb-8">
+        <h2 className="mb-3 font-semibold text-neutral-800">Productos más vendidos</h2>
+
+        {ranking.masVendidos.length === 0 ? (
+          <p className="text-sm text-neutral-400">
+            Todavía no hay ventas en este período.
+          </p>
+        ) : (
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+            <div className="overflow-hidden rounded-lg border border-neutral-200 bg-white lg:col-span-2">
+              <table className="w-full text-left text-sm">
+                <thead className="border-b border-neutral-200 bg-neutral-50 text-xs uppercase tracking-wide text-neutral-500">
+                  <tr>
+                    <th className="px-3 py-2 w-8">#</th>
+                    <th className="px-3 py-2">Producto</th>
+                    <th className="px-3 py-2 text-right">Unidades</th>
+                    <th className="px-3 py-2 text-right">Facturación</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {ranking.masVendidos.map((fila, i) => (
+                    <tr key={fila.nombre} className="border-b border-neutral-100 last:border-0">
+                      <td className="px-3 py-2 font-semibold text-neutral-400">{i + 1}</td>
+                      <td className="px-3 py-2">
+                        <p className="font-medium text-neutral-900">{fila.nombre}</p>
+                        {/* Barra proporcional al más vendido, para ver de un
+                            vistazo cuánto se despega el primero del resto. */}
+                        <div className="mt-1 h-1.5 w-full max-w-[220px] rounded-full bg-neutral-100">
+                          <div
+                            className="h-1.5 rounded-full bg-brand"
+                            style={{
+                              width: `${
+                                (fila.unidades / ranking.masVendidos[0].unidades) * 100
+                              }%`,
+                            }}
+                          />
+                        </div>
+                      </td>
+                      <td className="px-3 py-2 text-right">
+                        <span className="font-semibold text-neutral-900">{fila.unidades}</span>
+                        <span className="block text-xs text-neutral-400">
+                          {fila.porcentaje.toFixed(1)}%
+                        </span>
+                      </td>
+                      <td className="px-3 py-2 text-right text-neutral-700">
+                        {formatearGuarani(Math.round(fila.facturacion))}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="rounded-lg border border-neutral-200 bg-white p-4">
+              <p className="mb-1 text-sm font-medium text-neutral-700">Sin ventas</p>
+              <p className="mb-3 text-xs text-neutral-500">
+                Productos visibles en el menú que no vendieron ni una unidad en este período.
+              </p>
+              {ranking.sinVentas.length === 0 ? (
+                <p className="text-sm text-green-700">
+                  Todos los productos del menú vendieron al menos una vez. 👏
+                </p>
+              ) : (
+                <ul className="flex flex-col gap-1 text-sm text-neutral-600">
+                  {ranking.sinVentas.slice(0, 12).map((nombre) => (
+                    <li key={nombre} className="truncate">
+                      · {nombre}
+                    </li>
+                  ))}
+                  {ranking.sinVentas.length > 12 && (
+                    <li className="text-xs text-neutral-400">
+                      y {ranking.sinVentas.length - 12} más
+                    </li>
+                  )}
+                </ul>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="mb-8">

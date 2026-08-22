@@ -1,14 +1,26 @@
 import Link from "next/link";
+import { headers } from "next/headers";
 import { prisma } from "@/lib/prisma";
 import { formatearGuarani, formatearNumero } from "@/lib/format";
 import { ESTADOS_PEDIDO, etiquetaEstado, colorEstado } from "@/lib/estados-pedido";
 import { calcularRangoFecha, type FiltroFecha } from "@/lib/rango-fecha";
 import { ZONA_NEGOCIO } from "@/lib/timezone";
 import { obtenerEstadoTienda } from "@/lib/estado-tienda";
+import { linkWhatsappCliente } from "@/lib/whatsapp";
 import { PausaPedidosToggle } from "../PausaPedidosToggle";
+import { CompartirCarta } from "../CompartirCarta";
 import { AvisoPedidosNuevos } from "./AvisoPedidosNuevos";
 
 export const dynamic = "force-dynamic";
+
+/** URL pública de la carta, tomada del dominio con el que se entró al panel. */
+async function urlPublicaCarta(): Promise<string> {
+  const cabeceras = await headers();
+  const host = cabeceras.get("x-forwarded-host") ?? cabeceras.get("host") ?? "";
+  if (!host) return "";
+  const protocolo = host.startsWith("localhost") ? "http" : "https";
+  return `${protocolo}://${host}`;
+}
 
 const FILTROS_FECHA: { value: FiltroFecha; label: string }[] = [
   { value: "hoy", label: "Hoy" },
@@ -44,6 +56,8 @@ export default async function AdminPedidosPage({
     prisma.order.count({ where: { enviadoWhatsapp: true } }),
   ]);
 
+  const urlCarta = await urlPublicaCarta();
+
   // Arma un querystring preservando los otros filtros activos, para que
   // cambiar de estado no te haga perder el filtro de fecha y viceversa.
   function hrefEstado(nuevoEstado: string | null) {
@@ -68,7 +82,18 @@ export default async function AdminPedidosPage({
     <div>
       <h1 className="mb-4 text-xl font-bold text-neutral-900">Pedidos</h1>
 
-      <AvisoPedidosNuevos enviadosIniciales={pedidosEnviados} />
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+        <AvisoPedidosNuevos enviadosIniciales={pedidosEnviados} />
+        {urlCarta && (
+          <div className="text-right">
+            <CompartirCarta
+              nombreNegocio={store?.nombre ?? "Nuestra carta"}
+              url={urlCarta}
+            />
+            <p className="mt-1 text-xs text-neutral-400">WhatsApp · link · QR imprimible</p>
+          </div>
+        )}
+      </div>
 
       <div className="mb-6">
         <PausaPedidosToggle
@@ -189,6 +214,7 @@ export default async function AdminPedidosPage({
                 <th className="px-3 py-2">Repartidor</th>
                 <th className="px-3 py-2">Pago</th>
                 <th className="px-3 py-2">Estado</th>
+                <th className="px-3 py-2 text-center">Escribir</th>
               </tr>
             </thead>
             <tbody>
@@ -273,6 +299,24 @@ export default async function AdminPedidosPage({
                           {etiquetaEstado(pedido.estado)}
                         </span>
                       </Link>
+                    </td>
+                    <td className="px-3 py-3 text-center">
+                      {/* Fuera del <Link> de la fila a propósito: acá el clic
+                          abre WhatsApp, no el detalle del pedido. */}
+                      <a
+                        href={linkWhatsappCliente(
+                          pedido.clienteTelefono,
+                          `Hola ${pedido.clienteNombre}, te escribimos de ${
+                            store?.nombre ?? "el local"
+                          } por tu pedido ${formatearNumero(pedido.numero)}.`
+                        )}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title={`Escribirle a ${pedido.clienteNombre} por WhatsApp`}
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-[#25D366]/10 text-base text-[#128C7E] hover:bg-[#25D366]/20"
+                      >
+                        💬
+                      </a>
                     </td>
                   </tr>
                 );

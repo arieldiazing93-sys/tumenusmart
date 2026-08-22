@@ -3,15 +3,30 @@ import { listarDias, claveDia } from "./rango-fecha";
 
 export type RangoFecha = { gte: Date; lt: Date };
 
+/**
+ * Un pedido cuenta como REAL si el cliente lo envió por WhatsApp, o si el
+ * local ya lo tocó (lo confirmó, lo preparó, lo entregó...). Con esto la
+ * facturación no se infla con carritos abandonados, pero tampoco se pierde
+ * un pedido legítimo cuyo registro de envío falló: apenas el encargado lo
+ * mueve de "pendiente", vuelve a contar.
+ */
+const PEDIDO_REAL = {
+  OR: [{ enviadoWhatsapp: true }, { estado: { not: "pendiente" } }],
+};
+
 export async function calcularEstadisticas(rango: RangoFecha) {
   const [store, pedidos, primerPedidoPorCliente] = await Promise.all([
     prisma.store.findFirst(),
     prisma.order.findMany({
-      where: { createdAt: rango },
+      where: { createdAt: rango, ...PEDIDO_REAL },
       include: { items: true },
       orderBy: { createdAt: "asc" },
     }),
-    prisma.order.groupBy({ by: ["clienteTelefono"], _min: { createdAt: true } }),
+    prisma.order.groupBy({
+      by: ["clienteTelefono"],
+      where: PEDIDO_REAL,
+      _min: { createdAt: true },
+    }),
   ]);
 
   const validos = pedidos.filter((p) => p.estado !== "cancelado");
@@ -61,6 +76,80 @@ export async function calcularEstadisticas(rango: RangoFecha) {
     dias,
     totalesPorDia,
     puntosCalor,
+  };
+}
+
+export type FilaRanking = {
+  nombre: string;
+  unidades: number;
+  facturacion: number;
+  /** porcentaje que representa sobre las unidades vendidas del período */
+  porcentaje: number;
+};
+
+export type RankingProductos = {
+  masVendidos: FilaRanking[];
+  /** productos activos del menú que no vendieron ni una unidad en el período */
+  sinVentas: string[];
+  unidadesTotales: number;
+};
+
+/**
+ * Ranking de productos del período, ordenado por unidades vendidas.
+ *
+ * Se agrupa por el NOMBRE guardado en el ítem (no por el id del producto)
+ * porque así entran también los combos "mitad y mitad", que no apuntan a un
+ * único producto. El efecto secundario es que si a un producto le cambiaste
+ * el nombre, las ventas viejas figuran con el nombre viejo — que en la
+ * práctica es lo que uno quiere ver.
+ */
+export async function calcularRankingProductos(
+  rango: RangoFecha,
+  limite = 10
+): Promise<RankingProductos> {
+  const [items, productosActivos] = await Promise.all([
+    prisma.orderItem.findMany({
+      where: {
+        order: { createdAt: rango, estado: { not: "cancelado" }, ...PEDIDO_REAL },
+      },
+      select: { nombreProducto: true, cantidad: true, precioUnitario: true },
+    }),
+    prisma.product.findMany({
+      where: { disponible: true },
+      select: { nombre: true },
+    }),
+  ]);
+
+  const acumulado = new Map<string, { unidades: number; facturacion: number }>();
+  for (const item of items) {
+    const clave = item.nombreProducto;
+    const actual = acumulado.get(clave) ?? { unidades: 0, facturacion: 0 };
+    actual.unidades += item.cantidad;
+    actual.facturacion += item.cantidad * Number(item.precioUnitario);
+    acumulado.set(clave, actual);
+  }
+
+  const unidadesTotales = [...acumulado.values()].reduce((s, v) => s + v.unidades, 0);
+
+  const ordenado: FilaRanking[] = [...acumulado.entries()]
+    .map(([nombre, v]) => ({
+      nombre,
+      unidades: v.unidades,
+      facturacion: v.facturacion,
+      porcentaje: unidadesTotales > 0 ? (v.unidades / unidadesTotales) * 100 : 0,
+    }))
+    .sort((a, b) => b.unidades - a.unidades || b.facturacion - a.facturacion);
+
+  const vendidos = new Set(acumulado.keys());
+  const sinVentas = productosActivos
+    .map((p) => p.nombre)
+    .filter((nombre) => !vendidos.has(nombre))
+    .sort((a, b) => a.localeCompare(b, "es"));
+
+  return {
+    masVendidos: ordenado.slice(0, limite),
+    sinVentas,
+    unidadesTotales,
   };
 }
 

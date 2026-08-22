@@ -4,20 +4,44 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { TURNOS, ESTADOS_RESERVA } from "@/lib/reservas";
 
+/** "" o un número inválido => sin límite (null). */
+function parsearCapacidad(valor: FormDataEntryValue | null): number | null {
+  const texto = String(valor ?? "").trim();
+  if (!texto) return null;
+  const numero = parseInt(texto, 10);
+  if (isNaN(numero) || numero <= 0) return null;
+  return numero;
+}
+
 export async function crearHorario(formData: FormData) {
   const turno = String(formData.get("turno") ?? "");
   const hora = String(formData.get("hora") ?? "").trim();
+  const capacidadPersonas = parsearCapacidad(formData.get("capacidadPersonas"));
 
   if (!TURNOS.some((t) => t.value === turno)) throw new Error("Turno inválido");
   if (!hora) throw new Error("Falta el horario");
 
   await prisma.horarioReserva.upsert({
     where: { turno_hora: { turno, hora } },
-    update: { activo: true },
-    create: { turno, hora },
+    update: { activo: true, capacidadPersonas },
+    create: { turno, hora, capacidadPersonas },
   });
 
   revalidatePath("/admin/reservas/horarios");
+  revalidatePath("/reservas");
+}
+
+export async function actualizarCapacidadHorario(
+  id: string,
+  capacidad: number | null
+): Promise<void> {
+  await prisma.horarioReserva.update({
+    where: { id },
+    data: { capacidadPersonas: capacidad && capacidad > 0 ? capacidad : null },
+  });
+
+  revalidatePath("/admin/reservas/horarios");
+  revalidatePath("/admin/reservas");
   revalidatePath("/reservas");
 }
 
