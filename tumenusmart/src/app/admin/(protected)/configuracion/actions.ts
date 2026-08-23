@@ -4,6 +4,8 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { subirLogoNegocio } from "@/lib/supabase-storage";
+import { idLocalActual } from "@/lib/local-actual";
+import { normalizarSlug } from "@/lib/alcance-local";
 
 export async function subirFotoLogo(formData: FormData): Promise<{ url: string }> {
   const archivo = formData.get("archivo");
@@ -76,7 +78,9 @@ export async function agregarTramoHorario(formData: FormData) {
   }
   if (!abre || !cierra) throw new Error("Faltan las horas de apertura y cierre");
 
-  await prisma.horarioAtencion.create({ data: { diaSemana, abre, cierra } });
+  await prisma.horarioAtencion.create({
+    data: { storeId: await idLocalActual(), diaSemana, abre, cierra },
+  });
 
   revalidatePath("/admin/configuracion/horarios");
   revalidatePath("/");
@@ -123,7 +127,11 @@ export async function actualizarStore(formData: FormData) {
   if (store) {
     await prisma.store.update({ where: { id: store.id }, data: datos });
   } else {
-    await prisma.store.create({ data: datos });
+    // Primer arranque: el local necesita además su nombre para la URL, que
+    // sale del nombre del negocio. Se puede cambiar después.
+    await prisma.store.create({
+      data: { ...datos, slug: normalizarSlug(nombre) || "negocio" },
+    });
   }
 
   revalidatePath("/admin/configuracion");
@@ -141,7 +149,9 @@ export async function crearZona(formData: FormData) {
     throw new Error("Datos inválidos");
   }
 
-  await prisma.deliveryZone.create({ data: { nombre, radioKm, costoEnvio } });
+  await prisma.deliveryZone.create({
+    data: { storeId: await idLocalActual(), nombre, radioKm, costoEnvio },
+  });
   revalidatePath("/admin/configuracion");
   revalidatePath("/checkout");
 }

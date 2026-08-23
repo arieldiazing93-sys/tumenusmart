@@ -1,5 +1,6 @@
 "use server";
 
+import { idLocalActual } from "@/lib/local-actual";
 import { prisma } from "@/lib/prisma";
 import { distanciaKm, encontrarZonaPorDistancia } from "@/lib/geo";
 import { obtenerEstadoTienda, motivoSinPedidos } from "@/lib/estado-tienda";
@@ -92,14 +93,19 @@ export async function crearPedido(datos: DatosCheckout): Promise<{ orderId: stri
   );
   const total = subtotal + costoEnvio;
 
+  const storeId = await idLocalActual();
+
   const customer = await prisma.customer.upsert({
-    where: { telefono: datos.clienteTelefono },
+    // El mismo número puede ser cliente de varios locales: cada negocio
+    // tiene su propia ficha de esa persona.
+    where: { storeId_telefono: { storeId, telefono: datos.clienteTelefono } },
     update: { nombre: datos.clienteNombre },
-    create: { nombre: datos.clienteNombre, telefono: datos.clienteTelefono },
+    create: { storeId, nombre: datos.clienteNombre, telefono: datos.clienteTelefono },
   });
 
   const order = await prisma.order.create({
     data: {
+      storeId,
       customerId: customer.id,
       clienteNombre: datos.clienteNombre,
       clienteTelefono: datos.clienteTelefono,
@@ -119,6 +125,7 @@ export async function crearPedido(datos: DatosCheckout): Promise<{ orderId: stri
       total,
       items: {
         create: datos.items.map((i) => ({
+          storeId,
           productId: i.productId,
           nombreProducto: i.nombreProducto,
           cantidad: i.cantidad,

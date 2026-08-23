@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { idLocalActual } from "@/lib/local-actual";
 import { prisma } from "@/lib/prisma";
 
 export async function crearCategoria(formData: FormData) {
@@ -10,7 +11,7 @@ export async function crearCategoria(formData: FormData) {
   const ultima = await prisma.category.findFirst({ orderBy: { orden: "desc" } });
 
   await prisma.category.create({
-    data: { nombre, orden: (ultima?.orden ?? 0) + 1 },
+    data: { storeId: await idLocalActual(), nombre, orden: (ultima?.orden ?? 0) + 1 },
   });
   revalidatePath("/admin/categorias");
 }

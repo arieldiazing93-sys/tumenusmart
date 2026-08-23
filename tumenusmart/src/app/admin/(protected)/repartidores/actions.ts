@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { idLocalActual } from "@/lib/local-actual";
 import { prisma } from "@/lib/prisma";
 
 export async function crearRepartidor(formData: FormData) {
@@ -10,7 +11,7 @@ export async function crearRepartidor(formData: FormData) {
   if (!nombre) throw new Error("El nombre es obligatorio");
 
   await prisma.repartidor.create({
-    data: { nombre, telefono: telefono || null },
+    data: { storeId: await idLocalActual(), nombre, telefono: telefono || null },
   });
   revalidatePath("/admin/repartidores");
 }

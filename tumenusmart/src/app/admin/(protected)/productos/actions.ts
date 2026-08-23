@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { idLocalActual } from "@/lib/local-actual";
 import { prisma } from "@/lib/prisma";
 import { subirImagenProducto } from "@/lib/supabase-storage";
 
@@ -38,6 +39,7 @@ export async function crearProducto(formData: FormData) {
 
   const producto = await prisma.product.create({
     data: {
+      storeId: await idLocalActual(),
       nombre,
       categoryId,
       precio,
@@ -107,7 +109,7 @@ export async function agregarOpcion(productId: string, formData: FormData) {
   if (!nombre) throw new Error("El nombre de la opción es obligatorio");
 
   await prisma.productOption.create({
-    data: { productId, nombre, tipo, precioExtra },
+    data: { storeId: await idLocalActual(), productId, nombre, tipo, precioExtra },
   });
   revalidatePath(`/admin/productos/${productId}`);
 }

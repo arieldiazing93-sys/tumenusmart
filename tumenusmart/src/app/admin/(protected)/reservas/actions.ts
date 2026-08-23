@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { idLocalActual } from "@/lib/local-actual";
 import { prisma } from "@/lib/prisma";
 import { TURNOS, ESTADOS_RESERVA } from "@/lib/reservas";
 
@@ -21,10 +22,13 @@ export async function crearHorario(formData: FormData) {
   if (!TURNOS.some((t) => t.value === turno)) throw new Error("Turno inválido");
   if (!hora) throw new Error("Falta el horario");
 
+  const storeId = await idLocalActual();
   await prisma.horarioReserva.upsert({
-    where: { turno_hora: { turno, hora } },
+    // La clave ahora incluye el local: dos negocios pueden tener el mismo
+    // horario de las 20:00 sin pisarse entre sí.
+    where: { storeId_turno_hora: { storeId, turno, hora } },
     update: { activo: true, capacidadPersonas },
-    create: { turno, hora, capacidadPersonas },
+    create: { storeId, turno, hora, capacidadPersonas },
   });
 
   revalidatePath("/admin/reservas/horarios");

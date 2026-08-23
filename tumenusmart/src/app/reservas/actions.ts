@@ -1,5 +1,6 @@
 "use server";
 
+import { idLocalActual } from "@/lib/local-actual";
 import { prisma } from "@/lib/prisma";
 import { fechaAsuncionDesdeTexto, claveDiaAsuncion, horaAsuncion } from "@/lib/timezone";
 import { TURNOS, MOTIVOS_RESERVA } from "@/lib/reservas";
@@ -66,6 +67,7 @@ export async function crearReserva(datos: DatosReserva): Promise<{ reservationId
 
   const reserva = await prisma.reservation.create({
     data: {
+      storeId: await idLocalActual(),
       fecha,
       turno: datos.turno,
       horario: datos.horario,

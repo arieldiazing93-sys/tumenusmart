@@ -1,6 +1,10 @@
-// Esquema de base de datos — v1 de un solo negocio.
-// El modelo Store existe desde ya (aunque haya una sola fila) para que
-// pasar a multi-tenant más adelante sea agregar una FK, no rediseñar todo.
+// Esquema de base de datos — multi-local.
+//
+// Cada fila de negocio (Store) es un local, y TODAS las tablas de datos
+// cuelgan de una a través de `storeId`. Esa columna es lo que separa a un
+// negocio de otro: si una consulta se olvida de filtrarla, un local vería
+// los datos de otro. Por eso no se filtra a mano en cada consulta, sino
+// que se usa el acceso de src/lib/prisma-local.ts, que la inyecta solo.
 
 generator client {
   provider = "prisma-client-js"
@@ -13,6 +17,8 @@ datasource db {
 
 model Store {
   id             String   @id @default(cuid())
+  // Nombre en la URL pública: tumenusmart.app/lafogata
+  slug           String   @unique
   nombre         String
   whatsappNumero String // formato internacional sin '+', ej: 595981234567
   logoUrl        String?
@@ -26,8 +32,36 @@ model Store {
   // horario (cocina saturada, falta de personal, etc.).
   pedidosPausados Boolean @default(false)
   mensajePausa    String? // motivo opcional que ve el cliente al entrar
+
+  // --- Suscripción ---
+  // "activo" atiende con normalidad. "suspendido" apaga el menú público
+  // pero conserva todo. "prueba" es igual que activo, sirve para saber
+  // que todavía no pagó nunca.
+  estado         String    @default("activo")
+  vencimiento    DateTime?
+  plan           String    @default("basico")
+
+  // --- Numeración propia de cada local ---
+  // Así cada negocio ve sus pedidos desde el #0001 en vez de heredar un
+  // contador global compartido con el resto. Se incrementan de a uno en
+  // la misma transacción que crea el pedido o la reserva.
+  contadorPedidos  Int @default(0)
+  contadorReservas Int @default(0)
+
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
+
+  categorias     Category[]
+  productos      Product[]
+  opciones       ProductOption[]
+  zonas          DeliveryZone[]
+  clientes       Customer[]
+  repartidores   Repartidor[]
+  pedidos        Order[]
+  itemsPedido    OrderItem[]
+  reservas       Reservation[]
+  horariosReserva  HorarioReserva[]
+  horariosAtencion HorarioAtencion[]
 }
 
 // Horario de atención del local, un registro por tramo. Un día SIN
@@ -35,14 +69,20 @@ model Store {
 // mismo día = turno partido (ej: 11:00-14:00 y 18:00-23:30).
 model HorarioAtencion {
   id        String @id @default(cuid())
+  storeId   String
+  store     Store  @relation(fields: [storeId], references: [id], onDelete: Cascade)
   diaSemana Int // 0 = domingo, 1 = lunes ... 6 = sábado
   abre      String // "HH:MM"
   cierra    String // "HH:MM" — si es menor que `abre`, el cierre cae pasada la medianoche
   createdAt DateTime @default(now())
+
+  @@index([storeId])
 }
 
 model Category {
   id        String    @id @default(cuid())
+  storeId   String
+  store     Store     @relation(fields: [storeId], references: [id], onDelete: Cascade)
   nombre    String
   orden     Int       @default(0)
   // Si está en false, la categoría (y sus productos) no aparecen en el
@@ -51,10 +91,14 @@ model Category {
   activa    Boolean   @default(true)
   productos Product[]
   createdAt DateTime  @default(now())
+
+  @@index([storeId])
 }
 
 model Product {
   id          String          @id @default(cuid())
+  storeId     String
+  store       Store           @relation(fields: [storeId], references: [id], onDelete: Cascade)
   categoryId  String
   category    Category        @relation(fields: [categoryId], references: [id])
   nombre      String
@@ -81,18 +125,26 @@ model Product {
   orderItems  OrderItem[]
   createdAt   DateTime        @default(now())
   updatedAt   DateTime        @updatedAt
+
+  @@index([storeId])
+  @@index([categoryId])
 }
 
 // Cubre tanto variantes (tamaño, sabor — normalmente eliges una)
 // como agregados (extras — normalmente eliges varios).
 model ProductOption {
   id          String  @id @default(cuid())
+  storeId     String
+  store       Store   @relation(fields: [storeId], references: [id], onDelete: Cascade)
   productId   String
   product     Product @relation(fields: [productId], references: [id], onDelete: Cascade)
   nombre      String
   tipo        String // "variante" | "agregado"
   precioExtra Decimal @db.Decimal(10, 2) @default(0)
   orden       Int     @default(0)
+
+  @@index([storeId])
+  @@index([productId])
 }
 
 // Solo se usa cuando Store.envioModo = "zonas". Cada zona es un anillo de
@@ -101,36 +153,56 @@ model ProductOption {
 // distancia del cliente es la que se aplica.
 model DeliveryZone {
   id         String  @id @default(cuid())
+  storeId    String
+  store      Store   @relation(fields: [storeId], references: [id], onDelete: Cascade)
   nombre     String // etiqueta libre, ej: "Zona 1" o "Centro"
   radioKm    Decimal @db.Decimal(6, 2)
   costoEnvio Decimal @db.Decimal(10, 2)
   activo     Boolean @default(true)
   orders     Order[]
+
+  @@index([storeId])
 }
 
 model Customer {
   id        String   @id @default(cuid())
+  storeId   String
+  store     Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
   nombre    String
-  telefono  String   @unique
+  telefono  String
   orders    Order[]
   createdAt DateTime @default(now())
+
+  // El mismo número puede ser cliente de dos locales distintos: son
+  // personas distintas para cada negocio.
+  @@unique([storeId, telefono])
+  @@index([storeId])
 }
 
 model Repartidor {
   id        String   @id @default(cuid())
+  storeId   String
+  store     Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
   nombre    String
   telefono  String?
   activo    Boolean  @default(true)
   orders    Order[]
   createdAt DateTime @default(now())
+
+  @@index([storeId])
 }
 
 model Order {
   id                   String        @id @default(cuid())
-  // Número correlativo simple (1, 2, 3...) para mostrarle al cliente y al
-  // encargado — el id (cuid) sigue siendo la clave interna/URLs, pero un
-  // código con letras y números confunde al cliente al leerlo por teléfono.
-  numero               Int           @unique @default(autoincrement())
+  storeId              String
+  store                Store         @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  // Número correlativo para mostrarle al cliente y al encargado — el id
+  // (cuid) sigue siendo la clave interna/URLs, pero un código con letras y
+  // números confunde al cliente al leerlo por teléfono.
+  // FASE 1: sigue usando el contador global que ya existía, para no romper
+  // los pedidos en curso. En la FASE 2 pasa a `contadorPedidos` del local,
+  // así cada negocio arranca desde su propio #0001.
+  numero               Int           @default(autoincrement())
   customerId           String?
   customer             Customer?     @relation(fields: [customerId], references: [id])
   clienteNombre        String
@@ -159,11 +231,20 @@ model Order {
   total                Decimal       @db.Decimal(10, 2)
   items                OrderItem[]
   createdAt            DateTime      @default(now())
-  updatedAt             DateTime      @updatedAt
+  updatedAt            DateTime      @updatedAt
+
+  @@unique([storeId, numero])
+  @@index([storeId])
+  @@index([storeId, createdAt])
 }
 
 model OrderItem {
   id             String   @id @default(cuid())
+  // Se repite el local acá (aunque se podría deducir del pedido) para que
+  // el filtro automático funcione igual en todas las tablas, sin excepciones
+  // que haya que recordar.
+  storeId        String
+  store          Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
   orderId        String
   order          Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
   // Nulo cuando el ítem es un combo "mitad y mitad" (no corresponde a un
@@ -175,6 +256,9 @@ model OrderItem {
   precioUnitario Decimal @db.Decimal(10, 2)
   opcionesTexto  String? // snapshot de las opciones elegidas, en texto legible
   ingredientesQuitadosTexto String? // snapshot de ingredientes que el cliente sacó, ej: "tomate, cebolla"
+
+  @@index([storeId])
+  @@index([orderId])
 }
 
 // Horarios disponibles para reservar, agrupados por turno. Se configuran
@@ -182,6 +266,8 @@ model OrderItem {
 // formulario público de reservas.
 model HorarioReserva {
   id     String  @id @default(cuid())
+  storeId String
+  store   Store   @relation(fields: [storeId], references: [id], onDelete: Cascade)
   turno  String // "dia" | "tarde" | "noche"
   hora   String // "HH:MM", ej: "12:30"
   activo Boolean @default(true)
@@ -190,13 +276,16 @@ model HorarioReserva {
   // NULL = sin límite (comportamiento anterior, sigue siendo el default).
   capacidadPersonas Int?
 
-  @@unique([turno, hora])
+  @@unique([storeId, turno, hora])
+  @@index([storeId])
 }
 
 model Reservation {
   id              String   @id @default(cuid())
-  // Mismo criterio que Order.numero: código simple para el cliente/encargado.
-  numero          Int      @unique @default(autoincrement())
+  storeId         String
+  store           Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  // Mismo criterio que Order.numero: pasa a numeración por local en la fase 2.
+  numero          Int      @default(autoincrement())
   fecha           DateTime // solo día, medianoche Asunción — la mesa/fecha reservada
   turno           String // "dia" | "tarde" | "noche"
   horario         String // "HH:MM" elegido dentro del turno
@@ -214,4 +303,8 @@ model Reservation {
   // es una reserva que el cliente armó pero nunca llegó a pedir.
   enviadoWhatsapp Boolean  @default(false)
   createdAt       DateTime @default(now())
+
+  @@unique([storeId, numero])
+  @@index([storeId])
+  @@index([storeId, fecha])
 }

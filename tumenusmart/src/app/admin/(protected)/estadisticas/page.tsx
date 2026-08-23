@@ -9,7 +9,6 @@ import {
 import { ZONA_NEGOCIO } from "@/lib/timezone";
 import { etiquetaTurno } from "@/lib/reservas";
 import { VentasPorDiaChart } from "@/components/VentasPorDiaChart";
-import { MapaCalor } from "@/components/MapaCalor";
 
 export const dynamic = "force-dynamic";
 
@@ -292,24 +291,6 @@ export default async function AdminEstadisticasPage({
         </div>
       </div>
 
-      <div>
-        <h2 className="mb-3 font-semibold text-neutral-800">Dónde se están pidiendo los deliveries</h2>
-        <p className="mb-3 text-sm text-neutral-500">
-          Cada pedido con entrega a domicilio se marca como un círculo — donde se
-          superponen varios, se ve más oscuro, mostrando las zonas con más pedidos.
-        </p>
-        {stats.puntosCalor.length === 0 ? (
-          <p className="text-sm text-neutral-400">
-            Todavía no hay pedidos de delivery con ubicación en este período.
-          </p>
-        ) : (
-          <MapaCalor
-            storeLat={stats.store?.lat ?? null}
-            storeLng={stats.store?.lng ?? null}
-            puntos={stats.puntosCalor}
-          />
-        )}
-      </div>
     </div>
   );
 }

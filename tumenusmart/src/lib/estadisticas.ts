@@ -58,10 +58,6 @@ export async function calcularEstadisticas(rango: RangoFecha) {
     totalesPorDia.set(clave, (totalesPorDia.get(clave) ?? 0) + Number(p.total));
   }
 
-  const puntosCalor = pedidos
-    .filter((p) => p.tipoEntrega === "delivery" && p.clienteLat != null && p.clienteLng != null)
-    .map((p) => ({ lat: p.clienteLat as number, lng: p.clienteLng as number }));
-
   return {
     store,
     pedidosTotales,
@@ -75,7 +71,6 @@ export async function calcularEstadisticas(rango: RangoFecha) {
     clientesNuevos,
     dias,
     totalesPorDia,
-    puntosCalor,
   };
 }
 
