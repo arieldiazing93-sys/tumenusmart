@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { haySesionAdminValida } from "@/lib/auth";
 import { idLocalActual } from "@/lib/local-actual";
 import { calcularRangoFecha, claveDia } from "@/lib/rango-fecha";
 import {
@@ -29,6 +30,13 @@ function filaCsv(valores: (string | number)[]): string {
 // como columnas (una fila de encabezados + una fila de valores), que es
 // como se lee mejor una tabla en una planilla.
 export async function GET(request: NextRequest) {
+  // Una ruta de API no pasa por el layout del panel, así que tiene que
+  // verificar la sesión por su cuenta. Sin esto, cualquiera que se inventara
+  // una cookie con el nombre correcto se bajaba el historial de ventas.
+  if (!(await haySesionAdminValida())) {
+    return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+  }
+
   const { searchParams } = new URL(request.url);
   const fecha = searchParams.get("fecha") ?? "30dias";
   const desde = searchParams.get("desde") ?? undefined;

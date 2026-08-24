@@ -7,8 +7,10 @@ import { elegirLocal } from "./actions-local";
 type LocalItem = { id: string; nombre: string; slug: string };
 
 /**
- * Selector temporal de local para el panel (fase 2).
- * Solo aparece cuando hay más de un local cargado.
+ * Selector de local del panel.
+ *
+ * Solo se le muestra al superadmin —el layout ni siquiera lo renderiza para
+ * los demás— y aparece recién cuando hay más de un local cargado.
  */
 export function SelectorLocal({
   locales,

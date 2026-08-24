@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { haySesionAdminValida } from "@/lib/auth";
+import { sesionActual } from "@/lib/auth";
 import { cerrarSesion } from "./logout/actions";
 import { idLocalActual, listarLocales } from "@/lib/local-actual";
 import { SelectorLocal } from "./SelectorLocal";
@@ -15,43 +15,63 @@ const LINKS = [
   { href: "/admin/configuracion", label: "Configuración" },
 ];
 
+/** Secciones que solamente ve el superadmin. */
+const LINKS_SUPERADMIN = [{ href: "/admin/usuarios", label: "Usuarios" }];
+
 export default async function AdminLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const autenticado = await haySesionAdminValida();
-  // El middleware ya redirige si no hay cookie; esto cubre el caso de
-  // cookie presente pero con firma inválida (manipulada o vencida).
-  if (!autenticado) redirect("/admin/login");
+  const sesion = await sesionActual();
+  // El middleware ya redirige si no hay cookie; esto cubre la cookie presente
+  // pero inválida: firma manipulada, usuario borrado o usuario desactivado.
+  if (!sesion) redirect("/admin/login");
 
-  // Con varios locales cargados hace falta saber cuál se está administrando.
-  // Si todavía no hay ninguno, se deja pasar para que Configuración pueda
-  // crear el primero.
-  const locales = await listarLocales();
+  const esSuper = sesion.rol === "superadmin";
+
+  // El selector solo tiene sentido para el superadmin. Para los demás el local
+  // sale de su usuario, así que la lista trae uno solo y el selector no aparece.
+  const locales = esSuper ? await listarLocales() : [];
+
   let localActualId = "";
   try {
     localActualId = await idLocalActual();
   } catch {
+    // Sin locales cargados todavía: se deja pasar para que Configuración
+    // pueda crear el primero.
     localActualId = "";
   }
+
+  const enlaces = esSuper ? [...LINKS, ...LINKS_SUPERADMIN] : LINKS;
+  const nombreVisible = sesion.nombre?.trim() || sesion.email;
 
   return (
     <div className="min-h-screen bg-neutral-50">
       <header className="border-b border-neutral-200 bg-white print:hidden">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
-          <div className="flex items-center gap-6">
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-3">
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
             <span className="font-semibold text-neutral-900">TuMenuSmart</span>
-            <nav className="flex gap-4 text-sm font-medium text-neutral-600">
-              {LINKS.map((link) => (
+            <nav className="flex flex-wrap gap-4 text-sm font-medium text-neutral-600">
+              {enlaces.map((link) => (
                 <Link key={link.href} href={link.href} className="hover:text-brand">
                   {link.label}
                 </Link>
               ))}
             </nav>
           </div>
-          <div className="flex items-center gap-4">
-            <SelectorLocal locales={locales} actual={localActualId} />
+
+          <div className="flex flex-wrap items-center gap-4">
+            {esSuper && <SelectorLocal locales={locales} actual={localActualId} />}
+
+            <Link
+              href="/admin/mi-cuenta"
+              className="text-sm text-neutral-500 hover:text-brand"
+              title="Mi cuenta"
+            >
+              {nombreVisible}
+            </Link>
+
             <form action={cerrarSesion}>
               <button type="submit" className="text-sm text-neutral-500 hover:text-red-600">
                 Cerrar sesión

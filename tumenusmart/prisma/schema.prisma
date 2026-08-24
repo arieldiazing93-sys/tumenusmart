@@ -62,6 +62,42 @@ model Store {
   reservas       Reservation[]
   horariosReserva  HorarioReserva[]
   horariosAtencion HorarioAtencion[]
+  usuarios         Usuario[]
+}
+
+/// Quién puede entrar al panel.
+///
+/// OJO: este modelo NO entra en el filtro automático por local, y es a
+/// propósito. El ingreso ocurre antes de saber de qué local se trata —
+/// justamente lo averiguamos leyendo esta tabla— así que filtrarlo por
+/// local haría imposible iniciar sesión. Cada consulta de acá decide
+/// explícitamente su alcance.
+model Usuario {
+  id           String  @id @default(cuid())
+  email        String  @unique
+  // Formato "scrypt:sal:hash". Nunca se guarda la contraseña en claro.
+  passwordHash String
+  nombre       String?
+
+  /// "superadmin" ve todos los locales y administra usuarios.
+  /// "local" queda atado a su negocio y no sabe que existen otros.
+  /// Es texto y no enum para poder sumar "empleado" sin migrar la base.
+  rol     String  @default("local")
+  /// Nulo solamente para el superadmin, que no pertenece a ningún local.
+  storeId String?
+  store   Store?  @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  activo Boolean @default(true)
+
+  // --- Freno a la fuerza bruta ---
+  intentosFallidos Int       @default(0)
+  bloqueadoHasta   DateTime?
+  ultimoIngreso    DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([storeId])
 }
 
 // Horario de atención del local, un registro por tramo. Un día SIN

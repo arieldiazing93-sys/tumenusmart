@@ -1,23 +1,33 @@
 import { cookies } from "next/headers";
 import { prisma } from "./prisma";
+import { sesionObligatoria } from "./auth";
 
 const COOKIE_LOCAL = "local_admin";
 
 /**
  * Qué local está administrando quien entró al panel.
  *
- * FASE 2 (temporal): sale de una cookie que se elige con el selector del
- * panel, y si no hay ninguna elegida, del primer local cargado. Sirve para
- * poder probar varios locales con una sola contraseña de administrador.
+ * Desde la fase 3 sale de la sesión:
  *
- * FASE 3: esto se reemplaza por el local que trae la sesión firmada de cada
- * usuario, y el selector desaparece. Mientras tanto, cualquiera que tenga la
- * contraseña del panel puede cambiar de local — aceptable porque hoy esa
- * contraseña la tenés solo vos.
+ *   - Un usuario de local queda atado al negocio que tiene asignado. No hay
+ *     forma de que administre otro: no depende de ninguna cookie que se pueda
+ *     editar, sino de la fila de su usuario en la base.
+ *
+ *   - El superadmin no pertenece a ningún local, así que para él sí hace falta
+ *     elegir uno. Esa elección va en una cookie y se cambia con el selector,
+ *     que solamente él ve.
  */
 export async function idLocalActual(): Promise<string> {
-  const elegido = (await cookies()).get(COOKIE_LOCAL)?.value;
+  const sesion = await sesionObligatoria();
 
+  if (sesion.rol !== "superadmin") {
+    if (!sesion.storeId) {
+      throw new Error("Tu usuario todavía no tiene un local asignado");
+    }
+    return sesion.storeId;
+  }
+
+  const elegido = (await cookies()).get(COOKIE_LOCAL)?.value;
   if (elegido) {
     const existe = await prisma.store.findUnique({
       where: { id: elegido },
@@ -46,8 +56,24 @@ export async function localActual() {
   return local;
 }
 
-/** Todos los locales, para el selector del panel. */
+/**
+ * Los locales que puede administrar quien entró.
+ *
+ * El superadmin los ve todos; cualquier otro usuario ve solamente el suyo, y
+ * por eso el selector no le aparece.
+ */
 export async function listarLocales() {
+  const sesion = await sesionObligatoria();
+
+  if (sesion.rol !== "superadmin") {
+    if (!sesion.storeId) return [];
+    const propio = await prisma.store.findUnique({
+      where: { id: sesion.storeId },
+      select: { id: true, nombre: true, slug: true },
+    });
+    return propio ? [propio] : [];
+  }
+
   return prisma.store.findMany({
     orderBy: { nombre: "asc" },
     select: { id: true, nombre: true, slug: true },

@@ -1,9 +1,9 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { cerrarSesionAdmin } from "@/lib/auth";
+import { cerrarSesion as cerrarSesionDeUsuario } from "@/lib/auth";
 
 export async function cerrarSesion() {
-  await cerrarSesionAdmin();
+  await cerrarSesionDeUsuario();
   redirect("/admin/login");
 }

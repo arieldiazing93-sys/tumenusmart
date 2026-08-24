@@ -16,12 +16,14 @@ export const dynamic = "force-dynamic";
  * verdad, porque una ruta de API no pasa por el layout del panel.
  */
 export async function GET() {
-  // Todas las consultas de acá abajo quedan atadas a este local.
-  const prisma = prismaDelLocal(await idLocalActual());
-
+  // La sesión se verifica ANTES de tocar la base: así, sin sesión, la
+  // respuesta es un 401 limpio y no un error de servidor.
   if (!(await haySesionAdminValida())) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
+
+  // Todas las consultas de acá abajo quedan atadas a este local.
+  const prisma = prismaDelLocal(await idLocalActual());
 
   const [enviados, pendientes] = await Promise.all([
     prisma.order.count({ where: { enviadoWhatsapp: true } }),
