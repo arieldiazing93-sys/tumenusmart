@@ -1,3 +1,4 @@
+import { idLocalActual } from "@/lib/local-actual";
 import { calcularRangoFecha, claveDia, type FiltroFecha } from "@/lib/rango-fecha";
 import {
   calcularEstadisticas,
@@ -22,10 +23,12 @@ export default async function ImprimirEstadisticasPage({
     calcularRangoFecha(fechaActiva, desde, hasta) ??
     calcularRangoFecha("30dias", undefined, undefined)!;
 
+  const storeId = await idLocalActual();
+
   const [stats, statsReservas, ranking] = await Promise.all([
-    calcularEstadisticas(rango),
-    calcularEstadisticasReservas(rango),
-    calcularRankingProductos(rango, 20),
+    calcularEstadisticas(storeId, rango),
+    calcularEstadisticasReservas(storeId, rango),
+    calcularRankingProductos(storeId, rango, 20),
   ]);
 
   const finRangoInclusive = new Date(rango.lt.getTime() - 24 * 60 * 60 * 1000);

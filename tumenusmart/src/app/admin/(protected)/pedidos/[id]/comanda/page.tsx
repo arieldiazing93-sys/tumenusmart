@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
-import { prisma } from "@/lib/prisma";
+import { prismaDelLocal } from "@/lib/prisma-local";
+import { idLocalActual } from "@/lib/local-actual";
 import { formatearNumero } from "@/lib/format";
 import { ZONA_NEGOCIO } from "@/lib/timezone";
 import { ImprimirAuto } from "@/components/ImprimirAuto";
@@ -21,6 +22,9 @@ export default async function ComandaPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  // Todas las consultas de acá abajo quedan atadas a este local.
+  const prisma = prismaDelLocal(await idLocalActual());
+
   const { id } = await params;
   const pedido = await prisma.order.findUnique({
     where: { id },

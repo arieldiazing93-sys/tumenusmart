@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { idLocalActual } from "@/lib/local-actual";
 import { calcularRangoFecha, claveDia } from "@/lib/rango-fecha";
 import {
   calcularEstadisticas,
@@ -36,11 +37,13 @@ export async function GET(request: NextRequest) {
   const rango =
     calcularRangoFecha(fecha, desde, hasta) ?? calcularRangoFecha("30dias", undefined, undefined)!;
 
+  const storeId = await idLocalActual();
+
   const [stats, statsReservas, ranking] = await Promise.all([
-    calcularEstadisticas(rango),
-    calcularEstadisticasReservas(rango),
+    calcularEstadisticas(storeId, rango),
+    calcularEstadisticasReservas(storeId, rango),
     // En la planilla conviene el ranking completo, no solo el top 10.
-    calcularRankingProductos(rango, 500),
+    calcularRankingProductos(storeId, rango, 500),
   ]);
 
   const finRangoInclusive = new Date(rango.lt.getTime() - 24 * 60 * 60 * 1000);

@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { idLocalActual } from "@/lib/local-actual";
-import { prisma } from "@/lib/prisma";
+import { prismaDelLocal } from "@/lib/prisma-local";
 import { subirImagenProducto } from "@/lib/supabase-storage";
 
 export async function subirFotoProducto(formData: FormData): Promise<{ url: string }> {
@@ -29,6 +29,9 @@ function parsearIngredientes(formData: FormData): string[] {
 }
 
 export async function crearProducto(formData: FormData) {
+  // Todas las consultas de acá abajo quedan atadas a este local.
+  const prisma = prismaDelLocal(await idLocalActual());
+
   const nombre = String(formData.get("nombre") ?? "").trim();
   const categoryId = String(formData.get("categoryId") ?? "");
   const precio = parseFloat(String(formData.get("precio") ?? "0"));
@@ -39,7 +42,6 @@ export async function crearProducto(formData: FormData) {
 
   const producto = await prisma.product.create({
     data: {
-      storeId: await idLocalActual(),
       nombre,
       categoryId,
       precio,
@@ -52,13 +54,16 @@ export async function crearProducto(formData: FormData) {
   });
 
   revalidatePath("/admin/productos");
-  revalidatePath("/");
+  revalidatePath("/[slug]", "layout");
   // Vuelve a la lista de la misma categoría (no al detalle del producto)
   // para poder seguir cargando productos sin ir y venir entre pantallas.
   redirect(`/admin/productos?categoria=${producto.categoryId}&guardado=1`);
 }
 
 export async function actualizarProducto(productId: string, formData: FormData) {
+  // Todas las consultas de acá abajo quedan atadas a este local.
+  const prisma = prismaDelLocal(await idLocalActual());
+
   const nombre = String(formData.get("nombre") ?? "").trim();
   const categoryId = String(formData.get("categoryId") ?? "");
   const precio = parseFloat(String(formData.get("precio") ?? "0"));
@@ -91,17 +96,23 @@ export async function actualizarProducto(productId: string, formData: FormData) 
 
   revalidatePath("/admin/productos");
   revalidatePath(`/admin/productos/${productId}`);
-  revalidatePath("/");
+  revalidatePath("/[slug]", "layout");
   redirect(`/admin/productos/${productId}?guardado=1`);
 }
 
 export async function eliminarProducto(productId: string) {
+  // Todas las consultas de acá abajo quedan atadas a este local.
+  const prisma = prismaDelLocal(await idLocalActual());
+
   await prisma.product.delete({ where: { id: productId } });
   revalidatePath("/admin/productos");
   redirect("/admin/productos");
 }
 
 export async function agregarOpcion(productId: string, formData: FormData) {
+  // Todas las consultas de acá abajo quedan atadas a este local.
+  const prisma = prismaDelLocal(await idLocalActual());
+
   const nombre = String(formData.get("nombre") ?? "").trim();
   const tipo = String(formData.get("tipo") ?? "agregado");
   const precioExtra = parseFloat(String(formData.get("precioExtra") ?? "0")) || 0;
@@ -109,12 +120,15 @@ export async function agregarOpcion(productId: string, formData: FormData) {
   if (!nombre) throw new Error("El nombre de la opción es obligatorio");
 
   await prisma.productOption.create({
-    data: { storeId: await idLocalActual(), productId, nombre, tipo, precioExtra },
+    data: { productId, nombre, tipo, precioExtra },
   });
   revalidatePath(`/admin/productos/${productId}`);
 }
 
 export async function eliminarOpcion(productId: string, optionId: string) {
+  // Todas las consultas de acá abajo quedan atadas a este local.
+  const prisma = prismaDelLocal(await idLocalActual());
+
   await prisma.productOption.delete({ where: { id: optionId } });
   revalidatePath(`/admin/productos/${productId}`);
 }

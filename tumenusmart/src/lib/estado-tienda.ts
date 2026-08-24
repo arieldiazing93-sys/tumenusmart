@@ -20,10 +20,10 @@ export type EstadoTienda = {
  * La usan tanto las pantallas públicas (para avisar) como el server action
  * que crea el pedido (para rechazarlo) — nunca se confía en el navegador.
  */
-export async function obtenerEstadoTienda(): Promise<EstadoTienda> {
+export async function obtenerEstadoTienda(storeId: string): Promise<EstadoTienda> {
   const [store, horarios] = await Promise.all([
-    prisma.store.findFirst(),
-    prisma.horarioAtencion.findMany(),
+    prisma.store.findUnique({ where: { id: storeId } }),
+    prisma.horarioAtencion.findMany({ where: { storeId } }),
   ]);
 
   const { abierto, proximaApertura } = calcularEstadoAtencion(horarios);

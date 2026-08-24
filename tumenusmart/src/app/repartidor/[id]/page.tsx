@@ -23,14 +23,19 @@ export default async function RepartidorPage({
   const repartidor = await prisma.repartidor.findUnique({ where: { id } });
   if (!repartidor) notFound();
 
+  // Todo lo que sigue queda atado al local de ESTE repartidor: aunque su
+  // enlace circule, nunca muestra pedidos de otro negocio.
+  const storeId = repartidor.storeId;
+
   const [pendientes, entregadosHoy] = await Promise.all([
     prisma.order.findMany({
-      where: { repartidorId: id, estado: "en_despacho" },
+      where: { storeId, repartidorId: id, estado: "en_despacho" },
       include: { items: true },
       orderBy: { createdAt: "asc" },
     }),
     prisma.order.findMany({
       where: {
+        storeId,
         repartidorId: id,
         estado: "entregado",
         updatedAt: { gte: inicioDeHoyEnAsuncion() },

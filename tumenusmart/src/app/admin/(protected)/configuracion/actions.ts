@@ -3,9 +3,25 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { prismaDelLocal } from "@/lib/prisma-local";
 import { subirLogoNegocio } from "@/lib/supabase-storage";
 import { idLocalActual } from "@/lib/local-actual";
 import { normalizarSlug } from "@/lib/alcance-local";
+
+// Dos accesos a la base conviven acá a propósito:
+//
+//   prisma          -> para el LOCAL en sí (Store no lleva columna de local,
+//                      así que el filtro automático no lo alcanza; siempre se
+//                      indica explícitamente de cuál se trata).
+//   prismaDelLocal  -> para todo lo que cuelga del local (zonas, horarios...),
+//                      que sale filtrado solo.
+
+/** Refresca las pantallas que dependen de los datos del local. */
+function refrescarPantallas() {
+  revalidatePath("/admin/configuracion");
+  revalidatePath("/admin/pedidos");
+  revalidatePath("/[slug]", "layout");
+}
 
 export async function subirFotoLogo(formData: FormData): Promise<{ url: string }> {
   const archivo = formData.get("archivo");
@@ -16,59 +32,44 @@ export async function subirFotoLogo(formData: FormData): Promise<{ url: string }
 
   // Se guarda de una, sin esperar a que aprieten "Guardar" al pie del
   // formulario grande — si no, la imagen se ve cargada en la vista previa
-  // pero el negocio (Store.logoUrl) se queda sin actualizar hasta que el
-  // usuario note que falta guardar el resto del formulario.
-  const store = await prisma.store.findFirst();
-  if (store) {
-    await prisma.store.update({ where: { id: store.id }, data: { logoUrl: url } });
-    revalidatePath("/admin/configuracion");
-    revalidatePath("/");
-    revalidatePath("/checkout");
-  }
+  // pero el negocio se queda sin actualizar hasta que el usuario note que
+  // falta guardar el resto del formulario.
+  await prisma.store.update({
+    where: { id: await idLocalActual() },
+    data: { logoUrl: url },
+  });
+  refrescarPantallas();
 
   return { url };
 }
 
 export async function quitarLogoStore(): Promise<void> {
-  const store = await prisma.store.findFirst();
-  if (store) {
-    await prisma.store.update({ where: { id: store.id }, data: { logoUrl: null } });
-    revalidatePath("/admin/configuracion");
-    revalidatePath("/");
-    revalidatePath("/checkout");
-  }
+  await prisma.store.update({
+    where: { id: await idLocalActual() },
+    data: { logoUrl: null },
+  });
+  refrescarPantallas();
 }
 
 export async function alternarPausaPedidos(pausado: boolean): Promise<void> {
-  const store = await prisma.store.findFirst();
-  if (!store) throw new Error("Todavía no cargaste los datos del negocio");
-
   await prisma.store.update({
-    where: { id: store.id },
+    where: { id: await idLocalActual() },
     data: { pedidosPausados: pausado },
   });
-
-  revalidatePath("/admin/pedidos");
-  revalidatePath("/admin/configuracion");
-  revalidatePath("/");
-  revalidatePath("/checkout");
+  refrescarPantallas();
 }
 
 export async function guardarMensajePausa(mensaje: string): Promise<void> {
-  const store = await prisma.store.findFirst();
-  if (!store) throw new Error("Todavía no cargaste los datos del negocio");
-
   await prisma.store.update({
-    where: { id: store.id },
+    where: { id: await idLocalActual() },
     data: { mensajePausa: mensaje.trim() || null },
   });
-
-  revalidatePath("/admin/pedidos");
-  revalidatePath("/admin/configuracion");
-  revalidatePath("/");
+  refrescarPantallas();
 }
 
 export async function agregarTramoHorario(formData: FormData) {
+  const db = prismaDelLocal(await idLocalActual());
+
   const diaSemana = Number(formData.get("diaSemana"));
   const abre = String(formData.get("abre") ?? "").trim();
   const cierra = String(formData.get("cierra") ?? "").trim();
@@ -78,29 +79,26 @@ export async function agregarTramoHorario(formData: FormData) {
   }
   if (!abre || !cierra) throw new Error("Faltan las horas de apertura y cierre");
 
-  await prisma.horarioAtencion.create({
-    data: { storeId: await idLocalActual(), diaSemana, abre, cierra },
-  });
+  await db.horarioAtencion.create({ data: { diaSemana, abre, cierra } });
 
   revalidatePath("/admin/configuracion/horarios");
-  revalidatePath("/");
-  revalidatePath("/checkout");
-  revalidatePath("/reservas");
+  revalidatePath("/[slug]", "layout");
 }
 
 export async function eliminarTramoHorario(id: string): Promise<void> {
-  await prisma.horarioAtencion.delete({ where: { id } });
+  const db = prismaDelLocal(await idLocalActual());
+
+  await db.horarioAtencion.delete({ where: { id } });
 
   revalidatePath("/admin/configuracion/horarios");
-  revalidatePath("/");
-  revalidatePath("/checkout");
-  revalidatePath("/reservas");
+  revalidatePath("/[slug]", "layout");
 }
 
 export async function actualizarStore(formData: FormData) {
   const nombre = String(formData.get("nombre") ?? "").trim();
   const whatsappNumero = String(formData.get("whatsappNumero") ?? "").replace(/[^\d]/g, "");
-  const envioModo = String(formData.get("envioModo") ?? "zonas") === "coordinar" ? "coordinar" : "zonas";
+  const envioModo =
+    String(formData.get("envioModo") ?? "zonas") === "coordinar" ? "coordinar" : "zonas";
 
   if (!nombre || !whatsappNumero) {
     throw new Error("Nombre y WhatsApp son obligatorios");
@@ -111,7 +109,6 @@ export async function actualizarStore(formData: FormData) {
   const lat = latRaw ? parseFloat(latRaw) : null;
   const lng = lngRaw ? parseFloat(lngRaw) : null;
 
-  const store = await prisma.store.findFirst();
   const datos = {
     nombre,
     whatsappNumero,
@@ -124,8 +121,16 @@ export async function actualizarStore(formData: FormData) {
     lng: lng != null && !isNaN(lng) ? lng : null,
   };
 
-  if (store) {
-    await prisma.store.update({ where: { id: store.id }, data: datos });
+  // Ojo con el orden: en el primer arranque todavía NO hay ningún local, y
+  // preguntar "¿cuál estoy administrando?" daría error. Por eso se mira
+  // primero si existe alguno, en vez de resolver el actual de entrada.
+  const existeAlguno = await prisma.store.findFirst({ select: { id: true } });
+
+  if (existeAlguno) {
+    await prisma.store.update({
+      where: { id: await idLocalActual() },
+      data: datos,
+    });
   } else {
     // Primer arranque: el local necesita además su nombre para la URL, que
     // sale del nombre del negocio. Se puede cambiar después.
@@ -134,13 +139,13 @@ export async function actualizarStore(formData: FormData) {
     });
   }
 
-  revalidatePath("/admin/configuracion");
-  revalidatePath("/checkout");
-  revalidatePath("/");
+  refrescarPantallas();
   redirect("/admin/configuracion?guardado=1");
 }
 
 export async function crearZona(formData: FormData) {
+  const db = prismaDelLocal(await idLocalActual());
+
   const nombre = String(formData.get("nombre") ?? "").trim();
   const radioKm = parseFloat(String(formData.get("radioKm") ?? "0"));
   const costoEnvio = parseFloat(String(formData.get("costoEnvio") ?? "0"));
@@ -149,27 +154,29 @@ export async function crearZona(formData: FormData) {
     throw new Error("Datos inválidos");
   }
 
-  await prisma.deliveryZone.create({
-    data: { storeId: await idLocalActual(), nombre, radioKm, costoEnvio },
-  });
+  await db.deliveryZone.create({ data: { nombre, radioKm, costoEnvio } });
   revalidatePath("/admin/configuracion");
-  revalidatePath("/checkout");
+  revalidatePath("/[slug]", "layout");
 }
 
 export async function eliminarZona(id: string) {
-  const pedidosEnZona = await prisma.order.count({ where: { deliveryZoneId: id } });
+  const db = prismaDelLocal(await idLocalActual());
+
+  const pedidosEnZona = await db.order.count({ where: { deliveryZoneId: id } });
   if (pedidosEnZona > 0) {
     throw new Error(
       `No se puede borrar: hay ${pedidosEnZona} pedido(s) que usan esta zona como parte de su historial. Si ya no la querés ofrecer, usá el botón "Desactivar" en vez de borrarla — así dejás de mostrarla a nuevos clientes pero conservás el historial de esos pedidos.`
     );
   }
-  await prisma.deliveryZone.delete({ where: { id } });
+  await db.deliveryZone.delete({ where: { id } });
   revalidatePath("/admin/configuracion");
-  revalidatePath("/checkout");
+  revalidatePath("/[slug]", "layout");
 }
 
 export async function alternarActivaZona(id: string, activo: boolean) {
-  await prisma.deliveryZone.update({ where: { id }, data: { activo } });
+  const db = prismaDelLocal(await idLocalActual());
+
+  await db.deliveryZone.update({ where: { id }, data: { activo } });
   revalidatePath("/admin/configuracion");
-  revalidatePath("/checkout");
+  revalidatePath("/[slug]", "layout");
 }

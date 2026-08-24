@@ -9,7 +9,12 @@ import {
 } from "react";
 import { ItemCarrito, precioUnitario } from "@/lib/cart-types";
 
-const STORAGE_KEY = "pedidos-app:carrito";
+// Un carrito por local. Sin esto, alguien que abre dos menús distintos en el
+// mismo navegador terminaría con productos de un negocio dentro del pedido
+// del otro.
+function claveGuardado(claveLocal: string): string {
+  return `tumenusmart:carrito:${claveLocal}`;
+}
 
 type CartContextValue = {
   items: ItemCarrito[];
@@ -23,30 +28,40 @@ type CartContextValue = {
 
 const CartContext = createContext<CartContextValue | null>(null);
 
-export function CartProvider({ children }: { children: React.ReactNode }) {
+export function CartProvider({
+  children,
+  claveLocal,
+}: {
+  children: React.ReactNode;
+  /** nombre del local en la URL — separa este carrito del de otros negocios */
+  claveLocal: string;
+}) {
   const [items, setItems] = useState<ItemCarrito[]>([]);
   const [cargado, setCargado] = useState(false);
 
-  // Cargar carrito guardado (si existe) una sola vez, al montar en el navegador.
+  // Cargar el carrito de ESTE local (si existe) al montar en el navegador.
+  // Si se cambia de local, se vacía y se lee el del nuevo.
   useEffect(() => {
+    setCargado(false);
+    setItems([]);
     try {
-      const guardado = window.localStorage.getItem(STORAGE_KEY);
+      const guardado = window.localStorage.getItem(claveGuardado(claveLocal));
       if (guardado) setItems(JSON.parse(guardado));
     } catch {
       // localStorage no disponible o corrupto: seguimos con carrito vacío
     } finally {
       setCargado(true);
     }
-  }, []);
+  }, [claveLocal]);
 
   useEffect(() => {
     if (!cargado) return;
     try {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+      window.localStorage.setItem(claveGuardado(claveLocal), JSON.stringify(items));
     } catch {
       // si falla el guardado, el carrito sigue funcionando en memoria
     }
-  }, [items, cargado]);
+  }, [items, cargado, claveLocal]);
 
   function agregarItem(nuevo: ItemCarrito) {
     setItems((actuales) => {

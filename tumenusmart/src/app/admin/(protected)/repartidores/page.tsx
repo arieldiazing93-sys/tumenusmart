@@ -1,4 +1,5 @@
-import { prisma } from "@/lib/prisma";
+import { prismaDelLocal } from "@/lib/prisma-local";
+import { idLocalActual } from "@/lib/local-actual";
 import { crearRepartidor } from "./actions";
 import { RepartidorAcciones } from "./RepartidorAcciones";
 import { LinkRepartidor } from "./LinkRepartidor";
@@ -6,6 +7,9 @@ import { LinkRepartidor } from "./LinkRepartidor";
 export const dynamic = "force-dynamic";
 
 export default async function AdminRepartidoresPage() {
+  // Todas las consultas de acá abajo quedan atadas a este local.
+  const prisma = prismaDelLocal(await idLocalActual());
+
   const repartidores = await prisma.repartidor.findMany({
     orderBy: { createdAt: "asc" },
   });

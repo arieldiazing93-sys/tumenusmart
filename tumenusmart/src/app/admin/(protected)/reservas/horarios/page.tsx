@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { prisma } from "@/lib/prisma";
+import { prismaDelLocal } from "@/lib/prisma-local";
+import { idLocalActual } from "@/lib/local-actual";
 import { crearHorario } from "../actions";
 import { TURNOS } from "@/lib/reservas";
 import { EliminarHorarioBoton } from "./EliminarHorarioBoton";
@@ -8,6 +9,9 @@ import { CapacidadField } from "./CapacidadField";
 export const dynamic = "force-dynamic";
 
 export default async function HorariosReservaPage() {
+  // Todas las consultas de acá abajo quedan atadas a este local.
+  const prisma = prismaDelLocal(await idLocalActual());
+
   const horarios = await prisma.horarioReserva.findMany({
     orderBy: [{ turno: "asc" }, { hora: "asc" }],
   });

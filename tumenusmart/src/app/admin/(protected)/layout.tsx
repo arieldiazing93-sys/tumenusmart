@@ -2,6 +2,8 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { haySesionAdminValida } from "@/lib/auth";
 import { cerrarSesion } from "./logout/actions";
+import { idLocalActual, listarLocales } from "@/lib/local-actual";
+import { SelectorLocal } from "./SelectorLocal";
 
 const LINKS = [
   { href: "/admin/pedidos", label: "Pedidos" },
@@ -23,6 +25,17 @@ export default async function AdminLayout({
   // cookie presente pero con firma inválida (manipulada o vencida).
   if (!autenticado) redirect("/admin/login");
 
+  // Con varios locales cargados hace falta saber cuál se está administrando.
+  // Si todavía no hay ninguno, se deja pasar para que Configuración pueda
+  // crear el primero.
+  const locales = await listarLocales();
+  let localActualId = "";
+  try {
+    localActualId = await idLocalActual();
+  } catch {
+    localActualId = "";
+  }
+
   return (
     <div className="min-h-screen bg-neutral-50">
       <header className="border-b border-neutral-200 bg-white print:hidden">
@@ -37,11 +50,14 @@ export default async function AdminLayout({
               ))}
             </nav>
           </div>
-          <form action={cerrarSesion}>
-            <button type="submit" className="text-sm text-neutral-500 hover:text-red-600">
-              Cerrar sesión
-            </button>
-          </form>
+          <div className="flex items-center gap-4">
+            <SelectorLocal locales={locales} actual={localActualId} />
+            <form action={cerrarSesion}>
+              <button type="submit" className="text-sm text-neutral-500 hover:text-red-600">
+                Cerrar sesión
+              </button>
+            </form>
+          </div>
         </div>
       </header>
       <div className="mx-auto max-w-6xl px-4 py-6 print:max-w-none print:p-0">{children}</div>

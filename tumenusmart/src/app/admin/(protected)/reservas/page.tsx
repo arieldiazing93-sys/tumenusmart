@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { prisma } from "@/lib/prisma";
+import { prismaDelLocal } from "@/lib/prisma-local";
+import { idLocalActual } from "@/lib/local-actual";
 import {
   ZONA_NEGOCIO,
   claveDiaAsuncion,
@@ -18,6 +19,7 @@ import {
 import { etiquetaTurno, etiquetaMotivo } from "@/lib/reservas";
 import { formatearNumero } from "@/lib/format";
 import { linkWhatsappCliente } from "@/lib/whatsapp";
+import type { Reservation } from "@prisma/client";
 import { calcularDisponibilidad } from "@/lib/cupos-reserva";
 import { EstadoReservaSelect } from "./EstadoReservaSelect";
 import { NotaReservaField } from "./NotaReservaField";
@@ -25,7 +27,7 @@ import { NotaReservaField } from "./NotaReservaField";
 export const dynamic = "force-dynamic";
 
 type Vista = "dia" | "semana" | "mes";
-type ReservaFila = Awaited<ReturnType<typeof prisma.reservation.findMany>>[number];
+type ReservaFila = Reservation;
 
 const VISTAS: { value: Vista; label: string }[] = [
   { value: "dia", label: "Día" },
@@ -92,6 +94,10 @@ export default async function AdminReservasPage({
 }: {
   searchParams: Promise<{ vista?: string; dia?: string }>;
 }) {
+  // Todas las consultas de acá abajo quedan atadas a este local.
+  const storeId = await idLocalActual();
+  const prisma = prismaDelLocal(storeId);
+
   const { vista: vistaParam, dia: diaParam } = await searchParams;
   const hoyClave = claveDiaAsuncion(new Date());
   const vista: Vista = vistaParam === "dia" || vistaParam === "semana" ? vistaParam : "mes";
@@ -134,7 +140,7 @@ export default async function AdminReservasPage({
       where: { fecha: { gte, lt }, enviadoWhatsapp: false },
     }),
     // La ocupación por horario solo tiene sentido mirando un día puntual.
-    vista === "dia" ? calcularDisponibilidad(diaAncla) : Promise.resolve([]),
+    vista === "dia" ? calcularDisponibilidad(storeId, diaAncla) : Promise.resolve([]),
   ]);
 
   // Solo se muestran los horarios que tienen cupo definido o alguna reserva:

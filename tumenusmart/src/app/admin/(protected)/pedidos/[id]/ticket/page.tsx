@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
-import { prisma } from "@/lib/prisma";
+import { prismaDelLocal } from "@/lib/prisma-local";
+import { idLocalActual } from "@/lib/local-actual";
 import { formatearGuarani, formatearNumero } from "@/lib/format";
 import { ZONA_NEGOCIO } from "@/lib/timezone";
 import { ImprimirAuto } from "@/components/ImprimirAuto";
@@ -25,6 +26,9 @@ export default async function TicketPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  // Todas las consultas de acá abajo quedan atadas a este local.
+  const prisma = prismaDelLocal(await idLocalActual());
+
   const { id } = await params;
 
   const [pedido, store] = await Promise.all([
@@ -32,7 +36,7 @@ export default async function TicketPage({
       where: { id },
       include: { items: true, deliveryZone: true, repartidor: true },
     }),
-    prisma.store.findFirst(),
+    prisma.store.findUnique({ where: { id: await idLocalActual() } }),
   ]);
 
   if (!pedido) notFound();

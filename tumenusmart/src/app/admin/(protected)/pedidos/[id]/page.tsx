@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { prisma } from "@/lib/prisma";
+import { prismaDelLocal } from "@/lib/prisma-local";
+import { idLocalActual } from "@/lib/local-actual";
 import { formatearGuarani, formatearNumero } from "@/lib/format";
 import { EstadoBotones } from "../EstadoBotones";
 import { RepartidorSelect } from "../RepartidorSelect";
@@ -13,6 +14,9 @@ export default async function DetallePedidoPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  // Todas las consultas de acá abajo quedan atadas a este local.
+  const prisma = prismaDelLocal(await idLocalActual());
+
   const { id } = await params;
 
   const [pedido, repartidores] = await Promise.all([

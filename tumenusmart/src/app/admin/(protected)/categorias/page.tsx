@@ -1,10 +1,14 @@
-import { prisma } from "@/lib/prisma";
+import { prismaDelLocal } from "@/lib/prisma-local";
+import { idLocalActual } from "@/lib/local-actual";
 import { crearCategoria } from "./actions";
 import { CategoriaFila } from "./CategoriaFila";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminCategoriasPage() {
+  // Todas las consultas de acá abajo quedan atadas a este local.
+  const prisma = prismaDelLocal(await idLocalActual());
+
   const categorias = await prisma.category.findMany({
     orderBy: { orden: "asc" },
     include: { _count: { select: { productos: true } } },

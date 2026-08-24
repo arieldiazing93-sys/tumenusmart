@@ -14,17 +14,17 @@ const PEDIDO_REAL = {
   OR: [{ enviadoWhatsapp: true }, { estado: { not: "pendiente" } }],
 };
 
-export async function calcularEstadisticas(rango: RangoFecha) {
+export async function calcularEstadisticas(storeId: string, rango: RangoFecha) {
   const [store, pedidos, primerPedidoPorCliente] = await Promise.all([
-    prisma.store.findFirst(),
+    prisma.store.findUnique({ where: { id: storeId } }),
     prisma.order.findMany({
-      where: { createdAt: rango, ...PEDIDO_REAL },
+      where: { storeId, createdAt: rango, ...PEDIDO_REAL },
       include: { items: true },
       orderBy: { createdAt: "asc" },
     }),
     prisma.order.groupBy({
       by: ["clienteTelefono"],
-      where: PEDIDO_REAL,
+      where: { storeId, ...PEDIDO_REAL },
       _min: { createdAt: true },
     }),
   ]);
@@ -99,18 +99,20 @@ export type RankingProductos = {
  * práctica es lo que uno quiere ver.
  */
 export async function calcularRankingProductos(
+  storeId: string,
   rango: RangoFecha,
   limite = 10
 ): Promise<RankingProductos> {
   const [items, productosActivos] = await Promise.all([
     prisma.orderItem.findMany({
       where: {
+        storeId,
         order: { createdAt: rango, estado: { not: "cancelado" }, ...PEDIDO_REAL },
       },
       select: { nombreProducto: true, cantidad: true, precioUnitario: true },
     }),
     prisma.product.findMany({
-      where: { disponible: true },
+      where: { storeId, disponible: true },
       select: { nombre: true },
     }),
   ]);
@@ -152,11 +154,11 @@ export async function calcularRankingProductos(
 // (el día de la mesa reservada) en vez de createdAt — así "Últimos 7 días"
 // muestra cuántas reservas hay agendadas para esos días, que es lo que le
 // interesa al encargado, no cuándo se cargaron.
-export async function calcularEstadisticasReservas(rango: RangoFecha) {
+export async function calcularEstadisticasReservas(storeId: string, rango: RangoFecha) {
   // Igual que el calendario: solo cuentan las reservas que el cliente
   // llegó a enviar por WhatsApp.
   const reservas = await prisma.reservation.findMany({
-    where: { fecha: rango, enviadoWhatsapp: true },
+    where: { storeId, fecha: rango, enviadoWhatsapp: true },
     orderBy: { fecha: "asc" },
   });
 

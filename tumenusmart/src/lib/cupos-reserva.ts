@@ -20,6 +20,7 @@ export type DisponibilidadHorario = {
  * debería estar ocupando una mesa.
  */
 export async function calcularDisponibilidad(
+  storeId: string,
   fechaTexto: string
 ): Promise<DisponibilidadHorario[]> {
   const fecha = fechaAsuncionDesdeTexto(fechaTexto);
@@ -29,11 +30,12 @@ export async function calcularDisponibilidad(
 
   const [horarios, reservas] = await Promise.all([
     prisma.horarioReserva.findMany({
-      where: { activo: true },
+      where: { storeId, activo: true },
       orderBy: [{ turno: "asc" }, { hora: "asc" }],
     }),
     prisma.reservation.findMany({
       where: {
+        storeId,
         fecha: { gte: fecha, lt: finDelDia },
         enviadoWhatsapp: true,
         estado: { not: "cancelada" },
@@ -66,11 +68,12 @@ export async function calcularDisponibilidad(
  * la reserva, que es el único punto donde el chequeo es confiable.
  */
 export async function motivoSinCupo(
+  storeId: string,
   fechaTexto: string,
   horario: string,
   personas: number
 ): Promise<string | null> {
-  const disponibilidad = await calcularDisponibilidad(fechaTexto);
+  const disponibilidad = await calcularDisponibilidad(storeId, fechaTexto);
   const slot = disponibilidad.find((d) => d.hora === horario);
 
   // Sin límite configurado (o horario que ya no existe): no se bloquea nada.

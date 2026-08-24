@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import Link from "next/link";
-import { prisma } from "@/lib/prisma";
+import { prismaDelLocal } from "@/lib/prisma-local";
+import { idLocalActual } from "@/lib/local-actual";
 import { formatearGuarani } from "@/lib/format";
 import { actualizarStore, crearZona } from "./actions";
 import { EliminarZonaBoton } from "./EliminarZonaBoton";
@@ -13,8 +14,11 @@ import { NOMBRES_DIA, DIAS_ORDENADOS, resumenDia } from "@/lib/horario-atencion"
 export const dynamic = "force-dynamic";
 
 export default async function AdminConfiguracionPage() {
+  // Todas las consultas de acá abajo quedan atadas a este local.
+  const prisma = prismaDelLocal(await idLocalActual());
+
   const [store, zonas, horarios] = await Promise.all([
-    prisma.store.findFirst(),
+    prisma.store.findUnique({ where: { id: await idLocalActual() } }),
     prisma.deliveryZone.findMany({ orderBy: { radioKm: "asc" } }),
     prisma.horarioAtencion.findMany({ orderBy: [{ diaSemana: "asc" }, { abre: "asc" }] }),
   ]);

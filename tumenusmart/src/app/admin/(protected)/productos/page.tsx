@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import Link from "next/link";
-import { prisma } from "@/lib/prisma";
+import { prismaDelLocal } from "@/lib/prisma-local";
+import { idLocalActual } from "@/lib/local-actual";
 import { formatearGuarani } from "@/lib/format";
 import { crearProducto } from "./actions";
 import { IngredientesField } from "./IngredientesField";
@@ -14,6 +15,9 @@ export default async function AdminProductosPage({
 }: {
   searchParams: Promise<{ categoria?: string; guardado?: string }>;
 }) {
+  // Todas las consultas de acá abajo quedan atadas a este local.
+  const prisma = prismaDelLocal(await idLocalActual());
+
   const { categoria: categoriaId, guardado } = await searchParams;
   // Si venimos de crear un producto, el formulario queda abierto para
   // poder seguir cargando el siguiente sin tener que volver a desplegarlo.

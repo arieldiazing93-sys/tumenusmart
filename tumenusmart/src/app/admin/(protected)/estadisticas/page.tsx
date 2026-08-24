@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { formatearGuarani } from "@/lib/format";
+import { idLocalActual } from "@/lib/local-actual";
 import { calcularRangoFecha, claveDia, type FiltroFecha } from "@/lib/rango-fecha";
 import {
   calcularEstadisticas,
@@ -53,10 +54,12 @@ export default async function AdminEstadisticasPage({
     return params.toString();
   }
 
+  const storeId = await idLocalActual();
+
   const [stats, statsReservas, ranking] = await Promise.all([
-    calcularEstadisticas(rango),
-    calcularEstadisticasReservas(rango),
-    calcularRankingProductos(rango),
+    calcularEstadisticas(storeId, rango),
+    calcularEstadisticasReservas(storeId, rango),
+    calcularRankingProductos(storeId, rango),
   ]);
 
   const datosChart = stats.dias.map((d) => ({

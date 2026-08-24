@@ -1,7 +1,8 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { prisma } from "@/lib/prisma";
+import { prismaDelLocal } from "@/lib/prisma-local";
+import { idLocalActual } from "@/lib/local-actual";
 import { formatearGuarani } from "@/lib/format";
 import { actualizarProducto, agregarOpcion } from "../actions";
 import { EliminarProductoBoton, EliminarOpcionBoton } from "./EliminarBotones";
@@ -16,6 +17,9 @@ export default async function EditarProductoPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  // Todas las consultas de acá abajo quedan atadas a este local.
+  const prisma = prismaDelLocal(await idLocalActual());
+
   const { id } = await params;
 
   const [producto, categorias] = await Promise.all([

@@ -1,12 +1,13 @@
 import Link from "next/link";
 import { headers } from "next/headers";
-import { prisma } from "@/lib/prisma";
+import { prismaDelLocal } from "@/lib/prisma-local";
 import { formatearGuarani, formatearNumero } from "@/lib/format";
 import { ESTADOS_PEDIDO, etiquetaEstado, colorEstado } from "@/lib/estados-pedido";
 import { calcularRangoFecha, type FiltroFecha } from "@/lib/rango-fecha";
 import { ZONA_NEGOCIO } from "@/lib/timezone";
 import { obtenerEstadoTienda } from "@/lib/estado-tienda";
 import { linkWhatsappCliente } from "@/lib/whatsapp";
+import { idLocalActual } from "@/lib/local-actual";
 import { PausaPedidosToggle } from "../PausaPedidosToggle";
 import { CompartirCarta } from "../CompartirCarta";
 import { AvisoPedidosNuevos } from "./AvisoPedidosNuevos";
@@ -14,12 +15,12 @@ import { AvisoPedidosNuevos } from "./AvisoPedidosNuevos";
 export const dynamic = "force-dynamic";
 
 /** URL pública de la carta, tomada del dominio con el que se entró al panel. */
-async function urlPublicaCarta(): Promise<string> {
+async function urlPublicaCarta(slug: string): Promise<string> {
   const cabeceras = await headers();
   const host = cabeceras.get("x-forwarded-host") ?? cabeceras.get("host") ?? "";
   if (!host) return "";
   const protocolo = host.startsWith("localhost") ? "http" : "https";
-  return `${protocolo}://${host}`;
+  return `${protocolo}://${host}/${slug}`;
 }
 
 const FILTROS_FECHA: { value: FiltroFecha; label: string }[] = [
@@ -34,14 +35,22 @@ export default async function AdminPedidosPage({
 }: {
   searchParams: Promise<{ estado?: string; fecha?: string; desde?: string; hasta?: string }>;
 }) {
+  // Todas las consultas de acá abajo quedan atadas a este local. El id se
+  // guarda aparte porque además hace falta para consultar el propio local
+  // (Store no lleva la columna, así que el filtro automático no lo alcanza).
+  const storeId = await idLocalActual();
+  const prisma = prismaDelLocal(storeId);
+
   const { estado, fecha, desde, hasta } = await searchParams;
   const estadoActivo = estado && estado !== "todos" ? estado : null;
   const rangoFecha = calcularRangoFecha(fecha, desde, hasta);
   const fechaActiva = rangoFecha ? fecha : null;
 
+  
   const [pedidos, store, estadoTienda, pedidosEnviados] = await Promise.all([
     prisma.order.findMany({
       where: {
+        storeId,
         ...(estadoActivo ? { estado: estadoActivo } : {}),
         ...(rangoFecha ? { createdAt: rangoFecha } : {}),
       },
@@ -49,14 +58,14 @@ export default async function AdminPedidosPage({
       include: { items: true, deliveryZone: true, repartidor: true },
       take: 100,
     }),
-    prisma.store.findFirst(),
-    obtenerEstadoTienda(),
+    prisma.store.findUnique({ where: { id: storeId } }),
+    obtenerEstadoTienda(storeId),
     // Punto de partida del vigilante de pedidos nuevos: si este número
     // sube mientras la pantalla está abierta, es que entró un pedido.
-    prisma.order.count({ where: { enviadoWhatsapp: true } }),
+    prisma.order.count({ where: { storeId, enviadoWhatsapp: true } }),
   ]);
 
-  const urlCarta = await urlPublicaCarta();
+  const urlCarta = store ? await urlPublicaCarta(store.slug) : "";
 
   // Arma un querystring preservando los otros filtros activos, para que
   // cambiar de estado no te haga perder el filtro de fecha y viceversa.

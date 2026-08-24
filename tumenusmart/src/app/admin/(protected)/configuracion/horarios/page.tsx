@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { prisma } from "@/lib/prisma";
+import { prismaDelLocal } from "@/lib/prisma-local";
+import { idLocalActual } from "@/lib/local-actual";
 import { agregarTramoHorario } from "../actions";
 import {
   NOMBRES_DIA,
@@ -11,6 +12,9 @@ import { EliminarTramoBoton } from "./EliminarTramoBoton";
 export const dynamic = "force-dynamic";
 
 export default async function HorariosAtencionPage() {
+  // Todas las consultas de acá abajo quedan atadas a este local.
+  const prisma = prismaDelLocal(await idLocalActual());
+
   const tramos = await prisma.horarioAtencion.findMany({
     orderBy: [{ diaSemana: "asc" }, { abre: "asc" }],
   });

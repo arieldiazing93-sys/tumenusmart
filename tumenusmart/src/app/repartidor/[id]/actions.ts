@@ -8,12 +8,26 @@ import { prisma } from "@/lib/prisma";
 // se verifica que el pedido esté realmente asignado a ESE repartidor antes
 // de dejarlo tocar nada.
 export async function marcarPedidoEntregado(repartidorId: string, orderId: string) {
-  const pedido = await prisma.order.findUnique({
-    where: { id: orderId },
-    select: { repartidorId: true, estado: true },
-  });
+  const [repartidor, pedido] = await Promise.all([
+    prisma.repartidor.findUnique({
+      where: { id: repartidorId },
+      select: { storeId: true },
+    }),
+    prisma.order.findUnique({
+      where: { id: orderId },
+      select: { repartidorId: true, estado: true, storeId: true },
+    }),
+  ]);
 
-  if (!pedido || pedido.repartidorId !== repartidorId) {
+  // Dos condiciones, no una: el pedido tiene que estar asignado a este
+  // repartidor Y pertenecer a su mismo local. La segunda sobra hoy, pero
+  // deja de sobrar el día que alguien reasigne repartidores entre negocios.
+  if (
+    !repartidor ||
+    !pedido ||
+    pedido.repartidorId !== repartidorId ||
+    pedido.storeId !== repartidor.storeId
+  ) {
     throw new Error("Este pedido no está asignado a este repartidor.");
   }
   if (pedido.estado !== "en_despacho") {
