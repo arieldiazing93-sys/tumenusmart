@@ -30,7 +30,8 @@ function parsearIngredientes(formData: FormData): string[] {
 
 export async function crearProducto(formData: FormData) {
   // Todas las consultas de acá abajo quedan atadas a este local.
-  const prisma = prismaDelLocal(await idLocalActual());
+  const idLocal = await idLocalActual();
+  const prisma = prismaDelLocal(idLocal);
 
   const nombre = String(formData.get("nombre") ?? "").trim();
   const categoryId = String(formData.get("categoryId") ?? "");
@@ -50,6 +51,7 @@ export async function crearProducto(formData: FormData) {
       disponible: formData.get("disponible") === "on",
       destacado: formData.get("destacado") === "on",
       ingredientes: parsearIngredientes(formData),
+      storeId: idLocal,
     },
   });
 
@@ -111,7 +113,8 @@ export async function eliminarProducto(productId: string) {
 
 export async function agregarOpcion(productId: string, formData: FormData) {
   // Todas las consultas de acá abajo quedan atadas a este local.
-  const prisma = prismaDelLocal(await idLocalActual());
+  const idLocal = await idLocalActual();
+  const prisma = prismaDelLocal(idLocal);
 
   const nombre = String(formData.get("nombre") ?? "").trim();
   const tipo = String(formData.get("tipo") ?? "agregado");
@@ -120,7 +123,7 @@ export async function agregarOpcion(productId: string, formData: FormData) {
   if (!nombre) throw new Error("El nombre de la opción es obligatorio");
 
   await prisma.productOption.create({
-    data: { productId, nombre, tipo, precioExtra },
+    data: { productId, nombre, tipo, precioExtra, storeId: idLocal },
   });
   revalidatePath(`/admin/productos/${productId}`);
 }

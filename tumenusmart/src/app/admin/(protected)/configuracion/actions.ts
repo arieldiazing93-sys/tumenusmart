@@ -68,7 +68,8 @@ export async function guardarMensajePausa(mensaje: string): Promise<void> {
 }
 
 export async function agregarTramoHorario(formData: FormData) {
-  const db = prismaDelLocal(await idLocalActual());
+  const idLocal = await idLocalActual();
+  const db = prismaDelLocal(idLocal);
 
   const diaSemana = Number(formData.get("diaSemana"));
   const abre = String(formData.get("abre") ?? "").trim();
@@ -79,7 +80,9 @@ export async function agregarTramoHorario(formData: FormData) {
   }
   if (!abre || !cierra) throw new Error("Faltan las horas de apertura y cierre");
 
-  await db.horarioAtencion.create({ data: { diaSemana, abre, cierra } });
+  await db.horarioAtencion.create({
+    data: { diaSemana, abre, cierra, storeId: idLocal },
+  });
 
   revalidatePath("/admin/configuracion/horarios");
   revalidatePath("/[slug]", "layout");
@@ -144,7 +147,8 @@ export async function actualizarStore(formData: FormData) {
 }
 
 export async function crearZona(formData: FormData) {
-  const db = prismaDelLocal(await idLocalActual());
+  const idLocal = await idLocalActual();
+  const db = prismaDelLocal(idLocal);
 
   const nombre = String(formData.get("nombre") ?? "").trim();
   const radioKm = parseFloat(String(formData.get("radioKm") ?? "0"));
@@ -154,7 +158,9 @@ export async function crearZona(formData: FormData) {
     throw new Error("Datos inválidos");
   }
 
-  await db.deliveryZone.create({ data: { nombre, radioKm, costoEnvio } });
+  await db.deliveryZone.create({
+    data: { nombre, radioKm, costoEnvio, storeId: idLocal },
+  });
   revalidatePath("/admin/configuracion");
   revalidatePath("/[slug]", "layout");
 }

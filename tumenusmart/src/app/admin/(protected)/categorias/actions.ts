@@ -6,15 +6,18 @@ import { prismaDelLocal } from "@/lib/prisma-local";
 
 export async function crearCategoria(formData: FormData) {
   // Todas las consultas de acá abajo quedan atadas a este local.
-  const prisma = prismaDelLocal(await idLocalActual());
+  const idLocal = await idLocalActual();
+  const prisma = prismaDelLocal(idLocal);
 
   const nombre = String(formData.get("nombre") ?? "").trim();
   if (!nombre) throw new Error("El nombre es obligatorio");
 
   const ultima = await prisma.category.findFirst({ orderBy: { orden: "desc" } });
 
+  // El local se escribe explícitamente aunque el filtro también lo inyecte:
+  // así TypeScript obliga a pensarlo al crear, y el filtro queda de red.
   await prisma.category.create({
-    data: { nombre, orden: (ultima?.orden ?? 0) + 1 },
+    data: { nombre, orden: (ultima?.orden ?? 0) + 1, storeId: idLocal },
   });
   revalidatePath("/admin/categorias");
 }

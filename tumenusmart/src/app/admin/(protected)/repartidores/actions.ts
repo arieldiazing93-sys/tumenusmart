@@ -6,7 +6,8 @@ import { prismaDelLocal } from "@/lib/prisma-local";
 
 export async function crearRepartidor(formData: FormData) {
   // Todas las consultas de acá abajo quedan atadas a este local.
-  const prisma = prismaDelLocal(await idLocalActual());
+  const idLocal = await idLocalActual();
+  const prisma = prismaDelLocal(idLocal);
 
   const nombre = String(formData.get("nombre") ?? "").trim();
   const telefono = String(formData.get("telefono") ?? "").trim();
@@ -14,7 +15,7 @@ export async function crearRepartidor(formData: FormData) {
   if (!nombre) throw new Error("El nombre es obligatorio");
 
   await prisma.repartidor.create({
-    data: { nombre, telefono: telefono || null },
+    data: { nombre, telefono: telefono || null, storeId: idLocal },
   });
   revalidatePath("/admin/repartidores");
 }
