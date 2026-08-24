@@ -41,4 +41,3 @@ npm run dev
 - Multi-tenancy (varios negocios en la misma instancia) — hoy es de un solo negocio.
 - Roles de empleado (hoy hay una sola contraseña de admin).
 - Historial de clientes y métricas de ventas en el panel.
-- Prueba 999
