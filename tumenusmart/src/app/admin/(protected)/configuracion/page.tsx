@@ -24,6 +24,7 @@ export default async function AdminConfiguracionPage() {
   ]);
 
   const envioModo = store?.envioModo === "coordinar" ? "coordinar" : "zonas";
+  const estiloCarta = store?.estiloCarta === "tarjetas" ? "tarjetas" : "lista";
 
   return (
     <div className="flex flex-col gap-10">
@@ -176,6 +177,52 @@ export default async function AdminConfiguracionPage() {
                   <span className="text-neutral-500">
                     El cliente marca su ubicación en el mapa, pero el precio del envío lo
                     definís vos por WhatsApp, caso por caso.
+                  </span>
+                </span>
+              </label>
+            </div>
+          </div>
+
+          <div className="mt-2 border-t border-neutral-200 pt-4">
+            <label className="mb-1 block text-sm font-medium text-neutral-700">
+              Cómo se ve tu carta
+            </label>
+            <p className="mb-2 text-xs text-neutral-500">
+              Depende de tus fotos. Si son de celular, la lista las disimula. Si son
+              profesionales, mostralas grandes: ahí la foto es la que vende.
+            </p>
+            <div className="grid gap-2 sm:grid-cols-2">
+              <label className="flex cursor-pointer items-start gap-2 rounded-lg border border-neutral-300 p-3 text-sm has-[:checked]:border-brand has-[:checked]:bg-brand-light">
+                <input
+                  type="radio"
+                  name="estiloCarta"
+                  value="lista"
+                  defaultChecked={estiloCarta === "lista"}
+                  className="mt-0.5"
+                />
+                <span>
+                  <span className="font-medium">Lista compacta</span>
+                  <br />
+                  <span className="text-neutral-500">
+                    Foto chica al costado. Entran muchos productos en una pantalla y se
+                    recorre rápido. Es la opción segura.
+                  </span>
+                </span>
+              </label>
+              <label className="flex cursor-pointer items-start gap-2 rounded-lg border border-neutral-300 p-3 text-sm has-[:checked]:border-brand has-[:checked]:bg-brand-light">
+                <input
+                  type="radio"
+                  name="estiloCarta"
+                  value="tarjetas"
+                  defaultChecked={estiloCarta === "tarjetas"}
+                  className="mt-0.5"
+                />
+                <span>
+                  <span className="font-medium">Tarjetas con foto grande</span>
+                  <br />
+                  <span className="text-neutral-500">
+                    La foto ocupa todo el ancho. Elegila solo si TODOS tus productos
+                    tienen buena foto: una mala se nota el triple.
                   </span>
                 </span>
               </label>

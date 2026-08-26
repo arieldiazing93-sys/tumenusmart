@@ -107,11 +107,11 @@ export function MitadYMitadPicker({ grupoNombre, productos }: Props) {
   }
 
   return (
-    <div className="rounded-xl border border-dashed border-brand bg-brand-light/30 p-4">
-      <h4 className="mb-1 font-semibold text-neutral-900">
+    <div className="rounded-xl border border-brand/35 bg-brand-light/50 p-4">
+      <h4 className="mb-1 text-[0.95rem] font-semibold tracking-titular">
         Armá tu mitad y mitad — {grupoNombre}
       </h4>
-      <p className="mb-3 text-xs text-neutral-500">
+      <p className="mb-3 text-[0.78rem] leading-snug text-tinta-media">
         {modo === "mayor"
           ? "Se cobra el precio del sabor más caro de los dos."
           : "Se cobra la mitad del precio de cada sabor, sumadas."}
@@ -124,7 +124,7 @@ export function MitadYMitadPicker({ grupoNombre, productos }: Props) {
             setIdA(e.target.value);
             setAgregadosIds([]);
           }}
-          className="flex-1 rounded-lg border border-neutral-300 px-3 py-2 text-sm"
+          className="flex-1 rounded-lg border border-linea bg-white px-3 py-2 text-[0.88rem] focus:border-brand focus:outline-none"
         >
           <option value="">Mitad 1...</option>
           {productos.map((p) => (
@@ -139,7 +139,7 @@ export function MitadYMitadPicker({ grupoNombre, productos }: Props) {
             setIdB(e.target.value);
             setAgregadosIds([]);
           }}
-          className="flex-1 rounded-lg border border-neutral-300 px-3 py-2 text-sm"
+          className="flex-1 rounded-lg border border-linea bg-white px-3 py-2 text-[0.88rem] focus:border-brand focus:outline-none"
         >
           <option value="">Mitad 2...</option>
           {productos.map((p) => (
@@ -151,7 +151,7 @@ export function MitadYMitadPicker({ grupoNombre, productos }: Props) {
       </div>
 
       {mismoDoble && (
-        <p className="mt-2 text-xs text-amber-600">Elegí dos sabores distintos.</p>
+        <p className="mt-2 text-[0.78rem] text-aviso">Elegí dos sabores distintos.</p>
       )}
 
       {agregadosDisponibles.length > 0 && (
@@ -159,10 +159,10 @@ export function MitadYMitadPicker({ grupoNombre, productos }: Props) {
           {agregadosDisponibles.map((a) => (
             <label
               key={a.id}
-              className={`cursor-pointer rounded-full border bg-white px-3 py-1 text-sm ${
+              className={`cursor-pointer rounded-full border bg-white px-3 py-1.5 text-[0.82rem] ${
                 agregadosIds.includes(a.id)
                   ? "border-brand bg-brand-light text-brand-dark"
-                  : "border-neutral-300 text-neutral-600"
+                  : "border-linea text-tinta-media"
               }`}
             >
               <input
@@ -178,24 +178,24 @@ export function MitadYMitadPicker({ grupoNombre, productos }: Props) {
       )}
 
       <div className="mt-3 flex items-center justify-between">
-        <span className="font-semibold text-neutral-900">
+        <span className="cifra font-semibold">
           {precioTotal != null ? formatearGuarani(precioTotal) : "—"}
         </span>
 
         <div className="flex items-center gap-3">
-          <div className="flex items-center rounded-lg border border-neutral-300 bg-white">
+          <div className="flex items-center rounded-lg border border-linea bg-white">
             <button
               type="button"
-              className="px-2 py-1 text-neutral-600"
+              className="px-2.5 py-1 text-tinta-media"
               onClick={() => setCantidad((c) => Math.max(1, c - 1))}
               aria-label="Restar cantidad"
             >
               −
             </button>
-            <span className="w-6 text-center text-sm">{cantidad}</span>
+            <span className="cifra w-6 text-center text-[0.85rem]">{cantidad}</span>
             <button
               type="button"
-              className="px-2 py-1 text-neutral-600"
+              className="px-2.5 py-1 text-tinta-media"
               onClick={() => setCantidad((c) => c + 1)}
               aria-label="Sumar cantidad"
             >
@@ -207,7 +207,7 @@ export function MitadYMitadPicker({ grupoNombre, productos }: Props) {
             type="button"
             onClick={handleAgregar}
             disabled={!listo}
-            className="rounded-lg bg-brand px-3 py-1.5 text-sm font-medium text-white transition hover:bg-brand-dark disabled:cursor-not-allowed disabled:bg-neutral-300"
+            className="rounded-lg bg-brand px-3.5 py-2 text-[0.85rem] font-semibold text-white transition hover:bg-brand-dark disabled:cursor-not-allowed disabled:bg-linea disabled:text-tinta-suave"
           >
             {agregado ? "Agregado ✓" : "Agregar"}
           </button>

@@ -102,6 +102,11 @@ export async function actualizarStore(formData: FormData) {
   const whatsappNumero = String(formData.get("whatsappNumero") ?? "").replace(/[^\d]/g, "");
   const envioModo =
     String(formData.get("envioModo") ?? "zonas") === "coordinar" ? "coordinar" : "zonas";
+  // Cómo se ve la carta pública. Se compara contra la lista de valores válidos
+  // en vez de guardar lo que venga: el formulario es del cliente, y el cliente
+  // puede mandar cualquier cosa.
+  const estiloCarta =
+    String(formData.get("estiloCarta") ?? "lista") === "tarjetas" ? "tarjetas" : "lista";
 
   if (!nombre || !whatsappNumero) {
     throw new Error("Nombre y WhatsApp son obligatorios");
@@ -120,6 +125,7 @@ export async function actualizarStore(formData: FormData) {
     mensajeSaludo: String(formData.get("mensajeSaludo") ?? "") || null,
     mensajeSaludoReserva: String(formData.get("mensajeSaludoReserva") ?? "") || null,
     envioModo,
+    estiloCarta,
     lat: lat != null && !isNaN(lat) ? lat : null,
     lng: lng != null && !isNaN(lng) ? lng : null,
   };

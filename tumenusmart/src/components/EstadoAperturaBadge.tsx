@@ -1,37 +1,46 @@
 import type { EstadoTienda } from "@/lib/estado-tienda";
 
 /**
- * Distintivo "Abierto / Cerrado" para la cabecera del menú público.
- * No muestra nada si el negocio todavía no cargó su horario — decir
- * "Abierto" sin tener horario configurado sería una promesa vacía.
+ * "Abierto / Cerrado" en la cabecera del menú público.
+ *
+ * No muestra nada si el negocio todavía no cargó su horario: decir "Abierto"
+ * sin tener horario configurado sería una promesa vacía, y el cliente que
+ * manda un pedido a las 3 de la mañana confiando en ese cartel no vuelve.
  */
 export function EstadoAperturaBadge({ estado }: { estado: EstadoTienda }) {
   if (!estado.tieneHorarios) return null;
 
   const abierto = estado.abierto;
+  const detalle = abierto
+    ? estado.horarioDeHoy !== "Cerrado"
+      ? `Hoy ${estado.horarioDeHoy}`
+      : null
+    : estado.proximaApertura
+      ? `Abre ${estado.proximaApertura}`
+      : null;
 
   return (
-    <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5">
+    <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-0.5">
       <span
-        className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold ${
-          abierto ? "bg-green-100 text-green-800" : "bg-neutral-200 text-neutral-600"
+        className={`inline-flex items-center gap-1.5 text-[0.8rem] font-semibold ${
+          abierto ? "text-exito" : "text-tinta-suave"
         }`}
       >
         <span
-          className={`h-1.5 w-1.5 rounded-full ${abierto ? "bg-green-600" : "bg-neutral-500"}`}
+          aria-hidden="true"
+          className={`h-[7px] w-[7px] rounded-full ${abierto ? "bg-exito" : "bg-tinta-suave"}`}
         />
-        {abierto ? "Abierto" : "Cerrado"}
+        {abierto ? "Abierto ahora" : "Cerrado"}
       </span>
 
-      <span className="text-xs text-neutral-500">
-        {abierto
-          ? estado.horarioDeHoy !== "Cerrado"
-            ? `Hoy ${estado.horarioDeHoy}`
-            : null
-          : estado.proximaApertura
-            ? `Abre ${estado.proximaApertura}`
-            : null}
-      </span>
-    </div>
+      {detalle && (
+        <>
+          <span aria-hidden="true" className="text-linea">
+            ·
+          </span>
+          <span className="text-[0.8rem] text-tinta-suave">{detalle}</span>
+        </>
+      )}
+    </span>
   );
 }

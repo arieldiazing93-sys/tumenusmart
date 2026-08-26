@@ -1,106 +1,59 @@
 "use client";
 
-import { useState } from "react";
 import { formatearGuarani } from "@/lib/format";
 
-type ProductoDestacado = {
+type Producto = {
   id: string;
   nombre: string;
   precio: number;
   imagenUrl: string | null;
 };
 
-// Banner de productos marcados como "destacado" — el/los producto(s)
-// estrella del negocio. Navegación 100% manual (‹ › y puntitos, sin
-// avance automático). No agrega al carrito directo desde acá — manda al
-// cliente a la tarjeta completa del producto más abajo en el menú, para
-// que elija ahí sus agregados/variantes antes de pedir.
-export function CarruselDestacados({ productos }: { productos: ProductoDestacado[] }) {
-  const [indice, setIndice] = useState(0);
-
+/**
+ * Los más pedidos, en una tira que se desliza con el dedo.
+ *
+ * Antes esto era un carrusel de a uno, con flechas para pasar. Se cambió por
+ * una tira porque en el celular deslizar es más natural que apretar una flecha,
+ * y porque mostrar tres a la vez deja comparar — que es justo lo que hace el
+ * cliente cuando todavía no decidió qué va a pedir.
+ */
+export function CarruselDestacados({ productos }: { productos: Producto[] }) {
   if (productos.length === 0) return null;
 
-  const total = productos.length;
-  const producto = productos[indice % total];
-
-  function anterior() {
-    setIndice((i) => (i - 1 + total) % total);
-  }
-
-  function siguiente() {
-    setIndice((i) => (i + 1) % total);
-  }
-
   return (
-    <div className="mb-8 overflow-hidden rounded-xl border border-brand/30 bg-brand-light">
-      <div className="flex items-center gap-1 p-3">
-        {total > 1 && (
-          <button
-            type="button"
-            onClick={anterior}
-            aria-label="Producto anterior"
-            className="flex-none rounded-full px-2 py-3 text-lg font-bold text-brand-dark hover:bg-white/60"
-          >
-            ‹
-          </button>
-        )}
+    <section className="mt-6 border-b border-linea-fina pb-5">
+      <p className="rotulo">Los más pedidos</p>
 
-        <div className="flex flex-1 items-center gap-3">
-          {producto.imagenUrl && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={producto.imagenUrl}
-              alt={producto.nombre}
-              width={64}
-              height={64}
-              loading="lazy"
-              decoding="async"
-              className="h-16 w-16 flex-none rounded-lg object-cover"
-            />
-          )}
-          <div className="min-w-0 flex-1">
-            <p className="text-xs font-semibold uppercase tracking-wide text-brand-dark">
-              ⭐ Producto destacado
-            </p>
-            <p className="truncate font-semibold text-neutral-900">{producto.nombre}</p>
-            <p className="text-sm text-neutral-600">{formatearGuarani(producto.precio)}</p>
-          </div>
-
+      <div className="-mx-4 mt-2.5 flex gap-2.5 overflow-x-auto px-4 pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        {productos.map((p) => (
           <a
-            href={`#producto-${producto.id}`}
-            className="flex-none rounded-lg border border-brand px-3 py-1.5 text-center text-sm font-medium text-brand hover:bg-white"
+            key={p.id}
+            href={`#producto-${p.id}`}
+            className="w-[136px] flex-none overflow-hidden rounded-xl border border-linea bg-white transition-colors hover:border-brand"
           >
-            Ver en el menú
+            {p.imagenUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={p.imagenUrl}
+                alt={p.nombre}
+                loading="lazy"
+                decoding="async"
+                className="h-20 w-full object-cover"
+              />
+            ) : (
+              <span aria-hidden="true" className="block h-20 w-full bg-papel-hundido" />
+            )}
+            <span className="block px-2 pb-2.5 pt-1.5">
+              <span className="block text-[0.78rem] font-semibold leading-tight tracking-titular">
+                {p.nombre}
+              </span>
+              <span className="cifra mt-1 block text-[0.75rem] text-tinta-media">
+                {formatearGuarani(p.precio)}
+              </span>
+            </span>
           </a>
-        </div>
-
-        {total > 1 && (
-          <button
-            type="button"
-            onClick={siguiente}
-            aria-label="Siguiente producto"
-            className="flex-none rounded-full px-2 py-3 text-lg font-bold text-brand-dark hover:bg-white/60"
-          >
-            ›
-          </button>
-        )}
+        ))}
       </div>
-
-      {total > 1 && (
-        <div className="flex justify-center gap-1.5 pb-3">
-          {productos.map((p, i) => (
-            <button
-              key={p.id}
-              type="button"
-              onClick={() => setIndice(i)}
-              aria-label={`Ir a ${p.nombre}`}
-              className={`h-1.5 w-1.5 rounded-full transition ${
-                i === indice % total ? "bg-brand" : "bg-brand/30"
-              }`}
-            />
-          ))}
-        </div>
-      )}
-    </div>
+    </section>
   );
 }

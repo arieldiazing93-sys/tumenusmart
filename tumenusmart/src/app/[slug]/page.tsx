@@ -1,11 +1,10 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
-import { ProductCard } from "@/components/ProductCard";
 import { CartBar } from "@/components/CartBar";
-import { MitadYMitadPicker } from "@/components/MitadYMitadPicker";
 import { CarruselDestacados } from "@/components/CarruselDestacados";
 import { AvisoTienda } from "@/components/AvisoTienda";
 import { EstadoAperturaBadge } from "@/components/EstadoAperturaBadge";
+import { Carta, type CategoriaCarta } from "@/components/Carta";
 import { obtenerEstadoTienda } from "@/lib/estado-tienda";
 import { localPorSlug } from "@/lib/local-por-slug";
 
@@ -20,7 +19,7 @@ export default async function CatalogoPage({
   const store = await localPorSlug(slug);
   const storeId = store.id;
 
-  const [categorias, destacados, estadoTienda] = await Promise.all([
+  const [categoriasCrudas, destacados, estadoTienda, zonas] = await Promise.all([
     prisma.category.findMany({
       where: { storeId, activa: true },
       orderBy: { orden: "asc" },
@@ -37,75 +36,136 @@ export default async function CatalogoPage({
       orderBy: { orden: "asc" },
     }),
     obtenerEstadoTienda(storeId),
+    prisma.deliveryZone.count({ where: { storeId, activo: true } }),
   ]);
 
-  // Agrupa TODOS los productos disponibles (de cualquier categoría) por su
-  // "grupo mitad y mitad" — así un "Pizza Grande" no se mezcla con un
-  // "Pizza Mediana" aunque convivan en la misma categoría del menú.
-  type ProductoMitad = {
-    id: string;
-    nombre: string;
-    precio: number;
-    mitadYMitadModo: string;
-    opciones: { id: string; nombre: string; tipo: string; precioExtra: number }[];
-  };
-  // La clave de agrupación ignora mayúsculas/minúsculas y espacios de más,
-  // para que "Pizza Grande" y "pizza grande " se traten como el mismo grupo.
-  const gruposMitadYMitad = new Map<
+  const conProductos = categoriasCrudas.filter((c) => c.productos.length > 0);
+
+  // Los combos "mitad y mitad" se agrupan por su nombre de grupo, ignorando
+  // mayúsculas y espacios de más, para que "Pizza Grande" y "pizza grande "
+  // sean el mismo grupo. Cada grupo se muestra dentro de la categoría donde
+  // están sus productos, y no todos juntos al final: ahí nadie los veía.
+  type ProductoMitad = CategoriaCarta["grupos"][number]["productos"][number];
+  const grupos = new Map<
     string,
-    { nombreVisible: string; productos: ProductoMitad[] }
+    { nombreVisible: string; productos: ProductoMitad[]; categoriaId: string }
   >();
-  for (const categoria of categorias) {
+
+  for (const categoria of conProductos) {
     for (const producto of categoria.productos) {
-      const grupoOriginal = producto.mitadYMitadGrupo?.trim();
-      if (!grupoOriginal) continue;
-      const clave = grupoOriginal.toLowerCase();
-      const entrada = gruposMitadYMitad.get(clave) ?? { nombreVisible: grupoOriginal, productos: [] };
+      const nombreGrupo = producto.mitadYMitadGrupo?.trim();
+      if (!nombreGrupo) continue;
+      const clave = nombreGrupo.toLowerCase();
+      const entrada =
+        grupos.get(clave) ??
+        { nombreVisible: nombreGrupo, productos: [], categoriaId: categoria.id };
       entrada.productos.push({
         id: producto.id,
         nombre: producto.nombre,
         precio: Number(producto.precio),
         mitadYMitadModo: producto.mitadYMitadModo,
-        opciones: producto.opciones.map((o) => ({ ...o, precioExtra: Number(o.precioExtra) })),
+        opciones: producto.opciones.map((o) => ({
+          id: o.id,
+          nombre: o.nombre,
+          tipo: o.tipo,
+          precioExtra: Number(o.precioExtra),
+        })),
       });
-      gruposMitadYMitad.set(clave, entrada);
+      grupos.set(clave, entrada);
     }
   }
 
+  const categorias: CategoriaCarta[] = conProductos.map((c) => ({
+    id: c.id,
+    nombre: c.nombre,
+    productos: c.productos.map((p) => ({
+      id: p.id,
+      nombre: p.nombre,
+      descripcion: p.descripcion,
+      precio: Number(p.precio),
+      imagenUrl: p.imagenUrl,
+      ingredientes: p.ingredientes,
+      opciones: p.opciones.map((o) => ({
+        id: o.id,
+        nombre: o.nombre,
+        tipo: o.tipo,
+        precioExtra: Number(o.precioExtra),
+      })),
+    })),
+    grupos: [...grupos.entries()]
+      .filter(([, g]) => g.categoriaId === c.id && g.productos.length >= 2)
+      .map(([clave, g]) => ({
+        clave,
+        nombreVisible: g.nombreVisible,
+        productos: g.productos,
+      })),
+  }));
+
+  // Las tres dudas que tiene cualquiera antes de mirar la carta: si está
+  // abierto, si llevan a domicilio, y cómo se paga.
+  const formasDeEntrega = [
+    store.envioModo === "zonas" && zonas > 0 ? "Envío por zonas" : "Envío a coordinar",
+    "Retiro en el local",
+  ];
+
   return (
-    <main className="mx-auto max-w-2xl px-4 pb-28 pt-8">
-      <header className="mb-8 flex items-center gap-4">
-        {store.logoUrl && (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={store.logoUrl}
-            alt={store.nombre}
-            width={64}
-            height={64}
-            decoding="async"
-            className="h-16 w-16 rounded-full object-cover"
-          />
-        )}
-        <div>
-          <h1 className="text-2xl font-bold text-neutral-900">
-            {store.nombre}
-          </h1>
-          {store.direccion && (
-            <p className="text-sm text-neutral-500">{store.direccion}</p>
+    <main className="mx-auto max-w-2xl px-4 pb-32">
+      {/* ---------- cabecera del local ---------- */}
+      <header className="pt-6">
+        <div className="flex items-center gap-3">
+          {store.logoUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={store.logoUrl}
+              alt={store.nombre}
+              width={56}
+              height={56}
+              decoding="async"
+              className="h-14 w-14 flex-none rounded-2xl object-cover"
+            />
+          ) : (
+            <span
+              aria-hidden="true"
+              className="flex h-14 w-14 flex-none items-center justify-center rounded-2xl bg-brand-light text-lg font-bold tracking-titular text-brand"
+            >
+              {store.nombre.slice(0, 2).toUpperCase()}
+            </span>
           )}
+          <div className="min-w-0">
+            <h1 className="truncate text-[1.4rem] font-semibold tracking-titular">
+              {store.nombre}
+            </h1>
+            {store.direccion && (
+              <p className="truncate text-[0.82rem] text-tinta-suave">{store.direccion}</p>
+            )}
+          </div>
+        </div>
+
+        <div className="mt-3">
           <EstadoAperturaBadge estado={estadoTienda} />
+        </div>
+
+        <p className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[0.8rem] text-tinta-media">
+          {formasDeEntrega.map((f, i) => (
+            <span key={f} className="flex items-center gap-2">
+              {i > 0 && <span className="text-linea">·</span>}
+              {f}
+            </span>
+          ))}
+        </p>
+
+        <div className="mt-4 flex flex-wrap gap-2">
+          <Link
+            href={`/${slug}/reservas`}
+            className="inline-flex items-center rounded-lg border border-linea px-3 py-1.5 text-[0.85rem] font-medium text-tinta hover:border-brand hover:text-brand"
+          >
+            Reservar mesa
+          </Link>
         </div>
       </header>
 
-      <AvisoTienda estado={estadoTienda} />
-
-      <div className="mb-6 flex justify-end">
-        <Link
-          href={`/${slug}/reservas`}
-          className="inline-flex items-center gap-1.5 rounded-lg border border-brand px-3 py-1.5 text-sm font-medium text-brand hover:bg-brand-light"
-        >
-          📅 Reservar mesa
-        </Link>
+      <div className="mt-5">
+        <AvisoTienda estado={estadoTienda} />
       </div>
 
       <CarruselDestacados
@@ -117,51 +177,12 @@ export default async function CatalogoPage({
         }))}
       />
 
-      {categorias.length === 0 && (
-        <p className="text-neutral-500">
-          Todavía no hay productos cargados. Entrá al panel admin para agregar el menú.
+      {categorias.length === 0 ? (
+        <p className="py-14 text-center text-[0.9rem] text-tinta-suave">
+          Este negocio todavía está cargando su carta.
         </p>
-      )}
-
-      <div className="flex flex-col gap-8">
-        {categorias
-          .filter((c) => c.productos.length > 0)
-          .map((categoria) => (
-            <section key={categoria.id}>
-              <h2 className="mb-3 text-lg font-semibold text-neutral-800">
-                {categoria.nombre}
-              </h2>
-              <div className="flex flex-col gap-3">
-                {categoria.productos.map((producto) => (
-                  <ProductCard
-                    key={producto.id}
-                    producto={{
-                      ...producto,
-                      precio: Number(producto.precio),
-                      opciones: producto.opciones.map((o) => ({
-                        ...o,
-                        precioExtra: Number(o.precioExtra),
-                      })),
-                    }}
-                  />
-                ))}
-              </div>
-            </section>
-          ))}
-      </div>
-
-      {gruposMitadYMitad.size > 0 && (
-        <div className="mt-10 flex flex-col gap-4">
-          {[...gruposMitadYMitad.entries()]
-            .filter(([, entrada]) => entrada.productos.length >= 2)
-            .map(([clave, entrada]) => (
-              <MitadYMitadPicker
-                key={clave}
-                grupoNombre={entrada.nombreVisible}
-                productos={entrada.productos}
-              />
-            ))}
-        </div>
+      ) : (
+        <Carta categorias={categorias} estilo={store.estiloCarta} />
       )}
 
       <CartBar />

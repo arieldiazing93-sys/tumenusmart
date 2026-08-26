@@ -28,6 +28,16 @@ model Store {
   lat            Float? // ubicación del local, centro para calcular distancias de envío
   lng            Float?
   envioModo      String   @default("zonas") // "zonas" (radio + precio automático) | "coordinar" (el negocio lo define directo con el cliente)
+
+  /// Cómo se ve la carta pública de este local.
+  ///
+  /// "lista"    — filas compactas con miniatura. Es lo mejor para el local que
+  ///              saca las fotos con el celular: la foto chica disimula.
+  /// "tarjetas" — foto grande arriba de cada producto. Para el local que tiene
+  ///              fotos profesionales, donde la foto es lo que vende.
+  ///
+  /// Forzar un solo diseño castiga a uno de los dos.
+  estiloCarta    String   @default("lista")
   // Corte manual: el encargado apaga los pedidos aunque esté dentro del
   // horario (cocina saturada, falta de personal, etc.).
   pedidosPausados Boolean @default(false)

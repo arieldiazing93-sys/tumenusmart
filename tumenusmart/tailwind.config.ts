@@ -91,6 +91,23 @@ const config: Config = {
           "0%": { opacity: "0", transform: "translateY(10px)" },
           "100%": { opacity: "1", transform: "translateY(0)" },
         },
+        // La hoja del producto entrando desde abajo.
+        subirHoja: {
+          "0%": { transform: "translateY(100%)" },
+          "100%": { transform: "translateY(0)" },
+        },
+        // El "+" al agregar: un latido corto, no una fiesta.
+        latir: {
+          "0%": { transform: "scale(1)" },
+          "35%": { transform: "scale(1.28)" },
+          "100%": { transform: "scale(1)" },
+        },
+        // El carrito acusando recibo cuando cambia el total.
+        saltito: {
+          "0%": { transform: "scale(1)" },
+          "40%": { transform: "scale(1.03)" },
+          "100%": { transform: "scale(1)" },
+        },
       },
       animation: {
         "destacado-entrada": "destacado-entrada 0.5s ease-out",
