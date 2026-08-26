@@ -48,7 +48,11 @@ export async function cambiarMiPassword(formData: FormData) {
 
   await prisma.usuario.update({
     where: { id: sesion.id },
-    data: { passwordHash: await cifrarPassword(nueva) },
+    data: {
+      passwordHash: await cifrarPassword(nueva),
+      // Ya es suya: se apaga el recordatorio del panel.
+      debeCambiarPassword: false,
+    },
   });
 
   redirect("/admin/mi-cuenta?guardado=1");

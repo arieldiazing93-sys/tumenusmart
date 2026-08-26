@@ -62,6 +62,8 @@ export async function crearUsuario(formData: FormData) {
       rol,
       storeId,
       passwordHash: await cifrarPassword(password),
+      // Vos elegiste esta contraseña y se la pasaste: que la cambie.
+      debeCambiarPassword: true,
     },
   });
 
@@ -79,6 +81,7 @@ export async function restablecerPassword(usuarioId: string, formData: FormData)
     where: { id: usuarioId },
     data: {
       passwordHash: await cifrarPassword(password),
+      debeCambiarPassword: true,
       // Restablecer la contraseña también levanta el freno por intentos
       // fallidos: si alguien quedó trabado, esto lo destraba.
       intentosFallidos: 0,

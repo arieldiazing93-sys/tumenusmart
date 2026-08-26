@@ -15,6 +15,7 @@ const LINKS = [
   { href: "/admin/estadisticas", label: "Estadísticas" },
   { href: "/admin/analista", label: "Ideas" },
   { href: "/admin/configuracion", label: "Configuración" },
+  { href: "/admin/mi-cuenta", label: "Mi cuenta" },
 ];
 
 /** Secciones que solamente ve el superadmin. */
@@ -91,13 +92,7 @@ export default async function AdminLayout({
           <div className="flex flex-wrap items-center gap-4">
             {esSuper && <SelectorLocal locales={locales} actual={localActualId} />}
 
-            <Link
-              href="/admin/mi-cuenta"
-              className="text-sm text-neutral-500 hover:text-brand"
-              title="Mi cuenta"
-            >
-              {nombreVisible}
-            </Link>
+            <span className="text-sm text-neutral-500">{nombreVisible}</span>
 
             <form action={cerrarSesion}>
               <button type="submit" className="text-sm text-neutral-500 hover:text-red-600">
@@ -107,6 +102,23 @@ export default async function AdminLayout({
           </div>
         </div>
       </header>
+      {sesion.debeCambiarPassword && (
+        <div className="border-b border-amber-200 bg-amber-50 print:hidden">
+          <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-2 px-4 py-2.5">
+            <p className="text-sm text-amber-900">
+              <strong>Cambiá tu contraseña.</strong> Todavía estás usando la que te
+              entregaron, y esa la vio más de una persona.
+            </p>
+            <Link
+              href="/admin/mi-cuenta"
+              className="rounded-lg bg-amber-600 px-3 py-1 text-sm font-medium text-white hover:bg-amber-700"
+            >
+              Cambiarla ahora
+            </Link>
+          </div>
+        </div>
+      )}
+
       <div className="mx-auto max-w-6xl px-4 py-6 print:max-w-none print:p-0">{children}</div>
     </div>
   );

@@ -157,6 +157,11 @@ model Usuario {
 
   activo Boolean @default(true)
 
+  /// Queda en true cuando la contraseña la generó el sistema o la restableció
+  /// un administrador. Mientras esté así, el panel le insiste al usuario que
+  /// la cambie: una contraseña que pasó por WhatsApp la vio más de una persona.
+  debeCambiarPassword Boolean @default(false)
+
   // --- Freno a la fuerza bruta ---
   intentosFallidos Int       @default(0)
   bloqueadoHasta   DateTime?

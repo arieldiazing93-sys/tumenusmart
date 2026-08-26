@@ -127,6 +127,8 @@ export type SesionUsuario = {
   nombre: string | null;
   rol: string;
   storeId: string | null;
+  /** Todavía usa la contraseña que le entregaron. El panel se lo recuerda. */
+  debeCambiarPassword: boolean;
 };
 
 /**
@@ -148,7 +150,15 @@ export const sesionActual = cache(async (): Promise<SesionUsuario | null> => {
 
   const usuario = await prisma.usuario.findUnique({
     where: { id: usuarioId },
-    select: { id: true, email: true, nombre: true, rol: true, storeId: true, activo: true },
+    select: {
+      id: true,
+      email: true,
+      nombre: true,
+      rol: true,
+      storeId: true,
+      activo: true,
+      debeCambiarPassword: true,
+    },
   });
 
   if (!usuario || !usuario.activo) return null;
@@ -163,6 +173,7 @@ export const sesionActual = cache(async (): Promise<SesionUsuario | null> => {
     nombre: usuario.nombre,
     rol: usuario.rol,
     storeId: usuario.storeId,
+    debeCambiarPassword: usuario.debeCambiarPassword,
   };
 });
 

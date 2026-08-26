@@ -104,6 +104,9 @@ export async function crearLocal(formData: FormData): Promise<ResultadoAlta> {
         nombre: nombre,
         rol: "local",
         storeId: local.id,
+        // La contraseña se la pasás por WhatsApp: hasta que la cambie, el
+        // panel se lo va a recordar en cada pantalla.
+        debeCambiarPassword: true,
       },
     });
 
