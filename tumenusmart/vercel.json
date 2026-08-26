@@ -3,6 +3,10 @@
     {
       "path": "/api/cron/idea-semanal",
       "schedule": "0 10 * * 1"
+    },
+    {
+      "path": "/api/cron/suspender-vencidos",
+      "schedule": "0 9 * * *"
     }
   ]
 }

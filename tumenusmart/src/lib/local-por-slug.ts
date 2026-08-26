@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { prisma } from "./prisma";
 import { SLUGS_RESERVADOS } from "./alcance-local";
+import { estaVencido } from "./suscripcion";
 
 /**
  * Encuentra el local a partir del nombre que viene en la URL.
@@ -33,6 +34,8 @@ export type Local = Awaited<ReturnType<typeof localPorSlug>>;
  */
 export function estaSuspendido(local: { estado: string; vencimiento: Date | null }): boolean {
   if (local.estado === "suspendido") return true;
-  if (local.vencimiento && local.vencimiento < new Date()) return true;
-  return false;
+  // El corte lo decide una sola regla, compartida con el panel de cobranza:
+  // la fecha significa "pagado hasta ese día inclusive". Comparar la fecha a
+  // secas apagaría el local al EMPEZAR el día que pagó, no al terminarlo.
+  return estaVencido(local.vencimiento);
 }

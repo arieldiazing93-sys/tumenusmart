@@ -18,7 +18,10 @@ const LINKS = [
 ];
 
 /** Secciones que solamente ve el superadmin. */
-const LINKS_SUPERADMIN = [{ href: "/admin/usuarios", label: "Usuarios" }];
+const LINKS_SUPERADMIN = [
+  { href: "/admin/super", label: "Cartera" },
+  { href: "/admin/usuarios", label: "Usuarios" },
+];
 
 export default async function AdminLayout({
   children,

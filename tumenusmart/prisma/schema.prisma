@@ -64,6 +64,38 @@ model Store {
   horariosAtencion HorarioAtencion[]
   usuarios         Usuario[]
   ideasSemanales   IdeaSemanal[]
+  pagos            Pago[]
+}
+
+/// Cada pago recibido de un local.
+///
+/// Se guarda el historial completo y no solo el vencimiento vigente: cuando un
+/// cliente pregunta "yo te pagué en mayo", la respuesta tiene que estar en el
+/// sistema y no en la memoria de nadie.
+model Pago {
+  id      String @id @default(cuid())
+  storeId String
+  store   Store  @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  /// En guaraníes. Se guarda lo que efectivamente entró.
+  monto  Decimal  @db.Decimal(12, 2)
+  /// Cuándo se recibió el pago.
+  fecha  DateTime @default(now())
+  /// Hasta qué día queda cubierto el local con este pago.
+  cubreHasta DateTime
+  /// Cuántos meses se cobraron, para poder reconstruir el criterio.
+  meses  Int      @default(1)
+  /// Número de transferencia, o cualquier cosa que sirva para encontrarlo.
+  nota   String?
+
+  /// Quién lo registró. Se guarda el correo y no el id: si algún día se borra
+  /// ese usuario, el historial de cobranza igual sigue diciendo quién fue.
+  registradoPor String?
+
+  createdAt DateTime @default(now())
+
+  @@index([storeId])
+  @@index([storeId, fecha])
 }
 
 /// La idea que se le pone adelante al dueño cada semana.

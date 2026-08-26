@@ -289,3 +289,44 @@ export function passwordDeArranqueValida(password: string): boolean {
   if (a.length !== b.length) return false;
   return timingSafeEqual(a, b);
 }
+
+// ---------------------------------------------------------------------------
+//  Contraseñas generadas por el sistema
+// ---------------------------------------------------------------------------
+
+/**
+ * Alfabeto sin caracteres que se confunden al dictarlos.
+ *
+ * Estas contraseñas se pasan por WhatsApp o se dicen por teléfono, así que se
+ * sacan el cero y la O, el uno y la ele, la i mayúscula. Un cliente que no
+ * puede entrar porque leyó mal una letra es una llamada perdida para vos.
+ */
+const LETRAS_CLARAS = "abcdefghjkmnpqrstuvwxyz";
+const NUMEROS_CLAROS = "23456789";
+
+/**
+ * Arma una contraseña fácil de dictar y difícil de adivinar.
+ *
+ * Sale en tres grupos separados por guiones —"kfrt-9mzq-2vbn"— porque así se
+ * lee y se copia mucho mejor que doce caracteres seguidos. Siempre incluye
+ * letras y números, para cumplir la misma regla que le pedimos a cualquiera.
+ */
+export function generarPassword(): string {
+  const alfabeto = LETRAS_CLARAS + NUMEROS_CLAROS;
+  const bytes = randomBytes(64);
+
+  const caracteres: string[] = [];
+  for (let i = 0; i < 12; i++) {
+    caracteres.push(alfabeto[bytes[i] % alfabeto.length]);
+  }
+
+  // Se garantiza al menos una letra y un número, sin depender de la suerte.
+  caracteres[0] = LETRAS_CLARAS[bytes[20] % LETRAS_CLARAS.length];
+  caracteres[11] = NUMEROS_CLAROS[bytes[21] % NUMEROS_CLAROS.length];
+
+  return [
+    caracteres.slice(0, 4).join(""),
+    caracteres.slice(4, 8).join(""),
+    caracteres.slice(8, 12).join(""),
+  ].join("-");
+}
