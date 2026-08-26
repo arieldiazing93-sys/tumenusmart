@@ -20,6 +20,7 @@ export const MODELOS_POR_LOCAL = new Set([
   "Reservation",
   "HorarioReserva",
   "HorarioAtencion",
+  "IdeaSemanal",
 ]);
 
 /** Operaciones que leen o modifican filas existentes: se filtran por `where`. */

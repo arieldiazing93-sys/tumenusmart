@@ -79,15 +79,34 @@ export default async function EditarProductoPage({
               </option>
             ))}
           </select>
-          <input
-            type="number"
-            name="precio"
-            required
-            step="1"
-            min="0"
-            defaultValue={Number(producto.precio)}
-            className="rounded-lg border border-neutral-300 px-3 py-2"
-          />
+          <label className="flex flex-col gap-1 text-sm text-neutral-600">
+            Precio de venta
+            <input
+              type="number"
+              name="precio"
+              required
+              step="1"
+              min="0"
+              defaultValue={Number(producto.precio)}
+              className="rounded-lg border border-neutral-300 px-3 py-2"
+            />
+          </label>
+          <label className="flex flex-col gap-1 text-sm text-neutral-600">
+            Costo (opcional)
+            <input
+              type="number"
+              name="costo"
+              step="1"
+              min="0"
+              placeholder="Lo que te cuesta prepararlo"
+              defaultValue={producto.costo != null ? Number(producto.costo) : ""}
+              className="rounded-lg border border-neutral-300 px-3 py-2"
+            />
+            <span className="text-xs text-neutral-400">
+              Solo lo ves vos. Con esto, Ideas para vender más puede decirte qué producto
+              te deja más ganancia, no solo cuál factura más.
+            </span>
+          </label>
           <ImagenProductoField initialUrl={producto.imagenUrl} />
           <label className="flex items-center gap-2 text-sm">
             <input

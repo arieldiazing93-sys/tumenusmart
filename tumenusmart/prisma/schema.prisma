@@ -63,6 +63,42 @@ model Store {
   horariosReserva  HorarioReserva[]
   horariosAtencion HorarioAtencion[]
   usuarios         Usuario[]
+  ideasSemanales   IdeaSemanal[]
+}
+
+/// La idea que se le pone adelante al dueño cada semana.
+///
+/// La pantalla de Ideas calcula todo en vivo cada vez que se abre, pero eso
+/// sirve para hurgar, no para actuar. Una vez por semana se elige UNA sola y
+/// se guarda acá, por tres motivos: que no cambie de un rato a otro dentro de
+/// la misma semana, poder saber si el dueño ya la vio, y no repetirle lo
+/// mismo varios lunes seguidos.
+model IdeaSemanal {
+  id      String @id @default(cuid())
+  storeId String
+  store   Store  @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  /// Lunes de la semana, en formato AAAA-MM-DD y en hora de Asunción.
+  /// Es texto y no fecha a propósito: identifica la semana sin que el huso
+  /// horario pueda correrla un día para atrás o para adelante.
+  semana String
+
+  /// Cuál de los análisis quedó elegido, para no repetirlo la semana próxima.
+  clave     String
+  tipo      String
+  titulo    String
+  dato      String
+  accion    String
+  confianza String
+  /// Filas de apoyo, guardadas como JSON en texto.
+  detalle   String?
+
+  /// Cuándo la vio el dueño. Mientras esté vacío, el panel muestra el aviso.
+  vistaEn   DateTime?
+  createdAt DateTime  @default(now())
+
+  @@unique([storeId, semana])
+  @@index([storeId])
 }
 
 /// Quién puede entrar al panel.
@@ -140,6 +176,10 @@ model Product {
   nombre      String
   descripcion String?
   precio      Decimal         @db.Decimal(10, 2)
+  /// Lo que le cuesta al negocio preparar este producto. Opcional: mientras
+  /// esté vacío, el analista comercial habla de facturación pero no de
+  /// margen, en vez de inventarlo.
+  costo       Decimal?        @db.Decimal(10, 2)
   imagenUrl   String?
   disponible  Boolean         @default(true)
   orden       Int             @default(0)

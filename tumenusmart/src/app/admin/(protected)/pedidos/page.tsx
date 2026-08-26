@@ -10,6 +10,8 @@ import { linkWhatsappCliente } from "@/lib/whatsapp";
 import { idLocalActual } from "@/lib/local-actual";
 import { PausaPedidosToggle } from "../PausaPedidosToggle";
 import { CompartirCarta } from "../CompartirCarta";
+import { TarjetaIdeaSemana } from "../TarjetaIdeaSemana";
+import { ideaDeLaSemana } from "@/lib/idea-semanal";
 import { AvisoPedidosNuevos } from "./AvisoPedidosNuevos";
 
 export const dynamic = "force-dynamic";
@@ -67,6 +69,10 @@ export default async function AdminPedidosPage({
 
   const urlCarta = store ? await urlPublicaCarta(store.slug) : "";
 
+  // La idea de la semana se muestra acá porque Pedidos es la pantalla que el
+  // encargado abre todos los días.
+  const ideaSemana = await ideaDeLaSemana(storeId).catch(() => null);
+
   // Arma un querystring preservando los otros filtros activos, para que
   // cambiar de estado no te haga perder el filtro de fecha y viceversa.
   function hrefEstado(nuevoEstado: string | null) {
@@ -90,6 +96,8 @@ export default async function AdminPedidosPage({
   return (
     <div>
       <h1 className="mb-4 text-xl font-bold text-neutral-900">Pedidos</h1>
+
+      {ideaSemana && <TarjetaIdeaSemana idea={ideaSemana} />}
 
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
         <AvisoPedidosNuevos enviadosIniciales={pedidosEnviados} />

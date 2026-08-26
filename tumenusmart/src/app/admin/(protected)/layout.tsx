@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { sesionActual } from "@/lib/auth";
 import { cerrarSesion } from "./logout/actions";
 import { idLocalActual, listarLocales } from "@/lib/local-actual";
+import { ideaDeLaSemana } from "@/lib/idea-semanal";
 import { SelectorLocal } from "./SelectorLocal";
 
 const LINKS = [
@@ -12,6 +13,7 @@ const LINKS = [
   { href: "/admin/repartidores", label: "Repartidores" },
   { href: "/admin/reservas", label: "Reservas" },
   { href: "/admin/estadisticas", label: "Estadísticas" },
+  { href: "/admin/analista", label: "Ideas" },
   { href: "/admin/configuracion", label: "Configuración" },
 ];
 
@@ -43,6 +45,18 @@ export default async function AdminLayout({
     localActualId = "";
   }
 
+  // Aviso de idea nueva: un punto al lado de "Ideas" hasta que el dueño entre
+  // a leerla. Es la única notificación del panel, así que se gana el lugar.
+  let hayIdeaSinVer = false;
+  if (localActualId) {
+    try {
+      const idea = await ideaDeLaSemana(localActualId);
+      hayIdeaSinVer = idea != null && !idea.vista;
+    } catch {
+      hayIdeaSinVer = false;
+    }
+  }
+
   const enlaces = esSuper ? [...LINKS, ...LINKS_SUPERADMIN] : LINKS;
   const nombreVisible = sesion.nombre?.trim() || sesion.email;
 
@@ -54,8 +68,18 @@ export default async function AdminLayout({
             <span className="font-semibold text-neutral-900">TuMenuSmart</span>
             <nav className="flex flex-wrap gap-4 text-sm font-medium text-neutral-600">
               {enlaces.map((link) => (
-                <Link key={link.href} href={link.href} className="hover:text-brand">
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  className="relative hover:text-brand"
+                >
                   {link.label}
+                  {link.href === "/admin/analista" && hayIdeaSinVer && (
+                    <span
+                      className="absolute -right-2 -top-0.5 h-2 w-2 rounded-full bg-brand"
+                      aria-label="Tenés una idea nueva"
+                    />
+                  )}
                 </Link>
               ))}
             </nav>

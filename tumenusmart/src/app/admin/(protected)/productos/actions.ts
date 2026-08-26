@@ -28,6 +28,22 @@ function parsearIngredientes(formData: FormData): string[] {
   }
 }
 
+
+/**
+ * Lee el costo del formulario.
+ *
+ * Vacío significa "no lo sé todavía", que no es lo mismo que cero: por eso
+ * devuelve null y no 0. Un cero haría creer al analista que el producto no
+ * cuesta nada y que todo lo que factura es ganancia.
+ */
+function leerCosto(formData: FormData): number | null {
+  const crudo = String(formData.get("costo") ?? "").trim();
+  if (!crudo) return null;
+  const valor = parseFloat(crudo);
+  if (isNaN(valor) || valor < 0) return null;
+  return valor;
+}
+
 export async function crearProducto(formData: FormData) {
   // Todas las consultas de acá abajo quedan atadas a este local.
   const idLocal = await idLocalActual();
@@ -51,6 +67,7 @@ export async function crearProducto(formData: FormData) {
       disponible: formData.get("disponible") === "on",
       destacado: formData.get("destacado") === "on",
       ingredientes: parsearIngredientes(formData),
+      costo: leerCosto(formData),
       storeId: idLocal,
     },
   });
@@ -91,6 +108,7 @@ export async function actualizarProducto(productId: string, formData: FormData) 
       disponible: formData.get("disponible") === "on",
       destacado: formData.get("destacado") === "on",
       ingredientes: parsearIngredientes(formData),
+      costo: leerCosto(formData),
       mitadYMitadGrupo,
       mitadYMitadModo,
     },
