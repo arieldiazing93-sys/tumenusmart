@@ -1,0 +1,10 @@
+Pruebas de la compresión de imágenes.
+
+Corren en un Chromium de verdad, porque el código usa el lienzo del navegador
+y no hay forma honesta de probarlo sin un navegador.
+
+  npx tsc src/lib/comprimir-imagen.ts --ignoreConfig --outDir pruebas/comprimir \
+      --target es2020 --module esnext --moduleResolution bundler \
+      --skipLibCheck --lib es2020,dom
+  cd pruebas/comprimir && python3 -m http.server 8731 &
+  python3 correr.py

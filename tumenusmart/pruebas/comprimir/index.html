@@ -1,0 +1,98 @@
+<!doctype html><html><head><meta charset="utf-8"><title>prueba</title></head><body>
+<script type="module">
+import { comprimirImagen, calcularMedidas, PARA_PRODUCTO, PARA_LOGO, pesoLegible }
+  from "./comprimir-imagen.js";
+
+const R = [];
+const ok = (n, c, d = "") => R.push({ n, c: !!c, d: String(d) });
+
+/** Arma una imagen de prueba con ruido, para que no se comprima artificialmente bien. */
+async function hacerImagen(ancho, alto, tipo = "image/png") {
+  const c = document.createElement("canvas");
+  c.width = ancho; c.height = alto;
+  const g = c.getContext("2d");
+  const datos = g.createImageData(ancho, alto);
+  let s = 7;
+  for (let i = 0; i < datos.data.length; i += 4) {
+    s = (s * 1103515245 + 12345) % 2147483648;
+    datos.data[i] = s % 256;
+    datos.data[i + 1] = (s >> 8) % 256;
+    datos.data[i + 2] = (s >> 16) % 256;
+    datos.data[i + 3] = 255;
+  }
+  g.putImageData(datos, 0, 0);
+  const blob = await new Promise((r) => c.toBlob(r, tipo));
+  return new File([blob], "foto.png", { type: tipo });
+}
+
+async function medir(archivo) {
+  const bmp = await createImageBitmap(archivo);
+  const d = { ancho: bmp.width, alto: bmp.height };
+  bmp.close();
+  return d;
+}
+
+window.correr = async () => {
+  // --- cálculo de medidas, sin navegador de por medio ---
+  ok("apaisada 2400x1600 -> 900x600", JSON.stringify(calcularMedidas(2400,1600,900)) === '{"ancho":900,"alto":600}', JSON.stringify(calcularMedidas(2400,1600,900)));
+  ok("vertical 1600x2400 -> 600x900", JSON.stringify(calcularMedidas(1600,2400,900)) === '{"ancho":600,"alto":900}', JSON.stringify(calcularMedidas(1600,2400,900)));
+  ok("cuadrada 2000x2000 -> 900x900", JSON.stringify(calcularMedidas(2000,2000,900)) === '{"ancho":900,"alto":900}');
+  ok("una imagen chica NO se agranda", JSON.stringify(calcularMedidas(300,200,900)) === '{"ancho":300,"alto":200}', JSON.stringify(calcularMedidas(300,200,900)));
+  ok("justo en el limite queda igual", JSON.stringify(calcularMedidas(900,450,900)) === '{"ancho":900,"alto":450}');
+  ok("una tira larguisima no queda en cero", calcularMedidas(5000,3,900).alto >= 1, JSON.stringify(calcularMedidas(5000,3,900)));
+
+  // --- foto grande de celular, apaisada ---
+  const grande = await hacerImagen(2400, 1600);
+  const r1 = await comprimirImagen(grande, PARA_PRODUCTO);
+  const d1 = await medir(r1.archivo);
+  ok("comprime una foto grande", r1.comprimida, r1.motivo || "");
+  ok("el lado mayor queda en 900", d1.ancho === 900, `${d1.ancho}x${d1.alto}`);
+  ok("mantiene la proporcion", d1.alto === 600, `${d1.ancho}x${d1.alto}`);
+  ok("sale en WebP", r1.archivo.type === "image/webp", r1.archivo.type);
+  ok("el nombre cambia a .webp", r1.archivo.name.endsWith(".webp"), r1.archivo.name);
+  ok("pesa menos que el original", r1.bytesDespues < r1.bytesAntes, `${pesoLegible(r1.bytesAntes)} -> ${pesoLegible(r1.bytesDespues)}`);
+  R.push({ n: `   ahorro real: ${pesoLegible(r1.bytesAntes)} -> ${pesoLegible(r1.bytesDespues)} (${Math.round(100 - (r1.bytesDespues/r1.bytesAntes)*100)}% menos)`, c: true, d: "" });
+
+  // --- foto vertical ---
+  const vertical = await hacerImagen(1600, 2400);
+  const r2 = await comprimirImagen(vertical, PARA_PRODUCTO);
+  const d2 = await medir(r2.archivo);
+  ok("una foto vertical tambien se limita a 900 de alto", d2.alto === 900 && d2.ancho === 600, `${d2.ancho}x${d2.alto}`);
+
+  // --- logo, limite mas chico ---
+  const logo = await hacerImagen(1200, 1200);
+  const r3 = await comprimirImagen(logo, PARA_LOGO);
+  const d3 = await medir(r3.archivo);
+  ok("el logo se limita a 500", d3.ancho === 500 && d3.alto === 500, `${d3.ancho}x${d3.alto}`);
+
+  // --- imagen chica: no se agranda ---
+  const chica = await hacerImagen(200, 150);
+  const r4 = await comprimirImagen(chica, PARA_PRODUCTO);
+  const d4 = await medir(r4.archivo);
+  ok("una imagen chica conserva su tamaño", d4.ancho === 200 && d4.alto === 150, `${d4.ancho}x${d4.alto}`);
+  ok("nunca devuelve algo mas pesado que el original", r4.bytesDespues <= r4.bytesAntes, `${r4.bytesAntes} -> ${r4.bytesDespues}`);
+
+  // --- cosas que NO hay que tocar ---
+  const gif = new File([new Uint8Array([71,73,70,56,57,97])], "animado.gif", { type: "image/gif" });
+  const rg = await comprimirImagen(gif, PARA_PRODUCTO);
+  ok("un GIF no se toca (perderia la animacion)", !rg.comprimida && rg.archivo === gif, rg.motivo);
+
+  const svg = new File(["<svg/>"], "logo.svg", { type: "image/svg+xml" });
+  const rs = await comprimirImagen(svg, PARA_PRODUCTO);
+  ok("un SVG no se toca", !rs.comprimida, rs.motivo);
+
+  const pdf = new File(["x"], "algo.pdf", { type: "application/pdf" });
+  const rp = await comprimirImagen(pdf, PARA_PRODUCTO);
+  ok("un archivo que no es imagen se devuelve igual", !rp.comprimida && rp.archivo === pdf, rp.motivo);
+
+  const roto = new File([new Uint8Array([1,2,3,4,5])], "roto.png", { type: "image/png" });
+  const rr = await comprimirImagen(roto, PARA_PRODUCTO);
+  ok("un archivo corrupto no revienta, devuelve el original", !rr.comprimida && rr.archivo === roto, rr.motivo);
+
+  // --- formato legible ---
+  ok("muestra MB con coma", pesoLegible(2516582) === "2,4 MB", pesoLegible(2516582));
+  ok("muestra KB", pesoLegible(61440) === "60 KB", pesoLegible(61440));
+
+  return R;
+};
+</script></body></html>

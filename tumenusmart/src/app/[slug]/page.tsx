@@ -80,6 +80,9 @@ export default async function CatalogoPage({
           <img
             src={store.logoUrl}
             alt={store.nombre}
+            width={64}
+            height={64}
+            decoding="async"
             className="h-16 w-16 rounded-full object-cover"
           />
         )}

@@ -51,6 +51,10 @@ export function CarruselDestacados({ productos }: { productos: ProductoDestacado
             <img
               src={producto.imagenUrl}
               alt={producto.nombre}
+              width={64}
+              height={64}
+              loading="lazy"
+              decoding="async"
               className="h-16 w-16 flex-none rounded-lg object-cover"
             />
           )}

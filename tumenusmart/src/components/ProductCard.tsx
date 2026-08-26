@@ -95,6 +95,10 @@ export function ProductCard({ producto }: Props) {
         <img
           src={producto.imagenUrl}
           alt={producto.nombre}
+          width={96}
+          height={96}
+          loading="lazy"
+          decoding="async"
           className="h-24 w-24 flex-none rounded-lg object-cover"
         />
       )}

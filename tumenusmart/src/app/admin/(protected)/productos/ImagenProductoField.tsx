@@ -2,23 +2,38 @@
 
 import { useRef, useState } from "react";
 import { subirFotoProducto } from "./actions";
+import { comprimirImagen, pesoLegible, PARA_PRODUCTO } from "@/lib/comprimir-imagen";
 
 export function ImagenProductoField({ initialUrl }: { initialUrl: string | null }) {
   const [url, setUrl] = useState(initialUrl ?? "");
   const [subiendo, setSubiendo] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [ahorro, setAhorro] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   async function handleArchivo(e: React.ChangeEvent<HTMLInputElement>) {
     const archivo = e.target.files?.[0];
     if (!archivo) return;
     setError(null);
+    setAhorro(null);
     setSubiendo(true);
     try {
+      // Se achica ANTES de subir: le ahorra datos móviles a quien la carga y
+      // deja guardado un archivo liviano para siempre. En la carta la foto se
+      // muestra a 96 píxeles, así que subir el original de la cámara es
+      // descargar varios megas para pintar una miniatura.
+      const resultado = await comprimirImagen(archivo, PARA_PRODUCTO);
+
       const formData = new FormData();
-      formData.set("archivo", archivo);
+      formData.set("archivo", resultado.archivo);
       const { url: nuevaUrl } = await subirFotoProducto(formData);
       setUrl(nuevaUrl);
+
+      if (resultado.comprimida) {
+        setAhorro(
+          `${pesoLegible(resultado.bytesAntes)} → ${pesoLegible(resultado.bytesDespues)}`
+        );
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "No se pudo subir la imagen");
     } finally {
@@ -68,6 +83,11 @@ export function ImagenProductoField({ initialUrl }: { initialUrl: string | null 
       </div>
 
       {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
+      {ahorro && !error && (
+        <p className="mt-1 text-xs text-green-700">
+          Foto optimizada: {ahorro}. Se ve igual y tu carta carga mucho más rápido.
+        </p>
+      )}
 
       <input type="hidden" name="imagenUrl" value={url} />
     </div>

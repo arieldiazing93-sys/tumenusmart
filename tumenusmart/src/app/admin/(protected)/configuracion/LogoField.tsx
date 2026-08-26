@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import { subirFotoLogo, quitarLogoStore } from "./actions";
+import { comprimirImagen, PARA_LOGO } from "@/lib/comprimir-imagen";
 
 export function LogoField({ initialUrl }: { initialUrl: string | null }) {
   const [url, setUrl] = useState(initialUrl ?? "");
@@ -17,8 +18,12 @@ export function LogoField({ initialUrl }: { initialUrl: string | null }) {
     setSubiendo(true);
     setGuardado(false);
     try {
+      // El logo se muestra chico en la carta y en los tickets: no hace falta
+      // guardar el original.
+      const resultado = await comprimirImagen(archivo, PARA_LOGO);
+
       const formData = new FormData();
-      formData.set("archivo", archivo);
+      formData.set("archivo", resultado.archivo);
       const { url: nuevaUrl } = await subirFotoLogo(formData);
       setUrl(nuevaUrl);
       setGuardado(true);
