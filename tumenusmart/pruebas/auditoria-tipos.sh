@@ -1,0 +1,72 @@
+#!/usr/bin/env bash
+# ===========================================================================
+#  Auditoría de tipos sin node_modules
+# ===========================================================================
+#  En este proyecto no se puede correr `npm install` para verificar antes de
+#  publicar, así que `tsc` no encuentra React, Next ni Prisma y escupe miles de
+#  errores que NO son bugs (JSX implícito, `process` sin tipos, etc.).
+#
+#  Durante un tiempo filtré solo TS1xxx (sintaxis), y eso dejó pasar un error
+#  que rompió el build en Vercel: un `export ... from` que reenviaba un tipo
+#  hacia afuera pero no lo traía al archivo, y después se usaba adentro.
+#
+#  Estos códigos SÍ son confiables aunque falte node_modules, porque hablan de
+#  nombres y de archivos MÍOS, no de librerías:
+#
+#    TS2304 / TS2552  no existe ese nombre
+#    TS2305 / TS2724  ese archivo no exporta eso
+#    TS2694           ese espacio de nombres no tiene ese miembro
+#    TS2307           no existe ese archivo  (solo rutas @/ ./ ../ ; las de
+#                     npm se ignoran porque obviamente faltan)
+#
+#  Uso:  bash pruebas/auditoria-tipos.sh
+# ===========================================================================
+set -uo pipefail
+RAIZ="$(cd "$(dirname "$0")/.." && pwd)"
+CONF="$(mktemp /tmp/tsconfig.auditoria.XXXX.json)"
+
+cat > "$CONF" << JSON
+{
+  "compilerOptions": {
+    "noEmit": true, "skipLibCheck": true, "jsx": "preserve",
+    "target": "es2020", "module": "esnext", "moduleResolution": "bundler",
+    "strict": true, "esModuleInterop": true, "types": [],
+    "paths": { "@/*": ["$RAIZ/src/*"] }
+  },
+  "include": ["$RAIZ/src/**/*.ts", "$RAIZ/src/**/*.tsx", "$RAIZ/prisma/**/*.ts"]
+}
+JSON
+
+# Ojo con el fallback: `tsc` devuelve código != 0 cuando ENCUENTRA errores, así
+# que un `a || b` correría los dos y duplicaría cada línea. Se elige uno solo.
+if command -v tsc > /dev/null 2>&1; then TSC="tsc"; else TSC="npx --no-install tsc"; fi
+SALIDA="$($TSC -p "$CONF" 2>&1)"
+rm -f "$CONF"
+
+# 1. Sintaxis rota: nunca es ruido.
+SINTAXIS="$(echo "$SALIDA" | grep -E "error TS1[0-9]{3}:" || true)"
+# 2. Nombres y exportaciones que no existen.
+NOMBRES="$(echo "$SALIDA" | grep -E "error TS(2304|2305|2552|2694|2724):" || true)"
+# 3. Archivos propios que no se encuentran (las rutas de npm se descartan).
+RUTAS="$(echo "$SALIDA" | grep "error TS2307:" | grep -E "'(@/|\./|\.\./)" || true)"
+
+FALLAS=0
+for par in "sintaxis:$SINTAXIS" "nombres y exportaciones:$NOMBRES" "rutas propias:$RUTAS"; do
+  titulo="${par%%:*}"; cuerpo="${par#*:}"
+  if [ -n "$cuerpo" ]; then
+    echo "  ✗ $titulo"
+    echo "$cuerpo" | sed 's/^/      /'
+    FALLAS=1
+  else
+    echo "  ✓ $titulo"
+  fi
+done
+
+if [ "$FALLAS" -eq 0 ]; then
+  echo
+  echo "  Auditoría de tipos limpia."
+else
+  echo
+  echo "  HAY ERRORES QUE VAN A ROMPER EL BUILD EN VERCEL. No publicar."
+fi
+exit $FALLAS

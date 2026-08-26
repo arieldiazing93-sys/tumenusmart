@@ -4,10 +4,13 @@ import { useEffect, useMemo, useState } from "react";
 import { useCart } from "./CartProvider";
 import { construirKey } from "@/lib/cart-types";
 import { formatearGuarani } from "@/lib/format";
-import type { ProductoCarta } from "@/lib/carta";
+import type { OpcionCarta, ProductoCarta } from "@/lib/carta";
 
-// Se re-exporta para no romper a quien ya lo importaba desde acá.
-export type { ProductoCarta, OpcionCarta } from "@/lib/carta";
+// Se re-exportan para no romper a quien ya los importaba desde acá.
+// OJO: hay que IMPORTARLOS además de re-exportarlos. Un `export ... from`
+// reenvía el nombre hacia afuera pero NO lo trae a este archivo, así que si
+// solo se re-exporta, usar OpcionCarta más abajo no compila.
+export type { OpcionCarta, ProductoCarta };
 export { necesitaFicha } from "@/lib/carta";
 
 /**
