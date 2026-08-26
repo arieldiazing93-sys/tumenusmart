@@ -107,7 +107,20 @@ export default async function PortadaPage() {
             <a href="#panel" className="hidden hover:text-tinta md:inline">
               El panel
             </a>
-            <Link href={cartaReal} className={BOTON}>
+
+            {/* Para el dueño que ya es cliente y perdió el enlace que le
+                pasamos por WhatsApp. Va como texto y no como botón: el botón
+                naranja es para el que todavía no compró. */}
+            <Link
+              href="/admin/login"
+              className="font-medium text-tinta hover:text-brand"
+            >
+              Iniciar sesión
+            </Link>
+
+            {/* En celular este botón se esconde: el mismo está en la portada,
+                dos dedos más abajo, y así la barra no se amontona. */}
+            <Link href={cartaReal} className={`${BOTON} hidden sm:inline-flex`}>
               Ver una carta real
             </Link>
           </nav>
@@ -307,9 +320,14 @@ export default async function PortadaPage() {
       </section>
 
       <footer className="border-t border-linea py-8 pb-12 text-[0.86rem] text-tinta-suave">
-        <div className="mx-auto flex max-w-6xl flex-wrap justify-between gap-4 px-5 sm:px-8">
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-5 sm:px-8">
           <span>TuMenuSmart · Asunción, Paraguay</span>
-          <span className="cifra">tumenusmart.app</span>
+          <span className="flex items-center gap-5">
+            <Link href="/admin/login" className="font-medium text-tinta-media hover:text-brand">
+              Iniciar sesión
+            </Link>
+            <span className="cifra">tumenusmart.app</span>
+          </span>
         </div>
       </footer>
     </div>
