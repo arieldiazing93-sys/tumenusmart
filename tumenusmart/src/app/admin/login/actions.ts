@@ -13,25 +13,37 @@ import {
   verificarIngreso,
 } from "@/lib/auth";
 
-export async function iniciarSesion(formData: FormData) {
-  const email = String(formData.get("email") ?? "");
-  const password = String(formData.get("password") ?? "");
+export type ResultadoIngresoPantalla = { ok: boolean; error?: string };
 
+/**
+ * Verifica las credenciales y abre la sesión.
+ *
+ * Devuelve el resultado en vez de redirigir cuando falla: así el error aparece
+ * sin recargar la pantalla. Recargando, el navegador volvía a completar los
+ * mismos datos que acababan de fallar y el intento siguiente fallaba igual.
+ */
+export async function iniciarSesion(
+  email: string,
+  password: string
+): Promise<ResultadoIngresoPantalla> {
   if (!email || !password) {
-    redirect("/admin/login?error=credenciales");
+    return { ok: false, error: "Escribí tu correo y tu contraseña." };
   }
 
   const resultado = await verificarIngreso(email, password);
 
   if (!resultado.ok) {
     if (resultado.motivo === "frenado") {
-      redirect(`/admin/login?error=frenado&minutos=${resultado.minutos ?? 10}`);
+      return {
+        ok: false,
+        error: `Demasiados intentos fallidos. Probá de nuevo en ${resultado.minutos ?? 10} minutos.`,
+      };
     }
-    redirect("/admin/login?error=credenciales");
+    return { ok: false, error: "Correo o contraseña incorrectos." };
   }
 
   await abrirSesion(resultado.usuarioId);
-  redirect("/admin/pedidos");
+  return { ok: true };
 }
 
 /**

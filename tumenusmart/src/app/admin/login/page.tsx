@@ -1,5 +1,6 @@
 import { faltaCrearElPrimerUsuario, faltaSecretoDeSesion } from "@/lib/auth";
-import { crearPrimerUsuario, iniciarSesion } from "./actions";
+import { crearPrimerUsuario } from "./actions";
+import { FormularioIngreso } from "./FormularioIngreso";
 
 export const dynamic = "force-dynamic";
 
@@ -140,38 +141,7 @@ export default async function AdminLoginPage({
             <p className="mb-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{aviso}</p>
           )}
 
-          <form action={iniciarSesion} className="flex flex-col gap-3">
-            <label className="flex flex-col gap-1 text-sm text-neutral-600">
-              Correo
-              <input
-                type="email"
-                name="email"
-                required
-                autoFocus
-                autoComplete="username"
-                placeholder="vos@ejemplo.com"
-                className={CAMPO}
-              />
-            </label>
-
-            <label className="flex flex-col gap-1 text-sm text-neutral-600">
-              Contraseña
-              <input
-                type="password"
-                name="password"
-                required
-                autoComplete="current-password"
-                className={CAMPO}
-              />
-            </label>
-
-            <button
-              type="submit"
-              className="mt-1 rounded-lg bg-brand px-4 py-2 font-medium text-white hover:bg-brand-dark"
-            >
-              Entrar
-            </button>
-          </form>
+          <FormularioIngreso />
 
           <p className="mt-6 text-xs text-neutral-400">
             ¿Olvidaste tu contraseña? Pedile al administrador que te la restablezca.
