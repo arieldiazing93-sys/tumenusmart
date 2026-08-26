@@ -10,9 +10,10 @@ import { formatearGuarani } from "@/lib/format";
 /**
  * "Ver mi pedido" — el repaso antes de mandar.
  *
- * La salida hacia la carta va ARRIBA y como botón. Antes era texto gris al
- * costado: el que entraba acá para chequear qué llevaba no encontraba cómo
- * seguir agregando, y la única salida evidente era vaciar el carrito.
+ * La salida hacia la carta va al final de la lista y como botón. Antes era
+ * texto gris al costado: el que entraba acá para chequear qué llevaba no
+ * encontraba cómo seguir agregando, y la única salida evidente era vaciar el
+ * carrito.
  */
 export default function CarritoPage() {
   const { items, actualizarCantidad, quitarItem, subtotal } = useCart();
@@ -33,9 +34,7 @@ export default function CarritoPage() {
 
   return (
     <main className="mx-auto max-w-2xl px-4 pb-32 pt-6">
-      <VolverAlMenu slug={slug} texto="Seguir agregando" />
-
-      <div className="mb-5 mt-5 flex items-baseline justify-between gap-3">
+      <div className="mb-5 flex items-baseline justify-between gap-3">
         <h1 className="text-[1.35rem] font-semibold tracking-titular">Tu pedido</h1>
         <span className="text-[0.8rem] text-tinta-suave">
           {cantidadTotal} {cantidadTotal === 1 ? "ítem" : "ítems"}
@@ -101,6 +100,21 @@ export default function CarritoPage() {
             </div>
           </div>
         ))}
+      </div>
+
+      {/*
+        "Seguir agregando" va DESPUÉS de la lista, no antes.
+        Arriba competía con el título y ensuciaba lo primero que se ve; acá
+        aparece justo cuando el cliente terminó de repasar lo que lleva, que es
+        el momento en que se pregunta si le falta algo. Ancho completo porque
+        en el celular es donde llega el pulgar.
+      */}
+      <div className="mt-7">
+        <VolverAlMenu
+          slug={slug}
+          texto="Seguir agregando"
+          className="w-full justify-center py-3"
+        />
       </div>
 
       <div className="fixed inset-x-0 bottom-0 border-t border-linea bg-papel/95 p-4 backdrop-blur">

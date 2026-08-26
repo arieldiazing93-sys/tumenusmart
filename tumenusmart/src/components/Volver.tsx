@@ -39,9 +39,11 @@ export function Volver({
 export function VolverAlMenu({
   slug,
   texto = "Volver a la carta",
+  className = "",
 }: {
   slug: string;
   texto?: string;
+  className?: string;
 }) {
-  return <Volver href={`/${slug}`} texto={texto} />;
+  return <Volver href={`/${slug}`} texto={texto} className={className} />;
 }

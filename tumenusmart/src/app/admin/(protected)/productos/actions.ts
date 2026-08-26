@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { idLocalActual } from "@/lib/local-actual";
 import { prismaDelLocal } from "@/lib/prisma-local";
+import { moverEnLista, cambiosDeOrden, type Direccion } from "@/lib/ordenar";
 import { subirImagenProducto } from "@/lib/supabase-storage";
 
 export async function subirFotoProducto(formData: FormData): Promise<{ url: string }> {
@@ -152,4 +153,50 @@ export async function eliminarOpcion(productId: string, optionId: string) {
 
   await prisma.productOption.delete({ where: { id: optionId } });
   revalidatePath(`/admin/productos/${productId}`);
+}
+
+/**
+ * Sube o baja un producto DENTRO de su categoría.
+ *
+ * Se reordena solo entre hermanos: mover una milanesa no puede alterar el
+ * orden de las bebidas. Misma renumeración completa y misma transacción que
+ * en categorías, y por los mismos motivos.
+ */
+export async function moverProducto(id: string, direccion: Direccion) {
+  const prisma = prismaDelLocal(await idLocalActual());
+
+  const producto = await prisma.product.findUnique({
+    where: { id },
+    select: { categoryId: true },
+  });
+  if (!producto) return;
+
+  const productos = await prisma.product.findMany({
+    where: { categoryId: producto.categoryId },
+    orderBy: [{ orden: "asc" }, { createdAt: "asc" }],
+    select: { id: true, orden: true },
+  });
+
+  const indice = productos.findIndex((p) => p.id === id);
+  if (indice === -1) return;
+
+  const nuevoOrden = moverEnLista(
+    productos.map((p) => p.id),
+    indice,
+    direccion
+  );
+  const cambios = cambiosDeOrden(
+    nuevoOrden,
+    new Map(productos.map((p) => [p.id, p.orden]))
+  );
+  if (cambios.length === 0) return;
+
+  await prisma.$transaction(
+    cambios.map((c) =>
+      prisma.product.update({ where: { id: c.id }, data: { orden: c.orden } })
+    )
+  );
+
+  revalidatePath("/admin/productos");
+  revalidatePath("/[slug]", "layout");
 }

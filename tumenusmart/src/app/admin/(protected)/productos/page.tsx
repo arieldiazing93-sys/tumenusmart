@@ -3,7 +3,8 @@ import Link from "next/link";
 import { prismaDelLocal } from "@/lib/prisma-local";
 import { idLocalActual } from "@/lib/local-actual";
 import { formatearGuarani } from "@/lib/format";
-import { crearProducto } from "./actions";
+import { crearProducto, moverProducto } from "./actions";
+import { BotonesMover } from "@/components/BotonesMover";
 import { IngredientesField } from "./IngredientesField";
 import { ImagenProductoField } from "./ImagenProductoField";
 import { GuardadoToast } from "@/components/GuardadoToast";
@@ -35,7 +36,10 @@ export default async function AdminProductosPage({
   const productos = categoriaActiva
     ? await prisma.product.findMany({
         where: { categoryId: categoriaActiva.id },
-        orderBy: { orden: "asc" },
+        // El desempate por createdAt importa: sin él, con órdenes repetidas la
+        // lista podría salir distinta en cada carga y las flechas moverían el
+        // producto equivocado.
+        orderBy: [{ orden: "asc" }, { createdAt: "asc" }],
       })
     : [];
 
@@ -143,22 +147,44 @@ export default async function AdminProductosPage({
         </p>
       )}
 
+      {categoriaActiva && productos.length > 1 && (
+        <p className="mb-2 text-sm text-neutral-500">
+          Este es el orden en que tu cliente ve los productos dentro de "
+          {categoriaActiva.nombre}". Movelos con las flechas.
+        </p>
+      )}
+
       <div className="flex flex-col gap-2">
-        {productos.map((p) => (
-          <Link
+        {productos.map((p, i) => (
+          // Las flechas van FUERA del enlace: adentro, tocarlas abriría el
+          // producto en vez de moverlo.
+          <div
             key={p.id}
-            href={`/admin/productos/${p.id}`}
-            className="flex items-center justify-between rounded-lg border border-neutral-200 bg-white px-4 py-3 hover:border-brand"
+            className="flex items-center gap-3 rounded-lg border border-neutral-200 bg-white px-3 py-3"
           >
-            <p className="font-medium">
-              {p.destacado && <span title="Destacado">⭐ </span>}
-              {p.nombre}{" "}
-              {!p.disponible && (
-                <span className="text-xs text-neutral-400">(oculto)</span>
-              )}
-            </p>
-            <span className="font-semibold">{formatearGuarani(Number(p.precio))}</span>
-          </Link>
+            <BotonesMover
+              id={p.id}
+              accion={moverProducto}
+              esPrimero={i === 0}
+              esUltimo={i === productos.length - 1}
+              etiqueta={p.nombre}
+            />
+            <Link
+              href={`/admin/productos/${p.id}`}
+              className="flex min-w-0 flex-1 items-center justify-between gap-3 hover:text-brand"
+            >
+              <p className="min-w-0 truncate font-medium">
+                {p.destacado && <span title="Destacado">⭐ </span>}
+                {p.nombre}{" "}
+                {!p.disponible && (
+                  <span className="text-xs text-neutral-400">(oculto)</span>
+                )}
+              </p>
+              <span className="flex-none font-semibold">
+                {formatearGuarani(Number(p.precio))}
+              </span>
+            </Link>
+          </div>
         ))}
         {categoriaActiva && productos.length === 0 && (
           <p className="text-sm text-neutral-400">

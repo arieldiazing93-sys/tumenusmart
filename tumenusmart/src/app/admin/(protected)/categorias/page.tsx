@@ -10,13 +10,20 @@ export default async function AdminCategoriasPage() {
   const prisma = prismaDelLocal(await idLocalActual());
 
   const categorias = await prisma.category.findMany({
-    orderBy: { orden: "asc" },
+    // El desempate por createdAt importa: sin él, con órdenes repetidas la
+    // lista podría salir en distinto orden en cada carga y las flechas
+    // moverían la categoría equivocada.
+    orderBy: [{ orden: "asc" }, { createdAt: "asc" }],
     include: { _count: { select: { productos: true } } },
   });
 
   return (
     <div>
-      <h1 className="mb-6 text-xl font-bold text-neutral-900">Categorías</h1>
+      <h1 className="mb-1 text-xl font-bold text-neutral-900">Categorías</h1>
+      <p className="mb-6 text-sm text-neutral-500">
+        El orden de esta lista es el orden en que las ve tu cliente en la carta.
+        Movelas con las flechas.
+      </p>
 
       <form action={crearCategoria} className="mb-6 flex gap-2">
         <input
@@ -34,13 +41,15 @@ export default async function AdminCategoriasPage() {
       </form>
 
       <div className="flex flex-col gap-2">
-        {categorias.map((c) => (
+        {categorias.map((c, i) => (
           <CategoriaFila
             key={c.id}
             id={c.id}
             nombre={c.nombre}
             activa={c.activa}
             cantidadProductos={c._count.productos}
+            esPrimera={i === 0}
+            esUltima={i === categorias.length - 1}
           />
         ))}
       </div>

@@ -5,18 +5,24 @@ import {
   renombrarCategoria,
   alternarActivaCategoria,
   eliminarCategoria,
+  moverCategoria,
 } from "./actions";
+import { BotonesMover } from "@/components/BotonesMover";
 
 export function CategoriaFila({
   id,
   nombre,
   activa,
   cantidadProductos,
+  esPrimera,
+  esUltima,
 }: {
   id: string;
   nombre: string;
   activa: boolean;
   cantidadProductos: number;
+  esPrimera: boolean;
+  esUltima: boolean;
 }) {
   const [pending, startTransition] = useTransition();
   const [editando, setEditando] = useState(false);
@@ -45,6 +51,16 @@ export function CategoriaFila({
       }`}
     >
       <div className="flex items-center justify-between gap-3">
+        {!editando && (
+          <BotonesMover
+            id={id}
+            accion={moverCategoria}
+            esPrimero={esPrimera}
+            esUltimo={esUltima}
+            etiqueta={nombre}
+          />
+        )}
+
         {editando ? (
           <div className="flex flex-1 items-center gap-2">
             <input
