@@ -2,6 +2,7 @@
 
 import { localPorSlug, estaSuspendido } from "@/lib/local-por-slug";
 import { prisma } from "@/lib/prisma";
+import { siguienteNumeroReserva } from "@/lib/prisma-local";
 import { fechaAsuncionDesdeTexto, claveDiaAsuncion, horaAsuncion } from "@/lib/timezone";
 import { TURNOS, MOTIVOS_RESERVA } from "@/lib/reservas";
 import { diasCerrados, diaSemanaDeClave, NOMBRES_DIA } from "@/lib/horario-atencion";
@@ -75,9 +76,14 @@ export async function crearReserva(datos: DatosReserva): Promise<{ reservationId
   const sinCupo = await motivoSinCupo(storeId, datos.fecha, datos.horario, datos.personas);
   if (sinCupo) throw new Error(sinCupo);
 
+  // Igual que con los pedidos: el número se toma recién cuando ya pasaron
+  // todas las validaciones, para no dejar huecos por reservas rechazadas.
+  const numero = await siguienteNumeroReserva(storeId);
+
   const reserva = await prisma.reservation.create({
     data: {
       storeId,
+      numero,
       fecha,
       turno: datos.turno,
       horario: datos.horario,

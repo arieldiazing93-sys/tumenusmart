@@ -2,6 +2,7 @@
 
 import { localPorSlug, estaSuspendido } from "@/lib/local-por-slug";
 import { prisma } from "@/lib/prisma";
+import { siguienteNumeroPedido } from "@/lib/prisma-local";
 import { distanciaKm, encontrarZonaPorDistancia } from "@/lib/geo";
 import { obtenerEstadoTienda, motivoSinPedidos } from "@/lib/estado-tienda";
 
@@ -113,9 +114,14 @@ export async function crearPedido(datos: DatosCheckout): Promise<{ orderId: stri
     create: { storeId, nombre: datos.clienteNombre, telefono: datos.clienteTelefono },
   });
 
+  // El número se pide justo antes de crear el pedido, no antes: así, si algo
+  // falla en las validaciones de más arriba, no se gasta un número al pedo.
+  const numero = await siguienteNumeroPedido(storeId);
+
   const order = await prisma.order.create({
     data: {
       storeId,
+      numero,
       customerId: customer.id,
       clienteNombre: datos.clienteNombre,
       clienteTelefono: datos.clienteTelefono,

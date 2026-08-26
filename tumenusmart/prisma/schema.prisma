@@ -235,10 +235,13 @@ model Order {
   // Número correlativo para mostrarle al cliente y al encargado — el id
   // (cuid) sigue siendo la clave interna/URLs, pero un código con letras y
   // números confunde al cliente al leerlo por teléfono.
-  // FASE 1: sigue usando el contador global que ya existía, para no romper
-  // los pedidos en curso. En la FASE 2 pasa a `contadorPedidos` del local,
-  // así cada negocio arranca desde su propio #0001.
-  numero               Int           @default(autoincrement())
+  // Número que ve el cliente. Sale de `contadorPedidos` del local, así cada
+  // negocio lleva su propia numeración desde el #0001.
+  //
+  // A propósito NO tiene valor por defecto: si alguna consulta se olvidara de
+  // pedirle el número al local, no compila. Y si igual llegara a la base, la
+  // base la rechaza. Un número equivocado sería visible para el cliente.
+  numero               Int
   customerId           String?
   customer             Customer?     @relation(fields: [customerId], references: [id])
   clienteNombre        String
@@ -320,8 +323,9 @@ model Reservation {
   id              String   @id @default(cuid())
   storeId         String
   store           Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
-  // Mismo criterio que Order.numero: pasa a numeración por local en la fase 2.
-  numero          Int      @default(autoincrement())
+  // Mismo criterio que Order.numero: sale de `contadorReservas` del local y
+  // deliberadamente no tiene valor por defecto.
+  numero          Int
   fecha           DateTime // solo día, medianoche Asunción — la mesa/fecha reservada
   turno           String // "dia" | "tarde" | "noche"
   horario         String // "HH:MM" elegido dentro del turno
