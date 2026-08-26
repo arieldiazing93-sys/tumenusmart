@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { VolverAlMenu } from "@/components/Volver";
 import { prisma } from "@/lib/prisma";
 import { claveDiaAsuncion, horaAsuncion } from "@/lib/timezone";
 import { diasCerrados, NOMBRES_DIA } from "@/lib/horario-atencion";
@@ -33,13 +33,11 @@ export default async function ReservasPage({
 
   return (
     <main className="mx-auto max-w-2xl px-4 py-8">
-      <Link href={`/${slug}`} className="mb-4 inline-block text-sm text-neutral-500 hover:text-brand">
-        ← Volver al menú
-      </Link>
-      <h1 className="mb-1 text-xl font-bold text-neutral-900">Reservar mesa</h1>
-      <p className="mb-2 text-sm text-neutral-500">{store.nombre}</p>
+      <VolverAlMenu slug={slug} />
+      <h1 className="mb-1 mt-5 text-[1.35rem] font-semibold tracking-titular">Reservar mesa</h1>
+      <p className="mb-2 text-[0.85rem] text-tinta-suave">{store.nombre}</p>
       {cerrados.length > 0 && (
-        <p className="mb-6 text-sm text-neutral-500">
+        <p className="mb-6 text-[0.85rem] text-tinta-media">
           Cerramos los{" "}
           <strong>{cerrados.map((d) => NOMBRES_DIA[d]).join(", ")}</strong>.
         </p>

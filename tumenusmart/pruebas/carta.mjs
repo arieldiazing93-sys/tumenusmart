@@ -8,7 +8,13 @@
 //   mv pruebas/compilado/carta.js pruebas/compilado/carta.mjs
 //   node pruebas/carta.mjs
 
-import { necesitaFicha, normalizar, filtrarCarta } from "./compilado/carta.mjs";
+import {
+  necesitaFicha,
+  normalizar,
+  filtrarCarta,
+  barraDeCarta,
+  MINIMO_PARA_BUSCADOR,
+} from "./compilado/carta.mjs";
 
 let ok = 0;
 const fallas = [];
@@ -102,6 +108,35 @@ igual("no rompe los productos originales", carta[0].productos.length, 2);
 // Un producto que solo coincide en la categoría no debería aparecer: el
 // cliente busca productos, no rubros.
 igual("el nombre de la categoría no cuenta como coincidencia", filtrarCarta(carta, "bebidas"), []);
+
+// ---------------------------------------------------------------------------
+console.log("— barraDeCarta —");
+const muchos = (n) => Array.from({ length: n }, (_, i) => prod(`Producto ${i}`));
+
+igual("el umbral es 25", MINIMO_PARA_BUSCADOR, 25);
+
+// Con carta corta NO hay buscador: es un cajón vacío tapando la primera pantalla.
+verificar("carta corta: sin buscador", barraDeCarta([cat("Todo", muchos(10))]).hayBuscador === false);
+verificar("carta corta de 1 categoría: tampoco barra", barraDeCarta([cat("Todo", muchos(10))]).hayBarra === false);
+verificar("carta corta de 2 categorías: hay barra por los chips",
+  barraDeCarta([cat("A", muchos(5)), cat("B", muchos(5))]).hayBarra === true);
+
+// El límite exacto, por los dos lados.
+verificar("24 productos: todavía sin buscador", barraDeCarta([cat("A", muchos(24))]).hayBuscador === false);
+verificar("25 productos: aparece el buscador", barraDeCarta([cat("A", muchos(25))]).hayBuscador === true);
+verificar("26 productos: sigue apareciendo", barraDeCarta([cat("A", muchos(26))]).hayBuscador === true);
+verificar("con buscador siempre hay barra", barraDeCarta([cat("A", muchos(30))]).hayBarra === true);
+
+// Cuenta el total sumando categorías, no la categoría más grande.
+igual("suma los productos de todas las categorías",
+  barraDeCarta([cat("A", muchos(13)), cat("B", muchos(12))]).totalProductos, 25);
+verificar("13 + 12 cruza el umbral",
+  barraDeCarta([cat("A", muchos(13)), cat("B", muchos(12))]).hayBuscador === true);
+
+// Casos borde que en producción existen: local recién dado de alta.
+igual("carta vacía: cero productos", barraDeCarta([]).totalProductos, 0);
+verificar("carta vacía: sin buscador ni barra", barraDeCarta([]).hayBuscador === false && barraDeCarta([]).hayBarra === false);
+verificar("una categoría vacía tampoco prende nada", barraDeCarta([cat("A", [])]).hayBarra === false);
 
 // ---------------------------------------------------------------------------
 console.log(`\n${fallas.length === 0 ? "✓" : "✗"} ${ok} pruebas pasaron, ${fallas.length} fallaron`);

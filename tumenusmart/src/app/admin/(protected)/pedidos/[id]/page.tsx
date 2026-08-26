@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { Volver } from "@/components/Volver";
 import { notFound } from "next/navigation";
 import { prismaDelLocal } from "@/lib/prisma-local";
 import { idLocalActual } from "@/lib/local-actual";
@@ -31,9 +31,9 @@ export default async function DetallePedidoPage({
 
   return (
     <div>
-      <Link href="/admin/pedidos" className="mb-4 inline-block text-sm text-brand">
-        ← Volver a pedidos
-      </Link>
+      <div className="mb-4">
+        <Volver href="/admin/pedidos" texto="Volver a pedidos" />
+      </div>
 
       <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
         <div>

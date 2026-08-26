@@ -58,6 +58,20 @@ const config: Config = {
           suave: "#A0A4AC",
         },
 
+        /**
+         * Azul: navegación. Nada más.
+         *
+         * El naranja es "avanzar, pedir, gastar plata". Si volver atrás usara
+         * el mismo color, el cliente tendría que leer cada botón para saber
+         * cuál lo lleva adelante y cuál atrás. Con dos colores lo resuelve de
+         * un vistazo. Por eso el azul NUNCA se usa para confirmar un pedido.
+         */
+        azul: {
+          DEFAULT: "#1668C4",
+          oscuro: "#12539C",
+          luz: "#E9F1FB",
+        },
+
         /** Colores con significado: estado, no decoración. */
         exito: { DEFAULT: "#1F6B4F", luz: "#E6F2EC" },
         aviso: { DEFAULT: "#8A6512", luz: "#FAF2E0" },

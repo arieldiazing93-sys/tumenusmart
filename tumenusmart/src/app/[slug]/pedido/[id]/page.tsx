@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { VolverAlMenu } from "@/components/Volver";
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
@@ -196,9 +196,7 @@ export default async function SeguimientoPedidoPage({
       </div>
 
       <div className="mt-8 text-center">
-        <Link href={`/${slug}`} className="text-sm text-brand">
-          Volver al menú
-        </Link>
+        <VolverAlMenu slug={slug} />
       </div>
     </main>
   );

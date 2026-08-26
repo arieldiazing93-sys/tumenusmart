@@ -94,3 +94,30 @@ export function filtrarCarta(
     }))
     .filter((c) => c.productos.length > 0);
 }
+
+/**
+ * A partir de cuántos productos aparece el buscador.
+ *
+ * En una carta de quince productos el buscador es un cajón vacío ocupando la
+ * primera pantalla: se recorre más rápido con el dedo que escribiendo. Recién
+ * cuando la carta es larga empieza a servir. No es una opción de configuración
+ * a propósito — nadie debería tener que decidir esto, se decide solo.
+ */
+export const MINIMO_PARA_BUSCADOR = 25;
+
+/**
+ * Qué va en la barra pegajosa de arriba de la carta.
+ *
+ * `hayBarra` importa más de lo que parece: sin ella, una carta corta de una
+ * sola categoría dibujaba una barra vacía con su línea abajo, ocupando lugar
+ * arriba de todo sin decir nada.
+ */
+export function barraDeCarta(categorias: CategoriaCarta[]): {
+  totalProductos: number;
+  hayBuscador: boolean;
+  hayBarra: boolean;
+} {
+  const totalProductos = categorias.reduce((s, c) => s + c.productos.length, 0);
+  const hayBuscador = totalProductos >= MINIMO_PARA_BUSCADOR;
+  return { totalProductos, hayBuscador, hayBarra: hayBuscador || categorias.length > 1 };
+}

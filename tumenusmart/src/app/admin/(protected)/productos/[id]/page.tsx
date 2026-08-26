@@ -1,5 +1,5 @@
 import { Suspense } from "react";
-import Link from "next/link";
+import { Volver } from "@/components/Volver";
 import { notFound } from "next/navigation";
 import { prismaDelLocal } from "@/lib/prisma-local";
 import { idLocalActual } from "@/lib/local-actual";
@@ -42,12 +42,12 @@ export default async function EditarProductoPage({
       </Suspense>
 
       <div>
-        <Link
-          href={`/admin/productos?categoria=${producto.categoryId}`}
-          className="mb-4 inline-flex items-center gap-1 text-sm text-neutral-500 hover:text-brand hover:underline"
-        >
-          ← Volver a {categorias.find((c) => c.id === producto.categoryId)?.nombre ?? "la categoría"}
-        </Link>
+        <div className="mb-4">
+          <Volver
+            href={`/admin/productos?categoria=${producto.categoryId}`}
+            texto={`Volver a ${categorias.find((c) => c.id === producto.categoryId)?.nombre ?? "la categoría"}`}
+          />
+        </div>
 
         <div className="mb-4 flex items-center justify-between">
           <h1 className="text-xl font-bold text-neutral-900">{producto.nombre}</h1>

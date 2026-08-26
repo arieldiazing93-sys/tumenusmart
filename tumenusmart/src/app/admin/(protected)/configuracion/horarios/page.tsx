@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { Volver } from "@/components/Volver";
 import { prismaDelLocal } from "@/lib/prisma-local";
 import { idLocalActual } from "@/lib/local-actual";
 import { agregarTramoHorario } from "../actions";
@@ -24,12 +24,9 @@ export default async function HorariosAtencionPage() {
 
   return (
     <div>
-      <Link
-        href="/admin/configuracion"
-        className="mb-4 inline-block text-sm text-neutral-500 hover:text-brand"
-      >
-        ← Configuración
-      </Link>
+      <div className="mb-4">
+        <Volver href="/admin/configuracion" texto="Volver a configuración" />
+      </div>
 
       <h1 className="mb-1 text-xl font-bold text-neutral-900">Horario de atención</h1>
       <p className="mb-6 text-sm text-neutral-500">

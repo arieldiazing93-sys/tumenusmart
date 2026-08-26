@@ -6,7 +6,13 @@ import { construirKey } from "@/lib/cart-types";
 import { formatearGuarani } from "@/lib/format";
 import { MitadYMitadPicker } from "./MitadYMitadPicker";
 import { FichaProducto } from "./FichaProducto";
-import { filtrarCarta, necesitaFicha, type CategoriaCarta, type ProductoCarta } from "@/lib/carta";
+import {
+  barraDeCarta,
+  filtrarCarta,
+  necesitaFicha,
+  type CategoriaCarta,
+  type ProductoCarta,
+} from "@/lib/carta";
 
 export type { CategoriaCarta } from "@/lib/carta";
 
@@ -31,10 +37,11 @@ export function Carta({
   const refsSecciones = useRef<Record<string, HTMLElement | null>>({});
   const tarjetas = estilo === "tarjetas";
 
-  const buscando = busqueda.trim().length > 0;
+  const { hayBuscador, hayBarra } = barraDeCarta(categorias);
+  const buscando = hayBuscador && busqueda.trim().length > 0;
   const filtradas = useMemo(
-    () => filtrarCarta(categorias, busqueda),
-    [categorias, busqueda]
+    () => (hayBuscador ? filtrarCarta(categorias, busqueda) : categorias),
+    [categorias, busqueda, hayBuscador]
   );
 
   // La categoría del chip se sigue sola mientras se baja por la carta.
@@ -63,7 +70,9 @@ export function Carta({
   return (
     <>
       {/* buscador y categorías, pegados arriba */}
+      {hayBarra && (
       <div className="sticky top-0 z-20 -mx-4 border-b border-linea bg-papel/95 px-4 backdrop-blur">
+        {hayBuscador && (
         <div className="relative py-2.5">
           <span
             aria-hidden="true"
@@ -80,9 +89,10 @@ export function Carta({
             className="w-full rounded-lg border border-linea bg-papel-suave py-2.5 pl-8 pr-3 text-[0.9rem] focus:border-brand focus:bg-white focus:outline-none"
           />
         </div>
+        )}
 
         {!buscando && categorias.length > 1 && (
-          <div className="flex gap-1.5 overflow-x-auto pb-2.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <div className="flex gap-1.5 overflow-x-auto pb-2.5 pt-2.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {categorias.map((c) => (
               <button
                 key={c.id}
@@ -101,6 +111,7 @@ export function Carta({
           </div>
         )}
       </div>
+      )}
 
       {!hayResultados && (
         <p className="py-14 text-center text-[0.9rem] text-tinta-suave">

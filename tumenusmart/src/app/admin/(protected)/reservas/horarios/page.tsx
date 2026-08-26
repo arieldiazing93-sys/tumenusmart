@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { Volver } from "@/components/Volver";
 import { prismaDelLocal } from "@/lib/prisma-local";
 import { idLocalActual } from "@/lib/local-actual";
 import { crearHorario } from "../actions";
@@ -18,12 +18,9 @@ export default async function HorariosReservaPage() {
 
   return (
     <div>
-      <Link
-        href="/admin/reservas"
-        className="mb-4 inline-block text-sm text-neutral-500 hover:text-brand"
-      >
-        ← Reservas
-      </Link>
+      <div className="mb-4">
+        <Volver href="/admin/reservas" texto="Volver a reservas" />
+      </div>
       <h1 className="mb-1 text-xl font-bold text-neutral-900">Horarios de reservas</h1>
       <p className="mb-6 text-sm text-neutral-500">
         Cargá los horarios disponibles para cada turno — son los que ve el cliente al reservar

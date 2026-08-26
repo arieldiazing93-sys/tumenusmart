@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { Volver } from "@/components/Volver";
 import { CheckoutForm } from "./CheckoutForm";
 import { AvisoTienda } from "@/components/AvisoTienda";
 import { obtenerEstadoTienda, motivoSinPedidos } from "@/lib/estado-tienda";
@@ -24,7 +25,10 @@ export default async function CheckoutPage({
 
   return (
     <main className="mx-auto max-w-2xl px-4 py-8">
-      <h1 className="mb-6 text-xl font-bold text-neutral-900">Finalizar pedido</h1>
+      <Volver href={`/${slug}/carrito`} texto="Volver a mi pedido" />
+      <h1 className="mb-6 mt-5 text-[1.35rem] font-semibold tracking-titular">
+        Finalizar pedido
+      </h1>
       <AvisoTienda estado={estadoTienda} />
       <CheckoutForm
         slug={slug}

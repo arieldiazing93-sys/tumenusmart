@@ -131,7 +131,7 @@ export default async function CatalogoPage({
               {store.nombre.slice(0, 2).toUpperCase()}
             </span>
           )}
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <h1 className="truncate text-[1.4rem] font-semibold tracking-titular">
               {store.nombre}
             </h1>
@@ -139,6 +139,20 @@ export default async function CatalogoPage({
               <p className="truncate text-[0.82rem] text-tinta-suave">{store.direccion}</p>
             )}
           </div>
+
+          {/*
+            Reservar mesa va acá arriba a la derecha, grande y en azul, por una
+            razón concreta: es la ÚNICA acción de esta pantalla que no es pedir
+            comida. Abajo, mezclado entre los productos, se perdía. En azul se
+            distingue del naranja de "agregar" sin competirle.
+          */}
+          <Link
+            href={`/${slug}/reservas`}
+            className="flex-none rounded-xl bg-azul px-4 py-3 text-center text-[0.88rem] font-semibold leading-tight text-white shadow-media transition-colors hover:bg-azul-oscuro sm:px-6"
+          >
+            Reservar
+            <span className="hidden sm:inline"> mesa</span>
+          </Link>
         </div>
 
         <div className="mt-3">
@@ -153,15 +167,6 @@ export default async function CatalogoPage({
             </span>
           ))}
         </p>
-
-        <div className="mt-4 flex flex-wrap gap-2">
-          <Link
-            href={`/${slug}/reservas`}
-            className="inline-flex items-center rounded-lg border border-linea px-3 py-1.5 text-[0.85rem] font-medium text-tinta hover:border-brand hover:text-brand"
-          >
-            Reservar mesa
-          </Link>
-        </div>
       </header>
 
       <div className="mt-5">

@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { VolverAlMenu } from "@/components/Volver";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { construirMensajeReserva, construirLinkWhatsapp } from "@/lib/whatsapp";
@@ -82,9 +82,9 @@ export default async function ConfirmacionReservaPage({
         <pre className="whitespace-pre-wrap font-sans">{mensaje}</pre>
       </div>
 
-      <Link href={`/${slug}`} className="mt-8 inline-block text-sm text-brand">
-        Volver al menú
-      </Link>
+      <div className="mt-8">
+        <VolverAlMenu slug={slug} />
+      </div>
     </main>
   );
 }
