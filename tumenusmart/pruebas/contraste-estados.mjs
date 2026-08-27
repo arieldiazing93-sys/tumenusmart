@@ -37,6 +37,13 @@ const PARES = [
   ["Cartel de éxito", c.exito.luz, c.exito.DEFAULT],
   ["Cartel de peligro", c.peligro.luz, c.peligro.DEFAULT],
   ["Botón volver", c.azul.luz, c.azul.oscuro],
+  // Las tarjetas de Estadísticas: el rótulo es texto chico sobre el fondo de
+  // color, así que necesita el mismo mínimo que las pastillas.
+  ["Tarjeta dinero", c.exito.luz, c.exito.DEFAULT],
+  ["Tarjeta volumen", c.azul.luz, c.azul.oscuro],
+  ["Tarjeta promedio", c.violeta.luz, c.violeta.oscuro],
+  ["Tarjeta clientes", c.aviso.luz, c.aviso.DEFAULT],
+  ["Tarjeta perdido", c.peligro.luz, c.peligro.DEFAULT],
 ];
 
 const fallas = [];
