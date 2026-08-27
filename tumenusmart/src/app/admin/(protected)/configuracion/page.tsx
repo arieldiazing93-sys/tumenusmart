@@ -43,7 +43,7 @@ export default async function AdminConfiguracionPage() {
 
           <div className="rounded-lg border border-linea bg-white p-4">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-              <p className="font-medium text-tinta">Horario de atención</p>
+              <p className="text-[0.95rem] font-semibold tracking-titular text-tinta">Horario de atención</p>
               <Link
                 href="/admin/configuracion/horarios"
                 className="rounded-lg border border-linea px-3 py-1.5 text-sm font-medium text-tinta-media hover:border-brand hover:text-brand"
@@ -51,30 +51,44 @@ export default async function AdminConfiguracionPage() {
                 Editar horarios
               </Link>
             </div>
+            {/*
+                Dos columnas con MUCHA separación entre ellas.
+
+                Antes eran 4 píxeles, y con la hora alineada a la derecha de la
+                primera columna pegada al nombre del día de la segunda, se leía
+                "00:00 Martes" como si fuera una sola cosa. Ahora hay 2.5rem de
+                aire y cada día lleva su línea, así que cada renglón se lee solo.
+            */}
             {horarios.length === 0 ? (
               <p className="text-sm text-tinta-media">
                 Sin horarios cargados — el menú acepta pedidos a cualquier hora.
               </p>
             ) : (
-              <div className="grid grid-cols-1 gap-1 text-sm sm:grid-cols-2">
+              <dl className="grid grid-cols-1 gap-x-10 text-[0.85rem] sm:grid-cols-2">
                 {DIAS_ORDENADOS.map((dia) => {
                   const texto = resumenDia(horarios, dia);
+                  const cerrado = texto === "Cerrado";
                   return (
-                    <div key={dia} className="flex justify-between gap-3 py-0.5">
-                      <span className="text-tinta-media">{NOMBRES_DIA[dia]}</span>
-                      <span
+                    <div
+                      key={dia}
+                      className="flex items-baseline justify-between gap-4 border-b border-linea-fina py-2 last:border-b-0 sm:[&:nth-last-child(-n+2)]:border-b-0"
+                    >
+                      <dt className="flex-none text-tinta-media">{NOMBRES_DIA[dia]}</dt>
+                      {/* Tabular: así los dígitos quedan en columna y se
+                          comparan los días de un vistazo. */}
+                      <dd
                         className={
-                          texto === "Cerrado"
-                            ? "text-tinta-suave"
-                            : "font-medium text-tinta"
+                          cerrado
+                            ? "cifra flex-none text-tinta-suave"
+                            : "cifra flex-none font-semibold text-tinta"
                         }
                       >
                         {texto}
-                      </span>
+                      </dd>
                     </div>
                   );
                 })}
-              </div>
+              </dl>
             )}
           </div>
         </div>
