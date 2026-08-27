@@ -12,7 +12,16 @@ import type { Config } from "tailwindcss";
  * para que el conjunto se lea como elegido y no como el gris por defecto.
  */
 const config: Config = {
-  content: ["./src/app/**/*.{ts,tsx}", "./src/components/**/*.{ts,tsx}"],
+  // OJO con esta lista: Tailwind SOLO genera las clases que encuentra acá.
+  // src/lib faltaba, y ahí viven los colores de estado de pedidos y reservas.
+  // El resultado no era un error sino algo peor: las clases existían en el
+  // código, el build pasaba en verde, y en pantalla los estados salían todos
+  // grises porque el CSS nunca se generó.
+  content: [
+    "./src/app/**/*.{ts,tsx}",
+    "./src/components/**/*.{ts,tsx}",
+    "./src/lib/**/*.{ts,tsx}",
+  ],
   theme: {
     extend: {
       fontFamily: {
@@ -25,6 +34,9 @@ const config: Config = {
           DEFAULT: "#D2501F",
           dark: "#B0401A",
           light: "#FCEDE6",
+          // "tinte" es el fondo de las pastillas de estado: más fuerte que
+          // "light" para que se distingan de un vistazo en una tabla larga.
+          tinte: "#F7D9CB",
           // Para texto de acento sobre fondo claro: más oscuro, mejor contraste.
           texto: "#A33A14",
         },
@@ -70,12 +82,30 @@ const config: Config = {
           DEFAULT: "#1668C4",
           oscuro: "#12539C",
           luz: "#E9F1FB",
+          tinte: "#CFE1F7",
+        },
+
+        /**
+         * Violeta: el pedido que ya salió del local.
+         *
+         * Existe solo para eso. Los otros cinco estados ya tienen color propio
+         * con significado, y "en despacho" necesitaba uno que no se confundiera
+         * con ninguno — sobre todo con el verde de entregado.
+         */
+        violeta: {
+          DEFAULT: "#6D4AA8",
+          oscuro: "#553780",
+          luz: "#F1ECFA",
+          tinte: "#DCD0F2",
         },
 
         /** Colores con significado: estado, no decoración. */
-        exito: { DEFAULT: "#1F6B4F", luz: "#E6F2EC" },
-        aviso: { DEFAULT: "#8A6512", luz: "#FAF2E0" },
-        peligro: { DEFAULT: "#A32F2C", luz: "#FAEAE9" },
+        exito: { DEFAULT: "#1F6B4F", luz: "#E6F2EC", tinte: "#C9E4D6" },
+        // El ámbar se oscureció de #8A6512 a #7A5810: sobre el fondo "tinte"
+        // el anterior daba 4.07:1, abajo del mínimo legible para texto chico.
+        // Ahora da 4.98:1, y de paso mejoran todos los carteles de aviso.
+        aviso: { DEFAULT: "#7A5810", luz: "#FAF2E0", tinte: "#F2E0B4" },
+        peligro: { DEFAULT: "#A32F2C", luz: "#FAEAE9", tinte: "#F4D2D0" },
       },
 
       letterSpacing: {

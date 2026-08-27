@@ -72,10 +72,12 @@ export function PausaPedidosToggle({
           type="button"
           onClick={alternar}
           disabled={pending}
-          className={`flex-none rounded-lg px-3 py-1.5 text-[0.8rem] font-semibold transition-colors duration-150 disabled:opacity-50 ${
+          // Pausar lleva fondo ámbar y no blanco: apaga los pedidos del local,
+          // así que tiene que verse como algo que se piensa antes de tocar.
+          className={`flex-none rounded-lg border px-3 py-1.5 text-[0.8rem] font-semibold transition-colors duration-150 disabled:opacity-50 ${
             activo
-              ? "bg-exito text-white hover:opacity-90"
-              : "border border-linea bg-white text-tinta-media hover:border-aviso hover:text-aviso"
+              ? "border-exito bg-exito text-white hover:opacity-90"
+              : "border-aviso/45 bg-aviso-tinte text-aviso hover:border-aviso hover:bg-aviso hover:text-white"
           }`}
         >
           {pending ? "Guardando…" : activo ? "Reanudar pedidos" : "Pausar pedidos"}

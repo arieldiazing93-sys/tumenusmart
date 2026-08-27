@@ -154,10 +154,10 @@ export function AvisoPedidosNuevos({ enviadosIniciales }: Props) {
             : "Activalo una vez y esta pantalla te avisa cuando entra un pedido."
         }
         aria-pressed={sonidoActivo}
-        className={`flex flex-none items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[0.8rem] font-medium transition-colors duration-150 ${
+        className={`flex flex-none items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[0.8rem] font-semibold transition-colors duration-150 ${
           sonidoActivo
-            ? "border-exito/30 bg-exito-luz text-exito"
-            : "border-linea bg-white text-tinta-media hover:border-brand hover:text-brand"
+            ? "border-exito/45 bg-exito-tinte text-exito"
+            : "border-linea bg-papel-hundido text-tinta-media hover:border-brand hover:bg-brand-light hover:text-brand-texto"
         }`}
       >
         <svg

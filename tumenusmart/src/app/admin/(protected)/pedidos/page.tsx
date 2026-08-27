@@ -394,7 +394,7 @@ export default async function AdminPedidosPage({
                     <td className="px-3 py-3">
                       <Link href={`/admin/pedidos/${pedido.id}`}>
                         <span
-                          className={`rounded-full px-2.5 py-1 text-xs font-medium ${colorEstado(pedido.estado)}`}
+                          className={`inline-block whitespace-nowrap rounded-full px-2.5 py-1 text-[0.74rem] font-semibold ${colorEstado(pedido.estado)}`}
                         >
                           {etiquetaEstado(pedido.estado)}
                         </span>

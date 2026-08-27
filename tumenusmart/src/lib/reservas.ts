@@ -32,12 +32,14 @@ export function etiquetaEstadoReserva(estado: string): string {
   return ESTADOS_RESERVA.find((e) => e.value === estado)?.label ?? estado;
 }
 
+// Mismo criterio que los estados de pedido: colores del sistema y fondo
+// "tinte", para que se distingan dentro de una lista.
 const COLORES_ESTADO_RESERVA: Record<string, string> = {
-  pendiente: "bg-amber-100 text-amber-800",
-  confirmada: "bg-green-100 text-green-800",
-  cancelada: "bg-red-100 text-red-700",
+  pendiente: "bg-aviso-tinte text-aviso",
+  confirmada: "bg-exito-tinte text-exito",
+  cancelada: "bg-peligro-tinte text-peligro",
 };
 
 export function colorEstadoReserva(estado: string): string {
-  return COLORES_ESTADO_RESERVA[estado] ?? "bg-neutral-100 text-neutral-700";
+  return COLORES_ESTADO_RESERVA[estado] ?? "bg-papel-hundido text-tinta-media";
 }

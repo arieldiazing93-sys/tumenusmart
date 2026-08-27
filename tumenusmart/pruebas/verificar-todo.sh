@@ -14,6 +14,11 @@ tsc tailwind.config.ts --ignoreConfig --outDir pruebas/compilado --target es2020
     --module esnext --moduleResolution bundler --skipLibCheck > /dev/null 2>&1
 mv -f pruebas/compilado/tailwind.config.js pruebas/compilado/tailwind.config.mjs
 node pruebas/auditoria-colores.mjs || FALLAS=1
+node pruebas/auditoria-content.mjs || FALLAS=1
+
+echo
+echo "── contraste ────────────────────────────────────────"
+node pruebas/contraste-estados.mjs || FALLAS=1
 
 echo
 echo "── lógica ────────────────────────────────────────────"

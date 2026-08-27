@@ -11,15 +11,26 @@ export function etiquetaEstado(estado: string): string {
   return ESTADOS_PEDIDO.find((e) => e.value === estado)?.label ?? estado;
 }
 
+/**
+ * El color de cada estado.
+ *
+ * Cada uno sale del sistema de color del producto, no de la paleta suelta de
+ * Tailwind, y el fondo es el tono "tinte" —más fuerte que el de los carteles—
+ * porque acá compiten dentro de una tabla larga: si son muy claros, el
+ * encargado tiene que leer cada fila en vez de barrerla con la vista.
+ *
+ * El orden de los colores sigue el recorrido del pedido: ámbar es el que
+ * espera algo tuyo, verde el que ya terminó, rojo el que se cayó.
+ */
 const COLORES_ESTADO: Record<string, string> = {
-  pendiente: "bg-amber-100 text-amber-800",
-  confirmado: "bg-blue-100 text-blue-800",
-  en_preparacion: "bg-purple-100 text-purple-800",
-  en_despacho: "bg-cyan-100 text-cyan-800",
-  entregado: "bg-green-100 text-green-800",
-  cancelado: "bg-red-100 text-red-700",
+  pendiente: "bg-aviso-tinte text-aviso",
+  confirmado: "bg-azul-tinte text-azul-oscuro",
+  en_preparacion: "bg-brand-tinte text-brand-texto",
+  en_despacho: "bg-violeta-tinte text-violeta-oscuro",
+  entregado: "bg-exito-tinte text-exito",
+  cancelado: "bg-peligro-tinte text-peligro",
 };
 
 export function colorEstado(estado: string): string {
-  return COLORES_ESTADO[estado] ?? "bg-neutral-100 text-neutral-700";
+  return COLORES_ESTADO[estado] ?? "bg-papel-hundido text-tinta-media";
 }
