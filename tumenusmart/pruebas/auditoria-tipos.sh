@@ -18,6 +18,16 @@
 #    TS2694           ese espacio de nombres no tiene ese miembro
 #    TS2307           no existe ese archivo  (solo rutas @/ ./ ../ ; las de
 #                     npm se ignoran porque obviamente faltan)
+#    TS2741 / TS2739  a un componente MÍO le falta una prop obligatoria
+#    TS2322           le paso a un componente MÍO algo del tipo equivocado
+#
+#  Los dos últimos estuvieron excluidos un tiempo por ruidosos, y esa exclusión
+#  dejó pasar un build roto: agregué una prop obligatoria a una tarjeta y me
+#  olvidé de cuatro usos más abajo. Revisado, TODO el ruido tiene solo dos
+#  formas, las dos causadas por la falta de los tipos de React:
+#    · "Property 'children' is missing"  → React no sabe que children es especial
+#    · un tipo que arranca con "{ key:"  → React no sabe que key es especial
+#  Filtrando esas dos, lo que queda son errores de verdad.
 #
 #  Uso:  bash pruebas/auditoria-tipos.sh
 # ===========================================================================
@@ -49,9 +59,13 @@ SINTAXIS="$(echo "$SALIDA" | grep -E "error TS1[0-9]{3}:" || true)"
 NOMBRES="$(echo "$SALIDA" | grep -E "error TS(2304|2305|2552|2694|2724):" || true)"
 # 3. Archivos propios que no se encuentran (las rutas de npm se descartan).
 RUTAS="$(echo "$SALIDA" | grep "error TS2307:" | grep -E "'(@/|\./|\.\./)" || true)"
+# 4. Props mal pasadas a componentes propios, sin el ruido de children y key.
+PROPS="$(echo "$SALIDA" | grep -E "error TS(2741|2739|2322):" \
+  | grep -v "Property 'children' is missing" \
+  | grep -v "Type '{ key:" || true)"
 
 FALLAS=0
-for par in "sintaxis:$SINTAXIS" "nombres y exportaciones:$NOMBRES" "rutas propias:$RUTAS"; do
+for par in "sintaxis:$SINTAXIS" "nombres y exportaciones:$NOMBRES" "rutas propias:$RUTAS" "props de componentes:$PROPS"; do
   titulo="${par%%:*}"; cuerpo="${par#*:}"
   if [ -n "$cuerpo" ]; then
     echo "  ✗ $titulo"

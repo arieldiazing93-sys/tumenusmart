@@ -300,10 +300,13 @@ export default async function AdminEstadisticasPage({
         </div>
 
         <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <Tarjeta etiqueta="Reservas" valor={String(statsReservas.total)} detalle="En este período" />
-          <Tarjeta etiqueta="Personas esperadas" valor={String(statsReservas.personasTotales)} />
-          <Tarjeta etiqueta="Confirmadas" valor={String(statsReservas.porEstado.confirmada)} />
+          {/* Mismo criterio de color que arriba: azul es volumen, ámbar son
+              personas, verde lo confirmado, rojo lo que se cayó. */}
+          <Tarjeta color="volumen" etiqueta="Reservas" valor={String(statsReservas.total)} detalle="En este período" />
+          <Tarjeta color="clientes" etiqueta="Personas esperadas" valor={String(statsReservas.personasTotales)} />
+          <Tarjeta color="dinero" etiqueta="Confirmadas" valor={String(statsReservas.porEstado.confirmada)} />
           <Tarjeta
+            color="perdido"
             etiqueta="Pendientes / canceladas"
             valor={`${statsReservas.porEstado.pendiente} / ${statsReservas.porEstado.cancelada}`}
           />
