@@ -1,3 +1,4 @@
+import { pantallaConPermiso } from "@/lib/auth";
 import { Volver } from "@/components/Volver";
 import { prismaDelLocal } from "@/lib/prisma-local";
 import { idLocalActual } from "@/lib/local-actual";
@@ -12,6 +13,8 @@ import { EliminarTramoBoton } from "./EliminarTramoBoton";
 export const dynamic = "force-dynamic";
 
 export default async function HorariosAtencionPage() {
+  await pantallaConPermiso("configuracion.editar");
+
   // Todas las consultas de acá abajo quedan atadas a este local.
   const prisma = prismaDelLocal(await idLocalActual());
 

@@ -1,10 +1,12 @@
 "use server";
 
+import { exigirPermiso } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 import { idLocalActual } from "@/lib/local-actual";
 import { prismaDelLocal } from "@/lib/prisma-local";
 
 export async function crearRepartidor(formData: FormData) {
+  await exigirPermiso("repartidores.gestionar");
   // Todas las consultas de acá abajo quedan atadas a este local.
   const idLocal = await idLocalActual();
   const prisma = prismaDelLocal(idLocal);
@@ -21,6 +23,7 @@ export async function crearRepartidor(formData: FormData) {
 }
 
 export async function alternarActivoRepartidor(id: string, activo: boolean) {
+  await exigirPermiso("repartidores.gestionar");
   // Todas las consultas de acá abajo quedan atadas a este local.
   const prisma = prismaDelLocal(await idLocalActual());
 
@@ -30,6 +33,7 @@ export async function alternarActivoRepartidor(id: string, activo: boolean) {
 }
 
 export async function eliminarRepartidor(id: string) {
+  await exigirPermiso("repartidores.gestionar");
   // Todas las consultas de acá abajo quedan atadas a este local.
   const prisma = prismaDelLocal(await idLocalActual());
 

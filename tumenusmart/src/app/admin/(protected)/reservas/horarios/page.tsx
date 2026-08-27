@@ -1,3 +1,4 @@
+import { pantallaConPermiso } from "@/lib/auth";
 import { clasesBoton } from "@/components/ui";
 import { Volver } from "@/components/Volver";
 import { prismaDelLocal } from "@/lib/prisma-local";
@@ -10,6 +11,8 @@ import { CapacidadField } from "./CapacidadField";
 export const dynamic = "force-dynamic";
 
 export default async function HorariosReservaPage() {
+  await pantallaConPermiso("reservas.gestionar");
+
   // Todas las consultas de acá abajo quedan atadas a este local.
   const prisma = prismaDelLocal(await idLocalActual());
 

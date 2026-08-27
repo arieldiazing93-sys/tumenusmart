@@ -7,56 +7,81 @@ import { idLocalActual, listarLocales } from "@/lib/local-actual";
 import { ideaDeLaSemana } from "@/lib/idea-semanal";
 import { SelectorLocal } from "./SelectorLocal";
 import { COOKIE_MENU, NavPanel, type GrupoSecciones } from "@/components/NavPanel";
+import { puede, type Permiso } from "@/lib/permisos";
 
 /**
  * Las secciones, agrupadas por lo que se hace con ellas.
  *
  * El agrupado no es decorativo: "Día a día" es lo que se toca con la cocina
  * llena, y va arriba de todo. Ajustes son cosas que se configuran una vez.
+ *
+ * Cada sección declara qué permiso hace falta para verla, y las que no
+ * corresponden simplemente no se arman. OJO: esto es comodidad, no seguridad
+ * — quien tenga la dirección puede escribirla igual. Lo que de verdad protege
+ * son las guardias de cada pantalla y de cada acción del servidor.
  */
-function armarGrupos(hayIdeaSinVer: boolean, esSuper: boolean): GrupoSecciones[] {
+function armarGrupos(hayIdeaSinVer: boolean, rol: string): GrupoSecciones[] {
+  const conPermiso = (p: Permiso) => puede(rol, p);
+
   const grupos: GrupoSecciones[] = [
     {
       titulo: "Día a día",
       secciones: [
-        { href: "/admin/pedidos", label: "Pedidos", icono: "pedidos" },
-        { href: "/admin/reservas", label: "Reservas", icono: "reservas" },
+        { href: "/admin/pedidos", label: "Pedidos", icono: "pedidos" as const,
+          ver: conPermiso("pedidos.ver") },
+        { href: "/admin/reservas", label: "Reservas", icono: "reservas" as const,
+          ver: conPermiso("reservas.ver") },
+        // Repartidores vive acá y no en Ajustes: se mira durante el servicio,
+        // no una vez al mes.
+        { href: "/admin/repartidores", label: "Repartidores", icono: "repartidores" as const,
+          ver: conPermiso("repartidores.ver") },
       ],
     },
     {
       titulo: "Mi carta",
       secciones: [
-        { href: "/admin/productos", label: "Productos", icono: "productos" },
-        { href: "/admin/categorias", label: "Categorías", icono: "categorias" },
+        { href: "/admin/productos", label: "Productos", icono: "productos" as const,
+          ver: conPermiso("productos.ver") },
+        { href: "/admin/categorias", label: "Categorías", icono: "categorias" as const,
+          ver: conPermiso("categorias.ver") },
       ],
     },
     {
       titulo: "Cómo va el negocio",
       secciones: [
-        { href: "/admin/estadisticas", label: "Estadísticas", icono: "estadisticas" },
-        { href: "/admin/analista", label: "Ideas", aviso: hayIdeaSinVer, icono: "ideas" },
+        { href: "/admin/estadisticas", label: "Estadísticas", icono: "estadisticas" as const,
+          ver: conPermiso("estadisticas.ver") },
+        { href: "/admin/analista", label: "Ideas", icono: "ideas" as const,
+          aviso: hayIdeaSinVer, ver: conPermiso("ideas.ver") },
       ],
     },
     {
       titulo: "Ajustes",
       secciones: [
-        { href: "/admin/configuracion", label: "Configuración", icono: "configuracion" },
-        { href: "/admin/repartidores", label: "Repartidores", icono: "repartidores" },
-        { href: "/admin/mi-cuenta", label: "Mi cuenta", icono: "cuenta" },
+        { href: "/admin/configuracion", label: "Configuración", icono: "configuracion" as const,
+          ver: conPermiso("configuracion.editar") },
+        { href: "/admin/empleados", label: "Empleados", icono: "usuarios" as const,
+          ver: conPermiso("empleados.gestionar") },
+        // Mi cuenta la ve todo el mundo: es donde se cambia la contraseña.
+        { href: "/admin/mi-cuenta", label: "Mi cuenta", icono: "cuenta" as const, ver: true },
+      ],
+    },
+    {
+      titulo: "Administración",
+      secciones: [
+        { href: "/admin/super", label: "Cartera", icono: "cartera" as const,
+          ver: conPermiso("cartera.gestionar") },
+        { href: "/admin/usuarios", label: "Usuarios", icono: "usuarios" as const,
+          ver: conPermiso("usuarios.gestionar") },
       ],
     },
   ];
 
-  if (esSuper) {
-    grupos.push({
-      titulo: "Administración",
-      secciones: [
-        { href: "/admin/super", label: "Cartera", icono: "cartera" },
-        { href: "/admin/usuarios", label: "Usuarios", icono: "usuarios" },
-      ],
-    });
-  }
-  return grupos;
+  // Se sacan las secciones sin permiso, y después los grupos que quedaron
+  // vacíos: un título de sección sin nada abajo se lee como algo roto.
+  return grupos
+    .map((g) => ({ ...g, secciones: g.secciones.filter((s) => s.ver) }))
+    .filter((g) => g.secciones.length > 0);
 }
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -105,7 +130,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
       {/* ---------- barra de arriba ---------- */}
       <header className="sticky top-0 z-40 border-b border-linea bg-papel/90 backdrop-blur print:hidden">
         <div className="mx-auto flex h-14 max-w-[92rem] items-center gap-3 px-4">
-          <NavPanel variante="boton" grupos={armarGrupos(hayIdeaSinVer, esSuper)} />
+          <NavPanel variante="boton" grupos={armarGrupos(hayIdeaSinVer, sesion.rol)} />
 
           <Link
             href="/admin/pedidos"
@@ -163,7 +188,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           <NavPanel
             variante="columna"
             plegadaInicial={menuPlegado}
-            grupos={armarGrupos(hayIdeaSinVer, esSuper)}
+            grupos={armarGrupos(hayIdeaSinVer, sesion.rol)}
           />
         </aside>
 

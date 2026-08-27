@@ -1,5 +1,6 @@
 "use server";
 
+import { exigirPermiso } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 import { idLocalActual } from "@/lib/local-actual";
 import { prismaDelLocal } from "@/lib/prisma-local";
@@ -15,6 +16,7 @@ function parsearCapacidad(valor: FormDataEntryValue | null): number | null {
 }
 
 export async function crearHorario(formData: FormData) {
+  await exigirPermiso("reservas.gestionar");
   // La clave compuesta necesita el local escrito, así que acá se pide aparte.
   const storeId = await idLocalActual();
   const prisma = prismaDelLocal(storeId);
@@ -41,6 +43,7 @@ export async function actualizarCapacidadHorario(
   id: string,
   capacidad: number | null
 ): Promise<void> {
+  await exigirPermiso("reservas.gestionar");
   // Todas las consultas de acá abajo quedan atadas a este local.
   const prisma = prismaDelLocal(await idLocalActual());
 
@@ -54,6 +57,7 @@ export async function actualizarCapacidadHorario(
 }
 
 export async function eliminarHorario(id: string) {
+  await exigirPermiso("reservas.gestionar");
   // Todas las consultas de acá abajo quedan atadas a este local.
   const prisma = prismaDelLocal(await idLocalActual());
 
@@ -62,6 +66,7 @@ export async function eliminarHorario(id: string) {
 }
 
 export async function actualizarEstadoReserva(id: string, estado: string) {
+  await exigirPermiso("reservas.gestionar");
   // Todas las consultas de acá abajo quedan atadas a este local.
   const prisma = prismaDelLocal(await idLocalActual());
 
@@ -71,6 +76,7 @@ export async function actualizarEstadoReserva(id: string, estado: string) {
 }
 
 export async function actualizarNotaReserva(id: string, nota: string) {
+  await exigirPermiso("reservas.gestionar");
   // Todas las consultas de acá abajo quedan atadas a este local.
   const prisma = prismaDelLocal(await idLocalActual());
 

@@ -2,11 +2,17 @@ import { prismaDelLocal } from "@/lib/prisma-local";
 import { idLocalActual } from "@/lib/local-actual";
 import { crearCategoria } from "./actions";
 import { CategoriaFila } from "./CategoriaFila";
+import { sesionActual } from "@/lib/auth";
+import { puede } from "@/lib/permisos";
 import { clasesBoton } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminCategoriasPage() {
+  // El empleado ve las categorías para entender la carta, pero no las toca.
+  const sesion = await sesionActual();
+  const puedeEditar = puede(sesion?.rol, "categorias.editar");
+
   // Todas las consultas de acá abajo quedan atadas a este local.
   const prisma = prismaDelLocal(await idLocalActual());
 
@@ -26,6 +32,7 @@ export default async function AdminCategoriasPage() {
         Movelas con las flechas.
       </p>
 
+      {puedeEditar && (
       <form action={crearCategoria} className="mb-6 flex gap-2">
         <input
           name="nombre"
@@ -40,6 +47,7 @@ export default async function AdminCategoriasPage() {
           Agregar
         </button>
       </form>
+      )}
 
       <div className="flex flex-col gap-2">
         {categorias.map((c, i) => (
@@ -49,6 +57,7 @@ export default async function AdminCategoriasPage() {
             nombre={c.nombre}
             activa={c.activa}
             cantidadProductos={c._count.productos}
+            puedeEditar={puedeEditar}
             esPrimera={i === 0}
             esUltima={i === categorias.length - 1}
           />

@@ -1,5 +1,6 @@
 "use server";
 
+import { exigirPermiso } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { idLocalActual } from "@/lib/local-actual";
@@ -8,6 +9,7 @@ import { moverEnLista, cambiosDeOrden, type Direccion } from "@/lib/ordenar";
 import { subirImagenProducto } from "@/lib/supabase-storage";
 
 export async function subirFotoProducto(formData: FormData): Promise<{ url: string }> {
+  await exigirPermiso("productos.editar");
   const archivo = formData.get("archivo");
   if (!(archivo instanceof File)) {
     throw new Error("No se recibió ninguna imagen");
@@ -46,6 +48,7 @@ function leerCosto(formData: FormData): number | null {
 }
 
 export async function crearProducto(formData: FormData) {
+  await exigirPermiso("productos.editar");
   // Todas las consultas de acá abajo quedan atadas a este local.
   const idLocal = await idLocalActual();
   const prisma = prismaDelLocal(idLocal);
@@ -81,6 +84,7 @@ export async function crearProducto(formData: FormData) {
 }
 
 export async function actualizarProducto(productId: string, formData: FormData) {
+  await exigirPermiso("productos.editar");
   // Todas las consultas de acá abajo quedan atadas a este local.
   const prisma = prismaDelLocal(await idLocalActual());
 
@@ -122,6 +126,7 @@ export async function actualizarProducto(productId: string, formData: FormData) 
 }
 
 export async function eliminarProducto(productId: string) {
+  await exigirPermiso("productos.editar");
   // Todas las consultas de acá abajo quedan atadas a este local.
   const prisma = prismaDelLocal(await idLocalActual());
 
@@ -131,6 +136,7 @@ export async function eliminarProducto(productId: string) {
 }
 
 export async function agregarOpcion(productId: string, formData: FormData) {
+  await exigirPermiso("productos.editar");
   // Todas las consultas de acá abajo quedan atadas a este local.
   const idLocal = await idLocalActual();
   const prisma = prismaDelLocal(idLocal);
@@ -148,6 +154,7 @@ export async function agregarOpcion(productId: string, formData: FormData) {
 }
 
 export async function eliminarOpcion(productId: string, optionId: string) {
+  await exigirPermiso("productos.editar");
   // Todas las consultas de acá abajo quedan atadas a este local.
   const prisma = prismaDelLocal(await idLocalActual());
 
@@ -163,6 +170,7 @@ export async function eliminarOpcion(productId: string, optionId: string) {
  * en categorías, y por los mismos motivos.
  */
 export async function moverProducto(id: string, direccion: Direccion) {
+  await exigirPermiso("productos.editar");
   const prisma = prismaDelLocal(await idLocalActual());
 
   const producto = await prisma.product.findUnique({
@@ -196,6 +204,27 @@ export async function moverProducto(id: string, direccion: Direccion) {
       prisma.product.update({ where: { id: c.id }, data: { orden: c.orden } })
     )
   );
+
+  revalidatePath("/admin/productos");
+  revalidatePath("/[slug]", "layout");
+}
+
+/**
+ * Marcar un producto agotado o disponible, sin abrir el formulario.
+ *
+ * Es la única cosa de la carta que puede tocar un empleado, y existe por lo
+ * que pasa todos los días en el medio del servicio: se acaba la muzzarella.
+ * Si hubiera que entrar a editar el producto, el empleado necesitaría permiso
+ * para cambiar precios — y ahí ya no hay nivel intermedio posible.
+ *
+ * Solo toca esa columna. No puede cambiar precio, nombre ni nada más, aunque
+ * alguien llame a esta acción desde afuera del panel.
+ */
+export async function alternarDisponibleProducto(id: string, disponible: boolean) {
+  await exigirPermiso("productos.disponibilidad");
+  const prisma = prismaDelLocal(await idLocalActual());
+
+  await prisma.product.update({ where: { id }, data: { disponible } });
 
   revalidatePath("/admin/productos");
   revalidatePath("/[slug]", "layout");

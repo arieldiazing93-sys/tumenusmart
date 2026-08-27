@@ -1,3 +1,4 @@
+import { pantallaConPermiso } from "@/lib/auth";
 import Link from "next/link";
 import { prismaDelLocal } from "@/lib/prisma-local";
 import { idLocalActual } from "@/lib/local-actual";
@@ -45,6 +46,8 @@ const TEXTO_CONFIANZA: Record<Confianza, string> = {
 const ORDEN_TIPO: Record<Idea["tipo"], number> = { alerta: 0, oportunidad: 1, dato: 2 };
 
 export default async function AnalistaPage() {
+  await pantallaConPermiso("ideas.ver");
+
   const storeId = await idLocalActual();
   const prisma = prismaDelLocal(storeId);
 

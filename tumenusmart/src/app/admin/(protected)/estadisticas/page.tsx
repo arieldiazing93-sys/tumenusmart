@@ -1,3 +1,4 @@
+import { pantallaConPermiso } from "@/lib/auth";
 import { Cabecera, clasesBoton } from "@/components/ui";
 import Link from "next/link";
 import { formatearGuarani } from "@/lib/format";
@@ -74,6 +75,8 @@ export default async function AdminEstadisticasPage({
 }: {
   searchParams: Promise<{ fecha?: string; desde?: string; hasta?: string }>;
 }) {
+  await pantallaConPermiso("estadisticas.ver");
+
   const { fecha, desde, hasta } = await searchParams;
   const fechaActiva: FiltroFecha = (fecha as FiltroFecha) ?? "30dias";
   const rango =

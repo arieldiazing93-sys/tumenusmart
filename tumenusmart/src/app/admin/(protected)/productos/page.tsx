@@ -6,6 +6,9 @@ import { idLocalActual } from "@/lib/local-actual";
 import { formatearGuarani } from "@/lib/format";
 import { crearProducto, moverProducto } from "./actions";
 import { BotonesMover } from "@/components/BotonesMover";
+import { DisponibleToggle } from "./DisponibleToggle";
+import { sesionActual } from "@/lib/auth";
+import { puede } from "@/lib/permisos";
 import { IngredientesField } from "./IngredientesField";
 import { ImagenProductoField } from "./ImagenProductoField";
 import { GuardadoToast } from "@/components/GuardadoToast";
@@ -17,6 +20,11 @@ export default async function AdminProductosPage({
 }: {
   searchParams: Promise<{ categoria?: string; guardado?: string }>;
 }) {
+  // Qué puede hacer quien entró. El empleado ve la carta y puede marcar algo
+  // agotado, pero no crear, editar ni reordenar.
+  const sesion = await sesionActual();
+  const puedeEditar = puede(sesion?.rol, "productos.editar");
+
   // Todas las consultas de acá abajo quedan atadas a este local.
   const prisma = prismaDelLocal(await idLocalActual());
 
@@ -77,6 +85,7 @@ export default async function AdminProductosPage({
             ))}
           </div>
 
+          {puedeEditar && (
           <details
             open={mantenerFormularioAbierto}
             className="mb-6 rounded-lg border border-linea bg-white p-4"
@@ -139,6 +148,7 @@ export default async function AdminProductosPage({
               </button>
             </form>
           </details>
+          )}
         </>
       )}
 
@@ -163,6 +173,7 @@ export default async function AdminProductosPage({
             key={p.id}
             className="flex items-center gap-3 rounded-lg border border-linea bg-white px-3 py-3"
           >
+            {puedeEditar && (
             <BotonesMover
               id={p.id}
               accion={moverProducto}
@@ -170,6 +181,7 @@ export default async function AdminProductosPage({
               esUltimo={i === productos.length - 1}
               etiqueta={p.nombre}
             />
+            )}
             <Link
               prefetch={false}
               href={`/admin/productos/${p.id}`}
@@ -186,6 +198,7 @@ export default async function AdminProductosPage({
                 {formatearGuarani(Number(p.precio))}
               </span>
             </Link>
+            <DisponibleToggle id={p.id} disponible={p.disponible} nombre={p.nombre} />
           </div>
         ))}
         {categoriaActiva && productos.length === 0 && (

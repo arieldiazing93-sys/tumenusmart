@@ -1,3 +1,5 @@
+import { redirect } from "next/navigation";
+import { puede, type Permiso } from "./permisos";
 import { cookies } from "next/headers";
 import { cache } from "react";
 import { createHmac, randomBytes, scrypt as scryptCallback, timingSafeEqual } from "crypto";
@@ -195,6 +197,42 @@ export async function exigirSuperadmin(): Promise<SesionUsuario> {
   if (sesion.rol !== "superadmin") {
     throw new Error("No tenés permiso para hacer esto");
   }
+  return sesion;
+}
+
+/**
+ * Corta la ejecución si quien entró no tiene ese permiso.
+ *
+ * Esto es el control DE VERDAD. Esconder un botón del menú no protege nada:
+ * una acción del servidor se puede llamar desde afuera del panel, con el
+ * navegador cerrado. Por eso toda acción que escriba en la base tiene que
+ * empezar llamando acá, y no confiar en que la pantalla ya filtró.
+ *
+ * El mensaje de error es a propósito el mismo para todos los casos: no le
+ * decimos a quien está probando qué permiso le falta.
+ */
+export async function exigirPermiso(permiso: Permiso): Promise<SesionUsuario> {
+  const sesion = await sesionObligatoria();
+  if (!puede(sesion.rol, permiso)) {
+    throw new Error("No tenés permiso para hacer esto");
+  }
+  return sesion;
+}
+
+/**
+ * Para las PANTALLAS: si no hay permiso, manda a Pedidos en vez de romper.
+ *
+ * Distinto de `exigirPermiso`, que lanza un error. Acá el error no aporta
+ * nada: alguien escribió una dirección que no le corresponde, probablemente
+ * porque tenía el link guardado de cuando era dueño, o porque probó. Se lo
+ * lleva a la pantalla que sí puede ver.
+ *
+ * Las acciones del servidor NO usan esto: ahí sí hay que cortar.
+ */
+export async function pantallaConPermiso(permiso: Permiso): Promise<SesionUsuario> {
+  const sesion = await sesionActual();
+  if (!sesion) redirect("/admin/login");
+  if (!puede(sesion.rol, permiso)) redirect("/admin/pedidos");
   return sesion;
 }
 

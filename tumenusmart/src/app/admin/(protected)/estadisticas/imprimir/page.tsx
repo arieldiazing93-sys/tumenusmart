@@ -1,3 +1,4 @@
+import { pantallaConPermiso } from "@/lib/auth";
 import { idLocalActual } from "@/lib/local-actual";
 import { calcularRangoFecha, claveDia, type FiltroFecha } from "@/lib/rango-fecha";
 import {
@@ -17,6 +18,8 @@ export default async function ImprimirEstadisticasPage({
 }: {
   searchParams: Promise<{ fecha?: string; desde?: string; hasta?: string }>;
 }) {
+  await pantallaConPermiso("estadisticas.ver");
+
   const { fecha, desde, hasta } = await searchParams;
   const fechaActiva: FiltroFecha = (fecha as FiltroFecha) ?? "30dias";
   const rango =

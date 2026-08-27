@@ -11,6 +11,12 @@ export type Seccion = {
   icono: NombreIcono;
   /** Un punto naranja al lado. Hoy solo lo usa "Ideas". */
   aviso?: boolean;
+  /**
+   * Si quien entró tiene permiso para verla. El layout ya filtra por esto
+   * antes de pasar los grupos; queda en el tipo para que sea imposible armar
+   * una sección sin haberlo pensado.
+   */
+  ver?: boolean;
 };
 
 export type GrupoSecciones = { titulo: string; secciones: Seccion[] };

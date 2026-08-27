@@ -1,5 +1,6 @@
 "use server";
 
+import { exigirPermiso } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
@@ -24,6 +25,7 @@ function refrescarPantallas() {
 }
 
 export async function subirFotoLogo(formData: FormData): Promise<{ url: string }> {
+  await exigirPermiso("configuracion.editar");
   const archivo = formData.get("archivo");
   if (!(archivo instanceof File)) {
     throw new Error("No se recibió ninguna imagen");
@@ -44,6 +46,7 @@ export async function subirFotoLogo(formData: FormData): Promise<{ url: string }
 }
 
 export async function quitarLogoStore(): Promise<void> {
+  await exigirPermiso("configuracion.editar");
   await prisma.store.update({
     where: { id: await idLocalActual() },
     data: { logoUrl: null },
@@ -52,6 +55,7 @@ export async function quitarLogoStore(): Promise<void> {
 }
 
 export async function alternarPausaPedidos(pausado: boolean): Promise<void> {
+  await exigirPermiso("configuracion.editar");
   await prisma.store.update({
     where: { id: await idLocalActual() },
     data: { pedidosPausados: pausado },
@@ -60,6 +64,7 @@ export async function alternarPausaPedidos(pausado: boolean): Promise<void> {
 }
 
 export async function guardarMensajePausa(mensaje: string): Promise<void> {
+  await exigirPermiso("configuracion.editar");
   await prisma.store.update({
     where: { id: await idLocalActual() },
     data: { mensajePausa: mensaje.trim() || null },
@@ -68,6 +73,7 @@ export async function guardarMensajePausa(mensaje: string): Promise<void> {
 }
 
 export async function agregarTramoHorario(formData: FormData) {
+  await exigirPermiso("configuracion.editar");
   const idLocal = await idLocalActual();
   const db = prismaDelLocal(idLocal);
 
@@ -89,6 +95,7 @@ export async function agregarTramoHorario(formData: FormData) {
 }
 
 export async function eliminarTramoHorario(id: string): Promise<void> {
+  await exigirPermiso("configuracion.editar");
   const db = prismaDelLocal(await idLocalActual());
 
   await db.horarioAtencion.delete({ where: { id } });
@@ -98,6 +105,7 @@ export async function eliminarTramoHorario(id: string): Promise<void> {
 }
 
 export async function actualizarStore(formData: FormData) {
+  await exigirPermiso("configuracion.editar");
   const nombre = String(formData.get("nombre") ?? "").trim();
   const whatsappNumero = String(formData.get("whatsappNumero") ?? "").replace(/[^\d]/g, "");
   const envioModo =
@@ -153,6 +161,7 @@ export async function actualizarStore(formData: FormData) {
 }
 
 export async function crearZona(formData: FormData) {
+  await exigirPermiso("configuracion.editar");
   const idLocal = await idLocalActual();
   const db = prismaDelLocal(idLocal);
 
@@ -172,6 +181,7 @@ export async function crearZona(formData: FormData) {
 }
 
 export async function eliminarZona(id: string) {
+  await exigirPermiso("configuracion.editar");
   const db = prismaDelLocal(await idLocalActual());
 
   const pedidosEnZona = await db.order.count({ where: { deliveryZoneId: id } });
@@ -186,6 +196,7 @@ export async function eliminarZona(id: string) {
 }
 
 export async function alternarActivaZona(id: string, activo: boolean) {
+  await exigirPermiso("configuracion.editar");
   const db = prismaDelLocal(await idLocalActual());
 
   await db.deliveryZone.update({ where: { id }, data: { activo } });

@@ -1,11 +1,13 @@
 "use server";
 
+import { exigirPermiso } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 import { idLocalActual } from "@/lib/local-actual";
 import { prismaDelLocal } from "@/lib/prisma-local";
 import { moverEnLista, cambiosDeOrden, type Direccion } from "@/lib/ordenar";
 
 export async function crearCategoria(formData: FormData) {
+  await exigirPermiso("categorias.editar");
   // Todas las consultas de acá abajo quedan atadas a este local.
   const idLocal = await idLocalActual();
   const prisma = prismaDelLocal(idLocal);
@@ -24,6 +26,7 @@ export async function crearCategoria(formData: FormData) {
 }
 
 export async function renombrarCategoria(id: string, nombre: string) {
+  await exigirPermiso("categorias.editar");
   // Todas las consultas de acá abajo quedan atadas a este local.
   const prisma = prismaDelLocal(await idLocalActual());
 
@@ -35,6 +38,7 @@ export async function renombrarCategoria(id: string, nombre: string) {
 }
 
 export async function alternarActivaCategoria(id: string, activa: boolean) {
+  await exigirPermiso("categorias.editar");
   // Todas las consultas de acá abajo quedan atadas a este local.
   const prisma = prismaDelLocal(await idLocalActual());
 
@@ -44,6 +48,7 @@ export async function alternarActivaCategoria(id: string, activa: boolean) {
 }
 
 export async function eliminarCategoria(id: string) {
+  await exigirPermiso("categorias.editar");
   // Todas las consultas de acá abajo quedan atadas a este local.
   const prisma = prismaDelLocal(await idLocalActual());
 
@@ -70,6 +75,7 @@ export async function eliminarCategoria(id: string) {
  * Una carta a medio ordenar sería peor que una desordenada.
  */
 export async function moverCategoria(id: string, direccion: Direccion) {
+  await exigirPermiso("categorias.editar");
   const prisma = prismaDelLocal(await idLocalActual());
 
   // El desempate por createdAt importa: sin él, con órdenes repetidas

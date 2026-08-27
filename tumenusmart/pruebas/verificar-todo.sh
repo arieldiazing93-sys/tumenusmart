@@ -21,17 +21,21 @@ node pruebas/auditoria-colores.mjs || FALLAS=1
 node pruebas/auditoria-content.mjs || FALLAS=1
 
 echo
+echo "── permisos ─────────────────────────────────────────"
+node pruebas/auditoria-permisos.mjs || FALLAS=1
+
+echo
 echo "── contraste ────────────────────────────────────────"
 node pruebas/contraste-estados.mjs || FALLAS=1
 
 echo
 echo "── lógica ────────────────────────────────────────────"
-for modulo in carta ordenar; do
+for modulo in carta ordenar permisos; do
   tsc "src/lib/$modulo.ts" --ignoreConfig --outDir pruebas/compilado --target es2020 \
       --module esnext --moduleResolution bundler --skipLibCheck > /dev/null 2>&1
   mv -f "pruebas/compilado/$modulo.js" "pruebas/compilado/$modulo.mjs"
 done
-for prueba in carta ordenar analista suscripcion filtro-por-local; do
+for prueba in carta ordenar permisos analista suscripcion filtro-por-local; do
   printf "  %-18s " "$prueba"
   node "pruebas/$prueba.mjs" > /tmp/salida.txt 2>&1 && echo "✓ $(grep -oE '[0-9]+ (pruebas pasaron|bien)' /tmp/salida.txt | head -1)" \
     || { echo "✗ FALLÓ"; cat /tmp/salida.txt | tail -5; FALLAS=1; }

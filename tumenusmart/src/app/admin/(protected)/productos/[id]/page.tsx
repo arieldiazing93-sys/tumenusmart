@@ -1,3 +1,4 @@
+import { pantallaConPermiso } from "@/lib/auth";
 import { clasesBoton } from "@/components/ui";
 import { Suspense } from "react";
 import { Volver } from "@/components/Volver";
@@ -18,6 +19,8 @@ export default async function EditarProductoPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  await pantallaConPermiso("productos.editar");
+
   // Todas las consultas de acá abajo quedan atadas a este local.
   const prisma = prismaDelLocal(await idLocalActual());
 

@@ -17,6 +17,7 @@ export function CategoriaFila({
   cantidadProductos,
   esPrimera,
   esUltima,
+  puedeEditar,
 }: {
   id: string;
   nombre: string;
@@ -24,6 +25,8 @@ export function CategoriaFila({
   cantidadProductos: number;
   esPrimera: boolean;
   esUltima: boolean;
+  /** Sin esto la fila es solo lectura: el empleado mira, no toca. */
+  puedeEditar: boolean;
 }) {
   const [pending, startTransition] = useTransition();
   const [editando, setEditando] = useState(false);
@@ -52,7 +55,7 @@ export function CategoriaFila({
       }`}
     >
       <div className="flex items-center justify-between gap-3">
-        {!editando && (
+        {!editando && puedeEditar && (
           <BotonesMover
             id={id}
             accion={moverCategoria}
@@ -105,6 +108,10 @@ export function CategoriaFila({
         {!editando && (
           <div className="flex items-center gap-4 text-sm">
             <span className="text-tinta-media">{cantidadProductos} producto(s)</span>
+            {/* Editar, ocultar y borrar son del dueño. El empleado ve la
+                categoría y cuántos productos tiene, y nada más. */}
+            {puedeEditar && (
+              <>
             <button
               type="button"
               onClick={() => setEditando(true)}
@@ -137,6 +144,8 @@ export function CategoriaFila({
             >
               Borrar
             </button>
+              </>
+            )}
           </div>
         )}
       </div>

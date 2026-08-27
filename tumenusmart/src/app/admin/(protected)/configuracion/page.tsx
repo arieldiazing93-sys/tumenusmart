@@ -1,3 +1,4 @@
+import { pantallaConPermiso } from "@/lib/auth";
 import { Suspense } from "react";
 import Link from "next/link";
 import { prismaDelLocal } from "@/lib/prisma-local";
@@ -15,6 +16,8 @@ import { clasesBoton } from "@/components/ui";
 export const dynamic = "force-dynamic";
 
 export default async function AdminConfiguracionPage() {
+  await pantallaConPermiso("configuracion.editar");
+
   // Todas las consultas de acá abajo quedan atadas a este local.
   const prisma = prismaDelLocal(await idLocalActual());
 

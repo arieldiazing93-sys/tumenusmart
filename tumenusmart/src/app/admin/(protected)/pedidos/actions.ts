@@ -1,5 +1,6 @@
 "use server";
 
+import { exigirPermiso } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 import { prismaDelLocal } from "@/lib/prisma-local";
 import { idLocalActual } from "@/lib/local-actual";
@@ -14,6 +15,7 @@ const ESTADOS_VALIDOS = [
 ];
 
 export async function cambiarEstadoPedido(orderId: string, estado: string) {
+  await exigirPermiso("pedidos.cambiarEstado");
   // Todas las consultas de acá abajo quedan atadas a este local.
   const prisma = prismaDelLocal(await idLocalActual());
 
@@ -39,6 +41,7 @@ export async function cambiarEstadoPedido(orderId: string, estado: string) {
 }
 
 export async function asignarRepartidor(orderId: string, repartidorId: string) {
+  await exigirPermiso("pedidos.asignarRepartidor");
   // Todas las consultas de acá abajo quedan atadas a este local.
   const prisma = prismaDelLocal(await idLocalActual());
 
