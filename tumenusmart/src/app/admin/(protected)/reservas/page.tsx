@@ -1,3 +1,4 @@
+import { BotonEnlace, Cabecera } from "@/components/ui";
 import Link from "next/link";
 import { prismaDelLocal } from "@/lib/prisma-local";
 import { idLocalActual } from "@/lib/local-actual";
@@ -159,15 +160,29 @@ export default async function AdminReservasPage({
 
   return (
     <div>
-      <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-[1.4rem] font-semibold tracking-titular text-tinta">Reservas</h1>
-        <Link
-          href="/admin/reservas/horarios"
-          className="rounded-lg border border-linea px-3 py-1.5 text-sm font-medium text-tinta-media hover:border-brand hover:text-brand"
-        >
-          ⚙ Horarios
-        </Link>
-      </div>
+      <Cabecera
+        titulo="Reservas"
+        bajada="Las mesas pedidas desde la carta. Imprimí el informe del día y dejáselo al encargado de turno."
+        acciones={
+          <>
+            {/*
+              El informe en naranja porque es la acción que se viene a hacer
+              acá; Horarios en azul porque lleva a otra pantalla. Es la misma
+              regla del resto del sistema: naranja avanza, azul navega.
+            */}
+            <BotonEnlace
+              href={`/admin/reservas/imprimir?dia=${vista === "dia" ? diaAncla : hoyClave}`}
+              tono="principal"
+              tam="sm"
+            >
+              Informe del día
+            </BotonEnlace>
+            <BotonEnlace href="/admin/reservas/horarios" tono="navegar" tam="sm">
+              Horarios
+            </BotonEnlace>
+          </>
+        }
+      />
 
       {sinEnviar > 0 && (
         <p className="mb-4 rounded-lg border border-linea bg-papel-suave px-3 py-2 text-xs text-tinta-media">
