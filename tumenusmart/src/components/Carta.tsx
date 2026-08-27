@@ -255,7 +255,14 @@ function FilaProducto({
           </span>
 
           {conFicha ? (
-            <span className="text-[0.72rem] text-tinta-suave">Elegir agregados →</span>
+            // Antes esto era texto gris de 0.72rem con una flechita: se leía
+            // como un comentario al pie y no como algo que se puede tocar.
+            // Ahora es un botón de verdad, del mismo alto que el "+", con
+            // fondo y sin flecha. Quien no ve bien tiene que poder distinguir
+            // qué se toca sin forzar la vista.
+            <span className="flex h-9 flex-none items-center whitespace-nowrap rounded-lg border border-brand/40 bg-brand-light px-3.5 text-[0.82rem] font-semibold text-brand-texto transition-transform active:scale-95">
+              Elegir agregados
+            </span>
           ) : (
             <span
               role="button"
@@ -268,10 +275,10 @@ function FilaProducto({
                   agregarDirecto(e as unknown as React.MouseEvent);
                 }
               }}
-              className={`flex h-8 w-8 flex-none items-center justify-center rounded-lg border text-lg leading-none transition-transform active:scale-90 ${
+              className={`flex h-9 w-9 flex-none items-center justify-center rounded-lg border text-xl leading-none transition-transform active:scale-90 ${
                 late
                   ? "animate-[latir_0.45s_ease] border-brand bg-brand text-white"
-                  : "border-linea bg-white text-tinta"
+                  : "border-brand/40 bg-brand-light text-brand-texto"
               }`}
             >
               +

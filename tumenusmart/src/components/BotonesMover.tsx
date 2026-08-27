@@ -1,6 +1,6 @@
 "use client";
 
-import { useTransition } from "react";
+import { useEffect, useRef, useTransition } from "react";
 import type { Direccion } from "@/lib/ordenar";
 
 /**
@@ -38,6 +38,46 @@ export function BotonesMover({
   etiqueta: string;
 }) {
   const [pendiente, iniciar] = useTransition();
+  const refSubir = useRef<HTMLButtonElement>(null);
+  const refBajar = useRef<HTMLButtonElement>(null);
+  const ultimaDireccion = useRef<Direccion | null>(null);
+
+  /**
+   * Devolver el foco al botón después de mover.
+   *
+   * Cuando la fila llega al extremo, el botón que se acaba de apretar queda
+   * deshabilitado — y un elemento deshabilitado no puede tener el foco, así
+   * que el navegador lo suelta al <body>. Quien ordena su carta con el teclado
+   * pierde el lugar y tiene que volver a tabular desde el principio.
+   *
+   * Se devuelve el foco al mismo botón; si quedó apagado, al de al lado.
+   *
+   * OJO con lo que esto NO arregla: llegué acá creyendo que esta pérdida de
+   * foco era la que hacía saltar la barra de desplazamiento. Medido en
+   * Chromium (pruebas/foco-al-mover.mjs), el scroll no se mueve ni un píxel,
+   * ni antes ni después. Eran dos cosas distintas y solo una era esta.
+   */
+  useEffect(() => {
+    if (pendiente || !ultimaDireccion.current) return;
+
+    const preferido = ultimaDireccion.current === "arriba" ? refSubir : refBajar;
+    const alternativo = ultimaDireccion.current === "arriba" ? refBajar : refSubir;
+    ultimaDireccion.current = null;
+
+    const destino = preferido.current?.disabled ? alternativo.current : preferido.current;
+    // preventScroll: el foco vuelve al botón sin arrastrar la página con él.
+    destino?.focus({ preventScroll: true });
+  }, [pendiente, esPrimero, esUltimo]);
+
+  function mover(direccion: Direccion) {
+    // Mientras se guarda no se acepta otro clic, pero NO se deshabilita el
+    // botón: deshabilitarlo le sacaría el foco al que lo está usando.
+    if (pendiente) return;
+    ultimaDireccion.current = direccion;
+    iniciar(() => {
+      void accion(id, direccion);
+    });
+  }
 
   // Con un solo elemento no hay nada que ordenar.
   if (esPrimero && esUltimo) return null;
@@ -46,22 +86,24 @@ export function BotonesMover({
     "flex h-7 w-7 items-center justify-center rounded border border-linea bg-white text-tinta-media transition-colors hover:border-azul hover:text-azul disabled:cursor-default disabled:border-linea-fina disabled:text-linea disabled:hover:border-linea-fina disabled:hover:text-linea";
 
   return (
-    <div className="flex flex-none items-center gap-1">
+    <div className="flex flex-none items-center gap-1" aria-busy={pendiente}>
       <button
+        ref={refSubir}
         type="button"
         aria-label={`Subir ${etiqueta}`}
-        disabled={esPrimero || pendiente}
-        onClick={() => iniciar(() => { void accion(id, "arriba"); })}
-        className={base}
+        disabled={esPrimero}
+        onClick={() => mover("arriba")}
+        className={`${base} ${pendiente ? "opacity-60" : ""}`}
       >
         <span aria-hidden="true" className="text-[0.7rem] leading-none">▲</span>
       </button>
       <button
+        ref={refBajar}
         type="button"
         aria-label={`Bajar ${etiqueta}`}
-        disabled={esUltimo || pendiente}
-        onClick={() => iniciar(() => { void accion(id, "abajo"); })}
-        className={base}
+        disabled={esUltimo}
+        onClick={() => mover("abajo")}
+        className={`${base} ${pendiente ? "opacity-60" : ""}`}
       >
         <span aria-hidden="true" className="text-[0.7rem] leading-none">▼</span>
       </button>

@@ -29,5 +29,12 @@ for prueba in carta ordenar analista suscripcion filtro-por-local; do
 done
 
 echo
+echo "── navegador (Chromium real) ─────────────────────────"
+printf "  %-18s " "foco-al-mover"
+node pruebas/foco-al-mover.mjs > /tmp/salida.txt 2>&1 \
+  && echo "✓ $(grep -oE '[0-9]+ comprobaciones' /tmp/salida.txt | head -1)" \
+  || { echo "✗ FALLÓ"; tail -5 /tmp/salida.txt; FALLAS=1; }
+
+echo
 [ "$FALLAS" -eq 0 ] && echo "  TODO EN VERDE." || echo "  HAY FALLAS. No entregar."
 exit $FALLAS
