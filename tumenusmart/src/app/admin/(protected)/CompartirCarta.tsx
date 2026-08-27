@@ -61,6 +61,18 @@ export function CompartirCarta({
     return () => window.removeEventListener("keydown", alPresionar);
   }, [abierto]);
 
+  // Mientras la ventana está abierta, la lista de atrás no se mueve. Si se
+  // moviera, la rueda del mouse haría desfilar los pedidos por detrás del velo
+  // y al cerrar uno queda en otro lugar del listado.
+  useEffect(() => {
+    if (!abierto) return;
+    const anterior = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = anterior;
+    };
+  }, [abierto]);
+
   async function copiarLink() {
     setError(null);
     try {
@@ -127,11 +139,14 @@ export function CompartirCarta({
 
       {abierto && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-label={`Compartir la carta de ${nombreNegocio}`}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-noche/50 p-4"
           onClick={() => setAbierto(false)}
         >
           <div
-            className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-2xl bg-white p-6 shadow-xl"
+            className="max-h-[90vh] w-full max-w-md animate-[subir_0.2s_ease-out] overflow-y-auto rounded-2xl border border-linea bg-white p-6 shadow-alta"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="mb-4 flex items-start justify-between gap-3">

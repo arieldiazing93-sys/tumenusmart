@@ -30,10 +30,12 @@ done
 
 echo
 echo "── navegador (Chromium real) ─────────────────────────"
-printf "  %-18s " "foco-al-mover"
-node pruebas/foco-al-mover.mjs > /tmp/salida.txt 2>&1 \
-  && echo "✓ $(grep -oE '[0-9]+ comprobaciones' /tmp/salida.txt | head -1)" \
-  || { echo "✗ FALLÓ"; tail -5 /tmp/salida.txt; FALLAS=1; }
+for prueba in foco-al-mover fixed-dentro-del-panel; do
+  printf "  %-24s " "$prueba"
+  node "pruebas/$prueba.mjs" > /tmp/salida.txt 2>&1 \
+    && echo "✓ $(grep -oE '[0-9]+/[0-9]+' /tmp/salida.txt | tail -1) $(grep -oE '[0-9]+ comprobaciones' /tmp/salida.txt | head -1)" \
+    || { echo "✗ FALLÓ"; tail -6 /tmp/salida.txt; FALLAS=1; }
+done
 
 echo
 [ "$FALLAS" -eq 0 ] && echo "  TODO EN VERDE." || echo "  HAY FALLAS. No entregar."

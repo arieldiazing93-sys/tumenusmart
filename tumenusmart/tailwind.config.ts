@@ -121,11 +121,27 @@ const config: Config = {
           "0%": { transform: "translateX(-100%)" },
           "100%": { transform: "translateX(0)" },
         },
-        // La entrada del contenido al cambiar de sección del panel. Corta a
-        // propósito: quien lo usa está trabajando, no mirando el sistema.
+        /**
+         * La entrada del contenido al cambiar de sección del panel.
+         *
+         * Corta a propósito: quien lo usa está trabajando, no mirando el
+         * sistema.
+         *
+         * OJO — acá NO puede haber transform, y es por una razón que ya rompió
+         * algo. Esta animación termina con `fill-mode: both`, que deja pegado
+         * el estado final para siempre. Un ancestro con transform distinto de
+         * `none` pasa a ser el bloque contenedor de sus hijos `position:
+         * fixed`, así que dejan de medirse contra la pantalla y se miden
+         * contra él. La ventana de "Compartir mi carta" terminaba con 3080px
+         * de alto —todo el largo de la lista de pedidos— y aparecía centrada
+         * al fondo de la página, con el velo oscuro tapando todas las filas.
+         * Medido en Chromium: pruebas/fixed-dentro-del-panel.mjs.
+         *
+         * Con solo opacidad el efecto se mantiene y el transform queda en none.
+         */
         entrarPanel: {
-          "0%": { opacity: "0", transform: "translateY(4px)" },
-          "100%": { opacity: "1", transform: "translateY(0)" },
+          "0%": { opacity: "0" },
+          "100%": { opacity: "1" },
         },
         // El carrito acusando recibo cuando cambia el total.
         saltito: {
