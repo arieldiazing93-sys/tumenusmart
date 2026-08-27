@@ -1,11 +1,12 @@
 "use client";
 
+import { clasesBoton } from "@/components/ui";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { iniciarSesion } from "./actions";
 
 const CAMPO =
-  "w-full rounded-lg border border-neutral-300 px-3 py-2 text-neutral-900 placeholder:text-neutral-400 focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand";
+  "w-full rounded-lg border border-linea px-3 py-2 text-tinta placeholder:text-tinta-suave focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand";
 
 /**
  * Ingreso al panel.
@@ -55,17 +56,17 @@ export function FormularioIngreso() {
   return (
     <form onSubmit={enviar} className="flex flex-col gap-3">
       {error && (
-        <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>
+        <p className="rounded-lg bg-peligro-luz px-3 py-2 text-sm text-peligro">{error}</p>
       )}
 
       {fallos >= 2 && (
-        <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">
+        <p className="rounded-lg bg-aviso-luz px-3 py-2 text-sm text-aviso">
           Si el navegador completó los campos solo, borralos y escribí tu correo y tu
           contraseña a mano. A veces guarda los de otra cuenta.
         </p>
       )}
 
-      <label className="flex flex-col gap-1 text-sm text-neutral-600">
+      <label className="flex flex-col gap-1 text-sm text-tinta-media">
         Correo
         <input
           type="email"
@@ -80,7 +81,7 @@ export function FormularioIngreso() {
         />
       </label>
 
-      <label className="flex flex-col gap-1 text-sm text-neutral-600">
+      <label className="flex flex-col gap-1 text-sm text-tinta-media">
         Contraseña
         <input
           type="password"
@@ -95,7 +96,7 @@ export function FormularioIngreso() {
       <button
         type="submit"
         disabled={pendiente}
-        className="mt-1 rounded-lg bg-brand px-4 py-2 font-medium text-white hover:bg-brand-dark disabled:opacity-60"
+        className={`mt-1 ${clasesBoton("principal")}`}
       >
         {pendiente ? "Entrando..." : "Entrar"}
       </button>

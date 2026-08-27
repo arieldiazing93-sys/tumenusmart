@@ -48,11 +48,11 @@ export function CapacidadField({
         placeholder="Sin límite"
         aria-label="Cupo de personas"
         className={`w-24 rounded-lg border px-2 py-1 text-sm ${
-          error ? "border-red-400" : "border-neutral-300"
+          error ? "border-peligro" : "border-linea"
         }`}
       />
-      {guardado && <span className="text-xs text-green-600">✓</span>}
-      {error && <span className="text-xs text-red-600">error</span>}
+      {guardado && <span className="text-xs text-exito">✓</span>}
+      {error && <span className="text-xs text-peligro">error</span>}
     </span>
   );
 }

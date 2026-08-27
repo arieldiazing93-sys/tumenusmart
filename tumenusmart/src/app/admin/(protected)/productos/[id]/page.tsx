@@ -1,3 +1,4 @@
+import { clasesBoton } from "@/components/ui";
 import { Suspense } from "react";
 import { Volver } from "@/components/Volver";
 import { notFound } from "next/navigation";
@@ -50,7 +51,7 @@ export default async function EditarProductoPage({
         </div>
 
         <div className="mb-4 flex items-center justify-between">
-          <h1 className="text-xl font-bold text-neutral-900">{producto.nombre}</h1>
+          <h1 className="text-[1.4rem] font-semibold tracking-titular text-tinta">{producto.nombre}</h1>
           <EliminarProductoBoton productId={producto.id} />
         </div>
 
@@ -59,19 +60,19 @@ export default async function EditarProductoPage({
             name="nombre"
             required
             defaultValue={producto.nombre}
-            className="rounded-lg border border-neutral-300 px-3 py-2"
+            className="rounded-lg border border-linea px-3 py-2"
           />
           <textarea
             name="descripcion"
             defaultValue={producto.descripcion ?? ""}
             rows={2}
-            className="rounded-lg border border-neutral-300 px-3 py-2"
+            className="rounded-lg border border-linea px-3 py-2"
           />
           <select
             name="categoryId"
             required
             defaultValue={producto.categoryId}
-            className="rounded-lg border border-neutral-300 px-3 py-2"
+            className="rounded-lg border border-linea px-3 py-2"
           >
             {categorias.map((c) => (
               <option key={c.id} value={c.id}>
@@ -79,7 +80,7 @@ export default async function EditarProductoPage({
               </option>
             ))}
           </select>
-          <label className="flex flex-col gap-1 text-sm text-neutral-600">
+          <label className="flex flex-col gap-1 text-sm text-tinta-media">
             Precio de venta
             <input
               type="number"
@@ -88,10 +89,10 @@ export default async function EditarProductoPage({
               step="1"
               min="0"
               defaultValue={Number(producto.precio)}
-              className="rounded-lg border border-neutral-300 px-3 py-2"
+              className="rounded-lg border border-linea px-3 py-2"
             />
           </label>
-          <label className="flex flex-col gap-1 text-sm text-neutral-600">
+          <label className="flex flex-col gap-1 text-sm text-tinta-media">
             Costo (opcional)
             <input
               type="number"
@@ -100,9 +101,9 @@ export default async function EditarProductoPage({
               min="0"
               placeholder="Lo que te cuesta prepararlo"
               defaultValue={producto.costo != null ? Number(producto.costo) : ""}
-              className="rounded-lg border border-neutral-300 px-3 py-2"
+              className="rounded-lg border border-linea px-3 py-2"
             />
-            <span className="text-xs text-neutral-400">
+            <span className="text-xs text-tinta-suave">
               Solo lo ves vos. Con esto, Ideas para vender más puede decirte qué producto
               te deja más ganancia, no solo cuál factura más.
             </span>
@@ -126,11 +127,11 @@ export default async function EditarProductoPage({
           </label>
           <IngredientesField initial={producto.ingredientes} />
 
-          <div className="rounded-lg border border-neutral-200 p-3">
-            <label className="mb-1 block text-sm font-medium text-neutral-700">
+          <div className="rounded-lg border border-linea p-3">
+            <label className="mb-1 block text-sm font-medium text-tinta-media">
               Grupo "mitad y mitad" (opcional)
             </label>
-            <p className="mb-2 text-xs text-neutral-500">
+            <p className="mb-2 text-xs text-tinta-media">
               Escribí un nombre de grupo (ej: "Pizza Grande") para que el cliente pueda
               combinar este producto mitad y mitad con otros del MISMO grupo. Dejalo vacío
               si este producto no se combina.
@@ -139,24 +140,24 @@ export default async function EditarProductoPage({
               name="mitadYMitadGrupo"
               defaultValue={producto.mitadYMitadGrupo ?? ""}
               placeholder="Ej: Pizza Grande"
-              className="mb-2 w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
+              className="mb-2 w-full rounded-lg border border-linea px-3 py-2 text-sm"
             />
             <select
               name="mitadYMitadModo"
               defaultValue={producto.mitadYMitadModo}
-              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
+              className="w-full rounded-lg border border-linea px-3 py-2 text-sm"
             >
               <option value="mayor">Precio mayor (cobra el sabor más caro)</option>
               <option value="proporcional">Precio proporcional (mitad de cada uno)</option>
             </select>
-            <p className="mt-1 text-xs text-neutral-400">
+            <p className="mt-1 text-xs text-tinta-suave">
               Usá el mismo modo en todos los productos de un mismo grupo.
             </p>
           </div>
 
           <button
             type="submit"
-            className="rounded-lg bg-brand px-4 py-2 font-medium text-white hover:bg-brand-dark"
+            className={clasesBoton("principal")}
           >
             Guardar cambios
           </button>
@@ -164,10 +165,10 @@ export default async function EditarProductoPage({
       </div>
 
       <div>
-        <h2 className="mb-3 font-semibold text-neutral-800">
+        <h2 className="mb-3 font-semibold text-tinta">
           Agregados
         </h2>
-        <p className="mb-3 text-sm text-neutral-500">
+        <p className="mb-3 text-sm text-tinta-media">
           Extras que el cliente puede sumar a este producto (ej: borde relleno, extra queso).
         </p>
 
@@ -175,12 +176,12 @@ export default async function EditarProductoPage({
           {producto.opciones.map((o) => (
             <div
               key={o.id}
-              className="flex items-center justify-between rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm"
+              className="flex items-center justify-between rounded-lg border border-linea bg-white px-3 py-2 text-sm"
             >
               <span>
                 {o.nombre}
                 {Number(o.precioExtra) > 0 && (
-                  <span className="text-neutral-400">
+                  <span className="text-tinta-suave">
                     {" "}
                     · +{formatearGuarani(Number(o.precioExtra))}
                   </span>
@@ -190,7 +191,7 @@ export default async function EditarProductoPage({
             </div>
           ))}
           {producto.opciones.length === 0 && (
-            <p className="text-sm text-neutral-400">Sin agregados todavía.</p>
+            <p className="text-sm text-tinta-suave">Sin agregados todavía.</p>
           )}
         </div>
 
@@ -199,7 +200,7 @@ export default async function EditarProductoPage({
             name="nombre"
             required
             placeholder="Nombre (ej: Extra queso, Borde relleno)"
-            className="min-w-[180px] flex-1 rounded-lg border border-neutral-300 px-3 py-2 text-sm"
+            className="min-w-[180px] flex-1 rounded-lg border border-linea px-3 py-2 text-sm"
           />
           <input
             type="number"
@@ -208,11 +209,11 @@ export default async function EditarProductoPage({
             min="0"
             defaultValue={0}
             placeholder="Precio extra"
-            className="w-32 rounded-lg border border-neutral-300 px-3 py-2 text-sm"
+            className="w-32 rounded-lg border border-linea px-3 py-2 text-sm"
           />
           <button
             type="submit"
-            className="rounded-lg bg-neutral-800 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-700"
+            className="rounded-lg bg-noche-panel px-4 py-2 text-sm font-medium text-white hover:bg-noche-panel"
           >
             Agregar
           </button>

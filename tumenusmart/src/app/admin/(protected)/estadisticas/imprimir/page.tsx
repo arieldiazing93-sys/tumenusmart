@@ -68,7 +68,7 @@ export default async function ImprimirEstadisticasPage({
         <ImprimirBoton />
       </div>
 
-      <div className="mb-8 flex items-center gap-4 border-b border-neutral-200 pb-6">
+      <div className="mb-8 flex items-center gap-4 border-b border-linea pb-6">
         {stats.store?.logoUrl && (
           // eslint-disable-next-line @next/next/no-img-element
           <img
@@ -78,13 +78,13 @@ export default async function ImprimirEstadisticasPage({
           />
         )}
         <div>
-          <h1 className="text-2xl font-bold text-neutral-900">
+          <h1 className="text-2xl font-bold text-tinta">
             {stats.store?.nombre ?? "Reporte de estadísticas"}
           </h1>
           {stats.store?.direccion && (
-            <p className="text-sm text-neutral-500">{stats.store.direccion}</p>
+            <p className="text-sm text-tinta-media">{stats.store.direccion}</p>
           )}
-          <p className="mt-1 text-sm text-neutral-500">
+          <p className="mt-1 text-sm text-tinta-media">
             Período: {rango.gte.toLocaleDateString("es-PY", opcionesFecha)} –{" "}
             {finRangoInclusive.toLocaleDateString("es-PY", opcionesFecha)}
           </p>
@@ -94,18 +94,18 @@ export default async function ImprimirEstadisticasPage({
       <table className="mb-10 w-full border-collapse text-sm">
         <tbody>
           {filasKpi.map(([etiqueta, valor]) => (
-            <tr key={etiqueta} className="border-b border-neutral-200">
-              <td className="py-2 text-neutral-600">{etiqueta}</td>
-              <td className="py-2 text-right font-semibold text-neutral-900">{valor}</td>
+            <tr key={etiqueta} className="border-b border-linea">
+              <td className="py-2 text-tinta-media">{etiqueta}</td>
+              <td className="py-2 text-right font-semibold text-tinta">{valor}</td>
             </tr>
           ))}
         </tbody>
       </table>
 
-      <h2 className="mb-3 font-semibold text-neutral-800">Ventas por día</h2>
+      <h2 className="mb-3 font-semibold text-tinta">Ventas por día</h2>
       <table className="w-full border-collapse text-sm">
         <thead>
-          <tr className="border-b border-neutral-300 text-left text-xs uppercase tracking-wide text-neutral-500">
+          <tr className="border-b border-linea text-left text-xs uppercase tracking-wide text-tinta-media">
             <th className="py-1.5">Fecha</th>
             <th className="py-1.5 text-right">Ventas</th>
           </tr>
@@ -114,11 +114,11 @@ export default async function ImprimirEstadisticasPage({
           {stats.dias.map((d) => {
             const clave = claveDia(d);
             return (
-              <tr key={clave} className="border-b border-neutral-100">
-                <td className="py-1.5 text-neutral-600">
+              <tr key={clave} className="border-b border-linea-fina">
+                <td className="py-1.5 text-tinta-media">
                   {d.toLocaleDateString("es-PY", { day: "2-digit", month: "2-digit", timeZone: ZONA_NEGOCIO })}
                 </td>
-                <td className="py-1.5 text-right text-neutral-900">
+                <td className="py-1.5 text-right text-tinta">
                   {formatearGuarani(Math.round(stats.totalesPorDia.get(clave) ?? 0))}
                 </td>
               </tr>
@@ -127,13 +127,13 @@ export default async function ImprimirEstadisticasPage({
         </tbody>
       </table>
 
-      <h2 className="mb-3 mt-10 font-semibold text-neutral-800">Productos más vendidos</h2>
+      <h2 className="mb-3 mt-10 font-semibold text-tinta">Productos más vendidos</h2>
       {ranking.masVendidos.length === 0 ? (
-        <p className="mb-10 text-sm text-neutral-400">Sin ventas en este período.</p>
+        <p className="mb-10 text-sm text-tinta-suave">Sin ventas en este período.</p>
       ) : (
         <table className="mb-10 w-full border-collapse text-sm">
           <thead>
-            <tr className="border-b border-neutral-300 text-left text-xs uppercase tracking-wide text-neutral-500">
+            <tr className="border-b border-linea text-left text-xs uppercase tracking-wide text-tinta-media">
               <th className="py-1.5">#</th>
               <th className="py-1.5">Producto</th>
               <th className="py-1.5 text-right">Unidades</th>
@@ -142,13 +142,13 @@ export default async function ImprimirEstadisticasPage({
           </thead>
           <tbody>
             {ranking.masVendidos.map((fila, i) => (
-              <tr key={fila.nombre} className="border-b border-neutral-100">
-                <td className="py-1.5 text-neutral-400">{i + 1}</td>
-                <td className="py-1.5 text-neutral-800">{fila.nombre}</td>
-                <td className="py-1.5 text-right font-semibold text-neutral-900">
+              <tr key={fila.nombre} className="border-b border-linea-fina">
+                <td className="py-1.5 text-tinta-suave">{i + 1}</td>
+                <td className="py-1.5 text-tinta">{fila.nombre}</td>
+                <td className="py-1.5 text-right font-semibold text-tinta">
                   {fila.unidades}
                 </td>
-                <td className="py-1.5 text-right text-neutral-700">
+                <td className="py-1.5 text-right text-tinta-media">
                   {formatearGuarani(Math.round(fila.facturacion))}
                 </td>
               </tr>
@@ -159,27 +159,27 @@ export default async function ImprimirEstadisticasPage({
 
       {ranking.sinVentas.length > 0 && (
         <div className="mb-10">
-          <h2 className="mb-2 font-semibold text-neutral-800">Sin ventas en el período</h2>
-          <p className="text-sm text-neutral-600">{ranking.sinVentas.join(" · ")}</p>
+          <h2 className="mb-2 font-semibold text-tinta">Sin ventas en el período</h2>
+          <p className="text-sm text-tinta-media">{ranking.sinVentas.join(" · ")}</p>
         </div>
       )}
 
-      <h2 className="mb-3 mt-10 font-semibold text-neutral-800">Reservas</h2>
+      <h2 className="mb-3 mt-10 font-semibold text-tinta">Reservas</h2>
       <table className="mb-10 w-full border-collapse text-sm">
         <tbody>
           {filasKpiReservas.map(([etiqueta, valor]) => (
-            <tr key={etiqueta} className="border-b border-neutral-200">
-              <td className="py-2 text-neutral-600">{etiqueta}</td>
-              <td className="py-2 text-right font-semibold text-neutral-900">{valor}</td>
+            <tr key={etiqueta} className="border-b border-linea">
+              <td className="py-2 text-tinta-media">{etiqueta}</td>
+              <td className="py-2 text-right font-semibold text-tinta">{valor}</td>
             </tr>
           ))}
         </tbody>
       </table>
 
-      <h2 className="mb-3 font-semibold text-neutral-800">Reservas por día</h2>
+      <h2 className="mb-3 font-semibold text-tinta">Reservas por día</h2>
       <table className="w-full border-collapse text-sm">
         <thead>
-          <tr className="border-b border-neutral-300 text-left text-xs uppercase tracking-wide text-neutral-500">
+          <tr className="border-b border-linea text-left text-xs uppercase tracking-wide text-tinta-media">
             <th className="py-1.5">Fecha</th>
             <th className="py-1.5 text-right">Reservas</th>
           </tr>
@@ -188,11 +188,11 @@ export default async function ImprimirEstadisticasPage({
           {statsReservas.dias.map((d) => {
             const clave = claveDia(d);
             return (
-              <tr key={clave} className="border-b border-neutral-100">
-                <td className="py-1.5 text-neutral-600">
+              <tr key={clave} className="border-b border-linea-fina">
+                <td className="py-1.5 text-tinta-media">
                   {d.toLocaleDateString("es-PY", { day: "2-digit", month: "2-digit", timeZone: ZONA_NEGOCIO })}
                 </td>
-                <td className="py-1.5 text-right text-neutral-900">
+                <td className="py-1.5 text-right text-tinta">
                   {statsReservas.totalesPorDia.get(clave) ?? 0}
                 </td>
               </tr>

@@ -1,3 +1,4 @@
+import { clasesBoton } from "@/components/ui";
 import { Suspense } from "react";
 import Link from "next/link";
 import { prismaDelLocal } from "@/lib/prisma-local";
@@ -49,10 +50,10 @@ export default async function AdminProductosPage({
         <GuardadoToast />
       </Suspense>
 
-      <h1 className="mb-6 text-xl font-bold text-neutral-900">Productos</h1>
+      <h1 className="mb-6 text-[1.4rem] font-semibold tracking-titular text-tinta">Productos</h1>
 
       {categorias.length === 0 ? (
-        <p className="mb-6 text-sm text-amber-700">
+        <p className="mb-6 text-sm text-aviso">
           Creá primero una categoría en la sección "Categorías" para poder cargar productos.
         </p>
       ) : (
@@ -65,11 +66,11 @@ export default async function AdminProductosPage({
                 className={`rounded-full border px-3 py-1.5 text-sm font-medium ${
                   categoriaActiva?.id === c.id
                     ? "border-brand bg-brand text-white"
-                    : "border-neutral-300 text-neutral-600 hover:border-brand hover:text-brand"
+                    : "border-linea text-tinta-media hover:border-brand hover:text-brand"
                 }`}
               >
                 {c.nombre}{" "}
-                <span className={categoriaActiva?.id === c.id ? "opacity-80" : "text-neutral-400"}>
+                <span className={categoriaActiva?.id === c.id ? "opacity-80" : "text-tinta-suave"}>
                   ({c._count.productos})
                 </span>
               </Link>
@@ -78,7 +79,7 @@ export default async function AdminProductosPage({
 
           <details
             open={mantenerFormularioAbierto}
-            className="mb-6 rounded-lg border border-neutral-200 bg-white p-4"
+            className="mb-6 rounded-lg border border-linea bg-white p-4"
           >
             <summary className="cursor-pointer font-medium">
               + Nuevo producto
@@ -88,19 +89,19 @@ export default async function AdminProductosPage({
                 name="nombre"
                 required
                 placeholder="Nombre"
-                className="rounded-lg border border-neutral-300 px-3 py-2"
+                className="rounded-lg border border-linea px-3 py-2"
               />
               <textarea
                 name="descripcion"
                 placeholder="Descripción (opcional)"
-                className="rounded-lg border border-neutral-300 px-3 py-2"
+                className="rounded-lg border border-linea px-3 py-2"
                 rows={2}
               />
               <select
                 name="categoryId"
                 required
                 defaultValue={categoriaActiva?.id ?? ""}
-                className="rounded-lg border border-neutral-300 px-3 py-2"
+                className="rounded-lg border border-linea px-3 py-2"
               >
                 <option value="" disabled>
                   Elegí una categoría
@@ -118,7 +119,7 @@ export default async function AdminProductosPage({
                 step="1"
                 min="0"
                 placeholder="Precio (Gs.)"
-                className="rounded-lg border border-neutral-300 px-3 py-2"
+                className="rounded-lg border border-linea px-3 py-2"
               />
               <ImagenProductoField initialUrl={null} />
               <label className="flex items-center gap-2 text-sm">
@@ -132,7 +133,7 @@ export default async function AdminProductosPage({
               <IngredientesField initial={[]} />
               <button
                 type="submit"
-                className="rounded-lg bg-brand px-4 py-2 font-medium text-white hover:bg-brand-dark"
+                className={clasesBoton("principal")}
               >
                 Crear producto
               </button>
@@ -142,13 +143,13 @@ export default async function AdminProductosPage({
       )}
 
       {!categoriaActiva && categorias.length > 0 && (
-        <p className="text-sm text-neutral-400">
+        <p className="text-sm text-tinta-suave">
           Elegí una categoría arriba para ver sus productos.
         </p>
       )}
 
       {categoriaActiva && productos.length > 1 && (
-        <p className="mb-2 text-sm text-neutral-500">
+        <p className="mb-2 text-sm text-tinta-media">
           Este es el orden en que tu cliente ve los productos dentro de "
           {categoriaActiva.nombre}". Movelos con las flechas.
         </p>
@@ -160,7 +161,7 @@ export default async function AdminProductosPage({
           // producto en vez de moverlo.
           <div
             key={p.id}
-            className="flex items-center gap-3 rounded-lg border border-neutral-200 bg-white px-3 py-3"
+            className="flex items-center gap-3 rounded-lg border border-linea bg-white px-3 py-3"
           >
             <BotonesMover
               id={p.id}
@@ -177,7 +178,7 @@ export default async function AdminProductosPage({
                 {p.destacado && <span title="Destacado">⭐ </span>}
                 {p.nombre}{" "}
                 {!p.disponible && (
-                  <span className="text-xs text-neutral-400">(oculto)</span>
+                  <span className="text-xs text-tinta-suave">(oculto)</span>
                 )}
               </p>
               <span className="flex-none font-semibold">
@@ -187,7 +188,7 @@ export default async function AdminProductosPage({
           </div>
         ))}
         {categoriaActiva && productos.length === 0 && (
-          <p className="text-sm text-neutral-400">
+          <p className="text-sm text-tinta-suave">
             Todavía no hay productos en "{categoriaActiva.nombre}".
           </p>
         )}

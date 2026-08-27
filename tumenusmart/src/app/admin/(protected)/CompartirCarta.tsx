@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { generarMatrizQR } from "@/lib/qr";
 import { dibujarPoster, matrizASvg } from "@/lib/poster-qr";
+import { clasesBoton } from "@/components/ui";
 
 type Solapa = "link" | "qr";
 
@@ -119,7 +120,7 @@ export function CompartirCarta({
       <button
         type="button"
         onClick={() => setAbierto(true)}
-        className="inline-flex items-center gap-2 rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-brand-dark"
+        className={clasesBoton("principal")}
       >
         🔗 Compartir mi carta
       </button>
@@ -138,19 +139,19 @@ export function CompartirCarta({
                 <p className="text-[11px] font-bold uppercase tracking-wide text-brand">
                   Comparte tu carta
                 </p>
-                <h2 className="text-xl font-bold text-neutral-900">{nombreNegocio}</h2>
+                <h2 className="text-[1.4rem] font-semibold tracking-titular text-tinta">{nombreNegocio}</h2>
               </div>
               <button
                 type="button"
                 onClick={() => setAbierto(false)}
                 aria-label="Cerrar"
-                className="text-2xl leading-none text-neutral-400 hover:text-neutral-700"
+                className="text-2xl leading-none text-tinta-suave hover:text-tinta-media"
               >
                 ×
               </button>
             </div>
 
-            <div className="mb-5 flex gap-1 rounded-xl bg-neutral-100 p-1">
+            <div className="mb-5 flex gap-1 rounded-xl bg-papel-hundido p-1">
               {SOLAPAS.map((s) => (
                 <button
                   key={s.id}
@@ -158,8 +159,8 @@ export function CompartirCarta({
                   onClick={() => setSolapa(s.id)}
                   className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg px-2 py-2 text-sm font-medium ${
                     solapa === s.id
-                      ? "bg-white text-neutral-900 shadow-sm"
-                      : "text-neutral-500 hover:text-neutral-700"
+                      ? "bg-white text-tinta shadow-sm"
+                      : "text-tinta-media hover:text-tinta-media"
                   }`}
                 >
                   <span aria-hidden>{s.icono}</span>
@@ -170,22 +171,22 @@ export function CompartirCarta({
 
             {solapa === "link" && (
               <div>
-                <h3 className="mb-1 font-semibold text-neutral-900">Tu link público</h3>
-                <p className="mb-4 text-sm text-neutral-500">
+                <h3 className="mb-1 font-semibold text-tinta">Tu link público</h3>
+                <p className="mb-4 text-sm text-tinta-media">
                   Pegalo en tu Instagram, TikTok, Google Maps o donde quieras recibir pedidos.
                 </p>
 
-                <div className="mb-3 flex items-center gap-2 rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-3">
-                  <span aria-hidden className="flex-none text-neutral-400">
+                <div className="mb-3 flex items-center gap-2 rounded-lg border border-linea bg-papel-suave px-3 py-3">
+                  <span aria-hidden className="flex-none text-tinta-suave">
                     🔗
                   </span>
-                  <span className="truncate font-mono text-sm text-neutral-700">{url}</span>
+                  <span className="truncate font-mono text-sm text-tinta-media">{url}</span>
                 </div>
 
                 <button
                   type="button"
                   onClick={copiarLink}
-                  className="mb-3 w-full rounded-xl bg-brand px-4 py-3 font-semibold text-white hover:bg-brand-dark"
+                  className={`mb-3 w-full ${clasesBoton("principal", "lg")}`}
                 >
                   {copiado ? "✓ Link copiado" : "Copiar link"}
                 </button>
@@ -195,14 +196,14 @@ export function CompartirCarta({
                     href={url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex-1 rounded-xl border border-neutral-300 px-4 py-2.5 text-center text-sm font-medium text-neutral-700 hover:border-brand hover:text-brand"
+                    className="flex-1 rounded-xl border border-linea px-4 py-2.5 text-center text-sm font-medium text-tinta-media hover:border-brand hover:text-brand"
                   >
                     Abrir carta ↗
                   </a>
                   <button
                     type="button"
                     onClick={compartirNativo}
-                    className="flex-1 rounded-xl border border-neutral-300 px-4 py-2.5 text-center text-sm font-medium text-neutral-700 hover:border-brand hover:text-brand"
+                    className="flex-1 rounded-xl border border-linea px-4 py-2.5 text-center text-sm font-medium text-tinta-media hover:border-brand hover:text-brand"
                   >
                     Compartir...
                   </button>
@@ -212,13 +213,13 @@ export function CompartirCarta({
 
             {solapa === "qr" && (
               <div>
-                <h3 className="mb-1 font-semibold text-neutral-900">QR para imprimir</h3>
-                <p className="mb-4 text-sm text-neutral-500">
+                <h3 className="mb-1 font-semibold text-tinta">QR para imprimir</h3>
+                <p className="mb-4 text-sm text-tinta-media">
                   Descargá un póster listo para imprimir. Ponelo en la mesa, en el mostrador o
                   en la entrada: el cliente apunta la cámara y entra directo a tu carta.
                 </p>
 
-                <div className="mb-4 flex justify-center rounded-xl border border-neutral-200 bg-brand-light/40 p-6">
+                <div className="mb-4 flex justify-center rounded-xl border border-linea bg-brand-light/40 p-6">
                   {svgQr ? (
                     <div
                       className="rounded-lg bg-white p-3"
@@ -227,7 +228,7 @@ export function CompartirCarta({
                       dangerouslySetInnerHTML={{ __html: svgQr }}
                     />
                   ) : (
-                    <p className="text-sm text-neutral-500">No se pudo generar el QR.</p>
+                    <p className="text-sm text-tinta-media">No se pudo generar el QR.</p>
                   )}
                 </div>
 
@@ -235,11 +236,11 @@ export function CompartirCarta({
                   type="button"
                   onClick={descargarPoster}
                   disabled={descargando || !svgQr}
-                  className="w-full rounded-xl bg-brand px-4 py-3 font-semibold text-white hover:bg-brand-dark disabled:opacity-60"
+                  className={`w-full ${clasesBoton("principal", "lg")}`}
                 >
                   {descargando ? "Generando..." : "Descargar póster PNG"}
                 </button>
-                <p className="mt-2 text-center text-xs text-neutral-400">
+                <p className="mt-2 text-center text-xs text-tinta-suave">
                   Tamaño 1200×1600 px · listo para imprimir en carta u oficio
                 </p>
 
@@ -247,7 +248,7 @@ export function CompartirCarta({
               </div>
             )}
 
-            {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
+            {error && <p className="mt-3 text-sm text-peligro">{error}</p>}
           </div>
         </div>
       )}

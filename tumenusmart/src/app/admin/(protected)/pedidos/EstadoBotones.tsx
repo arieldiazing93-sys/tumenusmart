@@ -52,8 +52,8 @@ export function EstadoBotones({
                 activo
                   ? "border-brand bg-brand text-white"
                   : bloqueado
-                    ? "border-neutral-200 text-neutral-400"
-                    : "border-neutral-300 text-neutral-600 hover:border-brand hover:text-brand"
+                    ? "border-linea text-tinta-suave"
+                    : "border-linea text-tinta-media hover:border-brand hover:text-brand"
               }`}
             >
               {e.emoji} {e.label}
@@ -61,9 +61,9 @@ export function EstadoBotones({
           );
         })}
       </div>
-      {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
+      {error && <p className="mt-2 text-sm text-peligro">{error}</p>}
       {faltaRepartidor && !error && (
-        <p className="mt-2 text-xs text-neutral-400">
+        <p className="mt-2 text-xs text-tinta-suave">
           Este pedido es delivery y todavía no tiene repartidor asignado.
         </p>
       )}

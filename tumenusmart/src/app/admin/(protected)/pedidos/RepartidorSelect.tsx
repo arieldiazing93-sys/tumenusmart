@@ -23,7 +23,7 @@ export function RepartidorSelect({
       onChange={(e) =>
         startTransition(() => asignarRepartidor(orderId, e.target.value))
       }
-      className="rounded-lg border border-neutral-300 px-2 py-1.5 text-sm disabled:opacity-50"
+      className="rounded-lg border border-linea px-2 py-1.5 text-sm disabled:opacity-50"
     >
       <option value="">Sin asignar</option>
       {repartidores.map((r) => (

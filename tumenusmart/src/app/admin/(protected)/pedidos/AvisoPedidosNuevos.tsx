@@ -1,5 +1,6 @@
 "use client";
 
+import { clasesBoton } from "@/components/ui";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
@@ -143,15 +144,15 @@ export function AvisoPedidosNuevos({ enviadosIniciales }: Props) {
         onClick={alternarSonido}
         className={`rounded-lg border px-3 py-1.5 text-sm font-medium ${
           sonidoActivo
-            ? "border-green-300 bg-green-50 text-green-800"
-            : "border-neutral-300 text-neutral-600 hover:border-brand hover:text-brand"
+            ? "border-exito/30 bg-exito-luz text-exito"
+            : "border-linea text-tinta-media hover:border-brand hover:text-brand"
         }`}
       >
         {sonidoActivo ? "🔔 Aviso sonoro activado" : "🔕 Activar aviso sonoro"}
       </button>
 
       {!sonidoActivo && (
-        <span className="text-xs text-neutral-400">
+        <span className="text-xs text-tinta-suave">
           Activalo una vez y esta pantalla te avisa cuando entra un pedido.
         </span>
       )}
@@ -160,7 +161,7 @@ export function AvisoPedidosNuevos({ enviadosIniciales }: Props) {
         <button
           type="button"
           onClick={verNuevos}
-          className="animate-pulse rounded-lg bg-brand px-3 py-1.5 text-sm font-semibold text-white hover:bg-brand-dark"
+          className={`animate-pulse ${clasesBoton("principal", "sm")}`}
         >
           🛎 {nuevos} {nuevos === 1 ? "pedido nuevo" : "pedidos nuevos"} — ver
         </button>

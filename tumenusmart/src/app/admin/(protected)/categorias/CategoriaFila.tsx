@@ -8,6 +8,7 @@ import {
   moverCategoria,
 } from "./actions";
 import { BotonesMover } from "@/components/BotonesMover";
+import { clasesBoton } from "@/components/ui";
 
 export function CategoriaFila({
   id,
@@ -47,7 +48,7 @@ export function CategoriaFila({
   return (
     <div
       className={`rounded-lg border bg-white px-4 py-3 ${
-        activa ? "border-neutral-200" : "border-neutral-200 opacity-60"
+        activa ? "border-linea" : "border-linea opacity-60"
       }`}
     >
       <div className="flex items-center justify-between gap-3">
@@ -67,13 +68,13 @@ export function CategoriaFila({
               autoFocus
               value={nombreEditado}
               onChange={(e) => setNombreEditado(e.target.value)}
-              className="flex-1 rounded-lg border border-neutral-300 px-2 py-1 text-sm"
+              className="flex-1 rounded-lg border border-linea px-2 py-1 text-sm"
             />
             <button
               type="button"
               disabled={pending}
               onClick={guardarNombre}
-              className="rounded-lg bg-brand px-3 py-1 text-sm font-medium text-white hover:bg-brand-dark disabled:opacity-50"
+              className={clasesBoton("principal", "sm")}
             >
               Guardar
             </button>
@@ -84,7 +85,7 @@ export function CategoriaFila({
                 setEditando(false);
                 setError(null);
               }}
-              className="text-sm text-neutral-500 hover:underline"
+              className="text-sm text-tinta-media hover:underline"
             >
               Cancelar
             </button>
@@ -93,21 +94,21 @@ export function CategoriaFila({
           <span className="font-medium">
             {nombre}
             {!activa && (
-              <span className="ml-2 text-xs font-normal text-neutral-400">(oculta)</span>
+              <span className="ml-2 text-xs font-normal text-tinta-suave">(oculta)</span>
             )}
             {guardado && (
-              <span className="ml-2 text-xs font-normal text-green-600">✓ Guardado</span>
+              <span className="ml-2 text-xs font-normal text-exito">✓ Guardado</span>
             )}
           </span>
         )}
 
         {!editando && (
           <div className="flex items-center gap-4 text-sm">
-            <span className="text-neutral-500">{cantidadProductos} producto(s)</span>
+            <span className="text-tinta-media">{cantidadProductos} producto(s)</span>
             <button
               type="button"
               onClick={() => setEditando(true)}
-              className="text-neutral-600 hover:underline"
+              className="text-tinta-media hover:underline"
             >
               Editar
             </button>
@@ -115,7 +116,7 @@ export function CategoriaFila({
               type="button"
               disabled={pending}
               onClick={() => startTransition(() => alternarActivaCategoria(id, !activa))}
-              className="text-neutral-600 hover:underline disabled:opacity-50"
+              className="text-tinta-media hover:underline disabled:opacity-50"
             >
               {activa ? "Ocultar" : "Mostrar"}
             </button>
@@ -132,14 +133,14 @@ export function CategoriaFila({
                   }
                 });
               }}
-              className="text-red-500 hover:underline disabled:opacity-50"
+              className="text-peligro hover:underline disabled:opacity-50"
             >
               Borrar
             </button>
           </div>
         )}
       </div>
-      {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
+      {error && <p className="mt-1 text-xs text-peligro">{error}</p>}
     </div>
   );
 }

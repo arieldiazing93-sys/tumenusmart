@@ -1,10 +1,11 @@
 "use client";
 
+import { clasesBoton } from "@/components/ui";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { cambiarMiPassword } from "./actions";
 
 const CAMPO =
-  "w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand";
+  "w-full rounded-lg border border-linea px-3 py-2 text-sm focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand";
 
 /**
  * Cambio de contraseña.
@@ -69,21 +70,21 @@ export function FormularioPassword() {
       ref={formRef}
       onSubmit={enviar}
       autoComplete="off"
-      className="flex flex-col gap-3 rounded-lg border border-neutral-200 bg-white p-4"
+      className="flex flex-col gap-3 rounded-lg border border-linea bg-white p-4"
     >
-      <h2 className="text-sm font-semibold text-neutral-800">Cambiar mi contraseña</h2>
+      <h2 className="text-sm font-semibold text-tinta">Cambiar mi contraseña</h2>
 
       {listo && (
-        <p className="rounded-lg bg-green-50 px-3 py-2 text-sm text-green-700">
+        <p className="rounded-lg bg-exito-luz px-3 py-2 text-sm text-exito">
           Listo, tu contraseña quedó cambiada. La próxima vez entrá con la nueva.
         </p>
       )}
 
       {error && (
-        <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>
+        <p className="rounded-lg bg-peligro-luz px-3 py-2 text-sm text-peligro">{error}</p>
       )}
 
-      <label className="flex flex-col gap-1 text-sm text-neutral-600">
+      <label className="flex flex-col gap-1 text-sm text-tinta-media">
         Contraseña actual
         <input
           type="password"
@@ -94,12 +95,12 @@ export function FormularioPassword() {
           required
           className={CAMPO}
         />
-        <span className="text-xs text-neutral-400">
+        <span className="text-xs text-tinta-suave">
           La que usás ahora para entrar. Si te la dimos nosotros, es esa.
         </span>
       </label>
 
-      <label className="flex flex-col gap-1 text-sm text-neutral-600">
+      <label className="flex flex-col gap-1 text-sm text-tinta-media">
         Contraseña nueva
         <input
           type="password"
@@ -110,12 +111,12 @@ export function FormularioPassword() {
           required
           className={CAMPO}
         />
-        <span className="text-xs text-neutral-400">
+        <span className="text-xs text-tinta-suave">
           Al menos 8 caracteres, con letras y números.
         </span>
       </label>
 
-      <label className="flex flex-col gap-1 text-sm text-neutral-600">
+      <label className="flex flex-col gap-1 text-sm text-tinta-media">
         Repetila
         <input
           type="password"
@@ -131,7 +132,7 @@ export function FormularioPassword() {
       <button
         type="submit"
         disabled={pendiente}
-        className="mt-1 self-start rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-dark disabled:opacity-50"
+        className={`mt-1 self-start ${clasesBoton("principal")}`}
       >
         {pendiente ? "Guardando..." : "Guardar"}
       </button>

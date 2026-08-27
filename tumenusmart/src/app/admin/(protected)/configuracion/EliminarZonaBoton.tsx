@@ -26,7 +26,7 @@ export function EliminarZonaBoton({ id, activo }: { id: string; activo: boolean 
           type="button"
           disabled={pending}
           onClick={() => startTransition(() => alternarActivaZona(id, !activo))}
-          className="text-sm text-neutral-600 hover:underline disabled:opacity-50"
+          className="text-sm text-tinta-media hover:underline disabled:opacity-50"
         >
           {activo ? "Desactivar" : "Activar"}
         </button>
@@ -34,12 +34,12 @@ export function EliminarZonaBoton({ id, activo }: { id: string; activo: boolean 
           type="button"
           disabled={pending}
           onClick={borrar}
-          className="text-sm text-red-500 hover:underline disabled:opacity-50"
+          className="text-sm text-peligro hover:underline disabled:opacity-50"
         >
           Borrar
         </button>
       </div>
-      {error && <p className="max-w-xs text-right text-xs text-red-600">{error}</p>}
+      {error && <p className="max-w-xs text-right text-xs text-peligro">{error}</p>}
     </div>
   );
 }

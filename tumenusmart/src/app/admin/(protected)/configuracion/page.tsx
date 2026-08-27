@@ -10,6 +10,7 @@ import { LogoField } from "./LogoField";
 import { GuardadoToast } from "@/components/GuardadoToast";
 import { PausaPedidosToggle } from "../PausaPedidosToggle";
 import { NOMBRES_DIA, DIAS_ORDENADOS, resumenDia } from "@/lib/horario-atencion";
+import { clasesBoton } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
@@ -33,25 +34,25 @@ export default async function AdminConfiguracionPage() {
       </Suspense>
 
       <div>
-        <h1 className="mb-4 text-xl font-bold text-neutral-900">Disponibilidad</h1>
+        <h1 className="mb-4 text-[1.4rem] font-semibold tracking-titular text-tinta">Disponibilidad</h1>
         <div className="flex flex-col gap-4">
           <PausaPedidosToggle
             pausado={store?.pedidosPausados ?? false}
             mensaje={store?.mensajePausa ?? null}
           />
 
-          <div className="rounded-lg border border-neutral-200 bg-white p-4">
+          <div className="rounded-lg border border-linea bg-white p-4">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-              <p className="font-medium text-neutral-900">Horario de atención</p>
+              <p className="font-medium text-tinta">Horario de atención</p>
               <Link
                 href="/admin/configuracion/horarios"
-                className="rounded-lg border border-neutral-300 px-3 py-1.5 text-sm font-medium text-neutral-600 hover:border-brand hover:text-brand"
+                className="rounded-lg border border-linea px-3 py-1.5 text-sm font-medium text-tinta-media hover:border-brand hover:text-brand"
               >
                 Editar horarios
               </Link>
             </div>
             {horarios.length === 0 ? (
-              <p className="text-sm text-neutral-500">
+              <p className="text-sm text-tinta-media">
                 Sin horarios cargados — el menú acepta pedidos a cualquier hora.
               </p>
             ) : (
@@ -60,12 +61,12 @@ export default async function AdminConfiguracionPage() {
                   const texto = resumenDia(horarios, dia);
                   return (
                     <div key={dia} className="flex justify-between gap-3 py-0.5">
-                      <span className="text-neutral-600">{NOMBRES_DIA[dia]}</span>
+                      <span className="text-tinta-media">{NOMBRES_DIA[dia]}</span>
                       <span
                         className={
                           texto === "Cerrado"
-                            ? "text-neutral-400"
-                            : "font-medium text-neutral-900"
+                            ? "text-tinta-suave"
+                            : "font-medium text-tinta"
                         }
                       >
                         {texto}
@@ -80,73 +81,73 @@ export default async function AdminConfiguracionPage() {
       </div>
 
       <div>
-        <h1 className="mb-4 text-xl font-bold text-neutral-900">Datos del negocio</h1>
+        <h1 className="mb-4 text-[1.4rem] font-semibold tracking-titular text-tinta">Datos del negocio</h1>
         <form action={actualizarStore} className="flex flex-col gap-3">
           <div>
-            <label className="mb-1 block text-sm font-medium text-neutral-700">
+            <label className="mb-1 block text-sm font-medium text-tinta-media">
               Nombre del negocio
             </label>
             <input
               name="nombre"
               required
               defaultValue={store?.nombre ?? ""}
-              className="w-full rounded-lg border border-neutral-300 px-3 py-2"
+              className="w-full rounded-lg border border-linea px-3 py-2"
             />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-neutral-700">
+            <label className="mb-1 block text-sm font-medium text-tinta-media">
               Número de WhatsApp (formato internacional, sin +, ej: 595981234567)
             </label>
             <input
               name="whatsappNumero"
               required
               defaultValue={store?.whatsappNumero ?? ""}
-              className="w-full rounded-lg border border-neutral-300 px-3 py-2"
+              className="w-full rounded-lg border border-linea px-3 py-2"
             />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-neutral-700">
+            <label className="mb-1 block text-sm font-medium text-tinta-media">
               Dirección (opcional)
             </label>
             <input
               name="direccion"
               defaultValue={store?.direccion ?? ""}
-              className="w-full rounded-lg border border-neutral-300 px-3 py-2"
+              className="w-full rounded-lg border border-linea px-3 py-2"
             />
           </div>
           <LogoField initialUrl={store?.logoUrl ?? null} />
           <div>
-            <label className="mb-1 block text-sm font-medium text-neutral-700">
+            <label className="mb-1 block text-sm font-medium text-tinta-media">
               Saludo del mensaje de WhatsApp — pedidos (opcional)
             </label>
             <input
               name="mensajeSaludo"
               defaultValue={store?.mensajeSaludo ?? ""}
               placeholder="Ej: ¡Hola! Te paso mi pedido:"
-              className="w-full rounded-lg border border-neutral-300 px-3 py-2"
+              className="w-full rounded-lg border border-linea px-3 py-2"
             />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-neutral-700">
+            <label className="mb-1 block text-sm font-medium text-tinta-media">
               Saludo del mensaje de WhatsApp — reservas (opcional)
             </label>
             <input
               name="mensajeSaludoReserva"
               defaultValue={store?.mensajeSaludoReserva ?? ""}
               placeholder="Ej: ¡Hola! Te paso mi reserva:"
-              className="w-full rounded-lg border border-neutral-300 px-3 py-2"
+              className="w-full rounded-lg border border-linea px-3 py-2"
             />
           </div>
 
-          <div className="mt-2 border-t border-neutral-200 pt-4">
-            <label className="mb-1 block text-sm font-medium text-neutral-700">
+          <div className="mt-2 border-t border-linea pt-4">
+            <label className="mb-1 block text-sm font-medium text-tinta-media">
               Costo de envío
             </label>
-            <p className="mb-2 text-xs text-neutral-500">
+            <p className="mb-2 text-xs text-tinta-media">
               Elegí cómo querés manejar el precio del delivery en este negocio.
             </p>
             <div className="flex flex-col gap-2">
-              <label className="flex items-start gap-2 rounded-lg border border-neutral-300 p-3 text-sm has-[:checked]:border-brand has-[:checked]:bg-brand-light">
+              <label className="flex items-start gap-2 rounded-lg border border-linea p-3 text-sm has-[:checked]:border-brand has-[:checked]:bg-brand-light">
                 <input
                   type="radio"
                   name="envioModo"
@@ -157,13 +158,13 @@ export default async function AdminConfiguracionPage() {
                 <span>
                   <span className="font-medium">Por zonas con precio automático</span>
                   <br />
-                  <span className="text-neutral-500">
+                  <span className="text-tinta-media">
                     Definís radios de distancia desde tu local, cada uno con su precio. El
                     cliente lo ve calculado automáticamente al marcar su ubicación.
                   </span>
                 </span>
               </label>
-              <label className="flex items-start gap-2 rounded-lg border border-neutral-300 p-3 text-sm has-[:checked]:border-brand has-[:checked]:bg-brand-light">
+              <label className="flex items-start gap-2 rounded-lg border border-linea p-3 text-sm has-[:checked]:border-brand has-[:checked]:bg-brand-light">
                 <input
                   type="radio"
                   name="envioModo"
@@ -174,7 +175,7 @@ export default async function AdminConfiguracionPage() {
                 <span>
                   <span className="font-medium">Lo coordino yo directamente</span>
                   <br />
-                  <span className="text-neutral-500">
+                  <span className="text-tinta-media">
                     El cliente marca su ubicación en el mapa, pero el precio del envío lo
                     definís vos por WhatsApp, caso por caso.
                   </span>
@@ -183,16 +184,16 @@ export default async function AdminConfiguracionPage() {
             </div>
           </div>
 
-          <div className="mt-2 border-t border-neutral-200 pt-4">
-            <label className="mb-1 block text-sm font-medium text-neutral-700">
+          <div className="mt-2 border-t border-linea pt-4">
+            <label className="mb-1 block text-sm font-medium text-tinta-media">
               Cómo se ve tu carta
             </label>
-            <p className="mb-2 text-xs text-neutral-500">
+            <p className="mb-2 text-xs text-tinta-media">
               Depende de tus fotos. Si son de celular, la lista las disimula. Si son
               profesionales, mostralas grandes: ahí la foto es la que vende.
             </p>
             <div className="grid gap-2 sm:grid-cols-2">
-              <label className="flex cursor-pointer items-start gap-2 rounded-lg border border-neutral-300 p-3 text-sm has-[:checked]:border-brand has-[:checked]:bg-brand-light">
+              <label className="flex cursor-pointer items-start gap-2 rounded-lg border border-linea p-3 text-sm has-[:checked]:border-brand has-[:checked]:bg-brand-light">
                 <input
                   type="radio"
                   name="estiloCarta"
@@ -203,13 +204,13 @@ export default async function AdminConfiguracionPage() {
                 <span>
                   <span className="font-medium">Lista compacta</span>
                   <br />
-                  <span className="text-neutral-500">
+                  <span className="text-tinta-media">
                     Foto chica al costado. Entran muchos productos en una pantalla y se
                     recorre rápido. Es la opción segura.
                   </span>
                 </span>
               </label>
-              <label className="flex cursor-pointer items-start gap-2 rounded-lg border border-neutral-300 p-3 text-sm has-[:checked]:border-brand has-[:checked]:bg-brand-light">
+              <label className="flex cursor-pointer items-start gap-2 rounded-lg border border-linea p-3 text-sm has-[:checked]:border-brand has-[:checked]:bg-brand-light">
                 <input
                   type="radio"
                   name="estiloCarta"
@@ -220,7 +221,7 @@ export default async function AdminConfiguracionPage() {
                 <span>
                   <span className="font-medium">Tarjetas con foto grande</span>
                   <br />
-                  <span className="text-neutral-500">
+                  <span className="text-tinta-media">
                     La foto ocupa todo el ancho. Elegila solo si TODOS tus productos
                     tienen buena foto: una mala se nota el triple.
                   </span>
@@ -241,7 +242,7 @@ export default async function AdminConfiguracionPage() {
 
           <button
             type="submit"
-            className="self-start rounded-lg bg-brand px-4 py-2 font-medium text-white hover:bg-brand-dark"
+            className={`self-start ${clasesBoton("principal")}`}
           >
             Guardar
           </button>
@@ -249,8 +250,8 @@ export default async function AdminConfiguracionPage() {
       </div>
 
       <div>
-        <h2 className="mb-1 text-xl font-bold text-neutral-900">Zonas de envío</h2>
-        <p className="mb-4 text-sm text-neutral-500">
+        <h2 className="mb-1 text-[1.4rem] font-semibold tracking-titular text-tinta">Zonas de envío</h2>
+        <p className="mb-4 text-sm text-tinta-media">
           Solo aplican si arriba elegiste "Por zonas con precio automático". Cargalas de
           menor a mayor radio — cada una es "hasta X km desde el local".
         </p>
@@ -260,7 +261,7 @@ export default async function AdminConfiguracionPage() {
             name="nombre"
             required
             placeholder="Nombre (ej: Zona 1)"
-            className="min-w-[140px] flex-1 rounded-lg border border-neutral-300 px-3 py-2"
+            className="min-w-[140px] flex-1 rounded-lg border border-linea px-3 py-2"
           />
           <input
             type="number"
@@ -269,7 +270,7 @@ export default async function AdminConfiguracionPage() {
             step="0.1"
             min="0.1"
             placeholder="Radio (km)"
-            className="w-32 rounded-lg border border-neutral-300 px-3 py-2"
+            className="w-32 rounded-lg border border-linea px-3 py-2"
           />
           <input
             type="number"
@@ -278,11 +279,11 @@ export default async function AdminConfiguracionPage() {
             step="1"
             min="0"
             placeholder="Costo (Gs.)"
-            className="w-36 rounded-lg border border-neutral-300 px-3 py-2"
+            className="w-36 rounded-lg border border-linea px-3 py-2"
           />
           <button
             type="submit"
-            className="rounded-lg bg-neutral-800 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-700"
+            className="rounded-lg bg-noche-panel px-4 py-2 text-sm font-medium text-white hover:bg-noche-panel"
           >
             Agregar
           </button>
@@ -292,18 +293,18 @@ export default async function AdminConfiguracionPage() {
           {zonas.map((z) => (
             <div
               key={z.id}
-              className={`flex items-center justify-between rounded-lg border border-neutral-200 bg-white px-4 py-2 ${
+              className={`flex items-center justify-between rounded-lg border border-linea bg-white px-4 py-2 ${
                 z.activo ? "" : "opacity-60"
               }`}
             >
               <span>
-                {z.nombre} <span className="text-neutral-400">— hasta {Number(z.radioKm)} km</span>
+                {z.nombre} <span className="text-tinta-suave">— hasta {Number(z.radioKm)} km</span>
                 {!z.activo && (
-                  <span className="ml-2 text-xs font-normal text-neutral-400">(inactiva)</span>
+                  <span className="ml-2 text-xs font-normal text-tinta-suave">(inactiva)</span>
                 )}
               </span>
               <div className="flex items-center gap-4">
-                <span className="text-sm text-neutral-500">
+                <span className="text-sm text-tinta-media">
                   {formatearGuarani(Number(z.costoEnvio))}
                 </span>
                 <EliminarZonaBoton id={z.id} activo={z.activo} />
@@ -311,7 +312,7 @@ export default async function AdminConfiguracionPage() {
             </div>
           ))}
           {zonas.length === 0 && (
-            <p className="text-sm text-neutral-400">Todavía no cargaste ninguna zona.</p>
+            <p className="text-sm text-tinta-suave">Todavía no cargaste ninguna zona.</p>
           )}
         </div>
       </div>

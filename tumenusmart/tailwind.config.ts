@@ -116,6 +116,17 @@ const config: Config = {
           "35%": { transform: "scale(1.28)" },
           "100%": { transform: "scale(1)" },
         },
+        // El cajón del menú entrando desde el costado, en el celular.
+        entrarIzquierda: {
+          "0%": { transform: "translateX(-100%)" },
+          "100%": { transform: "translateX(0)" },
+        },
+        // La entrada del contenido al cambiar de sección del panel. Corta a
+        // propósito: quien lo usa está trabajando, no mirando el sistema.
+        entrarPanel: {
+          "0%": { opacity: "0", transform: "translateY(4px)" },
+          "100%": { opacity: "1", transform: "translateY(0)" },
+        },
         // El carrito acusando recibo cuando cambia el total.
         saltito: {
           "0%": { transform: "scale(1)" },
@@ -126,6 +137,7 @@ const config: Config = {
       animation: {
         "destacado-entrada": "destacado-entrada 0.5s ease-out",
         subir: "subir 0.62s cubic-bezier(0.22,0.7,0.3,1) both",
+        panel: "entrarPanel 0.18s ease-out both",
       },
     },
   },

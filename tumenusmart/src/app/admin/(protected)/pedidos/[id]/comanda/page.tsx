@@ -51,7 +51,7 @@ export default async function ComandaPage({
         <ImprimirAuto />
 
         <div className="border-y-4 border-double border-black py-2 text-center">
-          <p className="text-lg font-bold tracking-widest">COMANDA</p>
+          <p className="text-[1.1rem] font-semibold tracking-titular tracking-widest">COMANDA</p>
           <p className="text-3xl font-bold leading-tight">
             {formatearNumero(pedido.numero)}
           </p>
@@ -65,7 +65,7 @@ export default async function ComandaPage({
         <ul className="divide-y divide-dashed divide-black">
           {pedido.items.map((item) => (
             <li key={item.id} className="py-2.5">
-              <p className="text-xl font-bold uppercase leading-tight">
+              <p className="text-[1.4rem] font-semibold tracking-titular uppercase leading-tight">
                 {item.cantidad} x {item.nombreProducto}
               </p>
               {item.opcionesTexto && (

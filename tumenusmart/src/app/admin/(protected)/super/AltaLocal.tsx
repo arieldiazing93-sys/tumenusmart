@@ -1,11 +1,12 @@
 "use client";
 
+import { clasesBoton } from "@/components/ui";
 import { useState, useTransition } from "react";
 import { crearLocal, type ResultadoAlta } from "./actions";
 import { PLANTILLAS, contarProductos } from "@/lib/plantillas-menu";
 
 const CAMPO =
-  "w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand";
+  "w-full rounded-lg border border-linea px-3 py-2 text-sm focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand";
 
 export function AltaLocal({ dominio }: { dominio: string }) {
   const [pendiente, iniciar] = useTransition();
@@ -40,23 +41,23 @@ export function AltaLocal({ dominio }: { dominio: string }) {
       `Te recomiendo cambiar la contraseña apenas entres, desde Mi cuenta.`;
 
     return (
-      <div className="rounded-lg border-2 border-green-300 bg-green-50/60 p-4">
-        <h3 className="font-semibold text-green-900">
+      <div className="rounded-lg border-2 border-exito/30 bg-exito-luz/60 p-4">
+        <h3 className="font-semibold text-exito">
           {local.nombre} quedó creado
         </h3>
 
-        <div className="mt-3 rounded-lg border border-green-200 bg-white p-3 font-mono text-sm">
-          <p className="text-neutral-500">Carta pública</p>
-          <p className="mb-2 font-medium text-neutral-900">{url}</p>
-          <p className="text-neutral-500">Usuario</p>
-          <p className="mb-2 font-medium text-neutral-900">{acceso.email}</p>
-          <p className="text-neutral-500">Contraseña</p>
-          <p className="text-lg font-bold tracking-wide text-neutral-900">
+        <div className="mt-3 rounded-lg border border-exito/25 bg-white p-3 font-mono text-sm">
+          <p className="text-tinta-media">Carta pública</p>
+          <p className="mb-2 font-medium text-tinta">{url}</p>
+          <p className="text-tinta-media">Usuario</p>
+          <p className="mb-2 font-medium text-tinta">{acceso.email}</p>
+          <p className="text-tinta-media">Contraseña</p>
+          <p className="text-[1.1rem] font-semibold tracking-titular tracking-wide text-tinta">
             {acceso.password}
           </p>
         </div>
 
-        <p className="mt-2 text-sm font-medium text-amber-800">
+        <p className="mt-2 text-sm font-medium text-aviso">
           Copiala ahora: no se puede volver a ver. Si se pierde, se la restablecés desde
           Usuarios.
         </p>
@@ -70,14 +71,14 @@ export function AltaLocal({ dominio }: { dominio: string }) {
                 () => setCopiado(false)
               );
             }}
-            className="rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-dark"
+            className={clasesBoton("principal")}
           >
             {copiado ? "Copiado ✓" : "Copiar el mensaje para el cliente"}
           </button>
           <button
             type="button"
             onClick={() => setResultado(null)}
-            className="rounded-lg border border-neutral-300 px-4 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50"
+            className="rounded-lg border border-linea px-4 py-2 text-sm font-medium text-tinta-media hover:bg-papel-suave"
           >
             Crear otro local
           </button>
@@ -89,33 +90,33 @@ export function AltaLocal({ dominio }: { dominio: string }) {
   return (
     <form action={enviar} className="grid gap-3 sm:grid-cols-2">
       {resultado?.error && (
-        <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 sm:col-span-2">
+        <p className="rounded-lg bg-peligro-luz px-3 py-2 text-sm text-peligro sm:col-span-2">
           {resultado.error}
         </p>
       )}
 
-      <label className="flex flex-col gap-1 text-sm text-neutral-600">
+      <label className="flex flex-col gap-1 text-sm text-tinta-media">
         Nombre del negocio
         <input name="nombre" required placeholder="Mas Pizza" className={CAMPO} />
       </label>
 
-      <label className="flex flex-col gap-1 text-sm text-neutral-600">
+      <label className="flex flex-col gap-1 text-sm text-tinta-media">
         Dirección de la carta
         <input name="slug" placeholder="maspizza" className={CAMPO} />
-        <span className="text-xs text-neutral-400">
+        <span className="text-xs text-tinta-suave">
           Si lo dejás vacío se arma con el nombre. Queda como {dominio}/maspizza
         </span>
       </label>
 
-      <label className="flex flex-col gap-1 text-sm text-neutral-600">
+      <label className="flex flex-col gap-1 text-sm text-tinta-media">
         WhatsApp del negocio
         <input name="whatsapp" required placeholder="0982 951807" className={CAMPO} />
-        <span className="text-xs text-neutral-400">
+        <span className="text-xs text-tinta-suave">
           Como lo escribís normalmente. Yo le pongo el código de país.
         </span>
       </label>
 
-      <label className="flex flex-col gap-1 text-sm text-neutral-600">
+      <label className="flex flex-col gap-1 text-sm text-tinta-media">
         Correo del dueño
         <input
           type="email"
@@ -124,12 +125,12 @@ export function AltaLocal({ dominio }: { dominio: string }) {
           placeholder="juan@maspizza.com"
           className={CAMPO}
         />
-        <span className="text-xs text-neutral-400">
+        <span className="text-xs text-tinta-suave">
           Con esto entra al panel. La contraseña la genero yo.
         </span>
       </label>
 
-      <label className="flex flex-col gap-1 text-sm text-neutral-600">
+      <label className="flex flex-col gap-1 text-sm text-tinta-media">
         Carta de arranque
         <select name="plantilla" defaultValue="pizzeria" className={CAMPO}>
           {PLANTILLAS.map((p) => (
@@ -139,18 +140,18 @@ export function AltaLocal({ dominio }: { dominio: string }) {
             </option>
           ))}
         </select>
-        <span className="text-xs text-neutral-400">
+        <span className="text-xs text-tinta-suave">
           Se cargan productos de ejemplo que el dueño después edita. Es lo que evita que
           abandone con la carta a medio hacer.
         </span>
       </label>
 
       <div className="grid grid-cols-2 gap-3">
-        <label className="flex flex-col gap-1 text-sm text-neutral-600">
+        <label className="flex flex-col gap-1 text-sm text-tinta-media">
           Plan
           <input name="plan" defaultValue="basico" className={CAMPO} />
         </label>
-        <label className="flex flex-col gap-1 text-sm text-neutral-600">
+        <label className="flex flex-col gap-1 text-sm text-tinta-media">
           Meses de regalo
           <input
             type="number"
@@ -167,7 +168,7 @@ export function AltaLocal({ dominio }: { dominio: string }) {
         <button
           type="submit"
           disabled={pendiente}
-          className="rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-dark disabled:opacity-50"
+          className={clasesBoton("principal")}
         >
           {pendiente ? "Creando..." : "Crear local"}
         </button>

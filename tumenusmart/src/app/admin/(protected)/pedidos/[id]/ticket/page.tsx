@@ -70,7 +70,7 @@ export default async function TicketPage({
         </div>
 
         <div className="border-b border-dashed border-black py-2">
-          <p className="text-lg font-bold">Pedido {formatearNumero(pedido.numero)}</p>
+          <p className="text-[1.1rem] font-semibold tracking-titular">Pedido {formatearNumero(pedido.numero)}</p>
           <p className="text-xs">{fecha}</p>
           <p className="mt-1">Cliente: {pedido.clienteNombre}</p>
           <p>Tel: {pedido.clienteTelefono}</p>
@@ -121,7 +121,7 @@ export default async function TicketPage({
               </span>
             </div>
           )}
-          <div className="mt-1 flex justify-between border-t border-black pt-1 text-lg font-bold">
+          <div className="mt-1 flex justify-between border-t border-black pt-1 text-[1.1rem] font-semibold tracking-titular">
             <span>TOTAL</span>
             <span>{formatearGuarani(Number(pedido.total))}</span>
           </div>

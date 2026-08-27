@@ -13,7 +13,7 @@ export function RepartidorAcciones({ id, activo }: { id: string; activo: boolean
         disabled={pending}
         onClick={() => startTransition(() => alternarActivoRepartidor(id, !activo))}
         className={`rounded-full px-2.5 py-0.5 text-xs font-medium disabled:opacity-50 ${
-          activo ? "bg-green-100 text-green-700" : "bg-neutral-100 text-neutral-500"
+          activo ? "bg-exito-luz text-exito" : "bg-papel-hundido text-tinta-media"
         }`}
       >
         {activo ? "Activo" : "Inactivo"}
@@ -31,7 +31,7 @@ export function RepartidorAcciones({ id, activo }: { id: string; activo: boolean
             }
           });
         }}
-        className="text-red-500 hover:underline disabled:opacity-50"
+        className="text-peligro hover:underline disabled:opacity-50"
       >
         Borrar
       </button>

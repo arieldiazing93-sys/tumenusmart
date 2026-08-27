@@ -55,18 +55,18 @@ function fechaCorta(clave: string): string {
 
 function TarjetaReserva({ r }: { r: ReservaFila }) {
   return (
-    <div className="rounded-lg border border-neutral-200 bg-white p-4">
+    <div className="rounded-lg border border-linea bg-white p-4">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
-          <p className="font-medium text-neutral-900">
+          <p className="font-medium text-tinta">
             {formatearNumero(r.numero)} · {r.horario} · {etiquetaTurno(r.turno)} — {r.personas}{" "}
             {r.personas === 1 ? "persona" : "personas"}
           </p>
-          <p className="text-sm text-neutral-600">
+          <p className="text-sm text-tinta-media">
             {r.clienteNombre} · {r.clienteTelefono}
           </p>
-          {r.clienteEmail && <p className="text-sm text-neutral-500">{r.clienteEmail}</p>}
-          <p className="text-sm text-neutral-500">Motivo: {etiquetaMotivo(r.motivo)}</p>
+          {r.clienteEmail && <p className="text-sm text-tinta-media">{r.clienteEmail}</p>}
+          <p className="text-sm text-tinta-media">Motivo: {etiquetaMotivo(r.motivo)}</p>
         </div>
         <div className="flex items-center gap-2">
           <a
@@ -160,17 +160,17 @@ export default async function AdminReservasPage({
   return (
     <div>
       <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-xl font-bold text-neutral-900">Reservas</h1>
+        <h1 className="text-[1.4rem] font-semibold tracking-titular text-tinta">Reservas</h1>
         <Link
           href="/admin/reservas/horarios"
-          className="rounded-lg border border-neutral-300 px-3 py-1.5 text-sm font-medium text-neutral-600 hover:border-brand hover:text-brand"
+          className="rounded-lg border border-linea px-3 py-1.5 text-sm font-medium text-tinta-media hover:border-brand hover:text-brand"
         >
           ⚙ Horarios
         </Link>
       </div>
 
       {sinEnviar > 0 && (
-        <p className="mb-4 rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2 text-xs text-neutral-500">
+        <p className="mb-4 rounded-lg border border-linea bg-papel-suave px-3 py-2 text-xs text-tinta-media">
           {sinEnviar} {sinEnviar === 1 ? "persona empezó" : "personas empezaron"} una reserva en
           este período pero nunca la envió por WhatsApp, así que no figura en el calendario.
         </p>
@@ -184,7 +184,7 @@ export default async function AdminReservasPage({
             className={`rounded-full border px-3 py-1.5 text-sm font-medium ${
               vista === v.value
                 ? "border-brand bg-brand text-white"
-                : "border-neutral-300 text-neutral-600 hover:border-brand hover:text-brand"
+                : "border-linea text-tinta-media hover:border-brand hover:text-brand"
             }`}
           >
             {v.label}
@@ -197,22 +197,22 @@ export default async function AdminReservasPage({
           <div className="mb-4 flex items-center justify-between">
             <Link
               href={hrefVista("dia", claveSumarDias(diaAncla, -1))}
-              className="rounded-lg border border-neutral-300 px-3 py-1.5 text-sm text-neutral-600 hover:border-brand hover:text-brand"
+              className="rounded-lg border border-linea px-3 py-1.5 text-sm text-tinta-media hover:border-brand hover:text-brand"
             >
               ‹ Anterior
             </Link>
-            <span className="font-semibold text-neutral-800">{fechaLarga(diaAncla)}</span>
+            <span className="font-semibold text-tinta">{fechaLarga(diaAncla)}</span>
             <Link
               href={hrefVista("dia", claveSumarDias(diaAncla, 1))}
-              className="rounded-lg border border-neutral-300 px-3 py-1.5 text-sm text-neutral-600 hover:border-brand hover:text-brand"
+              className="rounded-lg border border-linea px-3 py-1.5 text-sm text-tinta-media hover:border-brand hover:text-brand"
             >
               Siguiente ›
             </Link>
           </div>
 
           {ocupacionVisible.length > 0 && (
-            <div className="mb-4 rounded-lg border border-neutral-200 bg-white p-4">
-              <p className="mb-3 text-sm font-medium text-neutral-700">Ocupación del día</p>
+            <div className="mb-4 rounded-lg border border-linea bg-white p-4">
+              <p className="mb-3 text-sm font-medium text-tinta-media">Ocupación del día</p>
               <div className="flex flex-col gap-2">
                 {ocupacionVisible.map((o) => {
                   const lleno = o.lugaresLibres === 0;
@@ -222,20 +222,20 @@ export default async function AdminReservasPage({
                       : 0;
                   return (
                     <div key={`${o.turno}-${o.hora}`} className="flex items-center gap-3">
-                      <span className="w-14 flex-none text-sm font-medium text-neutral-800">
+                      <span className="w-14 flex-none text-sm font-medium text-tinta">
                         {o.hora}
                       </span>
-                      <div className="h-2 flex-1 rounded-full bg-neutral-100">
+                      <div className="h-2 flex-1 rounded-full bg-papel-hundido">
                         {o.capacidad != null && (
                           <div
-                            className={`h-2 rounded-full ${lleno ? "bg-red-500" : "bg-brand"}`}
+                            className={`h-2 rounded-full ${lleno ? "bg-peligro" : "bg-brand"}`}
                             style={{ width: `${proporcion}%` }}
                           />
                         )}
                       </div>
                       <span
                         className={`w-32 flex-none text-right text-sm ${
-                          lleno ? "font-semibold text-red-600" : "text-neutral-600"
+                          lleno ? "font-semibold text-peligro" : "text-tinta-media"
                         }`}
                       >
                         {o.capacidad == null
@@ -254,7 +254,7 @@ export default async function AdminReservasPage({
               <TarjetaReserva key={r.id} r={r} />
             ))}
             {(porDia.get(diaAncla) ?? []).length === 0 && (
-              <p className="text-sm text-neutral-400">No hay reservas para este día.</p>
+              <p className="text-sm text-tinta-suave">No hay reservas para este día.</p>
             )}
           </div>
         </div>
@@ -265,16 +265,16 @@ export default async function AdminReservasPage({
           <div className="mb-4 flex items-center justify-between">
             <Link
               href={hrefVista("semana", claveSumarDias(diaAncla, -7))}
-              className="rounded-lg border border-neutral-300 px-3 py-1.5 text-sm text-neutral-600 hover:border-brand hover:text-brand"
+              className="rounded-lg border border-linea px-3 py-1.5 text-sm text-tinta-media hover:border-brand hover:text-brand"
             >
               ‹ Semana anterior
             </Link>
-            <span className="font-semibold text-neutral-800">
+            <span className="font-semibold text-tinta">
               {fechaCorta(semana[0])} – {fechaCorta(semana[6])}
             </span>
             <Link
               href={hrefVista("semana", claveSumarDias(diaAncla, 7))}
-              className="rounded-lg border border-neutral-300 px-3 py-1.5 text-sm text-neutral-600 hover:border-brand hover:text-brand"
+              className="rounded-lg border border-linea px-3 py-1.5 text-sm text-tinta-media hover:border-brand hover:text-brand"
             >
               Semana siguiente ›
             </Link>
@@ -287,29 +287,29 @@ export default async function AdminReservasPage({
               return (
                 <div
                   key={clave}
-                  className={`rounded-lg border p-2 ${esHoy ? "border-brand" : "border-neutral-200"}`}
+                  className={`rounded-lg border p-2 ${esHoy ? "border-brand" : "border-linea"}`}
                 >
                   <Link
                     href={hrefVista("dia", clave)}
                     className={`mb-2 block text-center text-xs font-semibold ${
-                      esHoy ? "text-brand" : "text-neutral-500"
+                      esHoy ? "text-brand" : "text-tinta-media"
                     } hover:underline`}
                   >
                     {DIAS_SEMANA[i]} {fechaCorta(clave)}
                   </Link>
                   <div className="flex flex-col gap-1.5">
                     {lista.map((r) => (
-                      <div key={r.id} className="rounded-md bg-neutral-50 p-2 text-xs">
-                        <p className="font-medium text-neutral-800">
+                      <div key={r.id} className="rounded-md bg-papel-suave p-2 text-xs">
+                        <p className="font-medium text-tinta">
                           {r.horario} · {r.clienteNombre}
                         </p>
-                        <p className="text-neutral-500">
+                        <p className="text-tinta-media">
                           {r.personas}p · {etiquetaMotivo(r.motivo)}
                         </p>
                       </div>
                     ))}
                     {lista.length === 0 && (
-                      <p className="text-center text-[11px] text-neutral-300">—</p>
+                      <p className="text-center text-[11px] text-tinta-suave">—</p>
                     )}
                   </div>
                 </div>
@@ -330,11 +330,11 @@ export default async function AdminReservasPage({
                   anioMes.mes === 0 ? 11 : anioMes.mes - 1
                 )}-01`
               )}
-              className="rounded-lg border border-neutral-300 px-3 py-1.5 text-sm text-neutral-600 hover:border-brand hover:text-brand"
+              className="rounded-lg border border-linea px-3 py-1.5 text-sm text-tinta-media hover:border-brand hover:text-brand"
             >
               ‹ Anterior
             </Link>
-            <span className="font-semibold text-neutral-800">
+            <span className="font-semibold text-tinta">
               {NOMBRES_MES[anioMes.mes]} {anioMes.anio}
             </span>
             <Link
@@ -345,13 +345,13 @@ export default async function AdminReservasPage({
                   anioMes.mes === 11 ? 0 : anioMes.mes + 1
                 )}-01`
               )}
-              className="rounded-lg border border-neutral-300 px-3 py-1.5 text-sm text-neutral-600 hover:border-brand hover:text-brand"
+              className="rounded-lg border border-linea px-3 py-1.5 text-sm text-tinta-media hover:border-brand hover:text-brand"
             >
               Siguiente ›
             </Link>
           </div>
 
-          <div className="grid grid-cols-7 gap-1.5 text-center text-xs font-semibold text-neutral-500">
+          <div className="grid grid-cols-7 gap-1.5 text-center text-xs font-semibold text-tinta-media">
             {DIAS_SEMANA.map((d) => (
               <div key={d} className="py-1">
                 {d}
@@ -370,10 +370,10 @@ export default async function AdminReservasPage({
                   href={hrefVista("mes", c.fecha)}
                   className={`flex min-h-[60px] flex-col items-center justify-start rounded-lg border p-1.5 text-sm ${
                     !c.enMes
-                      ? "border-transparent text-neutral-300"
+                      ? "border-transparent text-tinta-suave"
                       : seleccionada
                         ? "border-brand bg-brand-light"
-                        : "border-neutral-200 bg-white hover:border-brand"
+                        : "border-linea bg-white hover:border-brand"
                   } ${esHoy ? "font-bold text-brand" : ""}`}
                 >
                   <span>{c.dia}</span>
@@ -388,12 +388,12 @@ export default async function AdminReservasPage({
           </div>
 
           <div className="mt-8">
-            <h2 className="mb-3 font-semibold text-neutral-800">
+            <h2 className="mb-3 font-semibold text-tinta">
               Reservas del {fechaLarga(diaAncla)}
             </h2>
 
             {(porDia.get(diaAncla) ?? []).length === 0 && (
-              <p className="text-sm text-neutral-400">No hay reservas para este día.</p>
+              <p className="text-sm text-tinta-suave">No hay reservas para este día.</p>
             )}
 
             <div className="flex flex-col gap-2">

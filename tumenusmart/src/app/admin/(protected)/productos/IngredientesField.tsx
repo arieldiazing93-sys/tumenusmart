@@ -28,10 +28,10 @@ export function IngredientesField({ initial }: { initial: string[] }) {
 
   return (
     <div>
-      <label className="mb-1 block text-sm font-medium text-neutral-700">
+      <label className="mb-1 block text-sm font-medium text-tinta-media">
         Ingredientes (opcional)
       </label>
-      <p className="mb-2 text-xs text-neutral-500">
+      <p className="mb-2 text-xs text-tinta-media">
         El cliente va a poder sacar los que no quiera al pedir. Escribí uno y apretá Enter o
         coma para agregarlo.
       </p>
@@ -41,13 +41,13 @@ export function IngredientesField({ initial }: { initial: string[] }) {
           {ingredientes.map((ing) => (
             <span
               key={ing}
-              className="flex items-center gap-1 rounded-full bg-neutral-100 px-2.5 py-1 text-sm text-neutral-700"
+              className="flex items-center gap-1 rounded-full bg-papel-hundido px-2.5 py-1 text-sm text-tinta-media"
             >
               {ing}
               <button
                 type="button"
                 onClick={() => quitar(ing)}
-                className="text-neutral-400 hover:text-red-500"
+                className="text-tinta-suave hover:text-peligro"
                 aria-label={`Quitar ${ing}`}
               >
                 ×
@@ -63,7 +63,7 @@ export function IngredientesField({ initial }: { initial: string[] }) {
         onKeyDown={handleKeyDown}
         onBlur={agregarDesdeTexto}
         placeholder="cebolla, tomate, queso..."
-        className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
+        className="w-full rounded-lg border border-linea px-3 py-2 text-sm"
       />
 
       <input type="hidden" name="ingredientes" value={JSON.stringify(ingredientes)} />

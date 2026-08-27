@@ -20,11 +20,11 @@ const DIAS_DE_ACTIVIDAD = 7;
 const DIAS_PARA_ALARMA = 14;
 
 const ESTILO_ESTADO: Record<EstadoSuscripcion["clase"], { chip: string; borde: string }> = {
-  vencido: { chip: "bg-red-100 text-red-700", borde: "border-l-red-400" },
-  suspendido: { chip: "bg-neutral-800 text-white", borde: "border-l-neutral-700" },
-  por_vencer: { chip: "bg-amber-100 text-amber-800", borde: "border-l-amber-400" },
-  al_dia: { chip: "bg-green-100 text-green-700", borde: "border-l-green-400" },
-  sin_vencimiento: { chip: "bg-neutral-100 text-neutral-600", borde: "border-l-neutral-300" },
+  vencido: { chip: "bg-peligro-luz text-peligro", borde: "border-l-peligro" },
+  suspendido: { chip: "bg-noche-panel text-white", borde: "border-l-tinta-media" },
+  por_vencer: { chip: "bg-aviso-luz text-aviso", borde: "border-l-aviso" },
+  al_dia: { chip: "bg-exito-luz text-exito", borde: "border-l-exito" },
+  sin_vencimiento: { chip: "bg-papel-hundido text-tinta-media", borde: "border-l-linea" },
 };
 
 /** Primero lo que hay que atender. */
@@ -156,8 +156,8 @@ export default async function SuperPage() {
 
   return (
     <div>
-      <h1 className="mb-1 text-xl font-bold text-neutral-900">Cartera de locales</h1>
-      <p className="mb-6 text-sm text-neutral-500">
+      <h1 className="mb-1 text-[1.4rem] font-semibold tracking-titular text-tinta">Cartera de locales</h1>
+      <p className="mb-6 text-sm text-tinta-media">
         Todos tus clientes, ordenados por lo que hay que atender primero.
       </p>
 
@@ -176,11 +176,11 @@ export default async function SuperPage() {
         />
       </div>
 
-      <details className="mb-6 rounded-lg border border-neutral-200 bg-white">
-        <summary className="cursor-pointer px-4 py-3 text-sm font-medium text-neutral-800">
+      <details className="mb-6 rounded-lg border border-linea bg-white">
+        <summary className="cursor-pointer px-4 py-3 text-sm font-medium text-tinta">
           Dar de alta un local nuevo
         </summary>
-        <div className="border-t border-neutral-200 p-4">
+        <div className="border-t border-linea p-4">
           <AltaLocal dominio={dominio} />
         </div>
       </details>
@@ -198,23 +198,23 @@ export default async function SuperPage() {
           return (
             <div
               key={f.local.id}
-              className={`flex flex-wrap items-start justify-between gap-3 rounded-lg border border-neutral-200 border-l-4 bg-white px-4 py-3 ${estilo.borde}`}
+              className={`flex flex-wrap items-start justify-between gap-3 rounded-lg border border-linea border-l-4 bg-white px-4 py-3 ${estilo.borde}`}
             >
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="font-medium text-neutral-900">{f.local.nombre}</span>
-                  <span className="font-mono text-xs text-neutral-400">
+                  <span className="font-medium text-tinta">{f.local.nombre}</span>
+                  <span className="font-mono text-xs text-tinta-suave">
                     /{f.local.slug}
                   </span>
                   <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${estilo.chip}`}>
                     {f.estado.etiqueta}
                   </span>
-                  <span className="rounded-full bg-neutral-100 px-2 py-0.5 text-xs text-neutral-600">
+                  <span className="rounded-full bg-papel-hundido px-2 py-0.5 text-xs text-tinta-media">
                     {f.local.plan}
                   </span>
                 </div>
 
-                <p className="mt-1 text-xs text-neutral-500">
+                <p className="mt-1 text-xs text-tinta-media">
                   Vence {fechaCorta(f.local.vencimiento)}
                   {" · "}
                   {f.pedidos} {f.pedidos === 1 ? "pedido" : "pedidos"} en {DIAS_DE_ACTIVIDAD} días
@@ -232,7 +232,7 @@ export default async function SuperPage() {
                 </p>
 
                 {(f.seEstaApagando || f.cartaIncompleta) && (
-                  <p className="mt-1 text-xs font-medium text-amber-700">
+                  <p className="mt-1 text-xs font-medium text-aviso">
                     {f.cartaIncompleta && "Casi no tiene productos cargados. "}
                     {f.seEstaApagando &&
                       "Sin pedidos y nadie entra al panel: está por darse de baja."}
@@ -251,7 +251,7 @@ export default async function SuperPage() {
         })}
 
         {filas.length === 0 && (
-          <p className="rounded-lg border border-dashed border-neutral-300 px-4 py-6 text-center text-sm text-neutral-500">
+          <p className="rounded-lg border border-dashed border-linea px-4 py-6 text-center text-sm text-tinta-media">
             Todavía no hay locales cargados.
           </p>
         )}
@@ -272,13 +272,13 @@ function Tarjeta({
   aviso?: boolean;
 }) {
   const color = alerta
-    ? "text-red-600"
+    ? "text-peligro"
     : aviso
-      ? "text-amber-700"
-      : "text-neutral-900";
+      ? "text-aviso"
+      : "text-tinta";
   return (
-    <div className="rounded-lg border border-neutral-200 bg-white px-4 py-3">
-      <p className="text-xs text-neutral-500">{etiqueta}</p>
+    <div className="rounded-lg border border-linea bg-white px-4 py-3">
+      <p className="text-xs text-tinta-media">{etiqueta}</p>
       <p className={`text-2xl font-bold ${color}`}>{valor}</p>
     </div>
   );

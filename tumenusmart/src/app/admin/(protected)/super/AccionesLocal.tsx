@@ -1,10 +1,11 @@
 "use client";
 
+import { clasesBoton } from "@/components/ui";
 import { useState, useTransition } from "react";
 import { alternarSuspension, registrarPago } from "./actions";
 
 const CAMPO =
-  "rounded-lg border border-neutral-300 px-2 py-1 text-sm focus:border-brand focus:outline-none";
+  "rounded-lg border border-linea px-2 py-1 text-sm focus:border-brand focus:outline-none";
 
 export function AccionesLocal({
   storeId,
@@ -42,7 +43,7 @@ export function AccionesLocal({
           type="button"
           disabled={pendiente}
           onClick={() => setCobrando((v) => !v)}
-          className="rounded-lg bg-brand px-3 py-1 font-medium text-white hover:bg-brand-dark disabled:opacity-50"
+          className={clasesBoton("principal", "sm")}
         >
           Registrar pago
         </button>
@@ -52,7 +53,7 @@ export function AccionesLocal({
             href={linkRecordatorio}
             target="_blank"
             rel="noopener noreferrer"
-            className="font-medium text-green-700 hover:underline"
+            className="font-medium text-exito hover:underline"
           >
             Recordar por WhatsApp
           </a>
@@ -70,8 +71,8 @@ export function AccionesLocal({
           }}
           className={
             suspendidoAMano
-              ? "text-green-700 hover:underline disabled:opacity-50"
-              : "text-red-500 hover:underline disabled:opacity-50"
+              ? "text-exito hover:underline disabled:opacity-50"
+              : "text-peligro hover:underline disabled:opacity-50"
           }
         >
           {suspendidoAMano ? "Reactivar" : "Suspender"}
@@ -83,9 +84,9 @@ export function AccionesLocal({
           action={(datos) =>
             correr(() => registrarPago(storeId, datos), "Pago registrado.")
           }
-          className="flex flex-wrap items-end justify-end gap-2 rounded-lg border border-neutral-200 bg-neutral-50 p-2"
+          className="flex flex-wrap items-end justify-end gap-2 rounded-lg border border-linea bg-papel-suave p-2"
         >
-          <label className="flex flex-col gap-0.5 text-xs text-neutral-600">
+          <label className="flex flex-col gap-0.5 text-xs text-tinta-media">
             Meses
             <input
               type="number"
@@ -96,7 +97,7 @@ export function AccionesLocal({
               className={`${CAMPO} w-16`}
             />
           </label>
-          <label className="flex flex-col gap-0.5 text-xs text-neutral-600">
+          <label className="flex flex-col gap-0.5 text-xs text-tinta-media">
             Monto (Gs.)
             <input
               type="text"
@@ -106,7 +107,7 @@ export function AccionesLocal({
               className={`${CAMPO} w-28`}
             />
           </label>
-          <label className="flex flex-col gap-0.5 text-xs text-neutral-600">
+          <label className="flex flex-col gap-0.5 text-xs text-tinta-media">
             Nota
             <input
               type="text"
@@ -118,14 +119,14 @@ export function AccionesLocal({
           <button
             type="submit"
             disabled={pendiente}
-            className="rounded-lg bg-neutral-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-neutral-700 disabled:opacity-50"
+            className="rounded-lg bg-noche px-3 py-1.5 text-sm font-medium text-white hover:bg-noche-panel disabled:opacity-50"
           >
             Guardar
           </button>
         </form>
       )}
 
-      {aviso && <p className="text-xs text-neutral-600">{aviso}</p>}
+      {aviso && <p className="text-xs text-tinta-media">{aviso}</p>}
     </div>
   );
 }

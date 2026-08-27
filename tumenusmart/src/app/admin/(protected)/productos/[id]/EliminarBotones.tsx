@@ -13,7 +13,7 @@ export function EliminarProductoBoton({ productId }: { productId: string }) {
         if (!confirm("¿Borrar este producto? No se puede deshacer.")) return;
         startTransition(() => eliminarProducto(productId));
       }}
-      className="text-sm text-red-500 hover:underline disabled:opacity-50"
+      className="text-sm text-peligro hover:underline disabled:opacity-50"
     >
       Borrar producto
     </button>
@@ -33,7 +33,7 @@ export function EliminarOpcionBoton({
       type="button"
       disabled={pending}
       onClick={() => startTransition(() => eliminarOpcion(productId, optionId))}
-      className="text-xs text-red-500 hover:underline disabled:opacity-50"
+      className="text-xs text-peligro hover:underline disabled:opacity-50"
     >
       Quitar
     </button>

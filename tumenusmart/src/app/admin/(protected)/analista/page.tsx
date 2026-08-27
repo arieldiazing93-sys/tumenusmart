@@ -24,13 +24,13 @@ const ESTILO_TIPO: Record<Idea["tipo"], { borde: string; chip: string; etiqueta:
     etiqueta: "Oportunidad",
   },
   alerta: {
-    borde: "border-l-red-400",
-    chip: "bg-red-100 text-red-700",
+    borde: "border-l-peligro",
+    chip: "bg-peligro-luz text-peligro",
     etiqueta: "Atención",
   },
   dato: {
-    borde: "border-l-neutral-300",
-    chip: "bg-neutral-100 text-neutral-600",
+    borde: "border-l-linea",
+    chip: "bg-papel-hundido text-tinta-media",
     etiqueta: "Para saber",
   },
 };
@@ -112,8 +112,8 @@ export default async function AnalistaPage() {
 
   return (
     <div>
-      <h1 className="mb-1 text-xl font-bold text-neutral-900">Ideas para vender más</h1>
-      <p className="mb-6 text-sm text-neutral-500">
+      <h1 className="mb-1 text-[1.4rem] font-semibold tracking-titular text-tinta">Ideas para vender más</h1>
+      <p className="mb-6 text-sm text-tinta-media">
         Sale de tus propios pedidos de los últimos {DIAS_DE_HISTORIA} días. Se actualiza solo.
       </p>
 
@@ -123,20 +123,20 @@ export default async function AnalistaPage() {
             <span className="rounded-full bg-brand px-2 py-0.5 text-xs font-medium text-white">
               Tu idea de esta semana
             </span>
-            <span className="text-xs text-neutral-500">
+            <span className="text-xs text-tinta-media">
               Elegida el lunes · una por semana para que puedas trabajarla
             </span>
           </div>
-          <h2 className="font-semibold text-neutral-900">{deLaSemana.titulo}</h2>
-          <p className="mt-0.5 text-sm font-medium text-neutral-800">{deLaSemana.dato}</p>
-          <p className="mt-1.5 text-sm text-neutral-700">{deLaSemana.accion}</p>
+          <h2 className="font-semibold text-tinta">{deLaSemana.titulo}</h2>
+          <p className="mt-0.5 text-sm font-medium text-tinta">{deLaSemana.dato}</p>
+          <p className="mt-1.5 text-sm text-tinta-media">{deLaSemana.accion}</p>
 
           {deLaSemana.detalle && deLaSemana.detalle.length > 0 && (
             <ul className="mt-3 divide-y divide-orange-100 rounded-lg bg-white/70 px-3">
               {deLaSemana.detalle.map((d, i) => (
                 <li key={i} className="flex items-center justify-between gap-3 py-1.5 text-sm">
-                  <span className="truncate text-neutral-700">{d.etiqueta}</span>
-                  <span className="whitespace-nowrap font-medium text-neutral-500">{d.valor}</span>
+                  <span className="truncate text-tinta-media">{d.etiqueta}</span>
+                  <span className="whitespace-nowrap font-medium text-tinta-media">{d.valor}</span>
                 </li>
               ))}
             </ul>
@@ -151,7 +151,7 @@ export default async function AnalistaPage() {
         />
       ) : (
         <>
-          <p className="mb-4 text-sm text-neutral-600">
+          <p className="mb-4 text-sm text-tinta-media">
             Analizados <strong>{resultado.base} pedidos</strong>.{" "}
             {ideas.length === 1
               ? "Por ahora hay una sola conclusión sólida."
@@ -169,11 +169,11 @@ export default async function AnalistaPage() {
       )}
 
       {sinCosto > 0 && (
-        <div className="mt-8 rounded-lg border border-dashed border-neutral-300 bg-white p-4">
-          <h2 className="text-sm font-semibold text-neutral-800">
+        <div className="mt-8 rounded-lg border border-dashed border-linea bg-white p-4">
+          <h2 className="text-sm font-semibold text-tinta">
             Falta un dato para hablar de ganancia
           </h2>
-          <p className="mt-1 text-sm text-neutral-600">
+          <p className="mt-1 text-sm text-tinta-media">
             {sinCosto} de tus {productos.length} productos no tienen cargado el costo. Sin eso
             puedo decirte qué producto <em>factura</em> más, pero no cuál te <em>deja</em> más
             — y muchas veces no son el mismo.
@@ -194,11 +194,11 @@ function FaltanDatos({ actuales, necesarios }: { actuales: number; necesarios: n
   const avance = Math.min(100, Math.round((actuales / necesarios) * 100));
 
   return (
-    <div className="rounded-lg border border-neutral-200 bg-white p-6">
-      <h2 className="text-base font-semibold text-neutral-900">
+    <div className="rounded-lg border border-linea bg-white p-6">
+      <h2 className="text-base font-semibold text-tinta">
         Todavía no tengo suficientes pedidos
       </h2>
-      <p className="mt-2 max-w-xl text-sm text-neutral-600">
+      <p className="mt-2 max-w-xl text-sm text-tinta-media">
         Llevás <strong>{actuales}</strong> {actuales === 1 ? "pedido" : "pedidos"} y hacen falta
         al menos <strong>{necesarios}</strong> para que lo que te diga signifique algo. Con menos
         que eso, cualquier patrón que encuentre sería casualidad, y prefiero no darte un consejo
@@ -206,24 +206,24 @@ function FaltanDatos({ actuales, necesarios }: { actuales: number; necesarios: n
       </p>
 
       <div className="mt-4 max-w-sm">
-        <div className="h-2 w-full overflow-hidden rounded-full bg-neutral-100">
+        <div className="h-2 w-full overflow-hidden rounded-full bg-papel-hundido">
           <div className="h-full rounded-full bg-brand transition-all" style={{ width: `${avance}%` }} />
         </div>
-        <p className="mt-1.5 text-xs text-neutral-500">
+        <p className="mt-1.5 text-xs text-tinta-media">
           {actuales} de {necesarios} pedidos
         </p>
       </div>
 
-      <p className="mt-5 max-w-xl text-sm text-neutral-600">
+      <p className="mt-5 max-w-xl text-sm text-tinta-media">
         No tenés que hacer nada: se va llenando solo a medida que entren pedidos. Cuando llegue,
         esta pantalla se enciende sola.
       </p>
 
-      <div className="mt-5 border-t border-neutral-100 pt-4">
-        <p className="text-xs font-semibold uppercase tracking-wide text-neutral-400">
+      <div className="mt-5 border-t border-linea-fina pt-4">
+        <p className="text-xs font-semibold uppercase tracking-wide text-tinta-suave">
           Mientras tanto, lo que se va a analizar
         </p>
-        <ul className="mt-2 grid gap-1.5 text-sm text-neutral-600 sm:grid-cols-2">
+        <ul className="mt-2 grid gap-1.5 text-sm text-tinta-media sm:grid-cols-2">
           <li>· En qué horas y días vendés poco</li>
           <li>· Qué productos ocupan carta y no se venden</li>
           <li>· Qué se pide junto con qué, para armar combos</li>
@@ -241,30 +241,30 @@ function TarjetaIdea({ idea }: { idea: Idea }) {
 
   return (
     <article
-      className={`rounded-lg border border-neutral-200 border-l-4 bg-white p-4 ${estilo.borde}`}
+      className={`rounded-lg border border-linea border-l-4 bg-white p-4 ${estilo.borde}`}
     >
       <div className="mb-1 flex flex-wrap items-center gap-2">
         <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${estilo.chip}`}>
           {estilo.etiqueta}
         </span>
-        <h2 className="font-semibold text-neutral-900">{idea.titulo}</h2>
+        <h2 className="font-semibold text-tinta">{idea.titulo}</h2>
       </div>
 
-      <p className="text-sm font-medium text-neutral-800">{idea.dato}</p>
-      <p className="mt-1.5 text-sm text-neutral-600">{idea.accion}</p>
+      <p className="text-sm font-medium text-tinta">{idea.dato}</p>
+      <p className="mt-1.5 text-sm text-tinta-media">{idea.accion}</p>
 
       {idea.detalle && idea.detalle.length > 0 && (
-        <ul className="mt-3 divide-y divide-neutral-100 rounded-lg bg-neutral-50 px-3">
+        <ul className="mt-3 divide-y divide-linea-fina rounded-lg bg-papel-suave px-3">
           {idea.detalle.map((d, i) => (
             <li key={i} className="flex items-center justify-between gap-3 py-1.5 text-sm">
-              <span className="truncate text-neutral-700">{d.etiqueta}</span>
-              <span className="whitespace-nowrap font-medium text-neutral-500">{d.valor}</span>
+              <span className="truncate text-tinta-media">{d.etiqueta}</span>
+              <span className="whitespace-nowrap font-medium text-tinta-media">{d.valor}</span>
             </li>
           ))}
         </ul>
       )}
 
-      <p className="mt-2.5 text-xs text-neutral-400">{TEXTO_CONFIANZA[idea.confianza]}</p>
+      <p className="mt-2.5 text-xs text-tinta-suave">{TEXTO_CONFIANZA[idea.confianza]}</p>
     </article>
   );
 }

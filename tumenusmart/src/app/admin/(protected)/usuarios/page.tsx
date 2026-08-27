@@ -1,3 +1,4 @@
+import { clasesBoton } from "@/components/ui";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { sesionActual } from "@/lib/auth";
@@ -8,7 +9,7 @@ import { UsuarioAcciones } from "./UsuarioAcciones";
 export const dynamic = "force-dynamic";
 
 const CAMPO =
-  "w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand";
+  "w-full rounded-lg border border-linea px-3 py-2 text-sm focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand";
 
 function fechaCorta(valor: Date | null): string {
   if (!valor) return "Nunca entró";
@@ -41,21 +42,21 @@ export default async function AdminUsuariosPage() {
 
   return (
     <div>
-      <h1 className="mb-1 text-xl font-bold text-neutral-900">Usuarios</h1>
-      <p className="mb-6 text-sm text-neutral-500">
+      <h1 className="mb-1 text-[1.4rem] font-semibold tracking-titular text-tinta">Usuarios</h1>
+      <p className="mb-6 text-sm text-tinta-media">
         Cada local entra con su propio correo y contraseña, y ve únicamente su negocio.
       </p>
 
-      <details className="mb-6 rounded-lg border border-neutral-200 bg-white">
-        <summary className="cursor-pointer px-4 py-3 text-sm font-medium text-neutral-800">
+      <details className="mb-6 rounded-lg border border-linea bg-white">
+        <summary className="cursor-pointer px-4 py-3 text-sm font-medium text-tinta">
           Crear un usuario nuevo
         </summary>
 
         <form
           action={crearUsuario}
-          className="grid gap-3 border-t border-neutral-200 p-4 sm:grid-cols-2"
+          className="grid gap-3 border-t border-linea p-4 sm:grid-cols-2"
         >
-          <label className="flex flex-col gap-1 text-sm text-neutral-600">
+          <label className="flex flex-col gap-1 text-sm text-tinta-media">
             Correo
             <input
               type="email"
@@ -66,12 +67,12 @@ export default async function AdminUsuariosPage() {
             />
           </label>
 
-          <label className="flex flex-col gap-1 text-sm text-neutral-600">
+          <label className="flex flex-col gap-1 text-sm text-tinta-media">
             Nombre
             <input type="text" name="nombre" placeholder="Juan Pérez" className={CAMPO} />
           </label>
 
-          <label className="flex flex-col gap-1 text-sm text-neutral-600">
+          <label className="flex flex-col gap-1 text-sm text-tinta-media">
             Local
             <select name="storeId" className={CAMPO} defaultValue="">
               <option value="">— Elegí un local —</option>
@@ -83,7 +84,7 @@ export default async function AdminUsuariosPage() {
             </select>
           </label>
 
-          <label className="flex flex-col gap-1 text-sm text-neutral-600">
+          <label className="flex flex-col gap-1 text-sm text-tinta-media">
             Nivel
             <select name="rol" className={CAMPO} defaultValue="local">
               <option value="local">Local — solo su negocio</option>
@@ -91,7 +92,7 @@ export default async function AdminUsuariosPage() {
             </select>
           </label>
 
-          <label className="flex flex-col gap-1 text-sm text-neutral-600 sm:col-span-2">
+          <label className="flex flex-col gap-1 text-sm text-tinta-media sm:col-span-2">
             Contraseña
             <input
               type="text"
@@ -101,7 +102,7 @@ export default async function AdminUsuariosPage() {
               placeholder="Al menos 8 caracteres, con letras y números"
               className={CAMPO}
             />
-            <span className="text-xs text-neutral-400">
+            <span className="text-xs text-tinta-suave">
               Se muestra en claro a propósito, para que puedas copiarla y pasársela. Después
               de guardar no se puede volver a ver: solo cambiarla. Si elegís Administrador, el
               local queda ignorado.
@@ -111,7 +112,7 @@ export default async function AdminUsuariosPage() {
           <div className="sm:col-span-2">
             <button
               type="submit"
-              className="rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-dark"
+              className={clasesBoton("principal")}
             >
               Crear usuario
             </button>
@@ -123,25 +124,25 @@ export default async function AdminUsuariosPage() {
         {usuarios.map((u) => (
           <div
             key={u.id}
-            className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-neutral-200 bg-white px-4 py-3"
+            className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-linea bg-white px-4 py-3"
           >
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
-                <span className="font-medium text-neutral-900">{u.email}</span>
+                <span className="font-medium text-tinta">{u.email}</span>
                 {u.rol === "superadmin" ? (
-                  <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">
+                  <span className="rounded-full bg-aviso-luz px-2 py-0.5 text-xs font-medium text-aviso">
                     Administrador
                   </span>
                 ) : (
-                  <span className="rounded-full bg-neutral-100 px-2 py-0.5 text-xs font-medium text-neutral-600">
+                  <span className="rounded-full bg-papel-hundido px-2 py-0.5 text-xs font-medium text-tinta-media">
                     {u.store ? `${u.store.nombre} (/${u.store.slug})` : "Sin local"}
                   </span>
                 )}
                 {u.id === sesion.id && (
-                  <span className="text-xs text-neutral-400">— sos vos</span>
+                  <span className="text-xs text-tinta-suave">— sos vos</span>
                 )}
               </div>
-              <p className="mt-0.5 text-xs text-neutral-500">
+              <p className="mt-0.5 text-xs text-tinta-media">
                 {u.nombre ? `${u.nombre} · ` : ""}
                 Último ingreso: {fechaCorta(u.ultimoIngreso)}
               </p>
@@ -157,7 +158,7 @@ export default async function AdminUsuariosPage() {
         ))}
 
         {usuarios.length === 0 && (
-          <p className="rounded-lg border border-dashed border-neutral-300 px-4 py-6 text-center text-sm text-neutral-500">
+          <p className="rounded-lg border border-dashed border-linea px-4 py-6 text-center text-sm text-tinta-media">
             Todavía no hay usuarios cargados.
           </p>
         )}

@@ -18,8 +18,8 @@ export default async function MiCuentaPage() {
 
   return (
     <div className="max-w-md">
-      <h1 className="mb-1 text-xl font-bold text-neutral-900">Mi cuenta</h1>
-      <p className="mb-6 text-sm text-neutral-500">
+      <h1 className="mb-1 text-[1.4rem] font-semibold tracking-titular text-tinta">Mi cuenta</h1>
+      <p className="mb-6 text-sm text-tinta-media">
         {sesion.email}
         {" · "}
         {sesion.rol === "superadmin"
@@ -30,8 +30,8 @@ export default async function MiCuentaPage() {
       </p>
 
       {sesion.debeCambiarPassword && (
-        <div className="mb-4 rounded-lg border border-amber-300 bg-amber-50 p-3">
-          <p className="text-sm text-amber-900">
+        <div className="mb-4 rounded-lg border border-aviso/30 bg-aviso-luz p-3">
+          <p className="text-sm text-aviso">
             <strong>Todavía usás la contraseña que te entregamos.</strong> Esa contraseña
             viajó por WhatsApp, así que la vio más de una persona. Cambiala por una tuya.
           </p>

@@ -48,22 +48,22 @@ export function LogoField({ initialUrl }: { initialUrl: string | null }) {
 
   return (
     <div>
-      <label className="mb-1 block text-sm font-medium text-neutral-700">
+      <label className="mb-1 block text-sm font-medium text-tinta-media">
         Logo del negocio
       </label>
 
       <div className="flex items-center gap-3">
-        <div className="flex h-20 w-20 flex-none items-center justify-center overflow-hidden rounded-full border border-neutral-300 bg-neutral-50">
+        <div className="flex h-20 w-20 flex-none items-center justify-center overflow-hidden rounded-full border border-linea bg-papel-suave">
           {url ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={url} alt="Logo del negocio" className="h-full w-full object-cover" />
           ) : (
-            <span className="text-xs text-neutral-400">Sin logo</span>
+            <span className="text-xs text-tinta-suave">Sin logo</span>
           )}
         </div>
 
         <div className="flex flex-col gap-1">
-          <label className="cursor-pointer rounded-lg border border-neutral-300 px-3 py-1.5 text-sm font-medium text-neutral-700 hover:bg-neutral-50">
+          <label className="cursor-pointer rounded-lg border border-linea px-3 py-1.5 text-sm font-medium text-tinta-media hover:bg-papel-suave">
             {subiendo ? "Subiendo..." : url ? "Cambiar logo" : "Subir logo"}
             <input
               ref={inputRef}
@@ -78,7 +78,7 @@ export function LogoField({ initialUrl }: { initialUrl: string | null }) {
             <button
               type="button"
               onClick={quitar}
-              className="text-left text-xs text-red-500 hover:underline"
+              className="text-left text-xs text-peligro hover:underline"
             >
               Quitar logo
             </button>
@@ -86,8 +86,8 @@ export function LogoField({ initialUrl }: { initialUrl: string | null }) {
         </div>
       </div>
 
-      {guardado && <p className="mt-1 text-xs text-green-600">✓ Logo guardado</p>}
-      {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
+      {guardado && <p className="mt-1 text-xs text-exito">✓ Logo guardado</p>}
+      {error && <p className="mt-1 text-xs text-peligro">{error}</p>}
 
       <input type="hidden" name="logoUrl" value={url} />
     </div>

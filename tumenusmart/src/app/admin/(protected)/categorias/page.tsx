@@ -2,6 +2,7 @@ import { prismaDelLocal } from "@/lib/prisma-local";
 import { idLocalActual } from "@/lib/local-actual";
 import { crearCategoria } from "./actions";
 import { CategoriaFila } from "./CategoriaFila";
+import { clasesBoton } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
@@ -19,8 +20,8 @@ export default async function AdminCategoriasPage() {
 
   return (
     <div>
-      <h1 className="mb-1 text-xl font-bold text-neutral-900">Categorías</h1>
-      <p className="mb-6 text-sm text-neutral-500">
+      <h1 className="mb-1 text-[1.4rem] font-semibold tracking-titular text-tinta">Categorías</h1>
+      <p className="mb-6 text-sm text-tinta-media">
         El orden de esta lista es el orden en que las ve tu cliente en la carta.
         Movelas con las flechas.
       </p>
@@ -30,11 +31,11 @@ export default async function AdminCategoriasPage() {
           name="nombre"
           required
           placeholder="Nueva categoría (ej: Postres)"
-          className="flex-1 rounded-lg border border-neutral-300 px-3 py-2"
+          className="flex-1 rounded-lg border border-linea px-3 py-2"
         />
         <button
           type="submit"
-          className="rounded-lg bg-brand px-4 py-2 font-medium text-white hover:bg-brand-dark"
+          className={clasesBoton("principal")}
         >
           Agregar
         </button>

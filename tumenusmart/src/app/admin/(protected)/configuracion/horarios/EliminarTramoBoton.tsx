@@ -21,7 +21,7 @@ export function EliminarTramoBoton({ id }: { id: string }) {
       type="button"
       onClick={eliminar}
       disabled={pending}
-      className="text-neutral-400 hover:text-red-600 disabled:opacity-50"
+      className="text-tinta-suave hover:text-peligro disabled:opacity-50"
       aria-label="Quitar tramo"
     >
       ✕

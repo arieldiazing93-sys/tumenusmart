@@ -29,7 +29,7 @@ export function LinkRepartidor({ id }: { id: string }) {
         href={url}
         target="_blank"
         rel="noopener noreferrer"
-        className="max-w-[220px] truncate text-xs text-neutral-400 hover:text-brand hover:underline"
+        className="max-w-[220px] truncate text-xs text-tinta-suave hover:text-brand hover:underline"
       >
         {url}
       </a>

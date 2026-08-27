@@ -44,22 +44,22 @@ export function ImagenProductoField({ initialUrl }: { initialUrl: string | null 
 
   return (
     <div>
-      <label className="mb-1 block text-sm font-medium text-neutral-700">
+      <label className="mb-1 block text-sm font-medium text-tinta-media">
         Foto del producto
       </label>
 
       <div className="flex items-center gap-3">
-        <div className="flex h-20 w-20 flex-none items-center justify-center overflow-hidden rounded-lg border border-neutral-300 bg-neutral-50">
+        <div className="flex h-20 w-20 flex-none items-center justify-center overflow-hidden rounded-lg border border-linea bg-papel-suave">
           {url ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={url} alt="Foto del producto" className="h-full w-full object-cover" />
           ) : (
-            <span className="text-xs text-neutral-400">Sin foto</span>
+            <span className="text-xs text-tinta-suave">Sin foto</span>
           )}
         </div>
 
         <div className="flex flex-col gap-1">
-          <label className="cursor-pointer rounded-lg border border-neutral-300 px-3 py-1.5 text-sm font-medium text-neutral-700 hover:bg-neutral-50">
+          <label className="cursor-pointer rounded-lg border border-linea px-3 py-1.5 text-sm font-medium text-tinta-media hover:bg-papel-suave">
             {subiendo ? "Subiendo..." : url ? "Cambiar foto" : "Subir foto"}
             <input
               ref={inputRef}
@@ -74,7 +74,7 @@ export function ImagenProductoField({ initialUrl }: { initialUrl: string | null 
             <button
               type="button"
               onClick={() => setUrl("")}
-              className="text-left text-xs text-red-500 hover:underline"
+              className="text-left text-xs text-peligro hover:underline"
             >
               Quitar foto
             </button>
@@ -82,9 +82,9 @@ export function ImagenProductoField({ initialUrl }: { initialUrl: string | null 
         </div>
       </div>
 
-      {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
+      {error && <p className="mt-1 text-xs text-peligro">{error}</p>}
       {ahorro && !error && (
-        <p className="mt-1 text-xs text-green-700">
+        <p className="mt-1 text-xs text-exito">
           Foto optimizada: {ahorro}. Se ve igual y tu carta carga mucho más rápido.
         </p>
       )}

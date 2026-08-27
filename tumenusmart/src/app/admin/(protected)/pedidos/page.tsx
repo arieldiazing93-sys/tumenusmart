@@ -1,3 +1,4 @@
+import { Cabecera } from "@/components/ui";
 import Link from "next/link";
 import { headers } from "next/headers";
 import { prismaDelLocal } from "@/lib/prisma-local";
@@ -95,21 +96,20 @@ export default async function AdminPedidosPage({
 
   return (
     <div>
-      <h1 className="mb-4 text-xl font-bold text-neutral-900">Pedidos</h1>
+      <Cabecera
+        titulo="Pedidos"
+        bajada="Lo que entró por la carta. Los nuevos aparecen arriba y avisan solos."
+        acciones={
+          urlCarta ? (
+            <CompartirCarta nombreNegocio={store?.nombre ?? "Nuestra carta"} url={urlCarta} />
+          ) : null
+        }
+      />
 
       {ideaSemana && <TarjetaIdeaSemana idea={ideaSemana} />}
 
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+      <div className="mb-3">
         <AvisoPedidosNuevos enviadosIniciales={pedidosEnviados} />
-        {urlCarta && (
-          <div className="text-right">
-            <CompartirCarta
-              nombreNegocio={store?.nombre ?? "Nuestra carta"}
-              url={urlCarta}
-            />
-            <p className="mt-1 text-xs text-neutral-400">Link público · QR imprimible</p>
-          </div>
-        )}
       </div>
 
       <div className="mb-6">
@@ -119,8 +119,8 @@ export default async function AdminPedidosPage({
           compacto
         />
         {!estadoTienda.abierto && !estadoTienda.pausado && (
-          <p className="mt-2 text-sm text-amber-700">
-            🕒 Fuera de horario: el menú no está tomando pedidos
+          <p className="mt-2 text-[0.84rem] text-aviso">
+            Fuera de horario: el menú no está tomando pedidos
             {estadoTienda.proximaApertura ? ` — abre ${estadoTienda.proximaApertura}` : ""}.
           </p>
         )}
@@ -129,10 +129,10 @@ export default async function AdminPedidosPage({
       <div className="mb-3 flex flex-wrap gap-2">
         <Link
           href={hrefEstado(null)}
-          className={`rounded-full border px-3 py-1.5 text-sm font-medium ${
+          className={`rounded-full border px-3.5 py-1.5 text-[0.82rem] font-semibold transition-colors duration-100 ${
             !estadoActivo
-              ? "border-brand bg-brand text-white"
-              : "border-neutral-300 text-neutral-600 hover:border-brand hover:text-brand"
+              ? "border-tinta bg-tinta text-white"
+              : "border-linea bg-white text-tinta-media hover:border-brand hover:text-brand"
           }`}
         >
           Todos
@@ -141,10 +141,10 @@ export default async function AdminPedidosPage({
           <Link
             key={e.value}
             href={hrefEstado(e.value)}
-            className={`rounded-full border px-3 py-1.5 text-sm font-medium ${
+            className={`rounded-full border px-3.5 py-1.5 text-[0.82rem] font-semibold transition-colors duration-100 ${
               estadoActivo === e.value
-                ? "border-brand bg-brand text-white"
-                : "border-neutral-300 text-neutral-600 hover:border-brand hover:text-brand"
+                ? "border-tinta bg-tinta text-white"
+                : "border-linea bg-white text-tinta-media hover:border-brand hover:text-brand"
             }`}
           >
             {e.emoji} {e.label}
@@ -152,13 +152,13 @@ export default async function AdminPedidosPage({
         ))}
       </div>
 
-      <div className="mb-6 flex flex-wrap items-center gap-2 border-t border-neutral-200 pt-3">
+      <div className="mb-6 flex flex-wrap items-center gap-2 border-t border-linea pt-3">
         <Link
           href={hrefFecha(null)}
           className={`rounded-full border px-3 py-1.5 text-sm font-medium ${
             !fechaActiva
               ? "border-brand bg-brand text-white"
-              : "border-neutral-300 text-neutral-600 hover:border-brand hover:text-brand"
+              : "border-linea text-tinta-media hover:border-brand hover:text-brand"
           }`}
         >
           Todas las fechas
@@ -170,7 +170,7 @@ export default async function AdminPedidosPage({
             className={`rounded-full border px-3 py-1.5 text-sm font-medium ${
               fechaActiva === f.value
                 ? "border-brand bg-brand text-white"
-                : "border-neutral-300 text-neutral-600 hover:border-brand hover:text-brand"
+                : "border-linea text-tinta-media hover:border-brand hover:text-brand"
             }`}
           >
             {f.label}
@@ -183,7 +183,7 @@ export default async function AdminPedidosPage({
           className={`flex items-center gap-1.5 rounded-full border px-2 py-1 text-sm ${
             fechaActiva === "rango"
               ? "border-brand bg-brand-light"
-              : "border-neutral-300"
+              : "border-linea"
           }`}
         >
           {estadoActivo && <input type="hidden" name="estado" value={estadoActivo} />}
@@ -193,19 +193,19 @@ export default async function AdminPedidosPage({
             name="desde"
             defaultValue={fechaActiva === "rango" ? desde : ""}
             required
-            className="rounded-md border border-neutral-300 px-1.5 py-1 text-xs"
+            className="rounded-md border border-linea px-1.5 py-1 text-xs"
           />
-          <span className="text-neutral-400">–</span>
+          <span className="text-tinta-suave">–</span>
           <input
             type="date"
             name="hasta"
             defaultValue={fechaActiva === "rango" ? hasta : ""}
             required
-            className="rounded-md border border-neutral-300 px-1.5 py-1 text-xs"
+            className="rounded-md border border-linea px-1.5 py-1 text-xs"
           />
           <button
             type="submit"
-            className="rounded-full bg-neutral-800 px-3 py-1 text-xs font-medium text-white hover:bg-neutral-700"
+            className="rounded-full bg-noche-panel px-3 py-1 text-xs font-medium text-white hover:bg-noche-panel"
           >
             Filtrar
           </button>
@@ -213,13 +213,13 @@ export default async function AdminPedidosPage({
       </div>
 
       {pedidos.length === 0 && (
-        <p className="text-neutral-500">No hay pedidos con estos filtros.</p>
+        <p className="text-tinta-media">No hay pedidos con estos filtros.</p>
       )}
 
       {pedidos.length > 0 && (
-        <div className="overflow-x-auto rounded-lg border border-neutral-200 bg-white">
+        <div className="overflow-x-auto rounded-lg border border-linea bg-white">
           <table className="w-full min-w-[900px] text-left text-sm">
-            <thead className="border-b border-neutral-200 bg-neutral-50 text-xs uppercase tracking-wide text-neutral-500">
+            <thead className="border-b border-linea bg-papel-suave text-xs uppercase tracking-wide text-tinta-media">
               <tr>
                 <th className="px-3 py-2">N°</th>
                 <th className="px-3 py-2">Hora</th>
@@ -242,15 +242,15 @@ export default async function AdminPedidosPage({
                 return (
                   <tr
                     key={pedido.id}
-                    className="cursor-pointer border-b border-neutral-100 last:border-0 hover:bg-neutral-50"
+                    className="cursor-pointer border-b border-linea-fina last:border-0 hover:bg-papel-suave"
                   >
                     <td className="px-3 py-3">
-                      <Link href={`/admin/pedidos/${pedido.id}`} className="block font-medium text-neutral-500">
+                      <Link href={`/admin/pedidos/${pedido.id}`} className="block font-medium text-tinta-media">
                         {formatearNumero(pedido.numero)}
                         {!pedido.enviadoWhatsapp && pedido.estado === "pendiente" && (
                           <span
                             title="El cliente armó el pedido pero nunca apretó 'Enviar por WhatsApp'"
-                            className="mt-0.5 block text-[10px] font-medium uppercase text-amber-600"
+                            className="mt-0.5 block text-[10px] font-medium uppercase text-aviso"
                           >
                             sin enviar
                           </span>

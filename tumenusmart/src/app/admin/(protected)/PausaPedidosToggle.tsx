@@ -55,15 +55,15 @@ export function PausaPedidosToggle({
   return (
     <div
       className={`rounded-lg border p-4 ${
-        activo ? "border-amber-300 bg-amber-50" : "border-neutral-200 bg-white"
+        activo ? "border-aviso/30 bg-aviso-luz" : "border-linea bg-white"
       }`}
     >
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="font-medium text-neutral-900">
+          <p className="font-medium text-tinta">
             {activo ? "⏸ Pedidos pausados" : "▶ Tomando pedidos"}
           </p>
-          <p className="text-sm text-neutral-500">
+          <p className="text-sm text-tinta-media">
             {activo
               ? "Los clientes ven el menú pero no pueden confirmar pedidos."
               : "El menú acepta pedidos con normalidad, dentro del horario."}
@@ -74,7 +74,7 @@ export function PausaPedidosToggle({
           onClick={alternar}
           disabled={pending}
           className={`rounded-lg px-4 py-2 text-sm font-semibold text-white disabled:opacity-50 ${
-            activo ? "bg-green-600 hover:bg-green-700" : "bg-amber-600 hover:bg-amber-700"
+            activo ? "bg-exito hover:opacity-90" : "bg-aviso hover:opacity-90"
           }`}
         >
           {pending ? "Guardando..." : activo ? "Reanudar pedidos" : "Pausar pedidos"}
@@ -82,8 +82,8 @@ export function PausaPedidosToggle({
       </div>
 
       {!compacto && (
-        <div className="mt-3 border-t border-neutral-200/70 pt-3">
-          <label className="mb-1 block text-xs font-medium text-neutral-500">
+        <div className="mt-3 border-t border-linea/70 pt-3">
+          <label className="mb-1 block text-xs font-medium text-tinta-media">
             Mensaje que ve el cliente mientras está pausado (opcional)
           </label>
           <div className="flex flex-wrap gap-2">
@@ -91,21 +91,21 @@ export function PausaPedidosToggle({
               value={texto}
               onChange={(e) => setTexto(e.target.value)}
               placeholder="Ej: Estamos con mucha demanda, volvemos en 30 minutos."
-              className="min-w-[220px] flex-1 rounded-lg border border-neutral-300 px-3 py-2 text-sm"
+              className="min-w-[220px] flex-1 rounded-lg border border-linea px-3 py-2 text-sm"
             />
             <button
               type="button"
               onClick={guardarTexto}
-              className="rounded-lg bg-neutral-800 px-3 py-2 text-sm font-medium text-white hover:bg-neutral-700"
+              className="rounded-lg bg-noche-panel px-3 py-2 text-sm font-medium text-white hover:bg-noche-panel"
             >
               Guardar
             </button>
           </div>
-          {guardadoTexto && <p className="mt-1 text-xs text-green-600">✓ Mensaje guardado</p>}
+          {guardadoTexto && <p className="mt-1 text-xs text-exito">✓ Mensaje guardado</p>}
         </div>
       )}
 
-      {error && <p className="mt-2 text-xs text-red-600">{error}</p>}
+      {error && <p className="mt-2 text-xs text-peligro">{error}</p>}
     </div>
   );
 }

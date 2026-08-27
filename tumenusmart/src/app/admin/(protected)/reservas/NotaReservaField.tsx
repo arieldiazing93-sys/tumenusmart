@@ -25,8 +25,8 @@ export function NotaReservaField({ id, nota }: { id: string; nota: string | null
   }
 
   return (
-    <div className="mt-3 border-t border-neutral-100 pt-3">
-      <label className="mb-1 block text-xs font-medium text-neutral-500">
+    <div className="mt-3 border-t border-linea-fina pt-3">
+      <label className="mb-1 block text-xs font-medium text-tinta-media">
         Nota interna (ej: pidió globos y velitas) — no la ve el cliente
       </label>
       <textarea
@@ -34,19 +34,19 @@ export function NotaReservaField({ id, nota }: { id: string; nota: string | null
         onChange={(e) => setTexto(e.target.value)}
         rows={2}
         placeholder="Notas para el encargado..."
-        className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
+        className="w-full rounded-lg border border-linea px-3 py-2 text-sm"
       />
       <div className="mt-1 flex items-center gap-2">
         <button
           type="button"
           onClick={guardar}
           disabled={guardando}
-          className="rounded-lg bg-neutral-800 px-3 py-1.5 text-xs font-medium text-white hover:bg-neutral-700 disabled:opacity-50"
+          className="rounded-lg bg-noche-panel px-3 py-1.5 text-xs font-medium text-white hover:bg-noche-panel disabled:opacity-50"
         >
           {guardando ? "Guardando..." : "Guardar nota"}
         </button>
-        {guardado && <span className="text-xs text-green-600">✓ Guardada</span>}
-        {error && <span className="text-xs text-red-600">{error}</span>}
+        {guardado && <span className="text-xs text-exito">✓ Guardada</span>}
+        {error && <span className="text-xs text-peligro">{error}</span>}
       </div>
     </div>
   );

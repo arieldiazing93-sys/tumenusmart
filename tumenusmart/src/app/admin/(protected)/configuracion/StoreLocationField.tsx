@@ -6,7 +6,7 @@ import type { ZonaMapa } from "@/components/MapPicker";
 
 const MapPicker = dynamic(
   () => import("@/components/MapPicker").then((m) => m.MapPicker),
-  { ssr: false, loading: () => <div className="h-80 animate-pulse rounded-xl bg-neutral-100" /> }
+  { ssr: false, loading: () => <div className="h-80 animate-pulse rounded-xl bg-papel-hundido" /> }
 );
 
 export function StoreLocationField({
@@ -23,10 +23,10 @@ export function StoreLocationField({
 
   return (
     <div>
-      <label className="mb-1 block text-sm font-medium text-neutral-700">
+      <label className="mb-1 block text-sm font-medium text-tinta-media">
         Ubicación del local
       </label>
-      <p className="mb-2 text-xs text-neutral-500">
+      <p className="mb-2 text-xs text-tinta-media">
         Marcá dónde está tu local — es el punto desde el que se calculan las
         distancias de las zonas de envío.
         {zonas.length > 0 && " Los círculos de acá abajo muestran el alcance de cada zona que cargaste."}

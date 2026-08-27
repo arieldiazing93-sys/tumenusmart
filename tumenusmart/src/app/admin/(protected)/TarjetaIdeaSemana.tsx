@@ -27,11 +27,11 @@ export function TarjetaIdeaSemana({ idea }: { idea: IdeaGuardada }) {
         {!idea.vista && (
           <span className="text-xs font-medium text-brand">Nueva</span>
         )}
-        <span className="text-xs text-neutral-500">{ETIQUETA[idea.tipo]}</span>
+        <span className="text-xs text-tinta-media">{ETIQUETA[idea.tipo]}</span>
       </div>
 
-      <p className="font-semibold text-neutral-900">{idea.titulo}</p>
-      <p className="mt-0.5 text-sm text-neutral-700">{idea.dato}</p>
+      <p className="font-semibold text-tinta">{idea.titulo}</p>
+      <p className="mt-0.5 text-sm text-tinta-media">{idea.dato}</p>
 
       <span className="mt-2 inline-block text-sm font-medium text-brand">
         Ver qué hacer →
