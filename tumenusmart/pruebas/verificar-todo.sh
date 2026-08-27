@@ -5,6 +5,10 @@ set -uo pipefail
 cd "$(dirname "$0")/.."
 FALLAS=0
 
+echo "── configuración de despliegue ───────────────────────"
+node pruebas/auditoria-vercel-json.mjs || FALLAS=1
+
+echo
 echo "── tipos ─────────────────────────────────────────────"
 bash pruebas/auditoria-tipos.sh || FALLAS=1
 

@@ -1,9 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-
-  "//": "Las funciones corren en São Paulo (gru1 = sa-east-1), que es EXACTAMENTE la misma región de AWS donde está la base en Supabase (aws-0-sa-east-1). Por defecto Vercel las pone en Washington (iad1), así que cada consulta cruzaba el continente ida y vuelta: ~120 ms por consulta. Una pantalla del panel hace entre 5 y 9 consultas seguidas, así que eso solo ya era cerca de un segundo. En la misma región el viaje pasa a ser de milisegundos. El plan Hobby permite elegir UNA región.",
   "regions": ["gru1"],
-
   "crons": [
     {
       "path": "/api/cron/idea-semanal",
