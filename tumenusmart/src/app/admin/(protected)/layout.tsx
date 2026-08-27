@@ -1,11 +1,12 @@
 import Link from "next/link";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { sesionActual } from "@/lib/auth";
 import { cerrarSesion } from "./logout/actions";
 import { idLocalActual, listarLocales } from "@/lib/local-actual";
 import { ideaDeLaSemana } from "@/lib/idea-semanal";
 import { SelectorLocal } from "./SelectorLocal";
-import { NavPanel, type GrupoSecciones } from "@/components/NavPanel";
+import { COOKIE_MENU, NavPanel, type GrupoSecciones } from "@/components/NavPanel";
 
 /**
  * Las secciones, agrupadas por lo que se hace con ellas.
@@ -18,30 +19,30 @@ function armarGrupos(hayIdeaSinVer: boolean, esSuper: boolean): GrupoSecciones[]
     {
       titulo: "Día a día",
       secciones: [
-        { href: "/admin/pedidos", label: "Pedidos" },
-        { href: "/admin/reservas", label: "Reservas" },
+        { href: "/admin/pedidos", label: "Pedidos", icono: "pedidos" },
+        { href: "/admin/reservas", label: "Reservas", icono: "reservas" },
       ],
     },
     {
       titulo: "Mi carta",
       secciones: [
-        { href: "/admin/productos", label: "Productos" },
-        { href: "/admin/categorias", label: "Categorías" },
+        { href: "/admin/productos", label: "Productos", icono: "productos" },
+        { href: "/admin/categorias", label: "Categorías", icono: "categorias" },
       ],
     },
     {
       titulo: "Cómo va el negocio",
       secciones: [
-        { href: "/admin/estadisticas", label: "Estadísticas" },
-        { href: "/admin/analista", label: "Ideas", aviso: hayIdeaSinVer },
+        { href: "/admin/estadisticas", label: "Estadísticas", icono: "estadisticas" },
+        { href: "/admin/analista", label: "Ideas", aviso: hayIdeaSinVer, icono: "ideas" },
       ],
     },
     {
       titulo: "Ajustes",
       secciones: [
-        { href: "/admin/configuracion", label: "Configuración" },
-        { href: "/admin/repartidores", label: "Repartidores" },
-        { href: "/admin/mi-cuenta", label: "Mi cuenta" },
+        { href: "/admin/configuracion", label: "Configuración", icono: "configuracion" },
+        { href: "/admin/repartidores", label: "Repartidores", icono: "repartidores" },
+        { href: "/admin/mi-cuenta", label: "Mi cuenta", icono: "cuenta" },
       ],
     },
   ];
@@ -50,8 +51,8 @@ function armarGrupos(hayIdeaSinVer: boolean, esSuper: boolean): GrupoSecciones[]
     grupos.push({
       titulo: "Administración",
       secciones: [
-        { href: "/admin/super", label: "Cartera" },
-        { href: "/admin/usuarios", label: "Usuarios" },
+        { href: "/admin/super", label: "Cartera", icono: "cartera" },
+        { href: "/admin/usuarios", label: "Usuarios", icono: "usuarios" },
       ],
     });
   }
@@ -90,6 +91,11 @@ export default async function AdminLayout({ children }: { children: React.ReactN
       hayIdeaSinVer = false;
     }
   }
+
+  // La preferencia de menú plegado se lee acá, en el servidor, para que la
+  // primera pintada ya salga con el ancho correcto. Si se leyera en el
+  // navegador, el menú aparecería ancho y se achicaría a la vista.
+  const menuPlegado = (await cookies()).get(COOKIE_MENU)?.value === "1";
 
   const nombreVisible = sesion.nombre?.trim() || sesion.email;
   const iniciales = nombreVisible.slice(0, 2).toUpperCase();
@@ -152,9 +158,13 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         </div>
       )}
 
-      <div className="mx-auto flex max-w-[92rem] gap-6 px-4 print:max-w-none print:block print:p-0">
+      <div className="mx-auto flex max-w-[92rem] gap-4 px-4 lg:gap-6 print:max-w-none print:block print:p-0">
         <aside className="print:hidden">
-          <NavPanel variante="columna" grupos={armarGrupos(hayIdeaSinVer, esSuper)} />
+          <NavPanel
+            variante="columna"
+            plegadaInicial={menuPlegado}
+            grupos={armarGrupos(hayIdeaSinVer, esSuper)}
+          />
         </aside>
 
         {/* La entrada es corta (0.18s) a propósito: marca el cambio de sección
