@@ -103,16 +103,38 @@ export function NavPanel({
 
   function lista(compacta: boolean) {
     return (
-      <nav className={`flex flex-col ${compacta ? "gap-3 p-2" : "gap-5 p-3"}`}>
+      <nav className={`flex flex-col ${compacta ? "gap-3 p-2" : "gap-4 p-3"}`}>
         {grupos.map((grupo) => (
-          <div key={grupo.titulo}>
-            {compacta ? (
-              // Plegado no entra el título del grupo, pero la separación entre
-              // grupos sí importa: es lo que evita que once iconos se lean
-              // como una lista sin orden.
-              <span aria-hidden="true" className="mx-auto mb-2 block h-px w-5 bg-linea first:hidden" />
-            ) : (
-              <p className="px-3 pb-1.5 text-[0.68rem] font-semibold uppercase tracking-rotulo text-tinta-suave">
+          <div
+            key={grupo.titulo}
+            // La línea de arriba separa las secciones sin gastar color, y sirve
+            // igual desplegado que plegado. El primer grupo no la lleva: ahí
+            // arriba no hay nada de qué separarlo.
+            className={`border-t border-linea-fina first:border-t-0 first:pt-0 ${
+              compacta ? "pt-2.5" : "pt-3"
+            }`}
+          >
+            {/*
+              Plegado no entra el título: queda solo la línea de arriba, que es
+              lo que evita que once iconos se lean como una lista sin orden.
+
+              Antes acá había un <span> separador con `first:hidden`, y como era
+              el primer hijo de su grupo la condición se cumplía SIEMPRE: la
+              raya no se dibujaba nunca. Ahora la separación la hace el borde
+              del grupo, que funciona en los dos modos.
+            */}
+            {!compacta && (
+              /*
+                Los títulos son tinta oscura y negrita, NO naranja.
+                Probé las dos: con cinco títulos naranjas, el naranja deja de
+                significar "estás acá" y la sección activa se pierde entre
+                ellos. En tinta oscura las secciones se leen igual de bien y el
+                naranja queda para una sola cosa.
+
+                La separación entre letras baja de 0.19em a 0.15em porque a
+                este tamaño la anterior desarma las palabras.
+              */
+              <p className="px-3 pb-2 text-[0.75rem] font-bold uppercase tracking-[0.15em] text-tinta">
                 {grupo.titulo}
               </p>
             )}
