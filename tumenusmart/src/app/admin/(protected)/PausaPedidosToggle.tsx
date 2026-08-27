@@ -13,10 +13,17 @@ export function PausaPedidosToggle({
   pausado,
   mensaje,
   compacto = false,
+  variante = "tarjeta",
 }: {
   pausado: boolean;
   mensaje: string | null;
   compacto?: boolean;
+  /**
+   * "tarjeta" es el bloque completo de Configuración, con su texto y el
+   * mensaje para el cliente. "barra" es solo el botón, para la línea de estado
+   * de Pedidos, donde el texto lo pone la barra.
+   */
+  variante?: "tarjeta" | "barra";
 }) {
   const router = useRouter();
   const [activo, setActivo] = useState(pausado);
@@ -50,6 +57,31 @@ export function PausaPedidosToggle({
     } catch (err) {
       setError(err instanceof Error ? err.message : "No se pudo guardar el mensaje");
     }
+  }
+
+  // En la barra de estado de Pedidos solo va el botón: el texto de qué está
+  // pasando lo pone la barra, que además sabe si el local está fuera de
+  // horario. Tenerlo en los dos lugares llevaba a que se contradijeran —
+  // la tarjeta decía "acepta pedidos con normalidad" justo arriba de
+  // "el menú no está tomando pedidos".
+  if (variante === "barra") {
+    return (
+      <span className="flex flex-none items-center gap-2">
+        {error && <span className="text-[0.76rem] text-peligro">{error}</span>}
+        <button
+          type="button"
+          onClick={alternar}
+          disabled={pending}
+          className={`flex-none rounded-lg px-3 py-1.5 text-[0.8rem] font-semibold transition-colors duration-150 disabled:opacity-50 ${
+            activo
+              ? "bg-exito text-white hover:opacity-90"
+              : "border border-linea bg-white text-tinta-media hover:border-aviso hover:text-aviso"
+          }`}
+        >
+          {pending ? "Guardando…" : activo ? "Reanudar pedidos" : "Pausar pedidos"}
+        </button>
+      </span>
+    );
   }
 
   return (

@@ -171,7 +171,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
             sin hacer esperar a nadie. */}
         <main
           key={sesion.email}
-          className="min-w-0 flex-1 animate-panel py-6 print:animate-none print:py-0"
+          className="min-w-0 flex-1 animate-panel py-5 print:animate-none print:py-0"
         >
           {children}
         </main>

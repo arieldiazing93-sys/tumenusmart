@@ -139,23 +139,43 @@ export function AvisoPedidosNuevos({ enviadosIniciales }: Props) {
 
   return (
     <div className="flex flex-wrap items-center gap-2">
+      {/*
+        El botón dice qué pasa si lo apretás, no en qué estado está: "Activar
+        aviso sonoro" cuando está apagado. El estado se ve por el color y la
+        campana. Antes ocupaba una línea entera para decir "activado", que es
+        justamente cuando NO hace falta explicar nada.
+      */}
       <button
         type="button"
         onClick={alternarSonido}
-        className={`rounded-lg border px-3 py-1.5 text-sm font-medium ${
+        title={
+          sonidoActivo
+            ? "El aviso sonoro está activado. Tocá para apagarlo."
+            : "Activalo una vez y esta pantalla te avisa cuando entra un pedido."
+        }
+        aria-pressed={sonidoActivo}
+        className={`flex flex-none items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[0.8rem] font-medium transition-colors duration-150 ${
           sonidoActivo
             ? "border-exito/30 bg-exito-luz text-exito"
-            : "border-linea text-tinta-media hover:border-brand hover:text-brand"
+            : "border-linea bg-white text-tinta-media hover:border-brand hover:text-brand"
         }`}
       >
-        {sonidoActivo ? "🔔 Aviso sonoro activado" : "🔕 Activar aviso sonoro"}
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.7"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+          className="h-[15px] w-[15px] flex-none"
+        >
+          <path d="M6 9a6 6 0 0 1 12 0c0 4 1.5 5.5 1.5 5.5h-15S6 13 6 9Z" />
+          <path d="M10.5 18a1.5 1.5 0 0 0 3 0" />
+          {!sonidoActivo && <path d="m4 4 16 16" />}
+        </svg>
+        <span className="hidden sm:inline">{sonidoActivo ? "Aviso sonoro" : "Activar aviso"}</span>
       </button>
-
-      {!sonidoActivo && (
-        <span className="text-xs text-tinta-suave">
-          Activalo una vez y esta pantalla te avisa cuando entra un pedido.
-        </span>
-      )}
 
       {nuevos > 0 && (
         <button

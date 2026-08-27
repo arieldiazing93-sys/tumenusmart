@@ -94,6 +94,38 @@ export default async function AdminPedidosPage({
     return qs ? `/admin/pedidos?${qs}` : "/admin/pedidos";
   }
 
+  /**
+   * El estado de los pedidos, en un solo lugar.
+   *
+   * Están pausados, o el local está fuera de horario, o se está tomando
+   * pedidos. Son excluyentes y en ese orden de prioridad: pausado manda sobre
+   * el horario, porque es una decisión que alguien tomó recién.
+   */
+  const estadoPedidos = store?.pedidosPausados
+    ? {
+        color: "aviso" as const,
+        titulo: "Pedidos pausados",
+        detalle:
+          store.mensajePausa?.trim() ||
+          "Los clientes ven la carta pero no pueden confirmar.",
+      }
+    : !estadoTienda.abierto
+      ? {
+          color: "neutro" as const,
+          titulo: "Fuera de horario",
+          detalle: estadoTienda.proximaApertura
+            ? `No se toman pedidos hasta que abra ${estadoTienda.proximaApertura}.`
+            : "No se toman pedidos fuera del horario cargado.",
+        }
+      : {
+          color: "exito" as const,
+          titulo: "Tomando pedidos",
+          detalle:
+            estadoTienda.horarioDeHoy && estadoTienda.horarioDeHoy !== "Cerrado"
+              ? `Hoy ${estadoTienda.horarioDeHoy}`
+              : "",
+        };
+
   return (
     <div>
       <Cabecera
@@ -108,25 +140,55 @@ export default async function AdminPedidosPage({
 
       {ideaSemana && <TarjetaIdeaSemana idea={ideaSemana} />}
 
-      <div className="mb-3">
-        <AvisoPedidosNuevos enviadosIniciales={pedidosEnviados} />
-      </div>
+      {/*
+        Una sola línea de estado, no tres bloques.
 
-      <div className="mb-6">
-        <PausaPedidosToggle
-          pausado={store?.pedidosPausados ?? false}
-          mensaje={store?.mensajePausa ?? null}
-          compacto
-        />
-        {!estadoTienda.abierto && !estadoTienda.pausado && (
-          <p className="mt-2 text-[0.84rem] text-aviso">
-            Fuera de horario: el menú no está tomando pedidos
-            {estadoTienda.proximaApertura ? ` — abre ${estadoTienda.proximaApertura}` : ""}.
-          </p>
+        Antes esto ocupaba media pantalla ANTES del primer pedido, que es lo
+        único que se viene a ver acá. Y peor: se contradecía — la tarjeta decía
+        "acepta pedidos con normalidad" justo arriba de "el menú no está
+        tomando pedidos". Eran dos piezas distintas contando la misma historia
+        sin hablarse. Ahora el estado se decide en un solo lugar.
+      */}
+      <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-linea bg-white px-3.5 py-2">
+        <span className="flex flex-none items-center gap-2 text-[0.86rem] font-semibold text-tinta">
+          <span
+            aria-hidden="true"
+            className={`h-2 w-2 flex-none rounded-full ${
+              estadoPedidos.color === "exito"
+                ? "bg-exito"
+                : estadoPedidos.color === "aviso"
+                  ? "bg-aviso"
+                  : "bg-tinta-suave"
+            }`}
+          />
+          {estadoPedidos.titulo}
+        </span>
+
+        {estadoPedidos.detalle && (
+          <span className="min-w-0 flex-1 truncate text-[0.82rem] text-tinta-media">
+            {estadoPedidos.detalle}
+          </span>
         )}
+
+        <div className="ml-auto flex flex-none items-center gap-2">
+          <AvisoPedidosNuevos enviadosIniciales={pedidosEnviados} />
+          <PausaPedidosToggle
+            pausado={store?.pedidosPausados ?? false}
+            mensaje={store?.mensajePausa ?? null}
+            compacto
+            variante="barra"
+          />
+        </div>
       </div>
 
-      <div className="mb-3 flex flex-wrap gap-2">
+      {/*
+        Estados y fechas comparten una sola fila.
+
+        Eran dos renglones de pastillas, uno arriba del otro, empujando los
+        pedidos fuera de la pantalla. Van separados por una línea vertical:
+        se sigue leyendo que son dos filtros distintos, pero ocupan la mitad.
+      */}
+      <div className="mb-4 flex flex-wrap items-center gap-x-2 gap-y-2">
         <Link
           href={hrefEstado(null)}
           className={`rounded-full border px-3.5 py-1.5 text-[0.82rem] font-semibold transition-colors duration-100 ${
@@ -150,66 +212,87 @@ export default async function AdminPedidosPage({
             {e.emoji} {e.label}
           </Link>
         ))}
-      </div>
 
-      <div className="mb-6 flex flex-wrap items-center gap-2 border-t border-linea pt-3">
+        <span aria-hidden="true" className="mx-1 h-5 w-px flex-none bg-linea" />
+
         <Link
           href={hrefFecha(null)}
-          className={`rounded-full border px-3 py-1.5 text-sm font-medium ${
+          className={`rounded-full border px-3 py-1.5 text-[0.82rem] font-semibold transition-colors duration-100 ${
             !fechaActiva
-              ? "border-brand bg-brand text-white"
-              : "border-linea text-tinta-media hover:border-brand hover:text-brand"
+              ? "border-tinta bg-tinta text-white"
+              : "border-linea bg-white text-tinta-media hover:border-brand hover:text-brand"
           }`}
         >
-          Todas las fechas
+          Todas
         </Link>
         {FILTROS_FECHA.map((f) => (
           <Link
             key={f.value}
             href={hrefFecha(f.value)}
-            className={`rounded-full border px-3 py-1.5 text-sm font-medium ${
+            className={`rounded-full border px-3 py-1.5 text-[0.82rem] font-semibold transition-colors duration-100 ${
               fechaActiva === f.value
-                ? "border-brand bg-brand text-white"
-                : "border-linea text-tinta-media hover:border-brand hover:text-brand"
+                ? "border-tinta bg-tinta text-white"
+                : "border-linea bg-white text-tinta-media hover:border-brand hover:text-brand"
             }`}
           >
             {f.label}
           </Link>
         ))}
 
-        <form
-          method="get"
-          action="/admin/pedidos"
-          className={`flex items-center gap-1.5 rounded-full border px-2 py-1 text-sm ${
-            fechaActiva === "rango"
-              ? "border-brand bg-brand-light"
-              : "border-linea"
-          }`}
-        >
-          {estadoActivo && <input type="hidden" name="estado" value={estadoActivo} />}
-          <input type="hidden" name="fecha" value="rango" />
-          <input
-            type="date"
-            name="desde"
-            defaultValue={fechaActiva === "rango" ? desde : ""}
-            required
-            className="rounded-md border border-linea px-1.5 py-1 text-xs"
-          />
-          <span className="text-tinta-suave">–</span>
-          <input
-            type="date"
-            name="hasta"
-            defaultValue={fechaActiva === "rango" ? hasta : ""}
-            required
-            className="rounded-md border border-linea px-1.5 py-1 text-xs"
-          />
-          <button
-            type="submit"
-            className="rounded-full bg-noche-panel px-3 py-1 text-xs font-medium text-white hover:bg-noche-panel"
+        <details className="group relative flex-none" open={fechaActiva === "rango"}>
+          <summary
+            className={`flex cursor-pointer list-none items-center gap-1.5 rounded-full border px-3 py-1.5 text-[0.82rem] font-semibold transition-colors duration-100 ${
+              fechaActiva === "rango"
+                ? "border-tinta bg-tinta text-white"
+                : "border-linea bg-white text-tinta-media hover:border-brand hover:text-brand"
+            }`}
           >
-            Filtrar
-          </button>
-        </form>
+            Rango
+            <span
+              aria-hidden="true"
+              className="text-[0.6rem] transition-transform duration-150 group-open:rotate-180"
+            >
+              ▼
+            </span>
+          </summary>
+
+          {/*
+            Se despliega por encima y no empujando la fila: si empujara, abrir
+            el rango correría los pedidos hacia abajo, que es justo lo que
+            estamos tratando de evitar.
+          */}
+          <form
+            method="get"
+            action="/admin/pedidos"
+            className="absolute left-0 top-full z-20 mt-1.5 flex items-center gap-1.5 rounded-xl border border-linea bg-white p-2 shadow-media"
+          >
+            {estadoActivo && <input type="hidden" name="estado" value={estadoActivo} />}
+            <input type="hidden" name="fecha" value="rango" />
+            <input
+              type="date"
+              name="desde"
+              aria-label="Desde"
+              defaultValue={fechaActiva === "rango" ? desde : ""}
+              required
+              className="rounded-lg border border-linea px-2 py-1.5 text-[0.78rem]"
+            />
+            <span className="text-tinta-suave">–</span>
+            <input
+              type="date"
+              name="hasta"
+              aria-label="Hasta"
+              defaultValue={fechaActiva === "rango" ? hasta : ""}
+              required
+              className="rounded-lg border border-linea px-2 py-1.5 text-[0.78rem]"
+            />
+            <button
+              type="submit"
+              className="flex-none rounded-lg bg-tinta px-3 py-1.5 text-[0.78rem] font-semibold text-white transition-opacity hover:opacity-90"
+            >
+              Filtrar
+            </button>
+          </form>
+        </details>
       </div>
 
       {pedidos.length === 0 && (

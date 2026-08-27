@@ -102,11 +102,11 @@ export function Cabecera({
   acciones?: ReactNode;
 }) {
   return (
-    <header className="mb-5 flex flex-wrap items-start justify-between gap-x-4 gap-y-3 border-b border-linea pb-4">
+    <header className="mb-4 flex flex-wrap items-start justify-between gap-x-4 gap-y-2.5 border-b border-linea pb-3">
       <div className="min-w-0">
-        <h1 className="text-[1.4rem] font-semibold tracking-titular text-tinta">{titulo}</h1>
+        <h1 className="text-[1.3rem] font-semibold tracking-titular text-tinta">{titulo}</h1>
         {bajada && (
-          <p className="mt-1 max-w-2xl text-[0.85rem] leading-snug text-tinta-media">{bajada}</p>
+          <p className="mt-0.5 max-w-2xl text-[0.83rem] leading-snug text-tinta-media">{bajada}</p>
         )}
       </div>
       {acciones && <div className="flex flex-wrap items-center gap-2">{acciones}</div>}
