@@ -328,7 +328,27 @@ export default async function AdminPedidosPage({
                     className="cursor-pointer border-b border-linea-fina last:border-0 hover:bg-papel-suave"
                   >
                     <td className="px-3 py-3">
-                      <Link href={`/admin/pedidos/${pedido.id}`} className="block font-medium text-tinta-media">
+                      {/*
+                        prefetch={false} en todos los enlaces de la fila.
+
+                        Next precarga cada enlace apenas entra en pantalla, y
+                        esta pantalla es force-dynamic: cada precarga es un
+                        render COMPLETO en el servidor, con sus consultas a la
+                        base. Con hasta 100 pedidos en la lista, desplazarse
+                        disparaba cientos de renders para terminar abriendo uno.
+                        En los registros de Vercel se veían cinco GET a
+                        /admin/pedidos/<id> en 70 milisegundos sin que nadie
+                        tocara nada.
+
+                        Y con connection_limit=1 es peor: esas precargas
+                        compiten por la misma conexión que necesita la pantalla
+                        que estás mirando.
+
+                        El costo es que abrir un pedido ya no viene adelantado.
+                        Se paga una vez al abrir, en lugar de cientos de veces
+                        al desplazarse.
+                      */}
+                      <Link prefetch={false} href={`/admin/pedidos/${pedido.id}`} className="block font-medium text-tinta-media">
                         {formatearNumero(pedido.numero)}
                         {!pedido.enviadoWhatsapp && pedido.estado === "pendiente" && (
                           <span
@@ -341,7 +361,7 @@ export default async function AdminPedidosPage({
                       </Link>
                     </td>
                     <td className="px-3 py-3">
-                      <Link href={`/admin/pedidos/${pedido.id}`} className="block">
+                      <Link prefetch={false} href={`/admin/pedidos/${pedido.id}`} className="block">
                         {new Date(pedido.createdAt).toLocaleDateString("es-PY", {
                           day: "2-digit",
                           month: "2-digit",
@@ -355,44 +375,44 @@ export default async function AdminPedidosPage({
                       </Link>
                     </td>
                     <td className="px-3 py-3">
-                      <Link href={`/admin/pedidos/${pedido.id}`} className="block font-medium">
+                      <Link prefetch={false} href={`/admin/pedidos/${pedido.id}`} className="block font-medium">
                         {pedido.clienteNombre}
                       </Link>
                     </td>
                     <td className="px-3 py-3">
-                      <Link href={`/admin/pedidos/${pedido.id}`} className="block">
+                      <Link prefetch={false} href={`/admin/pedidos/${pedido.id}`} className="block">
                         {pedido.clienteTelefono}
                       </Link>
                     </td>
                     <td className="px-3 py-3">
-                      <Link href={`/admin/pedidos/${pedido.id}`} className="block max-w-[220px] truncate">
+                      <Link prefetch={false} href={`/admin/pedidos/${pedido.id}`} className="block max-w-[220px] truncate">
                         {resumenProductos}
                       </Link>
                     </td>
                     <td className="px-3 py-3">
-                      <Link href={`/admin/pedidos/${pedido.id}`} className="block font-semibold">
+                      <Link prefetch={false} href={`/admin/pedidos/${pedido.id}`} className="block font-semibold">
                         {formatearGuarani(Number(pedido.total))}
                       </Link>
                     </td>
                     <td className="px-3 py-3">
-                      <Link href={`/admin/pedidos/${pedido.id}`} className="block">
+                      <Link prefetch={false} href={`/admin/pedidos/${pedido.id}`} className="block">
                         {pedido.tipoEntrega === "delivery"
                           ? pedido.deliveryZone?.nombre ?? "A coordinar"
                           : "Retiro"}
                       </Link>
                     </td>
                     <td className="px-3 py-3">
-                      <Link href={`/admin/pedidos/${pedido.id}`} className="block">
+                      <Link prefetch={false} href={`/admin/pedidos/${pedido.id}`} className="block">
                         {pedido.repartidor?.nombre ?? "—"}
                       </Link>
                     </td>
                     <td className="px-3 py-3">
-                      <Link href={`/admin/pedidos/${pedido.id}`} className="block">
+                      <Link prefetch={false} href={`/admin/pedidos/${pedido.id}`} className="block">
                         {pedido.metodoPagoReferencia}
                       </Link>
                     </td>
                     <td className="px-3 py-3">
-                      <Link href={`/admin/pedidos/${pedido.id}`}>
+                      <Link prefetch={false} href={`/admin/pedidos/${pedido.id}`}>
                         <span
                           className={`inline-block whitespace-nowrap rounded-full px-2.5 py-1 text-[0.74rem] font-semibold ${colorEstado(pedido.estado)}`}
                         >

@@ -171,6 +171,7 @@ export default async function AdminProductosPage({
               etiqueta={p.nombre}
             />
             <Link
+              prefetch={false}
               href={`/admin/productos/${p.id}`}
               className="flex min-w-0 flex-1 items-center justify-between gap-3 hover:text-brand"
             >
