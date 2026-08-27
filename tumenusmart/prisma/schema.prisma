@@ -77,6 +77,47 @@ model Store {
   pagos            Pago[]
 }
 
+/// Cada problema técnico que ocurrió en producción.
+///
+/// No es un registro de todo: los errores se AGRUPAN por su huella, así que
+/// una fila es "un problema", no "una vez que falló". Si el mismo bug ocurre
+/// doscientas veces, es una fila con ocurrencias = 200.
+///
+/// Esa distinción es la que hace que la pantalla sea legible: una lista de
+/// doscientas líneas iguales no se mira, una de tres problemas sí.
+model ErrorReportado {
+  id String @id @default(cuid())
+
+  /// Qué problema es. Sale de huellaDeError(): mismo bug con ids distintos
+  /// cae en la misma huella.
+  huella String @unique
+
+  /// De qué local. Nulo cuando el error ocurrió fuera del contexto de uno
+  /// (la portada, el login, un cron).
+  storeId     String?
+  nombreLocal String?
+
+  ruta    String
+  mensaje String
+  /// El rastro completo, recortado. Es lo que se lee para entender la causa.
+  detalle String?
+  /// Qué usuario lo sufrió, si había sesión.
+  usuario String?
+
+  ocurrencias Int      @default(1)
+  primeraVez  DateTime @default(now())
+  ultimaVez   DateTime @default(now())
+
+  /// Cuándo se mandó el último correo por este problema. Nulo = nunca se avisó.
+  avisadoEn DateTime?
+  /// Marcado como resuelto a mano desde el panel. No se borra: si vuelve a
+  /// ocurrir se desmarca solo y vuelve a avisar.
+  resuelto Boolean @default(false)
+
+  @@index([resuelto, ultimaVez])
+  @@index([storeId])
+}
+
 /// Cada pago recibido de un local.
 ///
 /// Se guarda el historial completo y no solo el vencimiento vigente: cuando un

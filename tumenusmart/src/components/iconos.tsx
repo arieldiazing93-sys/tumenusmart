@@ -128,6 +128,14 @@ export const IconoUsuarios = (p: Props) => (
   </Svg>
 );
 
+/** Errores: el triángulo de atención. */
+export const IconoErrores = (p: Props) => (
+  <Svg {...p}>
+    <path d="M12 3.5 21 19H3l9-15.5Z" />
+    <path d="M12 10v4M12 16.5v.01" />
+  </Svg>
+);
+
 /** La flecha que pliega y despliega el menú. */
 export const IconoPlegar = ({ className = "" }: Props) => (
   <Svg className={className}>
@@ -148,6 +156,7 @@ export const ICONOS = {
   cuenta: IconoCuenta,
   cartera: IconoCartera,
   usuarios: IconoUsuarios,
+  errores: IconoErrores,
 } as const;
 
 export type NombreIcono = keyof typeof ICONOS;
