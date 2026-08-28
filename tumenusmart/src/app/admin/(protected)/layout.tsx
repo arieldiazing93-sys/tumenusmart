@@ -1,3 +1,4 @@
+import { Logo } from "@/components/Logo";
 import Link from "next/link";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
@@ -142,9 +143,10 @@ export default async function AdminLayout({ children }: { children: React.ReactN
 
           <Link
             href="/admin/pedidos"
-            className="min-w-0 flex-none truncate text-[0.95rem] font-semibold tracking-titular text-tinta"
+            className="flex min-w-0 flex-none items-center gap-2 text-[0.95rem] font-semibold tracking-titular text-tinta"
           >
-            TuMenuSmart
+            <Logo tam={22} color="#D2501F" />
+            <span className="truncate">TuMenuSmart</span>
           </Link>
 
           <div className="ml-auto flex min-w-0 items-center gap-2.5">

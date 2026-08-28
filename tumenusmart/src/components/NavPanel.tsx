@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { ICONOS, IconoPlegar, type NombreIcono } from "./iconos";
+import { Logo } from "./Logo";
 
 export type Seccion = {
   href: string;
@@ -261,7 +262,10 @@ export function NavPanel({
           />
           <div className="absolute inset-y-0 left-0 w-[17rem] animate-[entrarIzquierda_0.18s_ease-out] overflow-y-auto border-r border-linea bg-white">
             <div className="flex items-center justify-between border-b border-linea px-4 py-3">
-              <span className="text-[0.95rem] font-semibold tracking-titular">TuMenuSmart</span>
+              <span className="flex items-center gap-2 text-[0.95rem] font-semibold tracking-titular">
+                <Logo tam={20} color="#D2501F" />
+                TuMenuSmart
+              </span>
               <button
                 type="button"
                 onClick={() => setAbierto(false)}

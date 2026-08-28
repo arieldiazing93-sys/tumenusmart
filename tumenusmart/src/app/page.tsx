@@ -1,3 +1,4 @@
+import { Logo } from "@/components/Logo";
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { construirLinkWhatsapp } from "@/lib/whatsapp";
@@ -94,7 +95,7 @@ export default async function PortadaPage() {
       <header className="sticky top-0 z-20 border-b border-linea bg-papel/85 backdrop-blur">
         <div className="mx-auto flex h-[62px] max-w-6xl items-center justify-between gap-4 px-5 sm:px-8">
           <span className="flex items-center gap-2 text-[1.06rem] font-semibold tracking-titular">
-            <Marca />
+            <Logo tam={26} color="#D2501F" />
             TuMenuSmart
           </span>
           <nav className="flex items-center gap-6 text-[0.925rem] text-tinta-media">
@@ -344,18 +345,6 @@ const BOTON =
 const BOTON_FANTASMA =
   "inline-flex items-center gap-1.5 rounded border border-linea px-4 py-2.5 text-[0.94rem] font-semibold text-tinta transition-colors hover:border-tinta-suave hover:bg-papel-suave";
 
-function Marca() {
-  return (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <rect x="1" y="1" width="22" height="22" rx="5" fill="#D2501F" />
-      <path
-        d="M6.5 16.5V7.5h1.9l3.6 5.4 3.6-5.4h1.9v9h-1.8v-6l-3.1 4.6h-1.2L8.3 10.5v6H6.5z"
-        fill="#fff"
-      />
-    </svg>
-  );
-}
-
 function Cifra({ valor, texto, borde }: { valor: string; texto: string; borde?: boolean }) {
   return (
     <div
@@ -507,7 +496,10 @@ function PanelMuestra() {
   return (
     <div className="mt-10 overflow-hidden rounded-lg border border-noche-linea bg-noche-panel">
       <div className="flex items-center gap-5 overflow-x-auto whitespace-nowrap border-b border-noche-linea px-4 py-2.5 text-[0.8rem] text-noche-suave">
-        <span className="font-semibold tracking-titular text-noche-tinta">TuMenuSmart</span>
+        <span className="flex items-center gap-1.5 font-semibold tracking-titular text-noche-tinta">
+            <Logo tam={16} color="#FFFFFF" hueco="#1D1F24" />
+            TuMenuSmart
+          </span>
         <span className="font-semibold text-noche-tinta">Pedidos</span>
         <span>Productos</span>
         <span>Reservas</span>

@@ -1,3 +1,4 @@
+import { Logo } from "@/components/Logo";
 import { clasesBoton } from "@/components/ui";
 import { faltaCrearElPrimerUsuario, faltaSecretoDeSesion } from "@/lib/auth";
 import { crearPrimerUsuario } from "./actions";
@@ -31,7 +32,10 @@ export default async function AdminLoginPage({
   if (faltaSecretoDeSesion()) {
     return (
       <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-4">
-        <h1 className="mb-1 text-[1.4rem] font-semibold tracking-titular text-tinta">TuMenuSmart</h1>
+        <h1 className="mb-1 flex items-center gap-2.5 text-[1.4rem] font-semibold tracking-titular text-tinta">
+        <Logo tam={30} color="#D2501F" />
+        TuMenuSmart
+      </h1>
         <div className="mt-4 rounded-lg border border-aviso/30 bg-aviso-luz p-4">
           <p className="font-semibold text-aviso">Falta una configuración</p>
           <p className="mt-1 text-sm text-aviso">
@@ -62,7 +66,10 @@ export default async function AdminLoginPage({
 
   return (
     <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center px-4 py-10">
-      <h1 className="mb-1 text-[1.4rem] font-semibold tracking-titular text-tinta">TuMenuSmart</h1>
+      <h1 className="mb-1 flex items-center gap-2.5 text-[1.4rem] font-semibold tracking-titular text-tinta">
+        <Logo tam={30} color="#D2501F" />
+        TuMenuSmart
+      </h1>
 
       {primerArranque ? (
         <>
