@@ -44,6 +44,7 @@ export function NavPanel({
   grupos,
   variante,
   plegadaInicial = false,
+  extra,
 }: {
   grupos: GrupoSecciones[];
   /**
@@ -53,6 +54,14 @@ export function NavPanel({
    * arriba y la columna al costado del contenido.
    */
   variante: "boton" | "columna";
+  /**
+   * Contenido extra para la cabecera del cajón del celular.
+   *
+   * Hoy lo usa el selector de local del superadmin: en la barra de arriba no
+   * entra —empujaba el avatar y "Salir" fuera de la pantalla— y acá adentro
+   * hay lugar de sobra.
+   */
+  extra?: React.ReactNode;
   /**
    * Si el menú arranca plegado. Viene del servidor leyendo la cookie, y NO de
    * localStorage a propósito: leer la preferencia recién en el navegador haría
@@ -262,6 +271,10 @@ export function NavPanel({
                 ✕
               </button>
             </div>
+            {extra && (
+              <div className="border-b border-linea px-4 py-3">{extra}</div>
+            )}
+
             {/* En el cajón siempre desplegado: hay lugar de sobra y ahí lo que
                 importa es leer los nombres. */}
             {lista(false)}

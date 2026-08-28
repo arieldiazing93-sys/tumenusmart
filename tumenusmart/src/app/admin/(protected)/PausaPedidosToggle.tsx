@@ -1,5 +1,6 @@
 "use client";
 
+import { clasesBoton } from "@/components/ui";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { alternarPausaPedidos, guardarMensajePausa } from "./configuracion/actions";
@@ -107,9 +108,10 @@ export function PausaPedidosToggle({
           type="button"
           onClick={alternar}
           disabled={pending}
-          className={`rounded-lg px-4 py-2 text-sm font-semibold text-white disabled:opacity-50 ${
-            activo ? "bg-exito hover:opacity-90" : "bg-aviso hover:opacity-90"
-          }`}
+          // Azul, como el resto de los botones de esta pantalla. El estado ya
+          // lo cuenta el fondo de la tarjeta —ámbar cuando está pausado— así
+          // que el botón no necesita repetirlo con su propio color.
+          className={clasesBoton("navegar", "md")}
         >
           {pending ? "Guardando..." : activo ? "Reanudar pedidos" : "Pausar pedidos"}
         </button>
@@ -130,7 +132,7 @@ export function PausaPedidosToggle({
             <button
               type="button"
               onClick={guardarTexto}
-              className="rounded-lg bg-noche-panel px-3 py-2 text-sm font-medium text-white hover:bg-noche-panel"
+              className={clasesBoton("navegar", "md")}
             >
               Guardar
             </button>

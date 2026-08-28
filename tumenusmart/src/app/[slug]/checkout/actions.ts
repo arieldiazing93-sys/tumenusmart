@@ -58,8 +58,20 @@ export async function crearPedido(datos: DatosCheckout): Promise<{ orderId: stri
   if (!datos.items || datos.items.length === 0) {
     throw new Error("El carrito está vacío");
   }
-  if (datos.tipoEntrega === "delivery" && !datos.direccion?.trim()) {
-    throw new Error("Falta la dirección de entrega");
+  // El pin del mapa es obligatorio para delivery; la referencia escrita, no.
+  //
+  // Es al revés de como estaba. El pin es un dato exacto que el repartidor
+  // abre y sigue; la referencia es texto que puede estar mal, incompleto o
+  // decir "la casa de al lado del almacén". Además el costo de envío por
+  // zonas se calcula con las coordenadas: sin pin no hay forma de cobrarlo.
+  //
+  // El formulario ya lo exige del lado del navegador. Esta comprobación es la
+  // que vale: una acción del servidor se puede llamar sin pasar por él.
+  if (
+    datos.tipoEntrega === "delivery" &&
+    (datos.clienteLat == null || datos.clienteLng == null)
+  ) {
+    throw new Error("Marcá tu ubicación en el mapa para poder entregarte el pedido");
   }
   if (
     datos.comprobanteTipo === "factura" &&

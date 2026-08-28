@@ -221,9 +221,26 @@ export function MapPicker({
         type="button"
         onClick={usarMiUbicacion}
         disabled={ubicando}
-        className="self-start text-sm text-brand hover:underline disabled:opacity-50"
+        // Azul y con cuerpo: es la forma MÁS rápida y más exacta de decir
+        // dónde vivís, y como enlace de texto no se veía que fuera algo para
+        // tocar. El azul además es el color de navegar en el sistema, y esto
+        // navega el mapa — no confirma nada.
+        className="inline-flex self-start items-center gap-2 rounded-lg border border-azul/35 bg-azul-luz px-3.5 py-2.5 text-[0.86rem] font-semibold text-azul-oscuro transition-colors duration-150 hover:border-azul hover:bg-azul hover:text-white active:scale-[0.98] disabled:opacity-50"
       >
-        {ubicando ? "Ubicando…" : "📍 Usar mi ubicación actual"}
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+          className="h-[17px] w-[17px] flex-none"
+        >
+          <path d="M12 21s7-6.2 7-11a7 7 0 1 0-14 0c0 4.8 7 11 7 11Z" />
+          <circle cx="12" cy="10" r="2.5" />
+        </svg>
+        {ubicando ? "Ubicando…" : "Usar mi ubicación actual"}
       </button>
       <p className="text-xs text-neutral-500">
         Arrastrá el pin o tocá el mapa para marcar dónde entregamos tu pedido.

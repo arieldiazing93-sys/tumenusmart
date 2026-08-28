@@ -49,7 +49,7 @@ export default async function AdminConfiguracionPage() {
               <p className="text-[0.95rem] font-semibold tracking-titular text-tinta">Horario de atención</p>
               <Link
                 href="/admin/configuracion/horarios"
-                className="rounded-lg border border-linea px-3 py-1.5 text-sm font-medium text-tinta-media hover:border-brand hover:text-brand"
+                className={clasesBoton("navegar", "sm")}
               >
                 Editar horarios
               </Link>
@@ -300,7 +300,7 @@ export default async function AdminConfiguracionPage() {
           />
           <button
             type="submit"
-            className="rounded-lg bg-noche-panel px-4 py-2 text-sm font-medium text-white hover:bg-noche-panel"
+            className={clasesBoton("suave", "md")}
           >
             Agregar
           </button>

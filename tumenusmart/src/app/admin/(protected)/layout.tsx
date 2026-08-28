@@ -131,18 +131,34 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     <div className="min-h-screen bg-papel-suave">
       {/* ---------- barra de arriba ---------- */}
       <header className="sticky top-0 z-40 border-b border-linea bg-papel/90 backdrop-blur print:hidden">
-        <div className="mx-auto flex h-14 max-w-[92rem] items-center gap-3 px-4">
-          <NavPanel variante="boton" grupos={armarGrupos(hayIdeaSinVer, sesion.rol)} />
+        <div className="mx-auto flex h-14 max-w-[92rem] items-center gap-3 overflow-hidden px-4">
+          <NavPanel
+            variante="boton"
+            grupos={armarGrupos(hayIdeaSinVer, sesion.rol)}
+            extra={
+              esSuper ? <SelectorLocal locales={locales} actual={localActualId} /> : null
+            }
+          />
 
           <Link
             href="/admin/pedidos"
-            className="flex-none text-[0.95rem] font-semibold tracking-titular text-tinta"
+            className="min-w-0 flex-none truncate text-[0.95rem] font-semibold tracking-titular text-tinta"
           >
             TuMenuSmart
           </Link>
 
           <div className="ml-auto flex min-w-0 items-center gap-2.5">
-            {esSuper && <SelectorLocal locales={locales} actual={localActualId} />}
+            {/*
+              El selector de local vive en la barra recién desde pantalla
+              mediana. En un teléfono de 375px hacía que la barra midiera 573:
+              198 píxeles de más, con el avatar y "Salir" fuera de la pantalla.
+              En celular está dentro del cajón del menú.
+            */}
+            {esSuper && (
+              <span className="hidden sm:flex">
+                <SelectorLocal locales={locales} actual={localActualId} />
+              </span>
+            )}
 
             {/* En pantalla chica el nombre entero no entra; quedan las
                 iniciales, que igual sirven para saber con qué cuenta se entró. */}

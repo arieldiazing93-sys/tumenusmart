@@ -305,6 +305,10 @@ export function CheckoutForm({
             <label className="mb-1 block text-sm font-medium text-neutral-700">
               ¿Dónde te lo llevamos?
             </label>
+            <p className="mb-2 text-xs text-neutral-500">
+              Marcá el punto en el mapa. Es lo que abre el repartidor para llegar, así que
+              sin eso no se puede enviar el pedido.
+            </p>
             <MapPicker
               storeLat={storeLat}
               storeLng={storeLng}
@@ -326,10 +330,14 @@ export function CheckoutForm({
 
           <div>
             <label className="mb-1 block text-sm font-medium text-neutral-700">
-              Referencia de la dirección
+              Referencia de la dirección{" "}
+              <span className="font-normal text-neutral-400">(opcional)</span>
             </label>
+            <p className="mb-1 text-xs text-neutral-500">
+              Con el pin en el mapa ya alcanza. Esto ayuda al repartidor a encontrarte más
+              rápido si el lugar es difícil.
+            </p>
             <input
-              required
               value={direccion}
               onChange={(e) => setDireccion(e.target.value)}
               className="w-full rounded-lg border border-neutral-300 px-3 py-2"

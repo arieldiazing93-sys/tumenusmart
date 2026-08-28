@@ -81,7 +81,11 @@ export function construirMensajePedido(datos: DatosMensaje): string {
   lineas.push("");
   lineas.push(
     datos.tipoEntrega === "delivery"
-      ? `Entrega a domicilio: ${datos.direccion ?? "-"}`
+      ? datos.direccion?.trim()
+        ? `Entrega a domicilio: ${datos.direccion.trim()}`
+        : // Sin referencia escrita, el pin del mapa es la dirección. Poner un
+          // guion suelto haría pensar que se perdió el dato.
+          "Entrega a domicilio — ver ubicación abajo"
       : "Retiro en el local"
   );
   if (datos.tipoEntrega === "delivery" && datos.clienteLat != null && datos.clienteLng != null) {
