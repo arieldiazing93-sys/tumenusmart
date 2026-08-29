@@ -19,7 +19,7 @@ export default async function CatalogoPage({
   const store = await localPorSlug(slug);
   const storeId = store.id;
 
-  const [categoriasCrudas, destacados, estadoTienda, zonas] = await Promise.all([
+  const [categoriasCrudas, destacados, estadoTienda] = await Promise.all([
     prisma.category.findMany({
       where: { storeId, activa: true },
       orderBy: { orden: "asc" },
@@ -36,7 +36,6 @@ export default async function CatalogoPage({
       orderBy: { orden: "asc" },
     }),
     obtenerEstadoTienda(storeId),
-    prisma.deliveryZone.count({ where: { storeId, activo: true } }),
   ]);
 
   const conProductos = categoriasCrudas.filter((c) => c.productos.length > 0);
@@ -102,31 +101,26 @@ export default async function CatalogoPage({
   }));
 
   // Las tres dudas que tiene cualquiera antes de mirar la carta: si está
-  // abierto, si llevan a domicilio, y cómo se paga.
-  const formasDeEntrega = [
-    store.envioModo === "zonas" && zonas > 0 ? "Envío por zonas" : "Envío a coordinar",
-    "Retiro en el local",
-  ];
 
   return (
     <main className="mx-auto max-w-2xl px-4 pb-32">
       {/* ---------- cabecera del local ---------- */}
       <header className="pt-6">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3.5">
           {store.logoUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
               src={store.logoUrl}
               alt={store.nombre}
-              width={56}
-              height={56}
+              width={72}
+              height={72}
               decoding="async"
-              className="h-14 w-14 flex-none rounded-2xl object-cover"
+              className="h-[72px] w-[72px] flex-none rounded-2xl object-cover"
             />
           ) : (
             <span
               aria-hidden="true"
-              className="flex h-14 w-14 flex-none items-center justify-center rounded-2xl bg-brand-light text-lg font-bold tracking-titular text-brand"
+              className="flex h-[72px] w-[72px] flex-none items-center justify-center rounded-2xl bg-brand-light text-xl font-bold tracking-titular text-brand"
             >
               {store.nombre.slice(0, 2).toUpperCase()}
             </span>
@@ -139,34 +133,27 @@ export default async function CatalogoPage({
               <p className="truncate text-[0.82rem] text-tinta-suave">{store.direccion}</p>
             )}
           </div>
-
-          {/*
-            Reservar mesa va acá arriba a la derecha, grande y en azul, por una
-            razón concreta: es la ÚNICA acción de esta pantalla que no es pedir
-            comida. Abajo, mezclado entre los productos, se perdía. En azul se
-            distingue del naranja de "agregar" sin competirle.
-          */}
-          <Link
-            href={`/${slug}/reservas`}
-            className="flex-none rounded-xl bg-azul px-4 py-3 text-center text-[0.88rem] font-semibold leading-tight text-white shadow-media transition-colors hover:bg-azul-oscuro sm:px-6"
-          >
-            Reservar
-            <span className="hidden sm:inline"> mesa</span>
-          </Link>
         </div>
 
         <div className="mt-3">
           <EstadoAperturaBadge estado={estadoTienda} />
         </div>
 
-        <p className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[0.8rem] text-tinta-media">
-          {formasDeEntrega.map((f, i) => (
-            <span key={f} className="flex items-center gap-2">
-              {i > 0 && <span className="text-linea">·</span>}
-              {f}
-            </span>
-          ))}
-        </p>
+        {/*
+          Reservar mesa va DEBAJO del estado de apertura, no arriba a la
+          derecha. Antes competía por el mismo renglón que el nombre del local
+          y le quitaba ancho al logo. Y el orden de lectura ahora es el que
+          corresponde: primero de qué local se trata, después si está abierto,
+          y recién entonces qué se puede hacer.
+        */}
+        <div className="mt-3.5">
+          <Link
+            href={`/${slug}/reservas`}
+            className="inline-flex items-center rounded-xl bg-azul px-5 py-2.5 text-[0.88rem] font-semibold text-white shadow-media transition-colors hover:bg-azul-oscuro"
+          >
+            Reservar mesa
+          </Link>
+        </div>
       </header>
 
       <div className="mt-5">

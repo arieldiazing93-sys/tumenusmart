@@ -68,7 +68,10 @@ export default function CarritoPage() {
               <button
                 type="button"
                 onClick={() => quitarItem(item.key)}
-                className="mt-1.5 text-[0.76rem] text-tinta-suave underline underline-offset-2 hover:text-peligro"
+                // Azul y no rojo: sacar un ítem del propio carrito se deshace
+                // volviéndolo a agregar. El rojo es para lo que no tiene vuelta,
+                // y usarlo acá lo gastaría para cuando de verdad haga falta.
+                className="mt-2 inline-flex items-center rounded-lg border border-azul/35 bg-azul-luz px-2.5 py-1 text-[0.76rem] font-semibold text-azul-oscuro transition-colors hover:border-azul hover:bg-azul hover:text-white"
               >
                 Quitar
               </button>
@@ -121,7 +124,7 @@ export default function CarritoPage() {
         <div className="mx-auto flex max-w-2xl items-center justify-between gap-3">
           <span>
             <span className="block text-[0.72rem] uppercase tracking-rotulo text-tinta-suave">
-              Subtotal
+              Total
             </span>
             <span className="cifra text-[1.15rem] font-semibold">
               {formatearGuarani(subtotal)}

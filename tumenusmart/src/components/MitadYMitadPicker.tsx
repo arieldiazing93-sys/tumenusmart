@@ -106,9 +106,12 @@ export function MitadYMitadPicker({ grupoNombre, productos }: Props) {
     setTimeout(() => setAgregado(false), 1500);
   }
 
+  // Azul y no naranja: este cuadro es una forma DISTINTA de armar el pedido,
+  // no un producto más de la lista. En naranja parecía otro destacado; el azul
+  // lo separa de un vistazo sin gritar.
   return (
-    <div className="rounded-xl border border-brand/35 bg-brand-light/50 p-4">
-      <h4 className="mb-1 text-[0.95rem] font-semibold tracking-titular">
+    <div className="rounded-xl border border-azul/35 bg-azul-luz p-4">
+      <h4 className="mb-1 text-[0.95rem] font-semibold tracking-titular text-azul-oscuro">
         Armá tu mitad y mitad — {grupoNombre}
       </h4>
       <p className="mb-3 text-[0.78rem] leading-snug text-tinta-media">
