@@ -4,6 +4,7 @@ import { ZONA_NEGOCIO } from "@/lib/timezone";
 import { Cabecera, Cifra, Vacio } from "@/components/ui";
 import { HORAS_ENTRE_AVISOS } from "@/lib/errores";
 import { FilaError } from "./FilaError";
+import { BotonProbar } from "./BotonProbar";
 
 export const dynamic = "force-dynamic";
 
@@ -41,6 +42,7 @@ export default async function ErroresPage() {
       <Cabecera
         titulo="Errores"
         bajada={`Un renglón por problema, no por vez que falló. El mismo error no vuelve a avisarte por correo durante ${HORAS_ENTRE_AVISOS} horas.`}
+        acciones={<BotonProbar />}
       />
 
       {!avisoConfigurado && (
@@ -65,7 +67,7 @@ export default async function ErroresPage() {
       {sinResolver.length === 0 ? (
         <Vacio
           titulo="Ningún problema sin resolver"
-          detalle="Cuando algo falle en producción va a aparecer acá, y te va a llegar un correo sin que tengas que entrar."
+          detalle="Cuando algo falle en producción va a aparecer acá, y te va a llegar un correo sin que tengas que entrar. Ojo: vacío también se vería igual si no se estuviera grabando nada — para sacarte la duda usá «Probar el aviso» acá arriba."
         />
       ) : (
         <div className="flex flex-col gap-2">
