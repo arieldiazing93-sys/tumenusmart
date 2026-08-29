@@ -144,6 +144,22 @@ export const IconoPlegar = ({ className = "" }: Props) => (
 );
 
 /** Cada sección del menú pide su icono por nombre. */
+
+/**
+ * Cierre de caja: un billete con la cara al medio.
+ *
+ * Es la forma que menos se parece a las que ya están: el recibo de Pedidos es
+ * vertical con el borde dentado, y este es un rectángulo ancho y horizontal.
+ * A 18 píxeles no se confunden.
+ */
+export const IconoCierre = (p: Props) => (
+  <Svg {...p}>
+    <rect x="2.5" y="6.5" width="19" height="11" rx="2" />
+    <circle cx="12" cy="12" r="2.4" />
+    <path d="M6 12h.01M18 12h.01" />
+  </Svg>
+);
+
 export const ICONOS = {
   pedidos: IconoPedidos,
   reservas: IconoReservas,
@@ -153,6 +169,7 @@ export const ICONOS = {
   ideas: IconoIdeas,
   configuracion: IconoConfiguracion,
   repartidores: IconoRepartidores,
+  cierre: IconoCierre,
   cuenta: IconoCuenta,
   cartera: IconoCartera,
   usuarios: IconoUsuarios,

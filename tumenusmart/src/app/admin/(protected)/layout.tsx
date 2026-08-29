@@ -36,6 +36,10 @@ function armarGrupos(hayIdeaSinVer: boolean, rol: string): GrupoSecciones[] {
         // no una vez al mes.
         { href: "/admin/repartidores", label: "Repartidores", icono: "repartidores" as const,
           ver: conPermiso("repartidores.ver") },
+        // El cierre vive con los repartidores porque se hace en el mismo
+        // momento: vuelven, se les recibe la plata, se cierra la vuelta.
+        { href: "/admin/cierre", label: "Cierre de caja", icono: "cierre" as const,
+          ver: conPermiso("rendiciones.gestionar") },
       ],
     },
     {

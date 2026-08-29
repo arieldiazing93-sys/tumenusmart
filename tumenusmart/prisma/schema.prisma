@@ -76,6 +76,7 @@ model Store {
   ideasSemanales   IdeaSemanal[]
   pagos            Pago[]
   urlsAnteriores   SlugAnterior[]
+  rendiciones      Rendicion[]
 }
 
 /// Las direcciones que este local tuvo antes.
@@ -369,6 +370,7 @@ model Repartidor {
   telefono  String?
   activo    Boolean  @default(true)
   orders    Order[]
+  rendiciones Rendicion[]
   createdAt DateTime @default(now())
 
   @@index([storeId])
@@ -402,6 +404,21 @@ model Order {
   clienteLat           Float? // pin que marcó el cliente en el mapa al hacer el pedido
   clienteLng           Float?
   metodoPagoReferencia String // "efectivo" | "transferencia" | "tarjeta" | "otro" — solo informativo, no se procesa
+
+  /// Lo que el repartidor DE VERDAD cobró al entregar.
+  ///
+  /// No es lo mismo que metodoPagoReferencia: ese es lo que el cliente dijo
+  /// que iba a pagar cuando armó el pedido. En la puerta cambia todo el
+  /// tiempo — dijo efectivo y sacó la tarjeta, o al revés. Para cuadrar la
+  /// caja del repartidor sirve lo que pasó, no lo que se pensaba hacer.
+  ///
+  /// null mientras el pedido no esté entregado.
+  cobroMetodo          String? // "efectivo" | "tarjeta" | "transferencia" | "ya_pagado"
+  entregadoEn          DateTime?
+
+  /// A qué cierre de caja pertenece. null = todavía no lo rindió.
+  rendicionId          String?
+  rendicion            Rendicion? @relation(fields: [rendicionId], references: [id])
   comprobanteTipo      String        @default("ticket") // "ticket" | "factura"
   facturaRazonSocial   String?
   facturaRuc           String?
@@ -418,6 +435,7 @@ model Order {
   createdAt            DateTime      @default(now())
   updatedAt            DateTime      @updatedAt
 
+  @@index([rendicionId])
   @@unique([storeId, numero])
   @@index([storeId])
   @@index([storeId, createdAt])
@@ -493,4 +511,36 @@ model Reservation {
   @@unique([storeId, numero])
   @@index([storeId])
   @@index([storeId, fecha])
+}
+
+/// El cierre de caja de un repartidor.
+///
+/// Cuando vuelve al local, el dueño mira cuánto EFECTIVO junta entre sus
+/// entregas, lo recibe, y esa vuelta queda cerrada. Los pedidos que entraron
+/// en el cierre quedan atados acá y no vuelven a aparecer como pendientes.
+///
+/// Los totales se copian en vez de calcularse después a propósito: si mañana
+/// se corrige el precio de un pedido viejo, la rendición que ya se firmó no
+/// puede cambiar sola. Lo que se recibió, se recibió.
+model Rendicion {
+  id           String   @id @default(cuid())
+  storeId      String
+  store        Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  repartidorId String
+  repartidor   Repartidor @relation(fields: [repartidorId], references: [id])
+
+  /// Cuántos pedidos entraron y cuánta plata de cada tipo, congelados.
+  cantidadPedidos Int
+  totalEfectivo   Decimal @db.Decimal(10, 2)
+  totalOtros      Decimal @db.Decimal(10, 2)
+
+  /// Quién lo recibió, para que después se sepa a quién preguntarle.
+  recibidoPor  String
+  notas        String?
+  creadoEn     DateTime @default(now())
+
+  pedidos      Order[]
+
+  @@index([storeId])
+  @@index([repartidorId])
 }

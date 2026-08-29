@@ -30,6 +30,8 @@ export type Permiso =
   | "reservas.gestionar"
   | "repartidores.ver"
   | "repartidores.gestionar"
+  // El cierre de caja del repartidor: ver cuánto debe y darlo por recibido.
+  | "rendiciones.gestionar"
   // --- la carta ---
   | "productos.ver"
   | "productos.disponibilidad"
@@ -83,6 +85,9 @@ const PERMISOS_EMPLEADO: Permiso[] = [
 const PERMISOS_LOCAL: Permiso[] = [
   ...PERMISOS_EMPLEADO,
   "repartidores.gestionar",
+  // Queda fuera del empleado a propósito: acá se decide que la plata que
+  // trajo el repartidor está bien. Es del dueño hasta que él diga otra cosa.
+  "rendiciones.gestionar",
   "productos.editar",
   "categorias.editar",
   "estadisticas.ver",

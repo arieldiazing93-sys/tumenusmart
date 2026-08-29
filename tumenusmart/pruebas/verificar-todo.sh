@@ -31,7 +31,7 @@ node pruebas/contraste-estados.mjs || FALLAS=1
 
 echo
 echo "── lógica ────────────────────────────────────────────"
-for modulo in carta ordenar permisos errores; do
+for modulo in carta ordenar permisos errores rendicion; do
   tsc "src/lib/$modulo.ts" --ignoreConfig --outDir pruebas/compilado --target es2020 \
       --module esnext --moduleResolution bundler --skipLibCheck > /dev/null 2>&1
   mv -f "pruebas/compilado/$modulo.js" "pruebas/compilado/$modulo.mjs"
@@ -49,7 +49,7 @@ tsc src/lib/whatsapp.ts src/lib/format.ts --ignoreConfig --outDir pruebas/compil
     --target es2020 --module esnext --moduleResolution bundler --skipLibCheck > /dev/null 2>&1
 for f in whatsapp format; do mv -f "pruebas/compilado/$f.js" "pruebas/compilado/$f.mjs"; done
 sed -i 's|from "./format"|from "./format.mjs"|' pruebas/compilado/whatsapp.mjs
-for prueba in carta ordenar permisos errores whatsapp analista suscripcion filtro-por-local url-publica; do
+for prueba in carta ordenar permisos errores whatsapp analista suscripcion filtro-por-local url-publica rendicion; do
   printf "  %-18s " "$prueba"
   node "pruebas/$prueba.mjs" > /tmp/salida.txt 2>&1 && echo "✓ $(grep -oE '[0-9]+ (pruebas pasaron|bien)' /tmp/salida.txt | head -1)" \
     || { echo "✗ FALLÓ"; cat /tmp/salida.txt | tail -5; FALLAS=1; }

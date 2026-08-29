@@ -3,29 +3,42 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { marcarPedidoEntregado } from "./actions";
+import { FORMAS_DE_COBRO } from "@/lib/rendicion";
 
+/**
+ * Marcar entregado, diciendo con qué le pagaron.
+ *
+ * Antes esto era un botón con un `confirm()` del navegador. Ahora el botón
+ * abre las cuatro formas de cobro y se elige una: sigue siendo un solo toque
+ * para confirmar, pero ese toque además deja el dato que hace falta para
+ * cuadrar la caja cuando vuelva.
+ *
+ * Se sugiere lo que el cliente había elegido al pedir, aunque marcado como
+ * sugerencia: en la puerta cambia seguido, y si la sugerencia viniera ya
+ * apretada el repartidor la confirmaría sin mirar.
+ */
 export function EntregarBoton({
   repartidorId,
   orderId,
+  pagoSugerido,
 }: {
   repartidorId: string;
   orderId: string;
+  /** Lo que el cliente dijo al hacer el pedido. Solo para resaltar una opción. */
+  pagoSugerido?: string;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [hecho, setHecho] = useState(false);
+  const [eligiendo, setEligiendo] = useState(false);
 
-  function marcar() {
+  function marcar(cobro: string) {
     setError(null);
-    if (!confirm("¿Confirmás que entregaste este pedido?")) return;
     startTransition(async () => {
       try {
-        await marcarPedidoEntregado(repartidorId, orderId);
+        await marcarPedidoEntregado(repartidorId, orderId, cobro);
         setHecho(true);
-        // Vuelve a pedirle al servidor la lista de pedidos — si no, esta
-        // tarjeta se queda marcada como entregada pero el resumen de abajo
-        // ("Entregados hoy") no se actualiza solo hasta recargar a mano.
         router.refresh();
       } catch (err) {
         setError(err instanceof Error ? err.message : "No se pudo marcar como entregado");
@@ -34,20 +47,65 @@ export function EntregarBoton({
   }
 
   if (hecho) {
-    return <span className="text-sm font-semibold text-green-600">✓ Entregado</span>;
+    return <span className="text-sm font-semibold text-exito">✓ Entregado</span>;
+  }
+
+  if (!eligiendo) {
+    return (
+      <div>
+        <button
+          type="button"
+          onClick={() => setEligiendo(true)}
+          className="w-full rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-dark"
+        >
+          ✓ Marcar como entregado
+        </button>
+        {error && <p className="mt-1 text-xs text-peligro">{error}</p>}
+      </div>
+    );
   }
 
   return (
-    <div>
+    <div className="rounded-lg border border-linea bg-papel-suave p-3">
+      <p className="text-[0.82rem] font-semibold text-tinta">¿Cómo te pagó?</p>
+
+      {/* Botones grandes: esto se aprieta parado en la vereda, de noche y con
+          una mano ocupada. */}
+      <div className="mt-2 grid grid-cols-2 gap-2">
+        {FORMAS_DE_COBRO.map((f) => (
+          <button
+            key={f.valor}
+            type="button"
+            disabled={pending}
+            onClick={() => marcar(f.valor)}
+            className={`rounded-lg border px-3 py-3 text-[0.85rem] font-semibold transition-colors disabled:opacity-50 ${
+              f.valor === pagoSugerido
+                ? "border-brand bg-brand-light text-brand-texto"
+                : "border-linea bg-white text-tinta hover:border-brand"
+            }`}
+          >
+            {f.etiqueta}
+          </button>
+        ))}
+      </div>
+
+      {pagoSugerido && (
+        <p className="mt-2 text-[0.75rem] text-tinta-suave">
+          El cliente había dicho{" "}
+          {FORMAS_DE_COBRO.find((f) => f.valor === pagoSugerido)?.etiqueta ?? pagoSugerido}.
+          Marcá lo que pasó de verdad.
+        </p>
+      )}
+
       <button
         type="button"
-        disabled={pending}
-        onClick={marcar}
-        className="w-full rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-dark disabled:opacity-50"
+        onClick={() => setEligiendo(false)}
+        className="mt-2 text-[0.8rem] font-medium text-tinta-suave underline"
       >
-        {pending ? "Marcando..." : "✓ Marcar como entregado"}
+        Cancelar
       </button>
-      {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
+
+      {error && <p className="mt-1 text-xs text-peligro">{error}</p>}
     </div>
   );
 }

@@ -111,7 +111,11 @@ export default async function RepartidorPage({
                 </span>
               </div>
 
-              <EntregarBoton repartidorId={id} orderId={pedido.id} />
+              <EntregarBoton
+                  repartidorId={id}
+                  orderId={pedido.id}
+                  pagoSugerido={pedido.metodoPagoReferencia}
+                />
             </div>
           );
         })}
