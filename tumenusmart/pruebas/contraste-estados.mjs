@@ -49,6 +49,9 @@ const PARES = [
   // fuerte. Es el único par de la carta del cliente, y va acá porque ese
   // "6 opciones" lo lee alguien con el teléfono al sol.
   ["Banda de categoría", c.brand.tinte, c.brand.texto],
+
+  // Botón de aviso sonoro cuando el navegador todavía no deja sonar.
+  ["Aviso sonoro trabado", c.aviso.tinte, c.aviso.DEFAULT],
 ];
 
 const fallas = [];
