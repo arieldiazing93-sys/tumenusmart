@@ -105,3 +105,38 @@ export function horaAsuncion(fecha: Date = new Date()): string {
     hourCycle: "h23",
   }).format(fecha);
 }
+
+/**
+ * Convierte "YYYY-MM-DDTHH:MM" (lo que da un <input type="datetime-local">,
+ * escrito en hora de Asunción) al instante UTC real.
+ *
+ * Hace falta para el cierre de repartidores: el dueño escribe "29/08 18:00"
+ * pensando en su reloj, y el servidor de Vercel corre en UTC. Sin esta
+ * traducción, filtrar "desde las 18" en Paraguay traería los pedidos desde
+ * las 15, y el cierre mostraría entregas de otro turno.
+ */
+export function instanteAsuncionDesdeTexto(texto: string): Date | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})/.exec(texto);
+  if (!m) return null;
+  const [, y, mes, d, h, min] = m.map(Number) as unknown as number[];
+  const aproximada = new Date(Date.UTC(y, mes - 1, d, h, min));
+  const offset = offsetMinutos(ZONA_NEGOCIO, aproximada);
+  return new Date(Date.UTC(y, mes - 1, d, h, min) - offset * 60000);
+}
+
+/** "YYYY-MM-DDTHH:MM" de un instante, en hora de Asunción (para los inputs). */
+export function textoLocalDesdeInstante(instante: Date): string {
+  const p: Record<string, string> = {};
+  for (const parte of new Intl.DateTimeFormat("en-CA", {
+    timeZone: ZONA_NEGOCIO,
+    hourCycle: "h23",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).formatToParts(instante)) {
+    if (parte.type !== "literal") p[parte.type] = parte.value;
+  }
+  return `${p.year}-${p.month}-${p.day}T${p.hour}:${p.minute}`;
+}

@@ -6,6 +6,9 @@ import { Cabecera, Tarjeta, Vacio } from "@/components/ui";
 import { formatearGuarani, formatearNumero } from "@/lib/format";
 import { resumirCierre, etiquetaDeCobro, rindeEfectivo } from "@/lib/rendicion";
 import { CerrarBoton } from "./CerrarBoton";
+import { FiltroTurno } from "./FiltroTurno";
+import { jornadaDe, jornadaAnterior, revisarRango, type Rango } from "@/lib/turno";
+import { instanteAsuncionDesdeTexto, textoLocalDesdeInstante } from "@/lib/timezone";
 
 export const dynamic = "force-dynamic";
 
@@ -19,9 +22,51 @@ function cuando(fecha: Date): string {
   });
 }
 
-export default async function CierrePage() {
+/**
+ * Qué turno se está mirando, a partir de la dirección.
+ *
+ * Devuelve también el error para mostrarlo en vez de tragárselo: si alguien
+ * escribe mal una fecha, es mejor decirlo que mostrar una lista vacía que
+ * parece "no hay nada pendiente".
+ */
+function turnoPedido(params: Record<string, string | string[] | undefined>): {
+  rango: Rango | null;
+  activo: "jornada" | "anterior" | "todo" | "manual";
+  error: string | null;
+} {
+  const uno = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v) ?? "";
+  const turno = uno(params.turno);
+  const desdeTexto = uno(params.desde);
+  const hastaTexto = uno(params.hasta);
+
+  if (desdeTexto || hastaTexto) {
+    const desde = instanteAsuncionDesdeTexto(desdeTexto);
+    const hasta = instanteAsuncionDesdeTexto(hastaTexto);
+    const error = revisarRango(desde, hasta);
+    if (error) return { rango: null, activo: "manual", error };
+    return { rango: { desde: desde!, hasta: hasta! }, activo: "manual", error: null };
+  }
+
+  if (turno === "todo") return { rango: null, activo: "todo", error: null };
+  if (turno === "anterior") return { rango: jornadaAnterior(), activo: "anterior", error: null };
+  return { rango: jornadaDe(), activo: "jornada", error: null };
+}
+
+export default async function CierrePage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   await pantallaConPermiso("rendiciones.gestionar");
   const db = prismaDelLocal(await idLocalActual());
+
+  const { rango, activo, error: errorRango } = turnoPedido(await searchParams);
+
+  // El filtro se aplica en la consulta y no después: con el rango puesto, la
+  // pantalla no tiene que traer meses de entregas para descartarlas en
+  // memoria. Los pedidos sin fecha de entrega (los de antes de este cambio)
+  // solo aparecen en "Todo lo pendiente".
+  const filtroFecha = rango ? { gte: rango.desde, lt: rango.hasta } : undefined;
 
   const [repartidores, ultimas] = await Promise.all([
     db.repartidor.findMany({
@@ -32,7 +77,7 @@ export default async function CierrePage() {
         nombre: true,
         orders: {
           // Entregados y todavía sin rendir: exactamente lo que debe.
-          where: { estado: "entregado", rendicionId: null },
+          where: { estado: "entregado", rendicionId: null, entregadoEn: filtroFecha },
           orderBy: { entregadoEn: "asc" },
           select: {
             id: true,
@@ -61,6 +106,13 @@ export default async function CierrePage() {
   ]);
 
   const conDeuda = repartidores.filter((r) => r.orders.length > 0);
+
+  // Los campos del formulario y la acción de cerrar hablan en hora de
+  // Paraguay, no en UTC: es lo que el dueño lee en su reloj.
+  const rangoTexto = rango
+    ? { desde: textoLocalDesdeInstante(rango.desde), hasta: textoLocalDesdeInstante(rango.hasta) }
+    : null;
+  const porDefecto = rango ?? jornadaDe();
   const efectivoEnLaCalle = conDeuda.reduce(
     (suma, r) => suma + resumirCierre(r.orders).efectivo,
     0
@@ -73,10 +125,30 @@ export default async function CierrePage() {
         bajada="Lo que cada uno tiene que rendir cuando vuelve. Solo cuenta el efectivo: lo de tarjeta y transferencia ya entró al negocio."
       />
 
+      <FiltroTurno
+        desde={textoLocalDesdeInstante(porDefecto.desde)}
+        hasta={textoLocalDesdeInstante(porDefecto.hasta)}
+        activo={activo}
+      />
+
+      {errorRango && (
+        <p className="mb-4 rounded-xl border border-peligro/25 bg-peligro-luz px-4 py-3 text-[0.88rem] font-medium text-peligro">
+          {errorRango}
+        </p>
+      )}
+
       {conDeuda.length === 0 ? (
         <Vacio
-          titulo="Nadie tiene nada pendiente"
-          detalle="Cuando un repartidor marque una entrega, va a aparecer acá con lo que tiene que rendir."
+          titulo={
+            activo === "todo"
+              ? "Nadie tiene nada pendiente"
+              : "Nadie tiene nada pendiente en este turno"
+          }
+          detalle={
+            activo === "todo"
+              ? "Cuando un repartidor marque una entrega, va a aparecer acá con lo que tiene que rendir."
+              : "Puede que las entregas sean de otra jornada: probá «Todo lo pendiente» acá arriba."
+          }
         />
       ) : (
         <>
@@ -195,6 +267,7 @@ export default async function CierrePage() {
                       nombre={r.nombre}
                       efectivo={resumen.efectivo}
                       cantidad={resumen.cantidad}
+                      rango={rangoTexto}
                     />
                   </div>
                 </Tarjeta>

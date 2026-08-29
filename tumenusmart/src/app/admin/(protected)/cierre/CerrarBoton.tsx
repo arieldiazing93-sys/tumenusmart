@@ -19,11 +19,14 @@ export function CerrarBoton({
   nombre,
   efectivo,
   cantidad,
+  rango,
 }: {
   repartidorId: string;
   nombre: string;
   efectivo: number;
   cantidad: number;
+  /** El turno que se está mirando, en hora de Paraguay. null = todo. */
+  rango: { desde: string; hasta: string } | null;
 }) {
   const [confirmando, setConfirmando] = useState(false);
   const [notas, setNotas] = useState("");
@@ -34,7 +37,9 @@ export function CerrarBoton({
   async function cerrar() {
     setYendo(true);
     setError(null);
-    const r = await cerrarRendicion(repartidorId, notas);
+    // Se mandan también los números que se están mostrando: el servidor
+    // recalcula y se niega si cambiaron. Lo que se firma es lo que se vio.
+    const r = await cerrarRendicion(repartidorId, notas, rango, cantidad, efectivo);
     setYendo(false);
     if (!r.ok) {
       setError(r.error ?? "No se pudo cerrar");
