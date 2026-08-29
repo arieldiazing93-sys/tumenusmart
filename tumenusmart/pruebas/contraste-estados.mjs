@@ -44,6 +44,11 @@ const PARES = [
   ["Tarjeta promedio", c.violeta.luz, c.violeta.oscuro],
   ["Tarjeta clientes", c.aviso.luz, c.aviso.DEFAULT],
   ["Tarjeta perdido", c.peligro.luz, c.peligro.DEFAULT],
+
+  // Banda de categoría de la carta pública: texto chico sobre el naranja
+  // fuerte. Es el único par de la carta del cliente, y va acá porque ese
+  // "6 opciones" lo lee alguien con el teléfono al sol.
+  ["Banda de categoría", c.brand.tinte, c.brand.texto],
 ];
 
 const fallas = [];

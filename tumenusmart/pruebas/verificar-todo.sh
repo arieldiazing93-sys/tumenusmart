@@ -50,7 +50,7 @@ done
 
 echo
 echo "── navegador (Chromium real) ─────────────────────────"
-for prueba in foco-al-mover fixed-dentro-del-panel; do
+for prueba in foco-al-mover fixed-dentro-del-panel banda-de-categoria; do
   printf "  %-24s " "$prueba"
   node "pruebas/$prueba.mjs" > /tmp/salida.txt 2>&1 \
     && echo "✓ $(grep -oE '[0-9]+/[0-9]+' /tmp/salida.txt | tail -1) $(grep -oE '[0-9]+ comprobaciones' /tmp/salida.txt | head -1)" \

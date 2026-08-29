@@ -35,6 +35,12 @@ export function Carta({
   const [abierto, setAbierto] = useState<ProductoCarta | null>(null);
   const [categoriaActiva, setCategoriaActiva] = useState(categorias[0]?.id ?? "");
   const refsSecciones = useRef<Record<string, HTMLElement | null>>({});
+  // La barra de arriba (buscador + chips) se mide de verdad en vez de
+  // escribir su alto a mano: cambia según haya buscador, haya chips o se esté
+  // buscando. Un número fijo dejaría la banda de la categoría flotando o
+  // tapada en cuanto alguna de esas tres cosas cambie.
+  const refBarra = useRef<HTMLDivElement | null>(null);
+  const [altoBarra, setAltoBarra] = useState(0);
   const tarjetas = estilo === "tarjetas";
 
   const { hayBuscador, hayBarra } = barraDeCarta(categorias);
@@ -61,6 +67,21 @@ export function Carta({
     return () => observador.disconnect();
   }, [categorias, buscando]);
 
+  useEffect(() => {
+    const el = refBarra.current;
+    if (!el) {
+      setAltoBarra(0);
+      return;
+    }
+    const medir = () => setAltoBarra(el.getBoundingClientRect().height);
+    medir();
+    // ResizeObserver y no un solo `medir()`: la barra se achica cuando se
+    // empieza a buscar (se ocultan los chips) y crece al volver.
+    const ro = new ResizeObserver(medir);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [hayBarra]);
+
   function irA(id: string) {
     refsSecciones.current[id]?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
@@ -71,7 +92,10 @@ export function Carta({
     <>
       {/* buscador y categorías, pegados arriba */}
       {hayBarra && (
-      <div className="sticky top-0 z-20 -mx-4 border-b border-linea bg-papel/95 px-4 backdrop-blur">
+      <div
+        ref={refBarra}
+        className="sticky top-0 z-20 -mx-4 border-b border-linea bg-papel/95 px-4 backdrop-blur"
+      >
         {hayBuscador && (
         <div className="relative py-2.5">
           <span
@@ -129,12 +153,34 @@ export function Carta({
             }}
             className="scroll-mt-28 pt-6"
           >
-            <h2 className="text-[1.05rem] font-semibold tracking-titular">{c.nombre}</h2>
-            <p className="text-[0.75rem] text-tinta-suave">
-              {c.productos.length} {c.productos.length === 1 ? "opción" : "opciones"}
-            </p>
+            {/*
+              La cabecera es una banda de borde a borde, no un título suelto.
 
-            <div className={tarjetas ? "mt-3 flex flex-col gap-6" : "mt-1"}>
+              El -mx-4 rompe el margen del contenedor a propósito: ese corte de
+              lado a lado es lo que dice "acá empieza otro grupo". Con el título
+              solo, dos categorías seguidas se leían como una lista corrida.
+
+              Queda pegada arriba mientras se baja: con seis productos en
+              pantalla, para el tercero ya no se sabe en qué grupo se está. El
+              `top` sale de medir la barra de chips, y el z-10 la deja pasar por
+              DEBAJO de esa barra (que es z-20) en vez de chocar con ella.
+
+              El fondo es opaco a propósito. Con transparencia, los productos se
+              verían pasar por atrás al desplazarse.
+            */}
+            <div
+              style={{ top: altoBarra }}
+              className="sticky z-10 -mx-4 bg-brand-tinte px-4 py-2.5"
+            >
+              <h2 className="text-[1.05rem] font-semibold tracking-titular text-brand-texto">
+                {c.nombre}
+              </h2>
+              <p className="text-[0.75rem] text-brand-texto">
+                {c.productos.length} {c.productos.length === 1 ? "opción" : "opciones"}
+              </p>
+            </div>
+
+            <div className={tarjetas ? "mt-4 flex flex-col gap-6" : "mt-2"}>
               {c.productos.map((p) => (
                 <FilaProducto
                   key={p.id}
