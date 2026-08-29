@@ -4,7 +4,6 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import { useCart } from "@/components/CartProvider";
-import { precioUnitario, opcionesTexto, ingredientesQuitadosTexto } from "@/lib/cart-types";
 import { formatearGuarani } from "@/lib/format";
 import { distanciaKm, encontrarZonaPorDistancia } from "@/lib/geo";
 import { crearPedido } from "./actions";
@@ -133,14 +132,21 @@ export function CheckoutForm({
         facturaRazonSocial: comprobanteTipo === "factura" ? facturaRazonSocial : undefined,
         facturaRuc: comprobanteTipo === "factura" ? facturaRuc : undefined,
         facturaEmail: comprobanteTipo === "factura" ? facturaEmail || undefined : undefined,
+        // Solo qué eligió el cliente. El precio, el nombre y los textos de
+        // la comanda los arma el servidor leyendo la carta: si viajaran desde
+        // acá, cualquiera los cambia antes de que salgan.
         items: items.map((i) => ({
           productId: i.mitadYMitad ? undefined : i.productId,
-          nombreProducto: i.nombreProducto,
+          mitadYMitad: i.mitadYMitad
+            ? { productIdA: i.mitadYMitad.productIdA, productIdB: i.mitadYMitad.productIdB }
+            : undefined,
+          opcionIds: i.opciones.map((o) => o.id),
+          ingredientesQuitados: i.ingredientesQuitados ?? [],
           cantidad: i.cantidad,
-          precioUnitario: precioUnitario(i),
-          opcionesTexto: opcionesTexto(i) || undefined,
-          ingredientesQuitadosTexto: ingredientesQuitadosTexto(i) || undefined,
         })),
+        // No es lo que se cobra: es lo que el cliente tenía en pantalla, para
+        // que el servidor avise si un precio cambió mientras completaba.
+        totalMostrado: total,
       });
       vaciarCarrito();
       router.push(`/${slug}/pedido/${orderId}`);
