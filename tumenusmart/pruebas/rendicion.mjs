@@ -8,6 +8,7 @@ import {
   normalizarCobro,
   rindeEfectivo,
   etiquetaDeCobro,
+  contrastarRendicion,
 } from "./compilado/rendicion.mjs";
 
 let bien = 0, mal = 0;
@@ -83,6 +84,63 @@ igual("la tarjeta no rinde", rindeEfectivo("tarjeta"), false);
 igual("ya pagado no rinde", rindeEfectivo("ya_pagado"), false);
 igual("un método raro se trata como efectivo", rindeEfectivo("???"), true);
 igual("etiqueta legible", etiquetaDeCobro("ya_pagado"), "Ya estaba pago");
+
+// ------------------------------------------- el comprobante ya cerrado
+// La hoja que se imprime cuando el repartidor ya entregó la plata. El número
+// que vale es el que quedó guardado ese día; esto solo mira si los pedidos
+// siguen diciendo lo mismo, para poder avisarlo en el papel.
+const rendidos = [p(1, 50000, "efectivo"), p(2, 30000, "tarjeta"), p(3, 45000, "efectivo")];
+const congelada = { cantidadPedidos: 3, totalEfectivo: 95000, totalOtros: 30000 };
+
+const sinTocar = contrastarRendicion(rendidos, congelada);
+igual("un comprobante intacto coincide", sinTocar.coincide, true);
+igual("informa lo que se recibió aquel día", sinTocar.efectivoRendido, 95000);
+igual("y lo que dicen los pedidos hoy", sinTocar.efectivoAhora, 95000);
+
+// Alguien corrigió el precio de un pedido después de recibir la plata: el
+// comprobante NO cambia, pero la hoja tiene que poder decirlo.
+const editado = contrastarRendicion(
+  [p(1, 50000, "efectivo"), p(2, 30000, "tarjeta"), p(3, 70000, "efectivo")],
+  congelada
+);
+igual("un pedido editado después rompe la coincidencia", editado.coincide, false);
+igual("el monto recibido NO se mueve", editado.efectivoRendido, 95000);
+igual("y se ve cuánto daría hoy", editado.efectivoAhora, 120000);
+
+igual(
+  "si falta un pedido de la rendición, tampoco coincide",
+  contrastarRendicion([p(1, 50000, "efectivo"), p(2, 30000, "tarjeta")], congelada).coincide,
+  false
+);
+// El caso peligroso: falta un pedido que se cobró con TARJETA. El efectivo da
+// exactamente igual, así que mirar solo el monto no lo agarra — hay que
+// comparar también cuántos pedidos son.
+igual(
+  "si falta un pedido que no era efectivo, el monto coincide pero la rendición no",
+  contrastarRendicion([p(1, 50000, "efectivo"), p(3, 45000, "efectivo")], congelada).coincide,
+  false
+);
+igual(
+  "medio guaraní de redondeo no cuenta como edición",
+  contrastarRendicion(rendidos, { ...congelada, totalEfectivo: 95000.4 }).coincide,
+  true
+);
+
+// Prisma devuelve los Decimal como objeto. Además de que la comparación dé
+// bien, el monto que sale impreso tiene que ser un número: si saliera el
+// objeto, la hoja quedaría a merced de cómo lo convierta cada formateador.
+const desdeDecimal = contrastarRendicion(rendidos, {
+  ...congelada,
+  totalEfectivo: { toString: () => "95000" },
+});
+igual("los montos congelados también pueden llegar como Decimal de Prisma", desdeDecimal.coincide, true);
+igual("y el monto que se imprime ya viene convertido a número", typeof desdeDecimal.efectivoRendido, "number");
+igual("con el valor correcto", desdeDecimal.efectivoRendido, 95000);
+igual(
+  "una rendición sin pedidos a la vista se nota",
+  contrastarRendicion([], congelada).coincide,
+  false
+);
 
 console.log(mal === 0 ? `  ✓ ${bien} pruebas pasaron` : `  ✗ ${mal} fallaron de ${bien + mal}`);
 process.exit(mal === 0 ? 0 : 1);

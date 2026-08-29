@@ -121,3 +121,59 @@ export function resumirCierre(pedidos: PedidoDeCierre[]): ResumenCierre {
     porMetodo,
   };
 }
+
+// ===========================================================================
+//  El comprobante de una rendición ya cerrada
+// ===========================================================================
+
+/**
+ * Los totales que quedaron congelados al recibir la plata.
+ *
+ * Vienen de la tabla `Rendicion`, no de sumar los pedidos otra vez. El
+ * comprobante existe justamente para decir cuánto se entregó ESE día, y eso
+ * no puede cambiar porque alguien haya corregido un precio después.
+ */
+export type RendicionCongelada = {
+  cantidadPedidos: number;
+  totalEfectivo: Monto;
+  totalOtros: Monto;
+};
+
+export type ContrasteRendicion = {
+  /** Si los pedidos de hoy siguen dando lo mismo que se recibió aquel día. */
+  coincide: boolean;
+  cantidadRendida: number;
+  cantidadAhora: number;
+  efectivoRendido: number;
+  efectivoAhora: number;
+};
+
+/**
+ * Compara lo que se recibió contra lo que esos mismos pedidos dicen hoy.
+ *
+ * No sirve para corregir el comprobante —el número bueno es siempre el
+ * congelado— sino para poder avisar en la hoja que algo se tocó después. Sin
+ * esto, un pedido editado más tarde haría que la lista impresa no sumara el
+ * total impreso y nadie sabría cuál de los dos creer.
+ *
+ * Los montos se comparan redondeados, igual que al cerrar: el guaraní no
+ * tiene centavos y una diferencia de medio no es una edición.
+ */
+export function contrastarRendicion(
+  pedidos: PedidoDeCierre[],
+  congelada: RendicionCongelada
+): ContrasteRendicion {
+  const ahora = resumirCierre(pedidos);
+  const efectivoRendido = aNumero(congelada.totalEfectivo);
+  const cantidadRendida = congelada.cantidadPedidos;
+
+  return {
+    coincide:
+      cantidadRendida === ahora.cantidad &&
+      Math.round(efectivoRendido) === Math.round(ahora.efectivo),
+    cantidadRendida,
+    cantidadAhora: ahora.cantidad,
+    efectivoRendido,
+    efectivoAhora: ahora.efectivo,
+  };
+}

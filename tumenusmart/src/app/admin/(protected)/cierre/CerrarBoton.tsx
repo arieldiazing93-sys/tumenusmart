@@ -13,6 +13,9 @@ import { cerrarRendicion } from "./actions";
  * cerrada, esos pedidos salen de la lista de pendientes. Y el monto va en la
  * confirmación —no solo arriba— para que el último vistazo sea al número que
  * se está por dar por bueno.
+ *
+ * Al confirmar no vuelve a la lista: abre el comprobante de esa rendición,
+ * que es el papel que firman los dos.
  */
 export function CerrarBoton({
   repartidorId,
@@ -47,7 +50,10 @@ export function CerrarBoton({
     }
     setConfirmando(false);
     setNotas("");
-    router.refresh();
+    // Recibida la plata, lo siguiente que hace falta es el papel: se abre el
+    // comprobante directo en vez de dejarlo buscándolo en la lista.
+    if (r.rendicionId) router.push(`/admin/cierre/${r.rendicionId}`);
+    else router.refresh();
   }
 
   if (!confirmando) {

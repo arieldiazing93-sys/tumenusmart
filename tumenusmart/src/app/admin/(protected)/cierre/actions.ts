@@ -31,7 +31,7 @@ export async function cerrarRendicion(
   rango: { desde: string; hasta: string } | null,
   cantidadVista: number,
   efectivoVisto: number
-): Promise<{ ok: boolean; error?: string; efectivo?: number }> {
+): Promise<{ ok: boolean; error?: string; efectivo?: number; rendicionId?: string }> {
   const sesion = await exigirPermiso("rendiciones.gestionar");
   const storeId = await idLocalActual();
   const db = prismaDelLocal(storeId);
@@ -80,7 +80,9 @@ export async function cerrarRendicion(
     };
   }
 
-  await prisma.$transaction(async (tx) => {
+  // Se devuelve el id para poder abrir el comprobante recién cerrado sin
+  // tener que buscarlo en la lista.
+  const rendicionId = await prisma.$transaction(async (tx) => {
     const rendicion = await tx.rendicion.create({
       data: {
         storeId,
@@ -100,9 +102,11 @@ export async function cerrarRendicion(
       where: { id: { in: pedidos.map((p) => p.id) } },
       data: { rendicionId: rendicion.id },
     });
+
+    return rendicion.id;
   });
 
   revalidatePath("/admin/cierre");
   revalidatePath("/admin/pedidos");
-  return { ok: true, efectivo: resumen.efectivo };
+  return { ok: true, efectivo: resumen.efectivo, rendicionId };
 }

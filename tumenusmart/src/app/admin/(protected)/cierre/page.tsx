@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { pantallaConPermiso } from "@/lib/auth";
 import { prismaDelLocal } from "@/lib/prisma-local";
 import { idLocalActual } from "@/lib/local-actual";
@@ -121,7 +122,7 @@ export default async function CierrePage({
   return (
     <div>
       <Cabecera
-        titulo="Cierre de repartidores"
+        titulo="Rendición de repartidores"
         bajada="Lo que cada uno tiene que rendir cuando vuelve. Solo cuenta el efectivo: lo de tarjeta y transferencia ya entró al negocio."
       />
 
@@ -282,11 +283,17 @@ export default async function CierrePage({
           <h2 className="mb-2 text-[0.95rem] font-semibold tracking-titular text-tinta">
             Últimas rendiciones recibidas
           </h2>
+          <p className="mb-2 text-[0.82rem] text-tinta-media">
+            Tocá una para ver e imprimir su comprobante.
+          </p>
           <div className="flex flex-col gap-1.5">
+            {/* Cada una lleva a su comprobante: es donde está el detalle de
+                los pedidos y las firmas. */}
             {ultimas.map((v) => (
-              <div
+              <Link
                 key={v.id}
-                className="flex flex-wrap items-baseline justify-between gap-2 rounded-lg border border-linea bg-white px-3 py-2 text-[0.85rem]"
+                href={`/admin/cierre/${v.id}`}
+                className="flex flex-wrap items-baseline justify-between gap-2 rounded-lg border border-linea bg-white px-3 py-2 text-[0.85rem] transition-colors hover:border-brand hover:bg-papel-suave"
               >
                 <span className="font-medium text-tinta">{v.repartidor.nombre}</span>
                 <span className="text-tinta-suave">
@@ -299,7 +306,7 @@ export default async function CierrePage({
                 {v.notas && (
                   <span className="w-full text-[0.8rem] text-tinta-media">↳ {v.notas}</span>
                 )}
-              </div>
+              </Link>
             ))}
           </div>
         </div>
