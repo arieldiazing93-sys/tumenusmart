@@ -36,13 +36,19 @@ for modulo in carta ordenar permisos errores; do
   mv -f "pruebas/compilado/$modulo.js" "pruebas/compilado/$modulo.mjs"
 done
 
+# url-publica importa alcance-local: mismo caso que whatsapp/format.
+tsc src/lib/url-publica.ts src/lib/alcance-local.ts --ignoreConfig --outDir pruebas/compilado \
+    --target es2020 --module esnext --moduleResolution bundler --skipLibCheck > /dev/null 2>&1
+for f in url-publica alcance-local; do mv -f "pruebas/compilado/$f.js" "pruebas/compilado/$f.mjs"; done
+sed -i 's|from "./alcance-local"|from "./alcance-local.mjs"|' pruebas/compilado/url-publica.mjs
+
 # whatsapp importa format, así que se compilan juntos y se corrige la extensión
 # del import: Node necesita la ruta completa, TypeScript la escribe sin ella.
 tsc src/lib/whatsapp.ts src/lib/format.ts --ignoreConfig --outDir pruebas/compilado \
     --target es2020 --module esnext --moduleResolution bundler --skipLibCheck > /dev/null 2>&1
 for f in whatsapp format; do mv -f "pruebas/compilado/$f.js" "pruebas/compilado/$f.mjs"; done
 sed -i 's|from "./format"|from "./format.mjs"|' pruebas/compilado/whatsapp.mjs
-for prueba in carta ordenar permisos errores whatsapp analista suscripcion filtro-por-local; do
+for prueba in carta ordenar permisos errores whatsapp analista suscripcion filtro-por-local url-publica; do
   printf "  %-18s " "$prueba"
   node "pruebas/$prueba.mjs" > /tmp/salida.txt 2>&1 && echo "✓ $(grep -oE '[0-9]+ (pruebas pasaron|bien)' /tmp/salida.txt | head -1)" \
     || { echo "✗ FALLÓ"; cat /tmp/salida.txt | tail -5; FALLAS=1; }

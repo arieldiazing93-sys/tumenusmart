@@ -75,6 +75,26 @@ model Store {
   usuarios         Usuario[]
   ideasSemanales   IdeaSemanal[]
   pagos            Pago[]
+  urlsAnteriores   SlugAnterior[]
+}
+
+/**
+ * Las direcciones que este local tuvo antes.
+ *
+ * Cuando un negocio cambia su URL, los carteles con QR ya impresos, los
+ * enlaces compartidos por WhatsApp y lo que Google tenga indexado siguen
+ * apuntando a la vieja. Sin esto, todo eso muere el día del cambio.
+ *
+ * Guardando la anterior, la carta redirige sola a la nueva y nadie se entera.
+ */
+model SlugAnterior {
+  id      String   @id @default(cuid())
+  slug    String   @unique
+  storeId String
+  store   Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  creadoEn DateTime @default(now())
+
+  @@index([storeId])
 }
 
 /// Cada problema técnico que ocurrió en producción.

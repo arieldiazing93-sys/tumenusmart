@@ -8,6 +8,7 @@ import { actualizarStore, crearZona } from "./actions";
 import { EliminarZonaBoton } from "./EliminarZonaBoton";
 import { StoreLocationField } from "./StoreLocationField";
 import { LogoField } from "./LogoField";
+import { UrlPublicaField } from "./UrlPublicaField";
 import { GuardadoToast } from "@/components/GuardadoToast";
 import { PausaPedidosToggle } from "../PausaPedidosToggle";
 import { NOMBRES_DIA, DIAS_ORDENADOS, resumenDia } from "@/lib/horario-atencion";
@@ -99,6 +100,12 @@ export default async function AdminConfiguracionPage() {
 
       <div>
         <h1 className="mb-4 text-[1.4rem] font-semibold tracking-titular text-tinta">Datos del negocio</h1>
+
+        {store?.slug && (
+          <div className="mb-4">
+            <UrlPublicaField slug={store.slug} />
+          </div>
+        )}
         <form action={actualizarStore} className="flex flex-col gap-3">
           <div>
             <label className="mb-1 block text-sm font-medium text-tinta-media">

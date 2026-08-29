@@ -1,4 +1,4 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { prisma } from "./prisma";
 import { SLUGS_RESERVADOS } from "./alcance-local";
 import { estaVencido } from "./suscripcion";
@@ -17,12 +17,28 @@ import { estaVencido } from "./suscripcion";
 export async function localPorSlug(slug: string) {
   if (!slug || SLUGS_RESERVADOS.has(slug.toLowerCase())) notFound();
 
-  const local = await prisma.store.findUnique({
-    where: { slug: slug.toLowerCase() },
+  const buscado = slug.toLowerCase();
+
+  const local = await prisma.store.findUnique({ where: { slug: buscado } });
+  if (local) return local;
+
+  // No existe con ese nombre. Antes de dar 404, se mira si fue el nombre
+  // ANTERIOR de algún local: los carteles con QR pegados en las mesas y los
+  // enlaces que quedaron en grupos de WhatsApp siguen apuntando ahí, y sería
+  // una pena matarlos por un cambio de nombre.
+  const anterior = await prisma.slugAnterior.findUnique({
+    where: { slug: buscado },
+    select: { store: { select: { slug: true } } },
   });
 
-  if (!local) notFound();
-  return local;
+  if (anterior) {
+    // Se manda a la portada del menú y no a la misma subpágina: acá solo
+    // llega el nombre del local, no la dirección completa. En la práctica no
+    // se pierde nada — los QR y lo que se comparte apuntan a la portada.
+    redirect(`/${anterior.store.slug}`);
+  }
+
+  notFound();
 }
 
 export type Local = Awaited<ReturnType<typeof localPorSlug>>;

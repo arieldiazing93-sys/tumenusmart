@@ -8,6 +8,7 @@ import { prismaDelLocal } from "@/lib/prisma-local";
 import { subirLogoNegocio } from "@/lib/supabase-storage";
 import { idLocalActual } from "@/lib/local-actual";
 import { normalizarSlug } from "@/lib/alcance-local";
+import { decidirCambioDeUrl } from "@/lib/url-publica";
 
 // Dos accesos a la base conviven acá a propósito:
 //
@@ -202,4 +203,71 @@ export async function alternarActivaZona(id: string, activo: boolean) {
   await db.deliveryZone.update({ where: { id }, data: { activo } });
   revalidatePath("/admin/configuracion");
   revalidatePath("/[slug]", "layout");
+}
+
+/**
+ * Cambiar la dirección pública del local (el "/loquesea" de la URL).
+ *
+ * Va aparte de `actualizarStore` a propósito. Guardar el teléfono y cambiar la
+ * dirección de la carta no son la misma clase de acción: lo segundo afecta a
+ * carteles ya impresos y a enlaces que están dando vueltas en WhatsApp. Si
+ * viajara en el mismo formulario, alguien que entró a corregir el horario
+ * podría cambiar la URL sin darse cuenta.
+ *
+ * La dirección vieja NO se tira: queda guardada y sigue funcionando.
+ */
+export async function cambiarUrlPublica(
+  formData: FormData
+): Promise<{ ok: boolean; error?: string; slug?: string }> {
+  await exigirPermiso("configuracion.editar");
+
+  const pedido = String(formData.get("slug") ?? "");
+  const storeId = await idLocalActual();
+
+  const actual = await prisma.store.findUnique({
+    where: { id: storeId },
+    select: { slug: true },
+  });
+  if (!actual) return { ok: false, error: "No encontré el local" };
+
+  const slugTanteo = normalizarSlug(pedido);
+
+  // Las dos consultas se hacen antes de decidir para que `decidirCambioDeUrl`
+  // reciba la situación completa y no tenga que ir a la base: así las reglas
+  // quedan probables sin levantar PostgreSQL.
+  const [ocupada, vieja] = await Promise.all([
+    slugTanteo
+      ? prisma.store.findUnique({ where: { slug: slugTanteo }, select: { id: true } })
+      : null,
+    slugTanteo
+      ? prisma.slugAnterior.findUnique({ where: { slug: slugTanteo }, select: { storeId: true } })
+      : null,
+  ]);
+
+  const decision = decidirCambioDeUrl({
+    pedido,
+    actual: actual.slug,
+    ocupadaPorOtro: Boolean(ocupada && ocupada.id !== storeId),
+    fueDeOtro: Boolean(vieja && vieja.storeId !== storeId),
+  });
+
+  if (!decision.ok) return { ok: false, error: decision.error };
+  if (!decision.cambia) return { ok: true, slug: decision.slug };
+
+  const slug = decision.slug;
+
+  await prisma.$transaction([
+    // Si el local vuelve a una dirección que ya tuvo, esa entrada deja de ser
+    // "anterior": si quedara, la dirección redirigiría a sí misma.
+    prisma.slugAnterior.deleteMany({ where: { slug, storeId } }),
+    prisma.slugAnterior.upsert({
+      where: { slug: actual.slug },
+      update: { storeId },
+      create: { slug: actual.slug, storeId },
+    }),
+    prisma.store.update({ where: { id: storeId }, data: { slug } }),
+  ]);
+
+  refrescarPantallas();
+  return { ok: true, slug };
 }
