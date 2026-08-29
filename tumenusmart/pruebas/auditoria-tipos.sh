@@ -63,6 +63,24 @@ RUTAS="$(echo "$SALIDA" | grep "error TS2307:" | grep -E "'(@/|\./|\.\./)" || tr
 PROPS="$(echo "$SALIDA" | grep -E "error TS(2741|2739|2322):" \
   | grep -v "Property 'children' is missing" \
   | grep -v "Type '{ key:" || true)"
+# Acá se probó agregar TS2345 (llamar a una función mía con un argumento del
+# tipo equivocado) después del build que rompió por el Decimal de Prisma. NO
+# QUEDÓ, y conviene saber por qué antes de volver a intentarlo:
+#
+#   · No agarraba ese error. Esta auditoría compila con un tsconfig propio y
+#     sin los tipos que genera Prisma, así que `pedido.total` no se ve como
+#     Decimal sino como `any`. Justo el dato que hacía falta comparar.
+#   · Y devolvía cuatro avisos en archivos que compilan perfecto en Vercel,
+#     por esa misma falta de tipos: `never`, `unknown[]`, `{}`.
+#
+# O sea: cero errores reales y cuatro falsos. Un auditor así se empieza a
+# ignorar en una semana, y entonces tampoco sirven los que sí funcionan.
+#
+# Mientras no se pueda correr el chequeo de tipos de verdad (npm bloqueado),
+# esta clase de error se cubre del otro lado: los módulos de src/lib que
+# reciben datos de la base aceptan "algo que sabe convertirse en texto" en vez
+# de adivinar la forma exacta, y las pruebas los ejercitan con un objeto que
+# imita al Decimal. Ver `Monto` en src/lib/rendicion.ts.
 
 FALLAS=0
 for par in "sintaxis:$SINTAXIS" "nombres y exportaciones:$NOMBRES" "rutas propias:$RUTAS" "props de componentes:$PROPS"; do

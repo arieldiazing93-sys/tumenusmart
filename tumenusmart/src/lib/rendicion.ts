@@ -52,10 +52,24 @@ export function rindeEfectivo(valor: string): boolean {
   return FORMAS_DE_COBRO.find((f) => f.valor === valor)?.rinde ?? true;
 }
 
+/**
+ * Un monto como puede llegar desde donde sea.
+ *
+ * Prisma no devuelve los Decimal como número ni como texto: devuelve un
+ * objeto Decimal. Poner acá `number | string` compilaba en las pruebas —donde
+ * los montos se escriben a mano— y reventaba recién en el build, al pasarle
+ * lo que da la base de verdad.
+ *
+ * Aceptar "algo que sabe convertirse en texto" cubre los tres casos sin que
+ * este módulo tenga que importar Prisma, que es justo lo que lo hace
+ * probable sin levantar una base.
+ */
+export type Monto = number | string | { toString(): string };
+
 export type PedidoDeCierre = {
   id: string;
   numero: number;
-  total: number | string;
+  total: Monto;
   cobroMetodo: string | null;
 };
 
@@ -70,8 +84,9 @@ export type ResumenCierre = {
   porMetodo: { metodo: FormaDeCobro; etiqueta: string; cantidad: number; monto: number }[];
 };
 
-function aNumero(valor: number | string): number {
-  const n = typeof valor === "string" ? parseFloat(valor) : valor;
+function aNumero(valor: Monto): number {
+  if (typeof valor === "number") return Number.isFinite(valor) ? valor : 0;
+  const n = parseFloat(String(valor));
   return Number.isFinite(n) ? n : 0;
 }
 

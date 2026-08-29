@@ -63,6 +63,18 @@ igual("montos como texto (así los da la base)",
 igual("un monto roto no ensucia la cuenta",
       resumirCierre([p(1, "no-es-un-numero", "efectivo"), p(2, 30000, "efectivo")]).efectivo, 30000);
 
+// Prisma NO devuelve number ni string: devuelve un objeto Decimal. Esto es lo
+// que rompió el build — las pruebas pasaban porque acá los montos se escriben
+// a mano. Se imita el objeto para que la prueba se parezca a la realidad.
+const decimalFalso = (n) => ({ toString: () => String(n) });
+igual("montos como objeto Decimal (lo que da Prisma de verdad)",
+      resumirCierre([
+        { id: "o1", numero: 1, total: decimalFalso(50000), cobroMetodo: "efectivo" },
+        { id: "o2", numero: 2, total: decimalFalso(45000), cobroMetodo: "efectivo" },
+      ]).efectivo, 95000);
+igual("Decimal con decimales",
+      resumirCierre([{ id: "o1", numero: 1, total: decimalFalso("1500.50"), cobroMetodo: "efectivo" }]).efectivo, 1500.5);
+
 // ------------------------------------------------------------ piezas sueltas
 igual("normalizar respeta lo válido", normalizarCobro("transferencia"), "transferencia");
 igual("normalizar cae en efectivo", normalizarCobro("cualquier cosa"), "efectivo");
