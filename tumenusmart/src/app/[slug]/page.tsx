@@ -112,15 +112,15 @@ export default async function CatalogoPage({
             <img
               src={store.logoUrl}
               alt={store.nombre}
-              width={72}
-              height={72}
+              width={96}
+              height={96}
               decoding="async"
-              className="h-[72px] w-[72px] flex-none rounded-2xl object-cover"
+              className="h-24 w-24 flex-none rounded-2xl object-cover"
             />
           ) : (
             <span
               aria-hidden="true"
-              className="flex h-[72px] w-[72px] flex-none items-center justify-center rounded-2xl bg-brand-light text-xl font-bold tracking-titular text-brand"
+              className="flex h-24 w-24 flex-none items-center justify-center rounded-2xl bg-brand-light text-2xl font-bold tracking-titular text-brand"
             >
               {store.nombre.slice(0, 2).toUpperCase()}
             </span>
