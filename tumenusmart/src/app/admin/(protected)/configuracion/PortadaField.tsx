@@ -66,7 +66,9 @@ export function PortadaField({ initialUrl }: { initialUrl: string | null }) {
       </label>
       <p className="mb-2 text-[0.78rem] text-tinta-suave">
         Se muestra de fondo, ancha, arriba del logo en tu carta pública. Sin ella, la
-        cabecera queda como está ahora — no hace falta subir nada.
+        cabecera queda como está ahora — no hace falta subir nada. Tamaño recomendado:{" "}
+        <span className="font-medium text-tinta-media">1200 × 450 px</span> — si le vas a
+        pedir una foto a un diseñador, pedísela con esa medida.
       </p>
 
       <div className="flex h-28 w-full items-center justify-center overflow-hidden rounded-xl border border-linea bg-papel-suave">

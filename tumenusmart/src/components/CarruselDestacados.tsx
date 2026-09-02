@@ -22,8 +22,10 @@ export function CarruselDestacados({ productos }: { productos: Producto[] }) {
   if (productos.length === 0) return null;
 
   return (
-    <section className="mt-6 border-b border-linea-fina pb-5">
-      <p className="rotulo text-center">Los más pedidos</p>
+    <section className="mt-6 border-y border-linea-fina py-5">
+      <p className="text-center font-mono text-[0.98rem] font-bold uppercase tracking-[0.1em] text-brand">
+        Los más pedidos
+      </p>
 
       <div className="-mx-4 mt-2.5 flex gap-2.5 overflow-x-auto px-4 pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {productos.map((p) => (
