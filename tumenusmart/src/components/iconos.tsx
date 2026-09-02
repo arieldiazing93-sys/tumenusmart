@@ -85,6 +85,20 @@ export const IconoIdeas = (p: Props) => (
   </Svg>
 );
 
+/**
+ * Analytics: la línea en ascenso con su flecha.
+ *
+ * Estadísticas ya usa barras verticales — esta tiene que distinguirse de esa
+ * incluso a 18 píxeles, así que en vez de barras es una tendencia con punta
+ * de flecha, la forma clásica de "esto está subiendo".
+ */
+export const IconoAnalytics = (p: Props) => (
+  <Svg {...p}>
+    <path d="M3 17l6-6 4 4 8-9" />
+    <path d="M15 6h6v6" />
+  </Svg>
+);
+
 /** Configuración: las perillas. */
 export const IconoConfiguracion = (p: Props) => (
   <Svg {...p}>
@@ -176,6 +190,7 @@ export const ICONOS = {
   categorias: IconoCategorias,
   estadisticas: IconoEstadisticas,
   ideas: IconoIdeas,
+  analytics: IconoAnalytics,
   configuracion: IconoConfiguracion,
   repartidores: IconoRepartidores,
   cierre: IconoCierre,

@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Boton } from "@/components/ui";
 import { normalizarSlug } from "@/lib/alcance-local";
 import { cambiarUrlPublica } from "./actions";
@@ -24,6 +24,15 @@ export function UrlPublicaField({ slug }: { slug: string }) {
   const [error, setError] = useState<string | null>(null);
   const [guardando, setGuardando] = useState(false);
   const router = useRouter();
+
+  // Se lee del navegador y no queda escrito a mano: así, el día que el
+  // dominio cambie (de tumenusmart.vercel.app a uno propio), esta pantalla
+  // no se queda mostrando la dirección vieja sin que nadie se acuerde de
+  // venir a tocarla.
+  const [dominio, setDominio] = useState("tumenusmart.vercel.app");
+  useEffect(() => {
+    setDominio(window.location.host);
+  }, []);
 
   const propuesto = normalizarSlug(texto);
   const cambia = propuesto !== slug && propuesto.length >= 2;
@@ -48,7 +57,7 @@ export function UrlPublicaField({ slug }: { slug: string }) {
       <p className="text-sm font-medium text-tinta-media">Dirección de la carta</p>
 
       <p className="mt-1 break-all font-mono text-[0.95rem] text-tinta">
-        tumenusmart.vercel.app/<strong className="text-brand-texto">{slug}</strong>
+        {dominio}/<strong className="text-brand-texto">{slug}</strong>
       </p>
 
       {!abierto ? (

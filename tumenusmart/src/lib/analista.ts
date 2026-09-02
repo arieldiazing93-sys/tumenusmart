@@ -16,6 +16,8 @@
 //  Lo que entra
 // ---------------------------------------------------------------------------
 
+import { agruparPorCliente } from "./agrupar-clientes";
+
 export type ItemAnalisis = {
   productId: string | null;
   nombre: string;
@@ -479,35 +481,15 @@ function ideaCategoriaAusente(
 
 // --- Clientes que dejaron de pedir -------------------------------------------
 
-type Cliente = {
-  telefono: string;
-  nombre: string;
-  pedidos: number;
-  gastado: number;
-  ultimo: Date;
-};
-
-function agruparClientes(reales: PedidoAnalisis[]): Cliente[] {
-  const mapa = new Map<string, Cliente>();
-  for (const p of reales) {
-    const clave = p.clienteTelefono.trim();
-    if (!clave) continue;
-    const c = mapa.get(clave) ?? {
-      telefono: clave,
-      nombre: p.clienteNombre,
-      pedidos: 0,
-      gastado: 0,
-      ultimo: p.creado,
-    };
-    c.pedidos += 1;
-    c.gastado += p.total;
-    if (p.creado > c.ultimo) {
-      c.ultimo = p.creado;
-      c.nombre = p.clienteNombre;
-    }
-    mapa.set(clave, c);
-  }
-  return [...mapa.values()];
+function agruparClientes(reales: PedidoAnalisis[]) {
+  return agruparPorCliente(
+    reales.map((p) => ({
+      clienteTelefono: p.clienteTelefono,
+      clienteNombre: p.clienteNombre,
+      createdAt: p.creado,
+      total: p.total,
+    }))
+  );
 }
 
 function ideaClientesPerdidos(reales: PedidoAnalisis[], ahora: Date): Idea | null {
@@ -518,7 +500,7 @@ function ideaClientesPerdidos(reales: PedidoAnalisis[], ahora: Date): Idea | nul
     .filter(
       (c) =>
         c.pedidos >= PEDIDOS_PARA_SER_HABITUAL &&
-        (ahora.getTime() - c.ultimo.getTime()) / MS_POR_DIA >= DIAS_SIN_VOLVER
+        (ahora.getTime() - c.ultimoPedido.getTime()) / MS_POR_DIA >= DIAS_SIN_VOLVER
     )
     .sort((a, b) => b.gastado - a.gastado);
 

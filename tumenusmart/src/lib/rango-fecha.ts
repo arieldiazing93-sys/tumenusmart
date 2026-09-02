@@ -6,7 +6,15 @@ import {
   claveDiaAsuncion,
 } from "./timezone";
 
-export type FiltroFecha = "hoy" | "ayer" | "7dias" | "30dias" | "mes" | "rango";
+export type FiltroFecha =
+  | "hoy"
+  | "ayer"
+  | "7dias"
+  | "30dias"
+  | "45dias"
+  | "60dias"
+  | "mes"
+  | "rango";
 
 function sumarDias(fecha: Date, dias: number): Date {
   return new Date(fecha.getTime() + dias * 24 * 60 * 60 * 1000);
@@ -31,6 +39,10 @@ export function calcularRangoFecha(
       return { gte: sumarDias(inicioHoy, -6), lt: sumarDias(inicioHoy, 1) };
     case "30dias":
       return { gte: sumarDias(inicioHoy, -29), lt: sumarDias(inicioHoy, 1) };
+    case "45dias":
+      return { gte: sumarDias(inicioHoy, -44), lt: sumarDias(inicioHoy, 1) };
+    case "60dias":
+      return { gte: sumarDias(inicioHoy, -59), lt: sumarDias(inicioHoy, 1) };
     case "mes":
       return { gte: inicioDeMesEnAsuncion(ahora), lt: inicioDeMesSiguienteEnAsuncion(ahora) };
     case "rango": {

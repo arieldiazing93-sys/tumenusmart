@@ -10,7 +10,7 @@ export type RangoFecha = { gte: Date; lt: Date };
  * un pedido legítimo cuyo registro de envío falló: apenas el encargado lo
  * mueve de "pendiente", vuelve a contar.
  */
-const PEDIDO_REAL = {
+export const PEDIDO_REAL = {
   OR: [{ enviadoWhatsapp: true }, { estado: { not: "pendiente" } }],
 };
 

@@ -41,6 +41,7 @@ export type Permiso =
   // --- el negocio ---
   | "estadisticas.ver"
   | "ideas.ver"
+  | "analytics.ver"
   | "configuracion.editar"
   | "empleados.gestionar"
   // --- administración de la cartera ---
@@ -92,6 +93,7 @@ const PERMISOS_LOCAL: Permiso[] = [
   "categorias.editar",
   "estadisticas.ver",
   "ideas.ver",
+  "analytics.ver",
   "configuracion.editar",
   "empleados.gestionar",
 ];
