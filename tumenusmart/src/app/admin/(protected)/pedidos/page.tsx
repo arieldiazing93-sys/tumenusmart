@@ -138,7 +138,7 @@ export default async function AdminPedidosPage({
         }
       />
 
-      {ideaSemana && <TarjetaIdeaSemana idea={ideaSemana} />}
+      {ideaSemana && !ideaSemana.vista && <TarjetaIdeaSemana idea={ideaSemana} />}
 
       {/*
         Una sola línea de estado, no tres bloques.
