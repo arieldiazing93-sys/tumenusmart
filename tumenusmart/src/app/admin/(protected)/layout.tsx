@@ -117,12 +117,14 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     localActualId = "";
   }
 
-  // El estado de la suscripción se le muestra al DUEÑO del local, no al
-  // superadmin: él ya tiene su propia vista completa en /admin/super, y
-  // repetir el aviso acá solo le agregaría ruido a su propio trabajo.
+  // El estado de la suscripción se muestra siempre que haya un local activo
+  // en pantalla — dueño, empleado, o el superadmin mirando ese local puntual
+  // con el selector. Al superadmin le sirve igual: es la forma más rápida de
+  // ver cómo lo ve el cliente sin pedirle su usuario, y queda a la vista
+  // mientras administra ese local en particular.
   let avisoSuscripcion: EstadoSuscripcion | null = null;
   let vencimientoLocal: Date | null = null;
-  if (!esSuper && localActualId) {
+  if (localActualId) {
     const datosLocal = await prisma.store
       .findUnique({
         where: { id: localActualId },
@@ -273,11 +275,11 @@ const ESTILOS_SUSCRIPCION: Record<string, string> = {
 };
 
 /**
- * Le muestra al dueño del local hasta cuándo tiene pagado — desde el primer
- * día, no solo cuando ya está por vencer. Que la fecha esté siempre a la
- * vista evita la sorpresa de un menú que se apaga solo sin que nadie lo viera
- * venir. Al superadmin no se le muestra: él ya tiene su propia vista completa
- * en /admin/super.
+ * Le muestra a quien esté administrando ese local hasta cuándo tiene pagado
+ * — desde el primer día, no solo cuando ya está por vencer. Que la fecha esté
+ * siempre a la vista evita la sorpresa de un menú que se apaga solo sin que
+ * nadie lo viera venir. Al superadmin también se lo muestra: es la vista de
+ * ESE local puntual (elegido con el selector), no un reemplazo de /admin/super.
  */
 function BannerSuscripcion({
   estado,
