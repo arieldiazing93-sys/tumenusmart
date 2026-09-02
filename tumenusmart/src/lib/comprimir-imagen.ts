@@ -23,6 +23,9 @@ export type OpcionesCompresion = {
 
 export const PARA_PRODUCTO: OpcionesCompresion = { ladoMaximo: 900, calidad: 0.8 };
 export const PARA_LOGO: OpcionesCompresion = { ladoMaximo: 500, calidad: 0.85 };
+// Se muestra a lo ancho de toda la pantalla, no como miniatura — necesita más
+// resolución que el logo, pero sigue sin hacer falta el original de cámara.
+export const PARA_PORTADA: OpcionesCompresion = { ladoMaximo: 1200, calidad: 0.8 };
 
 /** Más grande que esto ni se intenta: sería lentísimo y no es una foto normal. */
 const TAMANO_MAXIMO_ACEPTADO = 25 * 1024 * 1024;

@@ -8,6 +8,7 @@ import { actualizarStore, crearZona } from "./actions";
 import { EliminarZonaBoton } from "./EliminarZonaBoton";
 import { StoreLocationField } from "./StoreLocationField";
 import { LogoField } from "./LogoField";
+import { PortadaField } from "./PortadaField";
 import { UrlPublicaField } from "./UrlPublicaField";
 import { GuardadoToast } from "@/components/GuardadoToast";
 import { PausaPedidosToggle } from "../PausaPedidosToggle";
@@ -79,6 +80,7 @@ export default async function AdminConfiguracionPage() {
             />
           </div>
           <LogoField initialUrl={store?.logoUrl ?? null} />
+          <PortadaField initialUrl={store?.portadaUrl ?? null} />
           <div>
             <label className="mb-1 block text-sm font-medium text-tinta-media">
               Saludo del mensaje de WhatsApp — pedidos (opcional)

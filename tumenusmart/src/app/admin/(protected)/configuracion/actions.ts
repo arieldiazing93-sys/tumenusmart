@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { prismaDelLocal } from "@/lib/prisma-local";
-import { subirLogoNegocio } from "@/lib/supabase-storage";
+import { subirLogoNegocio, subirPortadaNegocio } from "@/lib/supabase-storage";
 import { idLocalActual } from "@/lib/local-actual";
 import { normalizarSlug } from "@/lib/alcance-local";
 import { decidirCambioDeUrl } from "@/lib/url-publica";
@@ -51,6 +51,32 @@ export async function quitarLogoStore(): Promise<void> {
   await prisma.store.update({
     where: { id: await idLocalActual() },
     data: { logoUrl: null },
+  });
+  refrescarPantallas();
+}
+
+export async function subirFotoPortada(formData: FormData): Promise<{ url: string }> {
+  await exigirPermiso("configuracion.editar");
+  const archivo = formData.get("archivo");
+  if (!(archivo instanceof File)) {
+    throw new Error("No se recibió ninguna imagen");
+  }
+  const url = await subirPortadaNegocio(archivo);
+
+  await prisma.store.update({
+    where: { id: await idLocalActual() },
+    data: { portadaUrl: url },
+  });
+  refrescarPantallas();
+
+  return { url };
+}
+
+export async function quitarPortadaStore(): Promise<void> {
+  await exigirPermiso("configuracion.editar");
+  await prisma.store.update({
+    where: { id: await idLocalActual() },
+    data: { portadaUrl: null },
   });
   refrescarPantallas();
 }

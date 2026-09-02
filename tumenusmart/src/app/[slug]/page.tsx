@@ -105,8 +105,28 @@ export default async function CatalogoPage({
   return (
     <main className="mx-auto max-w-2xl px-4 pb-32">
       {/* ---------- cabecera del local ---------- */}
-      <header className="animate-[subir_0.5s_cubic-bezier(0.22,0.7,0.3,1)] pt-6">
-        <div className="flex items-center gap-3.5">
+      <header className="animate-[subir_0.5s_cubic-bezier(0.22,0.7,0.3,1)]">
+        {/*
+          Opcional: sin portada cargada, la cabecera queda EXACTAMENTE como
+          antes (mismo pt-6 de acá abajo). Con portada, la foto va de borde a
+          borde (mismo truco de -mx-4 que ya usa Carta.tsx para sus cabeceras
+          de categoría) pegada arriba del todo — el logo y el nombre siguen
+          abajo, sobre el fondo sólido de siempre, así el texto nunca pierde
+          contraste por quedar encima de una foto.
+        */}
+        {store.portadaUrl && (
+          <div className="-mx-4 -mt-6 h-36 overflow-hidden sm:h-44">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={store.portadaUrl}
+              alt=""
+              aria-hidden="true"
+              decoding="async"
+              className="h-full w-full object-cover"
+            />
+          </div>
+        )}
+        <div className={`flex items-center gap-3.5 ${store.portadaUrl ? "pt-4" : "pt-6"}`}>
           {store.logoUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img

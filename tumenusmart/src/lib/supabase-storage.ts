@@ -55,3 +55,7 @@ export async function subirImagenProducto(archivo: File): Promise<string> {
 export async function subirLogoNegocio(archivo: File): Promise<string> {
   return subirImagen(archivo, "logos/");
 }
+
+export async function subirPortadaNegocio(archivo: File): Promise<string> {
+  return subirImagen(archivo, "portadas/");
+}
