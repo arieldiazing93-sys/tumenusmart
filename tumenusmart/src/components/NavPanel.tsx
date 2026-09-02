@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { ICONOS, IconoPlegar, type NombreIcono } from "./iconos";
 import { Logo } from "./Logo";
 
@@ -252,39 +253,48 @@ export function NavPanel({
         </span>
       </button>
 
-      {abierto && (
-        <div className="fixed inset-0 z-50 lg:hidden">
-          <button
-            type="button"
-            aria-label="Cerrar el menú"
-            onClick={() => setAbierto(false)}
-            className="absolute inset-0 bg-noche/40"
-          />
-          <div className="absolute inset-y-0 left-0 w-[17rem] animate-[entrarIzquierda_0.18s_ease-out] overflow-y-auto border-r border-linea bg-white">
-            <div className="flex items-center justify-between border-b border-linea px-4 py-3">
-              <span className="flex items-center gap-2 text-[0.95rem] font-semibold tracking-titular">
-                <Logo tam={20} color="#D2501F" />
-                TuMenuSmart
-              </span>
-              <button
-                type="button"
-                onClick={() => setAbierto(false)}
-                aria-label="Cerrar"
-                className="flex h-8 w-8 items-center justify-center rounded-lg text-tinta-media hover:bg-papel-hundido"
-              >
-                ✕
-              </button>
-            </div>
-            {extra && (
-              <div className="border-b border-linea px-4 py-3">{extra}</div>
-            )}
+      {abierto &&
+        createPortal(
+          // Se saca del <header> con un portal a propósito: el header tiene
+          // backdrop-blur (backdrop-filter), y esa propiedad hace que los
+          // navegadores usen al header como marco de referencia para
+          // cualquier elemento fixed de adentro — el cajón terminaba
+          // encajonado en la franja de 56px de la barra en vez de cubrir
+          // toda la pantalla. Portal a <body> lo saca de ese problema del
+          // todo, sin depender de que ningún ancestro se quede sin filtros.
+          <div className="fixed inset-0 z-50 lg:hidden">
+            <button
+              type="button"
+              aria-label="Cerrar el menú"
+              onClick={() => setAbierto(false)}
+              className="absolute inset-0 bg-noche/40"
+            />
+            <div className="absolute inset-y-0 left-0 w-[17rem] animate-[entrarIzquierda_0.18s_ease-out] overflow-y-auto border-r border-linea bg-white">
+              <div className="flex items-center justify-between border-b border-linea px-4 py-3">
+                <span className="flex items-center gap-2 text-[0.95rem] font-semibold tracking-titular">
+                  <Logo tam={20} color="#D2501F" />
+                  TuMenuSmart
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setAbierto(false)}
+                  aria-label="Cerrar"
+                  className="flex h-8 w-8 items-center justify-center rounded-lg text-tinta-media hover:bg-papel-hundido"
+                >
+                  ✕
+                </button>
+              </div>
+              {extra && (
+                <div className="border-b border-linea px-4 py-3">{extra}</div>
+              )}
 
-            {/* En el cajón siempre desplegado: hay lugar de sobra y ahí lo que
-                importa es leer los nombres. */}
-            {lista(false)}
-          </div>
-        </div>
-      )}
+              {/* En el cajón siempre desplegado: hay lugar de sobra y ahí lo que
+                  importa es leer los nombres. */}
+              {lista(false)}
+            </div>
+          </div>,
+          document.body
+        )}
     </>
   );
 }
