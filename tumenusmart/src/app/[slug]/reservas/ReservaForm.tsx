@@ -4,6 +4,9 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { crearReserva } from "./actions";
 import { TURNOS, MOTIVOS_RESERVA } from "@/lib/reservas";
+import { Tarjeta, Campo, Entrada, Selector, Aviso } from "@/components/ui";
+import { Segmentado } from "@/components/Segmentado";
+import { BotonEnviar } from "@/components/BotonEnviar";
 
 type Disponibilidad = {
   hora: string;
@@ -58,6 +61,15 @@ export function ReservaForm({
   const [error, setError] = useState<string | null>(null);
   const [disponibilidad, setDisponibilidad] = useState<Disponibilidad[] | null>(null);
   const [cargandoCupos, setCargandoCupos] = useState(false);
+  // Qué campo disparó el último error, para resaltarlo.
+  const [campoInvalido, setCampoInvalido] = useState<"fecha" | "turno" | "horario" | null>(null);
+  const [intento, setIntento] = useState(0);
+
+  function fallar(mensaje: string, campo?: "fecha" | "turno" | "horario") {
+    setError(mensaje);
+    setCampoInvalido(campo ?? null);
+    setIntento((n) => n + 1);
+  }
 
   // Cantidad real de personas: el campo vacío cuenta como 1 para los
   // cálculos, pero en pantalla se lo deja vacío mientras el cliente escribe.
@@ -129,33 +141,35 @@ export function ReservaForm({
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    setCampoInvalido(null);
 
     if (!fecha) {
-      setError("Elegí una fecha para la reserva.");
+      fallar("Elegí una fecha para la reserva.", "fecha");
       return;
     }
     if (diaElegidoCerrado) {
-      setError(`Ese día el local está cerrado. Elegí otra fecha.`);
+      fallar("Ese día el local está cerrado. Elegí otra fecha.", "fecha");
       return;
     }
     if (!turno) {
-      setError("Elegí un turno (día, tarde o noche).");
+      fallar("Elegí un turno (día, tarde o noche).", "turno");
       return;
     }
     if (!horario) {
-      setError("Elegí un horario.");
+      fallar("Elegí un horario.", "horario");
       return;
     }
     if (horarioYaPaso(horario)) {
-      setError("Ese horario ya pasó. Elegí uno más tarde u otra fecha.");
+      fallar("Ese horario ya pasó. Elegí uno más tarde u otra fecha.", "horario");
       return;
     }
     if (sinLugar(horario)) {
       const cupo = cupoDe(horario);
-      setError(
+      fallar(
         cupo?.lugaresLibres === 0
           ? "Ese horario ya está completo. Elegí otro horario u otra fecha."
-          : `En ese horario quedan ${cupo?.lugaresLibres} lugares y estás pidiendo para ${personas}.`
+          : `En ese horario quedan ${cupo?.lugaresLibres} lugares y estás pidiendo para ${personas}.`,
+        "horario"
       );
       return;
     }
@@ -163,7 +177,7 @@ export function ReservaForm({
     // celular), se toma la cantidad derivada y se refleja en pantalla.
     if (personasTexto !== String(personas)) setPersonasTexto(String(personas));
     if (!nombre.trim() || !telefono.trim()) {
-      setError("Faltan tus datos de contacto.");
+      fallar("Faltan tus datos de contacto.");
       return;
     }
 
@@ -182,7 +196,7 @@ export function ReservaForm({
       });
       router.push(`/${slug}/reserva/${reservationId}`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "No se pudo generar la reserva.");
+      fallar(err instanceof Error ? err.message : "No se pudo generar la reserva.");
       setEnviando(false);
     }
   }
@@ -190,247 +204,240 @@ export function ReservaForm({
   const horariosDelTurno = turno ? horariosPorTurno[turno] ?? [] : [];
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-5">
-      <div>
-        <label className="mb-1 block text-sm font-medium text-neutral-700">Fecha</label>
-        <input
-          type="date"
-          required
-          min={hoy}
-          value={fecha}
-          onChange={(e) => {
-            setFecha(e.target.value);
-            // Cambiar de fecha puede dejar inválido el horario ya elegido
-            // (ej: pasar a hoy y que ese horario ya haya pasado).
-            setHorario("");
-          }}
-          className={`w-full rounded-lg border px-3 py-2 ${
-            diaElegidoCerrado ? "border-red-400 bg-red-50" : "border-neutral-300"
-          }`}
-        />
-        {diaElegidoCerrado && diaDeLaFecha != null && (
-          <p className="mt-1 text-sm text-red-600">
-            Los {nombresDia[diaDeLaFecha].toLowerCase()} el local está cerrado — elegí otra
-            fecha.
-          </p>
-        )}
-      </div>
+    <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+      <fieldset disabled={enviando} className="flex flex-col gap-4">
+        <Tarjeta className="flex flex-col gap-4">
+          <p className="rotulo">Cuándo</p>
 
-      <div>
-        <label className="mb-1 block text-sm font-medium text-neutral-700">
-          Cantidad de personas
-        </label>
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
-            onClick={() => cambiarPersonas(personas - 1)}
-            disabled={personas <= 1}
-            aria-label="Menos personas"
-            className="h-12 w-12 flex-none rounded-lg border border-neutral-300 text-xl font-semibold text-neutral-600 disabled:opacity-40"
-          >
-            −
-          </button>
-
-          {/* Se guarda como texto para que en el celular se pueda borrar y
-              escribir de nuevo; recién al salir del campo se normaliza. */}
-          <input
-            type="text"
-            inputMode="numeric"
-            pattern="[0-9]*"
-            required
-            value={personasTexto}
-            onChange={(e) => {
-              const soloDigitos = e.target.value.replace(/[^\d]/g, "");
-              setPersonasTexto(soloDigitos.slice(0, 3));
-            }}
-            onBlur={() => {
-              if (!personasTexto || Number(personasTexto) < 1) setPersonasTexto("1");
-            }}
-            onFocus={(e) => e.target.select()}
-            aria-label="Cantidad de personas"
-            className="h-12 w-full rounded-lg border border-neutral-300 px-3 text-center text-lg"
-          />
-
-          <button
-            type="button"
-            onClick={() => cambiarPersonas(personas + 1)}
-            aria-label="Más personas"
-            className="h-12 w-12 flex-none rounded-lg border border-neutral-300 text-xl font-semibold text-neutral-600"
-          >
-            +
-          </button>
-        </div>
-      </div>
-
-      <div>
-        <label className="mb-1 block text-sm font-medium text-neutral-700">Turno</label>
-        <div className="flex gap-3">
-          {TURNOS.map((t) => (
-            <button
-              key={t.value}
-              type="button"
-              onClick={() => elegirTurno(t.value)}
-              className={`flex-1 rounded-lg border px-3 py-2 text-sm ${
-                turno === t.value
-                  ? "border-brand bg-brand-light text-brand-dark"
-                  : "border-neutral-300 text-neutral-600"
-              }`}
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
-
-        {turno && (
-          <div className="mt-3">
-            {horariosDelTurno.length === 0 ? (
-              <p className="text-sm text-neutral-500">
-                Todavía no hay horarios cargados para este turno. Probá con otro turno.
+          <Campo etiqueta="Fecha">
+            <Entrada
+              type="date"
+              required
+              min={hoy}
+              value={fecha}
+              invalido={campoInvalido === "fecha"}
+              key={campoInvalido === "fecha" ? `sac-${intento}` : "fecha"}
+              className={campoInvalido === "fecha" ? "animate-[sacudir_0.32s_ease]" : ""}
+              onChange={(e) => {
+                setFecha(e.target.value);
+                // Cambiar de fecha puede dejar inválido el horario ya elegido
+                // (ej: pasar a hoy y que ese horario ya haya pasado).
+                setHorario("");
+              }}
+            />
+            {diaElegidoCerrado && diaDeLaFecha != null && (
+              <p className="mt-1.5 text-[0.78rem] font-medium text-peligro">
+                Los {nombresDia[diaDeLaFecha].toLowerCase()} el local está cerrado — elegí otra
+                fecha.
               </p>
-            ) : (
-              <>
-                <div className="flex flex-wrap gap-2">
-                  {horariosDelTurno.map((h) => {
-                    const paso = horarioYaPaso(h);
-                    const completo = sinLugar(h);
-                    const bloqueado = paso || completo;
-                    const cupo = cupoDe(h);
-                    return (
-                      <button
-                        key={h}
-                        type="button"
-                        disabled={bloqueado}
-                        title={
-                          paso
-                            ? "Ese horario ya pasó"
-                            : completo
-                              ? "No quedan lugares para esa cantidad de personas"
-                              : undefined
-                        }
-                        onClick={() => setHorario(h)}
-                        className={`rounded-full border px-3 py-1.5 text-sm ${
-                          bloqueado
-                            ? `cursor-not-allowed border-neutral-200 text-neutral-300 ${
-                                paso ? "line-through" : ""
-                              }`
-                            : horario === h
-                              ? "border-brand bg-brand text-white"
-                              : "border-neutral-300 text-neutral-600"
-                        }`}
-                      >
-                        {h}
-                        {/* Solo se avisa cuando queda poco: mostrar "quedan 40"
-                            en un salón vacío es ruido, no información. */}
-                        {!paso &&
-                          cupo?.lugaresLibres != null &&
-                          cupo.lugaresLibres <= 10 && (
-                            <span
-                              className={`ml-1.5 text-[11px] ${
-                                bloqueado
-                                  ? "text-neutral-300"
-                                  : horario === h
-                                    ? "text-white/80"
-                                    : "text-amber-600"
-                              }`}
-                            >
-                              {cupo.lugaresLibres === 0
-                                ? "completo"
-                                : `quedan ${cupo.lugaresLibres}`}
-                            </span>
-                          )}
-                      </button>
-                    );
-                  })}
-                </div>
+            )}
+          </Campo>
 
-                {cargandoCupos && (
-                  <p className="mt-2 text-xs text-neutral-400">Consultando disponibilidad...</p>
-                )}
+          <Campo etiqueta="Cantidad de personas">
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => cambiarPersonas(personas - 1)}
+                disabled={personas <= 1}
+                aria-label="Menos personas"
+                className="h-12 w-12 flex-none rounded-lg border border-linea text-xl font-semibold text-tinta-media transition-colors hover:border-brand/40 disabled:opacity-40"
+              >
+                −
+              </button>
 
-                {esHoy && horariosDelTurno.every(horarioYaPaso) && (
-                  <p className="mt-2 text-sm text-amber-700">
-                    Todos los horarios de este turno ya pasaron por hoy. Elegí otro turno u
-                    otra fecha.
-                  </p>
-                )}
+              {/* Se guarda como texto para que en el celular se pueda borrar y
+                  escribir de nuevo; recién al salir del campo se normaliza. */}
+              <Entrada
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                required
+                value={personasTexto}
+                onChange={(e) => {
+                  const soloDigitos = e.target.value.replace(/[^\d]/g, "");
+                  setPersonasTexto(soloDigitos.slice(0, 3));
+                }}
+                onBlur={() => {
+                  if (!personasTexto || Number(personasTexto) < 1) setPersonasTexto("1");
+                }}
+                onFocus={(e) => e.target.select()}
+                aria-label="Cantidad de personas"
+                className="h-12 text-center text-lg"
+              />
 
-                {!cargandoCupos &&
-                  horariosDelTurno.length > 0 &&
-                  horariosDelTurno.every((h) => horarioYaPaso(h) || sinLugar(h)) &&
-                  !horariosDelTurno.every(horarioYaPaso) && (
-                    <p className="mt-2 text-sm text-amber-700">
-                      No quedan lugares en este turno para {personas}{" "}
-                      {personas === 1 ? "persona" : "personas"}. Probá otro turno, otra fecha,
-                      o consultanos por WhatsApp.
+              <button
+                type="button"
+                onClick={() => cambiarPersonas(personas + 1)}
+                aria-label="Más personas"
+                className="h-12 w-12 flex-none rounded-lg border border-linea text-xl font-semibold text-tinta-media transition-colors hover:border-brand/40"
+              >
+                +
+              </button>
+            </div>
+          </Campo>
+        </Tarjeta>
+
+        <Tarjeta className="flex flex-col gap-3">
+          <p className="rotulo">Turno y horario</p>
+          <div
+            key={campoInvalido === "turno" ? `sac-${intento}` : "turno"}
+            className={campoInvalido === "turno" ? "animate-[sacudir_0.32s_ease]" : ""}
+          >
+            <Segmentado
+              opciones={TURNOS.map((t) => ({ value: t.value, label: t.label }))}
+              valor={turno ?? ""}
+              onChange={elegirTurno}
+            />
+          </div>
+
+          {turno && (
+            <div className="animate-[subir_0.4s_cubic-bezier(0.22,0.7,0.3,1)]">
+              {horariosDelTurno.length === 0 ? (
+                <p className="text-[0.85rem] text-tinta-suave">
+                  Todavía no hay horarios cargados para este turno. Probá con otro turno.
+                </p>
+              ) : (
+                <>
+                  <div
+                    key={campoInvalido === "horario" ? `sac-${intento}` : "horarios"}
+                    className={`flex flex-wrap gap-2 ${
+                      campoInvalido === "horario" ? "animate-[sacudir_0.32s_ease]" : ""
+                    }`}
+                  >
+                    {horariosDelTurno.map((h) => {
+                      const paso = horarioYaPaso(h);
+                      const completo = sinLugar(h);
+                      const bloqueado = paso || completo;
+                      const cupo = cupoDe(h);
+                      return (
+                        <button
+                          key={h}
+                          type="button"
+                          disabled={bloqueado}
+                          title={
+                            paso
+                              ? "Ese horario ya pasó"
+                              : completo
+                                ? "No quedan lugares para esa cantidad de personas"
+                                : undefined
+                          }
+                          onClick={() => setHorario(h)}
+                          className={`rounded-full border px-3 py-1.5 text-[0.85rem] transition-colors duration-150 ${
+                            bloqueado
+                              ? `cursor-not-allowed border-linea-fina text-tinta-suave/60 ${
+                                  paso ? "line-through" : ""
+                                }`
+                              : horario === h
+                                ? "border-brand bg-brand text-white"
+                                : "border-linea text-tinta-media hover:border-brand/40"
+                          }`}
+                        >
+                          {h}
+                          {/* Solo se avisa cuando queda poco: mostrar "quedan 40"
+                              en un salón vacío es ruido, no información. */}
+                          {!paso &&
+                            cupo?.lugaresLibres != null &&
+                            cupo.lugaresLibres <= 10 && (
+                              <span
+                                className={`ml-1.5 text-[0.68rem] ${
+                                  bloqueado
+                                    ? "text-tinta-suave/60"
+                                    : horario === h
+                                      ? "text-white/80"
+                                      : "text-aviso"
+                                }`}
+                              >
+                                {cupo.lugaresLibres === 0
+                                  ? "completo"
+                                  : `quedan ${cupo.lugaresLibres}`}
+                              </span>
+                            )}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {cargandoCupos && (
+                    <p className="mt-2 text-[0.76rem] text-tinta-suave">
+                      Consultando disponibilidad...
                     </p>
                   )}
-              </>
-            )}
-          </div>
-        )}
-      </div>
 
-      <div>
-        <label className="mb-1 block text-sm font-medium text-neutral-700">Motivo</label>
-        <select
-          value={motivo}
-          onChange={(e) => setMotivo(e.target.value)}
-          className="w-full rounded-lg border border-neutral-300 px-3 py-2"
-        >
-          {MOTIVOS_RESERVA.map((m) => (
-            <option key={m.value} value={m.value}>
-              {m.label}
-            </option>
-          ))}
-        </select>
-      </div>
+                  {esHoy && horariosDelTurno.every(horarioYaPaso) && (
+                    <p className="mt-2 text-[0.85rem] text-aviso">
+                      Todos los horarios de este turno ya pasaron por hoy. Elegí otro turno u
+                      otra fecha.
+                    </p>
+                  )}
 
-      <div>
-        <label className="mb-1 block text-sm font-medium text-neutral-700">Nombre</label>
-        <input
-          required
-          value={nombre}
-          onChange={(e) => setNombre(e.target.value)}
-          className="w-full rounded-lg border border-neutral-300 px-3 py-2"
-          placeholder="Tu nombre"
-        />
-      </div>
+                  {!cargandoCupos &&
+                    horariosDelTurno.length > 0 &&
+                    horariosDelTurno.every((h) => horarioYaPaso(h) || sinLugar(h)) &&
+                    !horariosDelTurno.every(horarioYaPaso) && (
+                      <p className="mt-2 text-[0.85rem] text-aviso">
+                        No quedan lugares en este turno para {personas}{" "}
+                        {personas === 1 ? "persona" : "personas"}. Probá otro turno, otra fecha,
+                        o consultanos por WhatsApp.
+                      </p>
+                    )}
+                </>
+              )}
+            </div>
+          )}
+        </Tarjeta>
 
-      <div>
-        <label className="mb-1 block text-sm font-medium text-neutral-700">
-          Teléfono (WhatsApp)
-        </label>
-        <input
-          required
-          value={telefono}
-          onChange={(e) => setTelefono(e.target.value)}
-          className="w-full rounded-lg border border-neutral-300 px-3 py-2"
-          placeholder="0981 234 567"
-        />
-      </div>
+        <Tarjeta className="flex flex-col gap-4">
+          <p className="rotulo">Tus datos</p>
 
-      <div>
-        <label className="mb-1 block text-sm font-medium text-neutral-700">
-          Correo <span className="font-normal text-neutral-400">(opcional)</span>
-        </label>
-        <input
-          type="email"
-          value={correo}
-          onChange={(e) => setCorreo(e.target.value)}
-          className="w-full rounded-lg border border-neutral-300 px-3 py-2"
-          placeholder="nombre@correo.com"
-        />
-      </div>
+          <Campo etiqueta="Motivo">
+            <Selector value={motivo} onChange={(e) => setMotivo(e.target.value)}>
+              {MOTIVOS_RESERVA.map((m) => (
+                <option key={m.value} value={m.value}>
+                  {m.label}
+                </option>
+              ))}
+            </Selector>
+          </Campo>
 
-      {error && <p className="text-sm text-red-600">{error}</p>}
+          <Campo etiqueta="Nombre">
+            <Entrada
+              required
+              value={nombre}
+              onChange={(e) => setNombre(e.target.value)}
+              placeholder="Tu nombre"
+            />
+          </Campo>
 
-      <button
-        type="submit"
-        disabled={enviando || diaElegidoCerrado}
-        className="rounded-lg bg-brand px-6 py-3 font-medium text-white hover:bg-brand-dark disabled:cursor-not-allowed disabled:bg-neutral-300"
+          <Campo etiqueta="Teléfono (WhatsApp)">
+            <Entrada
+              required
+              value={telefono}
+              onChange={(e) => setTelefono(e.target.value)}
+              placeholder="0981 234 567"
+            />
+          </Campo>
+
+          <Campo etiqueta="Correo" ayuda="Opcional">
+            <Entrada
+              type="email"
+              value={correo}
+              onChange={(e) => setCorreo(e.target.value)}
+              placeholder="nombre@correo.com"
+            />
+          </Campo>
+        </Tarjeta>
+      </fieldset>
+
+      {error && <Aviso color="peligro">{error}</Aviso>}
+
+      <BotonEnviar
+        enviando={enviando}
+        disabled={diaElegidoCerrado}
+        enviandoTexto="Generando reserva..."
+        className="w-full"
       >
-        {enviando ? "Generando reserva..." : "Reservar"}
-      </button>
+        Reservar
+      </BotonEnviar>
     </form>
   );
 }

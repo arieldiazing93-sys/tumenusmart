@@ -105,7 +105,7 @@ export default async function CatalogoPage({
   return (
     <main className="mx-auto max-w-2xl px-4 pb-32">
       {/* ---------- cabecera del local ---------- */}
-      <header className="pt-6">
+      <header className="animate-[subir_0.5s_cubic-bezier(0.22,0.7,0.3,1)] pt-6">
         <div className="flex items-center gap-3.5">
           {store.logoUrl ? (
             // eslint-disable-next-line @next/next/no-img-element

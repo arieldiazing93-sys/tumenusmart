@@ -6,6 +6,8 @@ import { construirMensajePedido, construirLinkWhatsapp } from "@/lib/whatsapp";
 import { formatearGuarani, formatearNumero } from "@/lib/format";
 import { pasosSeguimiento, indicePaso } from "@/lib/seguimiento-pedido";
 import { AutoRefresh } from "@/components/AutoRefresh";
+import { SeguimientoTracker } from "@/components/SeguimientoTracker";
+import { Tarjeta, Aviso } from "@/components/ui";
 import { BotonWhatsapp } from "./BotonWhatsapp";
 import { localPorSlug } from "@/lib/local-por-slug";
 
@@ -80,18 +82,17 @@ export default async function SeguimientoPedidoPage({
       {!finalizado && !cancelado && <AutoRefresh segundos={25} />}
 
       <div className="mb-8 text-center">
-        <h1 className="text-xl font-bold text-neutral-900">
+        <h1 className="text-[1.3rem] font-semibold tracking-titular text-tinta">
           Pedido {formatearNumero(order.numero)}
         </h1>
-        <p className="text-sm text-neutral-500">{store.nombre}</p>
+        <p className="text-[0.85rem] text-tinta-suave">{store.nombre}</p>
       </div>
 
       {!order.enviadoWhatsapp && !cancelado && (
-        <div className="mb-6 rounded-xl border border-amber-300 bg-amber-50 p-4 text-center">
-          <p className="font-semibold text-amber-900">Falta un paso</p>
-          <p className="mt-0.5 text-sm text-amber-800">
+        <div className="mb-6">
+          <Aviso titulo="Falta un paso" color="aviso">
             Enviá el pedido por WhatsApp para que {store.nombre} lo reciba y lo confirme.
-          </p>
+          </Aviso>
         </div>
       )}
 
@@ -105,95 +106,44 @@ export default async function SeguimientoPedidoPage({
       </div>
 
       {cancelado ? (
-        <div className="mb-8 rounded-xl border border-red-200 bg-red-50 p-5 text-center">
-          <p className="text-2xl">❌</p>
-          <p className="mt-1 font-semibold text-red-800">Pedido cancelado</p>
-          <p className="mt-0.5 text-sm text-red-700">
+        <div className="mb-8">
+          <Aviso titulo="Pedido cancelado" color="peligro">
             Si creés que es un error, escribinos por WhatsApp.
-          </p>
+          </Aviso>
         </div>
       ) : (
-        <div className="mb-8 rounded-xl border border-neutral-200 bg-white p-5">
-          <p className="mb-4 text-sm font-semibold text-neutral-700">Estado de tu pedido</p>
-          <ol className="flex flex-col gap-1">
-            {pasos.map((paso, i) => {
-              const cumplido = actual >= 0 && i <= actual;
-              const esActual = i === actual;
-              return (
-                <li key={paso.estado} className="flex gap-3">
-                  <div className="flex flex-col items-center">
-                    <div
-                      className={`flex h-8 w-8 flex-none items-center justify-center rounded-full text-sm ${
-                        cumplido ? "bg-brand text-white" : "bg-neutral-100 text-neutral-400"
-                      }`}
-                    >
-                      {cumplido ? paso.emoji : "•"}
-                    </div>
-                    {i < pasos.length - 1 && (
-                      <div
-                        className={`w-0.5 flex-1 ${
-                          actual > i ? "bg-brand" : "bg-neutral-200"
-                        }`}
-                        style={{ minHeight: "18px" }}
-                      />
-                    )}
-                  </div>
-                  <div className={`pb-4 ${i === pasos.length - 1 ? "pb-0" : ""}`}>
-                    <p
-                      className={`text-sm font-medium ${
-                        esActual
-                          ? "text-brand-dark"
-                          : cumplido
-                            ? "text-neutral-900"
-                            : "text-neutral-400"
-                      }`}
-                    >
-                      {paso.titulo}
-                      {esActual && " ←"}
-                    </p>
-                    {esActual && (
-                      <p className="text-xs text-neutral-500">{paso.detalle}</p>
-                    )}
-                  </div>
-                </li>
-              );
-            })}
-          </ol>
-          {!finalizado && (
-            <p className="mt-3 border-t border-neutral-100 pt-3 text-center text-xs text-neutral-400">
-              Esta pantalla se actualiza sola — podés dejarla abierta.
-            </p>
-          )}
+        <div className="mb-8">
+          <SeguimientoTracker pasos={pasos} actual={actual} finalizado={finalizado} />
         </div>
       )}
 
-      <div className="rounded-xl border border-neutral-200 bg-white p-4">
-        <p className="mb-3 text-sm font-semibold text-neutral-700">Detalle</p>
-        <div className="flex flex-col gap-1.5 text-sm">
+      <Tarjeta>
+        <p className="mb-3 text-[0.85rem] font-semibold text-tinta-media">Detalle</p>
+        <div className="flex flex-col gap-1.5 text-[0.88rem]">
           {order.items.map((item) => (
             <div key={item.id} className="flex justify-between gap-3">
-              <span className="text-neutral-700">
+              <span className="text-tinta-media">
                 {item.cantidad}x {item.nombreProducto}
                 {item.opcionesTexto && (
-                  <span className="text-neutral-400"> ({item.opcionesTexto})</span>
+                  <span className="text-tinta-suave"> ({item.opcionesTexto})</span>
                 )}
               </span>
-              <span className="flex-none text-neutral-900">
+              <span className="cifra flex-none text-tinta">
                 {formatearGuarani(item.cantidad * Number(item.precioUnitario))}
               </span>
             </div>
           ))}
         </div>
-        <div className="mt-3 flex justify-between border-t border-neutral-200 pt-3 font-semibold">
+        <div className="mt-3 flex justify-between border-t border-linea pt-3 font-semibold text-tinta">
           <span>Total</span>
-          <span>{formatearGuarani(Number(order.total))}</span>
+          <span className="cifra">{formatearGuarani(Number(order.total))}</span>
         </div>
-        <p className="mt-3 text-xs text-neutral-500">
+        <p className="mt-3 text-[0.78rem] text-tinta-suave">
           {order.tipoEntrega === "delivery"
             ? `Entrega a domicilio: ${order.direccion ?? "-"}`
             : "Retiro en el local"}
         </p>
-      </div>
+      </Tarjeta>
 
       <div className="mt-8 text-center">
         <VolverAlMenu slug={slug} />

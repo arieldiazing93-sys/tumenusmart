@@ -212,7 +212,14 @@ export function MitadYMitadPicker({ grupoNombre, productos }: Props) {
             disabled={!listo}
             className="rounded-lg bg-brand px-3.5 py-2 text-[0.85rem] font-semibold text-white transition hover:bg-brand-dark disabled:cursor-not-allowed disabled:bg-linea disabled:text-tinta-suave"
           >
-            {agregado ? "Agregado ✓" : "Agregar"}
+            {agregado ? (
+              <>
+                Agregado{" "}
+                <span className="inline-block animate-[entradaExito_0.32s_ease]">✓</span>
+              </>
+            ) : (
+              "Agregar"
+            )}
           </button>
         </div>
       </div>

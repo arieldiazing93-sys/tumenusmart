@@ -262,7 +262,18 @@ const BASE_CAMPO =
   "focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/15 " +
   "disabled:bg-papel-hundido disabled:text-tinta-suave";
 
+const BASE_CAMPO_INVALIDO =
+  "w-full rounded-lg border border-peligro/50 bg-peligro-luz/40 px-3 py-2.5 text-[0.88rem] text-tinta " +
+  "transition-colors duration-150 placeholder:text-tinta-suave " +
+  "focus:border-peligro focus:outline-none focus:ring-2 focus:ring-peligro/15 " +
+  "disabled:bg-papel-hundido disabled:text-tinta-suave";
+
 export const clasesCampo = BASE_CAMPO;
+
+/** Las clases de un campo, en rojo cuando no pasó la validación. */
+export function clasesDeCampo(invalido = false) {
+  return invalido ? BASE_CAMPO_INVALIDO : BASE_CAMPO;
+}
 
 /** Etiqueta + campo + ayuda, siempre en el mismo orden y con el mismo aire. */
 export function Campo({
@@ -285,19 +296,34 @@ export function Campo({
   );
 }
 
-export function Entrada(props: React.InputHTMLAttributes<HTMLInputElement>) {
-  const { className = "", ...resto } = props;
-  return <input {...resto} className={`${BASE_CAMPO} ${className}`} />;
+export function Entrada(
+  props: React.InputHTMLAttributes<HTMLInputElement> & { invalido?: boolean }
+) {
+  const { className = "", invalido, ...resto } = props;
+  return <input {...resto} className={`${clasesDeCampo(invalido)} ${className}`} />;
 }
 
-export function Area(props: React.TextareaHTMLAttributes<HTMLTextAreaElement>) {
-  const { className = "", ...resto } = props;
-  return <textarea {...resto} className={`${BASE_CAMPO} ${className}`} />;
+export function Area(
+  props: React.TextareaHTMLAttributes<HTMLTextAreaElement> & { invalido?: boolean }
+) {
+  const { className = "", invalido, ...resto } = props;
+  return <textarea {...resto} className={`${clasesDeCampo(invalido)} ${className}`} />;
 }
 
-export function Selector(props: React.SelectHTMLAttributes<HTMLSelectElement>) {
-  const { className = "", ...resto } = props;
-  return <select {...resto} className={`${BASE_CAMPO} ${className}`} />;
+export function Selector(
+  props: React.SelectHTMLAttributes<HTMLSelectElement> & { invalido?: boolean }
+) {
+  const { className = "", invalido, ...resto } = props;
+  return <select {...resto} className={`${clasesDeCampo(invalido)} ${className}`} />;
+}
+
+/** El mensaje de un campo que no pasó la validación, con un sacudón para que se note. */
+export function MensajeError({ children }: { children: ReactNode }) {
+  return (
+    <p className="mt-1.5 animate-[sacudir_0.32s_ease] text-[0.78rem] font-medium text-peligro">
+      {children}
+    </p>
+  );
 }
 
 // ===========================================================================

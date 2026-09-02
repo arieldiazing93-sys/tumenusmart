@@ -5,6 +5,7 @@ import { construirMensajeReserva, construirLinkWhatsapp } from "@/lib/whatsapp";
 import { ZONA_NEGOCIO } from "@/lib/timezone";
 import { etiquetaTurno, etiquetaMotivo } from "@/lib/reservas";
 import { formatearNumero } from "@/lib/format";
+import { Tarjeta, Aviso } from "@/components/ui";
 import { BotonWhatsappReserva } from "./BotonWhatsappReserva";
 import { localPorSlug } from "@/lib/local-por-slug";
 
@@ -49,23 +50,31 @@ export default async function ConfirmacionReservaPage({
 
   const linkWhatsapp = construirLinkWhatsapp(store.whatsappNumero, mensaje);
 
+  const filas: { etiqueta: string; valor: string }[] = [
+    { etiqueta: "Fecha", valor: fechaTexto },
+    { etiqueta: "Turno", valor: etiquetaTurno(reserva.turno) },
+    { etiqueta: "Horario", valor: reserva.horario },
+    { etiqueta: "Personas", valor: String(reserva.personas) },
+    { etiqueta: "Motivo", valor: etiquetaMotivo(reserva.motivo) },
+    { etiqueta: "A nombre de", valor: reserva.clienteNombre },
+  ];
+
   return (
     <main className="mx-auto max-w-2xl px-4 py-10 text-center">
-      <div className="mb-6 text-5xl">📅</div>
-      <h1 className="mb-2 text-xl font-bold text-neutral-900">
+      <div className="mb-6 animate-[entradaExito_0.4s_ease] text-5xl">📅</div>
+      <h1 className="mb-2 text-[1.3rem] font-semibold tracking-titular text-tinta">
         Reserva {formatearNumero(reserva.numero)} generada
       </h1>
       {reserva.enviadoWhatsapp ? (
-        <p className="mb-8 text-neutral-600">
+        <p className="mb-8 text-[0.9rem] text-tinta-media">
           Ya le enviaste la reserva a {store.nombre}. Te van a confirmar por WhatsApp.
         </p>
       ) : (
-        <div className="mx-auto mb-8 max-w-md rounded-xl border border-amber-300 bg-amber-50 p-4">
-          <p className="font-semibold text-amber-900">Todavía falta enviarla</p>
-          <p className="mt-0.5 text-sm text-amber-800">
+        <div className="mx-auto mb-8 max-w-md text-left">
+          <Aviso titulo="Todavía falta enviarla" color="aviso">
             La reserva se confirma recién cuando la mandás por WhatsApp — hasta entonces{" "}
             {store.nombre} no la ve.
-          </p>
+          </Aviso>
         </div>
       )}
 
@@ -78,9 +87,17 @@ export default async function ConfirmacionReservaPage({
         />
       </div>
 
-      <div className="rounded-lg border border-neutral-200 bg-white p-4 text-left text-sm text-neutral-700">
-        <pre className="whitespace-pre-wrap font-sans">{mensaje}</pre>
-      </div>
+      <Tarjeta className="text-left">
+        <p className="mb-3 text-[0.85rem] font-semibold text-tinta-media">Tu reserva</p>
+        <div className="flex flex-col gap-2">
+          {filas.map((f) => (
+            <div key={f.etiqueta} className="flex justify-between gap-3 text-[0.88rem]">
+              <span className="text-tinta-suave">{f.etiqueta}</span>
+              <span className="font-medium text-tinta">{f.valor}</span>
+            </div>
+          ))}
+        </div>
+      </Tarjeta>
 
       <div className="mt-8">
         <VolverAlMenu slug={slug} />

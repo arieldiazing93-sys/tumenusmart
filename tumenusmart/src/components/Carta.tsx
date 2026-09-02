@@ -6,6 +6,7 @@ import { construirKey } from "@/lib/cart-types";
 import { formatearGuarani } from "@/lib/format";
 import { MitadYMitadPicker } from "./MitadYMitadPicker";
 import { FichaProducto } from "./FichaProducto";
+import { IconoFoto } from "./iconos";
 import {
   barraDeCarta,
   filtrarCarta,
@@ -257,12 +258,14 @@ function FilaProducto({
   ) : (
     <span
       aria-hidden="true"
-      className={
+      className={`flex items-center justify-center text-tinta-suave/35 ${
         tarjetas
-          ? "block h-44 w-full rounded-xl bg-papel-hundido"
-          : "block h-16 w-16 flex-none rounded-lg bg-papel-hundido"
-      }
-    />
+          ? "h-44 w-full rounded-xl bg-papel-hundido"
+          : "h-16 w-16 flex-none rounded-lg bg-papel-hundido"
+      }`}
+    >
+      <IconoFoto />
+    </span>
   );
 
   return (

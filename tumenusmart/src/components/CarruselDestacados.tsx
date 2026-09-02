@@ -1,6 +1,7 @@
 "use client";
 
 import { formatearGuarani } from "@/lib/format";
+import { IconoFoto } from "./iconos";
 
 type Producto = {
   id: string;
@@ -41,7 +42,12 @@ export function CarruselDestacados({ productos }: { productos: Producto[] }) {
                 className="h-20 w-full object-cover"
               />
             ) : (
-              <span aria-hidden="true" className="block h-20 w-full bg-papel-hundido" />
+              <span
+                aria-hidden="true"
+                className="flex h-20 w-full items-center justify-center bg-papel-hundido text-tinta-suave/35"
+              >
+                <IconoFoto />
+              </span>
             )}
             <span className="block px-2 pb-2.5 pt-1.5">
               <span className="block text-[0.78rem] font-semibold leading-tight tracking-titular">

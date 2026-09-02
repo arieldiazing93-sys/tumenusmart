@@ -160,6 +160,15 @@ export const IconoCierre = (p: Props) => (
   </Svg>
 );
 
+/** Foto pendiente: el marco vacío que reemplaza el bloque liso sin imagen. */
+export const IconoFoto = (p: Props) => (
+  <Svg {...p}>
+    <rect x="3" y="5" width="18" height="14" rx="2" />
+    <circle cx="8.5" cy="10" r="1.6" />
+    <path d="m4 16 4.5-4.5L12 15l3-3 5 5" />
+  </Svg>
+);
+
 export const ICONOS = {
   pedidos: IconoPedidos,
   reservas: IconoReservas,

@@ -34,10 +34,10 @@ export default async function LocalLayout({
     return (
       <main className="mx-auto flex min-h-[70vh] max-w-md flex-col items-center justify-center px-6 text-center">
         <div className="mb-4 text-4xl">🕒</div>
-        <h1 className="mb-2 text-xl font-bold text-neutral-900">
+        <h1 className="mb-2 text-[1.2rem] font-semibold tracking-titular text-tinta">
           Este menú no está disponible
         </h1>
-        <p className="text-neutral-600">
+        <p className="text-[0.9rem] text-tinta-media">
           Por el momento no se pueden tomar pedidos desde acá. Si querés hacer un pedido,
           comunicate directamente con el local.
         </p>

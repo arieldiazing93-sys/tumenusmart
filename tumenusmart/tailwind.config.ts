@@ -179,6 +179,37 @@ const config: Config = {
           "40%": { transform: "scale(1.03)" },
           "100%": { transform: "scale(1)" },
         },
+        // Un campo de formulario que no pasó la validación.
+        sacudir: {
+          "0%, 100%": { transform: "translateX(0)" },
+          "20%": { transform: "translateX(-6px)" },
+          "40%": { transform: "translateX(5px)" },
+          "60%": { transform: "translateX(-4px)" },
+          "80%": { transform: "translateX(2px)" },
+        },
+        // Un paso del seguimiento que recién se cumple.
+        entradaExito: {
+          "0%": { transform: "scale(0.6)", opacity: "0" },
+          "60%": { transform: "scale(1.08)", opacity: "1" },
+          "100%": { transform: "scale(1)", opacity: "1" },
+        },
+        // Una partícula del confeti al llegar el pedido. La opacidad termina
+        // en 0 a propósito: con prefers-reduced-motion la animación colapsa
+        // a instante pero el estado final sigue siendo invisible.
+        confetiCae: {
+          "0%": { transform: "translateY(-10px) rotate(0deg)", opacity: "1" },
+          "100%": { transform: "translateY(70px) rotate(210deg)", opacity: "0" },
+        },
+        // El spinner del botón mientras se envía el formulario.
+        girar: {
+          "0%": { transform: "rotate(0deg)" },
+          "100%": { transform: "rotate(360deg)" },
+        },
+        // Un destello breve para acusar recibo de un cambio de cantidad.
+        destello: {
+          "0%": { backgroundColor: "rgb(210 80 31 / 0.12)" },
+          "100%": { backgroundColor: "rgb(210 80 31 / 0)" },
+        },
       },
       animation: {
         "destacado-entrada": "destacado-entrada 0.5s ease-out",

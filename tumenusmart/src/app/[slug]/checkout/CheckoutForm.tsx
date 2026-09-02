@@ -6,12 +6,15 @@ import dynamic from "next/dynamic";
 import { useCart } from "@/components/CartProvider";
 import { formatearGuarani } from "@/lib/format";
 import { distanciaKm, encontrarZonaPorDistancia } from "@/lib/geo";
+import { Tarjeta, Campo, Entrada, Selector, Aviso } from "@/components/ui";
+import { Segmentado } from "@/components/Segmentado";
+import { BotonEnviar } from "@/components/BotonEnviar";
 import { crearPedido } from "./actions";
 
 // Leaflet usa `window`, así que el mapa se carga solo en el navegador.
 const MapPicker = dynamic(
   () => import("@/components/MapPicker").then((m) => m.MapPicker),
-  { ssr: false, loading: () => <div className="h-80 animate-pulse rounded-xl bg-neutral-100" /> }
+  { ssr: false, loading: () => <div className="h-80 animate-pulse rounded-xl bg-papel-hundido" /> }
 );
 
 type Zona = { id: string; nombre: string; radioKm: number; costoEnvio: number };
@@ -60,6 +63,16 @@ export function CheckoutForm({
   const [facturaEmail, setFacturaEmail] = useState("");
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Qué campo disparó el último error, para resaltarlo — no todo el aviso
+  // sirve de igual manera si el ojo no sabe dónde corregir.
+  const [campoInvalido, setCampoInvalido] = useState<"ubicacion" | "factura" | null>(null);
+  const [intento, setIntento] = useState(0);
+
+  function fallar(mensaje: string, campo?: "ubicacion" | "factura") {
+    setError(mensaje);
+    setCampoInvalido(campo ?? null);
+    setIntento((n) => n + 1);
+  }
 
   const hayUbicacionLocal = storeLat != null && storeLng != null;
 
@@ -99,21 +112,22 @@ export function CheckoutForm({
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    setCampoInvalido(null);
 
     if (!aceptaPedidos) {
-      setError(motivoBloqueo ?? "En este momento no se pueden tomar pedidos.");
+      fallar(motivoBloqueo ?? "En este momento no se pueden tomar pedidos.");
       return;
     }
     if (items.length === 0) {
-      setError("Tu carrito está vacío.");
+      fallar("Tu carrito está vacío.");
       return;
     }
     if (tipoEntrega === "delivery" && (clienteLat == null || clienteLng == null)) {
-      setError("Marcá tu ubicación en el mapa para poder entregarte el pedido.");
+      fallar("Marcá tu ubicación en el mapa para poder entregarte el pedido.", "ubicacion");
       return;
     }
     if (comprobanteTipo === "factura" && (!facturaRazonSocial.trim() || !facturaRuc.trim())) {
-      setError("Para factura necesitamos la razón social y el RUC.");
+      fallar("Para factura necesitamos la razón social y el RUC.", "factura");
       return;
     }
 
@@ -151,243 +165,194 @@ export function CheckoutForm({
       vaciarCarrito();
       router.push(`/${slug}/pedido/${orderId}`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "No se pudo generar el pedido.");
+      fallar(err instanceof Error ? err.message : "No se pudo generar el pedido.");
       setEnviando(false);
     }
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-5">
-      <div>
-        <label className="mb-1 block text-sm font-medium text-neutral-700">
-          Nombre
-        </label>
-        <input
-          required
-          value={nombre}
-          onChange={(e) => setNombre(e.target.value)}
-          className="w-full rounded-lg border border-neutral-300 px-3 py-2"
-          placeholder="Tu nombre"
-        />
-      </div>
+    <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+      <fieldset disabled={enviando} className="flex flex-col gap-4">
+        <Tarjeta className="flex flex-col gap-4">
+          <p className="rotulo">Tus datos</p>
+          <Campo etiqueta="Nombre">
+            <Entrada
+              required
+              value={nombre}
+              onChange={(e) => setNombre(e.target.value)}
+              placeholder="Tu nombre"
+            />
+          </Campo>
+          <Campo etiqueta="Teléfono (WhatsApp)">
+            <Entrada
+              required
+              value={telefono}
+              onChange={(e) => setTelefono(e.target.value)}
+              placeholder="0981 234 567"
+            />
+          </Campo>
+        </Tarjeta>
 
-      <div>
-        <label className="mb-1 block text-sm font-medium text-neutral-700">
-          Teléfono (WhatsApp)
-        </label>
-        <input
-          required
-          value={telefono}
-          onChange={(e) => setTelefono(e.target.value)}
-          className="w-full rounded-lg border border-neutral-300 px-3 py-2"
-          placeholder="0981 234 567"
-        />
-      </div>
+        <Tarjeta className="flex flex-col gap-4">
+          <p className="rotulo">Comprobante</p>
+          <Segmentado
+            opciones={[
+              { value: "ticket", label: "Ticket" },
+              { value: "factura", label: "Factura" },
+            ]}
+            valor={comprobanteTipo}
+            onChange={setComprobanteTipo}
+          />
 
-      <div>
-        <label className="mb-1 block text-sm font-medium text-neutral-700">
-          Comprobante
-        </label>
-        <div className="flex gap-3">
-          <button
-            type="button"
-            onClick={() => setComprobanteTipo("ticket")}
-            className={`flex-1 rounded-lg border px-3 py-2 text-sm ${
-              comprobanteTipo === "ticket"
-                ? "border-brand bg-brand-light text-brand-dark"
-                : "border-neutral-300 text-neutral-600"
-            }`}
-          >
-            Ticket
-          </button>
-          <button
-            type="button"
-            onClick={() => setComprobanteTipo("factura")}
-            className={`flex-1 rounded-lg border px-3 py-2 text-sm ${
-              comprobanteTipo === "factura"
-                ? "border-brand bg-brand-light text-brand-dark"
-                : "border-neutral-300 text-neutral-600"
-            }`}
-          >
-            Factura
-          </button>
-        </div>
+          {comprobanteTipo === "factura" && (
+            <div
+              key={campoInvalido === "factura" ? `sac-${intento}` : "factura"}
+              className={`flex flex-col gap-3 rounded-lg border p-3 ${
+                campoInvalido === "factura"
+                  ? "animate-[sacudir_0.32s_ease] border-peligro/50 bg-peligro-luz/30"
+                  : "border-linea bg-papel-suave"
+              }`}
+            >
+              <Campo etiqueta="Razón social">
+                <Entrada
+                  required
+                  value={facturaRazonSocial}
+                  onChange={(e) => setFacturaRazonSocial(e.target.value)}
+                  placeholder="Nombre de la empresa o del titular"
+                />
+              </Campo>
+              <Campo etiqueta="RUC">
+                <Entrada
+                  required
+                  value={facturaRuc}
+                  onChange={(e) => setFacturaRuc(e.target.value)}
+                  placeholder="80012345-6"
+                />
+              </Campo>
+              <Campo etiqueta="Correo electrónico" ayuda="Opcional">
+                <Entrada
+                  type="email"
+                  value={facturaEmail}
+                  onChange={(e) => setFacturaEmail(e.target.value)}
+                  placeholder="nombre@correo.com"
+                />
+              </Campo>
+            </div>
+          )}
+        </Tarjeta>
 
-        {comprobanteTipo === "factura" && (
-          <div className="mt-3 flex flex-col gap-3 rounded-lg border border-neutral-200 bg-neutral-50 p-3">
-            <div>
-              <label className="mb-1 block text-sm font-medium text-neutral-700">
-                Razón social
-              </label>
-              <input
-                required
-                value={facturaRazonSocial}
-                onChange={(e) => setFacturaRazonSocial(e.target.value)}
-                className="w-full rounded-lg border border-neutral-300 px-3 py-2"
-                placeholder="Nombre de la empresa o del titular"
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-neutral-700">
-                RUC
-              </label>
-              <input
-                required
-                value={facturaRuc}
-                onChange={(e) => setFacturaRuc(e.target.value)}
-                className="w-full rounded-lg border border-neutral-300 px-3 py-2"
-                placeholder="80012345-6"
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-neutral-700">
-                Correo electrónico <span className="font-normal text-neutral-400">(opcional)</span>
-              </label>
-              <input
-                type="email"
-                value={facturaEmail}
-                onChange={(e) => setFacturaEmail(e.target.value)}
-                className="w-full rounded-lg border border-neutral-300 px-3 py-2"
-                placeholder="nombre@correo.com"
-              />
-            </div>
+        <Tarjeta className="flex flex-col gap-4">
+          <p className="rotulo">Entrega y pago</p>
+
+          <Campo etiqueta="Método de pago" ayuda="Lo coordinás directamente con el local">
+            <Selector value={metodoPago} onChange={(e) => setMetodoPago(e.target.value)}>
+              {METODOS_PAGO.map((m) => (
+                <option key={m.value} value={m.value}>
+                  {m.label}
+                </option>
+              ))}
+            </Selector>
+          </Campo>
+
+          <div>
+            <span className="mb-1.5 block text-[0.82rem] font-semibold text-tinta">Entrega</span>
+            <Segmentado
+              opciones={[
+                {
+                  value: "delivery",
+                  label: "Delivery",
+                  sublabel: envioModo === "zonas" ? "Según zona" : "A coordinar",
+                },
+                { value: "retiro", label: "Retiro en el local" },
+              ]}
+              valor={tipoEntrega}
+              onChange={setTipoEntrega}
+            />
           </div>
-        )}
-      </div>
 
-      <div>
-        <label className="mb-1 block text-sm font-medium text-neutral-700">
-          Método de pago (lo coordinás directamente con el local)
-        </label>
-        <select
-          value={metodoPago}
-          onChange={(e) => setMetodoPago(e.target.value)}
-          className="w-full rounded-lg border border-neutral-300 px-3 py-2"
-        >
-          {METODOS_PAGO.map((m) => (
-            <option key={m.value} value={m.value}>
-              {m.label}
-            </option>
-          ))}
-        </select>
-      </div>
+          {tipoEntrega === "delivery" && (
+            <>
+              <div>
+                <Campo
+                  etiqueta="¿Dónde te lo llevamos?"
+                  ayuda="Marcá el punto en el mapa. Es lo que abre el repartidor para llegar, así que sin eso no se puede enviar el pedido."
+                >
+                  <div
+                    key={campoInvalido === "ubicacion" ? `sac-${intento}` : "mapa"}
+                    className={`overflow-hidden rounded-xl ${
+                      campoInvalido === "ubicacion"
+                        ? "animate-[sacudir_0.32s_ease] ring-2 ring-peligro/50"
+                        : ""
+                    }`}
+                  >
+                    <MapPicker
+                      storeLat={storeLat}
+                      storeLng={storeLng}
+                      zonas={envioModo === "zonas" ? zonas : []}
+                      lat={clienteLat}
+                      lng={clienteLng}
+                      onChange={(la, ln) => {
+                        setClienteLat(la);
+                        setClienteLng(ln);
+                      }}
+                    />
+                  </div>
+                </Campo>
+                {fueraDeCobertura && (
+                  <p className="mt-2 text-[0.82rem] text-aviso">
+                    Tu ubicación está fuera de las zonas con precio automático — el local va a
+                    coordinar el costo de envío directamente con vos por WhatsApp.
+                  </p>
+                )}
+              </div>
 
-      <div>
-        <label className="mb-1 block text-sm font-medium text-neutral-700">
-          Entrega
-        </label>
-        <div className="flex gap-3">
-          <button
-            type="button"
-            onClick={() => setTipoEntrega("delivery")}
-            className={`flex-1 rounded-lg border px-3 py-2 text-sm ${
-              tipoEntrega === "delivery"
-                ? "border-brand bg-brand-light text-brand-dark"
-                : "border-neutral-300 text-neutral-600"
-            }`}
-          >
-            Delivery
-            <span className="block text-xs opacity-70">
-              {envioModo === "zonas" ? "Según zona" : "A coordinar"}
+              <Campo
+                etiqueta="Referencia de la dirección"
+                ayuda="Con el pin en el mapa ya alcanza. Esto ayuda al repartidor a encontrarte más rápido si el lugar es difícil. Opcional."
+              >
+                <Entrada
+                  value={direccion}
+                  onChange={(e) => setDireccion(e.target.value)}
+                  placeholder="Casa, depto, entre calles, portón de color..."
+                />
+              </Campo>
+            </>
+          )}
+        </Tarjeta>
+
+        <div className="rounded-xl border border-linea bg-papel-suave p-4">
+          <div className="flex justify-between text-[0.88rem] text-tinta-media">
+            <span>Subtotal</span>
+            <span className="cifra">{formatearGuarani(subtotal)}</span>
+          </div>
+          {tipoEntrega === "delivery" && (
+            <div className="flex justify-between text-[0.88rem] text-tinta-media">
+              <span>Envío</span>
+              <span className="cifra">{textoEnvio}</span>
+            </div>
+          )}
+          <div className="mt-1.5 flex justify-between border-t border-linea pt-1.5 text-[0.95rem] font-semibold text-tinta">
+            <span>Total</span>
+            <span className="cifra">
+              {formatearGuarani(total)}
+              {tipoEntrega === "delivery" && !zonaEncontrada && envioModo === "zonas" && hayUbicacionLocal
+                ? " + envío"
+                : ""}
             </span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setTipoEntrega("retiro")}
-            className={`flex-1 rounded-lg border px-3 py-2 text-sm ${
-              tipoEntrega === "retiro"
-                ? "border-brand bg-brand-light text-brand-dark"
-                : "border-neutral-300 text-neutral-600"
-            }`}
-          >
-            Retiro en el local
-          </button>
-        </div>
-      </div>
-
-      {tipoEntrega === "delivery" && (
-        <>
-          <div>
-            <label className="mb-1 block text-sm font-medium text-neutral-700">
-              ¿Dónde te lo llevamos?
-            </label>
-            <p className="mb-2 text-xs text-neutral-500">
-              Marcá el punto en el mapa. Es lo que abre el repartidor para llegar, así que
-              sin eso no se puede enviar el pedido.
-            </p>
-            <MapPicker
-              storeLat={storeLat}
-              storeLng={storeLng}
-              zonas={envioModo === "zonas" ? zonas : []}
-              lat={clienteLat}
-              lng={clienteLng}
-              onChange={(la, ln) => {
-                setClienteLat(la);
-                setClienteLng(ln);
-              }}
-            />
-            {fueraDeCobertura && (
-              <p className="mt-2 text-sm text-amber-700">
-                Tu ubicación está fuera de las zonas con precio automático — el local va a
-                coordinar el costo de envío directamente con vos por WhatsApp.
-              </p>
-            )}
           </div>
-
-          <div>
-            <label className="mb-1 block text-sm font-medium text-neutral-700">
-              Referencia de la dirección{" "}
-              <span className="font-normal text-neutral-400">(opcional)</span>
-            </label>
-            <p className="mb-1 text-xs text-neutral-500">
-              Con el pin en el mapa ya alcanza. Esto ayuda al repartidor a encontrarte más
-              rápido si el lugar es difícil.
-            </p>
-            <input
-              value={direccion}
-              onChange={(e) => setDireccion(e.target.value)}
-              className="w-full rounded-lg border border-neutral-300 px-3 py-2"
-              placeholder="Casa, depto, entre calles, portón de color..."
-            />
-          </div>
-        </>
-      )}
-
-      <div className="rounded-lg bg-neutral-100 p-4 text-sm">
-        <div className="flex justify-between">
-          <span>Subtotal</span>
-          <span>{formatearGuarani(subtotal)}</span>
         </div>
-        {tipoEntrega === "delivery" && (
-          <div className="flex justify-between">
-            <span>Envío</span>
-            <span>{textoEnvio}</span>
-          </div>
-        )}
-        <div className="mt-1 flex justify-between border-t border-neutral-300 pt-1 font-semibold">
-          <span>Total</span>
-          <span>
-            {formatearGuarani(total)}
-            {tipoEntrega === "delivery" && !zonaEncontrada && envioModo === "zonas" && hayUbicacionLocal
-              ? " + envío"
-              : ""}
-          </span>
-        </div>
-      </div>
+      </fieldset>
 
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && <Aviso color="peligro">{error}</Aviso>}
 
-      <button
-        type="submit"
-        disabled={enviando || !aceptaPedidos}
-        className="rounded-lg bg-brand px-6 py-3 font-medium text-white hover:bg-brand-dark disabled:cursor-not-allowed disabled:bg-neutral-300"
+      <BotonEnviar
+        enviando={enviando}
+        disabled={!aceptaPedidos}
+        enviandoTexto="Generando pedido..."
+        className="w-full"
       >
-        {!aceptaPedidos
-          ? "No disponible en este momento"
-          : enviando
-            ? "Generando pedido..."
-            : "Confirmar pedido"}
-      </button>
+        {aceptaPedidos ? "Confirmar pedido" : "No disponible en este momento"}
+      </BotonEnviar>
     </form>
   );
 }
