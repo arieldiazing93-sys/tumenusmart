@@ -6,6 +6,7 @@ import { calcularClientesDelRango, calcularDistribucionFrecuencia } from "@/lib/
 import { Cabecera, Cifra, clasesBoton } from "@/components/ui";
 import { formatearGuarani } from "@/lib/format";
 import { ZONA_NEGOCIO } from "@/lib/timezone";
+import { linkWhatsappCliente } from "@/lib/whatsapp";
 
 export const dynamic = "force-dynamic";
 
@@ -110,7 +111,7 @@ export default async function AnalyticsPage({
         <p className="text-sm text-tinta-suave">Todavía no hay pedidos en este período.</p>
       ) : (
         <div className="overflow-x-auto rounded-lg border border-linea bg-white">
-          <table className="w-full min-w-[560px] text-left text-sm">
+          <table className="w-full min-w-[640px] text-left text-sm">
             <thead className="border-b border-linea bg-papel-suave text-xs uppercase tracking-wide text-tinta-media">
               <tr>
                 <th className="px-3 py-2 w-8">#</th>
@@ -119,6 +120,7 @@ export default async function AnalyticsPage({
                 <th className="px-3 py-2 text-right">Pedidos</th>
                 <th className="px-3 py-2 text-right">Gasto total</th>
                 <th className="px-3 py-2 text-right">Último pedido</th>
+                <th className="px-3 py-2 text-center">Escribir</th>
               </tr>
             </thead>
             <tbody>
@@ -133,6 +135,19 @@ export default async function AnalyticsPage({
                   </td>
                   <td className="px-3 py-2 text-right text-tinta-suave">
                     {fechaCorta(c.ultimoPedido)}
+                  </td>
+                  <td className="px-3 py-2 text-center">
+                    {/* Sin mensaje precargado a propósito: el dueño decide qué
+                        escribirle, no el sistema. */}
+                    <a
+                      href={linkWhatsappCliente(c.telefono, "")}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      title={`Escribirle a ${c.nombre} por WhatsApp`}
+                      className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-[#25D366]/10 text-base text-[#128C7E] hover:bg-[#25D366]/20"
+                    >
+                      💬
+                    </a>
                   </td>
                 </tr>
               ))}
