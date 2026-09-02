@@ -66,7 +66,7 @@ try { aplicarLocal("Order", "findMany", {}, ""); } catch { lanzo = true; }
 chequear("una consulta sin local lanza error en vez de traer todo", lanzo);
 
 console.log("\n=== 8. Todas las tablas del sistema quedan cubiertas ===");
-const tablas = ["Category","Product","ProductOption","DeliveryZone","Customer","Repartidor","Order","OrderItem","Reservation","HorarioReserva","HorarioAtencion"];
+const tablas = ["Category","Product","ProductOption","DeliveryZone","Customer","Repartidor","Order","OrderItem","Reservation","HorarioReserva","HorarioAtencion","IdeaSemanal","Pago","Rendicion"];
 const cubiertas = tablas.filter(t => aplicarLocal(t, "findMany", {}, A).where?.storeId === A);
 chequear(`las ${tablas.length} tablas se filtran`, cubiertas.length === tablas.length,
   cubiertas.length < tablas.length ? "faltan: " + tablas.filter(t=>!cubiertas.includes(t)).join(", ") : "");
