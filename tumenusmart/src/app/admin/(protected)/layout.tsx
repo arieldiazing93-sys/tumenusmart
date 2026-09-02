@@ -2,6 +2,7 @@ import { Logo } from "@/components/Logo";
 import Link from "next/link";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { prisma } from "@/lib/prisma";
 import { sesionActual } from "@/lib/auth";
 import { cerrarSesion } from "./logout/actions";
 import { idLocalActual, listarLocales } from "@/lib/local-actual";
@@ -9,6 +10,8 @@ import { ideaDeLaSemana } from "@/lib/idea-semanal";
 import { SelectorLocal } from "./SelectorLocal";
 import { COOKIE_MENU, NavPanel, type GrupoSecciones } from "@/components/NavPanel";
 import { puede, type Permiso } from "@/lib/permisos";
+import { estadoSuscripcion, type EstadoSuscripcion } from "@/lib/suscripcion";
+import { ZONA_NEGOCIO } from "@/lib/timezone";
 
 /**
  * Las secciones, agrupadas por lo que se hace con ellas.
@@ -114,6 +117,24 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     localActualId = "";
   }
 
+  // El estado de la suscripción se le muestra al DUEÑO del local, no al
+  // superadmin: él ya tiene su propia vista completa en /admin/super, y
+  // repetir el aviso acá solo le agregaría ruido a su propio trabajo.
+  let avisoSuscripcion: EstadoSuscripcion | null = null;
+  let vencimientoLocal: Date | null = null;
+  if (!esSuper && localActualId) {
+    const datosLocal = await prisma.store
+      .findUnique({
+        where: { id: localActualId },
+        select: { estado: true, vencimiento: true },
+      })
+      .catch(() => null);
+    if (datosLocal) {
+      avisoSuscripcion = estadoSuscripcion(datosLocal, new Date(), ZONA_NEGOCIO);
+      vencimientoLocal = datosLocal.vencimiento;
+    }
+  }
+
   // Aviso de idea nueva: un punto al lado de "Ideas" hasta que el dueño entre
   // a leerla. Es la única notificación del panel, así que se gana el lugar.
   let hayIdeaSinVer = false;
@@ -209,6 +230,10 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         </div>
       )}
 
+      {avisoSuscripcion && (
+        <BannerSuscripcion estado={avisoSuscripcion} vencimiento={vencimientoLocal} />
+      )}
+
       <div className="mx-auto flex max-w-[92rem] gap-4 px-4 lg:gap-6 print:max-w-none print:block print:p-0">
         <aside className="print:hidden">
           <NavPanel
@@ -226,6 +251,62 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         >
           {children}
         </main>
+      </div>
+    </div>
+  );
+}
+
+function fechaLarga(fecha: Date | null): string {
+  if (!fecha) return "";
+  return new Intl.DateTimeFormat("es-PY", {
+    day: "numeric",
+    month: "long",
+    timeZone: ZONA_NEGOCIO,
+  }).format(fecha);
+}
+
+const ESTILOS_SUSCRIPCION: Record<string, string> = {
+  al_dia: "border-linea bg-white text-tinta-media",
+  por_vencer: "border-aviso/25 bg-aviso-luz text-aviso",
+  vencido: "border-peligro/25 bg-peligro-luz text-peligro",
+  suspendido: "border-peligro/25 bg-peligro-luz text-peligro",
+};
+
+/**
+ * Le muestra al dueño del local hasta cuándo tiene pagado — desde el primer
+ * día, no solo cuando ya está por vencer. Que la fecha esté siempre a la
+ * vista evita la sorpresa de un menú que se apaga solo sin que nadie lo viera
+ * venir. Al superadmin no se le muestra: él ya tiene su propia vista completa
+ * en /admin/super.
+ */
+function BannerSuscripcion({
+  estado,
+  vencimiento,
+}: {
+  estado: EstadoSuscripcion;
+  vencimiento: Date | null;
+}) {
+  if (estado.clase === "sin_vencimiento") return null;
+
+  let mensaje: string;
+  switch (estado.clase) {
+    case "vencido":
+      mensaje = `Tu plan venció el ${fechaLarga(vencimiento)}. El menú público está apagado hasta que se renueve.`;
+      break;
+    case "suspendido":
+      mensaje = "Tu cuenta está suspendida. El menú público no está tomando pedidos.";
+      break;
+    case "por_vencer":
+      mensaje = `Tu plan vence el ${fechaLarga(vencimiento)} — ${estado.dias === 1 ? "mañana" : `en ${estado.dias} días`}.`;
+      break;
+    default:
+      mensaje = `Tu plan vence el ${fechaLarga(vencimiento)} (en ${estado.dias} días).`;
+  }
+
+  return (
+    <div className={`border-b print:hidden ${ESTILOS_SUSCRIPCION[estado.clase]}`}>
+      <div className="mx-auto max-w-[92rem] px-4 py-2 text-[0.82rem] font-medium">
+        {mensaje}
       </div>
     </div>
   );
