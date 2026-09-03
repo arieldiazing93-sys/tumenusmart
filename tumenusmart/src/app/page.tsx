@@ -19,10 +19,9 @@ export const metadata = {
 export const revalidate = 1800;
 
 /** Número al que escribe quien quiere contratar. Cambialo por el tuyo. */
-const WHATSAPP_VENTAS = "595982951807";
+const WHATSAPP_VENTAS = "595984792335";
 
-const MENSAJE_VENTAS =
-  "¡Hola! Vi TuMenuSmart y quiero saber cómo poner la carta de mi restaurante.";
+const MENSAJE_VENTAS = "TuMenuSmart Paraguay";
 
 const INCLUYE = [
   {
@@ -150,7 +149,7 @@ export default async function PortadaPage() {
           </div>
           <p className="mt-6 animate-subir text-[0.86rem] text-tinta-suave [animation-delay:320ms]">
             Operando en Asunción. Cada local con su propia dirección:{" "}
-            <span className="cifra text-tinta-media">tumenusmart.app/tunegocio</span>
+            <span className="cifra text-tinta-media">tumenusmart.com/tunegocio</span>
           </p>
         </div>
 
@@ -327,7 +326,7 @@ export default async function PortadaPage() {
             <Link href="/admin/login" className="font-medium text-tinta-media hover:text-brand">
               Iniciar sesión
             </Link>
-            <span className="cifra">tumenusmart.app</span>
+            <span className="cifra">tumenusmart.com</span>
           </span>
         </div>
       </footer>
@@ -378,7 +377,7 @@ function Escena({ nombreLocal }: { nombreLocal: string }) {
       <div className="w-[min(268px,78vw)] self-start overflow-hidden rounded-[22px] border border-linea bg-white shadow-alta">
         <div className="flex h-[26px] items-center justify-center border-b border-linea-fina bg-papel-suave">
           <span className="font-mono text-[0.58rem] tracking-wide text-tinta-suave">
-            tumenusmart.app
+            tumenusmart.com
           </span>
         </div>
 

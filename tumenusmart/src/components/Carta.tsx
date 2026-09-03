@@ -173,7 +173,7 @@ export function Carta({
               style={{ top: altoBarra }}
               className="sticky z-10 rounded-xl bg-brand-tinte px-4 py-2.5"
             >
-              <h2 className="text-[1.05rem] font-semibold tracking-titular text-brand-texto">
+              <h2 className="font-mono text-[1.05rem] font-bold tracking-titular text-tinta">
                 {c.nombre}
               </h2>
               <p className="text-[0.75rem] text-brand-texto">

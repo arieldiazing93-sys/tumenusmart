@@ -113,61 +113,73 @@ export default async function CatalogoPage({
           borde a borde (mismo truco que usa Carta.tsx para sus cabeceras de
           categoría).
         */}
-        <div className="-mx-4 -mt-6 flex h-28 flex-col items-center justify-center gap-1 bg-brand px-4 text-center text-white sm:h-32">
+        <div className="-mx-4 -mt-6 flex h-24 flex-col items-center justify-center gap-1 bg-brand px-4 text-center text-white sm:h-28">
           <p className="text-[1rem] font-semibold tracking-titular sm:text-[1.1rem]">
             Estamos en línea para recibir tu pedido
           </p>
-          <p className="text-[0.7rem] font-medium uppercase tracking-[0.14em] text-white/75">
-            Desarrollado por TuMenuSmart
-          </p>
-        </div>
-        <div className="flex items-center gap-3.5 pt-4">
-          {store.logoUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={store.logoUrl}
-              alt={store.nombre}
-              width={96}
-              height={96}
-              decoding="async"
-              className="h-24 w-24 flex-none rounded-2xl object-cover"
-            />
-          ) : (
-            <span
-              aria-hidden="true"
-              className="flex h-24 w-24 flex-none items-center justify-center rounded-2xl bg-brand-light text-2xl font-bold tracking-titular text-brand"
-            >
-              {store.nombre.slice(0, 2).toUpperCase()}
-            </span>
-          )}
-          <div className="min-w-0 flex-1">
-            <h1 className="truncate text-[1.4rem] font-semibold tracking-titular">
-              {store.nombre}
-            </h1>
-            {store.direccion && (
-              <p className="truncate text-[0.82rem] text-tinta-suave">{store.direccion}</p>
-            )}
-          </div>
-        </div>
-
-        <div className="mt-3">
-          <EstadoAperturaBadge estado={estadoTienda} />
+          <Link
+            href="/"
+            className="text-[0.7rem] font-medium uppercase tracking-[0.14em] text-white/75 hover:text-white hover:underline"
+          >
+            Desarrollado por tumenusmart.com
+          </Link>
         </div>
 
         {/*
-          Reservar mesa va DEBAJO del estado de apertura, no arriba a la
-          derecha. Antes competía por el mismo renglón que el nombre del local
-          y le quitaba ancho al logo. Y el orden de lectura ahora es el que
-          corresponde: primero de qué local se trata, después si está abierto,
-          y recién entonces qué se puede hacer.
+          Los datos del local van en su propia tarjeta, igual que "Tus datos"
+          en el checkout — no sueltos sobre el fondo de la página. La tarjeta
+          sube por encima del banner con el -mt-6 para que se lea como una
+          sola pieza con él, en vez de dos bloques que no se hablan.
         */}
-        <div className="mt-3.5">
-          <Link
-            href={`/${slug}/reservas`}
-            className="inline-flex items-center rounded-xl bg-azul px-5 py-2.5 text-[0.88rem] font-semibold text-white shadow-media transition-colors hover:bg-azul-oscuro"
-          >
-            Reservar mesa
-          </Link>
+        <div className="relative -mt-6 rounded-xl border border-linea bg-white p-4 shadow-media">
+          <div className="flex items-center gap-3.5">
+            {store.logoUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={store.logoUrl}
+                alt={store.nombre}
+                width={96}
+                height={96}
+                decoding="async"
+                className="h-24 w-24 flex-none rounded-2xl object-cover"
+              />
+            ) : (
+              <span
+                aria-hidden="true"
+                className="flex h-24 w-24 flex-none items-center justify-center rounded-2xl bg-brand-light text-2xl font-bold tracking-titular text-brand"
+              >
+                {store.nombre.slice(0, 2).toUpperCase()}
+              </span>
+            )}
+            <div className="min-w-0 flex-1">
+              <h1 className="truncate text-[1.4rem] font-semibold tracking-titular">
+                {store.nombre}
+              </h1>
+              {store.direccion && (
+                <p className="truncate text-[0.82rem] text-tinta-suave">{store.direccion}</p>
+              )}
+            </div>
+          </div>
+
+          <div className="mt-3">
+            <EstadoAperturaBadge estado={estadoTienda} />
+          </div>
+
+          {/*
+            Reservar mesa va DEBAJO del estado de apertura, no arriba a la
+            derecha. Antes competía por el mismo renglón que el nombre del
+            local y le quitaba ancho al logo. Y el orden de lectura ahora es
+            el que corresponde: primero de qué local se trata, después si
+            está abierto, y recién entonces qué se puede hacer.
+          */}
+          <div className="mt-3.5">
+            <Link
+              href={`/${slug}/reservas`}
+              className="inline-flex items-center rounded-xl bg-azul px-5 py-2.5 text-[0.88rem] font-semibold text-white shadow-media transition-colors hover:bg-azul-oscuro"
+            >
+              Reservar mesa
+            </Link>
+          </div>
         </div>
       </header>
 
