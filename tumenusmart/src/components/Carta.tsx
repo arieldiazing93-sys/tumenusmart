@@ -155,11 +155,11 @@ export function Carta({
             className="scroll-mt-28 pt-6"
           >
             {/*
-              La cabecera es una banda de borde a borde, no un título suelto.
-
-              El -mx-4 rompe el margen del contenedor a propósito: ese corte de
-              lado a lado es lo que dice "acá empieza otro grupo". Con el título
-              solo, dos categorías seguidas se leían como una lista corrida.
+              La cabecera es una tarjeta redondeada, no un título suelto — con
+              el título solo, dos categorías seguidas se leían como una lista
+              corrida. Ya no va de borde a borde (dejó de usar -mx-4): con las
+              esquinas redondeadas se lee como una pieza aparte, separada del
+              contenido, en vez de una franja pegada a la pantalla.
 
               Queda pegada arriba mientras se baja: con seis productos en
               pantalla, para el tercero ya no se sabe en qué grupo se está. El
@@ -171,7 +171,7 @@ export function Carta({
             */}
             <div
               style={{ top: altoBarra }}
-              className="sticky z-10 -mx-4 bg-brand-tinte px-4 py-2.5"
+              className="sticky z-10 rounded-xl bg-brand-tinte px-4 py-2.5"
             >
               <h2 className="text-[1.05rem] font-semibold tracking-titular text-brand-texto">
                 {c.nombre}

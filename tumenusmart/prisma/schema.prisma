@@ -22,7 +22,6 @@ model Store {
   nombre         String
   whatsappNumero String // formato internacional sin '+', ej: 595981234567
   logoUrl        String?
-  portadaUrl     String? // foto ancha de fondo en la cabecera del menú público, opcional
   direccion      String?
   mensajeSaludo  String? // texto opcional al inicio del mensaje de WhatsApp (pedidos)
   mensajeSaludoReserva String? // texto opcional al inicio del mensaje de WhatsApp (reservas)

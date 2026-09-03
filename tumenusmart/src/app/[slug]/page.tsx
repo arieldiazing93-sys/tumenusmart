@@ -107,26 +107,21 @@ export default async function CatalogoPage({
       {/* ---------- cabecera del local ---------- */}
       <header className="animate-[subir_0.5s_cubic-bezier(0.22,0.7,0.3,1)]">
         {/*
-          Opcional: sin portada cargada, la cabecera queda EXACTAMENTE como
-          antes (mismo pt-6 de acá abajo). Con portada, la foto va de borde a
-          borde (mismo truco de -mx-4 que ya usa Carta.tsx para sus cabeceras
-          de categoría) pegada arriba del todo — el logo y el nombre siguen
-          abajo, sobre el fondo sólido de siempre, así el texto nunca pierde
-          contraste por quedar encima de una foto.
+          Banner de marca, igual para todos los locales — no es algo que el
+          dueño suba ni edite. Es identidad de la plataforma, como el
+          "powered by" que ya usan otras apps de pedidos. El -mx-4 lo lleva de
+          borde a borde (mismo truco que usa Carta.tsx para sus cabeceras de
+          categoría).
         */}
-        {store.portadaUrl && (
-          <div className="-mx-4 -mt-6 h-36 overflow-hidden sm:h-44">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={store.portadaUrl}
-              alt=""
-              aria-hidden="true"
-              decoding="async"
-              className="h-full w-full object-cover"
-            />
-          </div>
-        )}
-        <div className={`flex items-center gap-3.5 ${store.portadaUrl ? "pt-4" : "pt-6"}`}>
+        <div className="-mx-4 -mt-6 flex h-28 flex-col items-center justify-center gap-1 bg-brand px-4 text-center text-white sm:h-32">
+          <p className="text-[1rem] font-semibold tracking-titular sm:text-[1.1rem]">
+            Estamos en línea para recibir tu pedido
+          </p>
+          <p className="text-[0.7rem] font-medium uppercase tracking-[0.14em] text-white/75">
+            Desarrollado por TuMenuSmart
+          </p>
+        </div>
+        <div className="flex items-center gap-3.5 pt-4">
           {store.logoUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
