@@ -111,7 +111,7 @@ export function MitadYMitadPicker({ grupoNombre, productos }: Props) {
   // lo separa de un vistazo sin gritar.
   return (
     <div className="rounded-xl border border-azul/35 bg-azul-luz p-4">
-      <h4 className="mb-1 text-[0.95rem] font-semibold tracking-titular text-azul-oscuro">
+      <h4 className="mb-1 text-[1.05rem] font-semibold tracking-titular text-azul-oscuro">
         Armá tu mitad y mitad — {grupoNombre}
       </h4>
       <p className="mb-3 text-[0.78rem] leading-snug text-tinta-media">
