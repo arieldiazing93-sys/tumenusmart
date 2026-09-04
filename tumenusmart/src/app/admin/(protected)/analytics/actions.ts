@@ -26,7 +26,9 @@ export async function registrarCanjeFidelidad(telefono: string): Promise<void> {
     throw new Error("La fidelización no está activa para este local.");
   }
 
-  const customer = await db.customer.findUnique({
+  // Plain `prisma`, no `prismaDelLocal`: la clave compuesta storeId_telefono
+  // ya fija el local sola.
+  const customer = await prisma.customer.findUnique({
     where: { storeId_telefono: { storeId, telefono } },
   });
   if (!customer) {
@@ -42,9 +44,18 @@ export async function registrarCanjeFidelidad(telefono: string): Promise<void> {
 
   // Se SUMA el umbral y no se iguala al total entregado: si hizo 12 pedidos
   // y el umbral es 10, le quedan 2 de arranque para el próximo premio.
-  await db.customer.update({
-    where: { id: customer.id },
+  //
+  // El "where" incluye pedidosCanjeados con el valor recién leído, a modo de
+  // candado optimista: si dos clics (doble toque, o dos encargados a la vez)
+  // llegan a la vez, el primero que escriba cambia ese valor y el segundo ya
+  // no encuentra la fila con ese pedidosCanjeados — no la actualiza, y el
+  // premio no se entrega dos veces por la misma tanda de pedidos.
+  const resultado = await db.customer.updateMany({
+    where: { id: customer.id, pedidosCanjeados: customer.pedidosCanjeados },
     data: { pedidosCanjeados: { increment: store.fidelizacionUmbral } },
   });
+  if (resultado.count === 0) {
+    throw new Error("Este cliente se actualizó justo ahora — volvé a intentar.");
+  }
   revalidatePath("/admin/analytics");
 }

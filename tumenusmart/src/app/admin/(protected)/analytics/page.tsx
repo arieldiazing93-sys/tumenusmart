@@ -56,7 +56,7 @@ export default async function AnalyticsPage({
 
   const fidelizacionActiva = store?.fidelizacionActiva ?? false;
   const umbral = store?.fidelizacionUmbral ?? 10;
-  const premio = store?.fidelizacionPremio ?? "";
+  const premio = store?.fidelizacionPremio || "el premio";
   const progresoFidelidad = fidelizacionActiva
     ? await calcularProgresoFidelidad(storeId, umbral)
     : null;

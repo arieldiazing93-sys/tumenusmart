@@ -1,3 +1,4 @@
+import { prisma } from "./prisma";
 import { prismaDelLocal } from "./prisma-local";
 
 export type ProgresoFidelidad = {
@@ -14,7 +15,11 @@ function armarProgreso(
   canjeados: number,
   umbral: number
 ): ProgresoFidelidad {
-  const progreso = entregados - canjeados;
+  // Nunca negativo: un pedido "entregado" se puede volver a cambiar de
+  // estado (corrección de un error de carga), y si eso pasa DESPUÉS de un
+  // canje ya entregado, entregados - canjeados da negativo. Mostrar "-2/10"
+  // no ayuda a nadie — se lee como progreso perdido, no como lo que es.
+  const progreso = Math.max(0, entregados - canjeados);
   return { telefono, entregados, canjeados, progreso, listo: progreso >= umbral };
 }
 
@@ -63,7 +68,10 @@ export async function progresoDeCliente(
   const db = prismaDelLocal(storeId);
   const [entregados, customer] = await Promise.all([
     db.order.count({ where: { clienteTelefono: telefono, estado: "entregado" } }),
-    db.customer.findUnique({
+    // Plain `prisma`, no `prismaDelLocal`, acá: la clave compuesta
+    // storeId_telefono ya fija el local sola, igual que en el upsert del
+    // checkout — no hace falta la capa extra para esto.
+    prisma.customer.findUnique({
       where: { storeId_telefono: { storeId, telefono } },
       select: { pedidosCanjeados: true },
     }),
