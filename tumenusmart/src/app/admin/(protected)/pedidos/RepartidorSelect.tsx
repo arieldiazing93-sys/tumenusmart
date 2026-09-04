@@ -20,9 +20,12 @@ export function RepartidorSelect({
     <select
       value={repartidorIdActual ?? ""}
       disabled={pending}
-      onChange={(e) =>
-        startTransition(() => asignarRepartidor(orderId, e.target.value))
-      }
+      onChange={(e) => {
+        const repartidorId = e.target.value;
+        startTransition(() => {
+          asignarRepartidor(orderId, repartidorId);
+        });
+      }}
       className="rounded-lg border border-linea px-2 py-1.5 text-sm disabled:opacity-50"
     >
       <option value="">Sin asignar</option>
