@@ -4,8 +4,9 @@ import Link from "next/link";
 import { prismaDelLocal } from "@/lib/prisma-local";
 import { idLocalActual } from "@/lib/local-actual";
 import { formatearGuarani } from "@/lib/format";
-import { actualizarStore, crearZona, guardarFidelizacion, guardarEnvioUbicacion } from "./actions";
+import { actualizarStore, guardarFidelizacion, guardarEnvioUbicacion } from "./actions";
 import { EliminarZonaBoton } from "./EliminarZonaBoton";
+import { CrearZonaForm } from "./CrearZonaForm";
 import { StoreLocationField } from "./StoreLocationField";
 import { LogoField } from "./LogoField";
 import { UrlPublicaField } from "./UrlPublicaField";
@@ -273,38 +274,7 @@ export default async function AdminConfiguracionPage() {
           automático". Cargalas de menor a mayor radio — cada una es "hasta X km desde el local".
         </p>
 
-        <form action={crearZona} className="mb-4 flex flex-wrap gap-2">
-          <input
-            name="nombre"
-            required
-            placeholder="Nombre (ej: Zona 1)"
-            className="min-w-[140px] flex-1 rounded-lg border border-linea px-3 py-2"
-          />
-          <input
-            type="number"
-            name="radioKm"
-            required
-            step="0.1"
-            min="0.1"
-            placeholder="Radio (km)"
-            className="w-32 rounded-lg border border-linea px-3 py-2"
-          />
-          <input
-            type="number"
-            name="costoEnvio"
-            required
-            step="1"
-            min="0"
-            placeholder="Costo (Gs.)"
-            className="w-36 rounded-lg border border-linea px-3 py-2"
-          />
-          <button
-            type="submit"
-            className={clasesBoton("suave", "md")}
-          >
-            Agregar
-          </button>
-        </form>
+        <CrearZonaForm />
 
         <div className="flex flex-col gap-2">
           {zonas.map((z) => (

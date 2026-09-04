@@ -192,7 +192,15 @@ export async function guardarEnvioUbicacion(formData: FormData): Promise<void> {
   refrescarPantallas();
 }
 
-export async function crearZona(formData: FormData) {
+export type ResultadoZona = { ok: true } | { ok: false; error: string };
+
+/**
+ * Devuelve un resultado en vez de lanzar el error de "datos inválidos":
+ * Next.js oculta en producción el mensaje de cualquier `throw` que salga de
+ * una Server Action, así que el motivo real solo llega si viaja en el
+ * retorno.
+ */
+export async function crearZona(formData: FormData): Promise<ResultadoZona> {
   await exigirPermiso("configuracion.editar");
   const idLocal = await idLocalActual();
   const db = prismaDelLocal(idLocal);
@@ -202,7 +210,7 @@ export async function crearZona(formData: FormData) {
   const costoEnvio = parseFloat(String(formData.get("costoEnvio") ?? "0"));
 
   if (!nombre || isNaN(radioKm) || radioKm <= 0 || isNaN(costoEnvio)) {
-    throw new Error("Datos inválidos");
+    return { ok: false, error: "Datos inválidos" };
   }
 
   await db.deliveryZone.create({
@@ -210,6 +218,7 @@ export async function crearZona(formData: FormData) {
   });
   revalidatePath("/admin/configuracion");
   revalidatePath("/[slug]", "layout");
+  return { ok: true };
 }
 
 /**
