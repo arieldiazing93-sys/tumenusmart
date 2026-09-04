@@ -126,8 +126,6 @@ export async function actualizarStore(formData: FormData) {
   await exigirPermiso("configuracion.editar");
   const nombre = String(formData.get("nombre") ?? "").trim();
   const whatsappNumero = String(formData.get("whatsappNumero") ?? "").replace(/[^\d]/g, "");
-  const envioModo =
-    String(formData.get("envioModo") ?? "zonas") === "coordinar" ? "coordinar" : "zonas";
   // Cómo se ve la carta pública. Se compara contra la lista de valores válidos
   // en vez de guardar lo que venga: el formulario es del cliente, y el cliente
   // puede mandar cualquier cosa.
@@ -138,11 +136,9 @@ export async function actualizarStore(formData: FormData) {
     throw new Error("Nombre y WhatsApp son obligatorios");
   }
 
-  const latRaw = String(formData.get("lat") ?? "").trim();
-  const lngRaw = String(formData.get("lng") ?? "").trim();
-  const lat = latRaw ? parseFloat(latRaw) : null;
-  const lng = lngRaw ? parseFloat(lngRaw) : null;
-
+  // envioModo, lat y lng NO se tocan acá: viven en su propio formulario más
+  // abajo en la pantalla (guardarEnvioUbicacion), para que guardar el nombre
+  // del negocio no pise sin querer la ubicación del mapa.
   const datos = {
     nombre,
     whatsappNumero,
@@ -150,10 +146,7 @@ export async function actualizarStore(formData: FormData) {
     logoUrl: String(formData.get("logoUrl") ?? "") || null,
     mensajeSaludo: String(formData.get("mensajeSaludo") ?? "") || null,
     mensajeSaludoReserva: String(formData.get("mensajeSaludoReserva") ?? "") || null,
-    envioModo,
     estiloCarta,
-    lat: lat != null && !isNaN(lat) ? lat : null,
-    lng: lng != null && !isNaN(lng) ? lng : null,
   };
 
   // Ojo con el orden: en el primer arranque todavía NO hay ningún local, y
@@ -176,6 +169,27 @@ export async function actualizarStore(formData: FormData) {
 
   refrescarPantallas();
   redirect("/admin/configuracion?guardado=1");
+}
+
+export async function guardarEnvioUbicacion(formData: FormData): Promise<void> {
+  await exigirPermiso("configuracion.editar");
+  const envioModo =
+    String(formData.get("envioModo") ?? "zonas") === "coordinar" ? "coordinar" : "zonas";
+
+  const latRaw = String(formData.get("lat") ?? "").trim();
+  const lngRaw = String(formData.get("lng") ?? "").trim();
+  const lat = latRaw ? parseFloat(latRaw) : null;
+  const lng = lngRaw ? parseFloat(lngRaw) : null;
+
+  await prisma.store.update({
+    where: { id: await idLocalActual() },
+    data: {
+      envioModo,
+      lat: lat != null && !isNaN(lat) ? lat : null,
+      lng: lng != null && !isNaN(lng) ? lng : null,
+    },
+  });
+  refrescarPantallas();
 }
 
 export async function crearZona(formData: FormData) {

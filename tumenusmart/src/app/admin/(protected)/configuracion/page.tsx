@@ -4,7 +4,7 @@ import Link from "next/link";
 import { prismaDelLocal } from "@/lib/prisma-local";
 import { idLocalActual } from "@/lib/local-actual";
 import { formatearGuarani } from "@/lib/format";
-import { actualizarStore, crearZona, guardarFidelizacion } from "./actions";
+import { actualizarStore, crearZona, guardarFidelizacion, guardarEnvioUbicacion } from "./actions";
 import { EliminarZonaBoton } from "./EliminarZonaBoton";
 import { StoreLocationField } from "./StoreLocationField";
 import { LogoField } from "./LogoField";
@@ -104,51 +104,6 @@ export default async function AdminConfiguracionPage() {
 
           <div className="mt-2 border-t border-linea pt-4">
             <label className="mb-1 block text-sm font-medium text-tinta-media">
-              Costo de envío
-            </label>
-            <p className="mb-2 text-xs text-tinta-media">
-              Elegí cómo querés manejar el precio del delivery en este negocio.
-            </p>
-            <div className="flex flex-col gap-2">
-              <label className="flex items-start gap-2 rounded-lg border border-linea p-3 text-sm has-[:checked]:border-brand has-[:checked]:bg-brand-light">
-                <input
-                  type="radio"
-                  name="envioModo"
-                  value="zonas"
-                  defaultChecked={envioModo === "zonas"}
-                  className="mt-0.5"
-                />
-                <span>
-                  <span className="font-medium">Por zonas con precio automático</span>
-                  <br />
-                  <span className="text-tinta-media">
-                    Definís radios de distancia desde tu local, cada uno con su precio. El
-                    cliente lo ve calculado automáticamente al marcar su ubicación.
-                  </span>
-                </span>
-              </label>
-              <label className="flex items-start gap-2 rounded-lg border border-linea p-3 text-sm has-[:checked]:border-brand has-[:checked]:bg-brand-light">
-                <input
-                  type="radio"
-                  name="envioModo"
-                  value="coordinar"
-                  defaultChecked={envioModo === "coordinar"}
-                  className="mt-0.5"
-                />
-                <span>
-                  <span className="font-medium">Lo coordino yo directamente</span>
-                  <br />
-                  <span className="text-tinta-media">
-                    El cliente marca su ubicación en el mapa, pero el precio del envío lo
-                    definís vos por WhatsApp, caso por caso.
-                  </span>
-                </span>
-              </label>
-            </div>
-          </div>
-
-          <div className="mt-2 border-t border-linea pt-4">
-            <label className="mb-1 block text-sm font-medium text-tinta-media">
               Cómo se ve tu carta
             </label>
             <p className="mb-2 text-xs text-tinta-media">
@@ -192,16 +147,6 @@ export default async function AdminConfiguracionPage() {
               </label>
             </div>
           </div>
-
-          <StoreLocationField
-            initialLat={store?.lat ?? null}
-            initialLng={store?.lng ?? null}
-            zonas={zonas.map((z) => ({
-              id: z.id,
-              radioKm: Number(z.radioKm),
-              costoEnvio: Number(z.costoEnvio),
-            }))}
-          />
 
           <button
             type="submit"
@@ -324,8 +269,8 @@ export default async function AdminConfiguracionPage() {
       <div>
         <h2 className="mb-1 text-[1.4rem] font-semibold tracking-titular text-tinta">Zonas de envío</h2>
         <p className="mb-4 text-sm text-tinta-media">
-          Solo aplican si arriba elegiste "Por zonas con precio automático". Cargalas de
-          menor a mayor radio — cada una es "hasta X km desde el local".
+          Solo aplican si más abajo, en "Envío y ubicación", elegiste "Por zonas con precio
+          automático". Cargalas de menor a mayor radio — cada una es "hasta X km desde el local".
         </p>
 
         <form action={crearZona} className="mb-4 flex flex-wrap gap-2">
@@ -387,6 +332,75 @@ export default async function AdminConfiguracionPage() {
             <p className="text-sm text-tinta-suave">Todavía no cargaste ninguna zona.</p>
           )}
         </div>
+      </div>
+
+      <div>
+        <h2 className="mb-4 text-[1.4rem] font-semibold tracking-titular text-tinta">
+          Envío y ubicación
+        </h2>
+        <form action={guardarEnvioUbicacion} className="flex flex-col gap-3">
+          <div>
+            <label className="mb-1 block text-sm font-medium text-tinta-media">
+              Costo de envío
+            </label>
+            <p className="mb-2 text-xs text-tinta-media">
+              Elegí cómo querés manejar el precio del delivery en este negocio.
+            </p>
+            <div className="flex flex-col gap-2">
+              <label className="flex items-start gap-2 rounded-lg border border-linea p-3 text-sm has-[:checked]:border-brand has-[:checked]:bg-brand-light">
+                <input
+                  type="radio"
+                  name="envioModo"
+                  value="zonas"
+                  defaultChecked={envioModo === "zonas"}
+                  className="mt-0.5"
+                />
+                <span>
+                  <span className="font-medium">Por zonas con precio automático</span>
+                  <br />
+                  <span className="text-tinta-media">
+                    Definís radios de distancia desde tu local, cada uno con su precio. El
+                    cliente lo ve calculado automáticamente al marcar su ubicación.
+                  </span>
+                </span>
+              </label>
+              <label className="flex items-start gap-2 rounded-lg border border-linea p-3 text-sm has-[:checked]:border-brand has-[:checked]:bg-brand-light">
+                <input
+                  type="radio"
+                  name="envioModo"
+                  value="coordinar"
+                  defaultChecked={envioModo === "coordinar"}
+                  className="mt-0.5"
+                />
+                <span>
+                  <span className="font-medium">Lo coordino yo directamente</span>
+                  <br />
+                  <span className="text-tinta-media">
+                    El cliente marca su ubicación en el mapa, pero el precio del envío lo
+                    definís vos por WhatsApp, caso por caso.
+                  </span>
+                </span>
+              </label>
+            </div>
+          </div>
+
+          <StoreLocationField
+            initialLat={store?.lat ?? null}
+            initialLng={store?.lng ?? null}
+            zonas={zonas.map((z) => ({
+              id: z.id,
+              radioKm: Number(z.radioKm),
+              costoEnvio: Number(z.costoEnvio),
+            }))}
+          />
+
+          <button
+            type="submit"
+            className={`self-start ${clasesBoton("principal")}`}
+          >
+            Guardar
+          </button>
+        </form>
       </div>
     </div>
   );
