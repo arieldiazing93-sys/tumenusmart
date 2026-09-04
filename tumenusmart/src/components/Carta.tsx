@@ -251,7 +251,7 @@ function FilaProducto({
       decoding="async"
       className={
         tarjetas
-          ? "h-44 w-full rounded-xl object-cover"
+          ? "h-56 w-full rounded-xl object-cover"
           : "h-16 w-16 flex-none rounded-lg object-cover"
       }
     />
@@ -260,7 +260,7 @@ function FilaProducto({
       aria-hidden="true"
       className={`flex items-center justify-center text-tinta-suave/35 ${
         tarjetas
-          ? "h-44 w-full rounded-xl bg-papel-hundido"
+          ? "h-56 w-full rounded-xl bg-papel-hundido"
           : "h-16 w-16 flex-none rounded-lg bg-papel-hundido"
       }`}
     >

@@ -23,7 +23,6 @@ const METODOS_PAGO = [
   { value: "efectivo", label: "Efectivo" },
   { value: "transferencia", label: "Transferencia" },
   { value: "tarjeta", label: "Tarjeta (POS al recibir)" },
-  { value: "otro", label: "A coordinar" },
 ];
 
 type Props = {
