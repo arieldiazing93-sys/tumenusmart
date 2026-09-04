@@ -183,7 +183,7 @@ export function ReservaForm({
 
     setEnviando(true);
     try {
-      const { reservationId } = await crearReserva({
+      const resultado = await crearReserva({
         slug,
         fecha,
         turno,
@@ -194,7 +194,12 @@ export function ReservaForm({
         clienteTelefono: telefono,
         clienteEmail: correo.trim() || undefined,
       });
-      router.push(`/${slug}/reserva/${reservationId}`);
+      if (!resultado.ok) {
+        fallar(resultado.error);
+        setEnviando(false);
+        return;
+      }
+      router.push(`/${slug}/reserva/${resultado.reservationId}`);
     } catch (err) {
       fallar(err instanceof Error ? err.message : "No se pudo generar la reserva.");
       setEnviando(false);

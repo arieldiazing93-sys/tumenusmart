@@ -1,10 +1,9 @@
 import { sesionActual } from "@/lib/auth";
 import { puede } from "@/lib/permisos";
-import { clasesBoton } from "@/components/ui";
 import { prismaDelLocal } from "@/lib/prisma-local";
 import { idLocalActual } from "@/lib/local-actual";
-import { crearRepartidor } from "./actions";
 import { RepartidorAcciones } from "./RepartidorAcciones";
+import { CrearRepartidorForm } from "./CrearRepartidorForm";
 import { LinkRepartidor } from "./LinkRepartidor";
 
 export const dynamic = "force-dynamic";
@@ -26,27 +25,7 @@ export default async function AdminRepartidoresPage() {
     <div>
       <h1 className="mb-6 text-[1.4rem] font-semibold tracking-titular text-tinta">Repartidores</h1>
 
-      {puedeGestionar && (
-      <form action={crearRepartidor} className="mb-6 flex flex-wrap gap-2">
-        <input
-          name="nombre"
-          required
-          placeholder="Nombre"
-          className="min-w-[160px] flex-1 rounded-lg border border-linea px-3 py-2"
-        />
-        <input
-          name="telefono"
-          placeholder="Teléfono (opcional)"
-          className="min-w-[160px] flex-1 rounded-lg border border-linea px-3 py-2"
-        />
-        <button
-          type="submit"
-          className={clasesBoton("principal")}
-        >
-          Agregar
-        </button>
-      </form>
-      )}
+      {puedeGestionar && <CrearRepartidorForm />}
 
       <div className="flex flex-col gap-2">
         {repartidores.map((r) => (

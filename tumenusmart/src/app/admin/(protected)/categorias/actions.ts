@@ -6,14 +6,21 @@ import { idLocalActual } from "@/lib/local-actual";
 import { prismaDelLocal } from "@/lib/prisma-local";
 import { moverEnLista, cambiosDeOrden, type Direccion } from "@/lib/ordenar";
 
-export async function crearCategoria(formData: FormData) {
+export type ResultadoCategoria = { ok: true } | { ok: false; error: string };
+
+/**
+ * Devuelve un resultado en vez de lanzar los errores de validación: Next.js
+ * oculta en producción el mensaje de cualquier `throw` que salga de una
+ * Server Action, así que el motivo real solo llega si viaja en el retorno.
+ */
+export async function crearCategoria(formData: FormData): Promise<ResultadoCategoria> {
   await exigirPermiso("categorias.editar");
   // Todas las consultas de acá abajo quedan atadas a este local.
   const idLocal = await idLocalActual();
   const prisma = prismaDelLocal(idLocal);
 
   const nombre = String(formData.get("nombre") ?? "").trim();
-  if (!nombre) throw new Error("El nombre es obligatorio");
+  if (!nombre) return { ok: false, error: "El nombre es obligatorio" };
 
   const ultima = await prisma.category.findFirst({ orderBy: { orden: "desc" } });
 
@@ -23,18 +30,20 @@ export async function crearCategoria(formData: FormData) {
     data: { nombre, orden: (ultima?.orden ?? 0) + 1, storeId: idLocal },
   });
   revalidatePath("/admin/categorias");
+  return { ok: true };
 }
 
-export async function renombrarCategoria(id: string, nombre: string) {
+export async function renombrarCategoria(id: string, nombre: string): Promise<ResultadoCategoria> {
   await exigirPermiso("categorias.editar");
   // Todas las consultas de acá abajo quedan atadas a este local.
   const prisma = prismaDelLocal(await idLocalActual());
 
   const nombreLimpio = nombre.trim();
-  if (!nombreLimpio) throw new Error("El nombre es obligatorio");
+  if (!nombreLimpio) return { ok: false, error: "El nombre es obligatorio" };
   await prisma.category.update({ where: { id }, data: { nombre: nombreLimpio } });
   revalidatePath("/admin/categorias");
   revalidatePath("/[slug]", "layout");
+  return { ok: true };
 }
 
 export async function alternarActivaCategoria(id: string, activa: boolean) {
@@ -47,19 +56,21 @@ export async function alternarActivaCategoria(id: string, activa: boolean) {
   revalidatePath("/[slug]", "layout");
 }
 
-export async function eliminarCategoria(id: string) {
+export async function eliminarCategoria(id: string): Promise<ResultadoCategoria> {
   await exigirPermiso("categorias.editar");
   // Todas las consultas de acá abajo quedan atadas a este local.
   const prisma = prismaDelLocal(await idLocalActual());
 
   const productosEnCategoria = await prisma.product.count({ where: { categoryId: id } });
   if (productosEnCategoria > 0) {
-    throw new Error(
-      "No se puede borrar: hay productos en esta categoría. Movelos o borralos primero."
-    );
+    return {
+      ok: false,
+      error: "No se puede borrar: hay productos en esta categoría. Movelos o borralos primero.",
+    };
   }
   await prisma.category.delete({ where: { id } });
   revalidatePath("/admin/categorias");
+  return { ok: true };
 }
 
 /**

@@ -19,7 +19,16 @@ function limpiarRol(valor: string): string {
   return ROLES_PERMITIDOS.has(valor) ? valor : "local";
 }
 
-export async function crearUsuario(formData: FormData) {
+export type ResultadoAccion = { ok: true } | { ok: false; error: string };
+
+/**
+ * Devuelve un resultado en vez de lanzar los errores de validación: Next.js
+ * oculta en producción el mensaje de cualquier `throw` que salga de una
+ * Server Action (lo cambia por un genérico "Server Components render...",
+ * por seguridad), así que el motivo real solo llega si viaja en el valor de
+ * retorno, no en una excepción.
+ */
+export async function crearUsuario(formData: FormData): Promise<ResultadoAccion> {
   await exigirSuperadmin();
 
   const email = normalizarEmail(String(formData.get("email") ?? ""));
@@ -29,16 +38,16 @@ export async function crearUsuario(formData: FormData) {
   const password = String(formData.get("password") ?? "");
 
   if (!email.includes("@") || email.length < 5) {
-    throw new Error("Escribí un correo válido");
+    return { ok: false, error: "Escribí un correo válido" };
   }
 
   const problema = revisarPasswordNueva(password);
-  if (problema) throw new Error(problema);
+  if (problema) return { ok: false, error: problema };
 
   // El superadmin no pertenece a ningún local; el usuario de local sí, siempre.
   const storeId = rol === "superadmin" ? null : storeIdCrudo || null;
   if (rol !== "superadmin" && !storeId) {
-    throw new Error("Elegí a qué local pertenece este usuario");
+    return { ok: false, error: "Elegí a qué local pertenece este usuario" };
   }
 
   if (storeId) {
@@ -46,14 +55,14 @@ export async function crearUsuario(formData: FormData) {
       where: { id: storeId },
       select: { id: true },
     });
-    if (!local) throw new Error("Ese local no existe");
+    if (!local) return { ok: false, error: "Ese local no existe" };
   }
 
   const yaExiste = await prisma.usuario.findUnique({
     where: { email },
     select: { id: true },
   });
-  if (yaExiste) throw new Error("Ya hay un usuario con ese correo");
+  if (yaExiste) return { ok: false, error: "Ya hay un usuario con ese correo" };
 
   await prisma.usuario.create({
     data: {
@@ -68,14 +77,18 @@ export async function crearUsuario(formData: FormData) {
   });
 
   revalidatePath("/admin/usuarios");
+  return { ok: true };
 }
 
-export async function restablecerPassword(usuarioId: string, formData: FormData) {
+export async function restablecerPassword(
+  usuarioId: string,
+  formData: FormData
+): Promise<ResultadoAccion> {
   await exigirSuperadmin();
 
   const password = String(formData.get("password") ?? "");
   const problema = revisarPasswordNueva(password);
-  if (problema) throw new Error(problema);
+  if (problema) return { ok: false, error: problema };
 
   await prisma.usuario.update({
     where: { id: usuarioId },
@@ -90,17 +103,24 @@ export async function restablecerPassword(usuarioId: string, formData: FormData)
   });
 
   revalidatePath("/admin/usuarios");
+  return { ok: true };
 }
 
-export async function alternarActivoUsuario(usuarioId: string, activo: boolean) {
+export async function alternarActivoUsuario(
+  usuarioId: string,
+  activo: boolean
+): Promise<ResultadoAccion> {
   const sesion = await exigirSuperadmin();
 
   // Desactivarse a uno mismo dejaría el panel sin nadie que pueda entrar.
   if (usuarioId === sesion.id && !activo) {
-    throw new Error("No podés desactivar tu propio usuario");
+    return { ok: false, error: "No podés desactivar tu propio usuario" };
   }
 
-  if (!activo) await protegerAlUltimoSuperadmin(usuarioId);
+  if (!activo) {
+    const problema = await protegerAlUltimoSuperadmin(usuarioId);
+    if (problema) return { ok: false, error: problema };
+  }
 
   await prisma.usuario.update({
     where: { id: usuarioId },
@@ -108,19 +128,22 @@ export async function alternarActivoUsuario(usuarioId: string, activo: boolean) 
   });
 
   revalidatePath("/admin/usuarios");
+  return { ok: true };
 }
 
-export async function eliminarUsuario(usuarioId: string) {
+export async function eliminarUsuario(usuarioId: string): Promise<ResultadoAccion> {
   const sesion = await exigirSuperadmin();
 
   if (usuarioId === sesion.id) {
-    throw new Error("No podés borrar tu propio usuario");
+    return { ok: false, error: "No podés borrar tu propio usuario" };
   }
 
-  await protegerAlUltimoSuperadmin(usuarioId);
+  const problema = await protegerAlUltimoSuperadmin(usuarioId);
+  if (problema) return { ok: false, error: problema };
 
   await prisma.usuario.delete({ where: { id: usuarioId } });
   revalidatePath("/admin/usuarios");
+  return { ok: true };
 }
 
 /**
@@ -129,20 +152,21 @@ export async function eliminarUsuario(usuarioId: string) {
  * Sin esta comprobación, desactivar o borrar al último administrador dejaría
  * el sistema sin forma de crear usuarios ni de cambiar de local, y habría que
  * arreglarlo escribiendo SQL a mano en la base.
+ *
+ * Devuelve el motivo si hay que bloquear la acción, o `null` si está bien.
  */
-async function protegerAlUltimoSuperadmin(usuarioId: string): Promise<void> {
+async function protegerAlUltimoSuperadmin(usuarioId: string): Promise<string | null> {
   const objetivo = await prisma.usuario.findUnique({
     where: { id: usuarioId },
     select: { rol: true, activo: true },
   });
-  if (!objetivo || objetivo.rol !== "superadmin" || !objetivo.activo) return;
+  if (!objetivo || objetivo.rol !== "superadmin" || !objetivo.activo) return null;
 
   const otrosActivos = await prisma.usuario.count({
     where: { rol: "superadmin", activo: true, id: { not: usuarioId } },
   });
   if (otrosActivos === 0) {
-    throw new Error(
-      "Es el único administrador activo. Creá otro antes de desactivar este."
-    );
+    return "Es el único administrador activo. Creá otro antes de desactivar este.";
   }
+  return null;
 }

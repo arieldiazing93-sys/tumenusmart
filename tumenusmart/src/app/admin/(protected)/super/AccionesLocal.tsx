@@ -23,16 +23,19 @@ export function AccionesLocal({
   const [cobrando, setCobrando] = useState(false);
   const [aviso, setAviso] = useState<string | null>(null);
 
-  function correr(accion: () => Promise<unknown>, exito?: string) {
+  function correr(
+    accion: () => Promise<{ ok: true } | { ok: false; error: string }>,
+    exito?: string
+  ) {
     setAviso(null);
     iniciar(async () => {
-      try {
-        await accion();
-        if (exito) setAviso(exito);
-        setCobrando(false);
-      } catch (err) {
-        setAviso(err instanceof Error ? err.message : "No se pudo completar");
+      const resultado = await accion();
+      if (!resultado.ok) {
+        setAviso(resultado.error);
+        return;
       }
+      if (exito) setAviso(exito);
+      setCobrando(false);
     });
   }
 

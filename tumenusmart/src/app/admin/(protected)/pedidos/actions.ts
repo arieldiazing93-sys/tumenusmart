@@ -14,13 +14,23 @@ const ESTADOS_VALIDOS = [
   "cancelado",
 ];
 
-export async function cambiarEstadoPedido(orderId: string, estado: string) {
+export type ResultadoPedidoAccion = { ok: true } | { ok: false; error: string };
+
+/**
+ * Devuelve un resultado en vez de lanzar los errores de validación: Next.js
+ * oculta en producción el mensaje de cualquier `throw` que salga de una
+ * Server Action, así que el motivo real solo llega si viaja en el retorno.
+ */
+export async function cambiarEstadoPedido(
+  orderId: string,
+  estado: string
+): Promise<ResultadoPedidoAccion> {
   await exigirPermiso("pedidos.cambiarEstado");
   // Todas las consultas de acá abajo quedan atadas a este local.
   const prisma = prismaDelLocal(await idLocalActual());
 
   if (!ESTADOS_VALIDOS.includes(estado)) {
-    throw new Error("Estado inválido");
+    return { ok: false, error: "Estado inválido" };
   }
 
   if (estado === "en_despacho") {
@@ -29,18 +39,23 @@ export async function cambiarEstadoPedido(orderId: string, estado: string) {
       select: { tipoEntrega: true, repartidorId: true },
     });
     if (pedido?.tipoEntrega === "delivery" && !pedido.repartidorId) {
-      throw new Error(
-        'Asigná un repartidor antes de pasar el pedido a "En despacho".'
-      );
+      return {
+        ok: false,
+        error: 'Asigná un repartidor antes de pasar el pedido a "En despacho".',
+      };
     }
   }
 
   await prisma.order.update({ where: { id: orderId }, data: { estado } });
   revalidatePath("/admin/pedidos");
   revalidatePath(`/admin/pedidos/${orderId}`);
+  return { ok: true };
 }
 
-export async function asignarRepartidor(orderId: string, repartidorId: string) {
+export async function asignarRepartidor(
+  orderId: string,
+  repartidorId: string
+): Promise<ResultadoPedidoAccion> {
   await exigirPermiso("pedidos.asignarRepartidor");
   // Todas las consultas de acá abajo quedan atadas a este local.
   const prisma = prismaDelLocal(await idLocalActual());
@@ -51,4 +66,5 @@ export async function asignarRepartidor(orderId: string, repartidorId: string) {
   });
   revalidatePath("/admin/pedidos");
   revalidatePath(`/admin/pedidos/${orderId}`);
+  return { ok: true };
 }

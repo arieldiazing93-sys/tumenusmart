@@ -9,6 +9,14 @@ function normalizarEmail(valor: string): string {
   return valor.trim().toLowerCase();
 }
 
+export type ResultadoCrearEmpleado =
+  | { ok: true; password: string }
+  | { ok: false; error: string };
+export type ResultadoAccionEmpleado = { ok: true } | { ok: false; error: string };
+export type ResultadoNuevaPassword =
+  | { ok: true; password: string }
+  | { ok: false; error: string };
+
 /**
  * Da de alta a un empleado del local.
  *
@@ -20,8 +28,12 @@ function normalizarEmail(valor: string): string {
  * formulario, podría crear un usuario dentro del negocio de otro. Las dos
  * cosas se hacen con una herramienta de navegador y treinta segundos, sin
  * saber programar. Por eso el formulario solo aporta el nombre y el correo.
+ *
+ * Devuelve un resultado en vez de lanzar los errores de validación: Next.js
+ * oculta en producción el mensaje de cualquier `throw` que salga de una
+ * Server Action, así que el motivo real solo llega si viaja en el retorno.
  */
-export async function crearEmpleado(formData: FormData): Promise<{ password: string }> {
+export async function crearEmpleado(formData: FormData): Promise<ResultadoCrearEmpleado> {
   const sesion = await exigirPermiso("empleados.gestionar");
   const storeId = await idLocalActual();
 
@@ -29,15 +41,15 @@ export async function crearEmpleado(formData: FormData): Promise<{ password: str
   const nombre = String(formData.get("nombre") ?? "").trim();
 
   if (!email.includes("@") || email.length < 5) {
-    throw new Error("Escribí un correo válido");
+    return { ok: false, error: "Escribí un correo válido" };
   }
-  if (!nombre) throw new Error("Poné el nombre de la persona");
+  if (!nombre) return { ok: false, error: "Poné el nombre de la persona" };
 
   const yaExiste = await prisma.usuario.findUnique({
     where: { email },
     select: { id: true },
   });
-  if (yaExiste) throw new Error("Ya hay un usuario con ese correo");
+  if (yaExiste) return { ok: false, error: "Ya hay un usuario con ese correo" };
 
   // La contraseña la genera el sistema. Nadie elige "1234" para el mozo, y
   // como igual va a viajar por WhatsApp, entra obligado a cambiarla.
@@ -60,7 +72,7 @@ export async function crearEmpleado(formData: FormData): Promise<{ password: str
   console.log(`[empleados] ${sesion.email} creó a ${email} en el local ${storeId}`);
 
   revalidatePath("/admin/empleados");
-  return { password };
+  return { ok: true, password };
 }
 
 /**
@@ -69,7 +81,10 @@ export async function crearEmpleado(formData: FormData): Promise<{ password: str
  * No se borra: si se borrara, se perdería quién registró cada pago o cada
  * cambio. Un empleado apagado no puede entrar y listo.
  */
-export async function alternarActivoEmpleado(id: string, activo: boolean) {
+export async function alternarActivoEmpleado(
+  id: string,
+  activo: boolean
+): Promise<ResultadoAccionEmpleado> {
   await exigirPermiso("empleados.gestionar");
   const storeId = await idLocalActual();
 
@@ -80,14 +95,15 @@ export async function alternarActivoEmpleado(id: string, activo: boolean) {
     data: { activo },
   });
   if (resultado.count === 0) {
-    throw new Error("Ese empleado no es de tu local");
+    return { ok: false, error: "Ese empleado no es de tu local" };
   }
 
   revalidatePath("/admin/empleados");
+  return { ok: true };
 }
 
 /** Genera una contraseña nueva cuando el empleado se la olvidó. */
-export async function restablecerPasswordEmpleado(id: string): Promise<{ password: string }> {
+export async function restablecerPasswordEmpleado(id: string): Promise<ResultadoNuevaPassword> {
   await exigirPermiso("empleados.gestionar");
   const storeId = await idLocalActual();
 
@@ -95,7 +111,7 @@ export async function restablecerPasswordEmpleado(id: string): Promise<{ passwor
     where: { id, storeId, rol: "empleado" },
     select: { id: true },
   });
-  if (!empleado) throw new Error("Ese empleado no es de tu local");
+  if (!empleado) return { ok: false, error: "Ese empleado no es de tu local" };
 
   const password = generarPassword();
   await prisma.usuario.update({
@@ -104,5 +120,5 @@ export async function restablecerPasswordEmpleado(id: string): Promise<{ passwor
   });
 
   revalidatePath("/admin/empleados");
-  return { password };
+  return { ok: true, password };
 }

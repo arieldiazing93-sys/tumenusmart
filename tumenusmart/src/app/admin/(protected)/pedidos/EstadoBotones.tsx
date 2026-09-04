@@ -27,11 +27,8 @@ export function EstadoBotones({
       return;
     }
     startTransition(async () => {
-      try {
-        await cambiarEstadoPedido(orderId, estado);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "No se pudo cambiar el estado");
-      }
+      const resultado = await cambiarEstadoPedido(orderId, estado);
+      if (!resultado.ok) setError(resultado.error);
     });
   }
 

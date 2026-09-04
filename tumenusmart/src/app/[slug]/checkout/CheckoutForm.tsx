@@ -6,7 +6,7 @@ import dynamic from "next/dynamic";
 import { useCart } from "@/components/CartProvider";
 import { formatearGuarani } from "@/lib/format";
 import { distanciaKm, encontrarZonaPorDistancia } from "@/lib/geo";
-import { Tarjeta, Campo, Entrada, Selector, Aviso } from "@/components/ui";
+import { Tarjeta, Campo, Entrada, Aviso } from "@/components/ui";
 import { Segmentado } from "@/components/Segmentado";
 import { BotonEnviar } from "@/components/BotonEnviar";
 import { crearPedido } from "./actions";
@@ -19,10 +19,12 @@ const MapPicker = dynamic(
 
 type Zona = { id: string; nombre: string; radioKm: number; costoEnvio: number };
 
-const METODOS_PAGO = [
+type MetodoPago = "efectivo" | "transferencia" | "tarjeta";
+
+const METODOS_PAGO: { value: MetodoPago; label: string; sublabel?: string }[] = [
   { value: "efectivo", label: "Efectivo" },
   { value: "transferencia", label: "Transferencia" },
-  { value: "tarjeta", label: "Tarjeta (POS al recibir)" },
+  { value: "tarjeta", label: "Tarjeta", sublabel: "POS al recibir" },
 ];
 
 type Props = {
@@ -55,7 +57,7 @@ export function CheckoutForm({
   const [clienteLat, setClienteLat] = useState<number | null>(null);
   const [clienteLng, setClienteLng] = useState<number | null>(null);
   const [direccion, setDireccion] = useState("");
-  const [metodoPago, setMetodoPago] = useState("efectivo");
+  const [metodoPago, setMetodoPago] = useState<MetodoPago>("efectivo");
   const [comprobanteTipo, setComprobanteTipo] = useState<"ticket" | "factura">("ticket");
   const [facturaRazonSocial, setFacturaRazonSocial] = useState("");
   const [facturaRuc, setFacturaRuc] = useState("");
@@ -132,7 +134,7 @@ export function CheckoutForm({
 
     setEnviando(true);
     try {
-      const { orderId } = await crearPedido({
+      const resultado = await crearPedido({
         slug,
         clienteNombre: nombre,
         clienteTelefono: telefono,
@@ -161,8 +163,13 @@ export function CheckoutForm({
         // que el servidor avise si un precio cambió mientras completaba.
         totalMostrado: total,
       });
+      if (!resultado.ok) {
+        fallar(resultado.error);
+        setEnviando(false);
+        return;
+      }
       vaciarCarrito();
-      router.push(`/${slug}/pedido/${orderId}`);
+      router.push(`/${slug}/pedido/${resultado.orderId}`);
     } catch (err) {
       fallar(err instanceof Error ? err.message : "No se pudo generar el pedido.");
       setEnviando(false);
@@ -244,13 +251,7 @@ export function CheckoutForm({
           <p className="rotulo">Entrega y pago</p>
 
           <Campo etiqueta="Método de pago" ayuda="Lo coordinás directamente con el local">
-            <Selector value={metodoPago} onChange={(e) => setMetodoPago(e.target.value)}>
-              {METODOS_PAGO.map((m) => (
-                <option key={m.value} value={m.value}>
-                  {m.label}
-                </option>
-              ))}
-            </Selector>
+            <Segmentado opciones={METODOS_PAGO} valor={metodoPago} onChange={setMetodoPago} />
           </Campo>
 
           <div>

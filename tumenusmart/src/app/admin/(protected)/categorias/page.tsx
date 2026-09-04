@@ -1,10 +1,9 @@
 import { prismaDelLocal } from "@/lib/prisma-local";
 import { idLocalActual } from "@/lib/local-actual";
-import { crearCategoria } from "./actions";
 import { CategoriaFila } from "./CategoriaFila";
+import { CrearCategoriaForm } from "./CrearCategoriaForm";
 import { sesionActual } from "@/lib/auth";
 import { puede } from "@/lib/permisos";
-import { clasesBoton } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
@@ -32,22 +31,7 @@ export default async function AdminCategoriasPage() {
         Movelas con las flechas.
       </p>
 
-      {puedeEditar && (
-      <form action={crearCategoria} className="mb-6 flex gap-2">
-        <input
-          name="nombre"
-          required
-          placeholder="Nueva categoría (ej: Postres)"
-          className="flex-1 rounded-lg border border-linea px-3 py-2"
-        />
-        <button
-          type="submit"
-          className={clasesBoton("principal")}
-        >
-          Agregar
-        </button>
-      </form>
-      )}
+      {puedeEditar && <CrearCategoriaForm />}
 
       <div className="flex flex-col gap-2">
         {categorias.map((c, i) => (

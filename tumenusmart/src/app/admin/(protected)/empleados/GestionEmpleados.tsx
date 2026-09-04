@@ -56,12 +56,12 @@ export function GestionEmpleados({
     const nombre = String(formData.get("nombre") ?? "").trim();
     const email = String(formData.get("email") ?? "").trim().toLowerCase();
     iniciar(async () => {
-      try {
-        const { password } = await crearEmpleado(formData);
-        setRecienCreado({ nombre, email, password });
-      } catch (e) {
-        setError(e instanceof Error ? e.message : "No se pudo crear");
+      const resultado = await crearEmpleado(formData);
+      if (!resultado.ok) {
+        setError(resultado.error);
+        return;
       }
+      setRecienCreado({ nombre, email, password: resultado.password });
     });
   }
 
@@ -177,12 +177,12 @@ function FilaEmpleado({ empleado }: { empleado: EmpleadoFila }) {
             onClick={() => {
               setError(null);
               iniciar(async () => {
-                try {
-                  const { password } = await restablecerPasswordEmpleado(empleado.id);
-                  setNuevaPassword(password);
-                } catch (e) {
-                  setError(e instanceof Error ? e.message : "No se pudo");
+                const resultado = await restablecerPasswordEmpleado(empleado.id);
+                if (!resultado.ok) {
+                  setError(resultado.error);
+                  return;
                 }
+                setNuevaPassword(resultado.password);
               });
             }}
             className={clasesBoton("suave", "sm")}
@@ -195,11 +195,8 @@ function FilaEmpleado({ empleado }: { empleado: EmpleadoFila }) {
             onClick={() => {
               setError(null);
               iniciar(async () => {
-                try {
-                  await alternarActivoEmpleado(empleado.id, !empleado.activo);
-                } catch (e) {
-                  setError(e instanceof Error ? e.message : "No se pudo");
-                }
+                const resultado = await alternarActivoEmpleado(empleado.id, !empleado.activo);
+                if (!resultado.ok) setError(resultado.error);
               });
             }}
             className={clasesBoton(empleado.activo ? "peligro" : "suave", "sm")}

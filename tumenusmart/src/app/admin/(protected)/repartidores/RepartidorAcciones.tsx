@@ -24,11 +24,8 @@ export function RepartidorAcciones({ id, activo }: { id: string; activo: boolean
         onClick={() => {
           if (!confirm("¿Borrar este repartidor?")) return;
           startTransition(async () => {
-            try {
-              await eliminarRepartidor(id);
-            } catch (err) {
-              alert(err instanceof Error ? err.message : "No se pudo borrar");
-            }
+            const resultado = await eliminarRepartidor(id);
+            if (!resultado.ok) alert(resultado.error);
           });
         }}
         className="text-peligro hover:underline disabled:opacity-50"

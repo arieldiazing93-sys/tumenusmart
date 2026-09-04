@@ -37,14 +37,14 @@ export function CategoriaFila({
   function guardarNombre() {
     setError(null);
     startTransition(async () => {
-      try {
-        await renombrarCategoria(id, nombreEditado);
-        setEditando(false);
-        setGuardado(true);
-        setTimeout(() => setGuardado(false), 2000);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "No se pudo guardar");
+      const resultado = await renombrarCategoria(id, nombreEditado);
+      if (!resultado.ok) {
+        setError(resultado.error);
+        return;
       }
+      setEditando(false);
+      setGuardado(true);
+      setTimeout(() => setGuardado(false), 2000);
     });
   }
 
@@ -133,11 +133,8 @@ export function CategoriaFila({
               onClick={() => {
                 if (!confirm("¿Borrar esta categoría?")) return;
                 startTransition(async () => {
-                  try {
-                    await eliminarCategoria(id);
-                  } catch (err) {
-                    alert(err instanceof Error ? err.message : "No se pudo borrar");
-                  }
+                  const resultado = await eliminarCategoria(id);
+                  if (!resultado.ok) alert(resultado.error);
                 });
               }}
               className="text-peligro hover:underline disabled:opacity-50"

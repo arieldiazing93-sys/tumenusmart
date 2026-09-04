@@ -26,8 +26,12 @@ export function ImagenProductoField({ initialUrl }: { initialUrl: string | null 
 
       const formData = new FormData();
       formData.set("archivo", resultado.archivo);
-      const { url: nuevaUrl } = await subirFotoProducto(formData);
-      setUrl(nuevaUrl);
+      const subida = await subirFotoProducto(formData);
+      if (!subida.ok) {
+        setError(subida.error);
+        return;
+      }
+      setUrl(subida.url);
 
       if (resultado.comprimida) {
         setAhorro(

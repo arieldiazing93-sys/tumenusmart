@@ -8,14 +8,21 @@ import { prismaDelLocal } from "@/lib/prisma-local";
 import { moverEnLista, cambiosDeOrden, type Direccion } from "@/lib/ordenar";
 import { subirImagenProducto } from "@/lib/supabase-storage";
 
-export async function subirFotoProducto(formData: FormData): Promise<{ url: string }> {
+export type ResultadoFoto = { ok: true; url: string } | { ok: false; error: string };
+
+/**
+ * Devuelve un resultado en vez de lanzar el error de "sin imagen": Next.js
+ * oculta en producción el mensaje de cualquier `throw` que salga de una
+ * Server Action, así que el motivo real solo llega si viaja en el retorno.
+ */
+export async function subirFotoProducto(formData: FormData): Promise<ResultadoFoto> {
   await exigirPermiso("productos.editar");
   const archivo = formData.get("archivo");
   if (!(archivo instanceof File)) {
-    throw new Error("No se recibió ninguna imagen");
+    return { ok: false, error: "No se recibió ninguna imagen" };
   }
   const url = await subirImagenProducto(archivo);
-  return { url };
+  return { ok: true, url };
 }
 
 function parsearIngredientes(formData: FormData): string[] {
@@ -47,7 +54,17 @@ function leerCosto(formData: FormData): number | null {
   return valor;
 }
 
-export async function crearProducto(formData: FormData) {
+export type ResultadoProducto = { ok: true } | { ok: false; error: string };
+
+/**
+ * Devuelve un resultado en vez de lanzar el error de "faltan datos": Next.js
+ * oculta en producción el mensaje de cualquier `throw` que salga de una
+ * Server Action. Este formulario todavía se envía directo (sin un
+ * componente cliente intermedio), así que hoy nadie lee este valor de
+ * retorno — pero evita que una validación fallida rompa la pantalla entera,
+ * que es el riesgo más grave de los dos.
+ */
+export async function crearProducto(formData: FormData): Promise<ResultadoProducto | void> {
   await exigirPermiso("productos.editar");
   // Todas las consultas de acá abajo quedan atadas a este local.
   const idLocal = await idLocalActual();
@@ -58,7 +75,7 @@ export async function crearProducto(formData: FormData) {
   const precio = parseFloat(String(formData.get("precio") ?? "0"));
 
   if (!nombre || !categoryId || isNaN(precio)) {
-    throw new Error("Faltan datos obligatorios");
+    return { ok: false, error: "Faltan datos obligatorios" };
   }
 
   const producto = await prisma.product.create({
@@ -83,7 +100,10 @@ export async function crearProducto(formData: FormData) {
   redirect(`/admin/productos?categoria=${producto.categoryId}&guardado=1`);
 }
 
-export async function actualizarProducto(productId: string, formData: FormData) {
+export async function actualizarProducto(
+  productId: string,
+  formData: FormData
+): Promise<ResultadoProducto | void> {
   await exigirPermiso("productos.editar");
   // Todas las consultas de acá abajo quedan atadas a este local.
   const prisma = prismaDelLocal(await idLocalActual());
@@ -93,7 +113,7 @@ export async function actualizarProducto(productId: string, formData: FormData) 
   const precio = parseFloat(String(formData.get("precio") ?? "0"));
 
   if (!nombre || !categoryId || isNaN(precio)) {
-    throw new Error("Faltan datos obligatorios");
+    return { ok: false, error: "Faltan datos obligatorios" };
   }
 
   const mitadYMitadGrupo = String(formData.get("mitadYMitadGrupo") ?? "").trim() || null;
@@ -135,7 +155,10 @@ export async function eliminarProducto(productId: string) {
   redirect("/admin/productos");
 }
 
-export async function agregarOpcion(productId: string, formData: FormData) {
+export async function agregarOpcion(
+  productId: string,
+  formData: FormData
+): Promise<ResultadoProducto> {
   await exigirPermiso("productos.editar");
   // Todas las consultas de acá abajo quedan atadas a este local.
   const idLocal = await idLocalActual();
@@ -145,12 +168,13 @@ export async function agregarOpcion(productId: string, formData: FormData) {
   const tipo = String(formData.get("tipo") ?? "agregado");
   const precioExtra = parseFloat(String(formData.get("precioExtra") ?? "0")) || 0;
 
-  if (!nombre) throw new Error("El nombre de la opción es obligatorio");
+  if (!nombre) return { ok: false, error: "El nombre de la opción es obligatorio" };
 
   await prisma.productOption.create({
     data: { productId, nombre, tipo, precioExtra, storeId: idLocal },
   });
   revalidatePath(`/admin/productos/${productId}`);
+  return { ok: true };
 }
 
 export async function eliminarOpcion(productId: string, optionId: string) {

@@ -21,43 +21,54 @@ export type DatosReserva = {
   clienteEmail?: string;
 };
 
-export async function crearReserva(datos: DatosReserva): Promise<{ reservationId: string }> {
+export type ResultadoReserva =
+  | { ok: true; reservationId: string }
+  | { ok: false; error: string };
+
+/**
+ * Devuelve un resultado en vez de lanzar los errores de validación: Next.js
+ * oculta en producción el mensaje de cualquier `throw` que salga de una
+ * Server Action (lo cambia por un genérico "Server Components render...",
+ * por seguridad), así que el motivo real de una reserva rechazada solo
+ * llega si viaja en el valor de retorno, no en una excepción.
+ */
+export async function crearReserva(datos: DatosReserva): Promise<ResultadoReserva> {
   // El local se resuelve en el servidor desde el nombre de la URL.
   const local = await localPorSlug(datos.slug);
   const storeId = local.id;
 
   if (estaSuspendido(local)) {
-    throw new Error("Este menú no está tomando reservas en este momento.");
+    return { ok: false, error: "Este menú no está tomando reservas en este momento." };
   }
 
   if (!datos.clienteNombre?.trim() || !datos.clienteTelefono?.trim()) {
-    throw new Error("Faltan datos de contacto");
+    return { ok: false, error: "Faltan datos de contacto" };
   }
   if (!TURNOS.some((t) => t.value === datos.turno)) {
-    throw new Error("Turno inválido");
+    return { ok: false, error: "Turno inválido" };
   }
   if (!datos.horario?.trim()) {
-    throw new Error("Falta seleccionar el horario");
+    return { ok: false, error: "Falta seleccionar el horario" };
   }
   if (!datos.personas || datos.personas < 1) {
-    throw new Error("Cantidad de personas inválida");
+    return { ok: false, error: "Cantidad de personas inválida" };
   }
   if (!MOTIVOS_RESERVA.some((m) => m.value === datos.motivo)) {
-    throw new Error("Motivo inválido");
+    return { ok: false, error: "Motivo inválido" };
   }
 
   const fecha = fechaAsuncionDesdeTexto(datos.fecha);
-  if (!fecha) throw new Error("Fecha inválida");
+  if (!fecha) return { ok: false, error: "Fecha inválida" };
 
   // Nada de reservar para atrás: ni un día pasado, ni un horario de hoy
   // que ya transcurrió. Se compara siempre contra el reloj de Asunción.
   const ahora = new Date();
   const hoy = claveDiaAsuncion(ahora);
   if (datos.fecha < hoy) {
-    throw new Error("Esa fecha ya pasó. Elegí una fecha de hoy en adelante.");
+    return { ok: false, error: "Esa fecha ya pasó. Elegí una fecha de hoy en adelante." };
   }
   if (datos.fecha === hoy && datos.horario <= horaAsuncion(ahora)) {
-    throw new Error("Ese horario ya pasó. Elegí uno más tarde u otra fecha.");
+    return { ok: false, error: "Ese horario ya pasó. Elegí uno más tarde u otra fecha." };
   }
 
   // No se acepta una reserva para un día en que el local no abre, aunque el
@@ -66,15 +77,16 @@ export async function crearReserva(datos: DatosReserva): Promise<{ reservationId
   const cerrados = diasCerrados(horariosAtencion);
   const diaSemana = diaSemanaDeClave(datos.fecha);
   if (diaSemana != null && cerrados.includes(diaSemana)) {
-    throw new Error(
-      `Los ${NOMBRES_DIA[diaSemana].toLowerCase()} el local está cerrado. Elegí otra fecha.`
-    );
+    return {
+      ok: false,
+      error: `Los ${NOMBRES_DIA[diaSemana].toLowerCase()} el local está cerrado. Elegí otra fecha.`,
+    };
   }
 
   // Chequeo real del cupo. Se hace acá y no solo en el formulario porque
   // dos personas pueden estar reservando el mismo horario al mismo tiempo.
   const sinCupo = await motivoSinCupo(storeId, datos.fecha, datos.horario, datos.personas);
-  if (sinCupo) throw new Error(sinCupo);
+  if (sinCupo) return { ok: false, error: sinCupo };
 
   // Igual que con los pedidos: el número se toma recién cuando ya pasaron
   // todas las validaciones, para no dejar huecos por reservas rechazadas.
@@ -95,5 +107,5 @@ export async function crearReserva(datos: DatosReserva): Promise<{ reservationId
     },
   });
 
-  return { reservationId: reserva.id };
+  return { ok: true, reservationId: reserva.id };
 }

@@ -147,13 +147,19 @@ export async function crearLocal(formData: FormData): Promise<ResultadoAlta> {
   };
 }
 
+export type ResultadoPago = { ok: true } | { ok: false; error: string };
+
 /**
  * Registra un pago y reactiva el local.
  *
  * Guardar el historial y no solo el vencimiento vigente es lo que permite
  * responder "¿cuándo te pagué?" con un dato y no con la memoria de nadie.
+ *
+ * Devuelve un resultado en vez de lanzar los errores de validación: Next.js
+ * oculta en producción el mensaje de cualquier `throw` que salga de una
+ * Server Action, así que el motivo real solo llega si viaja en el retorno.
  */
-export async function registrarPago(storeId: string, formData: FormData) {
+export async function registrarPago(storeId: string, formData: FormData): Promise<ResultadoPago> {
   const sesion = await exigirSuperadmin();
 
   const meses = Math.max(1, Math.min(24, Number(formData.get("meses") ?? 1)));
@@ -161,14 +167,14 @@ export async function registrarPago(storeId: string, formData: FormData) {
   const nota = String(formData.get("nota") ?? "").trim() || null;
 
   if (!Number.isFinite(monto) || monto < 0) {
-    throw new Error("El monto no es válido");
+    return { ok: false, error: "El monto no es válido" };
   }
 
   const local = await prisma.store.findUnique({
     where: { id: storeId },
     select: { id: true, vencimiento: true },
   });
-  if (!local) throw new Error("Ese local no existe");
+  if (!local) return { ok: false, error: "Ese local no existe" };
 
   const cubreHasta = calcularNuevoVencimiento(local.vencimiento, meses);
 
@@ -193,10 +199,14 @@ export async function registrarPago(storeId: string, formData: FormData) {
 
   revalidatePath("/admin/super");
   revalidatePath("/[slug]", "layout");
+  return { ok: true };
 }
 
 /** Apagar o prender un local a mano, sin tocar su fecha de vencimiento. */
-export async function alternarSuspension(storeId: string, suspender: boolean) {
+export async function alternarSuspension(
+  storeId: string,
+  suspender: boolean
+): Promise<{ ok: true }> {
   await exigirSuperadmin();
 
   await prisma.store.update({
@@ -206,6 +216,7 @@ export async function alternarSuspension(storeId: string, suspender: boolean) {
 
   revalidatePath("/admin/super");
   revalidatePath("/[slug]", "layout");
+  return { ok: true };
 }
 
 /** Cambia el plan que figura para un local. Es solo una etiqueta tuya. */

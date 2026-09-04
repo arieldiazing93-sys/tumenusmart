@@ -42,6 +42,8 @@ export type DatosCheckout = {
   totalMostrado?: number;
 };
 
+export type ResultadoPedido = { ok: true; orderId: string } | { ok: false; error: string };
+
 /** Largos máximos de los textos libres, para que no entre una novela en la comanda. */
 const LARGO = { nombre: 80, telefono: 30, direccion: 200, notas: 500, razonSocial: 120, ruc: 30, email: 120 };
 
@@ -50,7 +52,14 @@ function recortar(valor: string | undefined, max: number): string | undefined {
   return limpio ? limpio.slice(0, max) : undefined;
 }
 
-export async function crearPedido(datos: DatosCheckout): Promise<{ orderId: string }> {
+/**
+ * Devuelve un resultado en vez de lanzar los errores de validación: Next.js
+ * oculta en producción el mensaje de cualquier `throw` que salga de una
+ * Server Action (lo cambia por un genérico "Server Components render...",
+ * por seguridad), así que el motivo real de un pedido rechazado solo llega
+ * si viaja en el valor de retorno, no en una excepción.
+ */
+export async function crearPedido(datos: DatosCheckout): Promise<ResultadoPedido> {
   // El local se resuelve en el servidor a partir del nombre en la URL: el
   // navegador dice a qué menú entró, pero nunca manda un identificador de
   // local que podamos usar a ciegas.
@@ -58,23 +67,26 @@ export async function crearPedido(datos: DatosCheckout): Promise<{ orderId: stri
   const storeId = local.id;
 
   if (estaSuspendido(local)) {
-    throw new Error("Este menú no está tomando pedidos en este momento.");
+    return { ok: false, error: "Este menú no está tomando pedidos en este momento." };
   }
 
   // Se vuelve a chequear acá, no solo en el formulario: si el local cerró o
   // pausó mientras el cliente completaba sus datos, el pedido no entra.
   const estadoTienda = await obtenerEstadoTienda(storeId);
   if (!estadoTienda.aceptaPedidos) {
-    throw new Error(motivoSinPedidos(estadoTienda) ?? "En este momento no se pueden tomar pedidos.");
+    return {
+      ok: false,
+      error: motivoSinPedidos(estadoTienda) ?? "En este momento no se pueden tomar pedidos.",
+    };
   }
 
   const clienteNombre = recortar(datos.clienteNombre, LARGO.nombre);
   const clienteTelefono = recortar(datos.clienteTelefono, LARGO.telefono);
   if (!clienteNombre || !clienteTelefono) {
-    throw new Error("Faltan datos de contacto");
+    return { ok: false, error: "Faltan datos de contacto" };
   }
   if (!Array.isArray(datos.items) || datos.items.length === 0) {
-    throw new Error("El carrito está vacío");
+    return { ok: false, error: "El carrito está vacío" };
   }
   // El pin del mapa es obligatorio para delivery; la referencia escrita, no.
   //
@@ -89,13 +101,13 @@ export async function crearPedido(datos: DatosCheckout): Promise<{ orderId: stri
     datos.tipoEntrega === "delivery" &&
     (datos.clienteLat == null || datos.clienteLng == null)
   ) {
-    throw new Error("Marcá tu ubicación en el mapa para poder entregarte el pedido");
+    return { ok: false, error: "Marcá tu ubicación en el mapa para poder entregarte el pedido" };
   }
   if (
     datos.comprobanteTipo === "factura" &&
     (!datos.facturaRazonSocial?.trim() || !datos.facturaRuc?.trim())
   ) {
-    throw new Error("Para factura hacen falta la razón social y el RUC");
+    return { ok: false, error: "Para factura hacen falta la razón social y el RUC" };
   }
 
   // ---------------------------------------------------------------- el precio
@@ -112,7 +124,7 @@ export async function crearPedido(datos: DatosCheckout): Promise<{ orderId: stri
     }
   }
   if (idsPedidos.size === 0) {
-    throw new Error("El carrito está vacío");
+    return { ok: false, error: "El carrito está vacío" };
   }
 
   // Los productos se buscan por local Y por categoría activa: uno de otro
@@ -142,7 +154,7 @@ export async function crearPedido(datos: DatosCheckout): Promise<{ orderId: stri
   }));
 
   const armado = armarPedido(catalogo, datos.items);
-  if (!armado.ok) throw new Error(armado.motivo);
+  if (!armado.ok) return { ok: false, error: armado.motivo };
 
   // El costo de envío SIEMPRE se recalcula acá (nunca se confía en lo que
   // mande el navegador), comparando la ubicación del cliente contra las
@@ -185,9 +197,11 @@ export async function crearPedido(datos: DatosCheckout): Promise<{ orderId: stri
   // de la base; esto es para que no le llegue un WhatsApp con otro total del
   // que vio en pantalla.
   if (datos.totalMostrado !== undefined && !totalSinCambios(total, datos.totalMostrado)) {
-    throw new Error(
-      "Los precios de este local se actualizaron mientras armabas el pedido. Revisá tu carrito antes de enviarlo."
-    );
+    return {
+      ok: false,
+      error:
+        "Los precios de este local se actualizaron mientras armabas el pedido. Revisá tu carrito antes de enviarlo.",
+    };
   }
 
   const customer = await prisma.customer.upsert({
@@ -238,5 +252,5 @@ export async function crearPedido(datos: DatosCheckout): Promise<{ orderId: stri
     },
   });
 
-  return { orderId: order.id };
+  return { ok: true, orderId: order.id };
 }

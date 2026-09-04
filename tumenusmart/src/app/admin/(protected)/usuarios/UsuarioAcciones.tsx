@@ -2,7 +2,12 @@
 
 import { clasesBoton } from "@/components/ui";
 import { useState, useTransition } from "react";
-import { alternarActivoUsuario, eliminarUsuario, restablecerPassword } from "./actions";
+import {
+  alternarActivoUsuario,
+  eliminarUsuario,
+  restablecerPassword,
+  type ResultadoAccion,
+} from "./actions";
 
 export function UsuarioAcciones({
   id,
@@ -20,15 +25,15 @@ export function UsuarioAcciones({
   const [password, setPassword] = useState("");
   const [aviso, setAviso] = useState<string | null>(null);
 
-  function correr(accion: () => Promise<unknown>, exito?: string) {
+  function correr(accion: () => Promise<ResultadoAccion>, exito?: string) {
     setAviso(null);
     iniciar(async () => {
-      try {
-        await accion();
-        if (exito) setAviso(exito);
-      } catch (err) {
-        setAviso(err instanceof Error ? err.message : "No se pudo completar");
+      const resultado = await accion();
+      if (!resultado.ok) {
+        setAviso(resultado.error);
+        return;
       }
+      if (exito) setAviso(exito);
     });
   }
 
