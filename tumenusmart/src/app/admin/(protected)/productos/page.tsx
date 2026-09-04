@@ -58,7 +58,17 @@ export default async function AdminProductosPage({
         <GuardadoToast />
       </Suspense>
 
-      <h1 className="mb-6 text-[1.4rem] font-semibold tracking-titular text-tinta">Productos</h1>
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-2">
+        <h1 className="text-[1.4rem] font-semibold tracking-titular text-tinta">Productos</h1>
+        <a
+          href="/admin/productos/imprimir"
+          target="_blank"
+          rel="noopener noreferrer"
+          className={clasesBoton("navegar", "sm")}
+        >
+          Ver reporte / PDF
+        </a>
+      </div>
 
       {categorias.length === 0 ? (
         <p className="mb-6 text-sm text-aviso">
@@ -74,7 +84,7 @@ export default async function AdminProductosPage({
                 className={`rounded-full border px-3 py-1.5 text-sm font-medium ${
                   categoriaActiva?.id === c.id
                     ? "border-brand bg-brand text-white"
-                    : "border-linea text-tinta-media hover:border-brand hover:text-brand"
+                    : "border-brand/30 bg-brand-light text-brand-texto hover:border-brand"
                 }`}
               >
                 {c.nombre}{" "}

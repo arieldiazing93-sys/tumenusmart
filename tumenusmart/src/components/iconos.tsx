@@ -99,6 +99,15 @@ export const IconoAnalytics = (p: Props) => (
   </Svg>
 );
 
+/** Ayuda: el signo de pregunta. */
+export const IconoAyuda = (p: Props) => (
+  <Svg {...p}>
+    <circle cx="12" cy="12" r="9" />
+    <path d="M9.3 9.3a2.7 2.7 0 1 1 3.9 2.4c-.7.4-1.2.9-1.2 1.8v.3" />
+    <path d="M12 17v.01" />
+  </Svg>
+);
+
 /** Configuración: las perillas. */
 export const IconoConfiguracion = (p: Props) => (
   <Svg {...p}>
@@ -191,6 +200,7 @@ export const ICONOS = {
   estadisticas: IconoEstadisticas,
   ideas: IconoIdeas,
   analytics: IconoAnalytics,
+  ayuda: IconoAyuda,
   configuracion: IconoConfiguracion,
   repartidores: IconoRepartidores,
   cierre: IconoCierre,

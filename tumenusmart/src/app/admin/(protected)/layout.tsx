@@ -76,6 +76,9 @@ function armarGrupos(hayIdeaSinVer: boolean, rol: string): GrupoSecciones[] {
           ver: conPermiso("empleados.gestionar") },
         // Mi cuenta la ve todo el mundo: es donde se cambia la contraseña.
         { href: "/admin/mi-cuenta", label: "Mi cuenta", icono: "cuenta" as const, ver: true },
+        // Ayuda también la ve todo el mundo: cualquiera puede terminar
+        // encargado de la computadora de la impresora, no solo el dueño.
+        { href: "/admin/ayuda", label: "Ayuda", icono: "ayuda" as const, ver: true },
       ],
     },
     {
