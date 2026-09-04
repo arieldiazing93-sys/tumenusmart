@@ -212,19 +212,32 @@ export async function crearZona(formData: FormData) {
   revalidatePath("/[slug]", "layout");
 }
 
-export async function eliminarZona(id: string) {
+/**
+ * Devuelve un resultado en vez de lanzar el error de "zona en uso".
+ *
+ * Next.js oculta en producción el mensaje de cualquier `throw` que salga de
+ * una Server Action — lo reemplaza por un genérico "Server Components
+ * render..." sin texto útil, por seguridad. Un valor de retorno no pasa por
+ * ese filtro: por eso el motivo de "no se puede borrar" viaja en el
+ * resultado, no en una excepción.
+ */
+export async function eliminarZona(
+  id: string
+): Promise<{ ok: true } | { ok: false; error: string }> {
   await exigirPermiso("configuracion.editar");
   const db = prismaDelLocal(await idLocalActual());
 
   const pedidosEnZona = await db.order.count({ where: { deliveryZoneId: id } });
   if (pedidosEnZona > 0) {
-    throw new Error(
-      `No se puede borrar: hay ${pedidosEnZona} pedido(s) que usan esta zona como parte de su historial. Si ya no la querés ofrecer, usá el botón "Desactivar" en vez de borrarla — así dejás de mostrarla a nuevos clientes pero conservás el historial de esos pedidos.`
-    );
+    return {
+      ok: false,
+      error: `No se puede borrar: hay ${pedidosEnZona} pedido(s) que usan esta zona como parte de su historial. Si ya no la querés ofrecer, usá el botón "Desactivar" en vez de borrarla — así dejás de mostrarla a nuevos clientes pero conservás el historial de esos pedidos.`,
+    };
   }
   await db.deliveryZone.delete({ where: { id } });
   revalidatePath("/admin/configuracion");
   revalidatePath("/[slug]", "layout");
+  return { ok: true };
 }
 
 export async function alternarActivaZona(id: string, activo: boolean) {

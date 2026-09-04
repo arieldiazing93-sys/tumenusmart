@@ -6,14 +6,22 @@ import { prisma } from "@/lib/prisma";
 import { prismaDelLocal } from "@/lib/prisma-local";
 import { idLocalActual } from "@/lib/local-actual";
 
+export type ResultadoCanje = { ok: true } | { ok: false; error: string };
+
 /**
  * Marca el premio de fidelización como entregado.
  *
  * El progreso se recalcula acá adentro, server-side — no se confía en lo que
  * mandó el botón del cliente, que solo sabe lo que vio en pantalla un
  * instante antes.
+ *
+ * Devuelve un resultado en vez de lanzar los errores de validación: Next.js
+ * oculta en producción el mensaje de cualquier `throw` que salga de una
+ * Server Action (lo cambia por un genérico "Server Components render...",
+ * por seguridad), así que el motivo real solo llega si viaja en el valor de
+ * retorno, no en una excepción.
  */
-export async function registrarCanjeFidelidad(telefono: string): Promise<void> {
+export async function registrarCanjeFidelidad(telefono: string): Promise<ResultadoCanje> {
   await exigirPermiso("fidelizacion.gestionar");
   const storeId = await idLocalActual();
   const db = prismaDelLocal(storeId);
@@ -23,7 +31,7 @@ export async function registrarCanjeFidelidad(telefono: string): Promise<void> {
     select: { fidelizacionActiva: true, fidelizacionUmbral: true },
   });
   if (!store?.fidelizacionActiva) {
-    throw new Error("La fidelización no está activa para este local.");
+    return { ok: false, error: "La fidelización no está activa para este local." };
   }
 
   // Plain `prisma`, no `prismaDelLocal`: la clave compuesta storeId_telefono
@@ -32,14 +40,14 @@ export async function registrarCanjeFidelidad(telefono: string): Promise<void> {
     where: { storeId_telefono: { storeId, telefono } },
   });
   if (!customer) {
-    throw new Error("No encontré a ese cliente.");
+    return { ok: false, error: "No encontré a ese cliente." };
   }
 
   const entregados = await db.order.count({
     where: { clienteTelefono: telefono, estado: "entregado" },
   });
   if (entregados - customer.pedidosCanjeados < store.fidelizacionUmbral) {
-    throw new Error("Este cliente todavía no llegó al umbral del premio.");
+    return { ok: false, error: "Este cliente todavía no llegó al umbral del premio." };
   }
 
   // Se SUMA el umbral y no se iguala al total entregado: si hizo 12 pedidos
@@ -55,7 +63,8 @@ export async function registrarCanjeFidelidad(telefono: string): Promise<void> {
     data: { pedidosCanjeados: { increment: store.fidelizacionUmbral } },
   });
   if (resultado.count === 0) {
-    throw new Error("Este cliente se actualizó justo ahora — volvé a intentar.");
+    return { ok: false, error: "Este cliente se actualizó justo ahora — volvé a intentar." };
   }
   revalidatePath("/admin/analytics");
+  return { ok: true };
 }

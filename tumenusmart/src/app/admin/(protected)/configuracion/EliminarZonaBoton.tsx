@@ -9,16 +9,13 @@ export function EliminarZonaBoton({ id, activo }: { id: string; activo: boolean 
   function borrar() {
     if (!confirm("¿Borrar esta zona? No se puede deshacer.")) return;
     startTransition(async () => {
-      try {
-        await eliminarZona(id);
-      } catch (err) {
-        // alert() y no un texto en la pantalla: el mensaje explica por qué no
-        // se puede borrar y qué hacer en su lugar, y es demasiado largo para
-        // meterlo apretado al lado del botón sin que se lea como una franja
-        // de texto chico ilegible. Un diálogo nativo se lee siempre entero,
-        // sea cual sea el ancho de pantalla.
-        alert(err instanceof Error ? err.message : "No se pudo borrar.");
-      }
+      // alert() y no un texto en la pantalla: el mensaje explica por qué no
+      // se puede borrar y qué hacer en su lugar, y es demasiado largo para
+      // meterlo apretado al lado del botón sin que se lea como una franja
+      // de texto chico ilegible. Un diálogo nativo se lee siempre entero,
+      // sea cual sea el ancho de pantalla.
+      const resultado = await eliminarZona(id);
+      if (!resultado.ok) alert(resultado.error);
     });
   }
 

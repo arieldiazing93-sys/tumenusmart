@@ -9,11 +9,8 @@ export function CanjearFidelidadBoton({ telefono, premio }: { telefono: string; 
   function canjear() {
     if (!confirm(`¿Marcar como entregado el premio "${premio}"?`)) return;
     startTransition(async () => {
-      try {
-        await registrarCanjeFidelidad(telefono);
-      } catch (err) {
-        alert(err instanceof Error ? err.message : "No se pudo registrar el canje.");
-      }
+      const resultado = await registrarCanjeFidelidad(telefono);
+      if (!resultado.ok) alert(resultado.error);
     });
   }
 
