@@ -10,6 +10,7 @@ import { SeguimientoTracker } from "@/components/SeguimientoTracker";
 import { Tarjeta, Aviso } from "@/components/ui";
 import { BotonWhatsapp } from "./BotonWhatsapp";
 import { localPorSlug } from "@/lib/local-por-slug";
+import { progresoDeCliente } from "@/lib/fidelidad";
 
 export const dynamic = "force-dynamic";
 
@@ -76,6 +77,11 @@ export default async function SeguimientoPedidoPage({
   const actual = indicePaso(order.estado, order.tipoEntrega);
   const finalizado = order.estado === "entregado";
 
+  const progresoFidelidad = store.fidelizacionActiva
+    ? await progresoDeCliente(store.id, order.clienteTelefono, store.fidelizacionUmbral)
+    : null;
+  const nombrePremio = store.fidelizacionPremio || "un premio especial";
+
   return (
     <main className="mx-auto max-w-2xl px-4 py-10">
       {/* Mientras el pedido sigue en curso, la pantalla se actualiza sola. */}
@@ -114,6 +120,21 @@ export default async function SeguimientoPedidoPage({
       ) : (
         <div className="mb-8">
           <SeguimientoTracker pasos={pasos} actual={actual} finalizado={finalizado} />
+        </div>
+      )}
+
+      {progresoFidelidad && (
+        <div className="mb-8">
+          {progresoFidelidad.listo ? (
+            <Aviso titulo="¡Llegaste a tu premio!" color="exito">
+              Mostrale esto al local: {nombrePremio}.
+            </Aviso>
+          ) : (
+            <Aviso titulo="Fidelización" color="marca">
+              Te faltan {store.fidelizacionUmbral - progresoFidelidad.progreso} pedidos
+              entregados para tu premio: {nombrePremio}.
+            </Aviso>
+          )}
         </div>
       )}
 

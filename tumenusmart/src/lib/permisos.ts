@@ -44,6 +44,7 @@ export type Permiso =
   | "analytics.ver"
   | "configuracion.editar"
   | "empleados.gestionar"
+  | "fidelizacion.gestionar"
   // --- administración de la cartera ---
   | "cartera.gestionar"
   | "usuarios.gestionar";
@@ -96,6 +97,7 @@ const PERMISOS_LOCAL: Permiso[] = [
   "analytics.ver",
   "configuracion.editar",
   "empleados.gestionar",
+  "fidelizacion.gestionar",
 ];
 
 const POR_ROL: Record<Rol, Permiso[]> = {

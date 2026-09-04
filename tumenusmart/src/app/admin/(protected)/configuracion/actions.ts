@@ -73,6 +73,23 @@ export async function guardarMensajePausa(mensaje: string): Promise<void> {
   refrescarPantallas();
 }
 
+export async function guardarFidelizacion(formData: FormData): Promise<void> {
+  await exigirPermiso("fidelizacion.gestionar");
+  const activa = formData.get("fidelizacionActiva") === "on";
+  const umbralCrudo = parseInt(String(formData.get("fidelizacionUmbral") ?? "10"), 10);
+  // Rango acotado para filtrar errores de tipeo (un 0 o un 99999 no tienen
+  // sentido como cantidad de pedidos para un premio).
+  const umbral = Math.max(1, Math.min(50, Number.isFinite(umbralCrudo) ? umbralCrudo : 10));
+  const premio = String(formData.get("fidelizacionPremio") ?? "").trim() || null;
+
+  await prisma.store.update({
+    where: { id: await idLocalActual() },
+    data: { fidelizacionActiva: activa, fidelizacionUmbral: umbral, fidelizacionPremio: premio },
+  });
+  refrescarPantallas();
+  revalidatePath("/admin/analytics");
+}
+
 export async function agregarTramoHorario(formData: FormData) {
   await exigirPermiso("configuracion.editar");
   const idLocal = await idLocalActual();

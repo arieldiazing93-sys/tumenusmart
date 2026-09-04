@@ -1,12 +1,15 @@
 import Link from "next/link";
 import { pantallaConPermiso } from "@/lib/auth";
 import { idLocalActual } from "@/lib/local-actual";
+import { prisma } from "@/lib/prisma";
 import { calcularRangoFecha, type FiltroFecha } from "@/lib/rango-fecha";
 import { calcularClientesDelRango, calcularDistribucionFrecuencia } from "@/lib/clientes-analytics";
+import { calcularProgresoFidelidad } from "@/lib/fidelidad";
 import { Cabecera, Cifra, clasesBoton } from "@/components/ui";
 import { formatearGuarani } from "@/lib/format";
 import { ZONA_NEGOCIO } from "@/lib/timezone";
 import { linkWhatsappCliente } from "@/lib/whatsapp";
+import { CanjearFidelidadBoton } from "./CanjearFidelidadBoton";
 
 export const dynamic = "force-dynamic";
 
@@ -41,9 +44,22 @@ export default async function AnalyticsPage({
     calcularRangoFecha("30dias", undefined, undefined)!;
 
   const storeId = await idLocalActual();
-  const clientes = await calcularClientesDelRango(storeId, rango);
+  const [clientes, store] = await Promise.all([
+    calcularClientesDelRango(storeId, rango),
+    prisma.store.findUnique({
+      where: { id: storeId },
+      select: { fidelizacionActiva: true, fidelizacionUmbral: true, fidelizacionPremio: true },
+    }),
+  ]);
   const distribucion = calcularDistribucionFrecuencia(clientes);
   const top = clientes.slice(0, TOPE_TABLA);
+
+  const fidelizacionActiva = store?.fidelizacionActiva ?? false;
+  const umbral = store?.fidelizacionUmbral ?? 10;
+  const premio = store?.fidelizacionPremio ?? "";
+  const progresoFidelidad = fidelizacionActiva
+    ? await calcularProgresoFidelidad(storeId, umbral)
+    : null;
 
   return (
     <div>
@@ -120,11 +136,21 @@ export default async function AnalyticsPage({
                 <th className="px-3 py-2 text-right">Pedidos</th>
                 <th className="px-3 py-2 text-right">Gasto total</th>
                 <th className="px-3 py-2 text-right">Último pedido</th>
+                {fidelizacionActiva && (
+                  <th className="px-3 py-2 text-right">
+                    Fidelización
+                    <span className="block text-[0.65rem] normal-case text-tinta-suave">
+                      pedidos entregados de siempre
+                    </span>
+                  </th>
+                )}
                 <th className="px-3 py-2 text-center">Escribir</th>
               </tr>
             </thead>
             <tbody>
-              {top.map((c, i) => (
+              {top.map((c, i) => {
+                const progreso = progresoFidelidad?.get(c.telefono);
+                return (
                 <tr key={c.telefono} className="border-b border-linea-fina last:border-0">
                   <td className="px-3 py-2 font-semibold text-tinta-suave">{i + 1}</td>
                   <td className="px-3 py-2 font-medium text-tinta">{c.nombre}</td>
@@ -136,6 +162,22 @@ export default async function AnalyticsPage({
                   <td className="px-3 py-2 text-right text-tinta-suave">
                     {fechaCorta(c.ultimoPedido)}
                   </td>
+                  {fidelizacionActiva && (
+                    <td className="px-3 py-2 text-right">
+                      {progreso ? (
+                        <div className="flex flex-col items-end gap-0.5">
+                          <span className="cifra text-tinta-media">
+                            {progreso.progreso}/{umbral}
+                          </span>
+                          {progreso.listo && (
+                            <CanjearFidelidadBoton telefono={c.telefono} premio={premio} />
+                          )}
+                        </div>
+                      ) : (
+                        <span className="cifra text-tinta-suave">0/{umbral}</span>
+                      )}
+                    </td>
+                  )}
                   <td className="px-3 py-2 text-center">
                     {/* Sin mensaje precargado a propósito: el dueño decide qué
                         escribirle, no el sistema. */}
@@ -150,7 +192,8 @@ export default async function AnalyticsPage({
                     </a>
                   </td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         </div>

@@ -43,6 +43,13 @@ model Store {
   pedidosPausados Boolean @default(false)
   mensajePausa    String? // motivo opcional que ve el cliente al entrar
 
+  // --- Fidelización ---
+  // Cada N pedidos ENTREGADOS del mismo cliente suman uno para un premio.
+  // Sin niveles ni puntos: un umbral y un premio en texto libre.
+  fidelizacionActiva Boolean @default(false)
+  fidelizacionUmbral Int     @default(10)
+  fidelizacionPremio String?
+
   // --- Suscripción ---
   // "activo" atiende con normalidad. "suspendido" apaga el menú público
   // pero conserva todo. "prueba" es igual que activo, sirve para saber
@@ -355,6 +362,12 @@ model Customer {
   telefono  String
   orders    Order[]
   createdAt DateTime @default(now())
+
+  // Pedidos entregados de este cliente ya "gastados" en un premio anterior.
+  // No se resetea el conteo de pedidos entregados: se SUMA el umbral acá
+  // cada vez que se entrega un premio, para no perder los pedidos de más
+  // que hizo antes de que alguien marcara el canje.
+  pedidosCanjeados Int @default(0)
 
   // El mismo número puede ser cliente de dos locales distintos: son
   // personas distintas para cada negocio.

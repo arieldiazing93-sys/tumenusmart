@@ -4,7 +4,7 @@ import Link from "next/link";
 import { prismaDelLocal } from "@/lib/prisma-local";
 import { idLocalActual } from "@/lib/local-actual";
 import { formatearGuarani } from "@/lib/format";
-import { actualizarStore, crearZona } from "./actions";
+import { actualizarStore, crearZona, guardarFidelizacion } from "./actions";
 import { EliminarZonaBoton } from "./EliminarZonaBoton";
 import { StoreLocationField } from "./StoreLocationField";
 import { LogoField } from "./LogoField";
@@ -271,6 +271,54 @@ export default async function AdminConfiguracionPage() {
             )}
           </div>
         </div>
+      </div>
+
+      <div>
+        <h1 className="mb-1 text-[1.4rem] font-semibold tracking-titular text-tinta">Fidelización</h1>
+        <p className="mb-4 text-sm text-tinta-media">
+          Cada N pedidos entregados de un mismo cliente le dan derecho a un premio.
+          Solo cuenta pedidos hechos por acá — delivery o retiro.
+        </p>
+        <form action={guardarFidelizacion} className="flex flex-col gap-3">
+          <label className="flex items-center gap-2 text-sm font-medium text-tinta-media">
+            <input
+              type="checkbox"
+              name="fidelizacionActiva"
+              defaultChecked={store?.fidelizacionActiva ?? false}
+            />
+            Activar programa de fidelización
+          </label>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-tinta-media">
+              Pedidos entregados para ganar el premio
+            </label>
+            <input
+              type="number"
+              name="fidelizacionUmbral"
+              min={1}
+              max={50}
+              defaultValue={store?.fidelizacionUmbral ?? 10}
+              className="w-full rounded-lg border border-linea px-3 py-2 sm:w-40"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-tinta-media">
+              Premio (lo que le vas a dar cuando llegue)
+            </label>
+            <input
+              name="fidelizacionPremio"
+              defaultValue={store?.fidelizacionPremio ?? ""}
+              placeholder="Ej: 1 empanada gratis"
+              className="w-full rounded-lg border border-linea px-3 py-2"
+            />
+          </div>
+          <button
+            type="submit"
+            className={`self-start ${clasesBoton("principal")}`}
+          >
+            Guardar
+          </button>
+        </form>
       </div>
 
       <div>
