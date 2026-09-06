@@ -127,12 +127,12 @@ export default async function SeguimientoPedidoPage({
         <div className="mb-8">
           {progresoFidelidad.listo ? (
             <Aviso titulo="¡Llegaste a tu premio!" color="exito">
-              Mostrale esto al local: {nombrePremio}.
+              Mostrale esto al local: <strong className="font-semibold text-exito">{nombrePremio}</strong>.
             </Aviso>
           ) : (
             <Aviso titulo="Fidelización" color="marca">
               Te faltan {store.fidelizacionUmbral - progresoFidelidad.progreso} pedidos
-              entregados para tu premio: {nombrePremio}.
+              entregados para tu premio: <strong className="font-semibold text-exito">{nombrePremio}</strong>.
             </Aviso>
           )}
         </div>
