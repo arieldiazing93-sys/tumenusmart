@@ -180,12 +180,14 @@ export function MitadYMitadPicker({ grupoNombre, productos }: Props) {
         </div>
       )}
 
-      <div className="mt-3 flex items-center justify-between">
-        <span className="cifra font-semibold">
-          {precioTotal != null ? formatearGuarani(precioTotal) : "—"}
-        </span>
+      <div className="mt-3 flex items-center justify-between gap-3">
+        {precioTotal != null ? (
+          <span className="cifra font-semibold">{formatearGuarani(precioTotal)}</span>
+        ) : (
+          <span className="text-[0.78rem] text-tinta-suave">Elegí las dos mitades</span>
+        )}
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-none items-center gap-3">
           <div className="flex items-center rounded-lg border border-linea bg-white">
             <button
               type="button"
