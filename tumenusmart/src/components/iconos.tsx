@@ -108,6 +108,15 @@ export const IconoAyuda = (p: Props) => (
   </Svg>
 );
 
+/** Rentabilidad: el símbolo de porcentaje, para lo que cuenta margen y no solo venta. */
+export const IconoRentabilidad = (p: Props) => (
+  <Svg {...p}>
+    <path d="M18 6 6 18" />
+    <circle cx="7.5" cy="7.5" r="2" />
+    <circle cx="16.5" cy="16.5" r="2" />
+  </Svg>
+);
+
 /** Configuración: las perillas. */
 export const IconoConfiguracion = (p: Props) => (
   <Svg {...p}>
@@ -200,6 +209,7 @@ export const ICONOS = {
   estadisticas: IconoEstadisticas,
   ideas: IconoIdeas,
   analytics: IconoAnalytics,
+  rentabilidad: IconoRentabilidad,
   ayuda: IconoAyuda,
   configuracion: IconoConfiguracion,
   repartidores: IconoRepartidores,

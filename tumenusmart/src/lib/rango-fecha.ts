@@ -14,6 +14,7 @@ export type FiltroFecha =
   | "45dias"
   | "60dias"
   | "mes"
+  | "mesAnterior"
   | "rango";
 
 function sumarDias(fecha: Date, dias: number): Date {
@@ -45,6 +46,13 @@ export function calcularRangoFecha(
       return { gte: sumarDias(inicioHoy, -59), lt: sumarDias(inicioHoy, 1) };
     case "mes":
       return { gte: inicioDeMesEnAsuncion(ahora), lt: inicioDeMesSiguienteEnAsuncion(ahora) };
+    case "mesAnterior": {
+      const inicioMesActual = inicioDeMesEnAsuncion(ahora);
+      // Cualquier día del mes de atrás alcanza como referencia — se usa el
+      // último día del mes anterior, que es el día justo antes de hoy-1.
+      const unDiaDelMesAnterior = sumarDias(inicioMesActual, -1);
+      return { gte: inicioDeMesEnAsuncion(unDiaDelMesAnterior), lt: inicioMesActual };
+    }
     case "rango": {
       if (!desde || !hasta) return null;
       const inicio = fechaAsuncionDesdeTexto(desde);
