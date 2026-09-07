@@ -127,7 +127,7 @@ export function MitadYMitadPicker({ grupoNombre, productos }: Props) {
             setIdA(e.target.value);
             setAgregadosIds([]);
           }}
-          className="flex-1 rounded-lg border border-linea bg-white px-3 py-2 text-[0.88rem] focus:border-brand focus:outline-none"
+          className="min-w-0 flex-1 rounded-lg border border-linea bg-white px-3 py-2 text-[0.88rem] focus:border-brand focus:outline-none"
         >
           <option value="">Mitad 1...</option>
           {productos.map((p) => (
@@ -142,7 +142,7 @@ export function MitadYMitadPicker({ grupoNombre, productos }: Props) {
             setIdB(e.target.value);
             setAgregadosIds([]);
           }}
-          className="flex-1 rounded-lg border border-linea bg-white px-3 py-2 text-[0.88rem] focus:border-brand focus:outline-none"
+          className="min-w-0 flex-1 rounded-lg border border-linea bg-white px-3 py-2 text-[0.88rem] focus:border-brand focus:outline-none"
         >
           <option value="">Mitad 2...</option>
           {productos.map((p) => (
