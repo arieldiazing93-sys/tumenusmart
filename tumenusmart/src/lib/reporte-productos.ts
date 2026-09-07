@@ -112,7 +112,7 @@ export async function calcularReporteProductosVendidos(
 
   const categoriasMap = new Map<
     string,
-    Omit<CategoriaReporte, "totalCosto" | "totalGanancia"> & {
+    Omit<CategoriaReporte, "totalCosto" | "totalGanancia" | "totalVenta"> & {
       totalCostoConocido: number;
       hayAlgunCosto: boolean;
       orden: number;
