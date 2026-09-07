@@ -107,6 +107,14 @@ seccion("3. Cómo se muestra el estado");
     est(enAsuncion("2026-09-22T00:00:00")).clase);
   afirmar("faltando 30 dias esta al dia", est(enAsuncion("2026-10-20T00:00:00")).clase === "al_dia");
   afirmar("pasado el corte esta vencido", est(enAsuncion("2026-09-10T00:00:00")).clase === "vencido");
+  // El cron de cobranza (suspender-vencidos) escribe estado="vencido", NO
+  // "suspendido" — si compartieran el mismo valor, un cliente que dejó de
+  // pagar se vería en la cartera como uno que el dueño apagó a mano, sin
+  // contador de días vencido y con menos prioridad de cobranza.
+  afirmar("estado 'vencido' (el que pone el cron) SIGUE contando los dias, no lo tapa",
+    est(enAsuncion("2026-09-10T00:00:00"), "vencido").clase === "vencido" &&
+    est(enAsuncion("2026-09-10T00:00:00"), "vencido").etiqueta.includes("hace"),
+    JSON.stringify(est(enAsuncion("2026-09-10T00:00:00"), "vencido")));
   afirmar("dice 'Vence manana' cuando corresponde",
     est(enAsuncion("2026-09-20T00:00:00")).etiqueta === "Vence mañana",
     est(enAsuncion("2026-09-20T00:00:00")).etiqueta);

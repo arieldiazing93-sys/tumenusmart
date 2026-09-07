@@ -44,12 +44,16 @@ export async function localPorSlug(slug: string) {
 export type Local = Awaited<ReturnType<typeof localPorSlug>>;
 
 /**
- * Un local suspendido conserva todos sus datos pero deja de atender al
- * público. El aviso al cliente es neutro a propósito: nunca dice que el
- * negocio no pagó — eso lo expondría frente a sus propios clientes.
+ * Un local suspendido (a mano o por falta de pago) conserva todos sus datos
+ * pero deja de atender al público. El aviso al cliente es neutro a
+ * propósito: nunca dice que el negocio no pagó — eso lo expondría frente a
+ * sus propios clientes.
  */
 export function estaSuspendido(local: { estado: string; vencimiento: Date | null }): boolean {
-  if (local.estado === "suspendido") return true;
+  // "suspendido" = lo apagaste vos a mano. "vencido" = lo apagó solo el cron
+  // de cobranza. Son dos causas distintas del mismo bloqueo — separadas para
+  // que el panel de cartera pueda distinguirlas (ver suspender-vencidos).
+  if (local.estado === "suspendido" || local.estado === "vencido") return true;
   // El corte lo decide una sola regla, compartida con el panel de cobranza:
   // la fecha significa "pagado hasta ese día inclusive". Comparar la fecha a
   // secas apagaría el local al EMPEZAR el día que pagó, no al terminarlo.

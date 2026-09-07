@@ -55,9 +55,14 @@ model Store {
   fidelizacionMontoMinimo Int?
 
   // --- Suscripción ---
-  // "activo" atiende con normalidad. "suspendido" apaga el menú público
-  // pero conserva todo. "prueba" es igual que activo, sirve para saber
-  // que todavía no pagó nunca.
+  // "activo" atiende con normalidad. "prueba" es igual que activo, sirve
+  // para saber que todavía no pagó nunca. "suspendido" y "vencido" apagan
+  // el menú público (ver estaSuspendido) pero conservan todo — son la
+  // MISMA acción por dos causas distintas: "suspendido" lo apagaste vos a
+  // mano (alternarSuspension); "vencido" lo apagó solo el cron diario por
+  // falta de pago (suspender-vencidos). Separados para que el panel de
+  // cartera pueda avisarte de uno y no del otro — antes compartían el mismo
+  // valor y un cliente vencido se veía igual que uno que vos apagaste.
   estado         String    @default("activo")
   vencimiento    DateTime?
   plan           String    @default("basico")

@@ -17,7 +17,18 @@ export const maxDuration = 60;
  * el problema es entre vos y el dueño, no algo que haya que exponerle a quien
  * quería pedir una pizza.
  *
- * Es idempotente: un local ya suspendido no se vuelve a tocar.
+ * El estado que deja acá es "vencido", NO "suspendido" — son dos apagados
+ * distintos y antes se guardaban igual. "suspendido" es la única manija que
+ * usa `alternarSuspension` para un apagado A MANO. Si esta tarea también
+ * escribiera "suspendido", el panel de cartera (`estadoSuscripcion`) ya no
+ * podía distinguir "vos lo apagaste" de "se venció solo" — el cliente que
+ * dejó de pagar pasaba a verse como uno que apagaste vos a propósito, perdía
+ * el contador de días vencido y bajaba de prioridad en la lista de cobranza,
+ * justo el que más urgía llamar. `estaSuspendido()` (la puerta de la carta
+ * pública) igual lo sigue bloqueando: ese chequeo mira la fecha de
+ * vencimiento en forma independiente del valor de `estado`.
+ *
+ * Es idempotente: un local ya suspendido o ya vencido no se vuelve a tocar.
  */
 export async function GET(request: NextRequest) {
   const noAutorizado = revisarClave(request);
@@ -30,7 +41,7 @@ export async function GET(request: NextRequest) {
   // las dos reglas se irían separando y un local quedaría apagado en un lado
   // y abierto en el otro.
   const candidatos = await prisma.store.findMany({
-    where: { estado: { not: "suspendido" }, vencimiento: { not: null } },
+    where: { estado: { notIn: ["suspendido", "vencido"] }, vencimiento: { not: null } },
     select: { id: true, nombre: true, slug: true, vencimiento: true },
   });
 
@@ -39,7 +50,7 @@ export async function GET(request: NextRequest) {
   if (aApagar.length > 0) {
     await prisma.store.updateMany({
       where: { id: { in: aApagar.map((c) => c.id) } },
-      data: { estado: "suspendido" },
+      data: { estado: "vencido" },
     });
   }
 
