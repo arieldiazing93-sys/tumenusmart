@@ -114,16 +114,17 @@ export default async function ProductosVendidosPage({
       ) : (
         <>
           <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <TarjetaTotal etiqueta="Unidades vendidas" valor={String(reporte.totalGeneral.cantidad)} />
-            <TarjetaTotal etiqueta="Venta total" valor={formatearGuarani(Math.round(reporte.totalGeneral.venta))} />
+            <TarjetaTotal color="volumen" etiqueta="Unidades vendidas" valor={String(reporte.totalGeneral.cantidad)} />
+            <TarjetaTotal color="dinero" etiqueta="Venta total" valor={formatearGuarani(Math.round(reporte.totalGeneral.venta))} />
             <TarjetaTotal
+              color="costo"
               etiqueta="Costo total"
               valor={reporte.totalGeneral.costo != null ? formatearGuarani(Math.round(reporte.totalGeneral.costo)) : "—"}
             />
             <TarjetaTotal
+              color="ganancia"
               etiqueta="Ganancia total"
               valor={reporte.totalGeneral.ganancia != null ? formatearGuarani(Math.round(reporte.totalGeneral.ganancia)) : "—"}
-              destacada
             />
           </div>
 
@@ -192,31 +193,35 @@ export default async function ProductosVendidosPage({
   );
 }
 
+// Mismo criterio que en Estadísticas: el color agrupa por significado, no
+// decora. Volumen (azul) es cuánto se movió. Dinero (verde) es lo que entró.
+// Costo (ámbar) es lo que salió — atención, no error, por eso no es rojo.
+// Ganancia (verde fuerte) es la única que importa de verdad en esta
+// pantalla, así que se destaca más que el resto.
+const COLORES_TOTAL = {
+  volumen: { caja: "border-azul/25 bg-azul-luz", rotulo: "text-azul-oscuro", cifra: "text-azul-oscuro" },
+  dinero: { caja: "border-exito/25 bg-exito-luz", rotulo: "text-exito", cifra: "text-exito" },
+  costo: { caja: "border-aviso/30 bg-aviso-luz", rotulo: "text-aviso", cifra: "text-aviso" },
+  // Fondo sólido y no el mismo verde tenue de "Venta total": es el único
+  // número por el que existe esta pantalla, tiene que ganarle al resto de
+  // un vistazo, no confundirse con "venta" por usar el mismo tono.
+  ganancia: { caja: "border-exito bg-exito", rotulo: "text-white/80", cifra: "text-white" },
+} as const;
+
 function TarjetaTotal({
   etiqueta,
   valor,
-  destacada,
+  color,
 }: {
   etiqueta: string;
   valor: string;
-  destacada?: boolean;
+  color: keyof typeof COLORES_TOTAL;
 }) {
+  const c = COLORES_TOTAL[color];
   return (
-    <div
-      className={`rounded-xl border p-4 ${
-        destacada ? "border-exito/25 bg-exito-luz" : "border-linea bg-white"
-      }`}
-    >
-      <p
-        className={`text-[0.68rem] font-semibold uppercase tracking-rotulo ${
-          destacada ? "text-exito" : "text-tinta-media"
-        }`}
-      >
-        {etiqueta}
-      </p>
-      <p className={`cifra mt-1.5 text-[1.3rem] font-semibold leading-none ${destacada ? "text-exito" : "text-tinta"}`}>
-        {valor}
-      </p>
+    <div className={`rounded-xl border p-4 ${c.caja}`}>
+      <p className={`text-[0.68rem] font-semibold uppercase tracking-rotulo ${c.rotulo}`}>{etiqueta}</p>
+      <p className={`cifra mt-1.5 text-[1.3rem] font-semibold leading-none ${c.cifra}`}>{valor}</p>
     </div>
   );
 }
