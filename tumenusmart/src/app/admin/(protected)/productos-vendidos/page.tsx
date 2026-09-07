@@ -43,14 +43,22 @@ export default async function ProductosVendidosPage({
         titulo="Rentabilidad"
         bajada="Qué se vendió, por categoría, con el margen de cada producto — para saber qué te conviene empujar y qué te está regalando plata."
         acciones={
-          <a
-            href={`/admin/productos-vendidos/imprimir?${querystringActual()}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className={clasesBoton("navegar", "sm")}
-          >
-            Ver reporte / PDF
-          </a>
+          <>
+            <a
+              href={`/admin/productos-vendidos/exportar?${querystringActual()}`}
+              className={clasesBoton("principal", "sm")}
+            >
+              Descargar Excel
+            </a>
+            <a
+              href={`/admin/productos-vendidos/imprimir?${querystringActual()}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={clasesBoton("navegar", "sm")}
+            >
+              Ver reporte / PDF
+            </a>
+          </>
         }
       />
 
