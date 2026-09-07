@@ -258,6 +258,24 @@ export default async function AdminConfiguracionPage() {
               className="w-full rounded-lg border border-linea px-3 py-2"
             />
           </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-tinta-media">
+              Monto mínimo del pedido para que sume (opcional)
+            </label>
+            <input
+              type="number"
+              name="fidelizacionMontoMinimo"
+              min={0}
+              step={1000}
+              defaultValue={store?.fidelizacionMontoMinimo ?? ""}
+              placeholder="Ej: 50000 — dejalo vacío para no exigir un mínimo"
+              className="w-full rounded-lg border border-linea px-3 py-2 sm:w-64"
+            />
+            <p className="mt-1 text-xs text-tinta-suave">
+              Un pedido que no llega a este monto se entrega igual, pero no suma sello — así un
+              pedido muy chico no le gana el premio solo.
+            </p>
+          </div>
           <button
             type="submit"
             className={`self-start ${clasesBoton("principal")}`}

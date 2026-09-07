@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { prismaDelLocal } from "@/lib/prisma-local";
 import { idLocalActual } from "@/lib/local-actual";
+import { dondeEntregado } from "@/lib/fidelidad";
 
 export type ResultadoCanje = { ok: true } | { ok: false; error: string };
 
@@ -28,7 +29,7 @@ export async function registrarCanjeFidelidad(telefono: string): Promise<Resulta
 
   const store = await prisma.store.findUnique({
     where: { id: storeId },
-    select: { fidelizacionActiva: true, fidelizacionUmbral: true },
+    select: { fidelizacionActiva: true, fidelizacionUmbral: true, fidelizacionMontoMinimo: true },
   });
   if (!store?.fidelizacionActiva) {
     return { ok: false, error: "La fidelización no está activa para este local." };
@@ -44,7 +45,7 @@ export async function registrarCanjeFidelidad(telefono: string): Promise<Resulta
   }
 
   const entregados = await db.order.count({
-    where: { clienteTelefono: telefono, estado: "entregado" },
+    where: { clienteTelefono: telefono, ...dondeEntregado(store.fidelizacionMontoMinimo) },
   });
   if (entregados - customer.pedidosCanjeados < store.fidelizacionUmbral) {
     return { ok: false, error: "Este cliente todavía no llegó al umbral del premio." };

@@ -9,6 +9,26 @@ export type ProgresoFidelidad = {
   listo: boolean;
 };
 
+export type OpcionesFidelidad = {
+  umbral: number;
+  /** Nulo o sin definir: cualquier pedido entregado suma, sin mínimo. */
+  montoMinimo?: number | null;
+};
+
+/**
+ * El `where` de "pedido que cuenta para la fidelización": entregado, y si
+ * hay un monto mínimo configurado, que el total lo alcance. Existe una sola
+ * vez acá para que las dos funciones de abajo apliquen exactamente la misma
+ * regla — un pedido de Gs. 5.000 no puede sumar sello en una pantalla y no
+ * sumar en la otra.
+ */
+export function dondeEntregado(montoMinimo?: number | null) {
+  return {
+    estado: "entregado" as const,
+    ...(montoMinimo ? { total: { gte: montoMinimo } } : {}),
+  };
+}
+
 function armarProgreso(
   telefono: string,
   entregados: number,
@@ -35,13 +55,13 @@ function armarProgreso(
  */
 export async function calcularProgresoFidelidad(
   storeId: string,
-  umbral: number
+  { umbral, montoMinimo }: OpcionesFidelidad
 ): Promise<Map<string, ProgresoFidelidad>> {
   const db = prismaDelLocal(storeId);
   const [entregas, clientes] = await Promise.all([
     db.order.groupBy({
       by: ["clienteTelefono"],
-      where: { estado: "entregado" },
+      where: dondeEntregado(montoMinimo),
       _count: { _all: true },
     }),
     db.customer.findMany({ select: { telefono: true, pedidosCanjeados: true } }),
@@ -63,11 +83,11 @@ export async function calcularProgresoFidelidad(
 export async function progresoDeCliente(
   storeId: string,
   telefono: string,
-  umbral: number
+  { umbral, montoMinimo }: OpcionesFidelidad
 ): Promise<ProgresoFidelidad> {
   const db = prismaDelLocal(storeId);
   const [entregados, customer] = await Promise.all([
-    db.order.count({ where: { clienteTelefono: telefono, estado: "entregado" } }),
+    db.order.count({ where: { clienteTelefono: telefono, ...dondeEntregado(montoMinimo) } }),
     // Plain `prisma`, no `prismaDelLocal`, acá: la clave compuesta
     // storeId_telefono ya fija el local sola, igual que en el upsert del
     // checkout — no hace falta la capa extra para esto.

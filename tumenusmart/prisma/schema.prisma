@@ -49,6 +49,10 @@ model Store {
   fidelizacionActiva Boolean @default(false)
   fidelizacionUmbral Int     @default(10)
   fidelizacionPremio String?
+  // Opcional: un pedido solo suma si su total llega a este monto. Nulo =
+  // sin mínimo, cualquier pedido entregado suma (comportamiento de antes).
+  // Existe para que pedidos muy baratos no le "regalen" el sello al cliente.
+  fidelizacionMontoMinimo Int?
 
   // --- Suscripción ---
   // "activo" atiende con normalidad. "suspendido" apaga el menú público

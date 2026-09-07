@@ -79,7 +79,10 @@ export default async function SeguimientoPedidoPage({
   const finalizado = order.estado === "entregado";
 
   const progresoFidelidad = store.fidelizacionActiva
-    ? await progresoDeCliente(store.id, order.clienteTelefono, store.fidelizacionUmbral)
+    ? await progresoDeCliente(store.id, order.clienteTelefono, {
+        umbral: store.fidelizacionUmbral,
+        montoMinimo: store.fidelizacionMontoMinimo,
+      })
     : null;
   const nombrePremio = store.fidelizacionPremio || "un premio especial";
 

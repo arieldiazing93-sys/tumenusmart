@@ -82,9 +82,23 @@ export async function guardarFidelizacion(formData: FormData): Promise<void> {
   const umbral = Math.max(1, Math.min(50, Number.isFinite(umbralCrudo) ? umbralCrudo : 10));
   const premio = String(formData.get("fidelizacionPremio") ?? "").trim() || null;
 
+  // Vacío = sin mínimo (cualquier pedido entregado suma). Un valor negativo
+  // o inválido también cae en "sin mínimo", no en 0 — 0 se leería como "el
+  // mínimo es Gs. 0", que es otra cosa (y ya es el comportamiento sin fijar
+  // ninguno).
+  const montoMinimoCrudo = String(formData.get("fidelizacionMontoMinimo") ?? "").trim();
+  const montoMinimoParseado = montoMinimoCrudo ? parseInt(montoMinimoCrudo, 10) : NaN;
+  const montoMinimo =
+    Number.isFinite(montoMinimoParseado) && montoMinimoParseado > 0 ? montoMinimoParseado : null;
+
   await prisma.store.update({
     where: { id: await idLocalActual() },
-    data: { fidelizacionActiva: activa, fidelizacionUmbral: umbral, fidelizacionPremio: premio },
+    data: {
+      fidelizacionActiva: activa,
+      fidelizacionUmbral: umbral,
+      fidelizacionPremio: premio,
+      fidelizacionMontoMinimo: montoMinimo,
+    },
   });
   refrescarPantallas();
   revalidatePath("/admin/analytics");

@@ -48,7 +48,12 @@ export default async function AnalyticsPage({
     calcularClientesDelRango(storeId, rango),
     prisma.store.findUnique({
       where: { id: storeId },
-      select: { fidelizacionActiva: true, fidelizacionUmbral: true, fidelizacionPremio: true },
+      select: {
+        fidelizacionActiva: true,
+        fidelizacionUmbral: true,
+        fidelizacionPremio: true,
+        fidelizacionMontoMinimo: true,
+      },
     }),
   ]);
   const distribucion = calcularDistribucionFrecuencia(clientes);
@@ -58,7 +63,7 @@ export default async function AnalyticsPage({
   const umbral = store?.fidelizacionUmbral ?? 10;
   const premio = store?.fidelizacionPremio || "el premio";
   const progresoFidelidad = fidelizacionActiva
-    ? await calcularProgresoFidelidad(storeId, umbral)
+    ? await calcularProgresoFidelidad(storeId, { umbral, montoMinimo: store?.fidelizacionMontoMinimo })
     : null;
 
   return (
@@ -141,6 +146,9 @@ export default async function AnalyticsPage({
                     Fidelización
                     <span className="block text-[0.65rem] normal-case text-tinta-suave">
                       pedidos entregados de siempre
+                      {store?.fidelizacionMontoMinimo
+                        ? ` desde Gs. ${store.fidelizacionMontoMinimo.toLocaleString("es-PY")}`
+                        : ""}
                     </span>
                   </th>
                 )}
