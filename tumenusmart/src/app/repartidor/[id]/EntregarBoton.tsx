@@ -36,13 +36,13 @@ export function EntregarBoton({
   function marcar(cobro: string) {
     setError(null);
     startTransition(async () => {
-      try {
-        await marcarPedidoEntregado(repartidorId, orderId, cobro);
-        setHecho(true);
-        router.refresh();
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "No se pudo marcar como entregado");
+      const resultado = await marcarPedidoEntregado(repartidorId, orderId, cobro);
+      if (!resultado.ok) {
+        setError(resultado.error);
+        return;
       }
+      setHecho(true);
+      router.refresh();
     });
   }
 

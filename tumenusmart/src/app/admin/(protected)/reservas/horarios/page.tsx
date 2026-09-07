@@ -1,12 +1,11 @@
 import { pantallaConPermiso } from "@/lib/auth";
-import { clasesBoton } from "@/components/ui";
 import { Volver } from "@/components/Volver";
 import { prismaDelLocal } from "@/lib/prisma-local";
 import { idLocalActual } from "@/lib/local-actual";
-import { crearHorario } from "../actions";
 import { TURNOS } from "@/lib/reservas";
 import { EliminarHorarioBoton } from "./EliminarHorarioBoton";
 import { CapacidadField } from "./CapacidadField";
+import { CrearHorarioForm } from "./CrearHorarioForm";
 
 export const dynamic = "force-dynamic";
 
@@ -72,33 +71,7 @@ export default async function HorariosReservaPage() {
                     </p>
                   )}
 
-                  <form
-                    action={crearHorario}
-                    className="flex flex-wrap items-center gap-2 bg-papel-suave/60 px-4 py-3"
-                  >
-                    <input type="hidden" name="turno" value={turno.value} />
-                    <input
-                      type="time"
-                      name="hora"
-                      required
-                      aria-label={`Nuevo horario de ${turno.label}`}
-                      className="w-28 rounded-lg border border-linea px-2 py-1.5 text-sm"
-                    />
-                    <input
-                      type="number"
-                      name="capacidadPersonas"
-                      min={1}
-                      placeholder="Cupo (opcional)"
-                      aria-label="Cupo de personas del nuevo horario"
-                      className="w-36 rounded-lg border border-linea px-2 py-1.5 text-sm"
-                    />
-                    <button
-                      type="submit"
-                      className={clasesBoton("principal", "sm")}
-                    >
-                      Agregar horario
-                    </button>
-                  </form>
+                  <CrearHorarioForm turno={turno.value} turnoLabel={turno.label} />
                 </div>
               </div>
             </div>

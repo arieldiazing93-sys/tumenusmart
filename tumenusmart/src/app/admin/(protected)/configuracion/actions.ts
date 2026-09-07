@@ -25,11 +25,19 @@ function refrescarPantallas() {
   revalidatePath("/[slug]", "layout");
 }
 
-export async function subirFotoLogo(formData: FormData): Promise<{ url: string }> {
+export type ResultadoLogo = { ok: true; url: string } | { ok: false; error: string };
+
+/**
+ * Devuelve {ok,error} en vez de lanzar: se llama directamente desde
+ * LogoField (no atado a un <form action>), así que puede cambiar de firma
+ * sin romper nada — y así el mensaje real le llega al dueño en vez de
+ * quedar escondido por el genérico que Next.js pone en producción.
+ */
+export async function subirFotoLogo(formData: FormData): Promise<ResultadoLogo> {
   await exigirPermiso("configuracion.editar");
   const archivo = formData.get("archivo");
   if (!(archivo instanceof File)) {
-    throw new Error("No se recibió ninguna imagen");
+    return { ok: false, error: "No se recibió ninguna imagen" };
   }
   const url = await subirLogoNegocio(archivo);
 
@@ -43,7 +51,7 @@ export async function subirFotoLogo(formData: FormData): Promise<{ url: string }
   });
   refrescarPantallas();
 
-  return { url };
+  return { ok: true, url };
 }
 
 export async function quitarLogoStore(): Promise<void> {
@@ -104,7 +112,13 @@ export async function guardarFidelizacion(formData: FormData): Promise<void> {
   revalidatePath("/admin/analytics");
 }
 
-export async function agregarTramoHorario(formData: FormData) {
+export type ResultadoTramo = { ok: true } | { ok: false; error: string };
+
+/**
+ * Devuelve {ok,error} en vez de lanzar: Next.js esconde el mensaje real de
+ * un `throw` que escapa de una Server Action en producción.
+ */
+export async function agregarTramoHorario(formData: FormData): Promise<ResultadoTramo> {
   await exigirPermiso("configuracion.editar");
   const idLocal = await idLocalActual();
   const db = prismaDelLocal(idLocal);
@@ -114,9 +128,9 @@ export async function agregarTramoHorario(formData: FormData) {
   const cierra = String(formData.get("cierra") ?? "").trim();
 
   if (!Number.isInteger(diaSemana) || diaSemana < 0 || diaSemana > 6) {
-    throw new Error("Día inválido");
+    return { ok: false, error: "Día inválido" };
   }
-  if (!abre || !cierra) throw new Error("Faltan las horas de apertura y cierre");
+  if (!abre || !cierra) return { ok: false, error: "Faltan las horas de apertura y cierre" };
 
   await db.horarioAtencion.create({
     data: { diaSemana, abre, cierra, storeId: idLocal },
@@ -124,6 +138,7 @@ export async function agregarTramoHorario(formData: FormData) {
 
   revalidatePath("/admin/configuracion/horarios");
   revalidatePath("/[slug]", "layout");
+  return { ok: true };
 }
 
 export async function eliminarTramoHorario(id: string): Promise<void> {
@@ -147,7 +162,15 @@ export async function actualizarStore(formData: FormData) {
     String(formData.get("estiloCarta") ?? "lista") === "tarjetas" ? "tarjetas" : "lista";
 
   if (!nombre || !whatsappNumero) {
-    throw new Error("Nombre y WhatsApp son obligatorios");
+    // Este formulario queda atado con <form action={actualizarStore}> tal
+    // cual —sin envoltorio de cliente—, así que la función tiene que seguir
+    // devolviendo Promise<void>: no puede devolver {ok,error} sin romper esa
+    // firma. Por eso el error viaja en la URL del redirect, con el mismo
+    // mecanismo que ya usa el "?guardado=1" del caso de éxito, y no como un
+    // `throw` (que Next.js esconde en producción).
+    redirect(
+      `/admin/configuracion?error=${encodeURIComponent("Nombre y WhatsApp son obligatorios")}`
+    );
   }
 
   // envioModo, lat y lng NO se tocan acá: viven en su propio formulario más

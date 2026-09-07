@@ -11,7 +11,11 @@ export function EstadoReservaSelect({ id, estado }: { id: string; estado: string
 
   function cambiar(nuevoEstado: string) {
     startTransition(async () => {
-      await actualizarEstadoReserva(id, nuevoEstado);
+      const resultado = await actualizarEstadoReserva(id, nuevoEstado);
+      if (!resultado.ok) {
+        alert(resultado.error);
+        return;
+      }
       router.refresh();
     });
   }

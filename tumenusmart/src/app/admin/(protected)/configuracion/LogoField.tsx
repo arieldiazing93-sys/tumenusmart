@@ -34,8 +34,12 @@ export function LogoField({ initialUrl }: { initialUrl: string | null }) {
 
       const formData = new FormData();
       formData.set("archivo", resultado.archivo);
-      const { url: nuevaUrl } = await subirFotoLogo(formData);
-      setUrl(nuevaUrl);
+      const subida = await subirFotoLogo(formData);
+      if (!subida.ok) {
+        setError(subida.error);
+        return;
+      }
+      setUrl(subida.url);
       setGuardado(true);
       setTimeout(() => setGuardado(false), 3000);
     } catch (err) {

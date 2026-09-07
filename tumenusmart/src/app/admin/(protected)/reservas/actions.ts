@@ -15,7 +15,15 @@ function parsearCapacidad(valor: FormDataEntryValue | null): number | null {
   return numero;
 }
 
-export async function crearHorario(formData: FormData) {
+export type ResultadoAccion = { ok: true } | { ok: false; error: string };
+
+/**
+ * Devuelve {ok,error} en vez de lanzar: un `throw` que escapa de una Server
+ * Action queda con el mensaje real escondido en producción (Next.js lo
+ * cambia por un genérico "Application error"), así que quien carga el
+ * horario nunca se enteraría de si el problema fue el turno o la hora.
+ */
+export async function crearHorario(formData: FormData): Promise<ResultadoAccion> {
   await exigirPermiso("reservas.gestionar");
   // La clave compuesta necesita el local escrito, así que acá se pide aparte.
   const storeId = await idLocalActual();
@@ -25,8 +33,8 @@ export async function crearHorario(formData: FormData) {
   const hora = String(formData.get("hora") ?? "").trim();
   const capacidadPersonas = parsearCapacidad(formData.get("capacidadPersonas"));
 
-  if (!TURNOS.some((t) => t.value === turno)) throw new Error("Turno inválido");
-  if (!hora) throw new Error("Falta el horario");
+  if (!TURNOS.some((t) => t.value === turno)) return { ok: false, error: "Turno inválido" };
+  if (!hora) return { ok: false, error: "Falta el horario" };
 
   await prisma.horarioReserva.upsert({
     // La clave ahora incluye el local: dos negocios pueden tener el mismo
@@ -37,6 +45,7 @@ export async function crearHorario(formData: FormData) {
   });
 
   revalidatePath("/admin/reservas/horarios");
+  return { ok: true };
 }
 
 export async function actualizarCapacidadHorario(
@@ -65,14 +74,20 @@ export async function eliminarHorario(id: string) {
   revalidatePath("/admin/reservas/horarios");
 }
 
-export async function actualizarEstadoReserva(id: string, estado: string) {
+export async function actualizarEstadoReserva(
+  id: string,
+  estado: string
+): Promise<ResultadoAccion> {
   await exigirPermiso("reservas.gestionar");
   // Todas las consultas de acá abajo quedan atadas a este local.
   const prisma = prismaDelLocal(await idLocalActual());
 
-  if (!ESTADOS_RESERVA.some((e) => e.value === estado)) throw new Error("Estado inválido");
+  if (!ESTADOS_RESERVA.some((e) => e.value === estado)) {
+    return { ok: false, error: "Estado inválido" };
+  }
   await prisma.reservation.update({ where: { id }, data: { estado } });
   revalidatePath("/admin/reservas");
+  return { ok: true };
 }
 
 export async function actualizarNotaReserva(id: string, nota: string) {

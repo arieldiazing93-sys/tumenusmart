@@ -8,6 +8,9 @@ import { normalizarCobro } from "@/lib/rendicion";
 // URL (igual criterio que /pedido/[id] para el cliente) — por eso siempre
 // se verifica que el pedido esté realmente asignado a ESE repartidor antes
 // de dejarlo tocar nada.
+
+export type ResultadoEntrega = { ok: true } | { ok: false; error: string };
+
 /**
  * El repartidor marca un pedido como entregado y dice CÓMO le pagaron.
  *
@@ -16,12 +19,17 @@ import { normalizarCobro } from "@/lib/rendicion";
  * completa —o no— cuando ya nadie se acuerda si aquel fue el que pagó con
  * tarjeta. Preguntándolo en el momento, la respuesta es la de alguien que
  * acaba de tener la plata en la mano.
+ *
+ * Devuelve {ok,error} en vez de lanzar: Next.js esconde el mensaje real de
+ * cualquier excepción que escape de una Server Action en producción (queda
+ * un genérico "Application error"), así que un `throw` acá no le dice al
+ * repartidor POR QUÉ no se pudo marcar — solo que algo falló.
  */
 export async function marcarPedidoEntregado(
   repartidorId: string,
   orderId: string,
   cobro: string
-) {
+): Promise<ResultadoEntrega> {
   const [repartidor, pedido] = await Promise.all([
     prisma.repartidor.findUnique({
       where: { id: repartidorId },
@@ -42,10 +50,10 @@ export async function marcarPedidoEntregado(
     pedido.repartidorId !== repartidorId ||
     pedido.storeId !== repartidor.storeId
   ) {
-    throw new Error("Este pedido no está asignado a este repartidor.");
+    return { ok: false, error: "Este pedido no está asignado a este repartidor." };
   }
   if (pedido.estado !== "en_despacho") {
-    throw new Error("Este pedido ya no está en despacho.");
+    return { ok: false, error: "Este pedido ya no está en despacho." };
   }
 
   await prisma.order.update({
@@ -65,4 +73,5 @@ export async function marcarPedidoEntregado(
   revalidatePath("/admin/pedidos");
   revalidatePath(`/admin/pedidos/${orderId}`);
   revalidatePath("/admin/cierre");
+  return { ok: true };
 }

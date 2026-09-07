@@ -2,13 +2,13 @@ import { pantallaConPermiso } from "@/lib/auth";
 import { Volver } from "@/components/Volver";
 import { prismaDelLocal } from "@/lib/prisma-local";
 import { idLocalActual } from "@/lib/local-actual";
-import { agregarTramoHorario } from "../actions";
 import {
   NOMBRES_DIA,
   DIAS_ORDENADOS,
   calcularEstadoAtencion,
 } from "@/lib/horario-atencion";
 import { EliminarTramoBoton } from "./EliminarTramoBoton";
+import { AgregarTramoForm } from "./AgregarTramoForm";
 
 export const dynamic = "force-dynamic";
 
@@ -109,34 +109,7 @@ export default async function HorariosAtencionPage() {
                   )}
                 </div>
 
-                <form
-                  action={agregarTramoHorario}
-                  className="flex w-full flex-none items-center gap-1.5 sm:w-64"
-                >
-                  <input type="hidden" name="diaSemana" value={dia} />
-                  <input
-                    type="time"
-                    name="abre"
-                    required
-                    aria-label={`Hora de apertura del ${NOMBRES_DIA[dia]}`}
-                    className="w-full rounded-lg border border-linea px-2 py-1.5 text-sm"
-                  />
-                  <span className="text-tinta-suave">–</span>
-                  <input
-                    type="time"
-                    name="cierra"
-                    required
-                    aria-label={`Hora de cierre del ${NOMBRES_DIA[dia]}`}
-                    className="w-full rounded-lg border border-linea px-2 py-1.5 text-sm"
-                  />
-                  <button
-                    type="submit"
-                    aria-label={`Agregar tramo al ${NOMBRES_DIA[dia]}`}
-                    className="flex-none rounded-lg bg-noche-panel px-2.5 py-1.5 text-sm font-semibold text-white hover:bg-noche-panel"
-                  >
-                    +
-                  </button>
-                </form>
+                <AgregarTramoForm dia={dia} diaLabel={NOMBRES_DIA[dia]} />
               </div>
             );
           })}
