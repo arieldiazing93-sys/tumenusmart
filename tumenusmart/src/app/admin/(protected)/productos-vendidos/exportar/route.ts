@@ -9,14 +9,18 @@ export const dynamic = "force-dynamic";
 
 function csvEscape(valor: string | number): string {
   const texto = String(valor);
-  if (/[",\n]/.test(texto)) {
+  if (/[";\n]/.test(texto)) {
     return `"${texto.replace(/"/g, '""')}"`;
   }
   return texto;
 }
 
+// Separador ";" y no ",": Excel en español usa la coma como separador
+// DECIMAL, así que un CSV separado por comas le llega como una sola columna
+// de texto en vez de una planilla — hay que abrir "Datos > Desde texto/CSV"
+// a mano para arreglarlo. Con ";" lo abre bien con solo hacer doble clic.
 function filaCsv(valores: (string | number)[]): string {
-  return valores.map(csvEscape).join(",");
+  return valores.map(csvEscape).join(";");
 }
 
 // Genera un CSV (se abre directo en Excel, Google Sheets, Numbers, etc.), sin
@@ -91,12 +95,12 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  filas.push("");
-  filas.push(filaCsv(["Total general", "", "Cantidad", "Venta (Gs.)", "Costo (Gs.)", "", "Ganancia (Gs.)"]));
+  // Mismas 7 columnas que la tabla de arriba, no una estructura aparte —
+  // así la fila de totales se lee de un vistazo, alineada con los encabezados.
   filas.push(
     filaCsv([
       "",
-      "",
+      "TOTAL GENERAL",
       reporte.totalGeneral.cantidad,
       Math.round(reporte.totalGeneral.venta),
       reporte.totalGeneral.costo != null ? Math.round(reporte.totalGeneral.costo) : "",
