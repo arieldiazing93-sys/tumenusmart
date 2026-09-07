@@ -38,6 +38,12 @@ function IconoRegaloChico() {
  *
  * Mismos colores que ya tienen ese significado en SeguimientoTracker: verde
  * para lo ya entregado, naranja reservado solo para el círculo del premio.
+ *
+ * El sello pendiente usa un fondo ámbar en vez de gris: esta tarjeta vive
+ * DENTRO de un <Aviso> ya teñido (peach o verde), y gris sobre esos fondos
+ * quedaba casi invisible. El ámbar es lo bastante distinto de ambos como
+ * para notarse sin pisar el significado de "completado" (verde) ni el del
+ * premio (naranja).
  */
 export function SelloFidelidad({ progreso, umbral }: { progreso: number; umbral: number }) {
   const circulos = Array.from({ length: umbral }, (_, i) => i + 1);
@@ -67,7 +73,7 @@ export function SelloFidelidad({ progreso, umbral }: { progreso: number; umbral:
           <div
             key={n}
             className={`flex h-8 w-8 flex-none items-center justify-center rounded-full ${
-              cumplido ? "bg-exito text-white" : "bg-papel-hundido text-tinta-suave"
+              cumplido ? "bg-exito text-white" : "bg-aviso-tinte text-aviso"
             }`}
           >
             {cumplido && <IconoCheckChico />}
