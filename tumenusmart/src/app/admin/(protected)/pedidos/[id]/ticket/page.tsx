@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { pantallaConPermiso } from "@/lib/auth";
 import { prismaDelLocal } from "@/lib/prisma-local";
 import { idLocalActual } from "@/lib/local-actual";
 import { formatearGuarani, formatearNumero } from "@/lib/format";
@@ -26,6 +27,11 @@ export default async function TicketPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  // Layout y página se renderizan en paralelo: sin este chequeo acá, una
+  // sesión vencida podía terminar en el `throw` de idLocalActual() de acá
+  // abajo antes de que el layout redirigiera a /admin/login.
+  await pantallaConPermiso("pedidos.ver");
+
   // Todas las consultas de acá abajo quedan atadas a este local.
   const prisma = prismaDelLocal(await idLocalActual());
 

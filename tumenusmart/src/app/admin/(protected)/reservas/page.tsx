@@ -1,5 +1,6 @@
 import { BotonEnlace, Cabecera } from "@/components/ui";
 import Link from "next/link";
+import { pantallaConPermiso } from "@/lib/auth";
 import { prismaDelLocal } from "@/lib/prisma-local";
 import { idLocalActual } from "@/lib/local-actual";
 import {
@@ -95,6 +96,11 @@ export default async function AdminReservasPage({
 }: {
   searchParams: Promise<{ vista?: string; dia?: string }>;
 }) {
+  // Layout y página se renderizan en paralelo: sin este chequeo acá, una
+  // sesión vencida podía terminar en el `throw` de idLocalActual() de acá
+  // abajo antes de que el layout redirigiera a /admin/login.
+  await pantallaConPermiso("reservas.ver");
+
   // Todas las consultas de acá abajo quedan atadas a este local.
   const storeId = await idLocalActual();
   const prisma = prismaDelLocal(storeId);

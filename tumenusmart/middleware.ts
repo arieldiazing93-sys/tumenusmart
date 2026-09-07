@@ -14,6 +14,7 @@ import { NextRequest, NextResponse } from "next/server";
 // con sesionActual(). Son dos capas distintas y las dos hacen falta.
 
 const COOKIE_NAME = "admin_session";
+const DIAS_DE_SESION = 7;
 
 let claveCache: CryptoKey | null = null;
 
@@ -71,6 +72,24 @@ export async function middleware(request: NextRequest) {
     if (!cookie || !(await cookieBienFirmada(cookie))) {
       return NextResponse.redirect(new URL("/admin/login", request.url));
     }
+
+    // Sesión "deslizante": los 7 días se cuentan desde la ÚLTIMA visita, no
+    // desde que entró una vez. Un local que deja la pantalla de pedidos
+    // abierta en el mostrador nunca la toca "para volver a entrar" — y el
+    // aviso sonoro de pedidos nuevos ya golpea el servidor cada 15 segundos
+    // mientras esa pestaña sigue abierta. Aprovechamos ese mismo tráfico
+    // para renovar la cookie en cada visita: mientras el panel siga en uso,
+    // la sesión no vence. Si el dispositivo queda sin tocar los 7 días
+    // completos, ahí sí expira — ese es el límite real, no una fecha fija.
+    const respuesta = NextResponse.next();
+    respuesta.cookies.set(COOKIE_NAME, cookie, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: 60 * 60 * 24 * DIAS_DE_SESION,
+      path: "/",
+    });
+    return respuesta;
   }
 
   return NextResponse.next();

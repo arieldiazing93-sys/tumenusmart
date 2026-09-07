@@ -7,7 +7,7 @@ import { formatearGuarani } from "@/lib/format";
 import { moverProducto } from "./actions";
 import { BotonesMover } from "@/components/BotonesMover";
 import { DisponibleToggle } from "./DisponibleToggle";
-import { sesionActual } from "@/lib/auth";
+import { pantallaConPermiso } from "@/lib/auth";
 import { puede } from "@/lib/permisos";
 import { CrearProductoForm } from "./CrearProductoForm";
 import { GuardadoToast } from "@/components/GuardadoToast";
@@ -21,8 +21,13 @@ export default async function AdminProductosPage({
 }) {
   // Qué puede hacer quien entró. El empleado ve la carta y puede marcar algo
   // agotado, pero no crear, editar ni reordenar.
-  const sesion = await sesionActual();
-  const puedeEditar = puede(sesion?.rol, "productos.editar");
+  //
+  // El chequeo va acá y no solo en el layout: layout y página se renderizan
+  // en paralelo, así que una sesión vencida podía terminar en el `throw` de
+  // idLocalActual() de acá abajo antes de que el layout redirigiera a
+  // /admin/login — un error real en vez de un redirect silencioso.
+  const sesion = await pantallaConPermiso("productos.ver");
+  const puedeEditar = puede(sesion.rol, "productos.editar");
 
   // Todas las consultas de acá abajo quedan atadas a este local.
   const prisma = prismaDelLocal(await idLocalActual());

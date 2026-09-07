@@ -2,15 +2,21 @@ import { prismaDelLocal } from "@/lib/prisma-local";
 import { idLocalActual } from "@/lib/local-actual";
 import { CategoriaFila } from "./CategoriaFila";
 import { CrearCategoriaForm } from "./CrearCategoriaForm";
-import { sesionActual } from "@/lib/auth";
+import { pantallaConPermiso } from "@/lib/auth";
 import { puede } from "@/lib/permisos";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminCategoriasPage() {
   // El empleado ve las categorías para entender la carta, pero no las toca.
-  const sesion = await sesionActual();
-  const puedeEditar = puede(sesion?.rol, "categorias.editar");
+  //
+  // Este chequeo tiene que estar acá y no solo en el layout: layout y página
+  // se renderizan en paralelo, así que una sesión vencida podía terminar en
+  // el `throw` de idLocalActual() de acá abajo antes de que el layout
+  // llegara a redirigir a /admin/login — un error real en vez de un
+  // redirect silencioso.
+  const sesion = await pantallaConPermiso("categorias.ver");
+  const puedeEditar = puede(sesion.rol, "categorias.editar");
 
   // Todas las consultas de acá abajo quedan atadas a este local.
   const prisma = prismaDelLocal(await idLocalActual());

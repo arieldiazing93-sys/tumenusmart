@@ -1,4 +1,4 @@
-import { sesionActual } from "@/lib/auth";
+import { pantallaConPermiso } from "@/lib/auth";
 import { puede } from "@/lib/permisos";
 import { prismaDelLocal } from "@/lib/prisma-local";
 import { idLocalActual } from "@/lib/local-actual";
@@ -9,10 +9,15 @@ import { LinkRepartidor } from "./LinkRepartidor";
 export const dynamic = "force-dynamic";
 
 export default async function AdminRepartidoresPage() {
+  // Sin este chequeo acá, una sesión vencida con esta pantalla abierta
+  // terminaba en un error real en vez de mandar a /admin/login: layout y
+  // página se renderizan en paralelo, y el `throw` de idLocalActual() de acá
+  // abajo no siempre esperaba a que el layout redirigiera primero.
+  //
   // El empleado necesita ver quién está disponible para asignar un pedido,
   // pero no da de alta ni borra repartidores.
-  const sesion = await sesionActual();
-  const puedeGestionar = puede(sesion?.rol, "repartidores.gestionar");
+  const sesion = await pantallaConPermiso("repartidores.ver");
+  const puedeGestionar = puede(sesion.rol, "repartidores.gestionar");
 
   // Todas las consultas de acá abajo quedan atadas a este local.
   const prisma = prismaDelLocal(await idLocalActual());

@@ -1,3 +1,4 @@
+import { pantallaConPermiso } from "@/lib/auth";
 import { prismaDelLocal } from "@/lib/prisma-local";
 import { idLocalActual } from "@/lib/local-actual";
 import { prisma as prismaGlobal } from "@/lib/prisma";
@@ -38,6 +39,11 @@ export default async function InformeReservasPage({
 }: {
   searchParams: Promise<{ dia?: string }>;
 }) {
+  // Layout y página se renderizan en paralelo: sin este chequeo acá, una
+  // sesión vencida podía terminar en el `throw` de idLocalActual() de acá
+  // abajo antes de que el layout redirigiera a /admin/login.
+  await pantallaConPermiso("reservas.ver");
+
   const storeId = await idLocalActual();
   const prisma = prismaDelLocal(storeId);
 

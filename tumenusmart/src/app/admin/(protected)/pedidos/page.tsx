@@ -1,6 +1,7 @@
 import { Cabecera } from "@/components/ui";
 import Link from "next/link";
 import { headers } from "next/headers";
+import { pantallaConPermiso } from "@/lib/auth";
 import { prismaDelLocal } from "@/lib/prisma-local";
 import { formatearGuarani, formatearNumero } from "@/lib/format";
 import { ESTADOS_PEDIDO, etiquetaEstado, colorEstado } from "@/lib/estados-pedido";
@@ -38,6 +39,15 @@ export default async function AdminPedidosPage({
 }: {
   searchParams: Promise<{ estado?: string; fecha?: string; desde?: string; hasta?: string }>;
 }) {
+  // Sin este chequeo acá (y no solo en el layout), una sesión vencida con
+  // esta pantalla abierta terminaba en un error real: el layout y la página
+  // se renderizan en paralelo, así que el redirect del layout no siempre
+  // gana la carrera contra el `throw` de idLocalActual() de acá abajo — el
+  // aviso sonoro de pedidos nuevos hace router.refresh() cada 15s, y ese
+  // refresh es justo lo que disparaba el error cuando la sesión ya había
+  // vencido con la pestaña abierta.
+  await pantallaConPermiso("pedidos.ver");
+
   // Todas las consultas de acá abajo quedan atadas a este local. El id se
   // guarda aparte porque además hace falta para consultar el propio local
   // (Store no lleva la columna, así que el filtro automático no lo alcanza).
