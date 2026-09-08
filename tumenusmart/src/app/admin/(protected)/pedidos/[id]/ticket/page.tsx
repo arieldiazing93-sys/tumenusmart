@@ -22,26 +22,18 @@ const ETIQUETAS_PAGO: Record<string, string> = {
   otro: "A coordinar",
 };
 
-/**
- * Espacio entre un texto y un importe, como espacios REALES y no como hueco
- * generado por CSS (`justify-between`).
- *
- * En el navegador las dos formas se ven exactamente igual. Pero algunas
- * impresoras térmicas (o su driver en Windows configurado en modo "Genérico
- * / Solo texto") no interpretan el documento como lo renderiza el navegador:
- * agarran el texto tal cual está y descartan cualquier separación que venga
- * únicamente del diseño visual, así que "Subtotal" y "Gs. 60.000" terminaban
- * pegados en el papel aunque en la vista previa se vieran perfectamente
- * alineados. Con espacios de verdad en el texto, esa separación sobrevive
- * sin importar cómo la impresora interprete la página.
- */
-function espacioAlineado(izquierda: string, derecha: string, ancho: number): string {
-  const cantidad = Math.max(2, ancho - izquierda.length - derecha.length);
-  return " ".repeat(cantidad);
+// Línea con tinta de verdad (guiones), no un borde CSS (`border-dashed`) ni
+// un salto de línea en blanco. Algunas impresoras térmicas ajustan el papel
+// al contenido real de cada impresión: cualquier separación que sea solo
+// visual —un borde, un margen, un hueco de flexbox— se pierde, y lo mismo
+// pasa con los saltos de línea que quedan completamente vacíos. Solo lo que
+// es texto de verdad (caracteres con tinta) sobrevive sin importar cómo la
+// impresora interprete la página, así que cada bloque del comprobante
+// (cabecera, pedido, ítems, totales, pago, pie) separa del siguiente con
+// esta línea en vez de con un borde.
+function Separador() {
+  return <p className="py-1.5 text-center text-xs">{"- ".repeat(18).trim()}</p>;
 }
-
-const ANCHO_RENGLON = 40;
-const ANCHO_RENGLON_TOTAL = 30;
 
 export default async function TicketPage({
   params,
@@ -86,20 +78,9 @@ export default async function TicketPage({
       <div className="mx-auto max-w-[76mm] font-mono text-sm text-black">
         <ImprimirAuto />
 
-        {/*
-          Líneas en blanco REALES (no margen/padding CSS) antes y después del
-          comprobante. Si esta impresora se imprime justo después de otra
-          (comanda + ticket seguidos) y no deja suficiente papel en blanco
-          entre un trabajo y el siguiente, el final de uno queda pegado al
-          principio del otro — visto en un caso real donde "Cliente: Jose"
-          terminó fundido con el encabezado del comprobante siguiente. Un
-          `<br>` es contenido de verdad, no un hueco generado por diseño, así
-          que sobrevive aunque la impresora ignore los márgenes de @page.
-        */}
-        <br />
-        <br />
+        <Separador />
 
-        <div className="border-b border-dashed border-black pb-2 text-center">
+        <div className="text-center">
           <p className="text-base font-bold uppercase leading-tight">
             {store?.nombre ?? "Comprobante"}
           </p>
@@ -109,7 +90,9 @@ export default async function TicketPage({
           )}
         </div>
 
-        <div className="border-b border-dashed border-black py-2">
+        <Separador />
+
+        <div>
           <p className="text-[1.1rem] font-semibold tracking-titular">Pedido {formatearNumero(pedido.numero)}</p>
           <p className="text-xs">{fecha}</p>
           <p className="mt-1">Cliente: {pedido.clienteNombre}</p>
@@ -117,65 +100,72 @@ export default async function TicketPage({
         </div>
 
         {pedido.comprobanteTipo === "factura" && (
-          <div className="border-b border-dashed border-black py-2 text-xs">
-            <p className="font-bold uppercase">Datos para factura</p>
-            <p>Razón social: {pedido.facturaRazonSocial}</p>
-            <p>RUC: {pedido.facturaRuc}</p>
-            {pedido.facturaEmail && <p>Correo: {pedido.facturaEmail}</p>}
-          </div>
+          <>
+            <Separador />
+            <div className="text-xs">
+              <p className="font-bold uppercase">Datos para factura</p>
+              <p>Razon social: {pedido.facturaRazonSocial}</p>
+              <p>RUC: {pedido.facturaRuc}</p>
+              {pedido.facturaEmail && <p>Correo: {pedido.facturaEmail}</p>}
+            </div>
+          </>
         )}
 
-        <div className="border-b border-dashed border-black py-2">
-          {pedido.items.map((item) => {
-            const nombre = `${item.cantidad}x ${item.nombreProducto}`;
-            const importe = formatearGuarani(item.cantidad * Number(item.precioUnitario));
-            return (
-              <div key={item.id} className="mb-1.5 last:mb-0">
-                <p className="whitespace-pre-wrap break-words">
-                  {nombre}
-                  {espacioAlineado(nombre, importe, ANCHO_RENGLON)}
-                  <span className="font-bold">{importe}</span>
-                </p>
-                {item.opcionesTexto && (
-                  <p className="pl-3 text-xs leading-tight">+ {item.opcionesTexto}</p>
-                )}
-                {item.ingredientesQuitadosTexto && (
-                  <p className="pl-3 text-xs leading-tight">{item.ingredientesQuitadosTexto}</p>
-                )}
-              </div>
-            );
-          })}
+        <Separador />
+
+        <div>
+          {pedido.items.map((item) => (
+            <div key={item.id} className="mb-1.5 last:mb-0">
+              <p>
+                {item.cantidad}x {item.nombreProducto}
+              </p>
+              <p className="pl-3 font-bold">
+                {formatearGuarani(item.cantidad * Number(item.precioUnitario))}
+              </p>
+              {item.opcionesTexto && (
+                <p className="pl-3 text-xs leading-tight">+ {item.opcionesTexto}</p>
+              )}
+              {item.ingredientesQuitadosTexto && (
+                <p className="pl-3 text-xs leading-tight">{item.ingredientesQuitadosTexto}</p>
+              )}
+            </div>
+          ))}
         </div>
 
-        <div className="border-b border-dashed border-black py-2">
-          <p className="whitespace-pre-wrap">
-            Subtotal
-            {espacioAlineado("Subtotal", formatearGuarani(Number(pedido.subtotal)), ANCHO_RENGLON)}
-            {formatearGuarani(Number(pedido.subtotal))}
-          </p>
+        <Separador />
+
+        {/*
+          El monto va SIEMPRE en su propia línea, debajo del texto — nunca
+          en la misma línea con espacios calculados para "alinear a la
+          derecha". Cuántos caracteres entran por renglón depende del
+          modelo de impresora de cada local (este sistema lo usan varios
+          negocios, cada uno con la suya), así que cualquier número fijo que
+          se elija va a quedar mal en alguna. Poniendo el monto en su propia
+          línea, el resultado es el mismo sin importar el ancho real del
+          papel.
+        */}
+        <div>
+          <p>Subtotal</p>
+          <p className="pl-3 font-bold">{formatearGuarani(Number(pedido.subtotal))}</p>
           {esDelivery && (
-            <p className="whitespace-pre-wrap">
-              Envio
-              {espacioAlineado(
-                "Envio",
-                Number(pedido.costoEnvio) > 0
+            <>
+              <p className="mt-1">Envio</p>
+              <p className="pl-3 font-bold">
+                {Number(pedido.costoEnvio) > 0
                   ? formatearGuarani(Number(pedido.costoEnvio))
-                  : "A coordinar",
-                ANCHO_RENGLON
-              )}
-              {Number(pedido.costoEnvio) > 0
-                ? formatearGuarani(Number(pedido.costoEnvio))
-                : "A coordinar"}
-            </p>
+                  : "A coordinar"}
+              </p>
+            </>
           )}
-          <p className="mt-1 whitespace-pre-wrap border-t border-black pt-1 text-[1.1rem] font-semibold tracking-titular">
-            TOTAL
-            {espacioAlineado("TOTAL", formatearGuarani(Number(pedido.total)), ANCHO_RENGLON_TOTAL)}
+          <p className="mt-1 text-[1.1rem] font-semibold tracking-titular">TOTAL</p>
+          <p className="pl-3 text-[1.1rem] font-bold tracking-titular">
             {formatearGuarani(Number(pedido.total))}
           </p>
         </div>
 
-        <div className="border-b border-dashed border-black py-2 text-xs">
+        <Separador />
+
+        <div className="text-xs">
           <p>
             <span className="font-bold">Pago:</span>{" "}
             {ETIQUETAS_PAGO[pedido.metodoPagoReferencia] ?? pedido.metodoPagoReferencia}
@@ -186,20 +176,20 @@ export default async function TicketPage({
               ? `Delivery - ${pedido.deliveryZone?.nombre ?? "a coordinar"}`
               : "Retiro en el local"}
           </p>
-          {esDelivery && pedido.direccion && <p>Dirección: {pedido.direccion}</p>}
+          {esDelivery && pedido.direccion && <p>Direccion: {pedido.direccion}</p>}
           {esDelivery && pedido.repartidor && <p>Repartidor: {pedido.repartidor.nombre}</p>}
           {pedido.notas && <p className="mt-1">Nota: {pedido.notas}</p>}
         </div>
 
-        <p className="py-3 text-center text-xs">
+        <Separador />
+
+        <p className="pt-1 text-center text-xs">
           Gracias por su compra!
           <br />
           Este comprobante no es una factura legal.
         </p>
 
-        <br />
-        <br />
-        <br />
+        <Separador />
       </div>
     </>
   );

@@ -18,17 +18,18 @@ const ESTILOS_IMPRESION = `
   }
 `;
 
-// Espacios reales entre la hora y "DELIVERY"/"RETIRO", en vez de depender
-// del hueco que genera `justify-between`. Algunas impresoras térmicas (o su
-// driver en Windows en modo "Genérico / Solo texto") ignoran esa separación
-// visual y pegan los dos textos — con espacios de verdad en el documento,
-// sobrevive sin importar cómo la impresora interprete la página.
-function espacioAlineado(izquierda: string, derecha: string, ancho: number): string {
-  const cantidad = Math.max(2, ancho - izquierda.length - derecha.length);
-  return " ".repeat(cantidad);
+// Línea con tinta de verdad (guiones), no un borde CSS (`border-dashed`) ni
+// un salto de línea en blanco. Algunas impresoras térmicas ajustan el papel
+// al contenido real de cada impresión: cualquier separación que sea solo
+// visual —un borde, un margen, un hueco de flexbox— se pierde, y lo mismo
+// pasa con los saltos de línea que quedan completamente vacíos. Solo lo que
+// es texto de verdad (caracteres con tinta) sobrevive sin importar cómo la
+// impresora interprete la página, así que cada bloque de la comanda
+// (cabecera, hora/tipo, ítems, nota, pie) separa del siguiente con esta
+// línea en vez de con un borde.
+function Separador() {
+  return <p className="py-1.5 text-center text-xs">{"- ".repeat(18).trim()}</p>;
 }
-
-const ANCHO_RENGLON = 40;
 
 export default async function ComandaPage({
   params,
@@ -68,36 +69,27 @@ export default async function ComandaPage({
       <div className="mx-auto max-w-[76mm] font-mono text-black">
         <ImprimirAuto />
 
-        {/*
-          Líneas en blanco REALES (no margen/padding CSS) antes y después de
-          la comanda. Si se imprime justo después de otra impresión (comanda
-          + ticket seguidos) y la impresora no deja suficiente papel en
-          blanco entre un trabajo y el siguiente, el final de uno queda
-          pegado al principio del otro — visto en un caso real donde
-          "Cliente: Jose" terminó fundido con el encabezado "COMANDA" de la
-          impresión siguiente. Un `<br>` es contenido de verdad, no un hueco
-          generado por diseño, así que sobrevive aunque la impresora ignore
-          los márgenes de @page.
-        */}
-        <br />
-        <br />
+        <Separador />
 
-        <div className="border-y-4 border-double border-black py-2 text-center">
+        <div className="text-center">
           <p className="text-[1.1rem] font-semibold tracking-titular tracking-widest">COMANDA</p>
           <p className="text-3xl font-bold leading-tight">
             {formatearNumero(pedido.numero)}
           </p>
         </div>
 
-        <p className="whitespace-pre-wrap border-b border-dashed border-black py-1.5 text-sm font-bold">
-          {hora}
-          {espacioAlineado(hora, esDelivery ? "DELIVERY" : "RETIRO", ANCHO_RENGLON)}
-          {esDelivery ? "DELIVERY" : "RETIRO"}
-        </p>
+        <Separador />
 
-        <ul className="divide-y divide-dashed divide-black">
+        <div className="text-sm font-bold">
+          <p>{hora}</p>
+          <p>{esDelivery ? "DELIVERY" : "RETIRO"}</p>
+        </div>
+
+        <Separador />
+
+        <ul>
           {pedido.items.map((item) => (
-            <li key={item.id} className="py-2.5">
+            <li key={item.id} className="mb-2.5 last:mb-0">
               <p className="text-[1.4rem] font-semibold tracking-titular uppercase leading-tight">
                 {item.cantidad} x {item.nombreProducto}
               </p>
@@ -114,22 +106,20 @@ export default async function ComandaPage({
         </ul>
 
         {pedido.notas && (
-          <div className="border-t-2 border-black pt-2">
-            <p className="text-sm font-bold uppercase">Nota del cliente</p>
-            <p className="text-base leading-tight">{pedido.notas}</p>
-          </div>
+          <>
+            <Separador />
+            <div>
+              <p className="text-sm font-bold uppercase">Nota del cliente</p>
+              <p className="text-base leading-tight">{pedido.notas}</p>
+            </div>
+          </>
         )}
 
-        <div className="mt-2 border-t-4 border-double border-black pt-2 text-center text-sm">
-          <p className="font-bold">
-            {pedido.items.reduce((suma, i) => suma + i.cantidad, 0)} unidades en total
-          </p>
-          <p className="mt-1">Cliente: {pedido.clienteNombre}</p>
-        </div>
+        <Separador />
 
-        <br />
-        <br />
-        <br />
+        <p className="text-center text-sm">Cliente: {pedido.clienteNombre}</p>
+
+        <Separador />
       </div>
     </>
   );
