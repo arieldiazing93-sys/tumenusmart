@@ -35,6 +35,27 @@ function Separador() {
   return <p className="py-1.5 text-center text-xs">{"- ".repeat(18).trim()}</p>;
 }
 
+/**
+ * Cantidad + producto a la izquierda, monto a la derecha, en un solo
+ * renglón — con espacios de verdad para separarlos (ver nota de más abajo
+ * sobre por qué no alcanza con el hueco que genera `flex`).
+ *
+ * El ancho está calibrado con una impresión real de 80 mm: "1x 2 Lomito
+ * mixto +1 Coca cola" (31 caracteres) entró en un renglón sin cortarse, y
+ * agregarle "500cc" (36 en total) ya no entraba. 32 es conservador a
+ * propósito, para dejar un margen de error entre distintas impresoras.
+ * Si un nombre de producto es tan largo que ya no deja lugar ni para dos
+ * espacios antes del monto, el monto pasa solo a la línea de abajo en vez
+ * de superponerse o cortar el papel.
+ */
+function filaConMonto(texto: string, monto: string, ancho: number): string {
+  const espacio = ancho - texto.length - monto.length;
+  if (espacio < 2) return `${texto}\n${monto}`;
+  return texto + " ".repeat(espacio) + monto;
+}
+
+const ANCHO_RENGLON = 32;
+
 export default async function TicketPage({
   params,
 }: {
@@ -116,11 +137,12 @@ export default async function TicketPage({
         <div>
           {pedido.items.map((item) => (
             <div key={item.id} className="mb-1.5 last:mb-0">
-              <p>
-                {item.cantidad}x {item.nombreProducto}
-              </p>
-              <p className="pl-3 font-bold">
-                {formatearGuarani(item.cantidad * Number(item.precioUnitario))}
+              <p className="whitespace-pre-wrap">
+                {filaConMonto(
+                  `${item.cantidad}x ${item.nombreProducto}`,
+                  formatearGuarani(item.cantidad * Number(item.precioUnitario)),
+                  ANCHO_RENGLON
+                )}
               </p>
               {item.opcionesTexto && (
                 <p className="pl-3 text-xs leading-tight">+ {item.opcionesTexto}</p>
@@ -134,32 +156,18 @@ export default async function TicketPage({
 
         <Separador />
 
-        {/*
-          El monto va SIEMPRE en su propia línea, debajo del texto — nunca
-          en la misma línea con espacios calculados para "alinear a la
-          derecha". Cuántos caracteres entran por renglón depende del
-          modelo de impresora de cada local (este sistema lo usan varios
-          negocios, cada uno con la suya), así que cualquier número fijo que
-          se elija va a quedar mal en alguna. Poniendo el monto en su propia
-          línea, el resultado es el mismo sin importar el ancho real del
-          papel.
-        */}
         <div>
-          <p>Subtotal</p>
-          <p className="pl-3 font-bold">{formatearGuarani(Number(pedido.subtotal))}</p>
+          <p>Subtotal: {formatearGuarani(Number(pedido.subtotal))}</p>
           {esDelivery && (
-            <>
-              <p className="mt-1">Envio</p>
-              <p className="pl-3 font-bold">
-                {Number(pedido.costoEnvio) > 0
-                  ? formatearGuarani(Number(pedido.costoEnvio))
-                  : "A coordinar"}
-              </p>
-            </>
+            <p className="mt-1">
+              Envio:{" "}
+              {Number(pedido.costoEnvio) > 0
+                ? formatearGuarani(Number(pedido.costoEnvio))
+                : "A coordinar"}
+            </p>
           )}
-          <p className="mt-1 text-[1.1rem] font-semibold tracking-titular">TOTAL</p>
-          <p className="pl-3 text-[1.1rem] font-bold tracking-titular">
-            {formatearGuarani(Number(pedido.total))}
+          <p className="mt-1 text-[1.1rem] font-semibold tracking-titular">
+            TOTAL: {formatearGuarani(Number(pedido.total))}
           </p>
         </div>
 
