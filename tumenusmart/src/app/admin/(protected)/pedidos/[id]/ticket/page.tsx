@@ -22,6 +22,27 @@ const ETIQUETAS_PAGO: Record<string, string> = {
   otro: "A coordinar",
 };
 
+/**
+ * Espacio entre un texto y un importe, como espacios REALES y no como hueco
+ * generado por CSS (`justify-between`).
+ *
+ * En el navegador las dos formas se ven exactamente igual. Pero algunas
+ * impresoras térmicas (o su driver en Windows configurado en modo "Genérico
+ * / Solo texto") no interpretan el documento como lo renderiza el navegador:
+ * agarran el texto tal cual está y descartan cualquier separación que venga
+ * únicamente del diseño visual, así que "Subtotal" y "Gs. 60.000" terminaban
+ * pegados en el papel aunque en la vista previa se vieran perfectamente
+ * alineados. Con espacios de verdad en el texto, esa separación sobrevive
+ * sin importar cómo la impresora interprete la página.
+ */
+function espacioAlineado(izquierda: string, derecha: string, ancho: number): string {
+  const cantidad = Math.max(2, ancho - izquierda.length - derecha.length);
+  return " ".repeat(cantidad);
+}
+
+const ANCHO_RENGLON = 40;
+const ANCHO_RENGLON_TOTAL = 30;
+
 export default async function TicketPage({
   params,
 }: {
@@ -65,6 +86,19 @@ export default async function TicketPage({
       <div className="mx-auto max-w-[76mm] font-mono text-sm text-black">
         <ImprimirAuto />
 
+        {/*
+          Líneas en blanco REALES (no margen/padding CSS) antes y después del
+          comprobante. Si esta impresora se imprime justo después de otra
+          (comanda + ticket seguidos) y no deja suficiente papel en blanco
+          entre un trabajo y el siguiente, el final de uno queda pegado al
+          principio del otro — visto en un caso real donde "Cliente: Jose"
+          terminó fundido con el encabezado del comprobante siguiente. Un
+          `<br>` es contenido de verdad, no un hueco generado por diseño, así
+          que sobrevive aunque la impresora ignore los márgenes de @page.
+        */}
+        <br />
+        <br />
+
         <div className="border-b border-dashed border-black pb-2 text-center">
           <p className="text-base font-bold uppercase leading-tight">
             {store?.nombre ?? "Comprobante"}
@@ -92,45 +126,53 @@ export default async function TicketPage({
         )}
 
         <div className="border-b border-dashed border-black py-2">
-          {pedido.items.map((item) => (
-            <div key={item.id} className="mb-1.5 last:mb-0">
-              <div className="flex justify-between gap-2">
-                <span className="flex-1">
-                  {item.cantidad}x {item.nombreProducto}
-                </span>
-                <span className="whitespace-nowrap font-bold">
-                  {formatearGuarani(item.cantidad * Number(item.precioUnitario))}
-                </span>
+          {pedido.items.map((item) => {
+            const nombre = `${item.cantidad}x ${item.nombreProducto}`;
+            const importe = formatearGuarani(item.cantidad * Number(item.precioUnitario));
+            return (
+              <div key={item.id} className="mb-1.5 last:mb-0">
+                <p className="whitespace-pre-wrap break-words">
+                  {nombre}
+                  {espacioAlineado(nombre, importe, ANCHO_RENGLON)}
+                  <span className="font-bold">{importe}</span>
+                </p>
+                {item.opcionesTexto && (
+                  <p className="pl-3 text-xs leading-tight">+ {item.opcionesTexto}</p>
+                )}
+                {item.ingredientesQuitadosTexto && (
+                  <p className="pl-3 text-xs leading-tight">{item.ingredientesQuitadosTexto}</p>
+                )}
               </div>
-              {item.opcionesTexto && (
-                <p className="pl-3 text-xs leading-tight">+ {item.opcionesTexto}</p>
-              )}
-              {item.ingredientesQuitadosTexto && (
-                <p className="pl-3 text-xs leading-tight">{item.ingredientesQuitadosTexto}</p>
-              )}
-            </div>
-          ))}
+            );
+          })}
         </div>
 
         <div className="border-b border-dashed border-black py-2">
-          <div className="flex justify-between">
-            <span>Subtotal</span>
-            <span>{formatearGuarani(Number(pedido.subtotal))}</span>
-          </div>
+          <p className="whitespace-pre-wrap">
+            Subtotal
+            {espacioAlineado("Subtotal", formatearGuarani(Number(pedido.subtotal)), ANCHO_RENGLON)}
+            {formatearGuarani(Number(pedido.subtotal))}
+          </p>
           {esDelivery && (
-            <div className="flex justify-between">
-              <span>Envío</span>
-              <span>
-                {Number(pedido.costoEnvio) > 0
+            <p className="whitespace-pre-wrap">
+              Envio
+              {espacioAlineado(
+                "Envio",
+                Number(pedido.costoEnvio) > 0
                   ? formatearGuarani(Number(pedido.costoEnvio))
-                  : "A coordinar"}
-              </span>
-            </div>
+                  : "A coordinar",
+                ANCHO_RENGLON
+              )}
+              {Number(pedido.costoEnvio) > 0
+                ? formatearGuarani(Number(pedido.costoEnvio))
+                : "A coordinar"}
+            </p>
           )}
-          <div className="mt-1 flex justify-between border-t border-black pt-1 text-[1.1rem] font-semibold tracking-titular">
-            <span>TOTAL</span>
-            <span>{formatearGuarani(Number(pedido.total))}</span>
-          </div>
+          <p className="mt-1 whitespace-pre-wrap border-t border-black pt-1 text-[1.1rem] font-semibold tracking-titular">
+            TOTAL
+            {espacioAlineado("TOTAL", formatearGuarani(Number(pedido.total)), ANCHO_RENGLON_TOTAL)}
+            {formatearGuarani(Number(pedido.total))}
+          </p>
         </div>
 
         <div className="border-b border-dashed border-black py-2 text-xs">
@@ -141,7 +183,7 @@ export default async function TicketPage({
           <p>
             <span className="font-bold">Entrega:</span>{" "}
             {esDelivery
-              ? `Delivery — ${pedido.deliveryZone?.nombre ?? "a coordinar"}`
+              ? `Delivery - ${pedido.deliveryZone?.nombre ?? "a coordinar"}`
               : "Retiro en el local"}
           </p>
           {esDelivery && pedido.direccion && <p>Dirección: {pedido.direccion}</p>}
@@ -150,10 +192,14 @@ export default async function TicketPage({
         </div>
 
         <p className="py-3 text-center text-xs">
-          ¡Gracias por su compra!
+          Gracias por su compra!
           <br />
           Este comprobante no es una factura legal.
         </p>
+
+        <br />
+        <br />
+        <br />
       </div>
     </>
   );

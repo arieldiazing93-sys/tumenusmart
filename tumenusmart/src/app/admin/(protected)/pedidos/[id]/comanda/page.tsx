@@ -18,6 +18,18 @@ const ESTILOS_IMPRESION = `
   }
 `;
 
+// Espacios reales entre la hora y "DELIVERY"/"RETIRO", en vez de depender
+// del hueco que genera `justify-between`. Algunas impresoras térmicas (o su
+// driver en Windows en modo "Genérico / Solo texto") ignoran esa separación
+// visual y pegan los dos textos — con espacios de verdad en el documento,
+// sobrevive sin importar cómo la impresora interprete la página.
+function espacioAlineado(izquierda: string, derecha: string, ancho: number): string {
+  const cantidad = Math.max(2, ancho - izquierda.length - derecha.length);
+  return " ".repeat(cantidad);
+}
+
+const ANCHO_RENGLON = 40;
+
 export default async function ComandaPage({
   params,
 }: {
@@ -56,6 +68,20 @@ export default async function ComandaPage({
       <div className="mx-auto max-w-[76mm] font-mono text-black">
         <ImprimirAuto />
 
+        {/*
+          Líneas en blanco REALES (no margen/padding CSS) antes y después de
+          la comanda. Si se imprime justo después de otra impresión (comanda
+          + ticket seguidos) y la impresora no deja suficiente papel en
+          blanco entre un trabajo y el siguiente, el final de uno queda
+          pegado al principio del otro — visto en un caso real donde
+          "Cliente: Jose" terminó fundido con el encabezado "COMANDA" de la
+          impresión siguiente. Un `<br>` es contenido de verdad, no un hueco
+          generado por diseño, así que sobrevive aunque la impresora ignore
+          los márgenes de @page.
+        */}
+        <br />
+        <br />
+
         <div className="border-y-4 border-double border-black py-2 text-center">
           <p className="text-[1.1rem] font-semibold tracking-titular tracking-widest">COMANDA</p>
           <p className="text-3xl font-bold leading-tight">
@@ -63,10 +89,11 @@ export default async function ComandaPage({
           </p>
         </div>
 
-        <div className="flex justify-between border-b border-dashed border-black py-1.5 text-sm font-bold">
-          <span>{hora}</span>
-          <span>{esDelivery ? "DELIVERY" : "RETIRO"}</span>
-        </div>
+        <p className="whitespace-pre-wrap border-b border-dashed border-black py-1.5 text-sm font-bold">
+          {hora}
+          {espacioAlineado(hora, esDelivery ? "DELIVERY" : "RETIRO", ANCHO_RENGLON)}
+          {esDelivery ? "DELIVERY" : "RETIRO"}
+        </p>
 
         <ul className="divide-y divide-dashed divide-black">
           {pedido.items.map((item) => (
@@ -99,6 +126,10 @@ export default async function ComandaPage({
           </p>
           <p className="mt-1">Cliente: {pedido.clienteNombre}</p>
         </div>
+
+        <br />
+        <br />
+        <br />
       </div>
     </>
   );
