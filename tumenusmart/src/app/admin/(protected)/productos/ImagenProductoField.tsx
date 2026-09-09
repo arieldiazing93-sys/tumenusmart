@@ -48,7 +48,7 @@ export function ImagenProductoField({ initialUrl }: { initialUrl: string | null 
 
   return (
     <div>
-      <label className="mb-1 block text-sm font-medium text-tinta-media">
+      <label className="mb-1 block text-sm font-semibold text-tinta">
         Foto del producto
       </label>
 

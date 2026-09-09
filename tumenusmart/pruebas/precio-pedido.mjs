@@ -50,7 +50,12 @@ function acepta(titulo, resultado) {
 // --------------------------------------------------------------- la carta
 // Una carta chica pero con todos los casos raros: opciones de los dos tipos,
 // ingredientes que se pueden sacar, y un grupo de mitad y mitad.
-const opcion = (id, nombre, tipo, precioExtra) => ({ id, nombre, tipo, precioExtra });
+// `costo` queda en null salvo que se pase explícito — así la mayoría de las
+// opciones de esta carta de prueba reproducen el caso real más común: un
+// agregado con precio cargado pero sin costo, que es justo el que el
+// reporte de rentabilidad tiene que saber marcar como "desconocido" y no
+// como cero.
+const opcion = (id, nombre, tipo, precioExtra, costo = null) => ({ id, nombre, tipo, precioExtra, costo });
 
 const empanada = {
   id: "p-empanada",
@@ -76,6 +81,25 @@ const hamburguesa = {
     opcion("o-doble", "Doble", "variante", 15000),
     opcion("o-cheddar", "Cheddar extra", "agregado", 7000),
     opcion("o-panceta", "Panceta", "agregado", 9000),
+  ],
+};
+
+// El caso real que reportó el dueño: un plato con un agregado pago (la papa
+// frita) que ANTES de tener costo propio se contaba como ganancia pura del
+// plato principal, inflando su margen en el reporte de rentabilidad.
+const milanesa = {
+  id: "p-milanesa",
+  nombre: "Milanesita",
+  precio: 60000,
+  disponible: true,
+  ingredientes: [],
+  mitadYMitadGrupo: null,
+  mitadYMitadModo: "mayor",
+  opciones: [
+    opcion("o-papa", "Papa frita", "agregado", 7000, 4000),
+    // A propósito sin costo, para probar el caso mixto: un agregado con
+    // costo cargado junto a uno que todavía no lo tiene.
+    opcion("o-ensalada", "Ensalada", "agregado", 5000),
   ],
 };
 
@@ -129,7 +153,7 @@ const agotado = {
   opciones: [],
 };
 
-const CARTA = [empanada, hamburguesa, pizzaMuzza, pizzaEspecial, pizzaChica, agotado];
+const CARTA = [empanada, hamburguesa, milanesa, pizzaMuzza, pizzaEspecial, pizzaChica, agotado];
 
 // =========================================================== lo que sí pasa
 const simple = armarPedido(CARTA, [{ productId: "p-empanada", cantidad: 3 }]);
@@ -148,6 +172,39 @@ igual(
   "el texto de opciones sale en el orden de la carta, no en el que las mandó el cliente",
   conOpciones.lineas[0].opcionesTexto,
   "Doble, Cheddar extra, Panceta"
+);
+igual(
+  "sin costo cargado en ninguna opción, el costo de agregados es DESCONOCIDO (null), no cero",
+  conOpciones.lineas[0].costoAgregados,
+  null
+);
+
+const sinOpciones = armarPedido(CARTA, [{ productId: "p-hamburguesa", cantidad: 1 }]);
+igual(
+  "sin elegir ningún agregado, el costo de agregados es cero y SÍ se conoce",
+  sinOpciones.lineas[0].costoAgregados,
+  0
+);
+
+// El caso real que reportó el dueño: Milanesita (Gs. 60.000) + papa frita
+// como agregado (cobra Gs. 7.000, cuesta Gs. 4.000 de verdad). Antes de este
+// campo, el reporte de rentabilidad contaba los Gs. 7.000 como ganancia pura
+// de la Milanesita — el margen quedaba inflado por lo que en realidad se
+// vendió aparte.
+const conAgregadoCosteado = armarPedido(CARTA, [
+  { productId: "p-milanesa", opcionIds: ["o-papa"], cantidad: 1 },
+]);
+acepta("milanesa con un agregado que tiene costo cargado", conAgregadoCosteado);
+igual("el precio de venta suma el agregado igual que antes", conAgregadoCosteado.lineas[0].precioUnitario, 60000 + 7000);
+igual("el costo de agregados es el costo real del agregado, no su precio", conAgregadoCosteado.lineas[0].costoAgregados, 4000);
+
+const conAgregadosMixtos = armarPedido(CARTA, [
+  { productId: "p-milanesa", opcionIds: ["o-papa", "o-ensalada"], cantidad: 1 },
+]);
+igual(
+  "un solo agregado sin costo entre varios alcanza para volver el total desconocido",
+  conAgregadosMixtos.lineas[0].costoAgregados,
+  null
 );
 
 const sinIngredientes = armarPedido(CARTA, [
@@ -337,6 +394,11 @@ const bordeCaro = armarPedido(CARTA, [
 ]);
 acepta("el borde de la primera mitad entra", bordeCaro);
 igual("y suma su precio", bordeCaro.lineas[0].precioUnitario, 90000 + 12000);
+igual(
+  "el combo también arrastra el costo desconocido de sus agregados",
+  bordeCaro.lineas[0].costoAgregados,
+  null
+);
 rechaza(
   "el borde barato de la otra mitad, que la pantalla no ofrece, no entra",
   armarPedido(CARTA, [

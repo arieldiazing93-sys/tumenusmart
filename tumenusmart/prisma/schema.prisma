@@ -340,6 +340,13 @@ model ProductOption {
   nombre      String
   tipo        String // "variante" | "agregado"
   precioExtra Decimal @db.Decimal(10, 2) @default(0)
+  /// Lo que le cuesta al negocio esta variante o agregado extra (ej: la
+  /// papa frita que se agrega a una hamburguesa). Opcional, mismo criterio
+  /// que Product.costo: mientras esté vacío, el reporte de rentabilidad no
+  /// puede calcular el margen real de lo que se vendió CON este agregado —
+  /// antes esa plata quedaba contada como ganancia del producto principal,
+  /// inflando su margen cada vez que se vendía con algo pago encima.
+  costo       Decimal? @db.Decimal(10, 2)
   orden       Int     @default(0)
 
   @@index([storeId])
@@ -481,6 +488,19 @@ model OrderItem {
   precioUnitario Decimal @db.Decimal(10, 2)
   opcionesTexto  String? // snapshot de las opciones elegidas, en texto legible
   ingredientesQuitadosTexto String? // snapshot de ingredientes que el cliente sacó, ej: "tomate, cebolla"
+  /// Snapshot de cuánto costaban (sumados) los agregados/variantes elegidos
+  /// en ESTE ítem, al momento de la venta — a diferencia de Product.costo
+  /// (que el reporte de rentabilidad lee siempre ACTUAL, no del día que se
+  /// vendió), esto no se puede recalcular después: el pedido no guarda a
+  /// cuáles opciones concretas corresponde `opcionesTexto`, solo el texto.
+  /// 0 si no se eligió ningún agregado. Null si se eligió alguno pero no
+  /// tenía costo cargado en ese momento — "desconocido", nunca inventado.
+  /// El default en 0 es solo para los pedidos VIEJOS, de antes de que este
+  /// campo existiera: siguen reportando exactamente el mismo número que
+  /// hoy (no se vuelven "desconocidos" de golpe). Los pedidos nuevos
+  /// siempre mandan un valor explícito desde el checkout, nunca dependen
+  /// de este default.
+  costoAgregados Decimal? @db.Decimal(10, 2) @default(0)
 
   @@index([storeId])
   @@index([orderId])

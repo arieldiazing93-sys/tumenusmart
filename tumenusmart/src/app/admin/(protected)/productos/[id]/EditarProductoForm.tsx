@@ -65,7 +65,7 @@ export function EditarProductoForm({
           </option>
         ))}
       </select>
-      <label className="flex flex-col gap-1 text-sm text-tinta-media">
+      <label className="flex flex-col gap-1 text-sm font-semibold text-tinta">
         Precio de venta
         <input
           type="number"
@@ -77,7 +77,7 @@ export function EditarProductoForm({
           className="rounded-lg border border-linea px-3 py-2"
         />
       </label>
-      <label className="flex flex-col gap-1 text-sm text-tinta-media">
+      <label className="flex flex-col gap-1 text-sm font-semibold text-tinta">
         Costo (opcional)
         <input
           type="number"
@@ -105,7 +105,7 @@ export function EditarProductoForm({
       <IngredientesField initial={producto.ingredientes} />
 
       <div className="rounded-lg border border-linea p-3">
-        <label className="mb-1 block text-sm font-medium text-tinta-media">
+        <label className="mb-1 block text-sm font-semibold text-tinta">
           Grupo "mitad y mitad" (opcional)
         </label>
         <p className="mb-2 text-xs text-tinta-media">

@@ -30,6 +30,15 @@ export function AgregarOpcionForm({ productId }: { productId: string }) {
         placeholder="Precio extra"
         className="w-32 rounded-lg border border-linea px-3 py-2 text-sm"
       />
+      <input
+        type="number"
+        name="costo"
+        step="1"
+        min="0"
+        placeholder="Costo (opcional)"
+        title="Lo que te cuesta a vos, no lo que le cobrás al cliente. Sin esto, el reporte de Rentabilidad no puede calcular bien el margen de lo que se vende con este agregado."
+        className="w-36 rounded-lg border border-linea px-3 py-2 text-sm"
+      />
       <button
         type="submit"
         disabled={pendiente}

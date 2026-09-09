@@ -28,7 +28,7 @@ export function IngredientesField({ initial }: { initial: string[] }) {
 
   return (
     <div>
-      <label className="mb-1 block text-sm font-medium text-tinta-media">
+      <label className="mb-1 block text-sm font-semibold text-tinta">
         Ingredientes (opcional)
       </label>
       <p className="mb-2 text-xs text-tinta-media">

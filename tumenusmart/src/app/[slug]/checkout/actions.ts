@@ -150,6 +150,7 @@ export async function crearPedido(datos: DatosCheckout): Promise<ResultadoPedido
       nombre: o.nombre,
       tipo: o.tipo,
       precioExtra: o.precioExtra,
+      costo: o.costo,
     })),
   }));
 
@@ -247,6 +248,7 @@ export async function crearPedido(datos: DatosCheckout): Promise<ResultadoPedido
           precioUnitario: l.precioUnitario,
           opcionesTexto: l.opcionesTexto,
           ingredientesQuitadosTexto: l.ingredientesQuitadosTexto,
+          costoAgregados: l.costoAgregados,
         })),
       },
     },

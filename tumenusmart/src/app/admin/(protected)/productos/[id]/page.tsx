@@ -8,6 +8,7 @@ import { formatearGuarani } from "@/lib/format";
 import { EliminarProductoBoton, EliminarOpcionBoton } from "./EliminarBotones";
 import { EditarProductoForm } from "./EditarProductoForm";
 import { AgregarOpcionForm } from "./AgregarOpcionForm";
+import { EditarCostoOpcion } from "./EditarCostoOpcion";
 import { GuardadoToast } from "@/components/GuardadoToast";
 
 export const dynamic = "force-dynamic";
@@ -84,7 +85,7 @@ export default async function EditarProductoPage({
           {producto.opciones.map((o) => (
             <div
               key={o.id}
-              className="flex items-center justify-between rounded-lg border border-linea bg-white px-3 py-2 text-sm"
+              className="flex flex-col gap-2 rounded-lg border border-linea bg-white px-3 py-2 text-sm sm:flex-row sm:items-center sm:justify-between"
             >
               <span>
                 {o.nombre}
@@ -94,8 +95,22 @@ export default async function EditarProductoPage({
                     · +{formatearGuarani(Number(o.precioExtra))}
                   </span>
                 )}
+                {o.costo == null && (
+                  // Sin esto, el margen de todo lo que se venda con este
+                  // agregado sale inflado en el reporte de Rentabilidad —
+                  // esa plata queda contada como ganancia del producto
+                  // principal en vez de como lo que cuesta este agregado.
+                  <span className="text-aviso"> · sin costo cargado</span>
+                )}
               </span>
-              <EliminarOpcionBoton productId={producto.id} optionId={o.id} />
+              <div className="flex flex-none items-center gap-3">
+                <EditarCostoOpcion
+                  productId={producto.id}
+                  optionId={o.id}
+                  costoActual={o.costo != null ? Number(o.costo) : null}
+                />
+                <EliminarOpcionBoton productId={producto.id} optionId={o.id} />
+              </div>
             </div>
           ))}
           {producto.opciones.length === 0 && (

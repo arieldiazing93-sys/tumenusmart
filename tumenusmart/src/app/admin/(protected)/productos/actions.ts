@@ -25,6 +25,17 @@ export async function subirFotoProducto(formData: FormData): Promise<ResultadoFo
   return { ok: true, url };
 }
 
+/**
+ * Vacío o inválido = costo desconocido (null), no cero — un agregado
+ * gratis de verdad es un caso raro y se puede escribir "0" a mano; lo
+ * común es no saberlo todavía, y ahí el reporte de Rentabilidad tiene que
+ * poder distinguir "no cuesta nada" de "no lo cargaron".
+ */
+function parsearCosto(formData: FormData): number | null {
+  const crudo = String(formData.get("costo") ?? "").trim();
+  return crudo && !isNaN(parseFloat(crudo)) ? parseFloat(crudo) : null;
+}
+
 function parsearIngredientes(formData: FormData): string[] {
   const crudo = String(formData.get("ingredientes") ?? "[]");
   try {
@@ -167,12 +178,48 @@ export async function agregarOpcion(
   const nombre = String(formData.get("nombre") ?? "").trim();
   const tipo = String(formData.get("tipo") ?? "agregado");
   const precioExtra = parseFloat(String(formData.get("precioExtra") ?? "0")) || 0;
+  const costo = parsearCosto(formData);
 
   if (!nombre) return { ok: false, error: "El nombre de la opción es obligatorio" };
 
   await prisma.productOption.create({
-    data: { productId, nombre, tipo, precioExtra, storeId: idLocal },
+    data: { productId, nombre, tipo, precioExtra, costo, storeId: idLocal },
   });
+  revalidatePath(`/admin/productos/${productId}`);
+  return { ok: true };
+}
+
+/**
+ * Cambia el costo de un agregado/variante que ya existe.
+ *
+ * Separado de `agregarOpcion` a propósito: cuando este campo se agregó, los
+ * agregados creados antes se quedaron sin costo cargado y no había forma de
+ * completarlo salvo borrar y crear de nuevo (perdiendo también el precio
+ * extra ya configurado). Esto deja corregir solo el costo, sin tocar lo
+ * demás.
+ */
+export async function actualizarCostoOpcion(
+  productId: string,
+  optionId: string,
+  formData: FormData
+): Promise<ResultadoProducto> {
+  await exigirPermiso("productos.editar");
+  // Todas las consultas de acá abajo quedan atadas a este local.
+  const prisma = prismaDelLocal(await idLocalActual());
+
+  const costo = parsearCosto(formData);
+
+  // El `where` con productId de más, aparte de optionId, es defensa en
+  // profundidad: sin él, alguien podría mandar el id de una opción de OTRO
+  // producto (de este mismo local) y pisarle el costo desde este formulario.
+  const resultado = await prisma.productOption.updateMany({
+    where: { id: optionId, productId },
+    data: { costo },
+  });
+  if (resultado.count === 0) {
+    return { ok: false, error: "Esa opción no existe o no es de este producto" };
+  }
+
   revalidatePath(`/admin/productos/${productId}`);
   return { ok: true };
 }

@@ -31,6 +31,8 @@ export type OpcionBase = {
   /** "variante" | "agregado" */
   tipo: string;
   precioExtra: Monto;
+  /** Null si el dueño nunca cargó un costo para esta opción. */
+  costo: Monto | null;
 };
 
 export type ProductoBase = {
@@ -70,6 +72,13 @@ export type LineaArmada = {
   precioUnitario: number;
   opcionesTexto?: string;
   ingredientesQuitadosTexto?: string;
+  /**
+   * Costo (por unidad) de las opciones elegidas, sumadas. 0 si no se elige
+   * ninguna. Null si se elige alguna pero le falta el costo — el reporte de
+   * rentabilidad necesita distinguir "no tiene agregados" de "tiene
+   * agregados pero no sabemos cuánto cuestan", para no inventar un número.
+   */
+  costoAgregados: number | null;
 };
 
 export type ResultadoArmado =
@@ -93,6 +102,23 @@ function aNumero(valor: Monto): number {
   if (typeof valor === "number") return Number.isFinite(valor) ? valor : 0;
   const n = parseFloat(String(valor));
   return Number.isFinite(n) ? n : 0;
+}
+
+/**
+ * Suma el costo de un grupo de opciones elegidas. 0 si el grupo está vacío
+ * (no se eligió ningún agregado — costo conocido y es cero). Null si se
+ * eligió alguna pero al menos una no tiene costo cargado: no se puede
+ * saber el costo real de esta línea, y sumar solo las que sí tienen costo
+ * daría un número que parece exacto pero no lo es.
+ */
+function sumaCostoOpciones(opciones: OpcionBase[]): number | null {
+  if (opciones.length === 0) return 0;
+  let total = 0;
+  for (const o of opciones) {
+    if (o.costo == null) return null;
+    total += aNumero(o.costo);
+  }
+  return total;
 }
 
 /** Dos grupos de mitad y mitad son el mismo si difieren solo en mayúsculas o espacios. */
@@ -263,6 +289,7 @@ function armarProducto(
       opcionesTexto: textoOpciones(elegidas.opciones),
       ingredientesQuitadosTexto:
         quitadosOrdenados.length > 0 ? `Sin: ${quitadosOrdenados.join(", ")}` : undefined,
+      costoAgregados: sumaCostoOpciones(elegidas.opciones),
     },
   };
 }
@@ -314,6 +341,7 @@ function armarCombo(
       cantidad: pedida.cantidad,
       precioUnitario,
       opcionesTexto: textoOpciones(elegidas.opciones),
+      costoAgregados: sumaCostoOpciones(elegidas.opciones),
     },
   };
 }
