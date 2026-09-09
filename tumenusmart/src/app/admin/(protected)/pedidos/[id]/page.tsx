@@ -90,7 +90,7 @@ export default async function DetallePedidoPage({
 
       <div className="mb-6 grid gap-4 sm:grid-cols-2">
         <div className="rounded-lg border border-linea bg-white p-4">
-          <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-tinta-suave">
+          <p className="mb-1 text-sm font-bold uppercase tracking-wide text-tinta-suave">
             Entrega
           </p>
           <p className="text-sm text-tinta">
@@ -116,7 +116,7 @@ export default async function DetallePedidoPage({
 
           {pedido.tipoEntrega === "delivery" && (
             <div className="mt-3 border-t border-linea-fina pt-3">
-              <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-tinta-suave">
+              <p className="mb-1 text-sm font-bold uppercase tracking-wide text-tinta-suave">
                 Repartidor
               </p>
               <RepartidorSelect
@@ -129,7 +129,7 @@ export default async function DetallePedidoPage({
         </div>
 
         <div className="rounded-lg border border-linea bg-white p-4">
-          <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-tinta-suave">
+          <p className="mb-1 text-sm font-bold uppercase tracking-wide text-tinta-suave">
             Pago
           </p>
           <p className="text-sm text-tinta">{pedido.metodoPagoReferencia}</p>
@@ -145,7 +145,7 @@ export default async function DetallePedidoPage({
 
           {pedido.notas && (
             <div className="mt-3 border-t border-linea-fina pt-3">
-              <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-tinta-suave">
+              <p className="mb-1 text-sm font-bold uppercase tracking-wide text-tinta-suave">
                 Nota del cliente
               </p>
               <p className="text-sm text-tinta-media">{pedido.notas}</p>
@@ -155,7 +155,7 @@ export default async function DetallePedidoPage({
       </div>
 
       <div className="mb-6 rounded-lg border border-linea bg-white p-4">
-        <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-tinta-suave">
+        <p className="mb-2 text-sm font-bold uppercase tracking-wide text-tinta-suave">
           Productos
         </p>
         <ul className="flex flex-col gap-2">
