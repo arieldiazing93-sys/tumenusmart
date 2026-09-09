@@ -1,6 +1,7 @@
+import { Fragment } from "react";
 import Link from "next/link";
 import { pantallaConPermiso } from "@/lib/auth";
-import { Cabecera } from "@/components/ui";
+import { Cabecera, clasesBoton } from "@/components/ui";
 import { idLocalActual } from "@/lib/local-actual";
 import { formatearGuarani } from "@/lib/format";
 import { calcularRangoFecha, type FiltroFecha } from "@/lib/rango-fecha";
@@ -35,11 +36,37 @@ export default async function EnviosPage({
       ? Math.round((cantidad / reporte.totalGeneral.cantidadDelivery) * 100)
       : 0;
 
+  function querystringActual() {
+    const params = new URLSearchParams();
+    params.set("fecha", fechaActiva);
+    if (fechaActiva === "rango" && desde) params.set("desde", desde);
+    if (fechaActiva === "rango" && hasta) params.set("hasta", hasta);
+    return params.toString();
+  }
+
   return (
     <div>
       <Cabecera
         titulo="Envíos"
         bajada="Cuántos pedidos llegan por delivery y de qué zona, aparte de retiro en el local — para saber dónde conviene reforzar reparto."
+        acciones={
+          <>
+            <a
+              href={`/admin/envios/exportar?${querystringActual()}`}
+              className={clasesBoton("principal", "sm")}
+            >
+              Descargar Excel
+            </a>
+            <a
+              href={`/admin/envios/imprimir?${querystringActual()}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={clasesBoton("navegar", "sm")}
+            >
+              Ver reporte / PDF
+            </a>
+          </>
+        }
       />
 
       <div className="mb-6 flex flex-wrap items-center gap-2">
@@ -130,22 +157,38 @@ export default async function EnviosPage({
               </thead>
               <tbody>
                 {reporte.zonas.map((z) => (
-                  <tr key={z.zonaId ?? "sin-zona"} className="border-b border-linea-fina last:border-0">
-                    <td className="px-3 py-2 font-medium text-tinta">{z.zonaNombre}</td>
-                    <td className="cifra px-3 py-2 text-right text-tinta-media">{z.cantidadPedidos}</td>
-                    <td className="cifra px-3 py-2 text-right text-tinta-media">
-                      {pctDelivery(z.cantidadPedidos)}%
-                    </td>
-                    <td className="cifra px-3 py-2 text-right text-tinta-media">
-                      {formatearGuarani(Math.round(z.totalFacturado))}
-                    </td>
-                    <td className="cifra px-3 py-2 text-right text-tinta-media">
-                      {formatearGuarani(Math.round(z.totalEnvio))}
-                    </td>
-                    <td className="cifra px-3 py-2 text-right font-semibold text-tinta">
-                      {formatearGuarani(Math.round(z.envioPromedio))}
-                    </td>
-                  </tr>
+                  <Fragment key={z.zonaId ?? "sin-zona"}>
+                    <tr className={z.repartidores.length > 0 ? "border-linea-fina" : "border-b border-linea-fina last:border-0"}>
+                      <td className="px-3 py-2 font-medium text-tinta">{z.zonaNombre}</td>
+                      <td className="cifra px-3 py-2 text-right text-tinta-media">{z.cantidadPedidos}</td>
+                      <td className="cifra px-3 py-2 text-right text-tinta-media">
+                        {pctDelivery(z.cantidadPedidos)}%
+                      </td>
+                      <td className="cifra px-3 py-2 text-right text-tinta-media">
+                        {formatearGuarani(Math.round(z.totalFacturado))}
+                      </td>
+                      <td className="cifra px-3 py-2 text-right text-tinta-media">
+                        {formatearGuarani(Math.round(z.totalEnvio))}
+                      </td>
+                      <td className="cifra px-3 py-2 text-right font-semibold text-tinta">
+                        {formatearGuarani(Math.round(z.envioPromedio))}
+                      </td>
+                    </tr>
+                    {/* Quién hizo los envíos de esta zona, uno por repartidor. */}
+                    {z.repartidores.length > 0 &&
+                      z.repartidores.map((r) => (
+                        <tr
+                          key={r.repartidorId ?? "sin-repartidor"}
+                          className="border-b border-linea-fina bg-papel-suave/60 text-xs last:border-0"
+                        >
+                          <td className="px-3 py-1.5 pl-6 text-tinta-suave">→ {r.repartidorNombre}</td>
+                          <td className="cifra px-3 py-1.5 text-right text-tinta-suave">
+                            {r.cantidadPedidos}
+                          </td>
+                          <td colSpan={4} />
+                        </tr>
+                      ))}
+                  </Fragment>
                 ))}
                 {reporte.zonas.length === 0 && (
                   <tr>

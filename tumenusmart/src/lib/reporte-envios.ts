@@ -1,6 +1,14 @@
 import { prismaDelLocal } from "./prisma-local";
 import { PEDIDO_REAL, type RangoFecha } from "./estadisticas";
 
+export type FilaRepartidorEnvio = {
+  /** Null = el pedido nunca tuvo un repartidor asignado (quedó pendiente,
+   * se entregó sin pasar por "en despacho", etc.). */
+  repartidorId: string | null;
+  repartidorNombre: string;
+  cantidadPedidos: number;
+};
+
 export type FilaZonaEnvio = {
   /** Null = pedidos delivery que no matchearon ninguna zona activa (el
    * negocio usa "coordinar", o el cliente quedó fuera de todas las zonas). */
@@ -12,6 +20,9 @@ export type FilaZonaEnvio = {
   /** Suma de Order.costoEnvio — solo la parte de envío. */
   totalEnvio: number;
   envioPromedio: number;
+  /** Quién hizo esos envíos, desglosado — ordenados de quien más hizo a
+   * quien menos. */
+  repartidores: FilaRepartidorEnvio[];
 };
 
 export type ReporteEnvios = {
@@ -52,6 +63,8 @@ export async function calcularReporteEnvios(
       deliveryZone: { select: { nombre: true } },
       costoEnvio: true,
       total: true,
+      repartidorId: true,
+      repartidor: { select: { nombre: true } },
     },
   });
 
@@ -61,8 +74,10 @@ export async function calcularReporteEnvios(
     cantidadPedidos: number;
     totalFacturado: number;
     totalEnvio: number;
+    repartidores: Map<string, { repartidorId: string | null; repartidorNombre: string; cantidadPedidos: number }>;
   };
   const zonasMap = new Map<string, Acumulado>();
+  const SIN_REPARTIDOR = "__sin_repartidor__";
   // Sin zona propia: agrupa tanto al negocio que coordina el envío directo
   // como al cliente que quedó fuera de todos los radios cargados — en los
   // dos casos, no hay una zona real a la que atribuirle el pedido.
@@ -85,19 +100,36 @@ export async function calcularReporteEnvios(
       cantidadPedidos: 0,
       totalFacturado: 0,
       totalEnvio: 0,
+      repartidores: new Map(),
     };
     actual.cantidadPedidos += 1;
     actual.totalFacturado += Number(p.total);
     actual.totalEnvio += Number(p.costoEnvio);
+
+    const claveRepartidor = p.repartidorId ?? SIN_REPARTIDOR;
+    const repartidor = actual.repartidores.get(claveRepartidor) ?? {
+      repartidorId: p.repartidorId,
+      repartidorNombre: p.repartidor?.nombre ?? "Sin repartidor asignado",
+      cantidadPedidos: 0,
+    };
+    repartidor.cantidadPedidos += 1;
+    actual.repartidores.set(claveRepartidor, repartidor);
+
     zonasMap.set(clave, actual);
   }
 
   // La zona que más pedidos mueve primero: acá interesa dónde conviene
-  // reforzar reparto, no un orden alfabético.
+  // reforzar reparto, no un orden alfabético. Dentro de cada zona, el
+  // repartidor que más hizo primero, con el mismo criterio.
   const zonas: FilaZonaEnvio[] = [...zonasMap.values()]
     .map((z) => ({
-      ...z,
+      zonaId: z.zonaId,
+      zonaNombre: z.zonaNombre,
+      cantidadPedidos: z.cantidadPedidos,
+      totalFacturado: z.totalFacturado,
+      totalEnvio: z.totalEnvio,
       envioPromedio: z.cantidadPedidos > 0 ? z.totalEnvio / z.cantidadPedidos : 0,
+      repartidores: [...z.repartidores.values()].sort((a, b) => b.cantidadPedidos - a.cantidadPedidos),
     }))
     .sort((a, b) => b.cantidadPedidos - a.cantidadPedidos);
 
