@@ -67,6 +67,8 @@ function armarGrupos(hayIdeaSinVer: boolean, rol: string): GrupoSecciones[] {
           ver: conPermiso("analytics.ver") },
         { href: "/admin/productos-vendidos", label: "Rentabilidad", icono: "rentabilidad" as const,
           ver: conPermiso("estadisticas.ver") },
+        { href: "/admin/envios", label: "Envíos", icono: "envios" as const,
+          ver: conPermiso("estadisticas.ver") },
       ],
     },
     {

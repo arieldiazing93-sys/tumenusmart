@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { haySesionAdminValida } from "@/lib/auth";
 import { idLocalActual, localActual } from "@/lib/local-actual";
 import { calcularRangoFecha } from "@/lib/rango-fecha";
-import { calcularReporteProductosVendidos } from "@/lib/reporte-productos";
+import { calcularReporteProductosVendidos, type FilaProductoReporte } from "@/lib/reporte-productos";
 import { ZONA_NEGOCIO } from "@/lib/timezone";
 
 export const dynamic = "force-dynamic";
@@ -21,6 +21,19 @@ function csvEscape(valor: string | number): string {
 // a mano para arreglarlo. Con ";" lo abre bien con solo hacer doble clic.
 function filaCsv(valores: (string | number)[]): string {
   return valores.map(csvEscape).join(";");
+}
+
+/** "Borde relleno x1: Gs. 10.000 (costo Gs. 3.000); Extra queso x2: ..." —
+ * va todo en una sola columna porque `csvEscape` la entrecomilla si hace
+ * falta (tiene punto y coma adentro), así Excel no la corta en columnas de
+ * más. */
+function textoDetalleAgregados(detalle: FilaProductoReporte["agregadosDetalle"]): string {
+  return detalle
+    .map((d) => {
+      const costo = d.costo != null ? `costo Gs. ${Math.round(d.costo)}` : "costo desconocido";
+      return `${d.texto} x${d.cantidad}: Gs. ${Math.round(d.venta)} (${costo})`;
+    })
+    .join("; ");
 }
 
 // Genera un CSV (se abre directo en Excel, Google Sheets, Numbers, etc.), sin
@@ -84,6 +97,9 @@ export async function GET(request: NextRequest) {
       "Venta agregados (Gs.)",
       "Costo agregados (Gs.)",
       "Ganancia agregados (Gs.)",
+      // Cuál fue cada agregado, no solo el total — el mismo texto que ve
+      // el cliente en su comprobante.
+      "Detalle de agregados",
     ])
   );
 
@@ -101,12 +117,13 @@ export async function GET(request: NextRequest) {
           f.ventaAgregados > 0 ? Math.round(f.ventaAgregados) : "",
           f.costoAgregados != null ? Math.round(f.costoAgregados) : "",
           f.gananciaAgregados != null ? Math.round(f.gananciaAgregados) : "",
+          textoDetalleAgregados(f.agregadosDetalle),
         ])
       );
     }
   }
 
-  // Mismas 10 columnas que la tabla de arriba, no una estructura aparte —
+  // Mismas 11 columnas que la tabla de arriba, no una estructura aparte —
   // así la fila de totales se lee de un vistazo, alineada con los encabezados.
   filas.push(
     filaCsv([
@@ -117,6 +134,7 @@ export async function GET(request: NextRequest) {
       reporte.totalGeneral.costo != null ? Math.round(reporte.totalGeneral.costo) : "",
       "",
       reporte.totalGeneral.ganancia != null ? Math.round(reporte.totalGeneral.ganancia) : "",
+      "",
       "",
       "",
       "",

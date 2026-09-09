@@ -5,17 +5,15 @@ export type FilaProductoReporte = {
   nombre: string;
   cantidad: number;
   /**
-   * Precio de venta del PRODUCTO EN SÍ — para un producto normal, es
-   * siempre su precio de catálogo actual, sin importar si esa venta puntual
-   * llevó agregados pagos o no. Antes esto era un promedio entre "se vendió
-   * solo" y "se vendió con agregados", y un producto que se vendía siempre
-   * con extras caros terminaba mostrando un precio (y una ganancia) que no
-   * eran los suyos, sino mezclados con lo que en realidad se vendió aparte.
-   *
-   * Para un combo "mitad y mitad" (que no tiene un precio de catálogo
-   * único, depende de qué dos mitades se combinaron cada vez) sigue siendo
-   * el promedio ponderado del período, como antes — ahí no hay un número
-   * "propio" del cual separarse.
+   * Precio de venta promedio del PRODUCTO EN SÍ, sin lo que aportaron sus
+   * agregados. Sigue siendo un promedio ponderado del período (si el
+   * precio del producto cambió a mitad de camino, no es "el" precio, es lo
+   * que en promedio pagó cada uno — igual que siempre) pero ya NUNCA
+   * incluye lo que se cobró por agregados: antes esto mezclaba "se vendió
+   * solo" con "se vendió con agregados pagos", y un producto que se vendía
+   * seguido con extras caros terminaba mostrando un precio (y una
+   * ganancia) que no eran los suyos, sino mezclados con lo que en realidad
+   * se vendió aparte.
    */
   precioVentaUnitario: number;
   /** Costo ACTUAL del producto en sí (sin agregados). Null si el producto
@@ -38,6 +36,20 @@ export type FilaProductoReporte = {
   ventaAgregados: number;
   costoAgregados: number | null;
   gananciaAgregados: number | null;
+  /**
+   * Qué agregados fueron, desglosados por combinación exacta (el mismo
+   * texto que ve el cliente en su comprobante, ej: "Borde relleno, Extra
+   * queso"). Puede haber más de una fila si a este producto se le
+   * vendieron distintas combinaciones en el período. Vacío si nunca se le
+   * vendió nada con costo.
+   */
+  agregadosDetalle: {
+    texto: string;
+    cantidad: number;
+    venta: number;
+    costo: number | null;
+    ganancia: number | null;
+  }[];
 };
 
 export type CategoriaReporte = {
@@ -79,12 +91,16 @@ export type ReporteProductosVendidos = {
  * caen todos juntos en una categoría aparte al final, con el costo marcado
  * como no disponible en vez de inventado.
  *
- * El precio/costo de cada producto normal es siempre el suyo (de catálogo),
- * nunca mezclado con lo que aportaron sus agregados en cada venta puntual
- * — eso se calcula y se muestra por separado (`ventaAgregados`,
- * `costoAgregados`). Los totales de categoría y del período sí suman las
- * dos cosas juntas: esa es la plata real que entró, y tiene que coincidir
- * con lo que muestran Estadísticas y Analytics.
+ * La venta de cada producto normal nunca mezcla lo que aportaron sus
+ * agregados en cada venta puntual — eso se calcula y se muestra por
+ * separado (`ventaAgregados`, `costoAgregados`). Para la venta se usa el
+ * monto REAL cobrado en cada pedido (histórico), nunca el precio de
+ * catálogo de hoy — así el total no se corre si el precio cambió a mitad
+ * del período. El costo sí usa siempre el costo ACTUAL del producto,
+ * porque nunca se guardó una foto del costo del día que se vendió.
+ * Los totales de categoría y del período suman producto + agregados
+ * juntos: esa es la plata real que entró, y tiene que coincidir con lo que
+ * muestran Estadísticas y Analytics.
  */
 export async function calcularReporteProductosVendidos(
   storeId: string,
@@ -102,9 +118,9 @@ export async function calcularReporteProductosVendidos(
       precioUnitario: true,
       precioAgregados: true,
       costoAgregados: true,
+      opcionesTexto: true,
       product: {
         select: {
-          precio: true,
           costo: true,
           category: { select: { id: true, nombre: true, orden: true } },
         },
@@ -116,10 +132,20 @@ export async function calcularReporteProductosVendidos(
     nombre: string;
     cantidad: number;
     esCombo: boolean;
-    // Producto normal: precio/costo de catálogo — fijos, no dependen de
-    // qué se vendió en cada línea puntual.
-    precioCatalogo: number | null;
+    // Costo del producto en sí: siempre el ACTUAL de catálogo (igual que
+    // toda esta pantalla — nunca se guardó una foto del costo del día que
+    // se vendió, por diseño).
     costoCatalogo: number | null;
+    // Venta del producto SOLO, real e histórica — la suma de lo que
+    // realmente se cobró en cada venta, menos lo que en cada una
+    // correspondía a agregados. A propósito NO es "precio actual × cantidad":
+    // si el precio del producto cambió a mitad del período, usar el precio
+    // de HOY para todo el período haría que este total ya no coincida con
+    // la plata real que sumaron Estadísticas y Analytics para las mismas
+    // fechas. Restar los agregados de cada venta sí es seguro, porque eso
+    // es un valor histórico guardado (`OrderItem.precioAgregados`), no uno
+    // que se recalcula con datos de hoy.
+    totalVentaBase: number;
     // Combo: no tiene precio de catálogo propio, así que se sigue
     // promediando la venta real del período (agregados del combo incluidos,
     // como siempre se hizo — separarlos ahí no tiene un "propio" del cual
@@ -129,6 +155,13 @@ export async function calcularReporteProductosVendidos(
     totalVentaAgregados: number;
     totalCostoAgregadosConocido: number;
     costoAgregadosIncompleto: boolean;
+    // Desglosado por combinación exacta de opciones elegidas (el texto que
+    // ve el cliente en su comprobante), para poder mostrar CUÁL agregado
+    // fue y no solo un número suelto.
+    detalleAgregados: Map<
+      string,
+      { texto: string; cantidad: number; venta: number; costo: number; costoIncompleto: boolean }
+    >;
     categoriaId: string | null;
     categoriaNombre: string;
     categoriaOrden: number;
@@ -147,12 +180,13 @@ export async function calcularReporteProductosVendidos(
       nombre: item.nombreProducto,
       cantidad: 0,
       esCombo,
-      precioCatalogo: !esCombo && item.product ? Number(item.product.precio) : null,
       costoCatalogo: !esCombo && item.product?.costo != null ? Number(item.product.costo) : null,
+      totalVentaBase: 0,
       totalVentaCombo: 0,
       totalVentaAgregados: 0,
       totalCostoAgregadosConocido: 0,
       costoAgregadosIncompleto: false,
+      detalleAgregados: new Map(),
       categoriaId: item.product?.category?.id ?? null,
       categoriaNombre: item.product?.category?.nombre ?? "Mitad y mitad / combos",
       categoriaOrden: item.product?.category?.orden ?? Number.MAX_SAFE_INTEGER,
@@ -164,6 +198,12 @@ export async function calcularReporteProductosVendidos(
       // El combo no separa agregados: su "venta total" ya los incluye,
       // igual que siempre.
       actual.totalVentaCombo += item.cantidad * Number(item.precioUnitario);
+    } else {
+      // Lo que de verdad se cobró por el producto en ESTA venta, sin la
+      // parte de agregados — ambos son valores históricos guardados en el
+      // pedido, no algo que dependa del catálogo de hoy.
+      actual.totalVentaBase +=
+        item.cantidad * (Number(item.precioUnitario) - Number(item.precioAgregados));
     }
 
     const costoAgregadosItem = item.costoAgregados != null ? Number(item.costoAgregados) : null;
@@ -171,6 +211,30 @@ export async function calcularReporteProductosVendidos(
       actual.totalCostoAgregadosConocido += costoAgregadosItem * item.cantidad;
     } else {
       actual.costoAgregadosIncompleto = true;
+    }
+
+    // Desglose por combinación exacta — solo tiene sentido para productos
+    // normales (los combos no separan agregados) y solo cuando de verdad
+    // se pagó algo extra (una variante gratis elegida no es "un agregado
+    // vendido").
+    const precioAgregadosItem = Number(item.precioAgregados);
+    if (!esCombo && precioAgregadosItem > 0) {
+      const texto = item.opcionesTexto ?? "Agregados";
+      const entrada = actual.detalleAgregados.get(texto) ?? {
+        texto,
+        cantidad: 0,
+        venta: 0,
+        costo: 0,
+        costoIncompleto: false,
+      };
+      entrada.cantidad += item.cantidad;
+      entrada.venta += item.cantidad * precioAgregadosItem;
+      if (costoAgregadosItem != null) {
+        entrada.costo += costoAgregadosItem * item.cantidad;
+      } else {
+        entrada.costoIncompleto = true;
+      }
+      actual.detalleAgregados.set(texto, entrada);
     }
 
     acumulado.set(clave, actual);
@@ -192,16 +256,16 @@ export async function calcularReporteProductosVendidos(
     const costoAgregados = a.esCombo || a.costoAgregadosIncompleto ? null : a.totalCostoAgregadosConocido;
     const gananciaAgregados = costoAgregados != null ? ventaAgregados - costoAgregados : null;
 
-    // Producto en sí: precio/costo fijos de catálogo. Combo: el promedio
+    // Venta del producto en sí: la real e histórica (sin agregados), no el
+    // precio de catálogo de hoy — así coincide con Estadísticas aunque el
+    // precio haya cambiado a mitad del período. Combo: el promedio
     // ponderado de siempre (agregados del combo ya incluidos ahí).
-    const precioVentaUnitario = a.esCombo
-      ? a.cantidad > 0
-        ? a.totalVentaCombo / a.cantidad
-        : 0
-      : a.precioCatalogo ?? 0;
+    const totalVenta = a.esCombo ? a.totalVentaCombo : a.totalVentaBase;
+    const precioVentaUnitario = a.cantidad > 0 ? totalVenta / a.cantidad : 0;
+    // El costo sí es siempre el ACTUAL de catálogo — ver la nota en
+    // `costoCatalogo` más arriba.
     const costoUnitario = a.esCombo ? null : a.costoCatalogo;
 
-    const totalVenta = precioVentaUnitario * a.cantidad;
     const totalCosto = costoUnitario != null ? costoUnitario * a.cantidad : null;
     const ganancia = totalCosto != null ? totalVenta - totalCosto : null;
     const margen = ganancia != null && totalVenta > 0 ? (ganancia / totalVenta) * 100 : null;
@@ -223,6 +287,19 @@ export async function calcularReporteProductosVendidos(
       categoriasMap.set(claveCategoria, categoria);
     }
 
+    // Del mismo Map de más arriba, una fila por combinación — ordenadas de
+    // la que más vendió a la que menos, igual criterio que las filas de
+    // productos.
+    const agregadosDetalle = [...a.detalleAgregados.values()]
+      .map((d) => ({
+        texto: d.texto,
+        cantidad: d.cantidad,
+        venta: d.venta,
+        costo: d.costoIncompleto ? null : d.costo,
+        ganancia: d.costoIncompleto ? null : d.venta - d.costo,
+      }))
+      .sort((x, y) => y.venta - x.venta);
+
     categoria.filas.push({
       nombre: a.nombre,
       cantidad: a.cantidad,
@@ -235,6 +312,7 @@ export async function calcularReporteProductosVendidos(
       ventaAgregados,
       costoAgregados,
       gananciaAgregados,
+      agregadosDetalle,
     });
 
     categoria.totalCantidad += a.cantidad;

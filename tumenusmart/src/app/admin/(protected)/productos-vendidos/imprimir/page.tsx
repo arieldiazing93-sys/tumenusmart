@@ -141,23 +141,25 @@ export default async function ImprimirProductosVendidosPage({
                         </td>
                       </tr>
                       {/* Lo que aportaron los agregados vendidos junto con este producto,
-                          aparte — totales del período, no por unidad. */}
-                      {f.ventaAgregados > 0 && (
-                        <tr className="border-b border-linea-fina break-inside-avoid text-xs">
-                          <td className="py-1 pl-4 text-tinta-suave">+ agregados vendidos con este producto</td>
-                          <td />
-                          <td className="py-1 text-right text-tinta-suave">
-                            {formatearGuarani(Math.round(f.ventaAgregados))}
-                          </td>
-                          <td className="py-1 text-right text-tinta-suave">
-                            {f.costoAgregados != null ? formatearGuarani(Math.round(f.costoAgregados)) : "—"}
+                          aparte — una fila por combinación exacta, totales del período. */}
+                      {f.agregadosDetalle.map((d) => (
+                        <tr key={`${f.nombre}-${d.texto}`} className="border-b border-linea-fina break-inside-avoid text-xs">
+                          <td className="py-1 pl-4 text-tinta-suave">
+                            + {d.texto} · {d.cantidad}x
                           </td>
                           <td />
                           <td className="py-1 text-right text-tinta-suave">
-                            {f.gananciaAgregados != null ? formatearGuarani(Math.round(f.gananciaAgregados)) : "—"}
+                            {formatearGuarani(Math.round(d.venta))}
+                          </td>
+                          <td className="py-1 text-right text-tinta-suave">
+                            {d.costo != null ? formatearGuarani(Math.round(d.costo)) : "—"}
+                          </td>
+                          <td />
+                          <td className="py-1 text-right text-tinta-suave">
+                            {d.ganancia != null ? formatearGuarani(Math.round(d.ganancia)) : "—"}
                           </td>
                         </tr>
-                      )}
+                      ))}
                     </Fragment>
                   ))}
                 </tbody>

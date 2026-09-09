@@ -188,25 +188,33 @@ export default async function ProductosVendidosPage({
                             Lo que aportaron los agregados (papas, extras...) vendidos junto con
                             este producto, aparte — para que no se lea como si el producto en sí
                             vendiera más caro o dejara más ganancia de lo que en realidad es suya.
+                            Una fila por combinación exacta (el mismo texto que ve el cliente en
+                            su comprobante), no un número suelto — así se ve CUÁL agregado fue.
                             Los valores son TOTALES del período, no por unidad como la fila de
                             arriba (un agregado no tiene un "precio por unidad de producto").
                           */}
-                          {f.ventaAgregados > 0 && (
-                            <tr key={`${f.nombre}-agregados`} className="border-b border-linea-fina bg-papel-suave/60 text-xs last:border-0">
-                              <td className="px-3 py-1.5 pl-6 text-tinta-suave">+ agregados vendidos con este producto</td>
+                          {f.agregadosDetalle.map((d) => (
+                            <tr
+                              key={`${f.nombre}-${d.texto}`}
+                              className="border-b border-linea-fina bg-papel-suave/60 text-xs last:border-0"
+                            >
+                              <td className="px-3 py-1.5 pl-6 text-tinta-suave">
+                                + {d.texto}
+                                <span className="text-tinta-suave/70"> · {d.cantidad}x</span>
+                              </td>
                               <td />
                               <td className="cifra px-3 py-1.5 text-right text-tinta-suave">
-                                {formatearGuarani(Math.round(f.ventaAgregados))}
+                                {formatearGuarani(Math.round(d.venta))}
                               </td>
                               <td className="cifra px-3 py-1.5 text-right text-tinta-suave">
-                                {f.costoAgregados != null ? formatearGuarani(Math.round(f.costoAgregados)) : "—"}
+                                {d.costo != null ? formatearGuarani(Math.round(d.costo)) : "—"}
                               </td>
                               <td />
                               <td className="cifra px-3 py-1.5 text-right text-tinta-suave">
-                                {f.gananciaAgregados != null ? formatearGuarani(Math.round(f.gananciaAgregados)) : "—"}
+                                {d.ganancia != null ? formatearGuarani(Math.round(d.ganancia)) : "—"}
                               </td>
                             </tr>
-                          )}
+                          ))}
                         </Fragment>
                       ))}
                     </tbody>

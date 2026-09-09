@@ -117,6 +117,16 @@ export const IconoRentabilidad = (p: Props) => (
   </Svg>
 );
 
+/** Envíos: anillos de radio alrededor de un punto — la misma idea que las
+ * zonas de envío en el mapa, no la moto (esa es Repartidores). */
+export const IconoEnvios = (p: Props) => (
+  <Svg {...p}>
+    <circle cx="12" cy="12" r="9" />
+    <circle cx="12" cy="12" r="4.5" />
+    <circle cx="12" cy="12" r="1" fill="currentColor" stroke="none" />
+  </Svg>
+);
+
 /** Configuración: las perillas. */
 export const IconoConfiguracion = (p: Props) => (
   <Svg {...p}>
@@ -210,6 +220,7 @@ export const ICONOS = {
   ideas: IconoIdeas,
   analytics: IconoAnalytics,
   rentabilidad: IconoRentabilidad,
+  envios: IconoEnvios,
   ayuda: IconoAyuda,
   configuracion: IconoConfiguracion,
   repartidores: IconoRepartidores,
