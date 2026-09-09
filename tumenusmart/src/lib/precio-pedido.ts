@@ -79,6 +79,9 @@ export type LineaArmada = {
    * agregados pero no sabemos cuánto cuestan", para no inventar un número.
    */
   costoAgregados: number | null;
+  /** Precio (por unidad) de las opciones elegidas, sumadas. Nunca null: a
+   * diferencia del costo, el precio de un agregado siempre está cargado. */
+  precioAgregados: number;
 };
 
 export type ResultadoArmado =
@@ -119,6 +122,12 @@ function sumaCostoOpciones(opciones: OpcionBase[]): number | null {
     total += aNumero(o.costo);
   }
   return total;
+}
+
+/** Suma el precio extra de un grupo de opciones elegidas. A diferencia del
+ * costo, nunca es null: el precio de un agregado no es un dato opcional. */
+function sumaPrecioOpciones(opciones: OpcionBase[]): number {
+  return opciones.reduce((s, o) => s + aNumero(o.precioExtra), 0);
 }
 
 /** Dos grupos de mitad y mitad son el mismo si difieren solo en mayúsculas o espacios. */
@@ -275,9 +284,8 @@ function armarProducto(
   }
   const quitadosOrdenados = producto.ingredientes.filter((i) => quitados.includes(i));
 
-  const precioUnitario =
-    aNumero(producto.precio) +
-    elegidas.opciones.reduce((s, o) => s + aNumero(o.precioExtra), 0);
+  const precioAgregados = sumaPrecioOpciones(elegidas.opciones);
+  const precioUnitario = aNumero(producto.precio) + precioAgregados;
 
   return {
     ok: true,
@@ -290,6 +298,7 @@ function armarProducto(
       ingredientesQuitadosTexto:
         quitadosOrdenados.length > 0 ? `Sin: ${quitadosOrdenados.join(", ")}` : undefined,
       costoAgregados: sumaCostoOpciones(elegidas.opciones),
+      precioAgregados,
     },
   };
 }
@@ -329,9 +338,9 @@ function armarCombo(
   const elegidas = elegirOpciones(agregadosDeCombo(a, b), opcionIds);
   if (!elegidas.ok) return elegidas;
 
+  const precioAgregados = sumaPrecioOpciones(elegidas.opciones);
   const precioUnitario =
-    calcularPrecioMitadYMitad(aNumero(a.precio), aNumero(b.precio), modo) +
-    elegidas.opciones.reduce((s, o) => s + aNumero(o.precioExtra), 0);
+    calcularPrecioMitadYMitad(aNumero(a.precio), aNumero(b.precio), modo) + precioAgregados;
 
   return {
     ok: true,
@@ -342,6 +351,7 @@ function armarCombo(
       precioUnitario,
       opcionesTexto: textoOpciones(elegidas.opciones),
       costoAgregados: sumaCostoOpciones(elegidas.opciones),
+      precioAgregados,
     },
   };
 }

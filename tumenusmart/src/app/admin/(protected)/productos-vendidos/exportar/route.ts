@@ -76,6 +76,14 @@ export async function GET(request: NextRequest) {
       "Costo (Gs.)",
       "Margen (%)",
       "Ganancia (Gs.)",
+      // Estas tres van aparte del precio/costo/ganancia del producto: son
+      // lo que aportaron los agregados (papas, extras...) vendidos junto
+      // con él, no el producto en sí — sumarlas al precio de venta de
+      // arriba daría el mismo número mezclado que este reporte dejó de
+      // mostrar.
+      "Venta agregados (Gs.)",
+      "Costo agregados (Gs.)",
+      "Ganancia agregados (Gs.)",
     ])
   );
 
@@ -90,12 +98,15 @@ export async function GET(request: NextRequest) {
           f.costoUnitario != null ? Math.round(f.costoUnitario) : "",
           f.margen != null ? f.margen.toFixed(1) : "",
           f.ganancia != null ? Math.round(f.ganancia) : "",
+          f.ventaAgregados > 0 ? Math.round(f.ventaAgregados) : "",
+          f.costoAgregados != null ? Math.round(f.costoAgregados) : "",
+          f.gananciaAgregados != null ? Math.round(f.gananciaAgregados) : "",
         ])
       );
     }
   }
 
-  // Mismas 7 columnas que la tabla de arriba, no una estructura aparte —
+  // Mismas 10 columnas que la tabla de arriba, no una estructura aparte —
   // así la fila de totales se lee de un vistazo, alineada con los encabezados.
   filas.push(
     filaCsv([
@@ -106,6 +117,9 @@ export async function GET(request: NextRequest) {
       reporte.totalGeneral.costo != null ? Math.round(reporte.totalGeneral.costo) : "",
       "",
       reporte.totalGeneral.ganancia != null ? Math.round(reporte.totalGeneral.ganancia) : "",
+      "",
+      "",
+      "",
     ])
   );
 

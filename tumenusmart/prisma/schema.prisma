@@ -501,6 +501,14 @@ model OrderItem {
   /// siempre mandan un valor explícito desde el checkout, nunca dependen
   /// de este default.
   costoAgregados Decimal? @db.Decimal(10, 2) @default(0)
+  /// Snapshot de cuánto de `precioUnitario` corresponde a agregados
+  /// (nunca desconocido: a diferencia del costo, el precio de un agregado
+  /// no es opcional, siempre está cargado). Existe para que el reporte de
+  /// Rentabilidad pueda mostrar el precio de venta del PRODUCTO solo,
+  /// siempre el mismo, sin que varíe según si esa venta puntual llevó
+  /// agregados o no — antes esos Gs. de más quedaban mezclados en el
+  /// precio del producto y lo mostraban como si vendiera más caro.
+  precioAgregados Decimal @db.Decimal(10, 2) @default(0)
 
   @@index([storeId])
   @@index([orderId])

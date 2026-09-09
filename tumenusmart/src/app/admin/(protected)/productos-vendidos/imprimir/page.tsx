@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 import { pantallaConPermiso } from "@/lib/auth";
 import { idLocalActual, localActual } from "@/lib/local-actual";
 import { calcularRangoFecha, type FiltroFecha } from "@/lib/rango-fecha";
@@ -122,22 +123,42 @@ export default async function ImprimirProductosVendidosPage({
                 </thead>
                 <tbody>
                   {cat.filas.map((f) => (
-                    <tr key={f.nombre} className="border-b border-linea-fina break-inside-avoid">
-                      <td className="py-1.5 text-tinta">{f.nombre}</td>
-                      <td className="py-1.5 text-right text-tinta-media">{f.cantidad}</td>
-                      <td className="py-1.5 text-right text-tinta-media">
-                        {formatearGuarani(Math.round(f.precioVentaUnitario))}
-                      </td>
-                      <td className="py-1.5 text-right text-tinta-media">
-                        {f.costoUnitario != null ? formatearGuarani(Math.round(f.costoUnitario)) : "—"}
-                      </td>
-                      <td className="py-1.5 text-right text-tinta-media">
-                        {f.margen != null ? `${f.margen.toFixed(0)}%` : "—"}
-                      </td>
-                      <td className="py-1.5 text-right font-semibold text-tinta">
-                        {f.ganancia != null ? formatearGuarani(Math.round(f.ganancia)) : "—"}
-                      </td>
-                    </tr>
+                    <Fragment key={f.nombre}>
+                      <tr className="border-b border-linea-fina break-inside-avoid">
+                        <td className="py-1.5 text-tinta">{f.nombre}</td>
+                        <td className="py-1.5 text-right text-tinta-media">{f.cantidad}</td>
+                        <td className="py-1.5 text-right text-tinta-media">
+                          {formatearGuarani(Math.round(f.precioVentaUnitario))}
+                        </td>
+                        <td className="py-1.5 text-right text-tinta-media">
+                          {f.costoUnitario != null ? formatearGuarani(Math.round(f.costoUnitario)) : "—"}
+                        </td>
+                        <td className="py-1.5 text-right text-tinta-media">
+                          {f.margen != null ? `${f.margen.toFixed(0)}%` : "—"}
+                        </td>
+                        <td className="py-1.5 text-right font-semibold text-tinta">
+                          {f.ganancia != null ? formatearGuarani(Math.round(f.ganancia)) : "—"}
+                        </td>
+                      </tr>
+                      {/* Lo que aportaron los agregados vendidos junto con este producto,
+                          aparte — totales del período, no por unidad. */}
+                      {f.ventaAgregados > 0 && (
+                        <tr className="border-b border-linea-fina break-inside-avoid text-xs">
+                          <td className="py-1 pl-4 text-tinta-suave">+ agregados vendidos con este producto</td>
+                          <td />
+                          <td className="py-1 text-right text-tinta-suave">
+                            {formatearGuarani(Math.round(f.ventaAgregados))}
+                          </td>
+                          <td className="py-1 text-right text-tinta-suave">
+                            {f.costoAgregados != null ? formatearGuarani(Math.round(f.costoAgregados)) : "—"}
+                          </td>
+                          <td />
+                          <td className="py-1 text-right text-tinta-suave">
+                            {f.gananciaAgregados != null ? formatearGuarani(Math.round(f.gananciaAgregados)) : "—"}
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
                   ))}
                 </tbody>
               </table>

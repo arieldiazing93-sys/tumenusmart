@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 import Link from "next/link";
 import { pantallaConPermiso } from "@/lib/auth";
 import { Cabecera, clasesBoton } from "@/components/ui";
@@ -164,22 +165,49 @@ export default async function ProductosVendidosPage({
                     </thead>
                     <tbody>
                       {cat.filas.map((f) => (
-                        <tr key={f.nombre} className="border-b border-linea-fina last:border-0">
-                          <td className="px-3 py-2 font-medium text-tinta">{f.nombre}</td>
-                          <td className="cifra px-3 py-2 text-right text-tinta-media">{f.cantidad}</td>
-                          <td className="cifra px-3 py-2 text-right text-tinta-media">
-                            {formatearGuarani(Math.round(f.precioVentaUnitario))}
-                          </td>
-                          <td className="cifra px-3 py-2 text-right text-tinta-media">
-                            {f.costoUnitario != null ? formatearGuarani(Math.round(f.costoUnitario)) : "—"}
-                          </td>
-                          <td className="cifra px-3 py-2 text-right text-tinta-media">
-                            {f.margen != null ? `${f.margen.toFixed(0)}%` : "—"}
-                          </td>
-                          <td className="cifra px-3 py-2 text-right font-semibold text-tinta">
-                            {f.ganancia != null ? formatearGuarani(Math.round(f.ganancia)) : "—"}
-                          </td>
-                        </tr>
+                        <Fragment key={f.nombre}>
+                          <tr
+                            className={f.ventaAgregados > 0 ? "border-linea-fina" : "border-b border-linea-fina last:border-0"}
+                          >
+                            <td className="px-3 py-2 font-medium text-tinta">{f.nombre}</td>
+                            <td className="cifra px-3 py-2 text-right text-tinta-media">{f.cantidad}</td>
+                            <td className="cifra px-3 py-2 text-right text-tinta-media">
+                              {formatearGuarani(Math.round(f.precioVentaUnitario))}
+                            </td>
+                            <td className="cifra px-3 py-2 text-right text-tinta-media">
+                              {f.costoUnitario != null ? formatearGuarani(Math.round(f.costoUnitario)) : "—"}
+                            </td>
+                            <td className="cifra px-3 py-2 text-right text-tinta-media">
+                              {f.margen != null ? `${f.margen.toFixed(0)}%` : "—"}
+                            </td>
+                            <td className="cifra px-3 py-2 text-right font-semibold text-tinta">
+                              {f.ganancia != null ? formatearGuarani(Math.round(f.ganancia)) : "—"}
+                            </td>
+                          </tr>
+                          {/*
+                            Lo que aportaron los agregados (papas, extras...) vendidos junto con
+                            este producto, aparte — para que no se lea como si el producto en sí
+                            vendiera más caro o dejara más ganancia de lo que en realidad es suya.
+                            Los valores son TOTALES del período, no por unidad como la fila de
+                            arriba (un agregado no tiene un "precio por unidad de producto").
+                          */}
+                          {f.ventaAgregados > 0 && (
+                            <tr key={`${f.nombre}-agregados`} className="border-b border-linea-fina bg-papel-suave/60 text-xs last:border-0">
+                              <td className="px-3 py-1.5 pl-6 text-tinta-suave">+ agregados vendidos con este producto</td>
+                              <td />
+                              <td className="cifra px-3 py-1.5 text-right text-tinta-suave">
+                                {formatearGuarani(Math.round(f.ventaAgregados))}
+                              </td>
+                              <td className="cifra px-3 py-1.5 text-right text-tinta-suave">
+                                {f.costoAgregados != null ? formatearGuarani(Math.round(f.costoAgregados)) : "—"}
+                              </td>
+                              <td />
+                              <td className="cifra px-3 py-1.5 text-right text-tinta-suave">
+                                {f.gananciaAgregados != null ? formatearGuarani(Math.round(f.gananciaAgregados)) : "—"}
+                              </td>
+                            </tr>
+                          )}
+                        </Fragment>
                       ))}
                     </tbody>
                   </table>

@@ -4,25 +4,40 @@ import { PEDIDO_REAL, type RangoFecha } from "./estadisticas";
 export type FilaProductoReporte = {
   nombre: string;
   cantidad: number;
-  /** Precio de venta promedio ponderado del período — si el precio cambió a
-   * mitad de camino, no es "el" precio, es lo que en promedio pagó cada uno. */
-  precioVentaUnitario: number;
-  totalVenta: number;
   /**
-   * Costo promedio por unidad = costo ACTUAL del producto + costo promedio
-   * de los agregados vendidos con él. El del producto se lee siempre
-   * actual (no el de cuando se vendió, el pedido no guarda esa foto); el
-   * de los agregados sí queda fijado al momento de la venta (ver
-   * `OrderItem.costoAgregados`) porque no hay otra forma de reconstruirlo
-   * después. Null si ALGUNA venta de este producto en el período tiene
-   * algo sin costo — un promedio con parte inventada sería peor que
-   * avisar que falta.
+   * Precio de venta del PRODUCTO EN SÍ — para un producto normal, es
+   * siempre su precio de catálogo actual, sin importar si esa venta puntual
+   * llevó agregados pagos o no. Antes esto era un promedio entre "se vendió
+   * solo" y "se vendió con agregados", y un producto que se vendía siempre
+   * con extras caros terminaba mostrando un precio (y una ganancia) que no
+   * eran los suyos, sino mezclados con lo que en realidad se vendió aparte.
+   *
+   * Para un combo "mitad y mitad" (que no tiene un precio de catálogo
+   * único, depende de qué dos mitades se combinaron cada vez) sigue siendo
+   * el promedio ponderado del período, como antes — ahí no hay un número
+   * "propio" del cual separarse.
    */
+  precioVentaUnitario: number;
+  /** Costo ACTUAL del producto en sí (sin agregados). Null si el producto
+   * nunca tuvo costo cargado. Siempre null para combos. */
   costoUnitario: number | null;
+  /** Venta del producto solo = precioVentaUnitario × cantidad. */
+  totalVenta: number;
   totalCosto: number | null;
+  /** Ganancia del producto solo, sin contar lo que aportaron sus agregados. */
   ganancia: number | null;
-  /** Porcentaje: ganancia sobre venta. */
+  /** Porcentaje: ganancia sobre venta, del producto solo. */
   margen: number | null;
+  /**
+   * Lo que aportaron los agregados vendidos junto con este producto (papas,
+   * extras...), aparte del producto en sí. 0 si nunca se le vendió ninguno.
+   * `costoAgregados` es null si se vendió alguno sin costo cargado — mismo
+   * criterio que el resto del reporte: avisar que falta el dato en vez de
+   * mezclarlo sin avisar.
+   */
+  ventaAgregados: number;
+  costoAgregados: number | null;
+  gananciaAgregados: number | null;
 };
 
 export type CategoriaReporte = {
@@ -30,11 +45,13 @@ export type CategoriaReporte = {
   categoriaNombre: string;
   filas: FilaProductoReporte[];
   totalCantidad: number;
+  /** Venta REAL de la categoría — producto más agregados, la plata que
+   * realmente entró en el período (coincide con Estadísticas). */
   totalVenta: number;
   totalCosto: number | null;
   totalGanancia: number | null;
-  /** true si algún producto de la categoría no tiene costo cargado — el
-   * total de costo/ganancia de la categoría queda incompleto, no en cero. */
+  /** true si algo de la categoría (un producto o un agregado suyo) no tiene
+   * costo cargado — el total de costo/ganancia queda incompleto, no en cero. */
   costoIncompleto: boolean;
 };
 
@@ -62,12 +79,12 @@ export type ReporteProductosVendidos = {
  * caen todos juntos en una categoría aparte al final, con el costo marcado
  * como no disponible en vez de inventado.
  *
- * El costo de cada línea es el del producto (actual) MÁS el de los
- * agregados que se le eligieron en ESA venta puntual (`OrderItem.costoAgregados`,
- * ver el modelo). Antes solo se contaba el costo del producto: un
- * agregado pago (ej. una papa frita al lado de una milanesa) suma su
- * precio a la venta pero no restaba nada del costo, así que el margen de
- * ese producto salía inflado cada vez que se vendía con algo pago encima.
+ * El precio/costo de cada producto normal es siempre el suyo (de catálogo),
+ * nunca mezclado con lo que aportaron sus agregados en cada venta puntual
+ * — eso se calcula y se muestra por separado (`ventaAgregados`,
+ * `costoAgregados`). Los totales de categoría y del período sí suman las
+ * dos cosas juntas: esa es la plata real que entró, y tiene que coincidir
+ * con lo que muestran Estadísticas y Analytics.
  */
 export async function calcularReporteProductosVendidos(
   storeId: string,
@@ -83,9 +100,11 @@ export async function calcularReporteProductosVendidos(
       nombreProducto: true,
       cantidad: true,
       precioUnitario: true,
+      precioAgregados: true,
       costoAgregados: true,
       product: {
         select: {
+          precio: true,
           costo: true,
           category: { select: { id: true, nombre: true, orden: true } },
         },
@@ -96,13 +115,20 @@ export async function calcularReporteProductosVendidos(
   type Acumulado = {
     nombre: string;
     cantidad: number;
-    totalVenta: number;
-    totalCostoConocido: number;
-    /** true si al menos una venta de este producto tiene el costo completo. */
-    hayAlgunCosto: boolean;
-    /** true si al menos una venta de este producto tiene ALGO sin costo
-     * (el producto en sí, o alguno de sus agregados). */
-    costoIncompleto: boolean;
+    esCombo: boolean;
+    // Producto normal: precio/costo de catálogo — fijos, no dependen de
+    // qué se vendió en cada línea puntual.
+    precioCatalogo: number | null;
+    costoCatalogo: number | null;
+    // Combo: no tiene precio de catálogo propio, así que se sigue
+    // promediando la venta real del período (agregados del combo incluidos,
+    // como siempre se hizo — separarlos ahí no tiene un "propio" del cual
+    // separarse).
+    totalVentaCombo: number;
+    // Lo que aportaron los agregados de productos normales, aparte.
+    totalVentaAgregados: number;
+    totalCostoAgregadosConocido: number;
+    costoAgregadosIncompleto: boolean;
     categoriaId: string | null;
     categoriaNombre: string;
     categoriaOrden: number;
@@ -116,27 +142,35 @@ export async function calcularReporteProductosVendidos(
 
   for (const item of items) {
     const clave = item.productId ?? `combo:${item.nombreProducto}`;
+    const esCombo = !item.productId;
     const actual = acumulado.get(clave) ?? {
       nombre: item.nombreProducto,
       cantidad: 0,
-      totalVenta: 0,
-      totalCostoConocido: 0,
-      hayAlgunCosto: false,
-      costoIncompleto: false,
+      esCombo,
+      precioCatalogo: !esCombo && item.product ? Number(item.product.precio) : null,
+      costoCatalogo: !esCombo && item.product?.costo != null ? Number(item.product.costo) : null,
+      totalVentaCombo: 0,
+      totalVentaAgregados: 0,
+      totalCostoAgregadosConocido: 0,
+      costoAgregadosIncompleto: false,
       categoriaId: item.product?.category?.id ?? null,
       categoriaNombre: item.product?.category?.nombre ?? "Mitad y mitad / combos",
       categoriaOrden: item.product?.category?.orden ?? Number.MAX_SAFE_INTEGER,
     };
-    actual.cantidad += item.cantidad;
-    actual.totalVenta += item.cantidad * Number(item.precioUnitario);
 
-    const costoProducto = item.product?.costo != null ? Number(item.product.costo) : null;
-    const costoAgregados = item.costoAgregados != null ? Number(item.costoAgregados) : null;
-    if (costoProducto != null && costoAgregados != null) {
-      actual.totalCostoConocido += (costoProducto + costoAgregados) * item.cantidad;
-      actual.hayAlgunCosto = true;
+    actual.cantidad += item.cantidad;
+    actual.totalVentaAgregados += item.cantidad * Number(item.precioAgregados);
+    if (esCombo) {
+      // El combo no separa agregados: su "venta total" ya los incluye,
+      // igual que siempre.
+      actual.totalVentaCombo += item.cantidad * Number(item.precioUnitario);
+    }
+
+    const costoAgregadosItem = item.costoAgregados != null ? Number(item.costoAgregados) : null;
+    if (costoAgregadosItem != null) {
+      actual.totalCostoAgregadosConocido += costoAgregadosItem * item.cantidad;
     } else {
-      actual.costoIncompleto = true;
+      actual.costoAgregadosIncompleto = true;
     }
 
     acumulado.set(clave, actual);
@@ -145,6 +179,7 @@ export async function calcularReporteProductosVendidos(
   const categoriasMap = new Map<
     string,
     Omit<CategoriaReporte, "totalCosto" | "totalGanancia" | "totalVenta"> & {
+      totalVentaReal: number;
       totalCostoConocido: number;
       hayAlgunCosto: boolean;
       orden: number;
@@ -152,15 +187,24 @@ export async function calcularReporteProductosVendidos(
   >();
 
   for (const a of acumulado.values()) {
-    // Parcial-pero-avisado, no todo-o-nada: si de 10 ventas de este
-    // producto 8 tienen el costo completo y 2 no (les faltó cargar el
-    // costo de un agregado nuevo, por ejemplo), se muestra lo que se sabe
-    // de esas 8 y se marca `costoIncompleto` — perder el número entero por
-    // un dato suelto sería peor que mostrarlo parcial y avisado.
-    const totalCosto = a.hayAlgunCosto ? a.totalCostoConocido : null;
-    const costoUnitario = totalCosto != null && a.cantidad > 0 ? totalCosto / a.cantidad : null;
-    const ganancia = totalCosto != null ? a.totalVenta - totalCosto : null;
-    const margen = ganancia != null && a.totalVenta > 0 ? (ganancia / a.totalVenta) * 100 : null;
+    // Agregados: siempre se conoce cuánto vendieron; el costo puede faltar.
+    const ventaAgregados = a.esCombo ? 0 : a.totalVentaAgregados;
+    const costoAgregados = a.esCombo || a.costoAgregadosIncompleto ? null : a.totalCostoAgregadosConocido;
+    const gananciaAgregados = costoAgregados != null ? ventaAgregados - costoAgregados : null;
+
+    // Producto en sí: precio/costo fijos de catálogo. Combo: el promedio
+    // ponderado de siempre (agregados del combo ya incluidos ahí).
+    const precioVentaUnitario = a.esCombo
+      ? a.cantidad > 0
+        ? a.totalVentaCombo / a.cantidad
+        : 0
+      : a.precioCatalogo ?? 0;
+    const costoUnitario = a.esCombo ? null : a.costoCatalogo;
+
+    const totalVenta = precioVentaUnitario * a.cantidad;
+    const totalCosto = costoUnitario != null ? costoUnitario * a.cantidad : null;
+    const ganancia = totalCosto != null ? totalVenta - totalCosto : null;
+    const margen = ganancia != null && totalVenta > 0 ? (ganancia / totalVenta) * 100 : null;
 
     const claveCategoria = a.categoriaId ?? SIN_CATEGORIA;
     let categoria = categoriasMap.get(claveCategoria);
@@ -170,6 +214,7 @@ export async function calcularReporteProductosVendidos(
         categoriaNombre: a.categoriaNombre,
         filas: [],
         totalCantidad: 0,
+        totalVentaReal: 0,
         totalCostoConocido: 0,
         hayAlgunCosto: false,
         costoIncompleto: false,
@@ -181,37 +226,50 @@ export async function calcularReporteProductosVendidos(
     categoria.filas.push({
       nombre: a.nombre,
       cantidad: a.cantidad,
-      precioVentaUnitario: a.cantidad > 0 ? a.totalVenta / a.cantidad : 0,
-      totalVenta: a.totalVenta,
+      precioVentaUnitario,
       costoUnitario,
+      totalVenta,
       totalCosto,
       ganancia,
       margen,
+      ventaAgregados,
+      costoAgregados,
+      gananciaAgregados,
     });
+
     categoria.totalCantidad += a.cantidad;
-    if (totalCosto != null) categoria.totalCostoConocido += totalCosto;
-    if (a.hayAlgunCosto) categoria.hayAlgunCosto = true;
-    if (a.costoIncompleto) categoria.costoIncompleto = true;
+    // El total de categoría es la plata REAL: producto más agregados.
+    categoria.totalVentaReal += totalVenta + ventaAgregados;
+    if (totalCosto != null && costoAgregados != null) {
+      categoria.totalCostoConocido += totalCosto + costoAgregados;
+      categoria.hayAlgunCosto = true;
+    } else {
+      categoria.costoIncompleto = true;
+    }
   }
 
   const categorias: CategoriaReporte[] = [...categoriasMap.values()]
     .sort((a, b) => a.orden - b.orden)
     .map((c) => {
-      const totalVenta = c.filas.reduce((s, f) => s + f.totalVenta, 0);
       // Productos más rentables primero: acá interesa dónde está la plata,
-      // no solo qué se movió más.
-      const filas = [...c.filas].sort(
-        (a, b) => (b.ganancia ?? -Infinity) - (a.ganancia ?? -Infinity)
-      );
+      // no solo qué se movió más. La ganancia de cada fila incluye la de
+      // sus agregados, para que el orden refleje lo que en verdad conviene
+      // empujar (un producto con extras rentables sigue siendo un producto
+      // que conviene empujar).
+      const filas = [...c.filas].sort((a, b) => {
+        const gananciaA = a.ganancia != null ? a.ganancia + (a.gananciaAgregados ?? 0) : -Infinity;
+        const gananciaB = b.ganancia != null ? b.ganancia + (b.gananciaAgregados ?? 0) : -Infinity;
+        return gananciaB - gananciaA;
+      });
       const totalCosto = c.hayAlgunCosto ? c.totalCostoConocido : null;
       return {
         categoriaId: c.categoriaId,
         categoriaNombre: c.categoriaNombre,
         filas,
         totalCantidad: c.totalCantidad,
-        totalVenta,
+        totalVenta: c.totalVentaReal,
         totalCosto,
-        totalGanancia: totalCosto != null ? totalVenta - totalCosto : null,
+        totalGanancia: totalCosto != null ? c.totalVentaReal - totalCosto : null,
         costoIncompleto: c.costoIncompleto,
       };
     });

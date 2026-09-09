@@ -178,6 +178,11 @@ igual(
   conOpciones.lineas[0].costoAgregados,
   null
 );
+igual(
+  "el precio de agregados sí se conoce siempre (no es opcional como el costo)",
+  conOpciones.lineas[0].precioAgregados,
+  15000 + 7000 + 9000
+);
 
 const sinOpciones = armarPedido(CARTA, [{ productId: "p-hamburguesa", cantidad: 1 }]);
 igual(
@@ -185,6 +190,7 @@ igual(
   sinOpciones.lineas[0].costoAgregados,
   0
 );
+igual("sin elegir ningún agregado, el precio de agregados es cero", sinOpciones.lineas[0].precioAgregados, 0);
 
 // El caso real que reportó el dueño: Milanesita (Gs. 60.000) + papa frita
 // como agregado (cobra Gs. 7.000, cuesta Gs. 4.000 de verdad). Antes de este
@@ -197,6 +203,11 @@ const conAgregadoCosteado = armarPedido(CARTA, [
 acepta("milanesa con un agregado que tiene costo cargado", conAgregadoCosteado);
 igual("el precio de venta suma el agregado igual que antes", conAgregadoCosteado.lineas[0].precioUnitario, 60000 + 7000);
 igual("el costo de agregados es el costo real del agregado, no su precio", conAgregadoCosteado.lineas[0].costoAgregados, 4000);
+igual(
+  "el precio de agregados queda aparte, para que el reporte no lo mezcle con el precio de Milanesita",
+  conAgregadoCosteado.lineas[0].precioAgregados,
+  7000
+);
 
 const conAgregadosMixtos = armarPedido(CARTA, [
   { productId: "p-milanesa", opcionIds: ["o-papa", "o-ensalada"], cantidad: 1 },
