@@ -35,6 +35,13 @@ export function Carta({
   const [busqueda, setBusqueda] = useState("");
   const [abierto, setAbierto] = useState<ProductoCarta | null>(null);
   const [categoriaActiva, setCategoriaActiva] = useState(categorias[0]?.id ?? "");
+  // Qué categorías ya se mostraron alguna vez: cada bloque entra con una
+  // animación suave la PRIMERA vez que aparece en pantalla al bajar por la
+  // carta, y se queda así — no vuelve a jugar la animación si el cliente
+  // sube y baja de nuevo. Es por categoría completa, no producto por
+  // producto: animar cada tarjeta por separado en una carta con muchos
+  // productos se siente lento en vez de prolijo.
+  const [revelados, setRevelados] = useState<Set<string>>(new Set());
   const refsSecciones = useRef<Record<string, HTMLElement | null>>({});
   // La barra de arriba (buscador + chips) se mide de verdad en vez de
   // escribir su alto a mano: cambia según haya buscador, haya chips o se esté
@@ -61,6 +68,33 @@ export function Carta({
         }
       },
       { rootMargin: "-120px 0px -68% 0px" }
+    );
+    for (const el of Object.values(refsSecciones.current)) {
+      if (el) observador.observe(el);
+    }
+    return () => observador.disconnect();
+  }, [categorias, buscando]);
+
+  // La entrada animada de cada categoría, la primera vez que se cruza con
+  // la pantalla. Un observador aparte del de arriba porque este es "de un
+  // solo tiro" (se desconecta de cada sección apenas la revela) — el de
+  // arriba en cambio sigue mirando todo el tiempo, para saber en qué
+  // categoría está el cliente.
+  useEffect(() => {
+    if (buscando) return;
+    const observador = new IntersectionObserver(
+      (entradas) => {
+        for (const e of entradas) {
+          if (!e.isIntersecting) continue;
+          const id = e.target.id.replace("cat-", "");
+          setRevelados((previos) => {
+            if (previos.has(id)) return previos;
+            return new Set(previos).add(id);
+          });
+          observador.unobserve(e.target);
+        }
+      },
+      { rootMargin: "0px 0px -8% 0px" }
     );
     for (const el of Object.values(refsSecciones.current)) {
       if (el) observador.observe(el);
@@ -152,7 +186,16 @@ export function Carta({
             ref={(el) => {
               refsSecciones.current[c.id] = el;
             }}
-            className="scroll-mt-28 pt-6"
+            className={`scroll-mt-28 pt-6 ${
+              buscando || revelados.has(c.id)
+                ? // Sin fill-mode: no deja un `transform` colgado después de
+                  // terminar. La sección tiene adentro la cabecera de
+                  // categoría en `sticky`, y un ancestro con transform
+                  // distinto de "none" cambia cómo se posicionan sus hijos
+                  // (mismo motivo documentado en `entrarPanel`, tailwind.config.ts).
+                  "animate-[subir_0.5s_cubic-bezier(0.22,0.7,0.3,1)]"
+                : "opacity-0"
+            }`}
           >
             {/*
               La cabecera es una tarjeta redondeada, no un título suelto — con
