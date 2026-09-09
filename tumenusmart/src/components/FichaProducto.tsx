@@ -25,7 +25,7 @@ export { necesitaFicha } from "@/lib/carta";
  * pulgar queda cerca de los controles y no se pierde el lugar del menú.
  */
 export function FichaProducto({
-  producto,
+  producto: productoProp,
   onCerrar,
 }: {
   producto: ProductoCarta | null;
@@ -48,8 +48,8 @@ export function FichaProducto({
   const [saliendo, setSaliendo] = useState(false);
 
   useEffect(() => {
-    if (producto) {
-      setActual(producto);
+    if (productoProp) {
+      setActual(productoProp);
       setSaliendo(false);
       return;
     }
@@ -59,7 +59,7 @@ export function FichaProducto({
     const id = setTimeout(() => setActual(null), 220);
     return () => clearTimeout(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [producto]);
+  }, [productoProp]);
 
   // Cada vez que se abre otro producto, la ficha arranca limpia.
   //
