@@ -140,6 +140,12 @@ const config: Config = {
           "0%": { transform: "translateY(100%)" },
           "100%": { transform: "translateY(0)" },
         },
+        // La misma hoja, pero cerrándose — espejo de la anterior. Sin esto,
+        // la ficha desaparecía de un salto en vez de bajar.
+        bajarHoja: {
+          "0%": { transform: "translateY(0)" },
+          "100%": { transform: "translateY(100%)" },
+        },
         // El "+" al agregar: un latido corto, no una fiesta.
         latir: {
           "0%": { transform: "scale(1)" },

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useCart } from "./CartProvider";
 import { construirKey } from "@/lib/cart-types";
 import { formatearGuarani } from "@/lib/format";
@@ -37,35 +37,100 @@ export function FichaProducto({
   const [agregadosIds, setAgregadosIds] = useState<string[]>([]);
   const [quitados, setQuitados] = useState<string[]>([]);
   const [cantidad, setCantidad] = useState(1);
+  const refDialog = useRef<HTMLDivElement | null>(null);
+
+  // El producto que se sigue mostrando mientras la ficha se cierra. Sin
+  // esto, apenas `onCerrar` pone `producto` en null, el `return null` de
+  // más abajo desmontaba todo de un salto — nunca se llegaba a ver la hoja
+  // bajando. `actual` se queda con el último producto hasta que termina la
+  // animación de salida, recién ahí se limpia de verdad.
+  const [actual, setActual] = useState<ProductoCarta | null>(null);
+  const [saliendo, setSaliendo] = useState(false);
+
+  useEffect(() => {
+    if (producto) {
+      setActual(producto);
+      setSaliendo(false);
+      return;
+    }
+    if (!actual) return;
+    setSaliendo(true);
+    // Tiene que coincidir con la duración de `bajarHoja` de más abajo.
+    const id = setTimeout(() => setActual(null), 220);
+    return () => clearTimeout(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [producto]);
 
   // Cada vez que se abre otro producto, la ficha arranca limpia.
+  //
+  // Depende de `actual?.id` y no de `producto?.id` a propósito: si dependiera
+  // de `producto`, al cerrar (producto pasa a null) esto resetearía los
+  // checkboxes y la cantidad de una, ANTES de que termine la animación de
+  // salida — se vería un parpadeo de las opciones destildándose mientras la
+  // hoja todavía está bajando. Con `actual`, que se queda con el producto
+  // hasta que la animación termina, el reseteo no pasa hasta que ya no hay
+  // nada visible.
   useEffect(() => {
     setVarianteId(undefined);
     setAgregadosIds([]);
     setQuitados([]);
     setCantidad(1);
-  }, [producto?.id]);
+  }, [actual?.id]);
 
-  // Con la ficha abierta el fondo no debe desplazarse.
+  // Con la ficha abierta: el fondo no se desplaza, Escape la cierra, Tab
+  // queda atrapado adentro (no se escapa hacia la carta de atrás), y el
+  // foco entra a la ficha apenas se abre y vuelve a quien la abrió al
+  // cerrarse — para que navegando con teclado no se pierda el lugar.
+  //
+  // Depende de `actual` y no de `producto`: cuando `producto` recién pasa a
+  // no-null, todavía es el render ANTERIOR el que está montado (el `<div>`
+  // de la ficha se crea cuando `actual` se actualiza, un ciclo de render
+  // después) — enfocar en ese momento no encontraría nada. Con `actual`
+  // como dependencia, este efecto corre justo cuando el `<div>` ya existe.
   useEffect(() => {
-    if (!producto) return;
+    if (!actual) return;
+    const disparador = document.activeElement as HTMLElement | null;
+    refDialog.current?.focus();
+
     const previo = document.body.style.overflow;
     document.body.style.overflow = "hidden";
-    const alEscapar = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onCerrar();
-    };
-    window.addEventListener("keydown", alEscapar);
+
+    function alTeclado(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        onCerrar();
+        return;
+      }
+      if (e.key !== "Tab") return;
+      const contenedor = refDialog.current;
+      if (!contenedor) return;
+      const focosables = contenedor.querySelectorAll<HTMLElement>(
+        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+      );
+      if (focosables.length === 0) return;
+      const primero = focosables[0];
+      const ultimo = focosables[focosables.length - 1];
+      if (e.shiftKey && document.activeElement === primero) {
+        e.preventDefault();
+        ultimo.focus();
+      } else if (!e.shiftKey && document.activeElement === ultimo) {
+        e.preventDefault();
+        primero.focus();
+      }
+    }
+    window.addEventListener("keydown", alTeclado);
+
     return () => {
       document.body.style.overflow = previo;
-      window.removeEventListener("keydown", alEscapar);
+      window.removeEventListener("keydown", alTeclado);
+      disparador?.focus?.();
     };
-  }, [producto, onCerrar]);
+  }, [actual, onCerrar]);
 
-  const variantes = producto?.opciones.filter((o) => o.tipo === "variante") ?? [];
-  const agregados = producto?.opciones.filter((o) => o.tipo === "agregado") ?? [];
+  const variantes = actual?.opciones.filter((o) => o.tipo === "variante") ?? [];
+  const agregados = actual?.opciones.filter((o) => o.tipo === "agregado") ?? [];
 
   const elegidas = useMemo(() => {
-    if (!producto) return [];
+    if (!actual) return [];
     const salida: OpcionCarta[] = [];
     const v = variantes.find((o) => o.id === varianteId);
     if (v) salida.push(v);
@@ -75,14 +140,14 @@ export function FichaProducto({
     }
     return salida;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [producto, varianteId, agregadosIds]);
+  }, [actual, varianteId, agregadosIds]);
 
-  if (!producto) return null;
+  if (!actual) return null;
+  const producto = actual;
 
   const unitario = producto.precio + elegidas.reduce((s, o) => s + o.precioExtra, 0);
 
   function confirmar() {
-    if (!producto) return;
     agregarItem({
       key: construirKey(producto.id, elegidas.map((o) => o.id), quitados),
       productId: producto.id,
@@ -103,14 +168,24 @@ export function FichaProducto({
         type="button"
         aria-label="Cerrar"
         onClick={onCerrar}
-        className="fixed inset-0 z-40 bg-tinta/45 animate-[subir_0.2s_ease]"
+        className={`fixed inset-0 z-40 bg-tinta/45 ${
+          saliendo
+            ? "opacity-0 transition-opacity duration-[220ms]"
+            : "animate-[subir_0.2s_ease]"
+        }`}
       />
 
       <div
+        ref={refDialog}
+        tabIndex={-1}
         role="dialog"
         aria-modal="true"
         aria-label={producto.nombre}
-        className="fixed inset-x-0 bottom-0 z-50 mx-auto flex max-h-[88vh] max-w-2xl flex-col rounded-t-2xl bg-white shadow-alta animate-[subirHoja_0.34s_cubic-bezier(0.22,0.7,0.3,1)]"
+        className={`fixed inset-x-0 bottom-0 z-50 mx-auto flex max-h-[88vh] max-w-2xl flex-col rounded-t-2xl bg-white shadow-alta outline-none ${
+          saliendo
+            ? "animate-[bajarHoja_0.22s_ease-in]"
+            : "animate-[subirHoja_0.34s_cubic-bezier(0.22,0.7,0.3,1)]"
+        }`}
       >
         <span className="mx-auto mt-2.5 h-1 w-10 flex-none rounded-full bg-linea" />
 
