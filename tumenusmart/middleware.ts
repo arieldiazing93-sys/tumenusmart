@@ -67,6 +67,18 @@ export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   if (pathname.startsWith("/admin") && pathname !== "/admin/login") {
+    // En producción, sin SESSION_SECRET configurado, las cookies se firman
+    // con el literal "dev-secret-cambiar" que está escrito acá arriba y en
+    // el código fuente público — cualquiera podría armarse una cookie de
+    // administrador válida. `lib/auth.ts` ya corta el INGRESO en este caso
+    // (`exigirSecretoDeSesion`), pero eso no invalida una cookie que ya
+    // exista; esta es la otra mitad: ninguna cookie se acepta como válida
+    // acá tampoco mientras falte la variable, así no queda ninguna puerta
+    // abierta con el secreto de ejemplo.
+    if (process.env.NODE_ENV === "production" && !process.env.SESSION_SECRET) {
+      return NextResponse.redirect(new URL("/admin/login", request.url));
+    }
+
     const cookie = request.cookies.get(COOKIE_NAME)?.value;
 
     if (!cookie || !(await cookieBienFirmada(cookie))) {
