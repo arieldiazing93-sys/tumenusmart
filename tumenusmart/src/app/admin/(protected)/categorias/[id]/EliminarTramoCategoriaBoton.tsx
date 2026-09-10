@@ -1,0 +1,36 @@
+"use client";
+
+import { useTransition } from "react";
+import { useRouter } from "next/navigation";
+import { eliminarTramoCategoria } from "../actions";
+
+export function EliminarTramoCategoriaBoton({
+  categoryId,
+  id,
+}: {
+  categoryId: string;
+  id: string;
+}) {
+  const router = useRouter();
+  const [pending, startTransition] = useTransition();
+
+  function eliminar() {
+    if (!confirm("¿Quitar este tramo de horario?")) return;
+    startTransition(async () => {
+      await eliminarTramoCategoria(categoryId, id);
+      router.refresh();
+    });
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={eliminar}
+      disabled={pending}
+      className="text-tinta-suave hover:text-peligro disabled:opacity-50"
+      aria-label="Quitar tramo"
+    >
+      ✕
+    </button>
+  );
+}

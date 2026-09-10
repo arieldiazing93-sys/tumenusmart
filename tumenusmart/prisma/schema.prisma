@@ -88,6 +88,7 @@ model Store {
   reservas       Reservation[]
   horariosReserva  HorarioReserva[]
   horariosAtencion HorarioAtencion[]
+  horariosCategoria CategoriaHorario[]
   usuarios         Usuario[]
   ideasSemanales   IdeaSemanal[]
   pagos            Pago[]
@@ -286,8 +287,32 @@ model Category {
   activa    Boolean   @default(true)
   productos Product[]
   createdAt DateTime  @default(now())
+  // Días y horarios en que esta categoría se muestra en la carta pública —
+  // ej: una categoría "Pizzas" que solo se vende de miércoles a domingo.
+  // Sin tramos cargados = siempre visible (mismo criterio por defecto que
+  // el horario de atención del local).
+  horarios  CategoriaHorario[]
 
   @@index([storeId])
+}
+
+// Mismo shape que HorarioAtencion (día + abre + cierra) y la misma lógica de
+// cálculo (`calcularEstadoAtencion` en horario-atencion.ts, que es genérica
+// y no está atada a "el local") — pero acá decide si se muestra una
+// CATEGORÍA, no el local entero. Dos categorías pueden tener tramos muy
+// distintos entre sí (ej: "Pizzas" solo miér-dom, "Bebidas" todos los días).
+model CategoriaHorario {
+  id         String   @id @default(cuid())
+  storeId    String
+  store      Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  categoryId String
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  diaSemana  Int // 0=domingo … 6=sábado, mismo criterio que HorarioAtencion
+  abre       String // "HH:MM"
+  cierra     String // "HH:MM"
+
+  @@index([storeId])
+  @@index([categoryId])
 }
 
 model Product {

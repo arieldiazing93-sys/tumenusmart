@@ -121,3 +121,52 @@ export async function moverCategoria(id: string, direccion: Direccion) {
   revalidatePath("/admin/productos");
   revalidatePath("/[slug]", "layout");
 }
+
+export type ResultadoTramoCategoria = { ok: true } | { ok: false; error: string };
+
+/**
+ * Agrega un tramo de horario a una categoría — ej: "Pizzas" visible de
+ * miércoles a domingo, de 18:00 a 23:00. Sin ningún tramo cargado, la
+ * categoría se muestra siempre (mismo criterio que el horario de atención
+ * del local): esto es una restricción opcional, no algo que haya que
+ * configurar para que la carta funcione.
+ *
+ * Devuelve un resultado en vez de lanzar los errores de validación: Next.js
+ * oculta en producción el mensaje de cualquier `throw` que salga de una
+ * Server Action, así que el motivo real solo llega si viaja en el retorno.
+ */
+export async function agregarTramoCategoria(
+  categoryId: string,
+  formData: FormData
+): Promise<ResultadoTramoCategoria> {
+  await exigirPermiso("categorias.editar");
+  const idLocal = await idLocalActual();
+  const prisma = prismaDelLocal(idLocal);
+
+  const diaSemana = Number(formData.get("diaSemana"));
+  const abre = String(formData.get("abre") ?? "").trim();
+  const cierra = String(formData.get("cierra") ?? "").trim();
+
+  if (!Number.isInteger(diaSemana) || diaSemana < 0 || diaSemana > 6) {
+    return { ok: false, error: "Día inválido" };
+  }
+  if (!abre || !cierra) return { ok: false, error: "Faltan las horas de apertura y cierre" };
+
+  await prisma.categoriaHorario.create({
+    data: { categoryId, diaSemana, abre, cierra, storeId: idLocal },
+  });
+
+  revalidatePath(`/admin/categorias/${categoryId}/horario`);
+  revalidatePath("/[slug]", "layout");
+  return { ok: true };
+}
+
+export async function eliminarTramoCategoria(categoryId: string, id: string): Promise<void> {
+  await exigirPermiso("categorias.editar");
+  const prisma = prismaDelLocal(await idLocalActual());
+
+  await prisma.categoriaHorario.delete({ where: { id } });
+
+  revalidatePath(`/admin/categorias/${categoryId}/horario`);
+  revalidatePath("/[slug]", "layout");
+}

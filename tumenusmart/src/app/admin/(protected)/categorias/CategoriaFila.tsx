@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import Link from "next/link";
 import {
   renombrarCategoria,
   alternarActivaCategoria,
@@ -112,6 +113,12 @@ export function CategoriaFila({
                 categoría y cuántos productos tiene, y nada más. */}
             {puedeEditar && (
               <>
+            <Link
+              href={`/admin/categorias/${id}/horario`}
+              className="text-tinta-media hover:underline"
+            >
+              Horario
+            </Link>
             <button
               type="button"
               onClick={() => setEditando(true)}
