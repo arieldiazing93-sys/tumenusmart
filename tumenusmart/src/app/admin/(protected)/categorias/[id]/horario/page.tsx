@@ -6,7 +6,7 @@ import { idLocalActual } from "@/lib/local-actual";
 import {
   NOMBRES_DIA,
   DIAS_ORDENADOS,
-  calcularEstadoAtencion,
+  categoriaOcultaPorHorario,
 } from "@/lib/horario-atencion";
 import { EliminarTramoCategoriaBoton } from "../EliminarTramoCategoriaBoton";
 import { AgregarTramoCategoriaForm } from "../AgregarTramoCategoriaForm";
@@ -35,8 +35,8 @@ export default async function HorarioCategoriaPage({
 
   if (!categoria) notFound();
 
-  const estado = calcularEstadoAtencion(tramos);
   const sinConfigurar = tramos.length === 0;
+  const oculta = categoriaOcultaPorHorario(tramos);
 
   return (
     <div>
@@ -48,37 +48,34 @@ export default async function HorarioCategoriaPage({
         Horario de "{categoria.nombre}"
       </h1>
       <p className="mb-6 text-sm text-tinta-media">
-        Cargá los días y horarios en que esta categoría se muestra en la carta — por ejemplo,
-        una categoría de pizzas que solo se vende de miércoles a domingo. Un día sin tramos
-        queda <strong>oculto ese día</strong>, aunque el resto del local esté abierto. Sin
-        ningún tramo cargado, la categoría se muestra siempre.
+        Por defecto, esta categoría se muestra siempre — esto es para el caso puntual en que
+        NO querés venderla en ciertos días u horarios (ej: "Hamburguesas Simple" no se vende
+        lunes ni martes). Cargá acá esos días/horarios de <strong>bloqueo</strong>: el resto
+        del tiempo, la categoría sigue visible como siempre.
       </p>
 
       <div
         className={`mb-6 rounded-lg border p-4 ${
           sinConfigurar
             ? "border-linea bg-white"
-            : estado.abierto
-              ? "border-exito/30 bg-exito-luz"
-              : "border-aviso/30 bg-aviso-luz"
+            : oculta
+              ? "border-aviso/30 bg-aviso-luz"
+              : "border-exito/30 bg-exito-luz"
         }`}
       >
         {sinConfigurar ? (
           <p className="text-sm text-tinta-media">
-            Todavía no cargaste ningún horario, así que esta categoría se muestra{" "}
-            <strong>siempre</strong>. Cargá los tramos de abajo para restringirla a ciertos
-            días y horas.
+            Todavía no cargaste ningún bloqueo, así que esta categoría se muestra{" "}
+            <strong>siempre</strong>. Cargá los tramos de abajo solo si necesitás ocultarla en
+            ciertos días u horas.
+          </p>
+        ) : oculta ? (
+          <p className="text-sm font-medium text-aviso">
+            🔴 Ahora mismo está OCULTA de la carta por el bloqueo que cargaste.
           </p>
         ) : (
-          <p className="text-sm font-medium">
-            {estado.abierto ? (
-              <span className="text-exito">🟢 Ahora mismo figura VISIBLE en la carta</span>
-            ) : (
-              <span className="text-aviso">
-                🔴 Ahora mismo figura OCULTA de la carta
-                {estado.proximaApertura ? ` — vuelve ${estado.proximaApertura}` : ""}
-              </span>
-            )}
+          <p className="text-sm font-medium text-exito">
+            🟢 Ahora mismo está VISIBLE en la carta (no estás dentro de ningún bloqueo).
           </p>
         )}
       </div>
@@ -86,43 +83,44 @@ export default async function HorarioCategoriaPage({
       <div className="overflow-hidden rounded-lg border border-linea bg-white">
         <div className="hidden border-b border-linea bg-papel-suave px-4 py-2 text-xs font-semibold uppercase tracking-wide text-tinta-media sm:flex">
           <span className="w-28 flex-none">Día</span>
-          <span className="flex-1">Horarios</span>
-          <span className="w-64 flex-none">Agregar tramo</span>
+          <span className="flex-1">Bloqueado</span>
+          <span className="w-64 flex-none">Agregar bloqueo</span>
         </div>
 
         <div className="divide-y divide-linea-fina">
           {DIAS_ORDENADOS.map((dia) => {
             const delDia = tramos.filter((t) => t.diaSemana === dia);
-            const oculto = delDia.length === 0;
+            const sinBloqueos = delDia.length === 0;
             return (
               <div
                 key={dia}
-                className={`flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-3 sm:flex-nowrap ${
-                  oculto ? "bg-papel-suave/60" : ""
-                }`}
+                className="flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-3 sm:flex-nowrap"
               >
                 <span className="w-28 flex-none font-medium text-tinta">
                   {NOMBRES_DIA[dia]}
                 </span>
 
                 <div className="flex min-w-[160px] flex-1 flex-wrap items-center gap-1.5">
-                  {oculto ? (
-                    <span className="rounded-full bg-linea px-2.5 py-0.5 text-xs font-medium text-tinta-media">
-                      Oculta ese día
+                  {sinBloqueos ? (
+                    <span className="rounded-full bg-exito-luz px-2.5 py-0.5 text-xs font-medium text-exito">
+                      Visible todo el día
                     </span>
                   ) : (
-                    delDia.map((t) => (
-                      <span
-                        key={t.id}
-                        className="inline-flex items-center gap-1.5 rounded-full border border-linea px-2.5 py-1 text-sm"
-                      >
-                        {t.abre}–{t.cierra}
-                        {t.cierra <= t.abre && (
-                          <span className="text-[10px] text-tinta-suave">+1 día</span>
-                        )}
-                        <EliminarTramoCategoriaBoton categoryId={categoryId} id={t.id} />
-                      </span>
-                    ))
+                    delDia.map((t) => {
+                      const todoElDia = t.abre === "00:00" && t.cierra === "23:59";
+                      return (
+                        <span
+                          key={t.id}
+                          className="inline-flex items-center gap-1.5 rounded-full border border-aviso/30 bg-aviso-luz px-2.5 py-1 text-sm text-aviso"
+                        >
+                          {todoElDia ? "Todo el día" : `${t.abre}–${t.cierra}`}
+                          {!todoElDia && t.cierra <= t.abre && (
+                            <span className="text-[10px] text-tinta-suave">+1 día</span>
+                          )}
+                          <EliminarTramoCategoriaBoton categoryId={categoryId} id={t.id} />
+                        </span>
+                      );
+                    })
                   )}
                 </div>
 
@@ -134,9 +132,9 @@ export default async function HorarioCategoriaPage({
       </div>
 
       <p className="mt-6 text-xs text-tinta-suave">
-        Si querés que esta categoría se vea toda la semana pero solo por la noche, cargá el
-        mismo horario los 7 días. Si cierra después de medianoche (ej: 19:00 a 01:00), cargá el
-        tramo tal cual — el sistema entiende que el cierre cae al día siguiente.
+        Para bloquear un día entero (como lunes y martes en el ejemplo), tildá "Todo el día" al
+        cargarlo. Si el bloqueo cruza la medianoche (ej: 19:00 a 01:00), cargalo tal cual — el
+        sistema entiende que termina al día siguiente.
       </p>
     </div>
   );

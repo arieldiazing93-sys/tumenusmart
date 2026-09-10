@@ -96,6 +96,30 @@ export function calcularEstadoAtencion(
 }
 
 /**
+ * Si una CATEGORÍA de la carta está oculta ahora mismo por su propio
+ * horario de bloqueo.
+ *
+ * Ojo, es el criterio CONTRARIO al de `calcularEstadoAtencion`: ahí los
+ * tramos son "cuándo el local SÍ atiende" (sin tramos = abierto siempre).
+ * Acá los tramos son "cuándo la categoría NO se muestra" (sin tramos =
+ * visible siempre). No todos los negocios necesitan esto —por eso el
+ * default tiene que seguir siendo "se ve"— y cuando lo cargan, lo piensan
+ * como una excepción puntual ("no vendemos hamburguesas lunes y martes"),
+ * no como una ventana de disponibilidad que hay que definir entera.
+ *
+ * Reutiliza `calcularEstadoAtencion` para el cálculo de "¿estamos dentro de
+ * alguno de estos tramos ahora?" (mismo manejo de zona horaria y de tramos
+ * que cruzan la medianoche) y solo invierte el resultado.
+ */
+export function categoriaOcultaPorHorario(
+  tramos: TramoHorario[],
+  ahora: Date = new Date()
+): boolean {
+  if (tramos.length === 0) return false;
+  return calcularEstadoAtencion(tramos, ahora).abierto;
+}
+
+/**
  * Días de la semana en los que el local no abre nunca (no tienen ningún
  * tramo cargado). Se usa para no dejar reservar una mesa un día cerrado.
  * Con la agenda vacía devuelve [] — ningún día bloqueado.

@@ -7,7 +7,7 @@ import { EstadoAperturaBadge } from "@/components/EstadoAperturaBadge";
 import { Carta, type CategoriaCarta } from "@/components/Carta";
 import { obtenerEstadoTienda } from "@/lib/estado-tienda";
 import { localPorSlug } from "@/lib/local-por-slug";
-import { calcularEstadoAtencion } from "@/lib/horario-atencion";
+import { categoriaOcultaPorHorario } from "@/lib/horario-atencion";
 
 export const dynamic = "force-dynamic";
 
@@ -40,14 +40,14 @@ export default async function CatalogoPage({
     obtenerEstadoTienda(storeId),
   ]);
 
-  // Una categoría con horario propio (ej: "Pizzas" solo miércoles a domingo)
-  // se oculta entera fuera de ese horario, aunque el local esté abierto —
-  // misma lógica que decide si el local entero está abierto, reutilizada acá
-  // sin cambios (no está atada a "el local", solo a una lista de tramos).
-  // Sin tramos cargados, la categoría se muestra siempre.
+  // Una categoría con tramos de bloqueo propios (ej: "Hamburguesas Simple"
+  // oculta lunes y martes) desaparece entera durante esos tramos, aunque el
+  // local esté abierto y el resto de la carta siga normal. Sin tramos
+  // cargados, la categoría se muestra siempre — esto es una excepción que
+  // configura el que la necesita, no algo que haya que definir por default.
   const ahora = new Date();
   const conProductos = categoriasCrudas.filter(
-    (c) => c.productos.length > 0 && calcularEstadoAtencion(c.horarios, ahora).abierto
+    (c) => c.productos.length > 0 && !categoriaOcultaPorHorario(c.horarios, ahora)
   );
 
   // Los combos "mitad y mitad" se agrupan por su nombre de grupo, ignorando

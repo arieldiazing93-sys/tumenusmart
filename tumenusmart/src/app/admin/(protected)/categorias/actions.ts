@@ -125,11 +125,14 @@ export async function moverCategoria(id: string, direccion: Direccion) {
 export type ResultadoTramoCategoria = { ok: true } | { ok: false; error: string };
 
 /**
- * Agrega un tramo de horario a una categoría — ej: "Pizzas" visible de
- * miércoles a domingo, de 18:00 a 23:00. Sin ningún tramo cargado, la
- * categoría se muestra siempre (mismo criterio que el horario de atención
- * del local): esto es una restricción opcional, no algo que haya que
- * configurar para que la carta funcione.
+ * Agrega un tramo de BLOQUEO a una categoría — ej: "Hamburguesas Simple"
+ * oculta los lunes y martes. Es el criterio contrario al horario de
+ * atención del local: ahí sin tramos el local está siempre abierto Y con
+ * tramos solo atiende en esas ventanas; acá sin tramos la categoría se
+ * muestra SIEMPRE, y los tramos cargados son las ventanas en las que se
+ * OCULTA — el resto del tiempo sigue visible sin tocar nada. Es una
+ * excepción puntual que configura el que la necesita, no un horario que
+ * haya que definir entero para que la carta funcione.
  *
  * Devuelve un resultado en vez de lanzar los errores de validación: Next.js
  * oculta en producción el mensaje de cualquier `throw` que salga de una
@@ -150,7 +153,7 @@ export async function agregarTramoCategoria(
   if (!Number.isInteger(diaSemana) || diaSemana < 0 || diaSemana > 6) {
     return { ok: false, error: "Día inválido" };
   }
-  if (!abre || !cierra) return { ok: false, error: "Faltan las horas de apertura y cierre" };
+  if (!abre || !cierra) return { ok: false, error: "Faltan las horas del bloqueo" };
 
   await prisma.categoriaHorario.create({
     data: { categoryId, diaSemana, abre, cierra, storeId: idLocal },

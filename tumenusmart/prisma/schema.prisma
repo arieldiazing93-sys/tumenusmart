@@ -287,20 +287,23 @@ model Category {
   activa    Boolean   @default(true)
   productos Product[]
   createdAt DateTime  @default(now())
-  // Días y horarios en que esta categoría se muestra en la carta pública —
-  // ej: una categoría "Pizzas" que solo se vende de miércoles a domingo.
-  // Sin tramos cargados = siempre visible (mismo criterio por defecto que
-  // el horario de atención del local).
+  // Días y horarios en que esta categoría se OCULTA de la carta pública —
+  // ej: "Hamburguesas Simple" no se vende lunes ni martes. Es al revés del
+  // horario de atención del local: sin tramos cargados, la categoría se
+  // muestra SIEMPRE (default), y los tramos cargados son ventanas de
+  // bloqueo puntuales, no un horario completo que haya que definir.
   horarios  CategoriaHorario[]
 
   @@index([storeId])
 }
 
-// Mismo shape que HorarioAtencion (día + abre + cierra) y la misma lógica de
-// cálculo (`calcularEstadoAtencion` en horario-atencion.ts, que es genérica
-// y no está atada a "el local") — pero acá decide si se muestra una
-// CATEGORÍA, no el local entero. Dos categorías pueden tener tramos muy
-// distintos entre sí (ej: "Pizzas" solo miér-dom, "Bebidas" todos los días).
+// Mismo shape que HorarioAtencion (día + abre + cierra), pero el criterio es
+// el opuesto: acá el tramo dice cuándo se OCULTA la categoría, no cuándo
+// atiende el local. Reutiliza el cálculo de "¿estamos dentro de alguno de
+// estos tramos ahora?" (`calcularEstadoAtencion`, genérica) a través de
+// `categoriaOcultaPorHorario` en horario-atencion.ts, que es la que invierte
+// el resultado. Dos categorías pueden tener bloqueos muy distintos entre sí
+// (ej: "Hamburguesas Simple" lunes y martes, "Postres" ninguno).
 model CategoriaHorario {
   id         String   @id @default(cuid())
   storeId    String
