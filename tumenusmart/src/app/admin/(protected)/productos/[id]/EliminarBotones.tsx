@@ -11,7 +11,14 @@ export function EliminarProductoBoton({ productId }: { productId: string }) {
       disabled={pending}
       onClick={() => {
         if (!confirm("¿Borrar este producto? No se puede deshacer.")) return;
-        startTransition(() => eliminarProducto(productId));
+        startTransition(async () => {
+          // alert() y no un texto en pantalla: mismo motivo que en zonas de
+          // envío — el mensaje explica por qué no se borró y qué hacer en
+          // su lugar, y es demasiado largo para un texto chico al lado del
+          // botón.
+          const resultado = await eliminarProducto(productId);
+          if (!resultado.ok) alert(resultado.error);
+        });
       }}
       className="text-sm text-peligro hover:underline disabled:opacity-50"
     >

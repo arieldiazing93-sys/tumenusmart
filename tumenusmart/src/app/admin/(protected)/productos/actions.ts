@@ -156,10 +156,27 @@ export async function actualizarProducto(
   redirect(`/admin/productos/${productId}?guardado=1`);
 }
 
-export async function eliminarProducto(productId: string) {
+/**
+ * Mismo criterio que `eliminarZona` para las zonas de envío: si el producto
+ * ya aparece en algún pedido (aunque esté cancelado), no se borra. Borrarlo
+ * dejaría el `OrderItem` de ese pedido viejo sin producto (`productId` en
+ * null) y el reporte de Rentabilidad lo empezaría a tratar como un combo sin
+ * costo — el margen de esa venta pasada se vuelve "desconocido" de la nada.
+ * En vez de eso, se le pide al dueño que lo marque "No disponible": deja de
+ * venderse en la carta pública sin tocar ni un dato de lo ya vendido.
+ */
+export async function eliminarProducto(productId: string): Promise<ResultadoProducto> {
   await exigirPermiso("productos.editar");
   // Todas las consultas de acá abajo quedan atadas a este local.
   const prisma = prismaDelLocal(await idLocalActual());
+
+  const pedidosConEsteProducto = await prisma.orderItem.count({ where: { productId } });
+  if (pedidosConEsteProducto > 0) {
+    return {
+      ok: false,
+      error: `No se puede borrar: hay ${pedidosConEsteProducto} pedido(s) que incluyen este producto en su historial. Si ya no lo querés vender, marcalo como "No disponible" en el formulario de arriba — así dejás de venderlo sin perder ese historial en los reportes.`,
+    };
+  }
 
   await prisma.product.delete({ where: { id: productId } });
   revalidatePath("/admin/productos");
