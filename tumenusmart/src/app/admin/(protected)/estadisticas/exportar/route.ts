@@ -108,6 +108,12 @@ export async function GET(request: NextRequest) {
   }
 
   filas.push("");
+  filas.push(filaCsv(["Tipo de entrega", "Pedidos", "Ingresos (Gs.)"]));
+  filas.push(filaCsv(["Delivery", stats.porTipoEntrega.delivery.cantidad, Math.round(stats.porTipoEntrega.delivery.ingresos)]));
+  filas.push(filaCsv(["Retiro en el local", stats.porTipoEntrega.retiro.cantidad, Math.round(stats.porTipoEntrega.retiro.ingresos)]));
+  filas.push(filaCsv(["Comer en el local", stats.porTipoEntrega.mesa.cantidad, Math.round(stats.porTipoEntrega.mesa.ingresos)]));
+
+  filas.push("");
   filas.push(filaCsv(["Puesto", "Producto", "Unidades", "Facturación (Gs.)", "% de unidades"]));
   ranking.masVendidos.forEach((fila, i) => {
     filas.push(

@@ -58,6 +58,21 @@ export async function calcularEstadisticas(storeId: string, rango: RangoFecha) {
     totalesPorDia.set(clave, (totalesPorDia.get(clave) ?? 0) + Number(p.total));
   }
 
+  // Cuánto entró por cada vía — delivery, retiro, comer en el local. Se
+  // arma acá y no en un reporte aparte porque ya se tiene `validos` en
+  // memoria: no hace falta una segunda consulta a la base para esto.
+  const porTipoEntrega = {
+    delivery: { cantidad: 0, ingresos: 0 },
+    retiro: { cantidad: 0, ingresos: 0 },
+    mesa: { cantidad: 0, ingresos: 0 },
+  };
+  for (const p of validos) {
+    const grupo =
+      p.tipoEntrega === "delivery" || p.tipoEntrega === "mesa" ? p.tipoEntrega : "retiro";
+    porTipoEntrega[grupo].cantidad += 1;
+    porTipoEntrega[grupo].ingresos += Number(p.total);
+  }
+
   return {
     store,
     pedidosTotales,
@@ -71,6 +86,7 @@ export async function calcularEstadisticas(storeId: string, rango: RangoFecha) {
     clientesNuevos,
     dias,
     totalesPorDia,
+    porTipoEntrega,
   };
 }
 

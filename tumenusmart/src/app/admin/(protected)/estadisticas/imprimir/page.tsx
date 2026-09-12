@@ -130,6 +130,34 @@ export default async function ImprimirEstadisticasPage({
         </tbody>
       </table>
 
+      <h2 className="mb-3 mt-10 font-semibold text-tinta">Ventas por tipo de entrega</h2>
+      <table className="mb-10 w-full border-collapse text-sm">
+        <thead>
+          <tr className="border-b border-linea text-left text-xs uppercase tracking-wide text-tinta-media">
+            <th className="py-1.5">Tipo</th>
+            <th className="py-1.5 text-right">Pedidos</th>
+            <th className="py-1.5 text-right">Ingresos</th>
+          </tr>
+        </thead>
+        <tbody>
+          {(
+            [
+              ["Delivery", stats.porTipoEntrega.delivery],
+              ["Retiro en el local", stats.porTipoEntrega.retiro],
+              ["Comer en el local", stats.porTipoEntrega.mesa],
+            ] as const
+          ).map(([etiqueta, fila]) => (
+            <tr key={etiqueta} className="border-b border-linea-fina">
+              <td className="py-1.5 text-tinta-media">{etiqueta}</td>
+              <td className="py-1.5 text-right font-semibold text-tinta">{fila.cantidad}</td>
+              <td className="py-1.5 text-right text-tinta-media">
+                {formatearGuarani(Math.round(fila.ingresos))}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+
       <h2 className="mb-3 mt-10 font-semibold text-tinta">Productos más vendidos</h2>
       {ranking.masVendidos.length === 0 ? (
         <p className="mb-10 text-sm text-tinta-suave">Sin ventas en este período.</p>

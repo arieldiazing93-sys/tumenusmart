@@ -144,17 +144,17 @@ export default async function ImprimirProductosVendidosPage({
                           aparte — una fila por combinación exacta, totales del período. */}
                       {f.agregadosDetalle.map((d) => (
                         <tr key={`${f.nombre}-${d.texto}`} className="border-b border-linea-fina break-inside-avoid text-xs">
-                          <td className="py-1 pl-4 text-tinta-suave">
-                            + {d.texto} · {d.cantidad}x
-                          </td>
-                          <td />
+                          <td className="py-1 pl-4 text-tinta-suave">+ {d.texto}</td>
+                          <td className="py-1 text-right text-tinta-suave">{d.cantidad}</td>
                           <td className="py-1 text-right text-tinta-suave">
                             {formatearGuarani(Math.round(d.venta))}
                           </td>
                           <td className="py-1 text-right text-tinta-suave">
                             {d.costo != null ? formatearGuarani(Math.round(d.costo)) : "—"}
                           </td>
-                          <td />
+                          <td className="py-1 text-right text-tinta-suave">
+                            {d.margen != null ? `${d.margen.toFixed(0)}%` : "—"}
+                          </td>
                           <td className="py-1 text-right text-tinta-suave">
                             {d.ganancia != null ? formatearGuarani(Math.round(d.ganancia)) : "—"}
                           </td>

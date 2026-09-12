@@ -198,18 +198,17 @@ export default async function ProductosVendidosPage({
                               key={`${f.nombre}-${d.texto}`}
                               className="border-b border-linea-fina bg-papel-suave/60 text-xs last:border-0"
                             >
-                              <td className="px-3 py-1.5 pl-6 text-tinta-suave">
-                                + {d.texto}
-                                <span className="text-tinta-suave/70"> · {d.cantidad}x</span>
-                              </td>
-                              <td />
+                              <td className="px-3 py-1.5 pl-6 text-tinta-suave">+ {d.texto}</td>
+                              <td className="cifra px-3 py-1.5 text-right text-tinta-suave">{d.cantidad}</td>
                               <td className="cifra px-3 py-1.5 text-right text-tinta-suave">
                                 {formatearGuarani(Math.round(d.venta))}
                               </td>
                               <td className="cifra px-3 py-1.5 text-right text-tinta-suave">
                                 {d.costo != null ? formatearGuarani(Math.round(d.costo)) : "—"}
                               </td>
-                              <td />
+                              <td className="cifra px-3 py-1.5 text-right text-tinta-suave">
+                                {d.margen != null ? `${d.margen.toFixed(0)}%` : "—"}
+                              </td>
                               <td className="cifra px-3 py-1.5 text-right text-tinta-suave">
                                 {d.ganancia != null ? formatearGuarani(Math.round(d.ganancia)) : "—"}
                               </td>

@@ -49,6 +49,8 @@ export type FilaProductoReporte = {
     venta: number;
     costo: number | null;
     ganancia: number | null;
+    /** Porcentaje: ganancia sobre venta, de este agregado solo. */
+    margen: number | null;
   }[];
 };
 
@@ -291,13 +293,12 @@ export async function calcularReporteProductosVendidos(
     // la que más vendió a la que menos, igual criterio que las filas de
     // productos.
     const agregadosDetalle = [...a.detalleAgregados.values()]
-      .map((d) => ({
-        texto: d.texto,
-        cantidad: d.cantidad,
-        venta: d.venta,
-        costo: d.costoIncompleto ? null : d.costo,
-        ganancia: d.costoIncompleto ? null : d.venta - d.costo,
-      }))
+      .map((d) => {
+        const costo = d.costoIncompleto ? null : d.costo;
+        const ganancia = costo != null ? d.venta - costo : null;
+        const margen = ganancia != null && d.venta > 0 ? (ganancia / d.venta) * 100 : null;
+        return { texto: d.texto, cantidad: d.cantidad, venta: d.venta, costo, ganancia, margen };
+      })
       .sort((x, y) => y.venta - x.venta);
 
     categoria.filas.push({

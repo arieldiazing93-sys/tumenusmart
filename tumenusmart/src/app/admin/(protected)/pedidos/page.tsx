@@ -235,11 +235,9 @@ export default async function AdminPedidosPage({
       </div>
 
       {/*
-        Estados, fechas y tipo de entrega en tres filas separadas, no una
-        compartida: mezcladas se pisaban entre sí (los estados por sí solos ya
-        llenan el ancho, y fecha terminaba partida a la mitad, una pastilla
-        sí y la siguiente en el renglón de abajo). Cada filtro es una idea
-        distinta, así que cada uno tiene su propio renglón.
+        Estados en su propia fila: por sí solos ya llenan el ancho, así que
+        compartir renglón con fecha los partía a la mitad (una pastilla de
+        fecha sí, la siguiente en el renglón de abajo).
       */}
       <div className="mb-2 flex flex-wrap items-center gap-x-2 gap-y-2">
         <Link
@@ -347,53 +345,54 @@ export default async function AdminPedidosPage({
             </button>
           </form>
         </details>
-      </div>
 
-      {/*
-        Filtro de tipo de entrega, separado del resto con un borde arriba y
-        alineado a la derecha: es una dimensión distinta de las anteriores
-        (estado y fecha son "cuándo/cómo va" el pedido, esto es "por dónde
-        entró"), así que se lee mejor como su propio bloque y no como una
-        pastilla más de la misma fila.
-        Por defecto ("Delivery + Retiro" de acá sin tocar, o entrando por
-        "Pedidos" del menú) se ven delivery y retiro mezclados como siempre —
-        los de mesa quedan afuera salvo que se pidan a propósito con estas
-        pastillas o con "Mesas" del menú.
-      */}
-      <div className="mb-4 flex flex-wrap items-center justify-end gap-x-2 gap-y-2 border-t border-linea pt-3">
-        <Link
-          href={hrefTipo(null)}
-          className={`rounded-full border px-3.5 py-1.5 text-[0.82rem] font-semibold transition-colors duration-100 ${
-            !tipoActivo
-              ? "border-tinta bg-tinta text-white"
-              : "border-linea bg-white text-tinta-media hover:border-brand hover:text-brand"
-          }`}
-        >
-          Delivery + Retiro
-        </Link>
-        {FILTROS_TIPO.map((t) => (
+        {/*
+          Tipo de entrega, en la misma fila que la fecha (separado con una
+          línea vertical) y empujado a la derecha con "ml-auto" — es un
+          filtro de otra dimensión (por dónde entró el pedido, no cuándo),
+          pero comparte renglón para no ocupar una fila entera aparte.
+          Por defecto ("Delivery + Retiro" de acá sin tocar, o entrando por
+          "Pedidos" del menú) se ven delivery y retiro mezclados como
+          siempre — los de mesa quedan afuera salvo que se pidan a propósito
+          con estas pastillas o con "Mesas" del menú.
+        */}
+        <span aria-hidden="true" className="mx-1 h-5 w-px flex-none bg-linea" />
+
+        <div className="ml-auto flex flex-wrap items-center gap-x-2 gap-y-2">
           <Link
-            key={t.value}
-            href={hrefTipo(t.value)}
+            href={hrefTipo(null)}
             className={`rounded-full border px-3.5 py-1.5 text-[0.82rem] font-semibold transition-colors duration-100 ${
-              tipoActivo === t.value
+              !tipoActivo
                 ? "border-tinta bg-tinta text-white"
                 : "border-linea bg-white text-tinta-media hover:border-brand hover:text-brand"
             }`}
           >
-            {t.label}
+            Delivery + Retiro
           </Link>
-        ))}
-        <Link
-          href={hrefTipo("todos")}
-          className={`rounded-full border px-3.5 py-1.5 text-[0.82rem] font-semibold transition-colors duration-100 ${
-            tipoActivo === "todos"
-              ? "border-tinta bg-tinta text-white"
-              : "border-linea bg-white text-tinta-media hover:border-brand hover:text-brand"
-          }`}
-        >
-          Todos los tipos
-        </Link>
+          {FILTROS_TIPO.map((t) => (
+            <Link
+              key={t.value}
+              href={hrefTipo(t.value)}
+              className={`rounded-full border px-3.5 py-1.5 text-[0.82rem] font-semibold transition-colors duration-100 ${
+                tipoActivo === t.value
+                  ? "border-tinta bg-tinta text-white"
+                  : "border-linea bg-white text-tinta-media hover:border-brand hover:text-brand"
+              }`}
+            >
+              {t.label}
+            </Link>
+          ))}
+          <Link
+            href={hrefTipo("todos")}
+            className={`rounded-full border px-3.5 py-1.5 text-[0.82rem] font-semibold transition-colors duration-100 ${
+              tipoActivo === "todos"
+                ? "border-tinta bg-tinta text-white"
+                : "border-linea bg-white text-tinta-media hover:border-brand hover:text-brand"
+            }`}
+          >
+            Todos los tipos
+          </Link>
+        </div>
       </div>
 
       {pedidos.length === 0 && (

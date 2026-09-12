@@ -15,6 +15,12 @@ import { VentasPorDiaChart } from "@/components/VentasPorDiaChart";
 
 export const dynamic = "force-dynamic";
 
+const ETIQUETAS_TIPO_ENTREGA: Record<"delivery" | "retiro" | "mesa", string> = {
+  delivery: "Delivery",
+  retiro: "Retiro en el local",
+  mesa: "Comer en el local",
+};
+
 const FILTROS_FECHA: { value: FiltroFecha; label: string }[] = [
   { value: "hoy", label: "Hoy" },
   { value: "ayer", label: "Ayer" },
@@ -207,6 +213,42 @@ export default async function AdminEstadisticasPage({
         <h2 className="mb-3 font-semibold text-tinta">Ventas por día</h2>
         <div className="rounded-lg border border-linea bg-white p-4">
           <VentasPorDiaChart datos={datosChart} />
+        </div>
+      </div>
+
+      <div className="mb-8">
+        <h2 className="mb-3 font-semibold text-tinta">Ventas por tipo de entrega</h2>
+        <div className="rounded-lg border border-linea bg-white p-4">
+          {stats.pedidosValidos === 0 ? (
+            <p className="text-sm text-tinta-suave">Sin pedidos en este período.</p>
+          ) : (
+            <div className="flex flex-col gap-3">
+              {(["delivery", "retiro", "mesa"] as const).map((t) => {
+                const fila = stats.porTipoEntrega[t];
+                const porcentaje = stats.ingresos > 0 ? (fila.ingresos / stats.ingresos) * 100 : 0;
+                return (
+                  <div key={t}>
+                    <div className="mb-1 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5 text-sm">
+                      <span className="font-medium text-tinta">{ETIQUETAS_TIPO_ENTREGA[t]}</span>
+                      <span className="text-tinta-media">
+                        {fila.cantidad} {fila.cantidad === 1 ? "pedido" : "pedidos"} ·{" "}
+                        <span className="font-semibold text-tinta">
+                          {formatearGuarani(Math.round(fila.ingresos))}
+                        </span>{" "}
+                        <span className="text-xs text-tinta-suave">({porcentaje.toFixed(0)}%)</span>
+                      </span>
+                    </div>
+                    <div className="h-2 rounded-full bg-papel-hundido">
+                      <div
+                        className="h-2 rounded-full bg-brand"
+                        style={{ width: `${porcentaje}%` }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       </div>
 
