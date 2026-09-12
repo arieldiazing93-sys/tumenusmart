@@ -10,7 +10,20 @@ export type PasoSeguimiento = {
 };
 
 export function pasosSeguimiento(tipoEntrega: string): PasoSeguimiento[] {
-  const esDelivery = tipoEntrega === "delivery";
+  const pasoDespacho =
+    tipoEntrega === "delivery"
+      ? { titulo: "En camino", detalle: "El repartidor salió con tu pedido.", emoji: "🛵" }
+      : tipoEntrega === "mesa"
+        ? { titulo: "Casi listo", detalle: "Ya casi te lo llevamos a la mesa.", emoji: "🍽️" }
+        : { titulo: "Listo para retirar", detalle: "Ya podés pasar a buscarlo por el local.", emoji: "🛍" };
+
+  const pasoFinal =
+    tipoEntrega === "delivery"
+      ? { titulo: "Entregado", emoji: "🎉" }
+      : tipoEntrega === "mesa"
+        ? { titulo: "Servido", emoji: "🎉" }
+        : { titulo: "Retirado", emoji: "🎉" };
+
   return [
     {
       estado: "pendiente",
@@ -32,17 +45,15 @@ export function pasosSeguimiento(tipoEntrega: string): PasoSeguimiento[] {
     },
     {
       estado: "en_despacho",
-      titulo: esDelivery ? "En camino" : "Listo para retirar",
-      detalle: esDelivery
-        ? "El repartidor salió con tu pedido."
-        : "Ya podés pasar a buscarlo por el local.",
-      emoji: esDelivery ? "🛵" : "🛍",
+      titulo: pasoDespacho.titulo,
+      detalle: pasoDespacho.detalle,
+      emoji: pasoDespacho.emoji,
     },
     {
       estado: "entregado",
-      titulo: esDelivery ? "Entregado" : "Retirado",
+      titulo: pasoFinal.titulo,
       detalle: "¡Que lo disfrutes!",
-      emoji: "🎉",
+      emoji: pasoFinal.emoji,
     },
   ];
 }

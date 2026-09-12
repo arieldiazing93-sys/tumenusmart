@@ -96,7 +96,9 @@ export default async function DetallePedidoPage({
           <p className="text-sm text-tinta">
             {pedido.tipoEntrega === "delivery"
               ? `Delivery — ${pedido.deliveryZone?.nombre ?? "a coordinar"}`
-              : "Retiro en el local"}
+              : pedido.tipoEntrega === "mesa"
+                ? `Mesa ${pedido.mesaNumero ?? "-"}`
+                : "Retiro en el local"}
           </p>
           {pedido.tipoEntrega === "delivery" && pedido.direccion && (
             <p className="text-sm text-tinta-media">{pedido.direccion}</p>

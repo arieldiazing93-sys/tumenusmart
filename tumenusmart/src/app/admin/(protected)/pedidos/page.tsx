@@ -34,10 +34,16 @@ const FILTROS_FECHA: { value: FiltroFecha; label: string }[] = [
   { value: "mes", label: "Este mes" },
 ];
 
+const FILTROS_TIPO: { value: "delivery" | "retiro" | "mesa"; label: string }[] = [
+  { value: "delivery", label: "Delivery" },
+  { value: "retiro", label: "Retiro" },
+  { value: "mesa", label: "Mesa" },
+];
+
 export default async function AdminPedidosPage({
   searchParams,
 }: {
-  searchParams: Promise<{ estado?: string; fecha?: string; desde?: string; hasta?: string }>;
+  searchParams: Promise<{ estado?: string; fecha?: string; desde?: string; hasta?: string; tipo?: string }>;
 }) {
   // Sin este chequeo acá (y no solo en el layout), una sesión vencida con
   // esta pantalla abierta terminaba en un error real: el layout y la página
@@ -54,18 +60,35 @@ export default async function AdminPedidosPage({
   const storeId = await idLocalActual();
   const prisma = prismaDelLocal(storeId);
 
-  const { estado, fecha, desde, hasta } = await searchParams;
+  const { estado, fecha, desde, hasta, tipo } = await searchParams;
   const estadoActivo = estado && estado !== "todos" ? estado : null;
   const rangoFecha = calcularRangoFecha(fecha, desde, hasta);
   const fechaActiva = rangoFecha ? fecha : null;
+  // "todos" es un valor EXPLÍCITO (pastilla "Todos" de tipo): ahí sí se
+  // mezclan los tres. Sin filtro de tipo en la URL (entrando por "Pedidos"
+  // del menú, como toda la vida) se sigue mostrando delivery + retiro nada
+  // más — los pedidos de mesa quedan afuera salvo que se pidan a propósito,
+  // que es justo lo que el dueño pidió.
+  const tipoActivo =
+    tipo === "delivery" || tipo === "retiro" || tipo === "mesa" || tipo === "todos"
+      ? tipo
+      : null;
+  // null → default (delivery+retiro, mesa afuera) · "todos" → sin filtro ·
+  // cualquier otro valor → exactamente ese tipo.
+  const filtroTipo =
+    tipoActivo == null
+      ? { tipoEntrega: { not: "mesa" } }
+      : tipoActivo === "todos"
+        ? {}
+        : { tipoEntrega: tipoActivo };
 
-  
   const [pedidos, store, estadoTienda, pedidosEnviados] = await Promise.all([
     prisma.order.findMany({
       where: {
         storeId,
         ...(estadoActivo ? { estado: estadoActivo } : {}),
         ...(rangoFecha ? { createdAt: rangoFecha } : {}),
+        ...filtroTipo,
       },
       orderBy: { createdAt: "desc" },
       include: { items: true, deliveryZone: true, repartidor: true },
@@ -92,6 +115,7 @@ export default async function AdminPedidosPage({
     if (fechaActiva) params.set("fecha", fechaActiva);
     if (fechaActiva === "rango" && desde) params.set("desde", desde);
     if (fechaActiva === "rango" && hasta) params.set("hasta", hasta);
+    if (tipoActivo) params.set("tipo", tipoActivo);
     const qs = params.toString();
     return qs ? `/admin/pedidos?${qs}` : "/admin/pedidos";
   }
@@ -100,6 +124,16 @@ export default async function AdminPedidosPage({
     const params = new URLSearchParams();
     if (estadoActivo) params.set("estado", estadoActivo);
     if (nuevaFecha) params.set("fecha", nuevaFecha);
+    if (tipoActivo) params.set("tipo", tipoActivo);
+    const qs = params.toString();
+    return qs ? `/admin/pedidos?${qs}` : "/admin/pedidos";
+  }
+
+  function hrefTipo(nuevoTipo: "delivery" | "retiro" | "mesa" | "todos" | null) {
+    const params = new URLSearchParams();
+    if (estadoActivo) params.set("estado", estadoActivo);
+    if (fechaActiva) params.set("fecha", fechaActiva);
+    if (nuevoTipo) params.set("tipo", nuevoTipo);
     const qs = params.toString();
     return qs ? `/admin/pedidos?${qs}` : "/admin/pedidos";
   }
@@ -277,6 +311,7 @@ export default async function AdminPedidosPage({
             className="absolute left-0 top-full z-20 mt-1.5 flex items-center gap-1.5 rounded-xl border border-linea bg-white p-2 shadow-media"
           >
             {estadoActivo && <input type="hidden" name="estado" value={estadoActivo} />}
+            {tipoActivo && <input type="hidden" name="tipo" value={tipoActivo} />}
             <input type="hidden" name="fecha" value="rango" />
             <input
               type="date"
@@ -303,6 +338,48 @@ export default async function AdminPedidosPage({
             </button>
           </form>
         </details>
+      </div>
+
+      {/*
+        Filtro de tipo de entrega, en su propia fila. Por defecto ("Todos" de
+        acá sin tocar, o entrando por "Pedidos" del menú) se ven delivery y
+        retiro mezclados como siempre — los de mesa quedan afuera salvo que
+        se pidan a propósito con estas pastillas o con "Mesas" del menú.
+      */}
+      <div className="mb-4 flex flex-wrap items-center gap-x-2 gap-y-2">
+        <Link
+          href={hrefTipo(null)}
+          className={`rounded-full border px-3.5 py-1.5 text-[0.82rem] font-semibold transition-colors duration-100 ${
+            !tipoActivo
+              ? "border-tinta bg-tinta text-white"
+              : "border-linea bg-white text-tinta-media hover:border-brand hover:text-brand"
+          }`}
+        >
+          Delivery + Retiro
+        </Link>
+        {FILTROS_TIPO.map((t) => (
+          <Link
+            key={t.value}
+            href={hrefTipo(t.value)}
+            className={`rounded-full border px-3.5 py-1.5 text-[0.82rem] font-semibold transition-colors duration-100 ${
+              tipoActivo === t.value
+                ? "border-tinta bg-tinta text-white"
+                : "border-linea bg-white text-tinta-media hover:border-brand hover:text-brand"
+            }`}
+          >
+            {t.label}
+          </Link>
+        ))}
+        <Link
+          href={hrefTipo("todos")}
+          className={`rounded-full border px-3.5 py-1.5 text-[0.82rem] font-semibold transition-colors duration-100 ${
+            tipoActivo === "todos"
+              ? "border-tinta bg-tinta text-white"
+              : "border-linea bg-white text-tinta-media hover:border-brand hover:text-brand"
+          }`}
+        >
+          Todos los tipos
+        </Link>
       </div>
 
       {pedidos.length === 0 && (
@@ -408,7 +485,9 @@ export default async function AdminPedidosPage({
                       <Link prefetch={false} href={`/admin/pedidos/${pedido.id}`} className="block">
                         {pedido.tipoEntrega === "delivery"
                           ? pedido.deliveryZone?.nombre ?? "A coordinar"
-                          : "Retiro"}
+                          : pedido.tipoEntrega === "mesa"
+                            ? `Mesa ${pedido.mesaNumero ?? "-"}`
+                            : "Retiro"}
                       </Link>
                     </td>
                     <td className="px-3 py-3">

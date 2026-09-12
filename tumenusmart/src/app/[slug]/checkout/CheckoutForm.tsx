@@ -53,10 +53,11 @@ export function CheckoutForm({
 
   const [nombre, setNombre] = useState("");
   const [telefono, setTelefono] = useState("");
-  const [tipoEntrega, setTipoEntrega] = useState<"delivery" | "retiro">("delivery");
+  const [tipoEntrega, setTipoEntrega] = useState<"delivery" | "retiro" | "mesa">("delivery");
   const [clienteLat, setClienteLat] = useState<number | null>(null);
   const [clienteLng, setClienteLng] = useState<number | null>(null);
   const [direccion, setDireccion] = useState("");
+  const [mesaNumero, setMesaNumero] = useState("");
   const [metodoPago, setMetodoPago] = useState<MetodoPago>("efectivo");
   const [comprobanteTipo, setComprobanteTipo] = useState<"ticket" | "factura">("ticket");
   const [facturaRazonSocial, setFacturaRazonSocial] = useState("");
@@ -66,10 +67,10 @@ export function CheckoutForm({
   const [error, setError] = useState<string | null>(null);
   // Qué campo disparó el último error, para resaltarlo — no todo el aviso
   // sirve de igual manera si el ojo no sabe dónde corregir.
-  const [campoInvalido, setCampoInvalido] = useState<"ubicacion" | "factura" | null>(null);
+  const [campoInvalido, setCampoInvalido] = useState<"ubicacion" | "factura" | "mesa" | null>(null);
   const [intento, setIntento] = useState(0);
 
-  function fallar(mensaje: string, campo?: "ubicacion" | "factura") {
+  function fallar(mensaje: string, campo?: "ubicacion" | "factura" | "mesa") {
     setError(mensaje);
     setCampoInvalido(campo ?? null);
     setIntento((n) => n + 1);
@@ -127,6 +128,10 @@ export function CheckoutForm({
       fallar("Marcá tu ubicación en el mapa para poder entregarte el pedido.", "ubicacion");
       return;
     }
+    if (tipoEntrega === "mesa" && !mesaNumero.trim()) {
+      fallar("Escribí el número de tu mesa.", "mesa");
+      return;
+    }
     if (comprobanteTipo === "factura" && (!facturaRazonSocial.trim() || !facturaRuc.trim())) {
       fallar("Para factura necesitamos la razón social y el RUC.", "factura");
       return;
@@ -142,6 +147,7 @@ export function CheckoutForm({
         clienteLat: tipoEntrega === "delivery" ? clienteLat ?? undefined : undefined,
         clienteLng: tipoEntrega === "delivery" ? clienteLng ?? undefined : undefined,
         direccion: tipoEntrega === "delivery" ? direccion : undefined,
+        mesaNumero: tipoEntrega === "mesa" ? mesaNumero : undefined,
         metodoPagoReferencia: metodoPago,
         comprobanteTipo,
         facturaRazonSocial: comprobanteTipo === "factura" ? facturaRazonSocial : undefined,
@@ -264,11 +270,32 @@ export function CheckoutForm({
                   sublabel: envioModo === "zonas" ? "Según zona" : "A coordinar",
                 },
                 { value: "retiro", label: "Retiro en el local" },
+                { value: "mesa", label: "Comer en el local" },
               ]}
               valor={tipoEntrega}
               onChange={setTipoEntrega}
             />
           </div>
+
+          {tipoEntrega === "mesa" && (
+            <Campo etiqueta="N° de mesa" ayuda="Así el mozo sabe a dónde llevarte el pedido.">
+              <div
+                key={campoInvalido === "mesa" ? `sac-${intento}` : "mesa"}
+                className={
+                  campoInvalido === "mesa"
+                    ? "animate-[sacudir_0.32s_ease] rounded-xl ring-2 ring-peligro/50"
+                    : ""
+                }
+              >
+                <Entrada
+                  required
+                  value={mesaNumero}
+                  onChange={(e) => setMesaNumero(e.target.value)}
+                  placeholder="Ej: 5"
+                />
+              </div>
+            </Campo>
+          )}
 
           {tipoEntrega === "delivery" && (
             <>

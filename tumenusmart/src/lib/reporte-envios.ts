@@ -55,6 +55,11 @@ export async function calcularReporteEnvios(
     where: {
       createdAt: rango,
       estado: { not: "cancelado" },
+      // Este reporte es sobre zonas y repartidores: un pedido de mesa no
+      // tiene ninguno de los dos, así que ni suma como delivery ni como
+      // retiro — queda afuera del todo (cuenta en Estadísticas y
+      // Rentabilidad igual, ahí sí sin importar el tipo de entrega).
+      tipoEntrega: { not: "mesa" },
       ...PEDIDO_REAL,
     },
     select: {

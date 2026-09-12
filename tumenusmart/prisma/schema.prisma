@@ -452,12 +452,15 @@ model Order {
   clienteNombre        String
   clienteTelefono      String
   estado               String        @default("pendiente") // pendiente | confirmado | en_preparacion | en_despacho | entregado | cancelado
-  tipoEntrega          String // "delivery" | "retiro"
+  tipoEntrega          String // "delivery" | "retiro" | "mesa"
   deliveryZoneId       String?
   deliveryZone         DeliveryZone? @relation(fields: [deliveryZoneId], references: [id])
   repartidorId         String? // solo aplica a pedidos "delivery" en camino
   repartidor           Repartidor?   @relation(fields: [repartidorId], references: [id])
   direccion            String?
+  // Solo para tipoEntrega "mesa": el número/nombre que el cliente escribió
+  // para identificar dónde está sentado. Null en delivery/retiro.
+  mesaNumero           String?
   clienteLat           Float? // pin que marcó el cliente en el mapa al hacer el pedido
   clienteLng           Float?
   metodoPagoReferencia String // "efectivo" | "transferencia" | "tarjeta" | "otro" — solo informativo, no se procesa

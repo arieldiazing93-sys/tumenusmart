@@ -182,7 +182,9 @@ export default async function TicketPage({
             <span className="font-bold">Entrega:</span>{" "}
             {esDelivery
               ? `Delivery - ${pedido.deliveryZone?.nombre ?? "a coordinar"}`
-              : "Retiro en el local"}
+              : pedido.tipoEntrega === "mesa"
+                ? `Mesa ${pedido.mesaNumero ?? "-"}`
+                : "Retiro en el local"}
           </p>
           {esDelivery && pedido.direccion && <p>Direccion: {pedido.direccion}</p>}
           {esDelivery && pedido.repartidor && <p>Repartidor: {pedido.repartidor.nombre}</p>}

@@ -17,10 +17,12 @@ export type DatosCheckout = {
   slug: string;
   clienteNombre: string;
   clienteTelefono: string;
-  tipoEntrega: "delivery" | "retiro";
+  tipoEntrega: "delivery" | "retiro" | "mesa";
   clienteLat?: number;
   clienteLng?: number;
   direccion?: string;
+  /** Solo para tipoEntrega "mesa": número/nombre que escribió el cliente. */
+  mesaNumero?: string;
   metodoPagoReferencia: string;
   comprobanteTipo: "ticket" | "factura";
   facturaRazonSocial?: string;
@@ -45,7 +47,7 @@ export type DatosCheckout = {
 export type ResultadoPedido = { ok: true; orderId: string } | { ok: false; error: string };
 
 /** Largos máximos de los textos libres, para que no entre una novela en la comanda. */
-const LARGO = { nombre: 80, telefono: 30, direccion: 200, notas: 500, razonSocial: 120, ruc: 30, email: 120 };
+const LARGO = { nombre: 80, telefono: 30, direccion: 200, mesaNumero: 20, notas: 500, razonSocial: 120, ruc: 30, email: 120 };
 
 function recortar(valor: string | undefined, max: number): string | undefined {
   const limpio = valor?.trim();
@@ -102,6 +104,9 @@ export async function crearPedido(datos: DatosCheckout): Promise<ResultadoPedido
     (datos.clienteLat == null || datos.clienteLng == null)
   ) {
     return { ok: false, error: "Marcá tu ubicación en el mapa para poder entregarte el pedido" };
+  }
+  if (datos.tipoEntrega === "mesa" && !datos.mesaNumero?.trim()) {
+    return { ok: false, error: "Escribí el número de tu mesa" };
   }
   if (
     datos.comprobanteTipo === "factura" &&
@@ -227,6 +232,7 @@ export async function crearPedido(datos: DatosCheckout): Promise<ResultadoPedido
       tipoEntrega: datos.tipoEntrega,
       deliveryZoneId: zonaId,
       direccion: datos.tipoEntrega === "delivery" ? recortar(datos.direccion, LARGO.direccion) : undefined,
+      mesaNumero: datos.tipoEntrega === "mesa" ? recortar(datos.mesaNumero, LARGO.mesaNumero) : undefined,
       clienteLat: datos.clienteLat,
       clienteLng: datos.clienteLng,
       metodoPagoReferencia: datos.metodoPagoReferencia,

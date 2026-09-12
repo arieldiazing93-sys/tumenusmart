@@ -33,6 +33,11 @@ function armarGrupos(hayIdeaSinVer: boolean, rol: string): GrupoSecciones[] {
       secciones: [
         { href: "/admin/pedidos", label: "Pedidos", icono: "pedidos" as const,
           ver: conPermiso("pedidos.ver") },
+        // Mismo permiso y misma pantalla que "Pedidos" — solo entra con el
+        // filtro de tipo puesto en "mesa", para que los pedidos de comer en
+        // el local queden aparte de un clic sin duplicar toda la pantalla.
+        { href: "/admin/pedidos?tipo=mesa", label: "Mesas", icono: "pedidos" as const,
+          ver: conPermiso("pedidos.ver") },
         { href: "/admin/reservas", label: "Reservas", icono: "reservas" as const,
           ver: conPermiso("reservas.ver") },
         // Repartidores vive acá y no en Ajustes: se mira durante el servicio,

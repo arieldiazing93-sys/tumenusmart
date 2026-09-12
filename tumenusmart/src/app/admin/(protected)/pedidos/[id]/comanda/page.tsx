@@ -82,7 +82,13 @@ export default async function ComandaPage({
 
         <div className="text-sm font-bold">
           <p>{hora}</p>
-          <p>{esDelivery ? "DELIVERY" : "RETIRO"}</p>
+          <p>
+            {esDelivery
+              ? "DELIVERY"
+              : pedido.tipoEntrega === "mesa"
+                ? `MESA ${pedido.mesaNumero ?? "-"}`
+                : "RETIRO"}
+          </p>
         </div>
 
         <Separador />
