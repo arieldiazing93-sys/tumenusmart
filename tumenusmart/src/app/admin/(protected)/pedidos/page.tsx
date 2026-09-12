@@ -172,9 +172,18 @@ export default async function AdminPedidosPage({
 
   return (
     <div>
+      {/*
+        Mismo título que ve el header cuando se entra por el link "Mesas" del
+        menú: sin esto, la pantalla seguía diciendo "Pedidos" con el filtro de
+        mesa ya aplicado, y parecía que el link no había hecho nada.
+      */}
       <Cabecera
-        titulo="Pedidos"
-        bajada="Lo que entró por la carta. Los nuevos aparecen arriba y avisan solos."
+        titulo={tipoActivo === "mesa" ? "Mesas" : "Pedidos"}
+        bajada={
+          tipoActivo === "mesa"
+            ? "Pedidos para comer en el local. No se mezclan con delivery ni retiro."
+            : "Lo que entró por la carta. Los nuevos aparecen arriba y avisan solos."
+        }
         acciones={
           urlCarta ? (
             <CompartirCarta nombreNegocio={store?.nombre ?? "Nuestra carta"} url={urlCarta} />
@@ -226,13 +235,13 @@ export default async function AdminPedidosPage({
       </div>
 
       {/*
-        Estados y fechas comparten una sola fila.
-
-        Eran dos renglones de pastillas, uno arriba del otro, empujando los
-        pedidos fuera de la pantalla. Van separados por una línea vertical:
-        se sigue leyendo que son dos filtros distintos, pero ocupan la mitad.
+        Estados, fechas y tipo de entrega en tres filas separadas, no una
+        compartida: mezcladas se pisaban entre sí (los estados por sí solos ya
+        llenan el ancho, y fecha terminaba partida a la mitad, una pastilla
+        sí y la siguiente en el renglón de abajo). Cada filtro es una idea
+        distinta, así que cada uno tiene su propio renglón.
       */}
-      <div className="mb-4 flex flex-wrap items-center gap-x-2 gap-y-2">
+      <div className="mb-2 flex flex-wrap items-center gap-x-2 gap-y-2">
         <Link
           href={hrefEstado(null)}
           className={`rounded-full border px-3.5 py-1.5 text-[0.82rem] font-semibold transition-colors duration-100 ${
@@ -256,9 +265,9 @@ export default async function AdminPedidosPage({
             {e.emoji} {e.label}
           </Link>
         ))}
+      </div>
 
-        <span aria-hidden="true" className="mx-1 h-5 w-px flex-none bg-linea" />
-
+      <div className="mb-4 flex flex-wrap items-center gap-x-2 gap-y-2">
         <Link
           href={hrefFecha(null)}
           className={`rounded-full border px-3 py-1.5 text-[0.82rem] font-semibold transition-colors duration-100 ${
@@ -341,12 +350,17 @@ export default async function AdminPedidosPage({
       </div>
 
       {/*
-        Filtro de tipo de entrega, en su propia fila. Por defecto ("Todos" de
-        acá sin tocar, o entrando por "Pedidos" del menú) se ven delivery y
-        retiro mezclados como siempre — los de mesa quedan afuera salvo que
-        se pidan a propósito con estas pastillas o con "Mesas" del menú.
+        Filtro de tipo de entrega, separado del resto con un borde arriba y
+        alineado a la derecha: es una dimensión distinta de las anteriores
+        (estado y fecha son "cuándo/cómo va" el pedido, esto es "por dónde
+        entró"), así que se lee mejor como su propio bloque y no como una
+        pastilla más de la misma fila.
+        Por defecto ("Delivery + Retiro" de acá sin tocar, o entrando por
+        "Pedidos" del menú) se ven delivery y retiro mezclados como siempre —
+        los de mesa quedan afuera salvo que se pidan a propósito con estas
+        pastillas o con "Mesas" del menú.
       */}
-      <div className="mb-4 flex flex-wrap items-center gap-x-2 gap-y-2">
+      <div className="mb-4 flex flex-wrap items-center justify-end gap-x-2 gap-y-2 border-t border-linea pt-3">
         <Link
           href={hrefTipo(null)}
           className={`rounded-full border px-3.5 py-1.5 text-[0.82rem] font-semibold transition-colors duration-100 ${
