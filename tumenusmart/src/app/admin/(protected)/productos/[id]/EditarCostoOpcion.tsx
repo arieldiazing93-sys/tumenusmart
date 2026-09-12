@@ -45,7 +45,7 @@ export function EditarCostoOpcion({
         type="button"
         onClick={guardar}
         disabled={pendiente}
-        className="rounded border border-linea px-1.5 py-0.5 text-xs font-medium text-tinta-media hover:border-brand hover:text-brand disabled:opacity-50"
+        className="rounded bg-brand px-1.5 py-0.5 text-xs font-medium text-white hover:bg-brand-dark disabled:opacity-50"
       >
         Guardar
       </button>

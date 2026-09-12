@@ -40,7 +40,7 @@ export function EliminarOpcionBoton({
       type="button"
       disabled={pending}
       onClick={() => startTransition(() => eliminarOpcion(productId, optionId))}
-      className="text-xs text-peligro hover:underline disabled:opacity-50"
+      className="rounded border border-peligro/30 bg-peligro-luz px-1.5 py-0.5 text-xs font-medium text-peligro hover:bg-peligro hover:text-white disabled:opacity-50"
     >
       Quitar
     </button>
