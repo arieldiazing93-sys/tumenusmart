@@ -4,11 +4,11 @@ import { Volver } from "@/components/Volver";
 import { notFound } from "next/navigation";
 import { prismaDelLocal } from "@/lib/prisma-local";
 import { idLocalActual } from "@/lib/local-actual";
-import { formatearGuarani } from "@/lib/format";
 import { EliminarProductoBoton, EliminarOpcionBoton } from "./EliminarBotones";
 import { EditarProductoForm } from "./EditarProductoForm";
 import { AgregarOpcionForm } from "./AgregarOpcionForm";
 import { EditarCostoOpcion } from "./EditarCostoOpcion";
+import { EditarPrecioExtraOpcion } from "./EditarPrecioExtraOpcion";
 import { GuardadoToast } from "@/components/GuardadoToast";
 
 export const dynamic = "force-dynamic";
@@ -89,12 +89,6 @@ export default async function EditarProductoPage({
             >
               <span>
                 {o.nombre}
-                {Number(o.precioExtra) > 0 && (
-                  <span className="text-tinta-suave">
-                    {" "}
-                    · +{formatearGuarani(Number(o.precioExtra))}
-                  </span>
-                )}
                 {o.costo == null && (
                   // Sin esto, el margen de todo lo que se venda con este
                   // agregado sale inflado en el reporte de Rentabilidad —
@@ -103,7 +97,12 @@ export default async function EditarProductoPage({
                   <span className="text-aviso"> · sin costo cargado</span>
                 )}
               </span>
-              <div className="flex flex-none items-center gap-3">
+              <div className="flex flex-wrap items-center gap-3">
+                <EditarPrecioExtraOpcion
+                  productId={producto.id}
+                  optionId={o.id}
+                  precioActual={Number(o.precioExtra)}
+                />
                 <EditarCostoOpcion
                   productId={producto.id}
                   optionId={o.id}
