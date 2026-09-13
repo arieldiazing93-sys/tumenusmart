@@ -1,7 +1,7 @@
 "use client";
 
 import { useTransition } from "react";
-import { clasesBoton } from "@/components/ui";
+import { Tarjeta, Campo, Entrada, Area, Selector, clasesBoton } from "@/components/ui";
 import { actualizarProducto } from "../actions";
 import { ImagenProductoField } from "../ImagenProductoField";
 import { IngredientesField } from "../IngredientesField";
@@ -22,6 +22,14 @@ type Producto = {
   mitadYMitadModo: string;
 };
 
+/**
+ * Un formulario largo con una sola columna de campos sueltos se leía como un
+ * bloque único: nada distinguía "esto es sobre el precio" de "esto es sobre
+ * cómo se ve en la carta". Se agrupa en tarjetas con rótulo, el mismo
+ * lenguaje visual que ya usan el checkout público y el formulario de
+ * reservas — así cada sección se identifica de un vistazo en vez de haber
+ * que leer todo para encontrar un campo puntual.
+ */
 export function EditarProductoForm({
   producto,
   categorias,
@@ -40,97 +48,95 @@ export function EditarProductoForm({
   }
 
   return (
-    <form action={alGuardar} className="flex flex-col gap-3">
-      <input
-        name="nombre"
-        required
-        defaultValue={producto.nombre}
-        className="rounded-lg border border-linea px-3 py-2"
-      />
-      <textarea
-        name="descripcion"
-        defaultValue={producto.descripcion ?? ""}
-        rows={2}
-        className="rounded-lg border border-linea px-3 py-2"
-      />
-      <select
-        name="categoryId"
-        required
-        defaultValue={producto.categoryId}
-        className="rounded-lg border border-linea px-3 py-2"
-      >
-        {categorias.map((c) => (
-          <option key={c.id} value={c.id}>
-            {c.nombre}
-          </option>
-        ))}
-      </select>
-      <label className="flex flex-col gap-1 text-sm font-semibold text-tinta">
-        Precio de venta
-        <input
-          type="number"
-          name="precio"
-          required
-          step="1"
-          min="0"
-          defaultValue={producto.precio}
-          className="rounded-lg border border-linea px-3 py-2"
-        />
-      </label>
-      <label className="flex flex-col gap-1 text-sm font-semibold text-tinta">
-        Costo (opcional)
-        <input
-          type="number"
-          name="costo"
-          step="1"
-          min="0"
-          placeholder="Lo que te cuesta prepararlo"
-          defaultValue={producto.costo != null ? producto.costo : ""}
-          className="rounded-lg border border-linea px-3 py-2"
-        />
-        <span className="text-xs text-tinta-suave">
-          Solo lo ves vos. Con esto, Ideas para vender más puede decirte qué producto
-          te deja más ganancia, no solo cuál factura más.
-        </span>
-      </label>
-      <ImagenProductoField initialUrl={producto.imagenUrl} />
-      <label className="flex items-center gap-2 text-sm">
-        <input type="checkbox" name="disponible" defaultChecked={producto.disponible} />
-        Disponible en el menú
-      </label>
-      <label className="flex items-center gap-2 text-sm">
-        <input type="checkbox" name="destacado" defaultChecked={producto.destacado} />
-        ⭐ Producto destacado (aparece en el carrusel de la cabecera del menú)
-      </label>
-      <IngredientesField initial={producto.ingredientes} />
+    <form action={alGuardar} className="flex flex-col gap-4">
+      <Tarjeta className="flex flex-col gap-3">
+        <p className="rotulo">Datos básicos</p>
+        <Campo etiqueta="Nombre">
+          <Entrada name="nombre" required defaultValue={producto.nombre} />
+        </Campo>
+        <Campo etiqueta="Descripción (opcional)">
+          <Area name="descripcion" rows={2} defaultValue={producto.descripcion ?? ""} />
+        </Campo>
+        <Campo etiqueta="Categoría">
+          <Selector name="categoryId" required defaultValue={producto.categoryId}>
+            {categorias.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.nombre}
+              </option>
+            ))}
+          </Selector>
+        </Campo>
+      </Tarjeta>
 
-      <div className="rounded-lg border border-linea p-3">
-        <label className="mb-1 block text-sm font-semibold text-tinta">
-          Grupo "mitad y mitad" (opcional)
+      <Tarjeta className="flex flex-col gap-3">
+        <p className="rotulo">Precio y costo</p>
+        <Campo etiqueta="Precio de venta">
+          <Entrada
+            type="number"
+            name="precio"
+            required
+            step="1"
+            min="0"
+            defaultValue={producto.precio}
+          />
+        </Campo>
+        <Campo
+          etiqueta="Costo (opcional)"
+          ayuda="Solo lo ves vos. Con esto, Ideas para vender más puede decirte qué producto te deja más ganancia, no solo cuál factura más."
+        >
+          <Entrada
+            type="number"
+            name="costo"
+            step="1"
+            min="0"
+            placeholder="Lo que te cuesta prepararlo"
+            defaultValue={producto.costo != null ? producto.costo : ""}
+          />
+        </Campo>
+      </Tarjeta>
+
+      <Tarjeta className="flex flex-col gap-3">
+        <p className="rotulo">Foto</p>
+        <ImagenProductoField initialUrl={producto.imagenUrl} />
+      </Tarjeta>
+
+      <Tarjeta className="flex flex-col gap-2">
+        <p className="rotulo">Visibilidad</p>
+        <label className="flex items-center gap-2 text-sm">
+          <input type="checkbox" name="disponible" defaultChecked={producto.disponible} />
+          Disponible en el menú
         </label>
-        <p className="mb-2 text-xs text-tinta-media">
+        <label className="flex items-center gap-2 text-sm">
+          <input type="checkbox" name="destacado" defaultChecked={producto.destacado} />
+          ⭐ Producto destacado (aparece en el carrusel de la cabecera del menú)
+        </label>
+      </Tarjeta>
+
+      <Tarjeta className="flex flex-col gap-3">
+        <p className="rotulo">Ingredientes</p>
+        <IngredientesField initial={producto.ingredientes} />
+      </Tarjeta>
+
+      <Tarjeta className="flex flex-col gap-3">
+        <p className="rotulo">Mitad y mitad (opcional)</p>
+        <p className="text-xs text-tinta-media">
           Escribí un nombre de grupo (ej: "Pizza Grande") para que el cliente pueda
           combinar este producto mitad y mitad con otros del MISMO grupo. Dejalo vacío
           si este producto no se combina.
         </p>
-        <input
+        <Entrada
           name="mitadYMitadGrupo"
           defaultValue={producto.mitadYMitadGrupo ?? ""}
           placeholder="Ej: Pizza Grande"
-          className="mb-2 w-full rounded-lg border border-linea px-3 py-2 text-sm"
         />
-        <select
-          name="mitadYMitadModo"
-          defaultValue={producto.mitadYMitadModo}
-          className="w-full rounded-lg border border-linea px-3 py-2 text-sm"
-        >
+        <Selector name="mitadYMitadModo" defaultValue={producto.mitadYMitadModo}>
           <option value="mayor">Precio mayor (cobra el sabor más caro)</option>
           <option value="proporcional">Precio proporcional (mitad de cada uno)</option>
-        </select>
-        <p className="mt-1 text-xs text-tinta-suave">
+        </Selector>
+        <p className="text-xs text-tinta-suave">
           Usá el mismo modo en todos los productos de un mismo grupo.
         </p>
-      </div>
+      </Tarjeta>
 
       <button type="submit" disabled={pendiente} className={clasesBoton("principal")}>
         {pendiente ? "Guardando…" : "Guardar cambios"}

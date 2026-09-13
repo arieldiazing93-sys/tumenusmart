@@ -10,6 +10,7 @@ import { AgregarOpcionForm } from "./AgregarOpcionForm";
 import { EditarCostoOpcion } from "./EditarCostoOpcion";
 import { EditarPrecioExtraOpcion } from "./EditarPrecioExtraOpcion";
 import { GuardadoToast } from "@/components/GuardadoToast";
+import { Tarjeta } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
@@ -73,15 +74,13 @@ export default async function EditarProductoPage({
         />
       </div>
 
-      <div>
-        <h2 className="mb-3 font-semibold text-tinta">
-          Agregados
-        </h2>
-        <p className="mb-3 text-sm text-tinta-media">
+      <Tarjeta className="flex flex-col gap-3">
+        <p className="rotulo">Agregados</p>
+        <p className="text-sm text-tinta-media">
           Extras que el cliente puede sumar a este producto (ej: borde relleno, extra queso).
         </p>
 
-        <div className="mb-4 flex flex-col gap-2">
+        <div className="flex flex-col gap-2">
           {producto.opciones.map((o) => (
             <div
               key={o.id}
@@ -118,7 +117,7 @@ export default async function EditarProductoPage({
         </div>
 
         <AgregarOpcionForm productId={producto.id} />
-      </div>
+      </Tarjeta>
     </div>
   );
 }
