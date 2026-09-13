@@ -113,17 +113,29 @@ export default async function CatalogoPage({
   // Las tres dudas que tiene cualquiera antes de mirar la carta: si está
 
   return (
-    <main className="mx-auto max-w-2xl px-4 pb-32">
-      {/* ---------- cabecera del local ---------- */}
-      <header className="animate-[subir_0.5s_cubic-bezier(0.22,0.7,0.3,1)]">
-        {/*
-          Banner de marca, igual para todos los locales — no es algo que el
-          dueño suba ni edite. Es identidad de la plataforma, como el
-          "powered by" que ya usan otras apps de pedidos. El -mx-4 lo lleva de
-          borde a borde (mismo truco que usa Carta.tsx para sus cabeceras de
-          categoría).
-        */}
-        <div className="-mx-4 -mt-6 flex h-20 flex-col items-center justify-center gap-1 bg-brand px-4 text-center text-white sm:h-24">
+    <>
+      {/*
+        Banner de marca, igual para todos los locales — no es algo que el
+        dueño suba ni edite. Es identidad de la plataforma, como el "powered
+        by" que ya usan otras apps de pedidos.
+
+        Va AFUERA de <main> a propósito, como hermano antes que ella, y no
+        adentro con un margen negativo para "escaparse" de su padding. Ese
+        margen negativo dependía de que se cancelara justo contra el padding
+        de arriba de todos sus ancestros (colapso de márgenes) — algo frágil
+        que en el navegador del celular no siempre daba el mismo resultado y
+        dejaba un hueco arriba del banner. Como primer elemento de la página,
+        ahora no hay nada de qué "escaparse": arranca pegado al borde
+        superior real de la pantalla, siempre.
+
+        El wrapper de acá abajo repite el mismo ancho máximo y centrado que
+        <main>, pero sin su padding lateral: así el banner queda del mismo
+        ancho que el resto del contenido en pantallas anchas (en vez de
+        estirarse a todo el monitor) y edge-to-edge en el celular (donde el
+        viewport ya es más angosto que ese máximo).
+      */}
+      <div className="mx-auto max-w-2xl">
+        <div className="flex h-20 flex-col items-center justify-center gap-1 bg-brand px-4 text-center text-white sm:h-24">
           <p className="text-[1rem] font-semibold tracking-titular sm:text-[1.1rem]">
             Estamos en línea para recibir tu pedido
           </p>
@@ -138,7 +150,11 @@ export default async function CatalogoPage({
             Desarrollado por tumenusmart.com
           </Link>
         </div>
+      </div>
 
+      <main className="mx-auto max-w-2xl px-4 pb-32">
+      {/* ---------- cabecera del local ---------- */}
+      <header className="animate-[subir_0.5s_cubic-bezier(0.22,0.7,0.3,1)]">
         {/*
           Los datos del local van en su propia tarjeta, igual que "Tus datos"
           en el checkout — no sueltos sobre el fondo de la página. Separada
@@ -220,6 +236,7 @@ export default async function CatalogoPage({
       )}
 
       <CartBar />
-    </main>
+      </main>
+    </>
   );
 }
