@@ -69,10 +69,16 @@ export async function GET(request: NextRequest) {
 
   const filas: string[] = [];
 
+  // Encabezado fijo en todo reporte descargable: al abrirlo meses después,
+  // o si alguien lo reenvía por WhatsApp, tiene que quedar claro de qué
+  // negocio y de qué reporte salió sin tener que preguntarle a nadie.
+  filas.push(filaCsv(["Negocio", stats.store?.nombre ?? ""]));
+  filas.push(filaCsv(["Reporte", "Estadísticas"]));
+  filas.push(filaCsv(["Período", periodo]));
+  filas.push("");
+
   filas.push(
     filaCsv([
-      "Negocio",
-      "Período",
       "Ingresos (Gs.)",
       "Pedidos totales",
       "Pedidos válidos",
@@ -86,8 +92,6 @@ export async function GET(request: NextRequest) {
   );
   filas.push(
     filaCsv([
-      stats.store?.nombre ?? "",
-      periodo,
       Math.round(stats.ingresos),
       stats.pedidosTotales,
       stats.pedidosValidos,

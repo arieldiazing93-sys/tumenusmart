@@ -76,8 +76,11 @@ export async function GET(request: NextRequest) {
 
   const filas: string[] = [];
 
-  filas.push(filaCsv(["Negocio", "Período"]));
-  filas.push(filaCsv([local.nombre, periodo]));
+  // Encabezado fijo en todo reporte descargable: ver el mismo comentario en
+  // envios/exportar/route.ts.
+  filas.push(filaCsv(["Negocio", local.nombre]));
+  filas.push(filaCsv(["Reporte", "Rentabilidad"]));
+  filas.push(filaCsv(["Período", periodo]));
   filas.push("");
 
   filas.push(

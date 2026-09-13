@@ -57,7 +57,7 @@ export default async function InformeReservasPage({
   const [store, reservas] = await Promise.all([
     prismaGlobal.store.findUnique({
       where: { id: storeId },
-      select: { nombre: true },
+      select: { nombre: true, logoUrl: true },
     }),
     // Canceladas afuera: en el mostrador solo estorban. Y solo las que el
     // cliente realmente envió por WhatsApp, igual que en el calendario.
@@ -89,20 +89,30 @@ export default async function InformeReservasPage({
 
       {/* --- la hoja --- */}
       <div className="rounded-xl border border-linea bg-white p-6 print:rounded-none print:border-0 print:p-0">
-        <header className="mb-5 border-b border-linea pb-4 print:mb-4 print:pb-3">
-          <p className="rotulo">Informe de reservas</p>
-          <h1 className="mt-1 text-[1.35rem] font-semibold tracking-titular text-tinta print:text-[16pt]">
-            {store?.nombre ?? "Reservas"}
-          </h1>
-          <p className="mt-0.5 text-[0.9rem] text-tinta-media">{fechaLarga(dia)}</p>
+        <header className="mb-5 flex items-center gap-4 border-b border-linea pb-4 print:mb-4 print:pb-3">
+          {store?.logoUrl && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={store.logoUrl}
+              alt={store.nombre}
+              className="h-16 w-16 flex-none rounded-full object-cover print:h-14 print:w-14"
+            />
+          )}
+          <div>
+            <p className="rotulo">Informe de reservas</p>
+            <h1 className="mt-1 text-[1.35rem] font-semibold tracking-titular text-tinta print:text-[16pt]">
+              {store?.nombre ?? "Reservas"}
+            </h1>
+            <p className="mt-0.5 text-[0.9rem] text-tinta-media">{fechaLarga(dia)}</p>
 
-          <p className="mt-3 text-[0.85rem] text-tinta">
-            <span className="cifra font-semibold">{reservas.length}</span>{" "}
-            {reservas.length === 1 ? "reserva" : "reservas"}
-            <span className="mx-1.5 text-linea">·</span>
-            <span className="cifra font-semibold">{totalPersonas}</span>{" "}
-            {totalPersonas === 1 ? "persona" : "personas"}
-          </p>
+            <p className="mt-3 text-[0.85rem] text-tinta">
+              <span className="cifra font-semibold">{reservas.length}</span>{" "}
+              {reservas.length === 1 ? "reserva" : "reservas"}
+              <span className="mx-1.5 text-linea">·</span>
+              <span className="cifra font-semibold">{totalPersonas}</span>{" "}
+              {totalPersonas === 1 ? "persona" : "personas"}
+            </p>
+          </div>
         </header>
 
         {reservas.length === 0 ? (

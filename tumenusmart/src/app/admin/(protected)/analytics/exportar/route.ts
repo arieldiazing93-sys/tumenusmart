@@ -47,7 +47,12 @@ export async function GET(request: NextRequest) {
     calcularClientesDelRango(storeId, rango),
     prisma.store.findUnique({
       where: { id: storeId },
-      select: { fidelizacionActiva: true, fidelizacionUmbral: true, fidelizacionMontoMinimo: true },
+      select: {
+        nombre: true,
+        fidelizacionActiva: true,
+        fidelizacionUmbral: true,
+        fidelizacionMontoMinimo: true,
+      },
     }),
   ]);
   const distribucion = calcularDistribucionFrecuencia(clientes);
@@ -69,6 +74,10 @@ export async function GET(request: NextRequest) {
 
   const filas: string[] = [];
 
+  // Encabezado fijo en todo reporte descargable: ver el mismo comentario en
+  // envios/exportar/route.ts.
+  filas.push(filaCsv(["Negocio", store?.nombre ?? ""]));
+  filas.push(filaCsv(["Reporte", "Analytics"]));
   filas.push(filaCsv(["Período", periodo]));
   filas.push("");
 

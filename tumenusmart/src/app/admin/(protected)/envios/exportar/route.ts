@@ -54,8 +54,12 @@ export async function GET(request: NextRequest) {
 
   const filas: string[] = [];
 
-  filas.push(filaCsv(["Negocio", "Período"]));
-  filas.push(filaCsv([local.nombre, periodo]));
+  // Encabezado fijo en todo reporte descargable: al abrirlo meses después,
+  // o si alguien lo reenvía por WhatsApp, tiene que quedar claro de qué
+  // negocio y de qué reporte salió sin tener que preguntarle a nadie.
+  filas.push(filaCsv(["Negocio", local.nombre]));
+  filas.push(filaCsv(["Reporte", "Envíos"]));
+  filas.push(filaCsv(["Período", periodo]));
   filas.push("");
 
   // Una fila por zona y, debajo de cada una, una fila por repartidor que
