@@ -234,12 +234,18 @@ export const IconoOjoCerrado = (p: Props) => (
  * archivo — es una marca reconocible, no un ícono de línea, y calcarlo en
  * trazo lo vuelve irreconocible.
  */
-export const IconoWhatsapp = ({ className = "" }: Props) => (
+export const IconoWhatsapp = ({ className = "", tam = 18 }: Props & { tam?: number }) => (
   <svg
     viewBox="0 0 32 32"
     fill="currentColor"
+    width={tam}
+    height={tam}
     aria-hidden="true"
-    className={`h-[18px] w-[18px] flex-none ${className}`}
+    // El tamaño va por width/height, no por una clase de Tailwind: dos
+    // clases de alto en el mismo string (la de acá y una que se pase desde
+    // afuera) compiten por la misma propiedad CSS y cuál gana no está
+    // garantizado. width/height del SVG no tiene esa ambigüedad.
+    className={`flex-none ${className}`}
   >
     <path d="M16.004 3C9.375 3 3.999 8.373 3.999 15c0 2.386.706 4.61 1.923 6.475L4 29l7.706-1.902A11.94 11.94 0 0 0 16.004 27C22.63 27 28 21.627 28 15S22.63 3 16.004 3Zm0 21.818c-1.98 0-3.827-.58-5.383-1.578l-.386-.24-4.573 1.128 1.155-4.457-.253-.397a9.77 9.77 0 0 1-1.53-5.274c0-5.421 4.41-9.83 9.97-9.83 5.56 0 9.97 4.409 9.97 9.83 0 5.421-4.41 9.818-9.97 9.818Zm5.47-7.35c-.3-.15-1.77-.873-2.045-.972-.274-.1-.474-.15-.673.15-.2.3-.773.972-.948 1.172-.174.2-.35.225-.648.075-.3-.15-1.266-.467-2.412-1.489-.892-.796-1.494-1.779-1.669-2.079-.174-.3-.019-.462.131-.611.135-.134.3-.35.449-.525.15-.174.2-.3.3-.5.1-.2.05-.375-.025-.525-.075-.15-.673-1.622-.922-2.222-.243-.583-.49-.504-.673-.513l-.573-.01c-.2 0-.524.075-.798.375-.274.3-1.048 1.024-1.048 2.497 0 1.473 1.073 2.897 1.223 3.097.15.2 2.112 3.225 5.116 4.523.715.309 1.273.494 1.708.632.717.228 1.37.196 1.886.119.575-.086 1.77-.723 2.02-1.422.25-.699.25-1.298.174-1.423-.075-.124-.274-.199-.573-.349Z" />
   </svg>

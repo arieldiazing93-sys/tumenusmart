@@ -381,7 +381,7 @@ export function CheckoutForm({
       >
         {aceptaPedidos ? (
           <>
-            <IconoWhatsapp />
+            <IconoWhatsapp tam={26} />
             Confirmar pedido
           </>
         ) : (

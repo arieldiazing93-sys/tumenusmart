@@ -129,7 +129,11 @@ export default async function CatalogoPage({
           </p>
           <Link
             href="/"
-            className="text-[0.7rem] font-medium uppercase tracking-[0.14em] text-white/75 hover:text-white hover:underline"
+            // El -mr compensa el espacio que "tracking" agrega DESPUÉS de la
+            // última letra: sin esto, el texto se ve corrido a la izquierda
+            // del centro real del banner (el espacio de más queda del lado
+            // derecho, así que el centrado automático lo cuenta de más).
+            className="mr-[-0.14em] text-[0.7rem] font-medium uppercase tracking-[0.14em] text-white/75 hover:text-white hover:underline"
           >
             Desarrollado por tumenusmart.com
           </Link>
