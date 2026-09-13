@@ -140,9 +140,15 @@ export default async function ProductosVendidosPage({
           <div className="flex flex-col gap-8">
             {reporte.categorias.map((cat) => (
               <div key={cat.categoriaId ?? "combos"}>
-                <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
+                {/*
+                  Mismo tinte de marca que usa la cabecera de categoría en la
+                  carta pública (Carta.tsx): un fondo de color acá hace que
+                  el título del grupo se lea de un vistazo en vez de perderse
+                  como un renglón más de texto suelto sobre el blanco.
+                */}
+                <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2 rounded-lg bg-brand-tinte px-3 py-2">
                   <h2 className="font-semibold text-tinta">{cat.categoriaNombre}</h2>
-                  <p className="text-xs text-tinta-suave">
+                  <p className="text-xs text-brand-texto">
                     {cat.totalCantidad} {cat.totalCantidad === 1 ? "unidad" : "unidades"} ·{" "}
                     {formatearGuarani(Math.round(cat.totalVenta))}
                     {cat.totalGanancia != null && (
