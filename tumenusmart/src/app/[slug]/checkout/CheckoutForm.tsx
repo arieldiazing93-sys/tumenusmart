@@ -9,6 +9,7 @@ import { distanciaKm, encontrarZonaPorDistancia } from "@/lib/geo";
 import { Tarjeta, Campo, Entrada, Aviso } from "@/components/ui";
 import { Segmentado } from "@/components/Segmentado";
 import { BotonEnviar } from "@/components/BotonEnviar";
+import { IconoWhatsapp } from "@/components/iconos";
 import { crearPedido } from "./actions";
 
 // Leaflet usa `window`, así que el mapa se carga solo en el navegador.
@@ -378,7 +379,14 @@ export function CheckoutForm({
         enviandoTexto="Generando pedido..."
         className="w-full"
       >
-        {aceptaPedidos ? "Confirmar pedido" : "No disponible en este momento"}
+        {aceptaPedidos ? (
+          <>
+            <IconoWhatsapp />
+            Confirmar pedido
+          </>
+        ) : (
+          "No disponible en este momento"
+        )}
       </BotonEnviar>
     </form>
   );

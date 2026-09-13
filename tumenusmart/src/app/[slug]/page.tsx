@@ -123,7 +123,7 @@ export default async function CatalogoPage({
           borde a borde (mismo truco que usa Carta.tsx para sus cabeceras de
           categoría).
         */}
-        <div className="-mx-4 -mt-6 flex h-24 flex-col items-center justify-center gap-1 bg-brand px-4 text-center text-white sm:h-28">
+        <div className="-mx-4 -mt-6 flex h-20 flex-col items-center justify-center gap-1 bg-brand px-4 text-center text-white sm:h-24">
           <p className="text-[1rem] font-semibold tracking-titular sm:text-[1.1rem]">
             Estamos en línea para recibir tu pedido
           </p>

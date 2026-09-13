@@ -139,11 +139,13 @@ export function diaSemanaDeClave(clave: string): number | null {
   ).getUTCDay();
 }
 
-/** Resumen legible de los tramos de un día, ej: "11:00 a 14:00 · 18:00 a 23:30". */
+/** Resumen legible de los tramos de un día, ej: "11:00 a 14:00 · 18:00 a 23:30 Hs.". */
 export function resumenDia(tramos: TramoHorario[], diaSemana: number): string {
   const delDia = tramos
     .filter((t) => t.diaSemana === diaSemana)
     .sort((a, b) => aMinutos(a.abre) - aMinutos(b.abre));
   if (delDia.length === 0) return "Cerrado";
-  return delDia.map((t) => `${t.abre} a ${t.cierra}`).join(" · ");
+  // "Cerrado" queda intacto arriba a propósito: configuracion/page.tsx compara
+  // este texto contra ese literal exacto para saber si el día está sin horario.
+  return delDia.map((t) => `${t.abre} a ${t.cierra}`).join(" · ") + " Hs.";
 }
