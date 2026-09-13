@@ -1,5 +1,6 @@
 "use client";
 
+import { CampoContrasena } from "@/components/CampoContrasena";
 import { clasesBoton } from "@/components/ui";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
@@ -83,8 +84,7 @@ export function FormularioIngreso() {
 
       <label className="flex flex-col gap-1 text-sm text-tinta-media">
         Contraseña
-        <input
-          type="password"
+        <CampoContrasena
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           required

@@ -1,3 +1,4 @@
+import { CampoContrasena } from "@/components/CampoContrasena";
 import { Logo } from "@/components/Logo";
 import { clasesBoton } from "@/components/ui";
 import { faltaCrearElPrimerUsuario, faltaSecretoDeSesion } from "@/lib/auth";
@@ -84,7 +85,7 @@ export default async function AdminLoginPage({
           <form action={crearPrimerUsuario} className="flex flex-col gap-3">
             <label className="flex flex-col gap-1 text-sm text-tinta-media">
               Contraseña actual del sistema
-              <input type="password" name="passwordSistema" required autoFocus className={CAMPO} />
+              <CampoContrasena name="passwordSistema" required autoFocus className={CAMPO} />
             </label>
 
             <hr className="my-1 border-linea" />
@@ -108,8 +109,7 @@ export default async function AdminLoginPage({
 
             <label className="flex flex-col gap-1 text-sm text-tinta-media">
               Contraseña nueva
-              <input
-                type="password"
+              <CampoContrasena
                 name="passwordNueva"
                 required
                 autoComplete="new-password"
@@ -119,8 +119,7 @@ export default async function AdminLoginPage({
 
             <label className="flex flex-col gap-1 text-sm text-tinta-media">
               Repetila
-              <input
-                type="password"
+              <CampoContrasena
                 name="passwordRepetida"
                 required
                 autoComplete="new-password"

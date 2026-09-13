@@ -211,6 +211,23 @@ export const IconoFoto = (p: Props) => (
   </Svg>
 );
 
+/** Ojo abierto: "mostrar contraseña" — el campo está oculto ahora mismo. */
+export const IconoOjo = (p: Props) => (
+  <Svg {...p}>
+    <path d="M2 12s3.8-7 10-7 10 7 10 7-3.8 7-10 7-10-7-10-7Z" />
+    <circle cx="12" cy="12" r="2.8" />
+  </Svg>
+);
+
+/** Ojo tachado: "ocultar contraseña" — el campo se está mostrando en texto plano. */
+export const IconoOjoCerrado = (p: Props) => (
+  <Svg {...p}>
+    <path d="M2 12s3.8-7 10-7 10 7 10 7-3.8 7-10 7-10-7-10-7Z" />
+    <circle cx="12" cy="12" r="2.8" />
+    <path d="M4 4l16 16" />
+  </Svg>
+);
+
 export const ICONOS = {
   pedidos: IconoPedidos,
   reservas: IconoReservas,

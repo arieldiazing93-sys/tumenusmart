@@ -1,5 +1,6 @@
 "use client";
 
+import { CampoContrasena } from "@/components/CampoContrasena";
 import { clasesBoton } from "@/components/ui";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { cambiarMiPassword } from "./actions";
@@ -86,8 +87,7 @@ export function FormularioPassword() {
 
       <label className="flex flex-col gap-1 text-sm text-tinta-media">
         Contraseña actual
-        <input
-          type="password"
+        <CampoContrasena
           value={actual}
           onChange={(e) => setActual(e.target.value)}
           autoComplete="new-password"
@@ -102,8 +102,7 @@ export function FormularioPassword() {
 
       <label className="flex flex-col gap-1 text-sm text-tinta-media">
         Contraseña nueva
-        <input
-          type="password"
+        <CampoContrasena
           value={nueva}
           onChange={(e) => setNueva(e.target.value)}
           autoComplete="new-password"
@@ -118,8 +117,7 @@ export function FormularioPassword() {
 
       <label className="flex flex-col gap-1 text-sm text-tinta-media">
         Repetila
-        <input
-          type="password"
+        <CampoContrasena
           value={repetida}
           onChange={(e) => setRepetida(e.target.value)}
           autoComplete="new-password"
