@@ -50,13 +50,7 @@ export function EditarProductoForm({
   return (
     <form action={alGuardar} className="flex flex-col gap-4">
       <Tarjeta className="flex flex-col gap-3">
-        <p className="rotulo">Datos básicos</p>
-        <Campo etiqueta="Nombre">
-          <Entrada name="nombre" required defaultValue={producto.nombre} />
-        </Campo>
-        <Campo etiqueta="Descripción (opcional)">
-          <Area name="descripcion" rows={2} defaultValue={producto.descripcion ?? ""} />
-        </Campo>
+        <p className="rotulo text-[0.8rem] font-bold">Datos básicos</p>
         <Campo etiqueta="Categoría">
           <Selector name="categoryId" required defaultValue={producto.categoryId}>
             {categorias.map((c) => (
@@ -66,10 +60,16 @@ export function EditarProductoForm({
             ))}
           </Selector>
         </Campo>
+        <Campo etiqueta="Nombre">
+          <Entrada name="nombre" required defaultValue={producto.nombre} />
+        </Campo>
+        <Campo etiqueta="Descripción (opcional)">
+          <Area name="descripcion" rows={2} defaultValue={producto.descripcion ?? ""} />
+        </Campo>
       </Tarjeta>
 
       <Tarjeta className="flex flex-col gap-3">
-        <p className="rotulo">Precio y costo</p>
+        <p className="rotulo text-[0.8rem] font-bold">Precio y costo</p>
         <Campo etiqueta="Precio de venta">
           <Entrada
             type="number"
@@ -96,12 +96,12 @@ export function EditarProductoForm({
       </Tarjeta>
 
       <Tarjeta className="flex flex-col gap-3">
-        <p className="rotulo">Foto</p>
+        <p className="rotulo text-[0.8rem] font-bold">Foto</p>
         <ImagenProductoField initialUrl={producto.imagenUrl} />
       </Tarjeta>
 
       <Tarjeta className="flex flex-col gap-2">
-        <p className="rotulo">Visibilidad</p>
+        <p className="rotulo text-[0.8rem] font-bold">Visibilidad</p>
         <label className="flex items-center gap-2 text-sm">
           <input type="checkbox" name="disponible" defaultChecked={producto.disponible} />
           Disponible en el menú
@@ -113,12 +113,12 @@ export function EditarProductoForm({
       </Tarjeta>
 
       <Tarjeta className="flex flex-col gap-3">
-        <p className="rotulo">Ingredientes</p>
+        <p className="rotulo text-[0.8rem] font-bold">Ingredientes</p>
         <IngredientesField initial={producto.ingredientes} />
       </Tarjeta>
 
       <Tarjeta className="flex flex-col gap-3">
-        <p className="rotulo">Mitad y mitad (opcional)</p>
+        <p className="rotulo text-[0.8rem] font-bold">Mitad y mitad (opcional)</p>
         <p className="text-xs text-tinta-media">
           Escribí un nombre de grupo (ej: "Pizza Grande") para que el cliente pueda
           combinar este producto mitad y mitad con otros del MISMO grupo. Dejalo vacío

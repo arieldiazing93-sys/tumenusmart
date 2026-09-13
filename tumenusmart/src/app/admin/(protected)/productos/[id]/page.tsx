@@ -75,7 +75,7 @@ export default async function EditarProductoPage({
       </div>
 
       <Tarjeta className="flex flex-col gap-3">
-        <p className="rotulo">Agregados</p>
+        <p className="rotulo text-[0.8rem] font-bold">Agregados</p>
         <p className="text-sm text-tinta-media">
           Extras que el cliente puede sumar a este producto (ej: borde relleno, extra queso).
         </p>
