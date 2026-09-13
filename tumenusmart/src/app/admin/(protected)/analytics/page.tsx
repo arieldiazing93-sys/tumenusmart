@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { calcularRangoFecha, type FiltroFecha } from "@/lib/rango-fecha";
 import { calcularClientesDelRango, calcularDistribucionFrecuencia } from "@/lib/clientes-analytics";
 import { calcularProgresoFidelidad } from "@/lib/fidelidad";
-import { Cabecera, Cifra, clasesBoton } from "@/components/ui";
+import { Cabecera, clasesBoton } from "@/components/ui";
 import { formatearGuarani } from "@/lib/format";
 import { ZONA_NEGOCIO } from "@/lib/timezone";
 import { linkWhatsappCliente } from "@/lib/whatsapp";
@@ -21,6 +21,43 @@ const FILTROS_FECHA: { value: FiltroFecha; label: string }[] = [
 
 const TOPE_TABLA = 100;
 
+// Mismo criterio de colores que ya usa Estadísticas: cada tarjeta con su
+// propio fondo tenue en vez de blanco liso, para que la distribución de
+// clientes se lea de un vistazo y no como tres números sueltos idénticos
+// entre sí. Ámbar el que recién probó (falta ver si vuelve), azul el que
+// está en camino de volver, verde el que ya es base fiel — la misma
+// progresión de "atención" a "ganado" que se usa en el resto del panel.
+const COLORES_TARJETA = {
+  nuevo: { caja: "border-aviso/30 bg-aviso-luz", rotulo: "text-aviso", cifra: "text-aviso" },
+  volviendo: { caja: "border-azul/25 bg-azul-luz", rotulo: "text-azul-oscuro", cifra: "text-azul-oscuro" },
+  fiel: { caja: "border-exito/25 bg-exito-luz", rotulo: "text-exito", cifra: "text-exito" },
+} as const;
+
+function Tarjeta({
+  etiqueta,
+  valor,
+  detalle,
+  color,
+}: {
+  etiqueta: string;
+  valor: string;
+  detalle?: string;
+  color: keyof typeof COLORES_TARJETA;
+}) {
+  const c = COLORES_TARJETA[color];
+  return (
+    <div className={`rounded-xl border p-4 ${c.caja}`}>
+      <p className={`text-[0.68rem] font-semibold uppercase tracking-rotulo ${c.rotulo}`}>
+        {etiqueta}
+      </p>
+      <p className={`cifra mt-1.5 text-[1.45rem] font-semibold leading-none ${c.cifra}`}>
+        {valor}
+      </p>
+      {detalle && <p className="mt-1.5 text-[0.72rem] text-tinta-media">{detalle}</p>}
+    </div>
+  );
+}
+
 function fechaCorta(valor: Date): string {
   return valor.toLocaleDateString("es-PY", {
     day: "2-digit",
@@ -33,15 +70,27 @@ function fechaCorta(valor: Date): string {
 export default async function AnalyticsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ fecha?: string }>;
+  searchParams: Promise<{ fecha?: string; desde?: string; hasta?: string }>;
 }) {
   await pantallaConPermiso("analytics.ver");
 
-  const { fecha } = await searchParams;
+  const { fecha, desde, hasta } = await searchParams;
   const fechaActiva: FiltroFecha = (fecha as FiltroFecha) ?? "30dias";
   const rango =
-    calcularRangoFecha(fechaActiva, undefined, undefined) ??
+    calcularRangoFecha(fechaActiva, desde, hasta) ??
     calcularRangoFecha("30dias", undefined, undefined)!;
+
+  function hrefFecha(nuevaFecha: FiltroFecha) {
+    return `/admin/analytics?fecha=${nuevaFecha}`;
+  }
+
+  function querystringActual() {
+    const params = new URLSearchParams();
+    params.set("fecha", fechaActiva);
+    if (fechaActiva === "rango" && desde) params.set("desde", desde);
+    if (fechaActiva === "rango" && hasta) params.set("hasta", hasta);
+    return params.toString();
+  }
 
   const storeId = await idLocalActual();
   const [clientes, store] = await Promise.all([
@@ -72,14 +121,22 @@ export default async function AnalyticsPage({
         titulo="Analytics"
         bajada="Quiénes son tus clientes más frecuentes en el período que elijas, para saber a quién cuidar primero."
         acciones={
-          <a
-            href={`/admin/analytics/imprimir?fecha=${fechaActiva}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className={clasesBoton("navegar", "sm")}
-          >
-            Ver reporte / PDF
-          </a>
+          <>
+            <a
+              href={`/admin/analytics/exportar?${querystringActual()}`}
+              className={clasesBoton("principal", "sm")}
+            >
+              Descargar Excel
+            </a>
+            <a
+              href={`/admin/analytics/imprimir?${querystringActual()}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={clasesBoton("navegar", "sm")}
+            >
+              Ver reporte / PDF
+            </a>
+          </>
         }
       />
 
@@ -87,9 +144,9 @@ export default async function AnalyticsPage({
         {FILTROS_FECHA.map((f) => (
           <Link
             key={f.value}
-            href={`/admin/analytics?fecha=${f.value}`}
+            href={hrefFecha(f.value)}
             className={`rounded-full border px-3 py-1.5 text-sm font-medium ${
-              fechaActiva === f.value
+              fechaActiva === f.value && fechaActiva !== "rango"
                 ? "border-brand bg-brand text-white"
                 : "border-linea text-tinta-media hover:border-brand hover:text-brand"
             }`}
@@ -97,21 +154,55 @@ export default async function AnalyticsPage({
             {f.label}
           </Link>
         ))}
+
+        <form
+          method="get"
+          action="/admin/analytics"
+          className={`flex items-center gap-1.5 rounded-full border px-2 py-1 text-sm ${
+            fechaActiva === "rango" ? "border-brand bg-brand-light" : "border-linea"
+          }`}
+        >
+          <input type="hidden" name="fecha" value="rango" />
+          <input
+            type="date"
+            name="desde"
+            defaultValue={fechaActiva === "rango" ? desde : ""}
+            required
+            className="rounded-md border border-linea px-1.5 py-1 text-xs"
+          />
+          <span className="text-tinta-suave">–</span>
+          <input
+            type="date"
+            name="hasta"
+            defaultValue={fechaActiva === "rango" ? hasta : ""}
+            required
+            className="rounded-md border border-linea px-1.5 py-1 text-xs"
+          />
+          <button
+            type="submit"
+            className="rounded-full bg-noche-panel px-3 py-1 text-xs font-medium text-white hover:bg-noche-panel"
+          >
+            Filtrar
+          </button>
+        </form>
       </div>
 
       <div className="mb-8 grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <Cifra
-          rotulo="Pidieron 1 vez"
+        <Tarjeta
+          color="nuevo"
+          etiqueta="Pidieron 1 vez"
           valor={String(distribucion.unaVez)}
           detalle="Todavía no volvieron"
         />
-        <Cifra
-          rotulo="Pidieron 2-3 veces"
+        <Tarjeta
+          color="volviendo"
+          etiqueta="Pidieron 2-3 veces"
           valor={String(distribucion.dosATres)}
           detalle="Empezando a volver"
         />
-        <Cifra
-          rotulo="Pidieron 4 o más veces"
+        <Tarjeta
+          color="fiel"
+          etiqueta="Pidieron 4 o más veces"
           valor={String(distribucion.cuatroOMas)}
           detalle="Tu base fiel"
         />

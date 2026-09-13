@@ -13,14 +13,14 @@ const TOPE_TABLA = 100;
 export default async function ImprimirAnalyticsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ fecha?: string }>;
+  searchParams: Promise<{ fecha?: string; desde?: string; hasta?: string }>;
 }) {
   await pantallaConPermiso("analytics.ver");
 
-  const { fecha } = await searchParams;
+  const { fecha, desde, hasta } = await searchParams;
   const fechaActiva: FiltroFecha = (fecha as FiltroFecha) ?? "30dias";
   const rango =
-    calcularRangoFecha(fechaActiva, undefined, undefined) ??
+    calcularRangoFecha(fechaActiva, desde, hasta) ??
     calcularRangoFecha("30dias", undefined, undefined)!;
 
   const storeId = await idLocalActual();
