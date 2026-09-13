@@ -137,11 +137,12 @@ export default async function CatalogoPage({
 
         {/*
           Los datos del local van en su propia tarjeta, igual que "Tus datos"
-          en el checkout — no sueltos sobre el fondo de la página. La tarjeta
-          sube por encima del banner con el -mt-6 para que se lea como una
-          sola pieza con él, en vez de dos bloques que no se hablan.
+          en el checkout — no sueltos sobre el fondo de la página. Separada
+          del banner con espacio de sobra: solapada (como estaba antes, con
+          un margen negativo) se leía como si las esquinas de la tarjeta le
+          pisaran el texto de abajo al banner.
         */}
-        <div className="relative -mt-6 rounded-xl border border-linea bg-white p-4 shadow-media">
+        <div className="relative mt-4 rounded-xl border border-linea bg-white p-4 shadow-media">
           <div className="flex items-center gap-3.5">
             {store.logoUrl ? (
               // eslint-disable-next-line @next/next/no-img-element

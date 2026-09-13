@@ -6,6 +6,28 @@ import { useEffect, useRef, useState } from "react";
 import { useCart } from "./CartProvider";
 import { formatearGuarani } from "@/lib/format";
 
+/** Mismo estilo de trazo que el resto de los íconos de la app: sin relleno,
+ * salvo las ruedas, que van sólidas para que el carrito se lea de un
+ * vistazo incluso a este tamaño chico. */
+function IconoCarrito() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.7"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      className="h-[18px] w-[18px] flex-none"
+    >
+      <path d="M2.5 3h2.4l2.2 11.4a2 2 0 0 0 2 1.6h7.9a2 2 0 0 0 1.96-1.6L20.5 7H6" />
+      <circle cx="9" cy="20" r="1.4" fill="currentColor" stroke="none" />
+      <circle cx="18" cy="20" r="1.4" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
 /**
  * La barra del carrito, siempre a la vista con el total.
  *
@@ -47,6 +69,7 @@ export function CartBar() {
           saltando ? "animate-[saltito_0.42s_ease]" : ""
         }`}
       >
+        <IconoCarrito />
         <span className="text-[0.92rem] font-semibold">Ver mi pedido</span>
         <span aria-hidden="true" className="text-white/45">·</span>
         <span className="whitespace-nowrap text-[0.82rem] font-medium text-white/85">
