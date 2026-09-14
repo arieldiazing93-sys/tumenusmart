@@ -187,7 +187,7 @@ export function Vacio({
 //  Estado
 // ===========================================================================
 
-type ColorEstado = "neutro" | "exito" | "aviso" | "peligro" | "marca" | "azul";
+export type ColorEstado = "neutro" | "exito" | "aviso" | "peligro" | "marca" | "azul";
 
 const ESTADOS: Record<ColorEstado, string> = {
   neutro: "bg-papel-hundido text-tinta-media",

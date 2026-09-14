@@ -1,3 +1,5 @@
+import type { ColorEstado } from "@/components/ui";
+
 export const TURNOS = [
   { value: "dia", label: "Día" },
   { value: "tarde", label: "Tarde" },
@@ -8,6 +10,19 @@ export type Turno = (typeof TURNOS)[number]["value"];
 
 export function etiquetaTurno(turno: string): string {
   return TURNOS.find((t) => t.value === turno)?.label ?? turno;
+}
+
+// Un color por turno para que el calendario se pueda escanear de un
+// vistazo (mañana/tarde/noche), el mismo criterio de color que ya usan los
+// estados de pedido/reserva.
+const COLORES_TURNO: Record<string, ColorEstado> = {
+  dia: "aviso",
+  tarde: "azul",
+  noche: "marca",
+};
+
+export function colorTurno(turno: string): ColorEstado {
+  return COLORES_TURNO[turno] ?? "neutro";
 }
 
 export const MOTIVOS_RESERVA = [

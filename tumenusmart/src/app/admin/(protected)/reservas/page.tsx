@@ -1,4 +1,4 @@
-import { BotonEnlace, Cabecera } from "@/components/ui";
+import { BotonEnlace, Cabecera, Pastilla } from "@/components/ui";
 import Link from "next/link";
 import { pantallaConPermiso } from "@/lib/auth";
 import { prismaDelLocal } from "@/lib/prisma-local";
@@ -19,13 +19,14 @@ import {
   DIAS_SEMANA,
 } from "@/lib/calendario";
 import { calcularRangoFecha } from "@/lib/rango-fecha";
-import { etiquetaTurno, etiquetaMotivo } from "@/lib/reservas";
+import { etiquetaTurno, etiquetaMotivo, colorTurno } from "@/lib/reservas";
 import { formatearNumero } from "@/lib/format";
 import { linkWhatsappCliente } from "@/lib/whatsapp";
 import type { Reservation } from "@prisma/client";
 import { calcularDisponibilidad } from "@/lib/cupos-reserva";
 import { EstadoReservaSelect } from "./EstadoReservaSelect";
 import { NotaReservaField } from "./NotaReservaField";
+import { RegistrarReservaForm } from "./RegistrarReservaForm";
 
 export const dynamic = "force-dynamic";
 
@@ -59,13 +60,18 @@ function fechaCorta(clave: string): string {
 function TarjetaReserva({ r }: { r: ReservaFila }) {
   return (
     <div className="rounded-lg border border-linea bg-white p-4">
-      <div className="flex flex-wrap items-start justify-between gap-2">
-        <div>
-          <p className="font-medium text-tinta">
-            {formatearNumero(r.numero)} · {r.horario} · {etiquetaTurno(r.turno)} — {r.personas}{" "}
-            {r.personas === 1 ? "persona" : "personas"}
-          </p>
-          <p className="text-sm text-tinta-media">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="font-semibold text-tinta">{formatearNumero(r.numero)}</span>
+            <Pastilla color={colorTurno(r.turno)}>
+              {r.horario} · {etiquetaTurno(r.turno)}
+            </Pastilla>
+            <span className="text-sm text-tinta-media">
+              {r.personas} {r.personas === 1 ? "persona" : "personas"}
+            </span>
+          </div>
+          <p className="mt-1.5 text-sm font-medium text-tinta">
             {r.clienteNombre} · {r.clienteTelefono}
           </p>
           {r.clienteEmail && <p className="text-sm text-tinta-media">{r.clienteEmail}</p>}
@@ -201,6 +207,30 @@ export default async function AdminReservasPage({
           </>
         }
       />
+
+      {/*
+        Mismo botón-acordeón que "Dar de alta un local nuevo"/"un asesor
+        nuevo": para que el encargado pueda cargar a mano una reserva por
+        teléfono o en el mostrador, sin pasar por el formulario público de
+        WhatsApp, y quede igual de registrada en el calendario.
+      */}
+      <details className="group mb-6 overflow-hidden rounded-lg border border-linea bg-white">
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-2 bg-brand px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-brand-dark">
+          <span className="flex items-center gap-1.5">
+            <span aria-hidden="true">+</span>
+            Registrar reserva manual
+          </span>
+          <span
+            aria-hidden="true"
+            className="text-xs transition-transform duration-150 group-open:rotate-180"
+          >
+            ▼
+          </span>
+        </summary>
+        <div className="border-t border-linea p-4">
+          <RegistrarReservaForm diaSugerido={vista === "dia" ? diaAncla : hoyClave} />
+        </div>
+      </details>
 
       {sinEnviar > 0 && (
         <p className="mb-4 rounded-lg border border-linea bg-papel-suave px-3 py-2 text-xs text-tinta-media">
@@ -396,7 +426,18 @@ export default async function AdminReservasPage({
                   </Link>
                   <div className="flex flex-col gap-1.5">
                     {lista.map((r) => (
-                      <div key={r.id} className="rounded-md bg-papel-suave p-2 text-xs">
+                      <div
+                        key={r.id}
+                        className={`rounded-md border-l-2 bg-papel-suave p-2 text-xs ${
+                          colorTurno(r.turno) === "aviso"
+                            ? "border-aviso"
+                            : colorTurno(r.turno) === "azul"
+                              ? "border-azul"
+                              : colorTurno(r.turno) === "marca"
+                                ? "border-brand"
+                                : "border-linea"
+                        }`}
+                      >
                         <p className="font-medium text-tinta">
                           {r.horario} · {r.clienteNombre}
                         </p>
