@@ -211,7 +211,11 @@ export function NavPanel({
   if (variante === "columna") {
     return (
       <div
-        className={`hidden flex-none transition-[width] duration-200 lg:block ${
+        // Fondo blanco + borde a la derecha para que el riel del menú se
+        // distinga del lienzo gris (papel-suave) donde flotan las tarjetas
+        // del contenido — antes los dos eran del mismo color y la pantalla
+        // se leía como un solo bloque homogéneo.
+        className={`hidden h-full flex-none border-r border-linea bg-white transition-[width] duration-200 lg:block ${
           plegada ? "w-[3.5rem]" : "w-[15rem]"
         }`}
       >
