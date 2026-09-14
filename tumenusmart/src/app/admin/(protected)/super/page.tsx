@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
@@ -5,11 +6,13 @@ import { sesionActual } from "@/lib/auth";
 import { ZONA_NEGOCIO } from "@/lib/timezone";
 import { formatearGuarani } from "@/lib/format";
 import { construirLinkWhatsapp } from "@/lib/whatsapp";
+import { type FiltroFecha } from "@/lib/rango-fecha";
 import {
   estadoSuscripcion,
   mensajeRecordatorio,
   type EstadoSuscripcion,
 } from "@/lib/suscripcion";
+import { Cabecera, clasesBoton } from "@/components/ui";
 import { AltaLocal } from "./AltaLocal";
 import { AccionesLocal } from "./AccionesLocal";
 
@@ -19,12 +22,15 @@ const DIAS_DE_ACTIVIDAD = 7;
 /** Sin pedidos ni ingresos al panel en este plazo, el local se está apagando. */
 const DIAS_PARA_ALARMA = 14;
 
-const ESTILO_ESTADO: Record<EstadoSuscripcion["clase"], { chip: string; borde: string }> = {
-  vencido: { chip: "bg-peligro-luz text-peligro", borde: "border-l-peligro" },
-  suspendido: { chip: "bg-noche-panel text-white", borde: "border-l-tinta-media" },
-  por_vencer: { chip: "bg-aviso-luz text-aviso", borde: "border-l-aviso" },
-  al_dia: { chip: "bg-exito-luz text-exito", borde: "border-l-exito" },
-  sin_vencimiento: { chip: "bg-papel-hundido text-tinta-media", borde: "border-l-linea" },
+const ESTILO_ESTADO: Record<
+  EstadoSuscripcion["clase"],
+  { chip: string; borde: string; fondo: string }
+> = {
+  vencido: { chip: "bg-peligro-luz text-peligro", borde: "border-l-peligro", fondo: "bg-peligro-luz/30" },
+  suspendido: { chip: "bg-noche-panel text-white", borde: "border-l-tinta-media", fondo: "bg-papel-hundido" },
+  por_vencer: { chip: "bg-aviso-luz text-aviso", borde: "border-l-aviso", fondo: "bg-aviso-luz/40" },
+  al_dia: { chip: "bg-exito-luz text-exito", borde: "border-l-exito", fondo: "bg-exito-luz/30" },
+  sin_vencimiento: { chip: "bg-papel-hundido text-tinta-media", borde: "border-l-linea", fondo: "bg-white" },
 };
 
 /** Primero lo que hay que atender. */
@@ -35,6 +41,20 @@ const URGENCIA: Record<EstadoSuscripcion["clase"], number> = {
   sin_vencimiento: 3,
   al_dia: 4,
 };
+
+/** Título de cada bloque de la lista, en el mismo orden que URGENCIA. */
+const TITULO_BLOQUE: Record<EstadoSuscripcion["clase"], string> = {
+  vencido: "Vencidos",
+  por_vencer: "Por vencer",
+  suspendido: "Suspendidos a mano",
+  sin_vencimiento: "Sin fecha de vencimiento",
+  al_dia: "Al día",
+};
+
+const FILTROS_FECHA: { value: FiltroFecha; label: string }[] = [
+  { value: "mes", label: "Este mes" },
+  { value: "mesAnterior", label: "Mes anterior" },
+];
 
 function fechaCorta(valor: Date | null): string {
   if (!valor) return "—";
@@ -54,12 +74,30 @@ function hace(valor: Date | null, ahora: Date): string {
   return `hace ${dias} días`;
 }
 
-export default async function SuperPage() {
+export default async function SuperPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ fecha?: string; desde?: string; hasta?: string }>;
+}) {
   const sesion = await sesionActual();
   if (!sesion || sesion.rol !== "superadmin") redirect("/admin/pedidos");
 
   const ahora = new Date();
   const desdeActividad = new Date(ahora.getTime() - DIAS_DE_ACTIVIDAD * 86400000);
+
+  // Esto es solo para el reporte descargable: la lista de la pantalla es
+  // siempre la foto de HOY (a quién hay que atender ahora), no tiene sentido
+  // "filtrarla" por fecha. Lo que sí varía por período son los pagos que se
+  // fueron cobrando — eso es lo que arma el Excel/PDF.
+  const { fecha, desde, hasta } = await searchParams;
+  const fechaActiva: FiltroFecha = (fecha as FiltroFecha) ?? "mes";
+  function querystringReporte() {
+    const params = new URLSearchParams();
+    params.set("fecha", fechaActiva);
+    if (fechaActiva === "rango" && desde) params.set("desde", desde);
+    if (fechaActiva === "rango" && hasta) params.set("hasta", hasta);
+    return params.toString();
+  }
 
   const cabeceras = await headers();
   const host =
@@ -154,12 +192,93 @@ export default async function SuperPage() {
   const cuenta = (clase: EstadoSuscripcion["clase"]) =>
     filas.filter((f) => f.estado.clase === clase).length;
 
+  // Misma lista de siempre, pero partida en bloques por estado en vez de un
+  // solo renglón continuo — "Vencidos" ya no se confunde visualmente con
+  // "Al día" solo porque están uno al lado del otro.
+  const bloques = (Object.keys(URGENCIA) as EstadoSuscripcion["clase"][])
+    .sort((a, b) => URGENCIA[a] - URGENCIA[b])
+    .map((clase) => ({
+      clase,
+      titulo: TITULO_BLOQUE[clase],
+      filas: filas.filter((f) => f.estado.clase === clase),
+    }))
+    .filter((b) => b.filas.length > 0);
+
   return (
     <div>
-      <h1 className="mb-1 text-[1.4rem] font-semibold tracking-titular text-tinta">Cartera de locales</h1>
-      <p className="mb-6 text-sm text-tinta-media">
-        Todos tus clientes, ordenados por lo que hay que atender primero.
-      </p>
+      <Cabecera
+        titulo="Cartera de locales"
+        bajada="Todos tus clientes, ordenados por lo que hay que atender primero."
+        acciones={
+          <>
+            <a
+              href={`/admin/super/exportar?${querystringReporte()}`}
+              className={clasesBoton("principal", "sm")}
+            >
+              Descargar Excel
+            </a>
+            <a
+              href={`/admin/super/imprimir?${querystringReporte()}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={clasesBoton("navegar", "sm")}
+            >
+              Ver reporte / PDF
+            </a>
+          </>
+        }
+      />
+
+      {/*
+        El rango de acá abajo es solo para el reporte de pagos cobrados —
+        no toca la lista de locales, que siempre muestra el estado de HOY.
+      */}
+      <div className="mb-6 flex flex-wrap items-center gap-2">
+        <span className="text-xs text-tinta-suave">Período del reporte:</span>
+        {FILTROS_FECHA.map((f) => (
+          <Link
+            key={f.value}
+            href={`/admin/super?fecha=${f.value}`}
+            className={`rounded-full border px-3 py-1.5 text-sm font-medium ${
+              fechaActiva === f.value
+                ? "border-brand bg-brand text-white"
+                : "border-linea text-tinta-media hover:border-brand hover:text-brand"
+            }`}
+          >
+            {f.label}
+          </Link>
+        ))}
+        <form
+          method="get"
+          action="/admin/super"
+          className={`flex items-center gap-1.5 rounded-full border px-2 py-1 text-sm ${
+            fechaActiva === "rango" ? "border-brand bg-brand-light" : "border-linea"
+          }`}
+        >
+          <input type="hidden" name="fecha" value="rango" />
+          <input
+            type="date"
+            name="desde"
+            defaultValue={fechaActiva === "rango" ? desde : ""}
+            required
+            className="rounded-md border border-linea px-1.5 py-1 text-xs"
+          />
+          <span className="text-tinta-suave">–</span>
+          <input
+            type="date"
+            name="hasta"
+            defaultValue={fechaActiva === "rango" ? hasta : ""}
+            required
+            className="rounded-md border border-linea px-1.5 py-1 text-xs"
+          />
+          <button
+            type="submit"
+            className="rounded-full bg-noche-panel px-3 py-1 text-xs font-medium text-white hover:bg-noche-panel"
+          >
+            Filtrar
+          </button>
+        </form>
+      </div>
 
       <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
         <Tarjeta etiqueta="Locales" valor={filas.length} />
@@ -185,70 +304,83 @@ export default async function SuperPage() {
         </div>
       </details>
 
-      <div className="flex flex-col gap-2">
-        {filas.map((f) => {
-          const estilo = ESTILO_ESTADO[f.estado.clase];
-          const link = f.local.whatsappNumero
-            ? construirLinkWhatsapp(
-                f.local.whatsappNumero,
-                mensajeRecordatorio(f.local.nombre, f.estado)
-              )
-            : null;
+      <div className="flex flex-col gap-6">
+        {bloques.map((bloque) => (
+          <div key={bloque.clase}>
+            <h2 className="mb-2 flex items-center gap-2 text-sm font-semibold text-tinta-media">
+              {bloque.titulo}
+              <span className="rounded-full bg-papel-hundido px-2 py-0.5 text-xs font-medium text-tinta-media">
+                {bloque.filas.length}
+              </span>
+            </h2>
+            <div className="flex flex-col gap-2">
+              {bloque.filas.map((f) => {
+                const estilo = ESTILO_ESTADO[f.estado.clase];
+                const link = f.local.whatsappNumero
+                  ? construirLinkWhatsapp(
+                      f.local.whatsappNumero,
+                      mensajeRecordatorio(f.local.nombre, f.estado)
+                    )
+                  : null;
 
-          return (
-            <div
-              key={f.local.id}
-              className={`flex flex-wrap items-start justify-between gap-3 rounded-lg border border-linea border-l-4 bg-white px-4 py-3 ${estilo.borde}`}
-            >
-              <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="font-medium text-tinta">{f.local.nombre}</span>
-                  <span className="font-mono text-xs text-tinta-suave">
-                    /{f.local.slug}
-                  </span>
-                  <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${estilo.chip}`}>
-                    {f.estado.etiqueta}
-                  </span>
-                  <span className="rounded-full bg-papel-hundido px-2 py-0.5 text-xs text-tinta-media">
-                    {f.local.plan}
-                  </span>
-                </div>
+                return (
+                  <div
+                    key={f.local.id}
+                    className={`flex flex-wrap items-start justify-between gap-3 rounded-lg border border-linea border-l-4 px-4 py-3 ${estilo.borde} ${estilo.fondo}`}
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-medium text-tinta">{f.local.nombre}</span>
+                        <span className="font-mono text-xs text-tinta-suave">
+                          /{f.local.slug}
+                        </span>
+                        <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${estilo.chip}`}>
+                          {f.estado.etiqueta}
+                        </span>
+                        <span className="rounded-full bg-papel-hundido px-2 py-0.5 text-xs text-tinta-media">
+                          {f.local.plan}
+                        </span>
+                      </div>
 
-                <p className="mt-1 text-xs text-tinta-media">
-                  Vence {fechaCorta(f.local.vencimiento)}
-                  {" · "}
-                  {f.pedidos} {f.pedidos === 1 ? "pedido" : "pedidos"} en {DIAS_DE_ACTIVIDAD} días
-                  {" · "}
-                  {f.cantidadProductos} productos
-                  {" · "}
-                  entró {hace(f.ultimoIngreso, ahora)}
-                  {f.ultimoPago && (
-                    <>
-                      {" · "}
-                      último pago {formatearGuarani(f.ultimoPago.monto)} el{" "}
-                      {fechaCorta(f.ultimoPago.fecha)}
-                    </>
-                  )}
-                </p>
+                      <p className="mt-1 text-xs text-tinta-media">
+                        Vence {fechaCorta(f.local.vencimiento)}
+                        {" · "}
+                        {f.pedidos} {f.pedidos === 1 ? "pedido" : "pedidos"} en {DIAS_DE_ACTIVIDAD}{" "}
+                        días
+                        {" · "}
+                        {f.cantidadProductos} productos
+                        {" · "}
+                        entró {hace(f.ultimoIngreso, ahora)}
+                        {f.ultimoPago && (
+                          <>
+                            {" · "}
+                            último pago {formatearGuarani(f.ultimoPago.monto)} el{" "}
+                            {fechaCorta(f.ultimoPago.fecha)}
+                          </>
+                        )}
+                      </p>
 
-                {(f.seEstaApagando || f.cartaIncompleta) && (
-                  <p className="mt-1 text-xs font-medium text-aviso">
-                    {f.cartaIncompleta && "Casi no tiene productos cargados. "}
-                    {f.seEstaApagando &&
-                      "Sin pedidos y nadie entra al panel: está por darse de baja."}
-                  </p>
-                )}
-              </div>
+                      {(f.seEstaApagando || f.cartaIncompleta) && (
+                        <p className="mt-1 text-xs font-medium text-aviso">
+                          {f.cartaIncompleta && "Casi no tiene productos cargados. "}
+                          {f.seEstaApagando &&
+                            "Sin pedidos y nadie entra al panel: está por darse de baja."}
+                        </p>
+                      )}
+                    </div>
 
-              <AccionesLocal
-                storeId={f.local.id}
-                nombre={f.local.nombre}
-                suspendidoAMano={f.local.estado === "suspendido"}
-                linkRecordatorio={link}
-              />
+                    <AccionesLocal
+                      storeId={f.local.id}
+                      nombre={f.local.nombre}
+                      suspendidoAMano={f.local.estado === "suspendido"}
+                      linkRecordatorio={link}
+                    />
+                  </div>
+                );
+              })}
             </div>
-          );
-        })}
+          </div>
+        ))}
 
         {filas.length === 0 && (
           <p className="rounded-lg border border-dashed border-linea px-4 py-6 text-center text-sm text-tinta-media">
