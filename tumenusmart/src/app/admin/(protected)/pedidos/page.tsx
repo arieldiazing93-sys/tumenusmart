@@ -43,7 +43,14 @@ const FILTROS_TIPO: { value: "delivery" | "retiro" | "mesa"; label: string }[] =
 export default async function AdminPedidosPage({
   searchParams,
 }: {
-  searchParams: Promise<{ estado?: string; fecha?: string; desde?: string; hasta?: string; tipo?: string }>;
+  searchParams: Promise<{
+    estado?: string;
+    fecha?: string;
+    desde?: string;
+    hasta?: string;
+    tipo?: string;
+    buscar?: string;
+  }>;
 }) {
   // Sin este chequeo acá (y no solo en el layout), una sesión vencida con
   // esta pantalla abierta terminaba en un error real: el layout y la página
@@ -60,7 +67,21 @@ export default async function AdminPedidosPage({
   const storeId = await idLocalActual();
   const prisma = prismaDelLocal(storeId);
 
-  const { estado, fecha, desde, hasta, tipo } = await searchParams;
+  const { estado, fecha, desde, hasta, tipo, buscar } = await searchParams;
+  const busquedaActiva = (buscar ?? "").trim();
+  // Si es todo dígitos, también puede ser un número de pedido — buscarlo
+  // exacto (el "#0072" que ve el cliente es solo el formato con ceros a la
+  // izquierda; el número real guardado es 72). El teléfono se busca por
+  // coincidencia parcial siempre, sea cual sea lo que se haya escrito.
+  const numeroBuscado = /^\d+$/.test(busquedaActiva) ? parseInt(busquedaActiva, 10) : null;
+  const filtroBusqueda = busquedaActiva
+    ? {
+        OR: [
+          { clienteTelefono: { contains: busquedaActiva } },
+          ...(numeroBuscado != null ? [{ numero: numeroBuscado }] : []),
+        ],
+      }
+    : {};
   const estadoActivo = estado && estado !== "todos" ? estado : null;
   const rangoFecha = calcularRangoFecha(fecha, desde, hasta);
   const fechaActiva = rangoFecha ? fecha : null;
@@ -89,10 +110,13 @@ export default async function AdminPedidosPage({
         ...(estadoActivo ? { estado: estadoActivo } : {}),
         ...(rangoFecha ? { createdAt: rangoFecha } : {}),
         ...filtroTipo,
+        ...filtroBusqueda,
       },
       orderBy: { createdAt: "desc" },
       include: { items: true, deliveryZone: true, repartidor: true },
-      take: 100,
+      // Con búsqueda activa no tiene sentido cortar en 100: si el pedido que
+      // se busca es viejo dentro del rango, tiene que aparecer igual.
+      take: busquedaActiva ? undefined : 100,
     }),
     prisma.store.findUnique({ where: { id: storeId } }),
     obtenerEstadoTienda(storeId),
@@ -116,6 +140,7 @@ export default async function AdminPedidosPage({
     if (fechaActiva === "rango" && desde) params.set("desde", desde);
     if (fechaActiva === "rango" && hasta) params.set("hasta", hasta);
     if (tipoActivo) params.set("tipo", tipoActivo);
+    if (busquedaActiva) params.set("buscar", busquedaActiva);
     const qs = params.toString();
     return qs ? `/admin/pedidos?${qs}` : "/admin/pedidos";
   }
@@ -125,6 +150,7 @@ export default async function AdminPedidosPage({
     if (estadoActivo) params.set("estado", estadoActivo);
     if (nuevaFecha) params.set("fecha", nuevaFecha);
     if (tipoActivo) params.set("tipo", tipoActivo);
+    if (busquedaActiva) params.set("buscar", busquedaActiva);
     const qs = params.toString();
     return qs ? `/admin/pedidos?${qs}` : "/admin/pedidos";
   }
@@ -134,8 +160,21 @@ export default async function AdminPedidosPage({
     if (estadoActivo) params.set("estado", estadoActivo);
     if (fechaActiva) params.set("fecha", fechaActiva);
     if (nuevoTipo) params.set("tipo", nuevoTipo);
+    if (busquedaActiva) params.set("buscar", busquedaActiva);
     const qs = params.toString();
     return qs ? `/admin/pedidos?${qs}` : "/admin/pedidos";
+  }
+
+  // Igual que las de arriba, pero para el propio buscador: preserva estado,
+  // fecha y tipo activos al escribir o al limpiar la búsqueda.
+  function hrefBase() {
+    const params = new URLSearchParams();
+    if (estadoActivo) params.set("estado", estadoActivo);
+    if (fechaActiva) params.set("fecha", fechaActiva);
+    if (fechaActiva === "rango" && desde) params.set("desde", desde);
+    if (fechaActiva === "rango" && hasta) params.set("hasta", hasta);
+    if (tipoActivo) params.set("tipo", tipoActivo);
+    return params;
   }
 
   /**
@@ -185,9 +224,53 @@ export default async function AdminPedidosPage({
             : "Lo que entró por la carta. Los nuevos aparecen arriba y avisan solos."
         }
         acciones={
-          urlCarta ? (
-            <CompartirCarta nombreNegocio={store?.nombre ?? "Nuestra carta"} url={urlCarta} />
-          ) : null
+          <>
+            {/*
+              Busca por número de pedido o teléfono, siempre dentro del
+              rango de fecha/estado/tipo que ya esté seleccionado — no es
+              una búsqueda aparte, es un filtro más sobre lo mismo que se
+              está mirando.
+            */}
+            <form
+              method="get"
+              action="/admin/pedidos"
+              className={`flex items-center gap-1.5 rounded-full border px-2 py-1 text-sm ${
+                busquedaActiva ? "border-brand bg-brand-light" : "border-linea"
+              }`}
+            >
+              {estadoActivo && <input type="hidden" name="estado" value={estadoActivo} />}
+              {fechaActiva && <input type="hidden" name="fecha" value={fechaActiva} />}
+              {fechaActiva === "rango" && desde && <input type="hidden" name="desde" value={desde} />}
+              {fechaActiva === "rango" && hasta && <input type="hidden" name="hasta" value={hasta} />}
+              {tipoActivo && <input type="hidden" name="tipo" value={tipoActivo} />}
+              <input
+                type="search"
+                name="buscar"
+                defaultValue={busquedaActiva}
+                placeholder="N° de pedido o teléfono"
+                className="w-44 rounded-md border border-linea px-2 py-1 text-xs"
+              />
+              <button
+                type="submit"
+                className="rounded-full bg-noche-panel px-3 py-1 text-xs font-medium text-white hover:bg-noche-panel"
+              >
+                Buscar
+              </button>
+              {busquedaActiva && (
+                <Link
+                  href={`/admin/pedidos?${hrefBase().toString()}`}
+                  className="text-xs text-tinta-suave hover:text-tinta-media"
+                  title="Quitar búsqueda"
+                >
+                  ✕
+                </Link>
+              )}
+            </form>
+
+            {urlCarta && (
+              <CompartirCarta nombreNegocio={store?.nombre ?? "Nuestra carta"} url={urlCarta} />
+            )}
+          </>
         }
       />
 

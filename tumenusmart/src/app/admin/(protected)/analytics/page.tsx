@@ -70,11 +70,12 @@ function fechaCorta(valor: Date): string {
 export default async function AnalyticsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ fecha?: string; desde?: string; hasta?: string }>;
+  searchParams: Promise<{ fecha?: string; desde?: string; hasta?: string; telefono?: string }>;
 }) {
   await pantallaConPermiso("analytics.ver");
 
-  const { fecha, desde, hasta } = await searchParams;
+  const { fecha, desde, hasta, telefono } = await searchParams;
+  const telefonoBuscado = telefono?.trim() ?? "";
   const fechaActiva: FiltroFecha = (fecha as FiltroFecha) ?? "30dias";
   const rango =
     calcularRangoFecha(fechaActiva, desde, hasta) ??
@@ -106,7 +107,15 @@ export default async function AnalyticsPage({
     }),
   ]);
   const distribucion = calcularDistribucionFrecuencia(clientes);
-  const top = clientes.slice(0, TOPE_TABLA);
+
+  // El buscador filtra la TABLA, no las tarjetas de arriba: esas siguen
+  // contando todo el período elegido, sin importar a quién se esté buscando
+  // en ese momento — mezclar las dos cosas haría que las tarjetas cambiaran
+  // de golpe cada vez que alguien tipea un teléfono, que no es lo que piden.
+  const clientesFiltrados = telefonoBuscado
+    ? clientes.filter((c) => c.telefono.includes(telefonoBuscado))
+    : clientes;
+  const top = clientesFiltrados.slice(0, TOPE_TABLA);
 
   const fidelizacionActiva = store?.fidelizacionActiva ?? false;
   const umbral = store?.fidelizacionUmbral ?? 10;
@@ -185,6 +194,46 @@ export default async function AnalyticsPage({
             Filtrar
           </button>
         </form>
+
+        {/*
+          Buscador de clientes por teléfono, empujado a la derecha. Filtra
+          solo la tabla de abajo — las tarjetas de arriba (1 vez / 2-3 veces
+          / 4 o más) siguen mostrando el período completo, sin importar a
+          quién se esté buscando.
+        */}
+        <form
+          method="get"
+          action="/admin/analytics"
+          className={`ml-auto flex items-center gap-1.5 rounded-full border px-2 py-1 text-sm ${
+            telefonoBuscado ? "border-brand bg-brand-light" : "border-linea"
+          }`}
+        >
+          <input type="hidden" name="fecha" value={fechaActiva} />
+          {fechaActiva === "rango" && desde && <input type="hidden" name="desde" value={desde} />}
+          {fechaActiva === "rango" && hasta && <input type="hidden" name="hasta" value={hasta} />}
+          <input
+            type="search"
+            name="telefono"
+            defaultValue={telefonoBuscado}
+            placeholder="Buscar por teléfono"
+            className="w-40 rounded-md border border-linea px-2 py-1 text-xs"
+          />
+          <button
+            type="submit"
+            className="rounded-full bg-noche-panel px-3 py-1 text-xs font-medium text-white hover:bg-noche-panel"
+          >
+            Buscar
+          </button>
+          {telefonoBuscado && (
+            <Link
+              href={`/admin/analytics?${querystringActual()}`}
+              className="text-xs text-tinta-suave hover:text-tinta-media"
+              title="Quitar búsqueda"
+            >
+              ✕
+            </Link>
+          )}
+        </form>
       </div>
 
       <div className="mb-8 grid grid-cols-1 gap-3 sm:grid-cols-3">
@@ -210,17 +259,23 @@ export default async function AnalyticsPage({
 
       <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
         <h2 className="font-semibold text-tinta">
-          Top {Math.min(TOPE_TABLA, clientes.length)} clientes por cantidad de pedidos
+          {telefonoBuscado
+            ? `${clientesFiltrados.length} resultado${clientesFiltrados.length === 1 ? "" : "s"} para "${telefonoBuscado}"`
+            : `Top ${Math.min(TOPE_TABLA, clientesFiltrados.length)} clientes por cantidad de pedidos`}
         </h2>
-        {clientes.length > TOPE_TABLA && (
+        {!telefonoBuscado && clientesFiltrados.length > TOPE_TABLA && (
           <p className="text-xs text-tinta-suave">
-            Mostrando los {TOPE_TABLA} primeros de {clientes.length} clientes en el período
+            Mostrando los {TOPE_TABLA} primeros de {clientesFiltrados.length} clientes en el período
           </p>
         )}
       </div>
 
       {top.length === 0 ? (
-        <p className="text-sm text-tinta-suave">Todavía no hay pedidos en este período.</p>
+        <p className="text-sm text-tinta-suave">
+          {telefonoBuscado
+            ? "Ningún cliente de este período tiene ese teléfono."
+            : "Todavía no hay pedidos en este período."}
+        </p>
       ) : (
         <div className="overflow-x-auto rounded-lg border border-linea bg-white">
           <table className="w-full min-w-[640px] text-left text-sm">
