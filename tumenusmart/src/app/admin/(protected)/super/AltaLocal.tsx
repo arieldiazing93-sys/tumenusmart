@@ -8,7 +8,13 @@ import { PLANTILLAS, contarProductos } from "@/lib/plantillas-menu";
 const CAMPO =
   "w-full rounded-lg border border-linea px-3 py-2 text-sm focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand";
 
-export function AltaLocal({ dominio }: { dominio: string }) {
+export function AltaLocal({
+  dominio,
+  asesores,
+}: {
+  dominio: string;
+  asesores: { id: string; nombre: string }[];
+}) {
   const [pendiente, iniciar] = useTransition();
   const [resultado, setResultado] = useState<ResultadoAlta | null>(null);
   const [copiado, setCopiado] = useState(false);
@@ -146,23 +152,29 @@ export function AltaLocal({ dominio }: { dominio: string }) {
         </span>
       </label>
 
-      <div className="grid grid-cols-2 gap-3">
-        <label className="flex flex-col gap-1 text-sm text-tinta-media">
-          Plan
-          <input name="plan" defaultValue="basico" className={CAMPO} />
-        </label>
-        <label className="flex flex-col gap-1 text-sm text-tinta-media">
-          Meses de regalo
-          <input
-            type="number"
-            name="mesesGratis"
-            min="0"
-            max="12"
-            defaultValue="1"
-            className={CAMPO}
-          />
-        </label>
-      </div>
+      <label className="flex flex-col gap-1 text-sm text-tinta-media">
+        Plan
+        <input name="plan" defaultValue="basico" className={CAMPO} />
+        <span className="text-xs text-tinta-suave">
+          Arranca con 10 días de prueba gratis desde hoy. Al vencer, vos decidís si lo activás
+          registrándole un pago o lo dejás apagarse.
+        </span>
+      </label>
+
+      <label className="flex flex-col gap-1 text-sm text-tinta-media">
+        Asesor comercial
+        <select name="asesorId" defaultValue="" className={CAMPO}>
+          <option value="">Sin asignar</option>
+          {asesores.map((a) => (
+            <option key={a.id} value={a.id}>
+              {a.nombre}
+            </option>
+          ))}
+        </select>
+        <span className="text-xs text-tinta-suave">
+          Quién trajo o atiende este cliente. Se puede dejar sin asignar.
+        </span>
+      </label>
 
       <div className="sm:col-span-2">
         <button

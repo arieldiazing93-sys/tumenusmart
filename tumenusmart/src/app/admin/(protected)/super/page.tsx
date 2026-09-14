@@ -107,8 +107,11 @@ export default async function SuperPage({
   // Se traen las filas y se cuenta en memoria en vez de agrupar en la base:
   // con decenas de locales el volumen es chico y el código queda mucho más
   // simple de leer. Si algún día son cientos, esto pasa a un agrupado.
-  const [locales, pedidosRecientes, productos, usuarios, pagos] = await Promise.all([
-    prisma.store.findMany({ orderBy: { nombre: "asc" } }),
+  const [locales, pedidosRecientes, productos, usuarios, pagos, asesoresActivos] = await Promise.all([
+    prisma.store.findMany({
+      orderBy: { nombre: "asc" },
+      include: { asesor: { select: { nombre: true } } },
+    }),
     prisma.order.findMany({
       where: { createdAt: { gte: desdeActividad }, enviadoWhatsapp: true },
       select: { storeId: true },
@@ -118,6 +121,11 @@ export default async function SuperPage({
     prisma.pago.findMany({
       orderBy: { fecha: "desc" },
       select: { storeId: true, monto: true, fecha: true },
+    }),
+    prisma.asesor.findMany({
+      where: { activo: true },
+      orderBy: { nombre: "asc" },
+      select: { id: true, nombre: true },
     }),
   ]);
 
@@ -295,12 +303,27 @@ export default async function SuperPage({
         />
       </div>
 
-      <details className="mb-6 rounded-lg border border-linea bg-white">
-        <summary className="cursor-pointer px-4 py-3 text-sm font-medium text-tinta">
-          Dar de alta un local nuevo
+      {/*
+        "group" + "list-none" para poder dibujar nuestra propia flechita en
+        vez de la que pone el navegador, y "overflow-hidden" en el <details>
+        para que el fondo de color del <summary> respete las esquinas
+        redondeadas del contenedor en vez de sobresalir en las puntas.
+      */}
+      <details className="group mb-6 overflow-hidden rounded-lg border border-linea bg-white">
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-2 bg-brand px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-brand-dark">
+          <span className="flex items-center gap-1.5">
+            <span aria-hidden="true">+</span>
+            Dar de alta un local nuevo
+          </span>
+          <span
+            aria-hidden="true"
+            className="text-xs transition-transform duration-150 group-open:rotate-180"
+          >
+            ▼
+          </span>
         </summary>
         <div className="border-t border-linea p-4">
-          <AltaLocal dominio={dominio} />
+          <AltaLocal dominio={dominio} asesores={asesoresActivos} />
         </div>
       </details>
 
@@ -340,6 +363,11 @@ export default async function SuperPage({
                         <span className="rounded-full bg-papel-hundido px-2 py-0.5 text-xs text-tinta-media">
                           {f.local.plan}
                         </span>
+                        {f.local.asesor && (
+                          <span className="rounded-full bg-azul-luz px-2 py-0.5 text-xs text-azul-oscuro">
+                            {f.local.asesor.nombre}
+                          </span>
+                        )}
                       </div>
 
                       <p className="mt-1 text-xs text-tinta-media">

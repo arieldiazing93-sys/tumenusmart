@@ -67,6 +67,12 @@ model Store {
   vencimiento    DateTime?
   plan           String    @default("basico")
 
+  // Quién de tu equipo comercial trajo o atiende este cliente. Se asigna al
+  // dar de alta el local (o después, a mano) — nunca lo elige ni lo ve el
+  // dueño del local, es solo para tu propia cartera.
+  asesorId       String?
+  asesor         Asesor?   @relation(fields: [asesorId], references: [id])
+
   // --- Numeración propia de cada local ---
   // Así cada negocio ve sus pedidos desde el #0001 en vez de heredar un
   // contador global compartido con el resto. Se incrementan de a uno en
@@ -183,6 +189,27 @@ model Pago {
 
   @@index([storeId])
   @@index([storeId, fecha])
+}
+
+/// Un vendedor/asesor comercial de TuMenuSmart (no de un local puntual —
+/// esto es tuyo, de la plataforma). No cuelga de ningún Store por storeId
+/// como el resto de las tablas: es al revés, son los Store los que apuntan
+/// acá para decir quién los trajo.
+model Asesor {
+  id       String  @id @default(cuid())
+  nombre   String
+  telefono String
+  ciudad   String
+  email    String
+
+  /// Un asesor que ya no trabaja más no se borra (perdería la referencia en
+  /// los locales que trajo) — se lo marca inactivo y desaparece de la lista
+  /// para asignar en locales nuevos, sin tocar los que ya tiene.
+  activo Boolean @default(true)
+
+  createdAt DateTime @default(now())
+
+  locales Store[]
 }
 
 /// La idea que se le pone adelante al dueño cada semana.

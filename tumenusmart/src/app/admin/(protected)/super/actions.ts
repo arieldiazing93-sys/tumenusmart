@@ -16,6 +16,14 @@ import { calcularNuevoVencimiento } from "@/lib/suscripcion";
 // por su cuenta: que la pantalla no muestre el botón no alcanza, porque una
 // acción de servidor se puede invocar sin pasar por la pantalla.
 
+/**
+ * Todo local nuevo arranca con este período de prueba, sin excepción — no
+ * se regalan meses. Pasados los 10 días, el dueño del local decide a mano
+ * si le registra un pago (lo que le suma meses desde este mismo vencimiento)
+ * o lo deja vencer.
+ */
+const DIAS_PRUEBA_GRATIS = 10;
+
 export type ResultadoAlta = {
   ok: boolean;
   error?: string;
@@ -40,7 +48,7 @@ export async function crearLocal(formData: FormData): Promise<ResultadoAlta> {
   const email = normalizarEmail(String(formData.get("email") ?? ""));
   const plantillaClave = String(formData.get("plantilla") ?? "vacio");
   const plan = String(formData.get("plan") ?? "basico").trim() || "basico";
-  const mesesGratis = Number(formData.get("mesesGratis") ?? 0);
+  const asesorId = String(formData.get("asesorId") ?? "").trim() || null;
 
   if (!nombre) return { ok: false, error: "Falta el nombre del negocio" };
 
@@ -76,8 +84,7 @@ export async function crearLocal(formData: FormData): Promise<ResultadoAlta> {
   const password = generarPassword();
   const plantilla = plantillaPorClave(plantillaClave);
 
-  const vencimiento =
-    mesesGratis > 0 ? calcularNuevoVencimiento(null, mesesGratis) : null;
+  const vencimiento = new Date(Date.now() + DIAS_PRUEBA_GRATIS * 24 * 60 * 60 * 1000);
 
   // Todo junto: si algo falla, no queda un local a medio crear con un usuario
   // colgando o una carta a medias.
@@ -93,6 +100,7 @@ export async function crearLocal(formData: FormData): Promise<ResultadoAlta> {
         estado: "activo",
         plan,
         vencimiento,
+        asesorId,
       },
       select: { id: true },
     });
@@ -225,6 +233,42 @@ export async function cambiarPlan(storeId: string, plan: string) {
   const limpio = plan.trim().slice(0, 40) || "basico";
   await prisma.store.update({ where: { id: storeId }, data: { plan: limpio } });
   revalidatePath("/admin/super");
+}
+
+export type ResultadoAsesor = { ok: true } | { ok: false; error: string };
+
+/** Da de alta un asesor comercial, para poder asignárselo a los locales que trae. */
+export async function crearAsesor(formData: FormData): Promise<ResultadoAsesor> {
+  await exigirSuperadmin();
+
+  const nombre = String(formData.get("nombre") ?? "").trim();
+  const telefono = String(formData.get("telefono") ?? "").trim();
+  const ciudad = String(formData.get("ciudad") ?? "").trim();
+  const email = normalizarEmail(String(formData.get("email") ?? ""));
+
+  if (!nombre) return { ok: false, error: "Falta el nombre del asesor" };
+  if (!telefono) return { ok: false, error: "Falta el teléfono del asesor" };
+  if (!ciudad) return { ok: false, error: "Falta la ciudad del asesor" };
+  if (!email.includes("@") || email.length < 5) {
+    return { ok: false, error: "Escribí un correo válido para el asesor" };
+  }
+
+  await prisma.asesor.create({ data: { nombre, telefono, ciudad, email } });
+  revalidatePath("/admin/super/asesores");
+  revalidatePath("/admin/super");
+  return { ok: true };
+}
+
+/**
+ * Activa o desactiva un asesor. Nunca se borra: si tiene locales asignados,
+ * borrarlo les dejaría la referencia colgando. Uno inactivo desaparece de
+ * la lista para asignar en locales nuevos, pero los que ya tiene lo
+ * conservan.
+ */
+export async function alternarActivoAsesor(id: string, activo: boolean) {
+  await exigirSuperadmin();
+  await prisma.asesor.update({ where: { id }, data: { activo } });
+  revalidatePath("/admin/super/asesores");
 }
 
 /**

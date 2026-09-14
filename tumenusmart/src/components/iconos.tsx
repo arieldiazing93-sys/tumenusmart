@@ -170,6 +170,17 @@ export const IconoUsuarios = (p: Props) => (
   </Svg>
 );
 
+/** Asesores comerciales: la credencial con foto — distinta de "Usuarios"
+ * (dos personas), porque acá es UNA persona identificada, no una cuenta. */
+export const IconoAsesores = (p: Props) => (
+  <Svg {...p}>
+    <rect x="6" y="4" width="12" height="16" rx="2.5" />
+    <circle cx="12" cy="6.8" r="0.9" fill="currentColor" stroke="none" />
+    <circle cx="12" cy="11.5" r="2.3" />
+    <path d="M8.3 17.5a3.9 3.9 0 0 1 7.4 0" />
+  </Svg>
+);
+
 /** Errores: el triángulo de atención. */
 export const IconoErrores = (p: Props) => (
   <Svg {...p}>
@@ -269,6 +280,7 @@ export const ICONOS = {
   cartera: IconoCartera,
   usuarios: IconoUsuarios,
   errores: IconoErrores,
+  asesores: IconoAsesores,
 } as const;
 
 export type NombreIcono = keyof typeof ICONOS;

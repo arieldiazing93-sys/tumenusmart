@@ -95,6 +95,8 @@ function armarGrupos(hayIdeaSinVer: boolean, rol: string): GrupoSecciones[] {
       secciones: [
         { href: "/admin/super", label: "Cartera", icono: "cartera" as const,
           ver: conPermiso("cartera.gestionar") },
+        { href: "/admin/super/asesores", label: "Asesores", icono: "asesores" as const,
+          ver: conPermiso("cartera.gestionar") },
         { href: "/admin/usuarios", label: "Usuarios", icono: "usuarios" as const,
           ver: conPermiso("usuarios.gestionar") },
         { href: "/admin/errores", label: "Errores", icono: "errores" as const,
