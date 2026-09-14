@@ -295,16 +295,27 @@ export async function alternarActivaZona(id: string, activo: boolean) {
   revalidatePath("/[slug]", "layout");
 }
 
-export async function renombrarZona(
+/**
+ * Corrige nombre, radio o precio de una zona ya creada — mismas validaciones
+ * que `crearZona`, para que una zona editada no pueda quedar con datos que
+ * la de alta nunca habría dejado pasar.
+ */
+export async function actualizarZona(
   id: string,
-  nombre: string
-): Promise<{ ok: true } | { ok: false; error: string }> {
+  formData: FormData
+): Promise<ResultadoZona> {
   await exigirPermiso("configuracion.editar");
   const db = prismaDelLocal(await idLocalActual());
 
-  const nombreLimpio = nombre.trim();
-  if (!nombreLimpio) return { ok: false, error: "El nombre es obligatorio" };
-  await db.deliveryZone.update({ where: { id }, data: { nombre: nombreLimpio } });
+  const nombre = String(formData.get("nombre") ?? "").trim();
+  const radioKm = parseFloat(String(formData.get("radioKm") ?? "0"));
+  const costoEnvio = parseFloat(String(formData.get("costoEnvio") ?? "0"));
+
+  if (!nombre || isNaN(radioKm) || radioKm <= 0 || isNaN(costoEnvio)) {
+    return { ok: false, error: "Datos inválidos" };
+  }
+
+  await db.deliveryZone.update({ where: { id }, data: { nombre, radioKm, costoEnvio } });
   revalidatePath("/admin/configuracion");
   revalidatePath("/[slug]", "layout");
   return { ok: true };

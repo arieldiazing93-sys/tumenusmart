@@ -12,7 +12,7 @@ import { UrlPublicaField } from "./UrlPublicaField";
 import { GuardadoToast } from "@/components/GuardadoToast";
 import { PausaPedidosToggle } from "../PausaPedidosToggle";
 import { NOMBRES_DIA, DIAS_ORDENADOS, resumenDia } from "@/lib/horario-atencion";
-import { clasesBoton } from "@/components/ui";
+import { clasesBoton, Tarjeta } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
@@ -37,8 +37,8 @@ export default async function AdminConfiguracionPage() {
         <GuardadoToast />
       </Suspense>
 
-      <div>
-        <h1 className="mb-4 text-[1.4rem] font-semibold tracking-titular text-tinta">Datos del negocio</h1>
+      <Tarjeta>
+        <h2 className="mb-4 text-[1.15rem] font-semibold tracking-titular text-tinta">Datos del negocio</h2>
 
         <form action={actualizarStore} className="flex flex-col gap-3">
           <div>
@@ -151,10 +151,10 @@ export default async function AdminConfiguracionPage() {
             Guardar
           </button>
         </form>
-      </div>
+      </Tarjeta>
 
-      <div>
-        <h1 className="mb-4 text-[1.4rem] font-semibold tracking-titular text-tinta">Disponibilidad</h1>
+      <Tarjeta>
+        <h2 className="mb-4 text-[1.15rem] font-semibold tracking-titular text-tinta">Disponibilidad</h2>
         <div className="flex flex-col gap-4">
           <PausaPedidosToggle
             pausado={store?.pedidosPausados ?? false}
@@ -212,10 +212,10 @@ export default async function AdminConfiguracionPage() {
             )}
           </div>
         </div>
-      </div>
+      </Tarjeta>
 
-      <div>
-        <h1 className="mb-1 text-[1.4rem] font-semibold tracking-titular text-tinta">Fidelización</h1>
+      <Tarjeta>
+        <h2 className="mb-1 text-[1.15rem] font-semibold tracking-titular text-tinta">Fidelización</h2>
         <p className="mb-4 text-sm text-tinta-media">
           Cada N pedidos entregados de un mismo cliente le dan derecho a un premio.
           Solo cuenta pedidos hechos por acá — delivery o retiro.
@@ -278,10 +278,10 @@ export default async function AdminConfiguracionPage() {
             Guardar
           </button>
         </form>
-      </div>
+      </Tarjeta>
 
-      <div>
-        <h2 className="mb-1 text-[1.4rem] font-semibold tracking-titular text-tinta">Zonas de envío</h2>
+      <Tarjeta>
+        <h2 className="mb-1 text-[1.15rem] font-semibold tracking-titular text-tinta">Zonas de envío</h2>
         <p className="mb-4 text-sm text-tinta-media">
           Solo aplican si más abajo, en "Envío y ubicación", elegiste "Por zonas con precio
           automático". Cargalas de menor a mayor radio — cada una es "hasta X km desde el local".
@@ -304,10 +304,10 @@ export default async function AdminConfiguracionPage() {
             <p className="text-sm text-tinta-suave">Todavía no cargaste ninguna zona.</p>
           )}
         </div>
-      </div>
+      </Tarjeta>
 
-      <div>
-        <h2 className="mb-4 text-[1.4rem] font-semibold tracking-titular text-tinta">
+      <Tarjeta>
+        <h2 className="mb-4 text-[1.15rem] font-semibold tracking-titular text-tinta">
           Envío y ubicación
         </h2>
         <form action={guardarEnvioUbicacion} className="flex flex-col gap-3">
@@ -373,7 +373,7 @@ export default async function AdminConfiguracionPage() {
             Guardar
           </button>
         </form>
-      </div>
+      </Tarjeta>
     </div>
   );
 }
