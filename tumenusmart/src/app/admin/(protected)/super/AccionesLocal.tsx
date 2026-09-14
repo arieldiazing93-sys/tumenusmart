@@ -126,6 +126,17 @@ export function AccionesLocal({
           >
             Guardar
           </button>
+          <button
+            type="button"
+            disabled={pendiente}
+            onClick={() => {
+              setCobrando(false);
+              setAviso(null);
+            }}
+            className="rounded-lg px-3 py-1.5 text-sm font-medium text-tinta-media hover:bg-papel-hundido disabled:opacity-50"
+          >
+            Cancelar
+          </button>
         </form>
       )}
 

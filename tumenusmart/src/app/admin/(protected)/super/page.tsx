@@ -431,15 +431,18 @@ function Tarjeta({
   alerta?: boolean;
   aviso?: boolean;
 }) {
-  const color = alerta
-    ? "text-peligro"
+  // Mismo criterio de color que el resto del panel (Estadísticas, Analytics):
+  // el fondo tenue también, no solo el número, para que se note de un
+  // vistazo cuál tarjeta pide atención sin tener que leer el texto chico.
+  const estilo = alerta
+    ? { caja: "border-peligro/25 bg-peligro-luz", texto: "text-peligro" }
     : aviso
-      ? "text-aviso"
-      : "text-tinta";
+      ? { caja: "border-aviso/30 bg-aviso-luz", texto: "text-aviso" }
+      : { caja: "border-linea bg-white", texto: "text-tinta" };
   return (
-    <div className="rounded-lg border border-linea bg-white px-4 py-3">
+    <div className={`rounded-lg border px-4 py-3 ${estilo.caja}`}>
       <p className="text-xs text-tinta-media">{etiqueta}</p>
-      <p className={`text-2xl font-bold ${color}`}>{valor}</p>
+      <p className={`text-2xl font-bold ${estilo.texto}`}>{valor}</p>
     </div>
   );
 }
