@@ -51,12 +51,18 @@ export function AccionesLocal({
           Registrar pago
         </button>
 
+        {/*
+          Las cuatro acciones con la misma forma de píldora (borde + fondo
+          tenue), aunque cada una tenga su propio color — antes "Recordar" y
+          "Suspender" eran texto subrayado suelto, y al lado del botón lleno
+          de "Registrar pago" se leían como que no se podían tocar igual.
+        */}
         {linkRecordatorio && (
           <a
             href={linkRecordatorio}
             target="_blank"
             rel="noopener noreferrer"
-            className="font-medium text-exito hover:underline"
+            className="rounded-lg border border-exito/30 bg-exito-luz px-3 py-1.5 text-sm font-medium text-exito transition-colors hover:bg-exito hover:text-white"
           >
             Recordar por WhatsApp
           </a>
@@ -74,8 +80,8 @@ export function AccionesLocal({
           }}
           className={
             suspendidoAMano
-              ? "text-exito hover:underline disabled:opacity-50"
-              : "text-peligro hover:underline disabled:opacity-50"
+              ? "rounded-lg border border-exito/30 bg-exito-luz px-3 py-1.5 text-sm font-medium text-exito transition-colors hover:bg-exito hover:text-white disabled:opacity-50"
+              : "rounded-lg border border-peligro/30 bg-peligro-luz px-3 py-1.5 text-sm font-medium text-peligro transition-colors hover:bg-peligro hover:text-white disabled:opacity-50"
           }
         >
           {suspendidoAMano ? "Reactivar" : "Suspender"}
@@ -133,7 +139,7 @@ export function AccionesLocal({
               setCobrando(false);
               setAviso(null);
             }}
-            className="rounded-lg px-3 py-1.5 text-sm font-medium text-tinta-media hover:bg-papel-hundido disabled:opacity-50"
+            className="rounded-lg border border-linea bg-white px-3 py-1.5 text-sm font-medium text-tinta-media transition-colors hover:border-brand hover:text-brand disabled:opacity-50"
           >
             Cancelar
           </button>
