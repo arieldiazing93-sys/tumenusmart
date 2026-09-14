@@ -18,6 +18,7 @@ import {
   NOMBRES_MES,
   DIAS_SEMANA,
 } from "@/lib/calendario";
+import { calcularRangoFecha } from "@/lib/rango-fecha";
 import { etiquetaTurno, etiquetaMotivo } from "@/lib/reservas";
 import { formatearNumero } from "@/lib/format";
 import { linkWhatsappCliente } from "@/lib/whatsapp";
@@ -28,7 +29,7 @@ import { NotaReservaField } from "./NotaReservaField";
 
 export const dynamic = "force-dynamic";
 
-type Vista = "dia" | "semana" | "mes";
+type Vista = "dia" | "semana" | "mes" | "rango";
 type ReservaFila = Reservation;
 
 const VISTAS: { value: Vista; label: string }[] = [
@@ -94,7 +95,7 @@ function TarjetaReserva({ r }: { r: ReservaFila }) {
 export default async function AdminReservasPage({
   searchParams,
 }: {
-  searchParams: Promise<{ vista?: string; dia?: string }>;
+  searchParams: Promise<{ vista?: string; dia?: string; desde?: string; hasta?: string }>;
 }) {
   // Layout y página se renderizan en paralelo: sin este chequeo acá, una
   // sesión vencida podía terminar en el `throw` de idLocalActual() de acá
@@ -105,9 +106,12 @@ export default async function AdminReservasPage({
   const storeId = await idLocalActual();
   const prisma = prismaDelLocal(storeId);
 
-  const { vista: vistaParam, dia: diaParam } = await searchParams;
+  const { vista: vistaParam, dia: diaParam, desde, hasta } = await searchParams;
   const hoyClave = claveDiaAsuncion(new Date());
-  const vista: Vista = vistaParam === "dia" || vistaParam === "semana" ? vistaParam : "mes";
+  const vista: Vista =
+    vistaParam === "dia" || vistaParam === "semana" || vistaParam === "rango"
+      ? vistaParam
+      : "mes";
   const diaAncla = diaParam && /^\d{4}-\d{2}-\d{2}$/.test(diaParam) ? diaParam : hoyClave;
 
   function hrefVista(v: Vista, dia = diaAncla) {
@@ -127,6 +131,14 @@ export default async function AdminReservasPage({
     semana = diasDeLaSemana(diaAncla);
     gte = fechaAsuncionDesdeTexto(semana[0])!;
     lt = fechaAsuncionDesdeTexto(claveSumarDias(semana[6], 1))!;
+  } else if (vista === "rango") {
+    // Mismo helper que usan Pedidos, Estadísticas y Analytics para su
+    // pastilla de "Rango" — sin desde/hasta todavía (primera vez que se
+    // entra a esta pestaña) cae en los últimos 30 días, así la pantalla no
+    // arranca vacía mientras el encargado elige las fechas.
+    const r = calcularRangoFecha("rango", desde, hasta) ?? calcularRangoFecha("30dias", undefined, undefined)!;
+    gte = r.gte;
+    lt = r.lt;
   } else {
     const [anioStr, mesStr] = diaAncla.split("-");
     anioMes = { anio: Number(anioStr), mes: Number(mesStr) - 1 };
@@ -197,7 +209,7 @@ export default async function AdminReservasPage({
         </p>
       )}
 
-      <div className="mb-6 flex gap-2">
+      <div className="mb-6 flex flex-wrap items-center gap-2">
         {VISTAS.map((v) => (
           <Link
             key={v.value}
@@ -211,7 +223,71 @@ export default async function AdminReservasPage({
             {v.label}
           </Link>
         ))}
+
+        {/*
+          "Rango" es un formulario y no un link como las otras tres, mismo
+          criterio que ya usan Pedidos/Estadísticas/Analytics: hace falta
+          pedirle al encargado las dos fechas antes de poder armar el
+          período, así que no alcanza con un solo click.
+        */}
+        <form
+          method="get"
+          action="/admin/reservas"
+          className={`flex items-center gap-1.5 rounded-full border px-2 py-1 text-sm ${
+            vista === "rango" ? "border-brand bg-brand-light" : "border-linea"
+          }`}
+        >
+          <input type="hidden" name="vista" value="rango" />
+          <input
+            type="date"
+            name="desde"
+            defaultValue={vista === "rango" ? desde : ""}
+            required
+            className="rounded-md border border-linea px-1.5 py-1 text-xs"
+          />
+          <span className="text-tinta-suave">–</span>
+          <input
+            type="date"
+            name="hasta"
+            defaultValue={vista === "rango" ? hasta : ""}
+            required
+            className="rounded-md border border-linea px-1.5 py-1 text-xs"
+          />
+          <button
+            type="submit"
+            className="rounded-full bg-noche-panel px-3 py-1 text-xs font-medium text-white hover:bg-noche-panel"
+          >
+            Filtrar
+          </button>
+        </form>
       </div>
+
+      {vista === "rango" && (
+        <div>
+          <p className="mb-4 font-semibold text-tinta">
+            {fechaLarga(claveDiaAsuncion(gte))} – {fechaLarga(claveDiaAsuncion(new Date(lt.getTime() - 24 * 60 * 60 * 1000)))}
+          </p>
+
+          {reservas.length === 0 ? (
+            <p className="text-sm text-tinta-suave">No hay reservas en este rango.</p>
+          ) : (
+            <div className="flex flex-col gap-6">
+              {[...porDia.keys()].sort().map((clave) => (
+                <div key={clave}>
+                  <h3 className="mb-2 text-sm font-semibold text-tinta-media">
+                    {fechaLarga(clave)}
+                  </h3>
+                  <div className="flex flex-col gap-2">
+                    {(porDia.get(clave) ?? []).map((r) => (
+                      <TarjetaReserva key={r.id} r={r} />
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {vista === "dia" && (
         <div>
