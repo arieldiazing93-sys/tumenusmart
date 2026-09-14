@@ -43,13 +43,33 @@ export async function GET(request: NextRequest) {
   const ahora = new Date();
 
   const [locales, pagos] = await Promise.all([
-    prisma.store.findMany({ select: { estado: true, vencimiento: true } }),
+    prisma.store.findMany({
+      select: { estado: true, vencimiento: true, asesor: { select: { nombre: true } } },
+    }),
     prisma.pago.findMany({
       where: { fecha: { gte: rango.gte, lt: rango.lt } },
       orderBy: { fecha: "desc" },
-      include: { store: { select: { nombre: true, slug: true } } },
+      include: { store: { select: { nombre: true, slug: true, asesor: { select: { nombre: true } } } } },
     }),
   ]);
+
+  const SIN_ASESOR = "Sin asignar";
+
+  // Locales por asesor: foto de HOY, igual criterio que el estado de
+  // suscripción — no tiene sentido acotarlo al período del reporte.
+  const localesPorAsesor = new Map<string, number>();
+  for (const l of locales) {
+    const nombre = l.asesor?.nombre ?? SIN_ASESOR;
+    localesPorAsesor.set(nombre, (localesPorAsesor.get(nombre) ?? 0) + 1);
+  }
+
+  // Recaudado en el período, agrupado por el asesor del local que pagó — la
+  // base para calcular comisiones sin tener que cruzar planillas a mano.
+  const recaudadoPorAsesor = new Map<string, number>();
+  for (const p of pagos) {
+    const nombre = p.store.asesor?.nombre ?? SIN_ASESOR;
+    recaudadoPorAsesor.set(nombre, (recaudadoPorAsesor.get(nombre) ?? 0) + Number(p.monto));
+  }
 
   // Foto de HOY, no del período — ver el mismo comentario en page.tsx: el
   // estado de la suscripción no es algo que tenga sentido "acotar" a un rango.
@@ -77,8 +97,32 @@ export async function GET(request: NextRequest) {
   );
   filas.push("");
 
+  filas.push(filaCsv(["Locales por asesor"]));
+  filas.push(filaCsv(["Asesor", "Locales"]));
+  for (const [nombre, cantidad] of [...localesPorAsesor].sort((a, b) => b[1] - a[1])) {
+    filas.push(filaCsv([nombre, cantidad]));
+  }
+  filas.push("");
+
+  filas.push(filaCsv(["Recaudado en el período por asesor"]));
+  filas.push(filaCsv(["Asesor", "Monto (Gs.)"]));
+  for (const [nombre, monto] of [...recaudadoPorAsesor].sort((a, b) => b[1] - a[1])) {
+    filas.push(filaCsv([nombre, Math.round(monto)]));
+  }
+  filas.push("");
+
   filas.push(
-    filaCsv(["Local", "Slug", "Monto (Gs.)", "Meses", "Cubre hasta", "Nota", "Registrado por", "Fecha del pago"])
+    filaCsv([
+      "Local",
+      "Slug",
+      "Asesor",
+      "Monto (Gs.)",
+      "Meses",
+      "Cubre hasta",
+      "Nota",
+      "Registrado por",
+      "Fecha del pago",
+    ])
   );
   let totalRecaudado = 0;
   for (const p of pagos) {
@@ -87,6 +131,7 @@ export async function GET(request: NextRequest) {
       filaCsv([
         p.store.nombre,
         p.store.slug,
+        p.store.asesor?.nombre ?? SIN_ASESOR,
         Math.round(Number(p.monto)),
         p.meses,
         p.cubreHasta.toLocaleDateString("es-PY", opcionesFecha),

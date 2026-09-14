@@ -27,11 +27,13 @@ export default async function ImprimirCarteraPage({
   const ahora = new Date();
 
   const [locales, pagos] = await Promise.all([
-    prisma.store.findMany({ select: { estado: true, vencimiento: true } }),
+    prisma.store.findMany({
+      select: { estado: true, vencimiento: true, asesor: { select: { nombre: true } } },
+    }),
     prisma.pago.findMany({
       where: { fecha: { gte: rango.gte, lt: rango.lt } },
       orderBy: { fecha: "desc" },
-      include: { store: { select: { nombre: true, slug: true } } },
+      include: { store: { select: { nombre: true, slug: true, asesor: { select: { nombre: true } } } } },
     }),
   ]);
 
@@ -39,6 +41,22 @@ export default async function ImprimirCarteraPage({
     locales.filter((l) => estadoSuscripcion(l, ahora, ZONA_NEGOCIO).clase === clase).length;
 
   const totalRecaudado = pagos.reduce((s, p) => s + Number(p.monto), 0);
+
+  const SIN_ASESOR = "Sin asignar";
+
+  const localesPorAsesor = new Map<string, number>();
+  for (const l of locales) {
+    const nombre = l.asesor?.nombre ?? SIN_ASESOR;
+    localesPorAsesor.set(nombre, (localesPorAsesor.get(nombre) ?? 0) + 1);
+  }
+  const filasAsesorLocales = [...localesPorAsesor].sort((a, b) => b[1] - a[1]);
+
+  const recaudadoPorAsesor = new Map<string, number>();
+  for (const p of pagos) {
+    const nombre = p.store.asesor?.nombre ?? SIN_ASESOR;
+    recaudadoPorAsesor.set(nombre, (recaudadoPorAsesor.get(nombre) ?? 0) + Number(p.monto));
+  }
+  const filasAsesorRecaudado = [...recaudadoPorAsesor].sort((a, b) => b[1] - a[1]);
 
   const finRangoInclusive = new Date(rango.lt.getTime() - 24 * 60 * 60 * 1000);
   const opcionesFecha: Intl.DateTimeFormatOptions = {
@@ -82,6 +100,46 @@ export default async function ImprimirCarteraPage({
         </tbody>
       </table>
 
+      <div className="mb-10 grid grid-cols-2 gap-8">
+        <div>
+          <h2 className="mb-3 font-semibold text-tinta">Locales por asesor</h2>
+          {filasAsesorLocales.length === 0 ? (
+            <p className="text-sm text-tinta-suave">Sin datos.</p>
+          ) : (
+            <table className="w-full border-collapse text-sm">
+              <tbody>
+                {filasAsesorLocales.map(([nombre, cantidad]) => (
+                  <tr key={nombre} className="border-b border-linea">
+                    <td className="py-1.5 text-tinta-media">{nombre}</td>
+                    <td className="py-1.5 text-right font-semibold text-tinta">{cantidad}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+
+        <div>
+          <h2 className="mb-3 font-semibold text-tinta">Recaudado en el período por asesor</h2>
+          {filasAsesorRecaudado.length === 0 ? (
+            <p className="text-sm text-tinta-suave">Sin pagos en este período.</p>
+          ) : (
+            <table className="w-full border-collapse text-sm">
+              <tbody>
+                {filasAsesorRecaudado.map(([nombre, monto]) => (
+                  <tr key={nombre} className="border-b border-linea">
+                    <td className="py-1.5 text-tinta-media">{nombre}</td>
+                    <td className="cifra py-1.5 text-right font-semibold text-tinta">
+                      {formatearGuarani(monto)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </div>
+
       <h2 className="mb-3 font-semibold text-tinta">Pagos cobrados en el período</h2>
       {pagos.length === 0 ? (
         <p className="text-sm text-tinta-suave">No se registraron pagos en este período.</p>
@@ -90,6 +148,7 @@ export default async function ImprimirCarteraPage({
           <thead>
             <tr className="border-b border-linea text-left text-xs uppercase tracking-wide text-tinta-media">
               <th className="py-1.5">Local</th>
+              <th className="py-1.5">Asesor</th>
               <th className="py-1.5 text-right">Monto</th>
               <th className="py-1.5 text-right">Meses</th>
               <th className="py-1.5 text-right">Cubre hasta</th>
@@ -100,6 +159,7 @@ export default async function ImprimirCarteraPage({
             {pagos.map((p) => (
               <tr key={p.id} className="border-b border-linea-fina">
                 <td className="py-1.5">{p.store.nombre}</td>
+                <td className="py-1.5 text-tinta-media">{p.store.asesor?.nombre ?? SIN_ASESOR}</td>
                 <td className="cifra py-1.5 text-right">{formatearGuarani(Number(p.monto))}</td>
                 <td className="py-1.5 text-right">{p.meses}</td>
                 <td className="py-1.5 text-right">
@@ -115,7 +175,7 @@ export default async function ImprimirCarteraPage({
             <tr className="border-t-2 border-linea font-semibold text-tinta">
               <td className="py-2">Total recaudado</td>
               <td className="cifra py-2 text-right">{formatearGuarani(totalRecaudado)}</td>
-              <td colSpan={3} />
+              <td colSpan={4} />
             </tr>
           </tfoot>
         </table>
