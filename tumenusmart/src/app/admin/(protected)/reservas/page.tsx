@@ -209,17 +209,16 @@ export default async function AdminReservasPage({
       />
 
       {/*
-        Mismo botón-acordeón que "Dar de alta un local nuevo"/"un asesor
-        nuevo": para que el encargado pueda cargar a mano una reserva por
-        teléfono o en el mostrador, sin pasar por el formulario público de
-        WhatsApp, y quede igual de registrada en el calendario.
+        Botón corto y verde (no la barra ancha de "Dar de alta un local/
+        asesor"): esto se abre seguido, en el medio del turno, así que no
+        tiene que dominar la pantalla como esos formularios de alta que se
+        usan una vez cada tanto. Verde porque es "agregar", no "avanzar"
+        (naranja) ni "navegar" (azul).
       */}
-      <details className="group mb-6 overflow-hidden rounded-lg border border-linea bg-white">
-        <summary className="flex cursor-pointer list-none items-center justify-between gap-2 bg-brand px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-brand-dark">
-          <span className="flex items-center gap-1.5">
-            <span aria-hidden="true">+</span>
-            Registrar reserva manual
-          </span>
+      <details className="group mb-6">
+        <summary className="inline-flex cursor-pointer list-none items-center gap-1.5 rounded-lg border border-exito/30 bg-exito-luz px-3 py-1.5 text-sm font-medium text-exito transition-colors hover:bg-exito hover:text-white">
+          <span aria-hidden="true">+</span>
+          Registrar reserva
           <span
             aria-hidden="true"
             className="text-xs transition-transform duration-150 group-open:rotate-180"
@@ -227,7 +226,7 @@ export default async function AdminReservasPage({
             ▼
           </span>
         </summary>
-        <div className="border-t border-linea p-4">
+        <div className="mt-3 rounded-lg border border-linea bg-white p-4">
           <RegistrarReservaForm diaSugerido={vista === "dia" ? diaAncla : hoyClave} />
         </div>
       </details>
