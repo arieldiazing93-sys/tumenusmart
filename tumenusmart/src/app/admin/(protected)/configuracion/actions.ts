@@ -295,6 +295,21 @@ export async function alternarActivaZona(id: string, activo: boolean) {
   revalidatePath("/[slug]", "layout");
 }
 
+export async function renombrarZona(
+  id: string,
+  nombre: string
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  await exigirPermiso("configuracion.editar");
+  const db = prismaDelLocal(await idLocalActual());
+
+  const nombreLimpio = nombre.trim();
+  if (!nombreLimpio) return { ok: false, error: "El nombre es obligatorio" };
+  await db.deliveryZone.update({ where: { id }, data: { nombre: nombreLimpio } });
+  revalidatePath("/admin/configuracion");
+  revalidatePath("/[slug]", "layout");
+  return { ok: true };
+}
+
 /**
  * Cambiar la dirección pública del local (el "/loquesea" de la URL).
  *

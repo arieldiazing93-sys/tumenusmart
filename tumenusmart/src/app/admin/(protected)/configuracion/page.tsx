@@ -3,9 +3,8 @@ import { Suspense } from "react";
 import Link from "next/link";
 import { prismaDelLocal } from "@/lib/prisma-local";
 import { idLocalActual } from "@/lib/local-actual";
-import { formatearGuarani } from "@/lib/format";
 import { actualizarStore, guardarFidelizacion, guardarEnvioUbicacion } from "./actions";
-import { EliminarZonaBoton } from "./EliminarZonaBoton";
+import { ZonaFila } from "./ZonaFila";
 import { CrearZonaForm } from "./CrearZonaForm";
 import { StoreLocationField } from "./StoreLocationField";
 import { LogoField } from "./LogoField";
@@ -41,11 +40,6 @@ export default async function AdminConfiguracionPage() {
       <div>
         <h1 className="mb-4 text-[1.4rem] font-semibold tracking-titular text-tinta">Datos del negocio</h1>
 
-        {store?.slug && (
-          <div className="mb-4">
-            <UrlPublicaField slug={store.slug} />
-          </div>
-        )}
         <form action={actualizarStore} className="flex flex-col gap-3">
           <div>
             <label className="mb-1 block text-sm font-medium text-tinta-media">
@@ -79,6 +73,7 @@ export default async function AdminConfiguracionPage() {
               className="w-full rounded-lg border border-linea px-3 py-2"
             />
           </div>
+          {store?.slug && <UrlPublicaField slug={store.slug} />}
           <LogoField initialUrl={store?.logoUrl ?? null} />
           <div>
             <label className="mb-1 block text-sm font-medium text-tinta-media">
@@ -296,25 +291,14 @@ export default async function AdminConfiguracionPage() {
 
         <div className="flex flex-col gap-2">
           {zonas.map((z) => (
-            <div
+            <ZonaFila
               key={z.id}
-              className={`flex items-center justify-between rounded-lg border border-linea bg-white px-4 py-2 ${
-                z.activo ? "" : "opacity-60"
-              }`}
-            >
-              <span>
-                {z.nombre} <span className="text-tinta-suave">— hasta {Number(z.radioKm)} km</span>
-                {!z.activo && (
-                  <span className="ml-2 text-xs font-normal text-tinta-suave">(inactiva)</span>
-                )}
-              </span>
-              <div className="flex items-center gap-4">
-                <span className="text-sm text-tinta-media">
-                  {formatearGuarani(Number(z.costoEnvio))}
-                </span>
-                <EliminarZonaBoton id={z.id} activo={z.activo} />
-              </div>
-            </div>
+              id={z.id}
+              nombre={z.nombre}
+              radioKm={Number(z.radioKm)}
+              costoEnvio={Number(z.costoEnvio)}
+              activo={z.activo}
+            />
           ))}
           {zonas.length === 0 && (
             <p className="text-sm text-tinta-suave">Todavía no cargaste ninguna zona.</p>
