@@ -100,14 +100,20 @@ export default async function AdminProductosPage({
           </div>
 
           {puedeEditar && (
-          <details
-            open={mantenerFormularioAbierto}
-            className="mb-6 rounded-lg border border-linea bg-white p-4"
-          >
-            <summary className="cursor-pointer font-medium">
-              + Nuevo producto
+          <details open={mantenerFormularioAbierto} className="group mb-6">
+            <summary className="inline-flex cursor-pointer list-none items-center gap-1.5 rounded-lg border border-exito/30 bg-exito-luz px-3 py-1.5 text-sm font-medium text-exito transition-colors hover:bg-exito hover:text-white">
+              <span aria-hidden="true">+</span>
+              Nuevo producto
+              <span
+                aria-hidden="true"
+                className="text-xs transition-transform duration-150 group-open:rotate-180"
+              >
+                ▼
+              </span>
             </summary>
-            <CrearProductoForm categorias={categorias} categoriaActivaId={categoriaActiva?.id} />
+            <div className="mt-3 rounded-lg border border-linea bg-white p-4">
+              <CrearProductoForm categorias={categorias} categoriaActivaId={categoriaActiva?.id} />
+            </div>
           </details>
           )}
         </>
