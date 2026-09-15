@@ -202,15 +202,20 @@ export default async function CatalogoPage({
             local y le quitaba ancho al logo. Y el orden de lectura ahora es
             el que corresponde: primero de qué local se trata, después si
             está abierto, y recién entonces qué se puede hacer.
+
+            Solo aparece si el local reserva mesas con anticipación — hay
+            locales que solo hacen delivery/retiro y no tienen mesas físicas.
           */}
-          <div className="mt-3.5">
-            <Link
-              href={`/${slug}/reservas`}
-              className="inline-flex items-center rounded-xl bg-azul px-5 py-2.5 text-[0.88rem] font-semibold text-white shadow-media transition-colors hover:bg-azul-oscuro"
-            >
-              Reservar mesa
-            </Link>
-          </div>
+          {store.aceptaReservas && (
+            <div className="mt-3.5">
+              <Link
+                href={`/${slug}/reservas`}
+                className="inline-flex items-center rounded-xl bg-azul px-5 py-2.5 text-[0.88rem] font-semibold text-white shadow-media transition-colors hover:bg-azul-oscuro"
+              >
+                Reservar mesa
+              </Link>
+            </div>
+          )}
         </div>
       </header>
 

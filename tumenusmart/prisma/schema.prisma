@@ -40,6 +40,12 @@ model Store {
   aceptaRetiro        Boolean @default(true)
   aceptaMesa          Boolean @default(true)
 
+  // Si este local reserva mesas con anticipación. Es OTRA cosa que
+  // "aceptaMesa" de arriba (ese es "comer en el local" al hacer un pedido
+  // ahora); esto es el botón "Reservar mesa" del menú público, para locales
+  // que solo hacen delivery/retiro y no tienen mesas físicas que reservar.
+  aceptaReservas Boolean @default(true)
+
   /// Cómo se ve la carta pública de este local.
   ///
   /// "lista"    — filas compactas con miniatura. Es lo mejor para el local que

@@ -41,6 +41,10 @@ export async function crearReserva(datos: DatosReserva): Promise<ResultadoReserv
     return { ok: false, error: "Este menú no está tomando reservas en este momento." };
   }
 
+  if (!local.aceptaReservas) {
+    return { ok: false, error: "Este local no reserva mesas con anticipación." };
+  }
+
   if (!datos.clienteNombre?.trim() || !datos.clienteTelefono?.trim()) {
     return { ok: false, error: "Faltan datos de contacto" };
   }

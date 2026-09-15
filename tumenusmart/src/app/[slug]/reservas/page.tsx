@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { VolverAlMenu } from "@/components/Volver";
 import { prisma } from "@/lib/prisma";
 import { claveDiaAsuncion, horaAsuncion } from "@/lib/timezone";
@@ -14,6 +15,10 @@ export default async function ReservasPage({
 }) {
   const { slug } = await params;
   const store = await localPorSlug(slug);
+
+  // El local no reserva mesas — nadie tiene que poder llegar acá aunque
+  // escriba la URL directo, no solo no ver el botón en el menú.
+  if (!store.aceptaReservas) redirect(`/${slug}`);
 
   const [horarios, horariosAtencion] = await Promise.all([
     prisma.horarioReserva.findMany({

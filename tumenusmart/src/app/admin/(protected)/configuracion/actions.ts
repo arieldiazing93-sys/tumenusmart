@@ -145,6 +145,24 @@ export async function guardarFormasPagoEntrega(formData: FormData): Promise<void
   redirect("/admin/configuracion?guardado=1");
 }
 
+/**
+ * Prende o apaga el botón "Reservar mesa" del menú público — para locales
+ * que solo hacen delivery/retiro y no tienen mesas físicas que reservar.
+ * Distinto de `aceptaMesa` (que es "comer en el local" al hacer un pedido
+ * ahora, no una reserva con anticipación).
+ */
+export async function guardarAceptaReservas(formData: FormData): Promise<void> {
+  await exigirPermiso("configuracion.editar");
+
+  await prisma.store.update({
+    where: { id: await idLocalActual() },
+    data: { aceptaReservas: formData.get("aceptaReservas") === "on" },
+  });
+
+  refrescarPantallas();
+  redirect("/admin/configuracion?guardado=1");
+}
+
 export type ResultadoTramo = { ok: true } | { ok: false; error: string };
 
 /**

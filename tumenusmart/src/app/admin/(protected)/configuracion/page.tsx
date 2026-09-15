@@ -8,6 +8,7 @@ import {
   guardarFidelizacion,
   guardarEnvioUbicacion,
   guardarFormasPagoEntrega,
+  guardarAceptaReservas,
 } from "./actions";
 import { ZonaFila } from "./ZonaFila";
 import { CrearZonaForm } from "./CrearZonaForm";
@@ -286,6 +287,29 @@ export default async function AdminConfiguracionPage() {
               </label>
             </div>
           </div>
+          <button type="submit" className={`self-start ${clasesBoton("principal")}`}>
+            Guardar
+          </button>
+        </form>
+      </Tarjeta>
+
+      <Tarjeta>
+        <h2 className="mb-1 text-[1.15rem] font-semibold tracking-titular text-tinta">
+          Reservas de mesa
+        </h2>
+        <p className="mb-4 text-sm text-tinta-media">
+          Para locales que solo hacen delivery o retiro y no tienen mesas físicas — apagalo y el
+          botón "Reservar mesa" deja de aparecer en tu menú público.
+        </p>
+        <form action={guardarAceptaReservas} className="flex flex-col gap-3">
+          <label className="flex items-center gap-2 text-sm font-medium text-tinta-media">
+            <input
+              type="checkbox"
+              name="aceptaReservas"
+              defaultChecked={store?.aceptaReservas ?? true}
+            />
+            Este local reserva mesas con anticipación
+          </label>
           <button type="submit" className={`self-start ${clasesBoton("principal")}`}>
             Guardar
           </button>
