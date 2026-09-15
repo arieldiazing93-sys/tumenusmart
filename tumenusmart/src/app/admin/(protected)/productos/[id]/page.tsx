@@ -7,9 +7,12 @@ import { idLocalActual } from "@/lib/local-actual";
 import { EliminarProductoBoton, EliminarOpcionBoton } from "./EliminarBotones";
 import { EditarProductoForm } from "./EditarProductoForm";
 import { AgregarOpcionForm } from "./AgregarOpcionForm";
+import { EditarNombreOpcion } from "./EditarNombreOpcion";
 import { EditarCostoOpcion } from "./EditarCostoOpcion";
 import { EditarPrecioExtraOpcion } from "./EditarPrecioExtraOpcion";
 import { GuardadoToast } from "@/components/GuardadoToast";
+import { BotonesMover } from "@/components/BotonesMover";
+import { moverOpcion } from "../actions";
 import { Tarjeta } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
@@ -81,21 +84,26 @@ export default async function EditarProductoPage({
         </p>
 
         <div className="flex flex-col gap-2">
-          {producto.opciones.map((o) => (
+          {producto.opciones.map((o, i) => (
             <div
               key={o.id}
               className="flex flex-col gap-2 rounded-lg border border-linea bg-white px-3 py-2 text-sm sm:flex-row sm:items-center sm:justify-between"
             >
-              <span>
-                {o.nombre}
-                {o.costo == null && (
-                  // Sin esto, el margen de todo lo que se venda con este
-                  // agregado sale inflado en el reporte de Rentabilidad —
-                  // esa plata queda contada como ganancia del producto
-                  // principal en vez de como lo que cuesta este agregado.
-                  <span className="text-aviso"> · sin costo cargado</span>
-                )}
-              </span>
+              <div className="flex flex-wrap items-center gap-2">
+                <BotonesMover
+                  id={o.id}
+                  accion={moverOpcion}
+                  esPrimero={i === 0}
+                  esUltimo={i === producto.opciones.length - 1}
+                  etiqueta={o.nombre}
+                />
+                <EditarNombreOpcion
+                  productId={producto.id}
+                  optionId={o.id}
+                  nombreActual={o.nombre}
+                  sinCosto={o.costo == null}
+                />
+              </div>
               <div className="flex flex-wrap items-center gap-3">
                 <EditarPrecioExtraOpcion
                   productId={producto.id}

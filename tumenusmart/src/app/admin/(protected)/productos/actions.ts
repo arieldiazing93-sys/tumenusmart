@@ -242,6 +242,36 @@ export async function actualizarCostoOpcion(
 }
 
 /**
+ * Corrige el nombre de un agregado/variante ya creado — para el típico "lo
+ * escribí mal", sin tener que borrarlo y perder el precio/costo ya cargados.
+ */
+export async function actualizarNombreOpcion(
+  productId: string,
+  optionId: string,
+  formData: FormData
+): Promise<ResultadoProducto> {
+  await exigirPermiso("productos.editar");
+  // Todas las consultas de acá abajo quedan atadas a este local.
+  const prisma = prismaDelLocal(await idLocalActual());
+
+  const nombre = String(formData.get("nombre") ?? "").trim();
+  if (!nombre) return { ok: false, error: "El nombre no puede quedar vacío" };
+
+  // El `where` con productId de más, aparte de optionId, es defensa en
+  // profundidad: ver el mismo comentario en `actualizarCostoOpcion`.
+  const resultado = await prisma.productOption.updateMany({
+    where: { id: optionId, productId },
+    data: { nombre },
+  });
+  if (resultado.count === 0) {
+    return { ok: false, error: "Esa opción no existe o no es de este producto" };
+  }
+
+  revalidatePath(`/admin/productos/${productId}`);
+  return { ok: true };
+}
+
+/**
  * Cambia el precio extra (lo que le cobra al cliente) de un agregado/variante
  * que ya existe — mismo criterio que `actualizarCostoOpcion`, separado para
  * no tener que borrar y crear de nuevo un agregado por corregir el precio.
@@ -280,6 +310,54 @@ export async function eliminarOpcion(productId: string, optionId: string) {
 
   await prisma.productOption.delete({ where: { id: optionId } });
   revalidatePath(`/admin/productos/${productId}`);
+}
+
+/**
+ * Sube o baja un agregado DENTRO de su producto.
+ *
+ * Mismo criterio que `moverProducto`: se reordena solo entre hermanos (los
+ * agregados del MISMO producto) y se renumera toda la lista, no solo los dos
+ * que se tocaron — los agregados cargados hasta ahora tienen todos
+ * `orden = 0`, así que intercambiar dos valores iguales no movería nada.
+ */
+export async function moverOpcion(id: string, direccion: Direccion) {
+  await exigirPermiso("productos.editar");
+  const prisma = prismaDelLocal(await idLocalActual());
+
+  const opcion = await prisma.productOption.findUnique({
+    where: { id },
+    select: { productId: true },
+  });
+  if (!opcion) return;
+
+  const opciones = await prisma.productOption.findMany({
+    where: { productId: opcion.productId },
+    orderBy: [{ orden: "asc" }, { id: "asc" }],
+    select: { id: true, orden: true },
+  });
+
+  const indice = opciones.findIndex((o) => o.id === id);
+  if (indice === -1) return;
+
+  const nuevoOrden = moverEnLista(
+    opciones.map((o) => o.id),
+    indice,
+    direccion
+  );
+  const cambios = cambiosDeOrden(
+    nuevoOrden,
+    new Map(opciones.map((o) => [o.id, o.orden]))
+  );
+  if (cambios.length === 0) return;
+
+  await prisma.$transaction(
+    cambios.map((c) =>
+      prisma.productOption.update({ where: { id: c.id }, data: { orden: c.orden } })
+    )
+  );
+
+  revalidatePath(`/admin/productos/${opcion.productId}`);
+  revalidatePath("/[slug]", "layout");
 }
 
 /**
