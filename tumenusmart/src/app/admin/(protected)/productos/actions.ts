@@ -330,7 +330,8 @@ export async function aplicarAgregadosACategoria(
   productId: string
 ): Promise<ResultadoAplicarAgregados> {
   await exigirPermiso("productos.editar");
-  const prisma = prismaDelLocal(await idLocalActual());
+  const idLocal = await idLocalActual();
+  const prisma = prismaDelLocal(idLocal);
 
   const producto = await prisma.product.findUnique({
     where: { id: productId },
@@ -367,6 +368,7 @@ export async function aplicarAgregadosACategoria(
       prisma.productOption.createMany({
         data: faltantes.map((o) => ({
           productId: destino.id,
+          storeId: idLocal,
           nombre: o.nombre,
           tipo: o.tipo,
           precioExtra: o.precioExtra,
