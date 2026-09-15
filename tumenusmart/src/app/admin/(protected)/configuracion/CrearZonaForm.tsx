@@ -29,6 +29,7 @@ export function CrearZonaForm() {
         step="0.1"
         min="0.1"
         placeholder="Radio (km)"
+        onWheel={(e) => e.currentTarget.blur()}
         className="w-32 rounded-lg border border-linea px-3 py-2"
       />
       <input
@@ -38,6 +39,7 @@ export function CrearZonaForm() {
         step="1"
         min="0"
         placeholder="Costo (Gs.)"
+        onWheel={(e) => e.currentTarget.blur()}
         className="w-36 rounded-lg border border-linea px-3 py-2"
       />
       <button type="submit" disabled={pendiente} className={clasesBoton("suave", "md")}>

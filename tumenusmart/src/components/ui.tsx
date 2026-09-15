@@ -299,8 +299,26 @@ export function Campo({
 export function Entrada(
   props: React.InputHTMLAttributes<HTMLInputElement> & { invalido?: boolean }
 ) {
-  const { className = "", invalido, ...resto } = props;
-  return <input {...resto} className={`${clasesDeCampo(invalido)} ${className}`} />;
+  const { className = "", invalido, onWheel, ...resto } = props;
+  return (
+    <input
+      {...resto}
+      // Si el mouse queda sobre un <input type="number"> mientras se
+      // scrollea la página, el navegador le suma/resta al valor por cada
+      // "click" de la rueda — sin ningún aviso. Sacarle el foco antes de que
+      // eso pase es la forma estándar de evitarlo, sin bloquear el scroll de
+      // la página en los demás campos.
+      onWheel={
+        resto.type === "number"
+          ? (e) => {
+              e.currentTarget.blur();
+              onWheel?.(e);
+            }
+          : onWheel
+      }
+      className={`${clasesDeCampo(invalido)} ${className}`}
+    />
+  );
 }
 
 export function Area(

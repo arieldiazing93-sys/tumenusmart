@@ -36,6 +36,7 @@ export function AgregarOpcionForm({ productId }: { productId: string }) {
         min="0"
         defaultValue={0}
         placeholder="Precio extra"
+        onWheel={(e) => e.currentTarget.blur()}
         className="w-32 rounded-lg border border-linea px-3 py-2 text-sm"
       />
       <input
@@ -45,6 +46,7 @@ export function AgregarOpcionForm({ productId }: { productId: string }) {
         min="0"
         placeholder="Costo (opcional)"
         title="Lo que te cuesta a vos, no lo que le cobrás al cliente. Sin esto, el reporte de Rentabilidad no puede calcular bien el margen de lo que se vende con este agregado."
+        onWheel={(e) => e.currentTarget.blur()}
         className="w-36 rounded-lg border border-linea px-3 py-2 text-sm"
       />
       <button

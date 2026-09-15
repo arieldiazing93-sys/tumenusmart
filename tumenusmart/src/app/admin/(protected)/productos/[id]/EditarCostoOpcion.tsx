@@ -44,6 +44,7 @@ export function EditarCostoOpcion({
         step="1"
         value={valor}
         onChange={(e) => setValor(e.target.value)}
+        onWheel={(e) => e.currentTarget.blur()}
         placeholder="Gs."
         className="w-20 rounded border border-linea px-1.5 py-0.5 text-xs"
       />

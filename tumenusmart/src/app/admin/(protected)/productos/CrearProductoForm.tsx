@@ -61,6 +61,10 @@ export function CrearProductoForm({
         step="1"
         min="0"
         placeholder="Precio (Gs.)"
+        // Si el mouse queda encima mientras se scrollea la página, el
+        // navegador le resta/suma al precio por cada "click" de la rueda,
+        // sin avisar — sacarle el foco antes evita que eso pase.
+        onWheel={(e) => e.currentTarget.blur()}
         className="rounded-lg border border-linea px-3 py-2"
       />
       <ImagenProductoField initialUrl={null} />

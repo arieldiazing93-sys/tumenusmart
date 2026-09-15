@@ -128,6 +128,7 @@ export function AccionesLocal({
               min="1"
               max="24"
               defaultValue="1"
+              onWheel={(e) => e.currentTarget.blur()}
               className={`${CAMPO} w-16`}
             />
           </label>

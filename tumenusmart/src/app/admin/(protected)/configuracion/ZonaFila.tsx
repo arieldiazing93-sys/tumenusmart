@@ -85,6 +85,7 @@ export function ZonaFila({
               min="0.1"
               value={radioEditado}
               onChange={(e) => setRadioEditado(e.target.value)}
+              onWheel={(e) => e.currentTarget.blur()}
               placeholder="Radio (km)"
               className="w-24 rounded-lg border border-linea px-2 py-1.5 text-sm"
             />
@@ -98,6 +99,7 @@ export function ZonaFila({
               min="0"
               value={costoEditado}
               onChange={(e) => setCostoEditado(e.target.value)}
+              onWheel={(e) => e.currentTarget.blur()}
               placeholder="Costo (Gs.)"
               className="w-28 rounded-lg border border-linea px-2 py-1.5 text-sm"
             />

@@ -342,6 +342,7 @@ export default async function AdminConfiguracionPage() {
               step={1000}
               defaultValue={store?.fidelizacionMontoMinimo ?? ""}
               placeholder="Ej: 50000 — dejalo vacío para no exigir un mínimo"
+              onWheel={(e) => e.currentTarget.blur()}
               className="w-full rounded-lg border border-linea px-3 py-2 sm:w-64"
             />
             <p className="mt-1 text-xs text-tinta-suave">
