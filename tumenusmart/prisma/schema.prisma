@@ -29,6 +29,17 @@ model Store {
   lng            Float?
   envioModo      String   @default("zonas") // "zonas" (radio + precio automático) | "coordinar" (el negocio lo define directo con el cliente)
 
+  // --- Formas de pago y de entrega ---
+  // Qué opciones ve el cliente en el checkout público. Todas arrancan en true
+  // para que los locales existentes sigan viendo las mismas 6 opciones de
+  // siempre hasta que el dueño entre a Configuración y destilde alguna.
+  aceptaEfectivo      Boolean @default(true)
+  aceptaTransferencia Boolean @default(true)
+  aceptaTarjeta       Boolean @default(true)
+  aceptaDelivery      Boolean @default(true)
+  aceptaRetiro        Boolean @default(true)
+  aceptaMesa          Boolean @default(true)
+
   /// Cómo se ve la carta pública de este local.
   ///
   /// "lista"    — filas compactas con miniatura. Es lo mejor para el local que

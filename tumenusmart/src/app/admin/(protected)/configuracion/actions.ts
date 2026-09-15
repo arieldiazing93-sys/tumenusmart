@@ -112,6 +112,38 @@ export async function guardarFidelizacion(formData: FormData): Promise<void> {
   revalidatePath("/admin/analytics");
 }
 
+/**
+ * Igual que `actualizarStore`: `<form action={...}>` plano sin wrapper de
+ * cliente, así que no puede devolver {ok,error} — el error de validación
+ * viaja en la URL del redirect, y lo levanta GuardadoToast.
+ */
+export async function guardarFormasPagoEntrega(formData: FormData): Promise<void> {
+  await exigirPermiso("configuracion.editar");
+
+  const aceptaEfectivo = formData.get("aceptaEfectivo") === "on";
+  const aceptaTransferencia = formData.get("aceptaTransferencia") === "on";
+  const aceptaTarjeta = formData.get("aceptaTarjeta") === "on";
+  const aceptaDelivery = formData.get("aceptaDelivery") === "on";
+  const aceptaRetiro = formData.get("aceptaRetiro") === "on";
+  const aceptaMesa = formData.get("aceptaMesa") === "on";
+
+  // Sin al menos una opción tildada en cada grupo, el checkout público se
+  // queda sin nada para ofrecerle al cliente.
+  if (!aceptaEfectivo && !aceptaTransferencia && !aceptaTarjeta) {
+    redirect(`/admin/configuracion?error=${encodeURIComponent("Elegí al menos una forma de pago")}`);
+  }
+  if (!aceptaDelivery && !aceptaRetiro && !aceptaMesa) {
+    redirect(`/admin/configuracion?error=${encodeURIComponent("Elegí al menos una forma de entrega")}`);
+  }
+
+  await prisma.store.update({
+    where: { id: await idLocalActual() },
+    data: { aceptaEfectivo, aceptaTransferencia, aceptaTarjeta, aceptaDelivery, aceptaRetiro, aceptaMesa },
+  });
+  refrescarPantallas();
+  redirect("/admin/configuracion?guardado=1");
+}
+
 export type ResultadoTramo = { ok: true } | { ok: false; error: string };
 
 /**

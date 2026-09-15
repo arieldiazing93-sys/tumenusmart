@@ -3,7 +3,12 @@ import { Suspense } from "react";
 import Link from "next/link";
 import { prismaDelLocal } from "@/lib/prisma-local";
 import { idLocalActual } from "@/lib/local-actual";
-import { actualizarStore, guardarFidelizacion, guardarEnvioUbicacion } from "./actions";
+import {
+  actualizarStore,
+  guardarFidelizacion,
+  guardarEnvioUbicacion,
+  guardarFormasPagoEntrega,
+} from "./actions";
 import { ZonaFila } from "./ZonaFila";
 import { CrearZonaForm } from "./CrearZonaForm";
 import { StoreLocationField } from "./StoreLocationField";
@@ -212,6 +217,79 @@ export default async function AdminConfiguracionPage() {
             )}
           </div>
         </div>
+      </Tarjeta>
+
+      <Tarjeta>
+        <h2 className="mb-1 text-[1.15rem] font-semibold tracking-titular text-tinta">
+          Formas de pago y de entrega
+        </h2>
+        <p className="mb-4 text-sm text-tinta-media">
+          Elegí con cuáles trabajás. En el checkout, al cliente solo le vas a
+          mostrar lo que dejes tildado acá.
+        </p>
+        <form action={guardarFormasPagoEntrega} className="flex flex-col gap-5">
+          <div>
+            <p className="mb-2 text-sm font-semibold text-tinta">Métodos de pago</p>
+            <div className="flex flex-col gap-2">
+              <label className="flex items-center gap-2 text-sm font-medium text-tinta-media">
+                <input
+                  type="checkbox"
+                  name="aceptaEfectivo"
+                  defaultChecked={store?.aceptaEfectivo ?? true}
+                />
+                Efectivo
+              </label>
+              <label className="flex items-center gap-2 text-sm font-medium text-tinta-media">
+                <input
+                  type="checkbox"
+                  name="aceptaTransferencia"
+                  defaultChecked={store?.aceptaTransferencia ?? true}
+                />
+                Transferencia
+              </label>
+              <label className="flex items-center gap-2 text-sm font-medium text-tinta-media">
+                <input
+                  type="checkbox"
+                  name="aceptaTarjeta"
+                  defaultChecked={store?.aceptaTarjeta ?? true}
+                />
+                Tarjeta (POS al recibir)
+              </label>
+            </div>
+          </div>
+          <div>
+            <p className="mb-2 text-sm font-semibold text-tinta">Formas de entrega</p>
+            <div className="flex flex-col gap-2">
+              <label className="flex items-center gap-2 text-sm font-medium text-tinta-media">
+                <input
+                  type="checkbox"
+                  name="aceptaDelivery"
+                  defaultChecked={store?.aceptaDelivery ?? true}
+                />
+                Delivery
+              </label>
+              <label className="flex items-center gap-2 text-sm font-medium text-tinta-media">
+                <input
+                  type="checkbox"
+                  name="aceptaRetiro"
+                  defaultChecked={store?.aceptaRetiro ?? true}
+                />
+                Retiro en el local
+              </label>
+              <label className="flex items-center gap-2 text-sm font-medium text-tinta-media">
+                <input
+                  type="checkbox"
+                  name="aceptaMesa"
+                  defaultChecked={store?.aceptaMesa ?? true}
+                />
+                Comer en el local
+              </label>
+            </div>
+          </div>
+          <button type="submit" className={`self-start ${clasesBoton("principal")}`}>
+            Guardar
+          </button>
+        </form>
       </Tarjeta>
 
       <Tarjeta>

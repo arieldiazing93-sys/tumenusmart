@@ -37,6 +37,12 @@ export default async function CheckoutPage({
         envioModo={store.envioModo === "coordinar" ? "coordinar" : "zonas"}
         aceptaPedidos={estadoTienda.aceptaPedidos}
         motivoBloqueo={motivoSinPedidos(estadoTienda)}
+        aceptaEfectivo={store.aceptaEfectivo}
+        aceptaTransferencia={store.aceptaTransferencia}
+        aceptaTarjeta={store.aceptaTarjeta}
+        aceptaDelivery={store.aceptaDelivery}
+        aceptaRetiro={store.aceptaRetiro}
+        aceptaMesa={store.aceptaMesa}
         zonas={zonas.map((z) => ({
           id: z.id,
           nombre: z.nombre,

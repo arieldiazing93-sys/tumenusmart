@@ -72,6 +72,39 @@ export async function crearPedido(datos: DatosCheckout): Promise<ResultadoPedido
     return { ok: false, error: "Este menú no está tomando pedidos en este momento." };
   }
 
+  // El local pudo destildar esta opción en Configuración después de que el
+  // cliente abrió la pantalla (o esto se llama directo, saltándose el
+  // formulario) — se vuelve a chequear acá contra lo que el local tiene
+  // habilitado hoy, no solo lo que el checkout le mostró al armar la página.
+  const metodosHabilitados: Record<string, boolean> = {
+    efectivo: local.aceptaEfectivo,
+    transferencia: local.aceptaTransferencia,
+    tarjeta: local.aceptaTarjeta,
+  };
+  // "otro" no lo ofrece el checkout público — no está en este objeto, así
+  // que pasa sin bloquearse (queda fuera del alcance de este control).
+  if (
+    datos.metodoPagoReferencia in metodosHabilitados &&
+    !metodosHabilitados[datos.metodoPagoReferencia]
+  ) {
+    return {
+      ok: false,
+      error: "Ese método de pago ya no está disponible en este local. Recargá la página.",
+    };
+  }
+
+  const entregasHabilitadas: Record<DatosCheckout["tipoEntrega"], boolean> = {
+    delivery: local.aceptaDelivery,
+    retiro: local.aceptaRetiro,
+    mesa: local.aceptaMesa,
+  };
+  if (!entregasHabilitadas[datos.tipoEntrega]) {
+    return {
+      ok: false,
+      error: "Esa forma de entrega ya no está disponible en este local. Recargá la página.",
+    };
+  }
+
   // Se vuelve a chequear acá, no solo en el formulario: si el local cerró o
   // pausó mientras el cliente completaba sus datos, el pedido no entra.
   const estadoTienda = await obtenerEstadoTienda(storeId);

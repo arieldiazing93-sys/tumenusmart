@@ -21,11 +21,18 @@ const MapPicker = dynamic(
 type Zona = { id: string; nombre: string; radioKm: number; costoEnvio: number };
 
 type MetodoPago = "efectivo" | "transferencia" | "tarjeta";
+type TipoEntrega = "delivery" | "retiro" | "mesa";
 
 const METODOS_PAGO: { value: MetodoPago; label: string; sublabel?: string }[] = [
   { value: "efectivo", label: "Efectivo" },
   { value: "transferencia", label: "Transferencia" },
   { value: "tarjeta", label: "Tarjeta", sublabel: "POS al recibir" },
+];
+
+const TIPOS_ENTREGA: { value: TipoEntrega; label: string; sublabel?: string }[] = [
+  { value: "delivery", label: "Delivery" },
+  { value: "retiro", label: "Retiro en el local" },
+  { value: "mesa", label: "Comer en el local" },
 ];
 
 type Props = {
@@ -37,6 +44,13 @@ type Props = {
   /** false cuando el local está cerrado o con los pedidos pausados */
   aceptaPedidos: boolean;
   motivoBloqueo: string | null;
+  /** Qué métodos de pago y formas de entrega tiene habilitados este local. */
+  aceptaEfectivo: boolean;
+  aceptaTransferencia: boolean;
+  aceptaTarjeta: boolean;
+  aceptaDelivery: boolean;
+  aceptaRetiro: boolean;
+  aceptaMesa: boolean;
   zonas: Zona[];
 };
 
@@ -47,19 +61,55 @@ export function CheckoutForm({
   envioModo,
   aceptaPedidos,
   motivoBloqueo,
+  aceptaEfectivo,
+  aceptaTransferencia,
+  aceptaTarjeta,
+  aceptaDelivery,
+  aceptaRetiro,
+  aceptaMesa,
   zonas,
 }: Props) {
   const router = useRouter();
   const { items, subtotal, vaciarCarrito } = useCart();
 
+  // Solo lo que el local dejó habilitado en Configuración — así el cliente
+  // nunca ve una opción que ese negocio no puede cumplir.
+  const metodosDisponibles = useMemo(
+    () =>
+      METODOS_PAGO.filter(
+        (m) =>
+          ({ efectivo: aceptaEfectivo, transferencia: aceptaTransferencia, tarjeta: aceptaTarjeta })[
+            m.value
+          ]
+      ),
+    [aceptaEfectivo, aceptaTransferencia, aceptaTarjeta]
+  );
+  const entregasDisponibles = useMemo(
+    () =>
+      TIPOS_ENTREGA.filter(
+        (t) => ({ delivery: aceptaDelivery, retiro: aceptaRetiro, mesa: aceptaMesa })[t.value]
+      ).map((t) =>
+        t.value === "delivery"
+          ? { ...t, sublabel: envioModo === "zonas" ? "Según zona" : "A coordinar" }
+          : t
+      ),
+    [aceptaDelivery, aceptaRetiro, aceptaMesa, envioModo]
+  );
+
   const [nombre, setNombre] = useState("");
   const [telefono, setTelefono] = useState("");
-  const [tipoEntrega, setTipoEntrega] = useState<"delivery" | "retiro" | "mesa">("delivery");
+  // Fallback defensivo: la Server Action de Configuración no deja guardar un
+  // grupo en cero, así que esto solo cubriría un dato inconsistente.
+  const [tipoEntrega, setTipoEntrega] = useState<TipoEntrega>(
+    entregasDisponibles[0]?.value ?? "retiro"
+  );
   const [clienteLat, setClienteLat] = useState<number | null>(null);
   const [clienteLng, setClienteLng] = useState<number | null>(null);
   const [direccion, setDireccion] = useState("");
   const [mesaNumero, setMesaNumero] = useState("");
-  const [metodoPago, setMetodoPago] = useState<MetodoPago>("efectivo");
+  const [metodoPago, setMetodoPago] = useState<MetodoPago>(
+    metodosDisponibles[0]?.value ?? "efectivo"
+  );
   const [comprobanteTipo, setComprobanteTipo] = useState<"ticket" | "factura">("ticket");
   const [facturaRazonSocial, setFacturaRazonSocial] = useState("");
   const [facturaRuc, setFacturaRuc] = useState("");
@@ -258,24 +308,12 @@ export function CheckoutForm({
           <p className="rotulo">Entrega y pago</p>
 
           <Campo etiqueta="Método de pago" ayuda="Lo coordinás directamente con el local">
-            <Segmentado opciones={METODOS_PAGO} valor={metodoPago} onChange={setMetodoPago} />
+            <Segmentado opciones={metodosDisponibles} valor={metodoPago} onChange={setMetodoPago} />
           </Campo>
 
           <div>
             <span className="mb-1.5 block text-[0.82rem] font-semibold text-tinta">Entrega</span>
-            <Segmentado
-              opciones={[
-                {
-                  value: "delivery",
-                  label: "Delivery",
-                  sublabel: envioModo === "zonas" ? "Según zona" : "A coordinar",
-                },
-                { value: "retiro", label: "Retiro en el local" },
-                { value: "mesa", label: "Comer en el local" },
-              ]}
-              valor={tipoEntrega}
-              onChange={setTipoEntrega}
-            />
+            <Segmentado opciones={entregasDisponibles} valor={tipoEntrega} onChange={setTipoEntrega} />
           </div>
 
           {tipoEntrega === "mesa" && (
