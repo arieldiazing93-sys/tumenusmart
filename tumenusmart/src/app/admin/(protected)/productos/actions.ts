@@ -312,6 +312,87 @@ export async function eliminarOpcion(productId: string, optionId: string) {
   revalidatePath(`/admin/productos/${productId}`);
 }
 
+export type ResultadoAplicarAgregados =
+  | { ok: true; productosActualizados: number; agregadosCreados: number; productosSinCambios: number }
+  | { ok: false; error: string };
+
+/**
+ * Copia TODOS los agregados de este producto a los demás productos de la
+ * MISMA categoría — para no cargar a mano los mismos 6-7 agregados en cada
+ * uno de los 15-20 productos de una categoría como "Hamburguesas".
+ *
+ * No duplica: si un producto destino ya tiene un agregado con ese nombre
+ * (comparado sin mayúsculas ni espacios de más), ese no se vuelve a crear —
+ * así se puede apretar el botón de nuevo después de sumar un agregado más
+ * sin pisar precios ya corregidos a mano en los demás productos.
+ */
+export async function aplicarAgregadosACategoria(
+  productId: string
+): Promise<ResultadoAplicarAgregados> {
+  await exigirPermiso("productos.editar");
+  const prisma = prismaDelLocal(await idLocalActual());
+
+  const producto = await prisma.product.findUnique({
+    where: { id: productId },
+    select: {
+      categoryId: true,
+      opciones: { select: { nombre: true, tipo: true, precioExtra: true, costo: true } },
+    },
+  });
+  if (!producto) return { ok: false, error: "No encontré el producto" };
+  if (producto.opciones.length === 0) {
+    return { ok: false, error: "Este producto todavía no tiene agregados para copiar" };
+  }
+
+  const productosDestino = await prisma.product.findMany({
+    where: { categoryId: producto.categoryId, id: { not: productId } },
+    select: { id: true, opciones: { select: { nombre: true } } },
+  });
+  if (productosDestino.length === 0) {
+    return { ok: false, error: "No hay otros productos en esta categoría" };
+  }
+
+  let agregadosCreados = 0;
+  let productosActualizados = 0;
+  const escrituras: ReturnType<typeof prisma.productOption.createMany>[] = [];
+
+  for (const destino of productosDestino) {
+    const yaTiene = new Set(destino.opciones.map((o) => o.nombre.trim().toLowerCase()));
+    const faltantes = producto.opciones.filter(
+      (o) => !yaTiene.has(o.nombre.trim().toLowerCase())
+    );
+    if (faltantes.length === 0) continue;
+
+    escrituras.push(
+      prisma.productOption.createMany({
+        data: faltantes.map((o) => ({
+          productId: destino.id,
+          nombre: o.nombre,
+          tipo: o.tipo,
+          precioExtra: o.precioExtra,
+          costo: o.costo,
+        })),
+      })
+    );
+    agregadosCreados += faltantes.length;
+    productosActualizados++;
+  }
+
+  if (escrituras.length > 0) {
+    await prisma.$transaction(escrituras);
+  }
+
+  revalidatePath("/admin/productos");
+  revalidatePath("/[slug]", "layout");
+
+  return {
+    ok: true,
+    productosActualizados,
+    agregadosCreados,
+    productosSinCambios: productosDestino.length - productosActualizados,
+  };
+}
+
 /**
  * Sube o baja un agregado DENTRO de su producto.
  *

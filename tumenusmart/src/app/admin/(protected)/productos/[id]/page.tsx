@@ -7,6 +7,7 @@ import { idLocalActual } from "@/lib/local-actual";
 import { EliminarProductoBoton, EliminarOpcionBoton } from "./EliminarBotones";
 import { EditarProductoForm } from "./EditarProductoForm";
 import { AgregarOpcionForm } from "./AgregarOpcionForm";
+import { AplicarAgregadosBoton } from "./AplicarAgregadosBoton";
 import { EditarNombreOpcion } from "./EditarNombreOpcion";
 import { EditarCostoOpcion } from "./EditarCostoOpcion";
 import { EditarPrecioExtraOpcion } from "./EditarPrecioExtraOpcion";
@@ -78,10 +79,21 @@ export default async function EditarProductoPage({
       </div>
 
       <Tarjeta className="flex flex-col gap-3">
-        <p className="rotulo text-[0.8rem] font-bold">Agregados</p>
-        <p className="text-sm text-tinta-media">
-          Extras que el cliente puede sumar a este producto (ej: borde relleno, extra queso).
-        </p>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p className="rotulo text-[0.8rem] font-bold">Agregados</p>
+            <p className="text-sm text-tinta-media">
+              Extras que el cliente puede sumar a este producto (ej: borde relleno, extra queso).
+            </p>
+          </div>
+          <AplicarAgregadosBoton
+            productId={producto.id}
+            categoriaNombre={
+              categorias.find((c) => c.id === producto.categoryId)?.nombre ?? "esta categoría"
+            }
+            cantidadAgregados={producto.opciones.length}
+          />
+        </div>
 
         <div className="flex flex-col gap-2">
           {producto.opciones.map((o, i) => (
