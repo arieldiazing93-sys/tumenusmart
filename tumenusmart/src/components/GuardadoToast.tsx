@@ -37,7 +37,11 @@ export function GuardadoToast() {
 
   return (
     <div
-      className={`fixed top-4 right-4 z-50 flex items-center gap-2 rounded-lg px-4 py-3 text-sm font-medium text-white shadow-lg ${
+      // top-[4.5rem]: la barra de arriba (header) es sticky, mide 3.5rem
+      // (56px) y usa z-40. Con top-4 el cartel quedaba flotando adentro de
+      // esa franja — por encima del header (z-50) pero tapando el nombre y
+      // "Salir" — y se veía como una línea oscura en vez de un cartel.
+      className={`fixed top-[4.5rem] right-4 z-50 flex items-center gap-2 rounded-lg px-4 py-3 text-sm font-medium text-white shadow-lg ${
         mensaje.esError ? "bg-peligro" : "bg-neutral-900"
       }`}
     >
