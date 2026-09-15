@@ -30,7 +30,18 @@ export async function GET(request: NextRequest) {
 
   const [locales, pagos] = await Promise.all([
     prisma.store.findMany({
-      select: { estado: true, vencimiento: true, asesor: { select: { nombre: true } } },
+      orderBy: { nombre: "asc" },
+      select: {
+        nombre: true,
+        slug: true,
+        estado: true,
+        vencimiento: true,
+        titularNombre: true,
+        titularTelefono: true,
+        razonSocial: true,
+        ruc: true,
+        asesor: { select: { nombre: true } },
+      },
     }),
     prisma.pago.findMany({
       where: { fecha: { gte: rango.gte, lt: rango.lt } },
@@ -96,6 +107,29 @@ export async function GET(request: NextRequest) {
     cuenta("al_dia"),
     cuenta("suspendido"),
   ]);
+  hoja.addRow([]);
+
+  // Foto de HOY de cada local con sus datos de contacto/facturación — los
+  // mismos cuatro campos que "Editar datos" en Cartera, que hasta ahora solo
+  // se podían ver abriendo ese formulario local por local, uno por uno.
+  filaTitulo(
+    hoja,
+    ["Local", "Slug", "Estado", "Vence", "Asesor", "Titular", "Teléfono titular", "Razón social", "RUC"],
+    9
+  );
+  for (const l of locales) {
+    hoja.addRow([
+      l.nombre,
+      l.slug,
+      estadoSuscripcion(l, ahora, ZONA_NEGOCIO).etiqueta,
+      l.vencimiento ? l.vencimiento.toLocaleDateString("es-PY", opcionesFecha) : "",
+      l.asesor?.nombre ?? SIN_ASESOR,
+      l.titularNombre ?? "",
+      l.titularTelefono ?? "",
+      l.razonSocial ?? "",
+      l.ruc ?? "",
+    ]);
+  }
   hoja.addRow([]);
 
   filaTitulo(hoja, ["Locales por asesor"], 2);

@@ -28,7 +28,18 @@ export default async function ImprimirCarteraPage({
 
   const [locales, pagos] = await Promise.all([
     prisma.store.findMany({
-      select: { estado: true, vencimiento: true, asesor: { select: { nombre: true } } },
+      orderBy: { nombre: "asc" },
+      select: {
+        nombre: true,
+        slug: true,
+        estado: true,
+        vencimiento: true,
+        titularNombre: true,
+        titularTelefono: true,
+        razonSocial: true,
+        ruc: true,
+        asesor: { select: { nombre: true } },
+      },
     }),
     prisma.pago.findMany({
       where: { fecha: { gte: rango.gte, lt: rango.lt } },
@@ -95,6 +106,45 @@ export default async function ImprimirCarteraPage({
             <tr key={etiqueta} className="border-b border-linea">
               <td className="py-2 text-tinta-media">{etiqueta}</td>
               <td className="py-2 text-right font-semibold text-tinta">{valor}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+
+      {/*
+        Foto de HOY de cada local con sus datos de contacto/facturación —
+        los mismos cuatro campos que "Editar datos" en Cartera, que hasta
+        ahora solo se podían ver abriendo ese formulario local por local.
+      */}
+      <h2 className="mb-3 font-semibold text-tinta">Locales</h2>
+      <table className="mb-10 w-full border-collapse text-sm">
+        <thead>
+          <tr className="border-b border-linea text-left text-xs uppercase tracking-wide text-tinta-media">
+            <th className="py-1.5">Local</th>
+            <th className="py-1.5">Estado</th>
+            <th className="py-1.5">Vence</th>
+            <th className="py-1.5">Asesor</th>
+            <th className="py-1.5">Titular</th>
+            <th className="py-1.5">Teléfono titular</th>
+            <th className="py-1.5">Razón social</th>
+            <th className="py-1.5">RUC</th>
+          </tr>
+        </thead>
+        <tbody>
+          {locales.map((l) => (
+            <tr key={l.slug} className="border-b border-linea-fina">
+              <td className="py-1.5">{l.nombre}</td>
+              <td className="py-1.5 text-tinta-media">
+                {estadoSuscripcion(l, ahora, ZONA_NEGOCIO).etiqueta}
+              </td>
+              <td className="py-1.5 text-tinta-media">
+                {l.vencimiento ? l.vencimiento.toLocaleDateString("es-PY", opcionesFecha) : "—"}
+              </td>
+              <td className="py-1.5 text-tinta-media">{l.asesor?.nombre ?? SIN_ASESOR}</td>
+              <td className="py-1.5 text-tinta-media">{l.titularNombre ?? "—"}</td>
+              <td className="py-1.5 text-tinta-media">{l.titularTelefono ?? "—"}</td>
+              <td className="py-1.5 text-tinta-media">{l.razonSocial ?? "—"}</td>
+              <td className="py-1.5 text-tinta-media">{l.ruc ?? "—"}</td>
             </tr>
           ))}
         </tbody>
