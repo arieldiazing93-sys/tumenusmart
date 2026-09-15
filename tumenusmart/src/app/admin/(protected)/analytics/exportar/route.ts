@@ -6,27 +6,14 @@ import { calcularRangoFecha } from "@/lib/rango-fecha";
 import { calcularClientesDelRango, calcularDistribucionFrecuencia } from "@/lib/clientes-analytics";
 import { calcularProgresoFidelidad } from "@/lib/fidelidad";
 import { ZONA_NEGOCIO } from "@/lib/timezone";
+import { nuevoLibro, filaTitulo, respuestaXlsx } from "@/lib/excel-reporte";
 
 export const dynamic = "force-dynamic";
 
-function csvEscape(valor: string | number): string {
-  const texto = String(valor);
-  if (/[";\n]/.test(texto)) {
-    return `"${texto.replace(/"/g, '""')}"`;
-  }
-  return texto;
-}
-
-// Mismo separador ";" que el resto de las exportaciones del panel — ver el
-// comentario en estadisticas/exportar/route.ts sobre por qué no es ",".
-function filaCsv(valores: (string | number)[]): string {
-  return valores.map(csvEscape).join(";");
-}
-
 /**
- * CSV de Analytics: mismo criterio que estadisticas/exportar — mismo período
- * y mismos números que se ven en pantalla, para que nunca haya dudas de que
- * la planilla y el panel dicen lo mismo.
+ * XLSX de Analytics: mismo criterio que estadisticas/exportar — mismo
+ * período y mismos números que se ven en pantalla, para que nunca haya
+ * dudas de que la planilla y el panel dicen lo mismo.
  */
 export async function GET(request: NextRequest) {
   if (!(await haySesionAdminValida())) {
@@ -72,22 +59,31 @@ export async function GET(request: NextRequest) {
   };
   const periodo = `${rango.gte.toLocaleDateString("es-PY", opcionesFecha)} - ${finRangoInclusive.toLocaleDateString("es-PY", opcionesFecha)}`;
 
-  const filas: string[] = [];
+  const { libro, hoja } = nuevoLibro("Analytics");
+  hoja.columns = [
+    { width: 6 },
+    { width: 24 },
+    { width: 16 },
+    { width: 10 },
+    { width: 16 },
+    { width: 14 },
+    { width: 18 },
+  ];
 
   // Encabezado fijo en todo reporte descargable: ver el mismo comentario en
   // envios/exportar/route.ts.
-  filas.push(filaCsv(["Negocio", store?.nombre ?? ""]));
-  filas.push(filaCsv(["Reporte", "Analytics"]));
-  filas.push(filaCsv(["Período", periodo]));
-  filas.push("");
+  filaTitulo(hoja, ["Negocio", store?.nombre ?? ""], 2);
+  filaTitulo(hoja, ["Reporte", "Analytics"], 2);
+  filaTitulo(hoja, ["Período", periodo], 2);
+  hoja.addRow([]);
 
-  filas.push(filaCsv(["Pidieron 1 vez", "Pidieron 2-3 veces", "Pidieron 4 o más veces"]));
-  filas.push(filaCsv([distribucion.unaVez, distribucion.dosATres, distribucion.cuatroOMas]));
-  filas.push("");
+  filaTitulo(hoja, ["Pidieron 1 vez", "Pidieron 2-3 veces", "Pidieron 4 o más veces"], 3);
+  hoja.addRow([distribucion.unaVez, distribucion.dosATres, distribucion.cuatroOMas]);
+  hoja.addRow([]);
 
-  const encabezados = ["#", "Cliente", "Teléfono", "Pedidos", "Gasto total (Gs.)", "Último pedido"];
+  const encabezados: (string | number)[] = ["#", "Cliente", "Teléfono", "Pedidos", "Gasto total (Gs.)", "Último pedido"];
   if (fidelizacionActiva) encabezados.push(`Fidelización (de ${umbral})`);
-  filas.push(filaCsv(encabezados));
+  filaTitulo(hoja, encabezados, encabezados.length);
 
   clientes.forEach((c, i) => {
     const fila: (string | number)[] = [
@@ -101,16 +97,8 @@ export async function GET(request: NextRequest) {
     if (fidelizacionActiva) {
       fila.push(progresoFidelidad?.get(c.telefono)?.progreso ?? 0);
     }
-    filas.push(filaCsv(fila));
+    hoja.addRow(fila);
   });
 
-  // BOM al inicio para que Excel detecte UTF-8 y no rompa los acentos/ñ.
-  const csv = "﻿" + filas.join("\n");
-
-  return new NextResponse(csv, {
-    headers: {
-      "Content-Type": "text/csv; charset=utf-8",
-      "Content-Disposition": `attachment; filename="analytics_${fecha}.csv"`,
-    },
-  });
+  return respuestaXlsx(libro, `analytics_${fecha}.xlsx`);
 }

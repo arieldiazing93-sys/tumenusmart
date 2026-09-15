@@ -4,29 +4,12 @@ import { idLocalActual, localActual } from "@/lib/local-actual";
 import { calcularRangoFecha } from "@/lib/rango-fecha";
 import { calcularReporteProductosVendidos, type FilaProductoReporte } from "@/lib/reporte-productos";
 import { ZONA_NEGOCIO } from "@/lib/timezone";
+import { nuevoLibro, filaTitulo, respuestaXlsx } from "@/lib/excel-reporte";
 
 export const dynamic = "force-dynamic";
 
-function csvEscape(valor: string | number): string {
-  const texto = String(valor);
-  if (/[";\n]/.test(texto)) {
-    return `"${texto.replace(/"/g, '""')}"`;
-  }
-  return texto;
-}
-
-// Separador ";" y no ",": Excel en español usa la coma como separador
-// DECIMAL, así que un CSV separado por comas le llega como una sola columna
-// de texto en vez de una planilla — hay que abrir "Datos > Desde texto/CSV"
-// a mano para arreglarlo. Con ";" lo abre bien con solo hacer doble clic.
-function filaCsv(valores: (string | number)[]): string {
-  return valores.map(csvEscape).join(";");
-}
-
 /** "Borde relleno x1: Gs. 10.000 (costo Gs. 3.000); Extra queso x2: ..." —
- * va todo en una sola columna porque `csvEscape` la entrecomilla si hace
- * falta (tiene punto y coma adentro), así Excel no la corta en columnas de
- * más. */
+ * va todo en una sola columna. */
 function textoDetalleAgregados(detalle: FilaProductoReporte["agregadosDetalle"]): string {
   return detalle
     .map((d) => {
@@ -36,9 +19,6 @@ function textoDetalleAgregados(detalle: FilaProductoReporte["agregadosDetalle"])
     .join("; ");
 }
 
-// Genera un CSV (se abre directo en Excel, Google Sheets, Numbers, etc.), sin
-// depender de ninguna librería nueva para armar un .xlsx real.
-//
 // A diferencia del reporte en pantalla, acá la categoría va como una columna
 // más y no como un título de sección — en una fila por producto. Es la forma
 // en que sirve de verdad en una planilla: se puede ordenar, filtrar o armar
@@ -74,17 +54,31 @@ export async function GET(request: NextRequest) {
   };
   const periodo = `${rango.gte.toLocaleDateString("es-PY", opcionesFecha)} - ${finRangoInclusive.toLocaleDateString("es-PY", opcionesFecha)}`;
 
-  const filas: string[] = [];
+  const { libro, hoja } = nuevoLibro("Rentabilidad");
+  hoja.columns = [
+    { width: 18 },
+    { width: 26 },
+    { width: 16 },
+    { width: 18 },
+    { width: 14 },
+    { width: 12 },
+    { width: 16 },
+    { width: 18 },
+    { width: 18 },
+    { width: 20 },
+    { width: 50 },
+  ];
 
   // Encabezado fijo en todo reporte descargable: ver el mismo comentario en
   // envios/exportar/route.ts.
-  filas.push(filaCsv(["Negocio", local.nombre]));
-  filas.push(filaCsv(["Reporte", "Rentabilidad"]));
-  filas.push(filaCsv(["Período", periodo]));
-  filas.push("");
+  filaTitulo(hoja, ["Negocio", local.nombre], 2);
+  filaTitulo(hoja, ["Reporte", "Rentabilidad"], 2);
+  filaTitulo(hoja, ["Período", periodo], 2);
+  hoja.addRow([]);
 
-  filas.push(
-    filaCsv([
+  filaTitulo(
+    hoja,
+    [
       "Categoría",
       "Producto",
       "Cantidad vendida",
@@ -103,33 +97,33 @@ export async function GET(request: NextRequest) {
       // Cuál fue cada agregado, no solo el total — el mismo texto que ve
       // el cliente en su comprobante.
       "Detalle de agregados",
-    ])
+    ],
+    11
   );
 
   for (const cat of reporte.categorias) {
     for (const f of cat.filas) {
-      filas.push(
-        filaCsv([
-          cat.categoriaNombre,
-          f.nombre,
-          f.cantidad,
-          Math.round(f.precioVentaUnitario),
-          f.costoUnitario != null ? Math.round(f.costoUnitario) : "",
-          f.margen != null ? f.margen.toFixed(1) : "",
-          f.ganancia != null ? Math.round(f.ganancia) : "",
-          f.ventaAgregados > 0 ? Math.round(f.ventaAgregados) : "",
-          f.costoAgregados != null ? Math.round(f.costoAgregados) : "",
-          f.gananciaAgregados != null ? Math.round(f.gananciaAgregados) : "",
-          textoDetalleAgregados(f.agregadosDetalle),
-        ])
-      );
+      hoja.addRow([
+        cat.categoriaNombre,
+        f.nombre,
+        f.cantidad,
+        Math.round(f.precioVentaUnitario),
+        f.costoUnitario != null ? Math.round(f.costoUnitario) : "",
+        f.margen != null ? f.margen.toFixed(1) : "",
+        f.ganancia != null ? Math.round(f.ganancia) : "",
+        f.ventaAgregados > 0 ? Math.round(f.ventaAgregados) : "",
+        f.costoAgregados != null ? Math.round(f.costoAgregados) : "",
+        f.gananciaAgregados != null ? Math.round(f.gananciaAgregados) : "",
+        textoDetalleAgregados(f.agregadosDetalle),
+      ]);
     }
   }
 
   // Mismas 11 columnas que la tabla de arriba, no una estructura aparte —
   // así la fila de totales se lee de un vistazo, alineada con los encabezados.
-  filas.push(
-    filaCsv([
+  filaTitulo(
+    hoja,
+    [
       "",
       "TOTAL GENERAL",
       reporte.totalGeneral.cantidad,
@@ -141,25 +135,16 @@ export async function GET(request: NextRequest) {
       "",
       "",
       "",
-    ])
+    ],
+    11
   );
 
   if (reporte.totalGeneral.costoIncompleto) {
-    filas.push("");
-    filas.push(
-      filaCsv([
-        "Hay productos vendidos sin costo cargado — los totales de costo y ganancia no incluyen esas filas.",
-      ])
-    );
+    hoja.addRow([]);
+    hoja.addRow([
+      "Hay productos vendidos sin costo cargado — los totales de costo y ganancia no incluyen esas filas.",
+    ]);
   }
 
-  // BOM al inicio para que Excel detecte UTF-8 y no rompa los acentos/ñ.
-  const csv = "﻿" + filas.join("\n");
-
-  return new NextResponse(csv, {
-    headers: {
-      "Content-Type": "text/csv; charset=utf-8",
-      "Content-Disposition": `attachment; filename="rentabilidad_${fecha}.csv"`,
-    },
-  });
+  return respuestaXlsx(libro, `rentabilidad_${fecha}.xlsx`);
 }

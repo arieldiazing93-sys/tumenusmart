@@ -9,30 +9,15 @@ import {
 } from "@/lib/estadisticas";
 import { ZONA_NEGOCIO } from "@/lib/timezone";
 import { etiquetaTurno } from "@/lib/reservas";
+import { nuevoLibro, filaTitulo, respuestaXlsx } from "@/lib/excel-reporte";
 
 export const dynamic = "force-dynamic";
 
-function csvEscape(valor: string | number): string {
-  const texto = String(valor);
-  if (/[";\n]/.test(texto)) {
-    return `"${texto.replace(/"/g, '""')}"`;
-  }
-  return texto;
-}
-
-// Separador ";" y no ",": Excel en español usa la coma como separador
-// DECIMAL, así que un CSV separado por comas le llega como una sola columna
-// de texto en vez de una planilla — hay que abrir "Datos > Desde texto/CSV"
-// a mano para arreglarlo. Con ";" lo abre bien con solo hacer doble clic.
-function filaCsv(valores: (string | number)[]): string {
-  return valores.map(csvEscape).join(";");
-}
-
-// Genera un CSV (se abre directo en Excel, Google Sheets, Numbers, etc.)
-// con el mismo período y los mismos números que se ven en el panel de
-// Estadísticas — no requiere ninguna librería nueva. Los indicadores van
-// como columnas (una fila de encabezados + una fila de valores), que es
-// como se lee mejor una tabla en una planilla.
+// Genera un XLSX real (con color de fondo en las filas de título, algo que
+// un CSV no puede llevar) con el mismo período y los mismos números que se
+// ven en el panel de Estadísticas. Los indicadores van como columnas (una
+// fila de encabezados + una fila de valores), que es como se lee mejor una
+// tabla en una planilla.
 export async function GET(request: NextRequest) {
   // Una ruta de API no pasa por el layout del panel, así que tiene que
   // verificar la sesión por su cuenta. Sin esto, cualquiera que se inventara
@@ -67,18 +52,30 @@ export async function GET(request: NextRequest) {
   };
   const periodo = `${rango.gte.toLocaleDateString("es-PY", opcionesFecha)} - ${finRangoInclusive.toLocaleDateString("es-PY", opcionesFecha)}`;
 
-  const filas: string[] = [];
+  const { libro, hoja } = nuevoLibro("Estadísticas");
+  hoja.columns = [
+    { width: 22 },
+    { width: 20 },
+    { width: 16 },
+    { width: 20 },
+    { width: 14 },
+    { width: 14 },
+    { width: 14 },
+    { width: 14 },
+    { width: 14 },
+  ];
 
   // Encabezado fijo en todo reporte descargable: al abrirlo meses después,
   // o si alguien lo reenvía por WhatsApp, tiene que quedar claro de qué
   // negocio y de qué reporte salió sin tener que preguntarle a nadie.
-  filas.push(filaCsv(["Negocio", stats.store?.nombre ?? ""]));
-  filas.push(filaCsv(["Reporte", "Estadísticas"]));
-  filas.push(filaCsv(["Período", periodo]));
-  filas.push("");
+  filaTitulo(hoja, ["Negocio", stats.store?.nombre ?? ""], 2);
+  filaTitulo(hoja, ["Reporte", "Estadísticas"], 2);
+  filaTitulo(hoja, ["Período", periodo], 2);
+  hoja.addRow([]);
 
-  filas.push(
-    filaCsv([
+  filaTitulo(
+    hoja,
+    [
       "Ingresos (Gs.)",
       "Pedidos totales",
       "Pedidos válidos",
@@ -88,60 +85,52 @@ export async function GET(request: NextRequest) {
       "Productos por pedido",
       "Clientes nuevos",
       "Cancelados",
-    ])
+    ],
+    9
   );
-  filas.push(
-    filaCsv([
-      Math.round(stats.ingresos),
-      stats.pedidosTotales,
-      stats.pedidosValidos,
-      Math.round(stats.ticketPromedio),
-      stats.clientesUnicos,
-      stats.unidadesVendidas,
-      stats.productosPorPedido.toFixed(2),
-      stats.clientesNuevos,
-      stats.cancelados,
-    ])
-  );
+  hoja.addRow([
+    Math.round(stats.ingresos),
+    stats.pedidosTotales,
+    stats.pedidosValidos,
+    Math.round(stats.ticketPromedio),
+    stats.clientesUnicos,
+    stats.unidadesVendidas,
+    stats.productosPorPedido.toFixed(2),
+    stats.clientesNuevos,
+    stats.cancelados,
+  ]);
 
-  filas.push("");
-  filas.push(filaCsv(["Fecha", "Ventas (Gs.)"]));
+  hoja.addRow([]);
+  filaTitulo(hoja, ["Fecha", "Ventas (Gs.)"], 2);
   for (const d of stats.dias) {
     const clave = claveDia(d);
-    filas.push(filaCsv([clave, Math.round(stats.totalesPorDia.get(clave) ?? 0)]));
+    hoja.addRow([clave, Math.round(stats.totalesPorDia.get(clave) ?? 0)]);
   }
 
-  filas.push("");
-  filas.push(filaCsv(["Tipo de entrega", "Pedidos", "Ingresos (Gs.)"]));
-  filas.push(filaCsv(["Delivery", stats.porTipoEntrega.delivery.cantidad, Math.round(stats.porTipoEntrega.delivery.ingresos)]));
-  filas.push(filaCsv(["Retiro en el local", stats.porTipoEntrega.retiro.cantidad, Math.round(stats.porTipoEntrega.retiro.ingresos)]));
-  filas.push(filaCsv(["Comer en el local", stats.porTipoEntrega.mesa.cantidad, Math.round(stats.porTipoEntrega.mesa.ingresos)]));
+  hoja.addRow([]);
+  filaTitulo(hoja, ["Tipo de entrega", "Pedidos", "Ingresos (Gs.)"], 3);
+  hoja.addRow(["Delivery", stats.porTipoEntrega.delivery.cantidad, Math.round(stats.porTipoEntrega.delivery.ingresos)]);
+  hoja.addRow(["Retiro en el local", stats.porTipoEntrega.retiro.cantidad, Math.round(stats.porTipoEntrega.retiro.ingresos)]);
+  hoja.addRow(["Comer en el local", stats.porTipoEntrega.mesa.cantidad, Math.round(stats.porTipoEntrega.mesa.ingresos)]);
 
-  filas.push("");
-  filas.push(filaCsv(["Puesto", "Producto", "Unidades", "Facturación (Gs.)", "% de unidades"]));
+  hoja.addRow([]);
+  filaTitulo(hoja, ["Puesto", "Producto", "Unidades", "Facturación (Gs.)", "% de unidades"], 5);
   ranking.masVendidos.forEach((fila, i) => {
-    filas.push(
-      filaCsv([
-        i + 1,
-        fila.nombre,
-        fila.unidades,
-        Math.round(fila.facturacion),
-        fila.porcentaje.toFixed(1),
-      ])
-    );
+    hoja.addRow([i + 1, fila.nombre, fila.unidades, Math.round(fila.facturacion), fila.porcentaje.toFixed(1)]);
   });
 
   if (ranking.sinVentas.length > 0) {
-    filas.push("");
-    filas.push(filaCsv(["Productos sin ventas en el período"]));
+    hoja.addRow([]);
+    filaTitulo(hoja, ["Productos sin ventas en el período"], 1);
     for (const nombre of ranking.sinVentas) {
-      filas.push(filaCsv([nombre]));
+      hoja.addRow([nombre]);
     }
   }
 
-  filas.push("");
-  filas.push(
-    filaCsv([
+  hoja.addRow([]);
+  filaTitulo(
+    hoja,
+    [
       "Reservas totales",
       "Personas esperadas",
       "Confirmadas",
@@ -150,35 +139,26 @@ export async function GET(request: NextRequest) {
       `Turno ${etiquetaTurno("dia")}`,
       `Turno ${etiquetaTurno("tarde")}`,
       `Turno ${etiquetaTurno("noche")}`,
-    ])
+    ],
+    8
   );
-  filas.push(
-    filaCsv([
-      statsReservas.total,
-      statsReservas.personasTotales,
-      statsReservas.porEstado.confirmada,
-      statsReservas.porEstado.pendiente,
-      statsReservas.porEstado.cancelada,
-      statsReservas.porTurno.dia,
-      statsReservas.porTurno.tarde,
-      statsReservas.porTurno.noche,
-    ])
-  );
+  hoja.addRow([
+    statsReservas.total,
+    statsReservas.personasTotales,
+    statsReservas.porEstado.confirmada,
+    statsReservas.porEstado.pendiente,
+    statsReservas.porEstado.cancelada,
+    statsReservas.porTurno.dia,
+    statsReservas.porTurno.tarde,
+    statsReservas.porTurno.noche,
+  ]);
 
-  filas.push("");
-  filas.push(filaCsv(["Fecha", "Reservas"]));
+  hoja.addRow([]);
+  filaTitulo(hoja, ["Fecha", "Reservas"], 2);
   for (const d of statsReservas.dias) {
     const clave = claveDia(d);
-    filas.push(filaCsv([clave, statsReservas.totalesPorDia.get(clave) ?? 0]));
+    hoja.addRow([clave, statsReservas.totalesPorDia.get(clave) ?? 0]);
   }
 
-  // BOM al inicio para que Excel detecte UTF-8 y no rompa los acentos/ñ.
-  const csv = "﻿" + filas.join("\n");
-
-  return new NextResponse(csv, {
-    headers: {
-      "Content-Type": "text/csv; charset=utf-8",
-      "Content-Disposition": `attachment; filename="estadisticas_${fecha}.csv"`,
-    },
-  });
+  return respuestaXlsx(libro, `estadisticas_${fecha}.xlsx`);
 }

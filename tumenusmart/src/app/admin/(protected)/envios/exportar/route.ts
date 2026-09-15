@@ -4,24 +4,9 @@ import { idLocalActual, localActual } from "@/lib/local-actual";
 import { calcularRangoFecha } from "@/lib/rango-fecha";
 import { calcularReporteEnvios } from "@/lib/reporte-envios";
 import { ZONA_NEGOCIO } from "@/lib/timezone";
+import { nuevoLibro, filaTitulo, respuestaXlsx } from "@/lib/excel-reporte";
 
 export const dynamic = "force-dynamic";
-
-function csvEscape(valor: string | number): string {
-  const texto = String(valor);
-  if (/[";\n]/.test(texto)) {
-    return `"${texto.replace(/"/g, '""')}"`;
-  }
-  return texto;
-}
-
-// Separador ";" y no ",": Excel en español usa la coma como separador
-// DECIMAL, así que un CSV separado por comas le llega como una sola columna
-// de texto en vez de una planilla — hay que abrir "Datos > Desde texto/CSV"
-// a mano para arreglarlo. Con ";" lo abre bien con solo hacer doble clic.
-function filaCsv(valores: (string | number)[]): string {
-  return valores.map(csvEscape).join(";");
-}
 
 export async function GET(request: NextRequest) {
   // Ruta de API: no pasa por el layout del panel, así que valida la sesión
@@ -52,21 +37,31 @@ export async function GET(request: NextRequest) {
   };
   const periodo = `${rango.gte.toLocaleDateString("es-PY", opcionesFecha)} - ${finRangoInclusive.toLocaleDateString("es-PY", opcionesFecha)}`;
 
-  const filas: string[] = [];
+  const { libro, hoja } = nuevoLibro("Envíos");
+  hoja.columns = [
+    { width: 20 },
+    { width: 20 },
+    { width: 18 },
+    { width: 14 },
+    { width: 16 },
+    { width: 18 },
+    { width: 18 },
+  ];
 
   // Encabezado fijo en todo reporte descargable: al abrirlo meses después,
   // o si alguien lo reenvía por WhatsApp, tiene que quedar claro de qué
   // negocio y de qué reporte salió sin tener que preguntarle a nadie.
-  filas.push(filaCsv(["Negocio", local.nombre]));
-  filas.push(filaCsv(["Reporte", "Envíos"]));
-  filas.push(filaCsv(["Período", periodo]));
-  filas.push("");
+  filaTitulo(hoja, ["Negocio", local.nombre], 2);
+  filaTitulo(hoja, ["Reporte", "Envíos"], 2);
+  filaTitulo(hoja, ["Período", periodo], 2);
+  hoja.addRow([]);
 
   // Una fila por zona y, debajo de cada una, una fila por repartidor que
   // hizo envíos ahí — la columna "Zona" queda vacía en esas para que se
   // lean como parte de la de arriba al ordenar o filtrar en la planilla.
-  filas.push(
-    filaCsv([
+  filaTitulo(
+    hoja,
+    [
       "Zona",
       "Repartidor",
       "Cantidad de pedidos",
@@ -74,34 +69,40 @@ export async function GET(request: NextRequest) {
       "Facturado (Gs.)",
       "Cobrado por envío (Gs.)",
       "Envío promedio (Gs.)",
-    ])
+    ],
+    7
   );
 
   const cantidadDelivery = reporte.totalGeneral.cantidadDelivery;
   for (const z of reporte.zonas) {
-    filas.push(
-      filaCsv([
-        z.zonaNombre,
-        "",
-        z.cantidadPedidos,
-        cantidadDelivery > 0 ? Math.round((z.cantidadPedidos / cantidadDelivery) * 100) : 0,
-        Math.round(z.totalFacturado),
-        Math.round(z.totalEnvio),
-        Math.round(z.envioPromedio),
-      ])
-    );
+    hoja.addRow([
+      z.zonaNombre,
+      "",
+      z.cantidadPedidos,
+      cantidadDelivery > 0 ? Math.round((z.cantidadPedidos / cantidadDelivery) * 100) : 0,
+      Math.round(z.totalFacturado),
+      Math.round(z.totalEnvio),
+      Math.round(z.envioPromedio),
+    ]);
     for (const r of z.repartidores) {
-      filas.push(filaCsv(["", r.repartidorNombre, r.cantidadPedidos, "", "", "", ""]));
+      hoja.addRow(["", r.repartidorNombre, r.cantidadPedidos, "", "", "", ""]);
     }
   }
 
-  filas.push(
-    filaCsv(["Retiro en el local", "", reporte.retiro.cantidadPedidos, "", Math.round(reporte.retiro.totalFacturado), "", ""])
-  );
+  hoja.addRow([
+    "Retiro en el local",
+    "",
+    reporte.retiro.cantidadPedidos,
+    "",
+    Math.round(reporte.retiro.totalFacturado),
+    "",
+    "",
+  ]);
 
-  filas.push("");
-  filas.push(
-    filaCsv([
+  hoja.addRow([]);
+  filaTitulo(
+    hoja,
+    [
       "TOTAL GENERAL",
       "",
       reporte.totalGeneral.cantidadPedidos,
@@ -109,16 +110,9 @@ export async function GET(request: NextRequest) {
       Math.round(reporte.totalGeneral.totalFacturado),
       Math.round(reporte.totalGeneral.totalEnvio),
       "",
-    ])
+    ],
+    7
   );
 
-  // BOM al inicio para que Excel detecte UTF-8 y no rompa los acentos/ñ.
-  const csv = "﻿" + filas.join("\n");
-
-  return new NextResponse(csv, {
-    headers: {
-      "Content-Type": "text/csv; charset=utf-8",
-      "Content-Disposition": `attachment; filename="envios_${fecha}.csv"`,
-    },
-  });
+  return respuestaXlsx(libro, `envios_${fecha}.xlsx`);
 }

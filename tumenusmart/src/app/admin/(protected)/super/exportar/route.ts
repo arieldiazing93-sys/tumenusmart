@@ -4,23 +4,9 @@ import { prisma } from "@/lib/prisma";
 import { calcularRangoFecha } from "@/lib/rango-fecha";
 import { estadoSuscripcion, type EstadoSuscripcion } from "@/lib/suscripcion";
 import { ZONA_NEGOCIO } from "@/lib/timezone";
+import { nuevoLibro, filaTitulo, respuestaXlsx } from "@/lib/excel-reporte";
 
 export const dynamic = "force-dynamic";
-
-function csvEscape(valor: string | number): string {
-  const texto = String(valor);
-  if (/[";\n]/.test(texto)) {
-    return `"${texto.replace(/"/g, '""')}"`;
-  }
-  return texto;
-}
-
-// Separador ";" y no ",": ver el mismo comentario en el resto de los
-// reportes del panel (estadisticas/exportar, envios/exportar, etc.) — con
-// "," Excel en español lo abre como una sola columna de texto.
-function filaCsv(valores: (string | number)[]): string {
-  return valores.map(csvEscape).join(";");
-}
 
 /**
  * A diferencia del resto de los reportes del panel, este no es de un local:
@@ -85,34 +71,51 @@ export async function GET(request: NextRequest) {
   };
   const periodo = `${rango.gte.toLocaleDateString("es-PY", opcionesFecha)} - ${finRangoInclusive.toLocaleDateString("es-PY", opcionesFecha)}`;
 
-  const filas: string[] = [];
+  const { libro, hoja } = nuevoLibro("Cartera");
+  hoja.columns = [
+    { width: 22 },
+    { width: 16 },
+    { width: 16 },
+    { width: 14 },
+    { width: 10 },
+    { width: 14 },
+    { width: 24 },
+    { width: 26 },
+    { width: 14 },
+  ];
 
-  filas.push(filaCsv(["Reporte", "Cartera de locales"]));
-  filas.push(filaCsv(["Período", periodo]));
-  filas.push("");
+  filaTitulo(hoja, ["Reporte", "Cartera de locales"], 2);
+  filaTitulo(hoja, ["Período", periodo], 2);
+  hoja.addRow([]);
 
-  filas.push(filaCsv(["Locales totales", "Vencidos", "Por vencer", "Al día", "Suspendidos"]));
-  filas.push(
-    filaCsv([locales.length, cuenta("vencido"), cuenta("por_vencer"), cuenta("al_dia"), cuenta("suspendido")])
-  );
-  filas.push("");
+  filaTitulo(hoja, ["Locales totales", "Vencidos", "Por vencer", "Al día", "Suspendidos"], 5);
+  hoja.addRow([
+    locales.length,
+    cuenta("vencido"),
+    cuenta("por_vencer"),
+    cuenta("al_dia"),
+    cuenta("suspendido"),
+  ]);
+  hoja.addRow([]);
 
-  filas.push(filaCsv(["Locales por asesor"]));
-  filas.push(filaCsv(["Asesor", "Locales"]));
+  filaTitulo(hoja, ["Locales por asesor"], 2);
+  filaTitulo(hoja, ["Asesor", "Locales"], 2);
   for (const [nombre, cantidad] of [...localesPorAsesor].sort((a, b) => b[1] - a[1])) {
-    filas.push(filaCsv([nombre, cantidad]));
+    hoja.addRow([nombre, cantidad]);
   }
-  filas.push("");
+  hoja.addRow([]);
 
-  filas.push(filaCsv(["Recaudado en el período por asesor"]));
-  filas.push(filaCsv(["Asesor", "Monto (Gs.)"]));
+  filaTitulo(hoja, ["Recaudado en el período por asesor"], 2);
+  filaTitulo(hoja, ["Asesor", "Monto (Gs.)"], 2);
   for (const [nombre, monto] of [...recaudadoPorAsesor].sort((a, b) => b[1] - a[1])) {
-    filas.push(filaCsv([nombre, Math.round(monto)]));
+    const fila = hoja.addRow([nombre, Math.round(monto)]);
+    fila.getCell(2).numFmt = "#,##0";
   }
-  filas.push("");
+  hoja.addRow([]);
 
-  filas.push(
-    filaCsv([
+  filaTitulo(
+    hoja,
+    [
       "Local",
       "Slug",
       "Asesor",
@@ -122,41 +125,38 @@ export async function GET(request: NextRequest) {
       "Nota",
       "Registrado por",
       "Fecha del pago",
-    ])
+    ],
+    9
   );
   let totalRecaudado = 0;
   for (const p of pagos) {
     totalRecaudado += Number(p.monto);
-    filas.push(
-      filaCsv([
-        p.store.nombre,
-        p.store.slug,
-        p.store.asesor?.nombre ?? SIN_ASESOR,
-        Math.round(Number(p.monto)),
-        p.meses,
-        p.cubreHasta.toLocaleDateString("es-PY", opcionesFecha),
-        p.nota ?? "",
-        p.registradoPor ?? "",
-        p.fecha.toLocaleDateString("es-PY", opcionesFecha),
-      ])
-    );
+    const fila = hoja.addRow([
+      p.store.nombre,
+      p.store.slug,
+      p.store.asesor?.nombre ?? SIN_ASESOR,
+      Math.round(Number(p.monto)),
+      p.meses,
+      p.cubreHasta.toLocaleDateString("es-PY", opcionesFecha),
+      p.nota ?? "",
+      p.registradoPor ?? "",
+      p.fecha.toLocaleDateString("es-PY", opcionesFecha),
+    ]);
+    fila.getCell(4).numFmt = "#,##0";
   }
 
-  filas.push("");
-  filas.push(filaCsv(["TOTAL RECAUDADO EN EL PERÍODO (Gs.)", Math.round(totalRecaudado)]));
+  hoja.addRow([]);
+  const filaTotal = filaTitulo(
+    hoja,
+    ["TOTAL RECAUDADO EN EL PERÍODO (Gs.)", Math.round(totalRecaudado)],
+    2
+  );
+  filaTotal.getCell(2).numFmt = "#,##0";
 
   if (pagos.length === 0) {
-    filas.push("");
-    filas.push(filaCsv(["No se registraron pagos en este período."]));
+    hoja.addRow([]);
+    hoja.addRow(["No se registraron pagos en este período."]);
   }
 
-  // BOM al inicio para que Excel detecte UTF-8 y no rompa los acentos/ñ.
-  const csv = "﻿" + filas.join("\n");
-
-  return new NextResponse(csv, {
-    headers: {
-      "Content-Type": "text/csv; charset=utf-8",
-      "Content-Disposition": `attachment; filename="cartera_${fecha}.csv"`,
-    },
-  });
+  return respuestaXlsx(libro, `cartera_${fecha}.xlsx`);
 }
