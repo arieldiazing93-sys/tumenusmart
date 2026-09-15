@@ -1,21 +1,30 @@
 "use client";
 
-import { useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { clasesBoton } from "@/components/ui";
 import { crearHorario } from "../actions";
 
 export function CrearHorarioForm({ turno, turnoLabel }: { turno: string; turnoLabel: string }) {
   const [pendiente, iniciar] = useTransition();
+  const [agregado, setAgregado] = useState(false);
+  const formRef = useRef<HTMLFormElement>(null);
 
   function alCrear(formData: FormData) {
     iniciar(async () => {
       const resultado = await crearHorario(formData);
-      if (!resultado.ok) alert(resultado.error);
+      if (!resultado.ok) {
+        alert(resultado.error);
+        return;
+      }
+      formRef.current?.reset();
+      setAgregado(true);
+      setTimeout(() => setAgregado(false), 2500);
     });
   }
 
   return (
     <form
+      ref={formRef}
       action={alCrear}
       className="flex flex-wrap items-center gap-2 bg-papel-suave/60 px-4 py-3"
     >
@@ -38,6 +47,7 @@ export function CrearHorarioForm({ turno, turnoLabel }: { turno: string; turnoLa
       <button type="submit" disabled={pendiente} className={clasesBoton("principal", "sm")}>
         Agregar horario
       </button>
+      {agregado && <span className="text-xs font-medium text-exito">✓ Agregado</span>}
     </form>
   );
 }

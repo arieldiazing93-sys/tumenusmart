@@ -19,13 +19,19 @@ export function EditarPrecioExtraOpcion({
 }) {
   const [pendiente, iniciar] = useTransition();
   const [valor, setValor] = useState(String(precioActual));
+  const [guardado, setGuardado] = useState(false);
 
   function guardar() {
     iniciar(async () => {
       const datos = new FormData();
       datos.set("precioExtra", valor);
       const resultado = await actualizarPrecioExtraOpcion(productId, optionId, datos);
-      if (!resultado.ok) alert(resultado.error);
+      if (!resultado.ok) {
+        alert(resultado.error);
+        return;
+      }
+      setGuardado(true);
+      setTimeout(() => setGuardado(false), 2500);
     });
   }
 
@@ -49,6 +55,7 @@ export function EditarPrecioExtraOpcion({
       >
         Guardar
       </button>
+      {guardado && <span className="text-xs font-medium text-exito">✓</span>}
     </span>
   );
 }

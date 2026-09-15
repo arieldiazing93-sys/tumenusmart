@@ -110,6 +110,7 @@ export async function guardarFidelizacion(formData: FormData): Promise<void> {
   });
   refrescarPantallas();
   revalidatePath("/admin/analytics");
+  redirect("/admin/configuracion?guardado=1");
 }
 
 /**
@@ -259,6 +260,7 @@ export async function guardarEnvioUbicacion(formData: FormData): Promise<void> {
     },
   });
   refrescarPantallas();
+  redirect("/admin/configuracion?guardado=1");
 }
 
 export type ResultadoZona = { ok: true } | { ok: false; error: string };

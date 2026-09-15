@@ -28,6 +28,7 @@ export function ZonaFila({
   const [radioEditado, setRadioEditado] = useState(String(radioKm));
   const [costoEditado, setCostoEditado] = useState(String(costoEnvio));
   const [error, setError] = useState<string | null>(null);
+  const [guardado, setGuardado] = useState(false);
 
   function cancelar() {
     setNombreEditado(nombre);
@@ -50,6 +51,8 @@ export function ZonaFila({
         return;
       }
       setEditando(false);
+      setGuardado(true);
+      setTimeout(() => setGuardado(false), 3000);
     });
   }
 
@@ -136,6 +139,7 @@ export function ZonaFila({
       </span>
 
       <div className="flex items-center gap-4">
+        {guardado && <span className="text-xs font-medium text-exito">✓ Guardado</span>}
         <span className="text-sm text-tinta-media">{formatearGuarani(costoEnvio)}</span>
         <button
           type="button"

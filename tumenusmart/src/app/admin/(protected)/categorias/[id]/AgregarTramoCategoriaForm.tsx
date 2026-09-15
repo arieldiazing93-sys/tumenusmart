@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { agregarTramoCategoria } from "../actions";
 
 export function AgregarTramoCategoriaForm({
@@ -14,6 +14,8 @@ export function AgregarTramoCategoriaForm({
 }) {
   const [pendiente, iniciar] = useTransition();
   const [todoElDia, setTodoElDia] = useState(false);
+  const [agregado, setAgregado] = useState(false);
+  const formRef = useRef<HTMLFormElement>(null);
 
   function alAgregar(formData: FormData) {
     if (todoElDia) {
@@ -22,12 +24,19 @@ export function AgregarTramoCategoriaForm({
     }
     iniciar(async () => {
       const resultado = await agregarTramoCategoria(categoryId, formData);
-      if (!resultado.ok) alert(resultado.error);
+      if (!resultado.ok) {
+        alert(resultado.error);
+        return;
+      }
+      formRef.current?.reset();
+      setTodoElDia(false);
+      setAgregado(true);
+      setTimeout(() => setAgregado(false), 2500);
     });
   }
 
   return (
-    <form action={alAgregar} className="flex w-full flex-none flex-col gap-1.5 sm:w-64">
+    <form ref={formRef} action={alAgregar} className="flex w-full flex-none flex-col gap-1.5 sm:w-64">
       <input type="hidden" name="diaSemana" value={dia} />
       <label className="flex items-center gap-1.5 text-xs text-tinta-media">
         <input
@@ -66,6 +75,7 @@ export function AgregarTramoCategoriaForm({
           {todoElDia ? "Bloquear día" : "+"}
         </button>
       </div>
+      {agregado && <span className="text-xs font-medium text-exito">✓ Agregado</span>}
     </form>
   );
 }

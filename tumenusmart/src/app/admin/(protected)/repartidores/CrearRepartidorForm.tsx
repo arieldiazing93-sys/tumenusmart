@@ -1,21 +1,29 @@
 "use client";
 
-import { useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { clasesBoton } from "@/components/ui";
 import { crearRepartidor } from "./actions";
 
 export function CrearRepartidorForm() {
   const [pendiente, iniciar] = useTransition();
+  const [agregado, setAgregado] = useState(false);
+  const formRef = useRef<HTMLFormElement>(null);
 
   function alCrear(formData: FormData) {
     iniciar(async () => {
       const resultado = await crearRepartidor(formData);
-      if (!resultado.ok) alert(resultado.error);
+      if (!resultado.ok) {
+        alert(resultado.error);
+        return;
+      }
+      formRef.current?.reset();
+      setAgregado(true);
+      setTimeout(() => setAgregado(false), 2500);
     });
   }
 
   return (
-    <form action={alCrear} className="mb-6 flex flex-wrap gap-2">
+    <form ref={formRef} action={alCrear} className="mb-6 flex flex-wrap items-center gap-2">
       <input
         name="nombre"
         required
@@ -30,6 +38,7 @@ export function CrearRepartidorForm() {
       <button type="submit" disabled={pendiente} className={clasesBoton("principal")}>
         Agregar
       </button>
+      {agregado && <span className="text-xs font-medium text-exito">✓ Agregado</span>}
     </form>
   );
 }

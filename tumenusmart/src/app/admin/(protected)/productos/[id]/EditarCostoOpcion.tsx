@@ -19,13 +19,19 @@ export function EditarCostoOpcion({
 }) {
   const [pendiente, iniciar] = useTransition();
   const [valor, setValor] = useState(costoActual != null ? String(costoActual) : "");
+  const [guardado, setGuardado] = useState(false);
 
   function guardar() {
     iniciar(async () => {
       const datos = new FormData();
       datos.set("costo", valor);
       const resultado = await actualizarCostoOpcion(productId, optionId, datos);
-      if (!resultado.ok) alert(resultado.error);
+      if (!resultado.ok) {
+        alert(resultado.error);
+        return;
+      }
+      setGuardado(true);
+      setTimeout(() => setGuardado(false), 2500);
     });
   }
 
@@ -49,6 +55,7 @@ export function EditarCostoOpcion({
       >
         Guardar
       </button>
+      {guardado && <span className="text-xs font-medium text-exito">✓</span>}
     </span>
   );
 }

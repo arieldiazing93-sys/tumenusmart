@@ -1,20 +1,28 @@
 "use client";
 
-import { useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { agregarOpcion } from "../actions";
 
 export function AgregarOpcionForm({ productId }: { productId: string }) {
   const [pendiente, iniciar] = useTransition();
+  const [agregado, setAgregado] = useState(false);
+  const formRef = useRef<HTMLFormElement>(null);
 
   function alAgregar(formData: FormData) {
     iniciar(async () => {
       const resultado = await agregarOpcion(productId, formData);
-      if (!resultado.ok) alert(resultado.error);
+      if (!resultado.ok) {
+        alert(resultado.error);
+        return;
+      }
+      formRef.current?.reset();
+      setAgregado(true);
+      setTimeout(() => setAgregado(false), 2500);
     });
   }
 
   return (
-    <form action={alAgregar} className="flex flex-wrap items-end gap-2">
+    <form ref={formRef} action={alAgregar} className="flex flex-wrap items-end gap-2">
       <input
         name="nombre"
         required
@@ -46,6 +54,7 @@ export function AgregarOpcionForm({ productId }: { productId: string }) {
       >
         Agregar
       </button>
+      {agregado && <span className="text-xs font-medium text-exito">✓ Agregado</span>}
     </form>
   );
 }
