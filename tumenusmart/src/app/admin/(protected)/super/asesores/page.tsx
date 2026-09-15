@@ -28,13 +28,11 @@ export default async function AsesoresPage() {
         bajada="Tu equipo de ventas. Cada local se le puede asignar a uno al darlo de alta desde Cartera."
       />
 
-      {/* Mismo botón-acordeón que "Dar de alta un local nuevo" en Cartera. */}
-      <details className="group mb-6 overflow-hidden rounded-lg border border-linea bg-white">
-        <summary className="flex cursor-pointer list-none items-center justify-between gap-2 bg-brand px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-brand-dark">
-          <span className="flex items-center gap-1.5">
-            <span aria-hidden="true">+</span>
-            Dar de alta un asesor nuevo
-          </span>
+      {/* Mismo botón corto y verde que "Dar de alta un local nuevo" en Cartera. */}
+      <details className="group mb-6">
+        <summary className="inline-flex cursor-pointer list-none items-center gap-1.5 rounded-lg border border-exito/30 bg-exito-luz px-3 py-1.5 text-sm font-medium text-exito transition-colors hover:bg-exito hover:text-white">
+          <span aria-hidden="true">+</span>
+          Dar de alta un asesor nuevo
           <span
             aria-hidden="true"
             className="text-xs transition-transform duration-150 group-open:rotate-180"
@@ -42,7 +40,7 @@ export default async function AsesoresPage() {
             ▼
           </span>
         </summary>
-        <div className="border-t border-linea p-4">
+        <div className="mt-3 rounded-lg border border-linea bg-white p-4">
           <AltaAsesor />
         </div>
       </details>

@@ -304,17 +304,14 @@ export default async function SuperPage({
       </div>
 
       {/*
-        "group" + "list-none" para poder dibujar nuestra propia flechita en
-        vez de la que pone el navegador, y "overflow-hidden" en el <details>
-        para que el fondo de color del <summary> respete las esquinas
-        redondeadas del contenedor en vez de sobresalir en las puntas.
+        Botón corto y verde, no la barra ancha de antes: esto se abre una
+        vez cada tanto (dar de alta un cliente nuevo), no tiene que dominar
+        la pantalla que se mira todos los días. Verde porque es "agregar".
       */}
-      <details className="group mb-6 overflow-hidden rounded-lg border border-linea bg-white">
-        <summary className="flex cursor-pointer list-none items-center justify-between gap-2 bg-brand px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-brand-dark">
-          <span className="flex items-center gap-1.5">
-            <span aria-hidden="true">+</span>
-            Dar de alta un local nuevo
-          </span>
+      <details className="group mb-6">
+        <summary className="inline-flex cursor-pointer list-none items-center gap-1.5 rounded-lg border border-exito/30 bg-exito-luz px-3 py-1.5 text-sm font-medium text-exito transition-colors hover:bg-exito hover:text-white">
+          <span aria-hidden="true">+</span>
+          Dar de alta un local nuevo
           <span
             aria-hidden="true"
             className="text-xs transition-transform duration-150 group-open:rotate-180"
@@ -322,7 +319,7 @@ export default async function SuperPage({
             ▼
           </span>
         </summary>
-        <div className="border-t border-linea p-4">
+        <div className="mt-3 rounded-lg border border-linea bg-white p-4">
           <AltaLocal dominio={dominio} asesores={asesoresActivos} />
         </div>
       </details>
