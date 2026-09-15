@@ -402,6 +402,10 @@ export default async function SuperPage({
                       nombre={f.local.nombre}
                       suspendidoAMano={f.local.estado === "suspendido"}
                       linkRecordatorio={link}
+                      titularNombre={f.local.titularNombre}
+                      titularTelefono={f.local.titularTelefono}
+                      razonSocial={f.local.razonSocial}
+                      ruc={f.local.ruc}
                     />
                   </div>
                 );

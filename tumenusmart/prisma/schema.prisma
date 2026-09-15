@@ -84,6 +84,16 @@ model Store {
   asesorId       String?
   asesor         Asesor?   @relation(fields: [asesorId], references: [id])
 
+  // --- Datos del titular ---
+  // Para uso interno de TuMenuSmart (facturación, contacto directo con el
+  // dueño real) — no lo ve el cliente ni el propio local en su panel. Los
+  // cuatro son opcionales: se cargan si se tienen a mano al dar de alta, o
+  // se completan/editan después desde Cartera.
+  titularNombre   String?
+  titularTelefono String?
+  razonSocial     String?
+  ruc             String?
+
   // --- Numeración propia de cada local ---
   // Así cada negocio ve sus pedidos desde el #0001 en vez de heredar un
   // contador global compartido con el resto. Se incrementan de a uno en

@@ -2,7 +2,7 @@
 
 import { clasesBoton } from "@/components/ui";
 import { useState, useTransition } from "react";
-import { alternarSuspension, registrarPago } from "./actions";
+import { actualizarDatosTitular, alternarSuspension, registrarPago } from "./actions";
 
 const CAMPO =
   "rounded-lg border border-linea px-2 py-1 text-sm focus:border-brand focus:outline-none";
@@ -12,15 +12,24 @@ export function AccionesLocal({
   nombre,
   suspendidoAMano,
   linkRecordatorio,
+  titularNombre,
+  titularTelefono,
+  razonSocial,
+  ruc,
 }: {
   storeId: string;
   nombre: string;
   suspendidoAMano: boolean;
   /** Enlace de WhatsApp con el mensaje ya escrito, o null si no hay número. */
   linkRecordatorio: string | null;
+  titularNombre: string | null;
+  titularTelefono: string | null;
+  razonSocial: string | null;
+  ruc: string | null;
 }) {
   const [pendiente, iniciar] = useTransition();
   const [cobrando, setCobrando] = useState(false);
+  const [editandoDatos, setEditandoDatos] = useState(false);
   const [aviso, setAviso] = useState<string | null>(null);
 
   function correr(
@@ -36,6 +45,7 @@ export function AccionesLocal({
       }
       if (exito) setAviso(exito);
       setCobrando(false);
+      setEditandoDatos(false);
     });
   }
 
@@ -45,7 +55,10 @@ export function AccionesLocal({
         <button
           type="button"
           disabled={pendiente}
-          onClick={() => setCobrando((v) => !v)}
+          onClick={() => {
+            setCobrando((v) => !v);
+            setEditandoDatos(false);
+          }}
           className={clasesBoton("principal", "sm")}
         >
           Registrar pago
@@ -85,6 +98,18 @@ export function AccionesLocal({
           }
         >
           {suspendidoAMano ? "Reactivar" : "Suspender"}
+        </button>
+
+        <button
+          type="button"
+          disabled={pendiente}
+          onClick={() => {
+            setEditandoDatos((v) => !v);
+            setCobrando(false);
+          }}
+          className="rounded-lg border border-linea bg-white px-3 py-1.5 text-sm font-medium text-tinta-media transition-colors hover:border-brand hover:text-brand disabled:opacity-50"
+        >
+          Editar datos
         </button>
       </div>
 
@@ -137,6 +162,74 @@ export function AccionesLocal({
             disabled={pendiente}
             onClick={() => {
               setCobrando(false);
+              setAviso(null);
+            }}
+            className="rounded-lg border border-linea bg-white px-3 py-1.5 text-sm font-medium text-tinta-media transition-colors hover:border-brand hover:text-brand disabled:opacity-50"
+          >
+            Cancelar
+          </button>
+        </form>
+      )}
+
+      {editandoDatos && (
+        <form
+          action={(datos) =>
+            correr(() => actualizarDatosTitular(storeId, datos), "Datos actualizados.")
+          }
+          className="flex flex-wrap items-end justify-end gap-2 rounded-lg border border-linea bg-papel-suave p-2"
+        >
+          <label className="flex flex-col gap-0.5 text-xs text-tinta-media">
+            Nombre y apellido del titular
+            <input
+              type="text"
+              name="titularNombre"
+              defaultValue={titularNombre ?? ""}
+              placeholder="Juan Pérez"
+              className={`${CAMPO} w-40`}
+            />
+          </label>
+          <label className="flex flex-col gap-0.5 text-xs text-tinta-media">
+            Teléfono del titular
+            <input
+              type="text"
+              name="titularTelefono"
+              defaultValue={titularTelefono ?? ""}
+              placeholder="0981 234 567"
+              className={`${CAMPO} w-36`}
+            />
+          </label>
+          <label className="flex flex-col gap-0.5 text-xs text-tinta-media">
+            Razón social
+            <input
+              type="text"
+              name="razonSocial"
+              defaultValue={razonSocial ?? ""}
+              placeholder="Juan Pérez S.A."
+              className={`${CAMPO} w-40`}
+            />
+          </label>
+          <label className="flex flex-col gap-0.5 text-xs text-tinta-media">
+            RUC
+            <input
+              type="text"
+              name="ruc"
+              defaultValue={ruc ?? ""}
+              placeholder="80012345-6"
+              className={`${CAMPO} w-28`}
+            />
+          </label>
+          <button
+            type="submit"
+            disabled={pendiente}
+            className="rounded-lg bg-noche px-3 py-1.5 text-sm font-medium text-white hover:bg-noche-panel disabled:opacity-50"
+          >
+            Guardar
+          </button>
+          <button
+            type="button"
+            disabled={pendiente}
+            onClick={() => {
+              setEditandoDatos(false);
               setAviso(null);
             }}
             className="rounded-lg border border-linea bg-white px-3 py-1.5 text-sm font-medium text-tinta-media transition-colors hover:border-brand hover:text-brand disabled:opacity-50"

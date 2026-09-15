@@ -49,6 +49,12 @@ export async function crearLocal(formData: FormData): Promise<ResultadoAlta> {
   const plantillaClave = String(formData.get("plantilla") ?? "vacio");
   const plan = String(formData.get("plan") ?? "basico").trim() || "basico";
   const asesorId = String(formData.get("asesorId") ?? "").trim() || null;
+  // Los cuatro datos del titular son opcionales: se completan si se tienen a
+  // mano al dar de alta, o después desde Cartera.
+  const titularNombre = String(formData.get("titularNombre") ?? "").trim() || null;
+  const titularTelefono = String(formData.get("titularTelefono") ?? "").trim() || null;
+  const razonSocial = String(formData.get("razonSocial") ?? "").trim() || null;
+  const ruc = String(formData.get("ruc") ?? "").trim() || null;
 
   if (!nombre) return { ok: false, error: "Falta el nombre del negocio" };
 
@@ -101,6 +107,10 @@ export async function crearLocal(formData: FormData): Promise<ResultadoAlta> {
         plan,
         vencimiento,
         asesorId,
+        titularNombre,
+        titularTelefono,
+        razonSocial,
+        ruc,
       },
       select: { id: true },
     });
@@ -224,6 +234,33 @@ export async function alternarSuspension(
 
   revalidatePath("/admin/super");
   revalidatePath("/[slug]", "layout");
+  return { ok: true };
+}
+
+export type ResultadoDatosTitular = { ok: true } | { ok: false; error: string };
+
+/**
+ * Corrige los datos del titular de un local ya creado — mismos cuatro campos
+ * que el alta, todos opcionales, para completarlos o corregirlos cuando no
+ * se tenían a mano al crear el local.
+ */
+export async function actualizarDatosTitular(
+  storeId: string,
+  formData: FormData
+): Promise<ResultadoDatosTitular> {
+  await exigirSuperadmin();
+
+  await prisma.store.update({
+    where: { id: storeId },
+    data: {
+      titularNombre: String(formData.get("titularNombre") ?? "").trim() || null,
+      titularTelefono: String(formData.get("titularTelefono") ?? "").trim() || null,
+      razonSocial: String(formData.get("razonSocial") ?? "").trim() || null,
+      ruc: String(formData.get("ruc") ?? "").trim() || null,
+    },
+  });
+
+  revalidatePath("/admin/super");
   return { ok: true };
 }
 

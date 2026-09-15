@@ -137,6 +137,32 @@ export function AltaLocal({
       </label>
 
       <label className="flex flex-col gap-1 text-sm text-tinta-media">
+        Nombre y apellido del titular
+        <input name="titularNombre" placeholder="Juan Pérez" className={CAMPO} />
+        <span className="text-xs text-tinta-suave">Opcional — el dueño real del negocio.</span>
+      </label>
+
+      <label className="flex flex-col gap-1 text-sm text-tinta-media">
+        Teléfono del titular
+        <input name="titularTelefono" placeholder="0981 234 567" className={CAMPO} />
+        <span className="text-xs text-tinta-suave">
+          Opcional — para contactarlo a él directamente, aparte del WhatsApp del negocio.
+        </span>
+      </label>
+
+      <label className="flex flex-col gap-1 text-sm text-tinta-media">
+        Razón social
+        <input name="razonSocial" placeholder="Juan Pérez S.A." className={CAMPO} />
+        <span className="text-xs text-tinta-suave">Opcional — para facturación.</span>
+      </label>
+
+      <label className="flex flex-col gap-1 text-sm text-tinta-media">
+        RUC
+        <input name="ruc" placeholder="80012345-6" className={CAMPO} />
+        <span className="text-xs text-tinta-suave">Opcional — para facturación.</span>
+      </label>
+
+      <label className="flex flex-col gap-1 text-sm text-tinta-media">
         Carta de arranque
         <select name="plantilla" defaultValue="pizzeria" className={CAMPO}>
           {PLANTILLAS.map((p) => (
