@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { pantallaConPermiso } from "@/lib/auth";
 import { prismaDelLocal } from "@/lib/prisma-local";
 import { idLocalActual } from "@/lib/local-actual";
-import { formatearGuarani, formatearNumero } from "@/lib/format";
+import { formatearGuarani, formatearNumero, formatearTelefonoLocal } from "@/lib/format";
 import { etiquetaFormaPagoPos } from "@/lib/turno-pos";
 import { ZONA_NEGOCIO } from "@/lib/timezone";
 import { ImprimirAuto } from "@/components/ImprimirAuto";
@@ -59,6 +59,7 @@ export default async function TicketVentaPosPage({
   if (!venta) notFound();
 
   const puntoExpedicion = venta.turnoPos.estacion.puntoExpedicion;
+  const esFactura = venta.comprobanteTipo === "factura";
 
   const fecha = venta.creadoEn.toLocaleString("es-PY", {
     day: "2-digit",
@@ -95,29 +96,30 @@ export default async function TicketVentaPosPage({
           </p>
           {store?.direccion && <p className="text-xs leading-tight">{store.direccion}</p>}
           {store?.whatsappNumero && (
-            <p className="text-xs leading-tight">Tel: {store.whatsappNumero}</p>
+            <p className="text-xs leading-tight">Tel: {formatearTelefonoLocal(store.whatsappNumero)}</p>
           )}
         </div>
 
         <Separador />
 
-        {venta.comprobanteTipo === "factura" ? (
+        {esFactura ? (
           <div className="text-center">
-            <p className="text-[1.05rem] font-bold tracking-titular">FACTURA AUTOIMPRESOR</p>
+            <p className="text-[1.05rem] font-bold tracking-titular">FACTURA</p>
             {puntoExpedicion && (
-              <p className="text-xs leading-tight">
-                {puntoExpedicion.razonSocialEmisor} — RUC: {puntoExpedicion.rucEmisor}
-              </p>
+              <>
+                <p className="text-xs leading-tight">Razón social: {puntoExpedicion.razonSocialEmisor}</p>
+                <p className="text-xs leading-tight">RUC: {puntoExpedicion.rucEmisor}</p>
+              </>
             )}
-            <p className="mt-1 text-xs leading-tight">Timbrado N° {venta.facturaTimbrado}</p>
+            <p className="mt-1 text-xs leading-tight">Timbrado N°: {venta.facturaTimbrado}</p>
             {venta.facturaVencimiento && (
               <p className="text-xs leading-tight">
-                Válido hasta{" "}
+                Válido hasta:{" "}
                 {venta.facturaVencimiento.toLocaleDateString("es-PY", { timeZone: ZONA_NEGOCIO })}
               </p>
             )}
-            <p className="mt-1 text-[1rem] font-semibold tracking-titular">N° {venta.facturaNumero}</p>
-            <p className="text-xs">{fecha}</p>
+            <p className="mt-1 text-[1rem] font-semibold tracking-titular">N°: {venta.facturaNumero}</p>
+            <p className="text-xs">Fecha: {fecha}</p>
           </div>
         ) : (
           <div>
@@ -129,10 +131,10 @@ export default async function TicketVentaPosPage({
 
         <Separador />
 
-        {venta.comprobanteTipo === "factura" && (
+        {esFactura && (
           <>
             <div className="text-xs leading-tight">
-              <p>Cliente: {venta.facturaRazonSocial}</p>
+              <p>Razón social: {venta.facturaRazonSocial}</p>
               <p>RUC: {venta.facturaRuc}</p>
             </div>
             <Separador />
@@ -140,6 +142,11 @@ export default async function TicketVentaPosPage({
         )}
 
         <div>
+          {esFactura && (
+            <p className="mb-1 whitespace-pre-wrap font-bold">
+              {filaConMonto("Cant. Descripción", "Monto", ANCHO_RENGLON)}
+            </p>
+          )}
           {venta.items.map((item) => (
             <div key={item.id} className="mb-1.5 last:mb-0">
               <p className="whitespace-pre-wrap">
@@ -164,41 +171,48 @@ export default async function TicketVentaPosPage({
 
         <Separador />
 
-        {venta.comprobanteTipo === "factura" && (
+        {esFactura && (
           <>
             <div className="text-xs leading-tight">
               {Number(venta.facturaGravado10 ?? 0) > 0 && (
-                <p>{filaConMonto("Gravadas 10%", formatearGuarani(Number(venta.facturaGravado10)), ANCHO_RENGLON)}</p>
+                <p>{filaConMonto("Gravadas 10%:", formatearGuarani(Number(venta.facturaGravado10)), ANCHO_RENGLON)}</p>
               )}
               {Number(venta.facturaGravado5 ?? 0) > 0 && (
-                <p>{filaConMonto("Gravadas 5%", formatearGuarani(Number(venta.facturaGravado5)), ANCHO_RENGLON)}</p>
+                <p>{filaConMonto("Gravadas 5%:", formatearGuarani(Number(venta.facturaGravado5)), ANCHO_RENGLON)}</p>
               )}
               {Number(venta.facturaExento ?? 0) > 0 && (
-                <p>{filaConMonto("Exentas", formatearGuarani(Number(venta.facturaExento)), ANCHO_RENGLON)}</p>
+                <p>{filaConMonto("Exentas:", formatearGuarani(Number(venta.facturaExento)), ANCHO_RENGLON)}</p>
               )}
               {Number(venta.facturaIva10 ?? 0) > 0 && (
-                <p>{filaConMonto("IVA 10%", formatearGuarani(Number(venta.facturaIva10)), ANCHO_RENGLON)}</p>
+                <p>{filaConMonto("IVA 10%:", formatearGuarani(Number(venta.facturaIva10)), ANCHO_RENGLON)}</p>
               )}
               {Number(venta.facturaIva5 ?? 0) > 0 && (
-                <p>{filaConMonto("IVA 5%", formatearGuarani(Number(venta.facturaIva5)), ANCHO_RENGLON)}</p>
+                <p>{filaConMonto("IVA 5%:", formatearGuarani(Number(venta.facturaIva5)), ANCHO_RENGLON)}</p>
               )}
             </div>
             <Separador />
           </>
         )}
 
-        <div className="text-xs">
-          <p>
-            <span className="font-bold">Pago:</span> {etiquetaFormaPagoPos(venta.formaPago)}
-          </p>
-        </div>
+        {/* La forma de pago es un dato operativo del cobro, no del documento
+            fiscal — una factura de verdad no lo muestra, pero el
+            comprobante informal (ticket normal) sí lo necesita. */}
+        {!esFactura && (
+          <>
+            <div className="text-xs">
+              <p>
+                <span className="font-bold">Pago:</span> {etiquetaFormaPagoPos(venta.formaPago)}
+              </p>
+            </div>
 
-        <Separador />
+            <Separador />
+          </>
+        )}
 
         <p className="pt-1 text-center text-xs">
           Gracias por su compra!
           <br />
-          {venta.comprobanteTipo === "factura"
+          {esFactura
             ? "Documento válido como Factura Autoimpresor."
             : "Este comprobante no es una factura legal."}
         </p>

@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { pantallaConPermiso } from "@/lib/auth";
 import { prismaDelLocal } from "@/lib/prisma-local";
 import { idLocalActual } from "@/lib/local-actual";
-import { formatearGuarani, formatearNumero } from "@/lib/format";
+import { formatearGuarani, formatearNumero, formatearTelefonoLocal } from "@/lib/format";
 import { etiquetaMetodoPago } from "@/lib/metodos-pago";
 import { ZONA_NEGOCIO } from "@/lib/timezone";
 import { ImprimirAuto } from "@/components/ImprimirAuto";
@@ -85,6 +85,7 @@ export default async function TicketPage({
   });
 
   const esDelivery = pedido.tipoEntrega === "delivery";
+  const esFactura = pedido.comprobanteTipo === "factura" && !!pedido.facturaNumero;
 
   return (
     <>
@@ -101,27 +102,26 @@ export default async function TicketPage({
           </p>
           {store?.direccion && <p className="text-xs leading-tight">{store.direccion}</p>}
           {store?.whatsappNumero && (
-            <p className="text-xs leading-tight">Tel: {store.whatsappNumero}</p>
+            <p className="text-xs leading-tight">Tel: {formatearTelefonoLocal(store.whatsappNumero)}</p>
           )}
         </div>
 
         <Separador />
 
-        {pedido.comprobanteTipo === "factura" && pedido.facturaNumero ? (
+        {esFactura ? (
           <div className="text-center">
-            <p className="text-[1.05rem] font-bold tracking-titular">FACTURA AUTOIMPRESOR</p>
-            <p className="text-xs leading-tight">
-              {pedido.facturaRazonSocialEmisor} — RUC: {pedido.facturaRucEmisor}
-            </p>
-            <p className="mt-1 text-xs leading-tight">Timbrado N° {pedido.facturaTimbrado}</p>
+            <p className="text-[1.05rem] font-bold tracking-titular">FACTURA</p>
+            <p className="text-xs leading-tight">Razón social: {pedido.facturaRazonSocialEmisor}</p>
+            <p className="text-xs leading-tight">RUC: {pedido.facturaRucEmisor}</p>
+            <p className="mt-1 text-xs leading-tight">Timbrado N°: {pedido.facturaTimbrado}</p>
             {pedido.facturaVencimiento && (
               <p className="text-xs leading-tight">
-                Válido hasta{" "}
+                Válido hasta:{" "}
                 {pedido.facturaVencimiento.toLocaleDateString("es-PY", { timeZone: ZONA_NEGOCIO })}
               </p>
             )}
-            <p className="mt-1 text-[1rem] font-semibold tracking-titular">N° {pedido.facturaNumero}</p>
-            <p className="text-xs">{fecha}</p>
+            <p className="mt-1 text-[1rem] font-semibold tracking-titular">N°: {pedido.facturaNumero}</p>
+            <p className="text-xs">Fecha: {fecha}</p>
           </div>
         ) : (
           <div>
@@ -136,9 +136,9 @@ export default async function TicketPage({
           <>
             <Separador />
             <div className="text-xs">
-              {pedido.facturaNumero ? (
+              {esFactura ? (
                 <>
-                  <p>Cliente: {pedido.facturaRazonSocial}</p>
+                  <p>Razón social: {pedido.facturaRazonSocial}</p>
                   <p>RUC: {pedido.facturaRuc}</p>
                 </>
               ) : (
@@ -156,6 +156,11 @@ export default async function TicketPage({
         <Separador />
 
         <div>
+          {esFactura && (
+            <p className="mb-1 whitespace-pre-wrap font-bold">
+              {filaConMonto("Cant. Descripción", "Monto", ANCHO_RENGLON)}
+            </p>
+          )}
           {pedido.items.map((item) => (
             <div key={item.id} className="mb-1.5 last:mb-0">
               <p className="whitespace-pre-wrap">
@@ -194,53 +199,60 @@ export default async function TicketPage({
 
         <Separador />
 
-        {pedido.comprobanteTipo === "factura" && pedido.facturaNumero && (
+        {esFactura && (
           <>
             <div className="text-xs leading-tight">
               {Number(pedido.facturaGravado10 ?? 0) > 0 && (
-                <p>{filaConMonto("Gravadas 10%", formatearGuarani(Number(pedido.facturaGravado10)), ANCHO_RENGLON)}</p>
+                <p>{filaConMonto("Gravadas 10%:", formatearGuarani(Number(pedido.facturaGravado10)), ANCHO_RENGLON)}</p>
               )}
               {Number(pedido.facturaGravado5 ?? 0) > 0 && (
-                <p>{filaConMonto("Gravadas 5%", formatearGuarani(Number(pedido.facturaGravado5)), ANCHO_RENGLON)}</p>
+                <p>{filaConMonto("Gravadas 5%:", formatearGuarani(Number(pedido.facturaGravado5)), ANCHO_RENGLON)}</p>
               )}
               {Number(pedido.facturaExento ?? 0) > 0 && (
-                <p>{filaConMonto("Exentas", formatearGuarani(Number(pedido.facturaExento)), ANCHO_RENGLON)}</p>
+                <p>{filaConMonto("Exentas:", formatearGuarani(Number(pedido.facturaExento)), ANCHO_RENGLON)}</p>
               )}
               {Number(pedido.facturaIva10 ?? 0) > 0 && (
-                <p>{filaConMonto("IVA 10%", formatearGuarani(Number(pedido.facturaIva10)), ANCHO_RENGLON)}</p>
+                <p>{filaConMonto("IVA 10%:", formatearGuarani(Number(pedido.facturaIva10)), ANCHO_RENGLON)}</p>
               )}
               {Number(pedido.facturaIva5 ?? 0) > 0 && (
-                <p>{filaConMonto("IVA 5%", formatearGuarani(Number(pedido.facturaIva5)), ANCHO_RENGLON)}</p>
+                <p>{filaConMonto("IVA 5%:", formatearGuarani(Number(pedido.facturaIva5)), ANCHO_RENGLON)}</p>
               )}
             </div>
             <Separador />
           </>
         )}
 
-        <div className="text-xs">
-          <p>
-            <span className="font-bold">Pago:</span>{" "}
-            {etiquetaMetodoPago(pedido.metodoPagoReferencia)}
-          </p>
-          <p>
-            <span className="font-bold">Entrega:</span>{" "}
-            {esDelivery
-              ? `Delivery - ${pedido.deliveryZone?.nombre ?? "a coordinar"}`
-              : pedido.tipoEntrega === "mesa"
-                ? `Mesa ${pedido.mesaNumero ?? "-"}`
-                : "Retiro en el local"}
-          </p>
-          {esDelivery && pedido.direccion && <p>Direccion: {pedido.direccion}</p>}
-          {esDelivery && pedido.repartidor && <p>Repartidor: {pedido.repartidor.nombre}</p>}
-          {pedido.notas && <p className="mt-1">Nota: {pedido.notas}</p>}
-        </div>
+        {/* Pago/entrega/repartidor: son datos operativos del pedido, no del
+            documento fiscal — una factura de verdad no los muestra, pero el
+            comprobante informal (ticket normal) sí los necesita. */}
+        {!esFactura && (
+          <>
+            <div className="text-xs">
+              <p>
+                <span className="font-bold">Pago:</span>{" "}
+                {etiquetaMetodoPago(pedido.metodoPagoReferencia)}
+              </p>
+              <p>
+                <span className="font-bold">Entrega:</span>{" "}
+                {esDelivery
+                  ? `Delivery - ${pedido.deliveryZone?.nombre ?? "a coordinar"}`
+                  : pedido.tipoEntrega === "mesa"
+                    ? `Mesa ${pedido.mesaNumero ?? "-"}`
+                    : "Retiro en el local"}
+              </p>
+              {esDelivery && pedido.direccion && <p>Direccion: {pedido.direccion}</p>}
+              {esDelivery && pedido.repartidor && <p>Repartidor: {pedido.repartidor.nombre}</p>}
+              {pedido.notas && <p className="mt-1">Nota: {pedido.notas}</p>}
+            </div>
 
-        <Separador />
+            <Separador />
+          </>
+        )}
 
         <p className="pt-1 text-center text-xs">
           Gracias por su compra!
           <br />
-          {pedido.comprobanteTipo === "factura" && pedido.facturaNumero
+          {esFactura
             ? "Documento válido como Factura Autoimpresor."
             : "Este comprobante no es una factura legal."}
         </p>

@@ -29,3 +29,23 @@ export function formatearGuarani(valor: number | string): string {
 export function formatearNumero(numero: number): string {
   return `#${String(numero).padStart(4, "0")}`;
 }
+
+/**
+ * "595984357698" -> "0984-357-698".
+ *
+ * `Store.whatsappNumero` se guarda en formato internacional (595 adelante)
+ * porque así lo necesitan los links de wa.me — pero en un ticket impreso la
+ * gente lee el número como lo marcaría desde acá, con el 0 local. Si el
+ * número no tiene la forma esperada (9 dígitos después del 595, o 10 con el
+ * 0 ya puesto), se devuelve tal cual en vez de inventar un formato raro.
+ */
+export function formatearTelefonoLocal(numero: string): string {
+  const digitos = numero.replace(/[^\d]/g, "");
+  const local = digitos.startsWith("595")
+    ? "0" + digitos.slice(3)
+    : digitos.startsWith("0")
+      ? digitos
+      : "0" + digitos;
+  if (local.length !== 10) return numero;
+  return `${local.slice(0, 4)}-${local.slice(4, 7)}-${local.slice(7)}`;
+}
