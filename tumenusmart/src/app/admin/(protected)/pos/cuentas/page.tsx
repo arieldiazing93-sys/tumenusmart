@@ -209,7 +209,7 @@ export default async function CuentasPosPage({
                   </Link>
                   {v.comprobanteTipo === "factura" && v.facturaNumero && (
                     <span className="mt-0.5 block text-[10px] font-medium uppercase text-tinta-suave">
-                      Factura {v.facturaNumero}
+                      {v.facturaNumero}
                     </span>
                   )}
                 </Td>

@@ -544,7 +544,7 @@ export default async function AdminPedidosPage({
                         )}
                         {pedido.comprobanteTipo === "factura" && pedido.facturaNumero && (
                           <span className="mt-0.5 block text-[10px] font-medium uppercase text-tinta-suave">
-                            Factura {pedido.facturaNumero}
+                            {pedido.facturaNumero}
                           </span>
                         )}
                       </Link>
