@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Area, Boton, Cabecera, Campo, Entrada, Tarjeta, clasesBoton } from "@/components/ui";
+import { Boton, Cabecera, Campo, Entrada, Tarjeta, clasesBoton } from "@/components/ui";
 import { Segmentado } from "@/components/Segmentado";
 import { formatearGuarani } from "@/lib/format";
 import { type FormaPagoPos } from "@/lib/turno-pos";
@@ -75,7 +75,6 @@ export function PantallaVenta({
   const [clienteNombre, setClienteNombre] = useState("");
   const [clienteTelefono, setClienteTelefono] = useState("");
   const [tipoEntrega, setTipoEntrega] = useState<TipoEntregaPos>("local");
-  const [nota, setNota] = useState("");
   const [comprobanteTipo, setComprobanteTipo] = useState<"ticket" | "factura">("ticket");
   const [facturaRazonSocial, setFacturaRazonSocial] = useState("");
   const [facturaRuc, setFacturaRuc] = useState("");
@@ -231,7 +230,7 @@ export function PantallaVenta({
       tipoEntrega,
       clienteNombre,
       clienteTelefono,
-      nota,
+      nota: "",
       comprobanteTipo,
       facturaRazonSocial: comprobanteTipo === "factura" ? facturaRazonSocial : undefined,
       facturaRuc: comprobanteTipo === "factura" ? facturaRuc : undefined,
@@ -510,13 +509,6 @@ export function PantallaVenta({
           )}
 
           <Segmentado opciones={TIPOS_ENTREGA_POS} valor={tipoEntrega} onChange={setTipoEntrega} />
-
-          <Area
-            value={nota}
-            onChange={(e) => setNota(e.target.value)}
-            placeholder="Nota interna del pedido (opcional): mesa 3, llamar al cliente, etc."
-            rows={2}
-          />
 
           <div className="flex items-center justify-between border-t border-linea pt-3">
             <span className="text-[0.85rem] text-tinta-media">Total ({cantidadTotal})</span>
