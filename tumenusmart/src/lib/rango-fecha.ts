@@ -3,6 +3,7 @@ import {
   inicioDeMesEnAsuncion,
   inicioDeMesSiguienteEnAsuncion,
   fechaAsuncionDesdeTexto,
+  instanteAsuncionDesdeTexto,
   claveDiaAsuncion,
 } from "./timezone";
 
@@ -55,9 +56,24 @@ export function calcularRangoFecha(
     }
     case "rango": {
       if (!desde || !hasta) return null;
-      const inicio = fechaAsuncionDesdeTexto(desde);
+      // Cada extremo puede venir como "YYYY-MM-DD" (input type=date, un día
+      // entero) o "YYYY-MM-DDTHH:MM" (input type=datetime-local, un instante
+      // exacto) — se detecta por la "T" y cada uno se resuelve con la función
+      // que le corresponde, así ambos formatos conviven en el mismo filtro.
+      const conHora = (texto: string) => texto.includes("T");
+
+      const inicio = conHora(desde)
+        ? instanteAsuncionDesdeTexto(desde)
+        : fechaAsuncionDesdeTexto(desde);
+      if (!inicio) return null;
+
+      if (conHora(hasta)) {
+        const fin = instanteAsuncionDesdeTexto(hasta);
+        if (!fin) return null;
+        return { gte: inicio, lt: fin };
+      }
       const fin = fechaAsuncionDesdeTexto(hasta);
-      if (!inicio || !fin) return null;
+      if (!fin) return null;
       return { gte: inicio, lt: sumarDias(fin, 1) };
     }
     default:

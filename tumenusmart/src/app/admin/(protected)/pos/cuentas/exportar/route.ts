@@ -42,14 +42,20 @@ export async function GET(request: NextRequest) {
     }),
   ]);
 
-  const finRangoInclusive = new Date(rango.lt.getTime() - 24 * 60 * 60 * 1000);
   const opcionesFecha: Intl.DateTimeFormatOptions = {
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
     timeZone: ZONA_NEGOCIO,
   };
-  const periodo = `${rango.gte.toLocaleDateString("es-PY", opcionesFecha)} - ${finRangoInclusive.toLocaleDateString("es-PY", opcionesFecha)}`;
+  // El rango manual con hora (desde/hasta con "T", de un datetime-local) usa
+  // instantes exactos, no días enteros — mostrar hora y hora evita que el
+  // período impreso diga "16/09 - 16/09" cuando en realidad se cortó a mitad
+  // del día 17.
+  const esRangoConHora = fecha === "rango" && ((desde?.includes("T") ?? false) || (hasta?.includes("T") ?? false));
+  const periodo = esRangoConHora
+    ? `${rango.gte.toLocaleString("es-PY", { ...opcionesFecha, hour: "2-digit", minute: "2-digit" })} - ${rango.lt.toLocaleString("es-PY", { ...opcionesFecha, hour: "2-digit", minute: "2-digit" })}`
+    : `${rango.gte.toLocaleDateString("es-PY", opcionesFecha)} - ${new Date(rango.lt.getTime() - 24 * 60 * 60 * 1000).toLocaleDateString("es-PY", opcionesFecha)}`;
 
   const { libro, hoja } = nuevoLibro("Cuentas POS");
   hoja.columns = [

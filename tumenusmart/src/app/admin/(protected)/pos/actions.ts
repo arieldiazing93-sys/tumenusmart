@@ -314,11 +314,12 @@ export type ResultadoCancelarVenta = { ok: true } | { ok: false; error: string }
 /**
  * Anula una cuenta ya cobrada.
  *
- * No borra nada ni recalcula el turno: si esa venta ya formaba parte de un
- * turno cerrado, el comprobante de ese cierre sigue mostrando los montos que
- * se congelaron al cerrar (mismo criterio que Rendicion) — el aviso de
- * "esto se modificó después" que ya tiene ese comprobante es lo que refleja
- * la cancelación, no un recálculo silencioso de números ya firmados.
+ * Solo se puede cancelar mientras el turno al que pertenece sigue abierto:
+ * una vez cerrado el turno, el cajero ya declaró esos montos en el corte
+ * ciego y el comprobante quedó firmado — permitir cancelar después abriría
+ * la puerta a "vender, cerrar caja, y después borrar la venta para que no
+ * quede registro". No borra nada, de todos modos: queda marcada como
+ * cancelada, con quién y por qué, nunca se elimina la fila.
  */
 export async function cancelarVenta(ventaId: string, motivo: string): Promise<ResultadoCancelarVenta> {
   const sesion = await exigirPermiso("pos.vender");
@@ -327,10 +328,16 @@ export async function cancelarVenta(ventaId: string, motivo: string): Promise<Re
 
   const venta = await db.ventaPos.findUnique({
     where: { id: ventaId },
-    select: { id: true, cancelada: true },
+    select: { id: true, cancelada: true, turnoPos: { select: { estado: true } } },
   });
   if (!venta) return { ok: false, error: "Esa cuenta no existe." };
   if (venta.cancelada) return { ok: false, error: "Esa cuenta ya estaba cancelada." };
+  if (venta.turnoPos.estado !== "abierto") {
+    return {
+      ok: false,
+      error: "El turno de esta cuenta ya está cerrado. Una vez cerrado el turno, la cuenta no se puede cancelar.",
+    };
+  }
 
   await db.ventaPos.update({
     where: { id: ventaId },

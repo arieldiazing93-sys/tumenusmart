@@ -774,11 +774,11 @@ model VentaPos {
   nota            String?
 
   // Anular una cuenta ya cobrada (se cargó mal, el cliente se arrepintió,
-  // etc.) sin borrar el registro — deja rastro de quién y por qué. No
-  // recalcula turnos ya cerrados: si el turno ya se cerró, el comprobante
-  // de ese cierre queda con los montos que se congelaron en ese momento
-  // (mismo criterio que Rendicion/TurnoPos), y el contraste que ya se
-  // muestra ahí avisa que algo cambió después.
+  // etc.) sin borrar el registro — deja rastro de quién y por qué. Solo se
+  // permite mientras el turno (turnoPos) sigue "abierto": una vez cerrado,
+  // el cajero ya declaró esos montos en el corte ciego, así que
+  // cancelarVenta (pos/actions.ts) rechaza la anulación en vez de dejar
+  // tocar una cuenta que ya quedó firmada en un cierre.
   cancelada         Boolean   @default(false)
   canceladaPor      String?
   canceladaEn       DateTime?

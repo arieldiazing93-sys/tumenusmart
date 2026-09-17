@@ -30,9 +30,11 @@ export default async function DetalleVentaPosPage({
 
   const venta = await db.ventaPos.findUnique({
     where: { id },
-    include: { items: { orderBy: { id: "asc" } } },
+    include: { items: { orderBy: { id: "asc" } }, turnoPos: { select: { estado: true } } },
   });
   if (!venta) notFound();
+
+  const turnoCerrado = venta.turnoPos.estado !== "abierto";
 
   const fecha = venta.creadoEn.toLocaleString("es-PY", {
     day: "2-digit",
@@ -163,7 +165,14 @@ export default async function DetalleVentaPosPage({
           </div>
         </Tarjeta>
 
-        {!venta.cancelada && <CancelarVentaBoton ventaId={venta.id} />}
+        {!venta.cancelada &&
+          (turnoCerrado ? (
+            <p className="rounded-lg border border-linea bg-papel-suave px-3 py-2 text-[0.82rem] text-tinta-media">
+              El turno de esta cuenta ya está cerrado — no se puede cancelar.
+            </p>
+          ) : (
+            <CancelarVentaBoton ventaId={venta.id} />
+          ))}
       </div>
     </div>
   );

@@ -40,13 +40,19 @@ export default async function ImprimirCuentasPosPage({
     }),
   ]);
 
-  const finRangoInclusive = new Date(rango.lt.getTime() - 24 * 60 * 60 * 1000);
   const opcionesFecha: Intl.DateTimeFormatOptions = {
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
     timeZone: ZONA_NEGOCIO,
   };
+  // Mismo criterio que el export a Excel: un rango manual con hora muestra
+  // los dos instantes exactos en vez de fingir que son días enteros.
+  const esRangoConHora =
+    fechaActiva === "rango" && ((desde?.includes("T") ?? false) || (hasta?.includes("T") ?? false));
+  const periodoTexto = esRangoConHora
+    ? `${rango.gte.toLocaleString("es-PY", { ...opcionesFecha, hour: "2-digit", minute: "2-digit" })} – ${rango.lt.toLocaleString("es-PY", { ...opcionesFecha, hour: "2-digit", minute: "2-digit" })}`
+    : `${rango.gte.toLocaleDateString("es-PY", opcionesFecha)} – ${new Date(rango.lt.getTime() - 24 * 60 * 60 * 1000).toLocaleDateString("es-PY", opcionesFecha)}`;
   const total = ventas.filter((v) => !v.cancelada).reduce((s, v) => s + Number(v.total), 0);
 
   return (
@@ -57,10 +63,7 @@ export default async function ImprimirCuentasPosPage({
 
       <div className="mb-8 border-b border-linea pb-6">
         <h1 className="text-2xl font-bold text-tinta">Cuentas del mostrador — {local.nombre}</h1>
-        <p className="mt-1 text-sm text-tinta-media">
-          Período: {rango.gte.toLocaleDateString("es-PY", opcionesFecha)} –{" "}
-          {finRangoInclusive.toLocaleDateString("es-PY", opcionesFecha)}
-        </p>
+        <p className="mt-1 text-sm text-tinta-media">Período: {periodoTexto}</p>
       </div>
 
       {ventas.length === 0 ? (

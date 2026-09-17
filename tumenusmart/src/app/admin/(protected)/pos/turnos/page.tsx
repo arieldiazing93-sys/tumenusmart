@@ -2,7 +2,7 @@ import Link from "next/link";
 import { pantallaConPermiso } from "@/lib/auth";
 import { prismaDelLocal } from "@/lib/prisma-local";
 import { idLocalActual } from "@/lib/local-actual";
-import { Cabecera, clasesBoton, Tabla, Th, Td, Tr, Vacio } from "@/components/ui";
+import { Cabecera, clasesBoton, Tabla, Th, Td, Tr, Vacio, BotonEnlace } from "@/components/ui";
 import { calcularRangoFecha, type FiltroFecha } from "@/lib/rango-fecha";
 import { formatearGuarani } from "@/lib/format";
 import { ZONA_NEGOCIO } from "@/lib/timezone";
@@ -149,6 +149,9 @@ export default async function TurnosPosPage({
               <Th className="text-right">Sistema</Th>
               <Th className="text-right">Declarado</Th>
               <Th className="text-right">Diferencia</Th>
+              <Th className="text-right">
+                <span className="sr-only">Acción</span>
+              </Th>
             </tr>
           </thead>
           <tbody>
@@ -197,6 +200,11 @@ export default async function TurnosPosPage({
                     }`}
                   >
                     {diferencia === 0 ? "—" : formatearGuarani(diferencia)}
+                  </Td>
+                  <Td className="text-right">
+                    <BotonEnlace href={`/admin/pos/turnos/${t.id}`} tono="navegar" tam="sm">
+                      Ver
+                    </BotonEnlace>
                   </Td>
                 </Tr>
               );

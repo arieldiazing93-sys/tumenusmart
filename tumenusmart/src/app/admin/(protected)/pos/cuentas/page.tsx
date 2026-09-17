@@ -121,14 +121,14 @@ export default async function CuentasPosPage({
         <form
           method="get"
           action="/admin/pos/cuentas"
-          className={`flex items-center gap-1.5 rounded-full border px-2 py-1 text-sm ${
+          className={`flex flex-wrap items-center gap-1.5 rounded-full border px-2 py-1 text-sm ${
             fechaActiva === "rango" ? "border-brand bg-brand-light" : "border-linea"
           }`}
         >
           <input type="hidden" name="fecha" value="rango" />
           {formaPago && <input type="hidden" name="formaPago" value={formaPago} />}
           <input
-            type="date"
+            type="datetime-local"
             name="desde"
             defaultValue={fechaActiva === "rango" ? desde : ""}
             required
@@ -136,7 +136,7 @@ export default async function CuentasPosPage({
           />
           <span className="text-tinta-suave">–</span>
           <input
-            type="date"
+            type="datetime-local"
             name="hasta"
             defaultValue={fechaActiva === "rango" ? hasta : ""}
             required
