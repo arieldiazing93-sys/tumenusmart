@@ -28,6 +28,7 @@ export async function GET(request: NextRequest) {
       where: { estado: "cerrado", cerradoEn: { gte: rango.gte, lt: rango.lt } },
       orderBy: { cerradoEn: "asc" },
       select: {
+        estacion: { select: { nombre: true } },
         abiertoPor: true,
         cerradoPor: true,
         abiertoEn: true,
@@ -61,6 +62,7 @@ export async function GET(request: NextRequest) {
 
   const { libro, hoja } = nuevoLibro("Cierres POS");
   hoja.columns = [
+    { width: 16 },
     { width: 18 },
     { width: 18 },
     { width: 18 },
@@ -81,6 +83,7 @@ export async function GET(request: NextRequest) {
   filaTitulo(
     hoja,
     [
+      "Estación",
       "Abrió",
       "Cerró",
       "Cerrado el",
@@ -92,7 +95,7 @@ export async function GET(request: NextRequest) {
       "Total declarado (Gs.)",
       "Diferencia (Gs.)",
     ],
-    10
+    11
   );
 
   let totalDeclaradoGeneral = 0;
@@ -115,6 +118,7 @@ export async function GET(request: NextRequest) {
     totalDiferenciaGeneral += diferencia;
 
     const fila = hoja.addRow([
+      t.estacion.nombre,
       t.abiertoPor,
       t.cerradoPor ?? "",
       t.cerradoEn ? t.cerradoEn.toLocaleString("es-PY", opcionesFechaHora) : "",
@@ -126,17 +130,17 @@ export async function GET(request: NextRequest) {
       totalDeclarado,
       diferencia,
     ]);
-    for (const col of [5, 6, 7, 8, 9, 10]) fila.getCell(col).numFmt = "#,##0";
+    for (const col of [6, 7, 8, 9, 10, 11]) fila.getCell(col).numFmt = "#,##0";
   }
 
   hoja.addRow([]);
   const filaTotal = filaTitulo(
     hoja,
-    ["", "", "", "", "", "", "", "TOTAL GENERAL (Gs.)", totalDeclaradoGeneral, totalDiferenciaGeneral],
-    10
+    ["", "", "", "", "", "", "", "", "TOTAL GENERAL (Gs.)", totalDeclaradoGeneral, totalDiferenciaGeneral],
+    11
   );
-  filaTotal.getCell(9).numFmt = "#,##0";
   filaTotal.getCell(10).numFmt = "#,##0";
+  filaTotal.getCell(11).numFmt = "#,##0";
 
   if (turnos.length === 0) {
     hoja.addRow([]);

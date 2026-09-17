@@ -132,6 +132,7 @@ model Store {
   turnosPos        TurnoPos[]
   ventasPos        VentaPos[]
   ventaPosItems    VentaPosItem[]
+  estaciones       Estacion[]
 }
 
 /// Las direcciones que este local tuvo antes.
@@ -710,15 +711,19 @@ model Rendicion {
 /// entregados), acá el turno tiene apertura y cierre EXPLÍCITOS: el cajero
 /// abre declarando el vuelto inicial, vende, y al cerrar declara cuánto tiene
 /// en cada una de las 4 formas de pago. Un solo turno puede estar "abierto"
-/// por local a la vez (ver el índice único parcial en la migración SQL).
+/// por ESTACIÓN a la vez (ver el índice único parcial en la migración SQL) —
+/// dos estaciones del mismo local pueden tener cada una su propio turno
+/// abierto en simultáneo, sin pisarse.
 ///
 /// Los "calculado*" y "declarado*" quedan congelados al cerrar, mismo
 /// criterio que Rendicion: si después se corrige algo, el cierre ya firmado
 /// no se mueve solo.
 model TurnoPos {
-  id      String @id @default(cuid())
-  storeId String
-  store   Store  @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  id         String   @id @default(cuid())
+  storeId    String
+  store      Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  estacionId String
+  estacion   Estacion @relation(fields: [estacionId], references: [id])
 
   estado String @default("abierto") // "abierto" | "cerrado"
 
@@ -748,6 +753,23 @@ model TurnoPos {
 
   @@index([storeId])
   @@index([storeId, estado])
+  @@index([estacionId])
+}
+
+/// Una notebook/caja física del local — la unidad de concurrencia del POS.
+/// Vinculada a un navegador por cookie (ver src/lib/estacion-actual.ts), no
+/// a un usuario: cualquier cajero que abra el panel desde esa computadora
+/// opera bajo esta estación.
+model Estacion {
+  id        String     @id @default(cuid())
+  storeId   String
+  store     Store      @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  nombre    String
+  activa    Boolean    @default(true)
+  createdAt DateTime   @default(now())
+  turnos    TurnoPos[]
+
+  @@index([storeId])
 }
 
 /// Una cuenta cobrada en el mostrador (venta rápida de POS).

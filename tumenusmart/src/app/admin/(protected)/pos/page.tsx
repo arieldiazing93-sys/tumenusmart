@@ -2,8 +2,10 @@ import { redirect } from "next/navigation";
 import { pantallaConPermiso } from "@/lib/auth";
 import { prismaDelLocal } from "@/lib/prisma-local";
 import { idLocalActual } from "@/lib/local-actual";
+import { estacionActual } from "@/lib/estacion-actual";
 import { turnoAbierto } from "./turno-actual";
 import { PantallaVenta } from "./PantallaVenta";
+import { EstacionNoVinculada } from "./EstacionNoVinculada";
 
 export const dynamic = "force-dynamic";
 
@@ -12,7 +14,10 @@ export default async function PosPage() {
   const storeId = await idLocalActual();
   const db = prismaDelLocal(storeId);
 
-  const turno = await turnoAbierto(db);
+  const estacion = await estacionActual(db);
+  if (!estacion) return <EstacionNoVinculada />;
+
+  const turno = await turnoAbierto(db, estacion.id);
   if (!turno) redirect("/admin/pos/abrir");
 
   const categorias = await db.category.findMany({

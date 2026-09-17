@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { prismaDelLocal } from "@/lib/prisma-local";
 import { idLocalActual } from "@/lib/local-actual";
 import { normalizarFormaPagoPos } from "@/lib/turno-pos";
+import { estacionActual } from "@/lib/estacion-actual";
 import { turnoAbierto } from "../pos/turno-actual";
 
 const ESTADOS_VALIDOS = [
@@ -61,10 +62,15 @@ export async function cambiarEstadoPedido(
       select: { tipoEntrega: true, estado: true },
     });
     if (pedido && pedido.tipoEntrega !== "delivery" && pedido.estado !== "entregado") {
-      const turno = await turnoAbierto(prisma);
-      // Sin turno abierto no hay a qué cierre atarlo: se marca entregado
-      // igual, sin pedir forma de pago — no romper el flujo de todos los
-      // días para un local que todavía no abrió la caja del POS.
+      // Se ata al turno de la MISMA computadora desde la que se marca
+      // entregado — misma cookie de estación que usa el Punto de Venta (ver
+      // src/lib/estacion-actual.ts). Sin estación vinculada, o sin turno
+      // abierto en esa estación, no hay a qué cierre atarlo: se marca
+      // entregado igual, sin pedir forma de pago — no romper el flujo de
+      // todos los días para quien mira Pedidos desde un dispositivo que no
+      // es una caja.
+      const estacion = await estacionActual(prisma);
+      const turno = estacion ? await turnoAbierto(prisma, estacion.id) : null;
       if (turno) {
         if (!formaPagoPos) {
           return { ok: false, error: "Declará con qué se cobró antes de marcarlo entregado." };

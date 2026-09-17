@@ -14,19 +14,26 @@ export type ResultadoAbrirTurno =
   | { ok: false; error: string };
 
 /**
- * Abre un turno nuevo, o devuelve el que ya está abierto.
+ * Abre un turno nuevo para esa estación, o devuelve el que ya está abierto.
  *
- * Un solo turno puede estar abierto por local a la vez. Si dos cajeros
- * aprietan "Abrir turno" en el mismo instante, el índice único parcial de la
- * base rechaza al segundo create — se atrapa y se engancha al turno que ganó
- * en vez de fallarle en la cara.
+ * Un solo turno puede estar abierto por ESTACIÓN a la vez (dos estaciones
+ * del mismo local sí pueden tener cada una el suyo). Si dos cajeros de la
+ * MISMA estación aprietan "Abrir turno" en el mismo instante, el índice
+ * único parcial de la base rechaza al segundo create — se atrapa y se
+ * engancha al turno que ganó en vez de fallarle en la cara.
  */
-export async function abrirTurno(montoInicial: number): Promise<ResultadoAbrirTurno> {
+export async function abrirTurno(
+  estacionId: string,
+  montoInicial: number
+): Promise<ResultadoAbrirTurno> {
   const sesion = await exigirPermiso("pos.vender");
   const storeId = await idLocalActual();
   const db = prismaDelLocal(storeId);
 
-  const existente = await turnoAbierto(db);
+  const estacion = await db.estacion.findFirst({ where: { id: estacionId, activa: true } });
+  if (!estacion) return { ok: false, error: "Esa estación no existe o está desactivada." };
+
+  const existente = await turnoAbierto(db, estacionId);
   if (existente) {
     return { ok: true, turnoId: existente.id, yaAbierto: true };
   }
@@ -37,6 +44,7 @@ export async function abrirTurno(montoInicial: number): Promise<ResultadoAbrirTu
     const turno = await db.turnoPos.create({
       data: {
         storeId,
+        estacionId,
         montoInicial: monto,
         abiertoPor: sesion.nombre?.trim() || sesion.email,
       },
@@ -45,7 +53,7 @@ export async function abrirTurno(montoInicial: number): Promise<ResultadoAbrirTu
     revalidatePath("/admin/pos");
     return { ok: true, turnoId: turno.id, yaAbierto: false };
   } catch {
-    const turnoGanador = await turnoAbierto(db);
+    const turnoGanador = await turnoAbierto(db, estacionId);
     if (turnoGanador) return { ok: true, turnoId: turnoGanador.id, yaAbierto: true };
     return { ok: false, error: "No se pudo abrir el turno. Probá de nuevo." };
   }

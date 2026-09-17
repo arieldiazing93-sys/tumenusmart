@@ -69,6 +69,7 @@ export default async function ComprobanteTurnoPosPage({
         cerradoPor: true,
         cerradoEn: true,
         notas: true,
+        estacion: { select: { nombre: true } },
         cantidadVentas: true,
         calculadoEfectivo: true,
         calculadoTransferencia: true,
@@ -178,6 +179,10 @@ export default async function ComprobanteTurnoPosPage({
           </p>
 
           <dl className="mt-3 flex flex-wrap gap-x-8 gap-y-1 text-[0.85rem]">
+            <div>
+              <dt className="text-tinta-suave">Estación</dt>
+              <dd className="font-semibold text-tinta">{turno.estacion.nombre}</dd>
+            </div>
             <div>
               <dt className="text-tinta-suave">Abrió</dt>
               <dd className="font-semibold text-tinta">{turno.abiertoPor}</dd>

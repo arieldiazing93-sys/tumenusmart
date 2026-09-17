@@ -36,6 +36,9 @@ export type Permiso =
   | "pos.vender"
   // Ver el histórico completo de cuentas y cierres de TODOS los cajeros.
   | "pos.verHistorico"
+  // Dar de alta estaciones (notebooks/cajas) y vincular una computadora a
+  // una de ellas — configuración de infraestructura, no algo del día a día.
+  | "pos.gestionarEstaciones"
   // --- la carta ---
   | "productos.ver"
   | "productos.disponibilidad"
@@ -97,6 +100,7 @@ const PERMISOS_LOCAL: Permiso[] = [
   "rendiciones.gestionar",
   // El dueño ve el histórico de TODOS los cajeros, no solo el suyo.
   "pos.verHistorico",
+  "pos.gestionarEstaciones",
   "productos.editar",
   "categorias.editar",
   "estadisticas.ver",

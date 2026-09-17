@@ -90,6 +90,10 @@ function armarGrupos(hayIdeaSinVer: boolean, rol: string): GrupoSecciones[] {
           ver: conPermiso("pos.verHistorico") },
         { href: "/admin/pos/reporte-general", label: "Reporte general", icono: "estadisticas" as const,
           ver: conPermiso("pos.verHistorico") },
+        // Configuración de infraestructura (qué notebook es qué caja), no
+        // algo operativo del día a día — por eso vive acá y no en "Día a día".
+        { href: "/admin/pos/estaciones", label: "Estaciones", icono: "configuracion" as const,
+          ver: conPermiso("pos.gestionarEstaciones") },
       ],
     },
     {

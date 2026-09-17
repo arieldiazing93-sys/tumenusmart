@@ -78,6 +78,7 @@ export default async function TurnosPosPage({
       id: true,
       abiertoPor: true,
       cerradoPor: true,
+      estacion: { select: { nombre: true } },
       abiertoEn: true,
       cerradoEn: true,
       cantidadVentas: true,
@@ -143,6 +144,7 @@ export default async function TurnosPosPage({
           <thead>
             <tr>
               <Th>Cajero</Th>
+              <Th>Estación</Th>
               <Th>Abrió</Th>
               <Th>Cerró</Th>
               <Th className="text-right">Ventas</Th>
@@ -169,6 +171,7 @@ export default async function TurnosPosPage({
                       {t.cerradoPor ?? t.abiertoPor}
                     </Link>
                   </Td>
+                  <Td>{t.estacion.nombre}</Td>
                   <Td>
                     {t.abiertoEn.toLocaleString("es-PY", {
                       day: "2-digit",

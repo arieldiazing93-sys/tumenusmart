@@ -7,7 +7,7 @@ import { abrirTurno } from "../actions";
 
 const MONTOS_RAPIDOS = [0, 50000, 100000, 200000];
 
-export function AbrirTurnoForm() {
+export function AbrirTurnoForm({ estacionId }: { estacionId: string }) {
   const router = useRouter();
   const [monto, setMonto] = useState("0");
   const [error, setError] = useState<string | null>(null);
@@ -16,7 +16,7 @@ export function AbrirTurnoForm() {
   async function abrir() {
     setAbriendo(true);
     setError(null);
-    const r = await abrirTurno(parseFloat(monto) || 0);
+    const r = await abrirTurno(estacionId, parseFloat(monto) || 0);
     setAbriendo(false);
     if (!r.ok) {
       setError(r.error);

@@ -8,6 +8,7 @@ import { etiquetaMetodoPago } from "@/lib/metodos-pago";
 import { EstadoBotones } from "../EstadoBotones";
 import { RepartidorSelect } from "../RepartidorSelect";
 import { ZONA_NEGOCIO } from "@/lib/timezone";
+import { estacionActual } from "@/lib/estacion-actual";
 import { turnoAbierto } from "../../pos/turno-actual";
 
 export const dynamic = "force-dynamic";
@@ -27,13 +28,17 @@ export default async function DetallePedidoPage({
 
   const { id } = await params;
 
+  // Se ata al turno de la MISMA computadora desde la que se marca entregado
+  // — misma cookie de estación que usa el Punto de Venta.
+  const estacion = await estacionActual(prisma);
+
   const [pedido, repartidores, turno] = await Promise.all([
     prisma.order.findUnique({
       where: { id },
       include: { items: true, deliveryZone: true, repartidor: true },
     }),
     prisma.repartidor.findMany({ where: { activo: true }, orderBy: { nombre: "asc" } }),
-    turnoAbierto(prisma),
+    estacion ? turnoAbierto(prisma, estacion.id) : Promise.resolve(null),
   ]);
 
   if (!pedido) notFound();

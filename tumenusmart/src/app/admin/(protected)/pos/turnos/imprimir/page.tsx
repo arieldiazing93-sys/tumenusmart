@@ -57,6 +57,7 @@ export default async function ImprimirTurnosPosPage({
       orderBy: { cerradoEn: "asc" },
       select: {
         id: true,
+        estacion: { select: { nombre: true } },
         abiertoPor: true,
         cerradoPor: true,
         abiertoEn: true,
@@ -108,6 +109,7 @@ export default async function ImprimirTurnosPosPage({
           <thead>
             <tr className="border-b border-linea text-left text-xs uppercase tracking-wide text-tinta-media">
               <th className="py-1.5">Cajero</th>
+              <th className="py-1.5">Estación</th>
               <th className="py-1.5">Cerró el</th>
               <th className="py-1.5 text-right">Ventas</th>
               <th className="py-1.5 text-right">Sistema</th>
@@ -122,6 +124,7 @@ export default async function ImprimirTurnosPosPage({
               return (
                 <tr key={t.id} className="border-b border-linea-fina">
                   <td className="py-1.5">{t.cerradoPor ?? t.abiertoPor}</td>
+                  <td className="py-1.5 text-tinta-media">{t.estacion.nombre}</td>
                   <td className="py-1.5 text-tinta-media">
                     {t.cerradoEn ? t.cerradoEn.toLocaleString("es-PY", opcionesFechaHora) : "—"}
                   </td>
