@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { prismaDelLocal } from "@/lib/prisma-local";
 import { idLocalActual } from "@/lib/local-actual";
-import { dondeEntregado } from "@/lib/fidelidad";
+import { dondeEntregado, dondeEntregadoPos } from "@/lib/fidelidad";
 
 export type ResultadoCanje = { ok: true } | { ok: false; error: string };
 
@@ -44,9 +44,20 @@ export async function registrarCanjeFidelidad(telefono: string): Promise<Resulta
     return { ok: false, error: "No encontré a ese cliente." };
   }
 
-  const entregados = await db.order.count({
-    where: { clienteTelefono: telefono, ...dondeEntregado(store.fidelizacionMontoMinimo) },
-  });
+  // Mismo criterio que calcularProgresoFidelidad/progresoDeCliente (ver
+  // src/lib/fidelidad.ts): una venta de mostrador cuenta igual que un
+  // pedido online. Sin esto, un cliente que llegó al umbral mezclando las
+  // dos formas de comprar aparecía "listo" en la pantalla pero este canje
+  // lo rechazaba por contar solo la mitad.
+  const [entregadosOrder, entregadosPos] = await Promise.all([
+    db.order.count({
+      where: { clienteTelefono: telefono, ...dondeEntregado(store.fidelizacionMontoMinimo) },
+    }),
+    db.ventaPos.count({
+      where: { ...dondeEntregadoPos(store.fidelizacionMontoMinimo), clienteTelefono: telefono },
+    }),
+  ]);
+  const entregados = entregadosOrder + entregadosPos;
   if (entregados - customer.pedidosCanjeados < store.fidelizacionUmbral) {
     return { ok: false, error: "Este cliente todavía no llegó al umbral del premio." };
   }
