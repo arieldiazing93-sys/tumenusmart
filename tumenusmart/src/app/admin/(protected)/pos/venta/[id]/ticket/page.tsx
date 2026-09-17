@@ -71,15 +71,17 @@ export default async function TicketVentaPosPage({
             {store?.nombre ?? "Comprobante"}
           </p>
           {store?.direccion && <p className="text-xs leading-tight">{store.direccion}</p>}
+          {store?.whatsappNumero && (
+            <p className="text-xs leading-tight">Tel: {store.whatsappNumero}</p>
+          )}
         </div>
 
         <Separador />
 
         <div>
-          <p className="text-[1.1rem] font-semibold tracking-titular">
-            Venta {formatearNumero(venta.numero)}
-          </p>
+          <p className="text-[1.1rem] font-semibold tracking-titular">Servicio rápido</p>
           <p className="text-xs">{fecha}</p>
+          <p className="mt-1">Venta {formatearNumero(venta.numero)}</p>
         </div>
 
         <Separador />
@@ -107,9 +109,6 @@ export default async function TicketVentaPosPage({
         <div className="text-xs">
           <p>
             <span className="font-bold">Pago:</span> {etiquetaFormaPagoPos(venta.formaPago)}
-          </p>
-          <p>
-            <span className="font-bold">Atendió:</span> {venta.registradoPor}
           </p>
         </div>
 

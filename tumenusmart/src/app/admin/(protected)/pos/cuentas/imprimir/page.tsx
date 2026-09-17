@@ -14,7 +14,7 @@ export default async function ImprimirCuentasPosPage({
 }: {
   searchParams: Promise<{ fecha?: string; desde?: string; hasta?: string; formaPago?: string }>;
 }) {
-  await pantallaConPermiso("pos.verHistorico");
+  await pantallaConPermiso("pos.vender");
 
   const { fecha, desde, hasta, formaPago } = await searchParams;
   const fechaActiva = fecha ?? "hoy";
@@ -28,7 +28,15 @@ export default async function ImprimirCuentasPosPage({
     db.ventaPos.findMany({
       where: { creadoEn: { gte: rango.gte, lt: rango.lt }, formaPago: formaPago || undefined },
       orderBy: { creadoEn: "asc" },
-      select: { id: true, numero: true, total: true, formaPago: true, registradoPor: true, creadoEn: true },
+      select: {
+        id: true,
+        numero: true,
+        total: true,
+        formaPago: true,
+        registradoPor: true,
+        creadoEn: true,
+        cancelada: true,
+      },
     }),
   ]);
 
@@ -39,7 +47,7 @@ export default async function ImprimirCuentasPosPage({
     year: "numeric",
     timeZone: ZONA_NEGOCIO,
   };
-  const total = ventas.reduce((s, v) => s + Number(v.total), 0);
+  const total = ventas.filter((v) => !v.cancelada).reduce((s, v) => s + Number(v.total), 0);
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-8 print:max-w-none print:px-0 print:py-0">
@@ -65,6 +73,7 @@ export default async function ImprimirCuentasPosPage({
               <th className="py-1.5">Fecha</th>
               <th className="py-1.5">Forma de pago</th>
               <th className="py-1.5">Cajero</th>
+              <th className="py-1.5">Estado</th>
               <th className="py-1.5 text-right">Total</th>
             </tr>
           </thead>
@@ -83,14 +92,19 @@ export default async function ImprimirCuentasPosPage({
                 </td>
                 <td className="py-1.5 text-tinta-media">{etiquetaFormaPagoPos(v.formaPago)}</td>
                 <td className="py-1.5 text-tinta-media">{v.registradoPor}</td>
-                <td className="cifra py-1.5 text-right">{formatearGuarani(Number(v.total))}</td>
+                <td className="py-1.5 text-tinta-media">{v.cancelada ? "Cancelada" : "Activa"}</td>
+                <td
+                  className={`cifra py-1.5 text-right ${v.cancelada ? "text-tinta-suave line-through" : ""}`}
+                >
+                  {formatearGuarani(Number(v.total))}
+                </td>
               </tr>
             ))}
           </tbody>
           <tfoot>
             <tr className="border-t-2 border-linea font-semibold text-tinta">
-              <td className="py-2" colSpan={4}>
-                Total recaudado
+              <td className="py-2" colSpan={5}>
+                Total recaudado (sin canceladas)
               </td>
               <td className="cifra py-2 text-right">{formatearGuarani(total)}</td>
             </tr>

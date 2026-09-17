@@ -35,6 +35,11 @@ function armarGrupos(hayIdeaSinVer: boolean, rol: string): GrupoSecciones[] {
           ver: conPermiso("pedidos.ver") },
         { href: "/admin/pos", label: "Punto de venta", icono: "pos" as const,
           ver: conPermiso("pos.vender") },
+        // Vive acá y no en "Cómo va el negocio": el cajero necesita buscar
+        // una cuenta y poder cancelarla en el momento, no solo el dueño
+        // repasando el día después.
+        { href: "/admin/pos/cuentas", label: "Cuentas del mostrador", icono: "pedidos" as const,
+          ver: conPermiso("pos.vender") },
         // Mismo permiso y misma pantalla que "Pedidos" — solo entra con el
         // filtro de tipo puesto en "mesa", para que los pedidos de comer en
         // el local queden aparte de un clic sin duplicar toda la pantalla.
@@ -76,11 +81,9 @@ function armarGrupos(hayIdeaSinVer: boolean, rol: string): GrupoSecciones[] {
           ver: conPermiso("estadisticas.ver") },
         { href: "/admin/envios", label: "Envíos", icono: "envios" as const,
           ver: conPermiso("estadisticas.ver") },
-        // Van acá y no en "Día a día": son pantallas de repaso del dueño
-        // (permiso solo del dueño), no algo que el cajero abre en el medio
-        // del servicio.
-        { href: "/admin/pos/cuentas", label: "Cuentas del mostrador", icono: "pedidos" as const,
-          ver: conPermiso("pos.verHistorico") },
+        // A diferencia de "Cuentas del mostrador", esto sí queda para el
+        // dueño: es la plata que cada cajero declaró al cerrar, no algo
+        // operativo del día a día.
         { href: "/admin/pos/turnos", label: "Cierres de turno", icono: "cierre" as const,
           ver: conPermiso("pos.verHistorico") },
       ],

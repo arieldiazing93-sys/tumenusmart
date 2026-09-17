@@ -79,7 +79,14 @@ export default async function ComprobanteTurnoPosPage({
         declaradoTarjetaCredito: true,
         ventas: {
           orderBy: { creadoEn: "asc" },
-          select: { id: true, numero: true, total: true, formaPago: true, creadoEn: true },
+          select: {
+            id: true,
+            numero: true,
+            total: true,
+            formaPago: true,
+            creadoEn: true,
+            cancelada: true,
+          },
         },
       },
     }),
@@ -107,8 +114,13 @@ export default async function ComprobanteTurnoPosPage({
   );
   const { totalCalculado, totalDeclarado, diferenciaTotal } = cierre;
 
+  // Una venta cancelada DESPUÉS de cerrar el turno es justo el tipo de
+  // cambio que este contraste tiene que sacar a la luz: hoy ya no cuenta
+  // para el total, aunque el cierre siga firmado con el número de aquel día.
   const contraste = contrastarTurno(
-    turno.ventas.map((v) => ({ total: Number(v.total), formaPago: v.formaPago })),
+    turno.ventas
+      .filter((v) => !v.cancelada)
+      .map((v) => ({ total: Number(v.total), formaPago: v.formaPago })),
     { cantidadVentas: turno.cantidadVentas ?? 0, calculado }
   );
 
@@ -257,8 +269,13 @@ export default async function ComprobanteTurnoPosPage({
                     </td>
                     <td className="border-b border-linea-fina py-2 text-[0.82rem] text-tinta-media">
                       {etiquetaFormaPagoPos(v.formaPago)}
+                      {v.cancelada && <span className="text-peligro"> (cancelada)</span>}
                     </td>
-                    <td className="cifra border-b border-linea-fina py-2 text-right text-[0.85rem] font-medium text-tinta">
+                    <td
+                      className={`cifra border-b border-linea-fina py-2 text-right text-[0.85rem] font-medium ${
+                        v.cancelada ? "text-tinta-suave line-through" : "text-tinta"
+                      }`}
+                    >
                       {formatearGuarani(Number(v.total))}
                     </td>
                   </tr>

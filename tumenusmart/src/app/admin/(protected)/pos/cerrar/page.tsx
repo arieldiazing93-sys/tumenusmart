@@ -18,7 +18,7 @@ export default async function CerrarTurnoPage() {
   if (!turno) redirect("/admin/pos/abrir");
 
   const ventas = await db.ventaPos.findMany({
-    where: { turnoPosId: turno.id },
+    where: { turnoPosId: turno.id, cancelada: false },
     select: { total: true, formaPago: true },
   });
   const resumen = resumirTurno(ventas.map((v) => ({ total: Number(v.total), formaPago: v.formaPago })));

@@ -2,7 +2,7 @@ import Link from "next/link";
 import { pantallaConPermiso } from "@/lib/auth";
 import { prismaDelLocal } from "@/lib/prisma-local";
 import { idLocalActual } from "@/lib/local-actual";
-import { Cabecera, clasesBoton, Tabla, Th, Td, Tr, Vacio } from "@/components/ui";
+import { Cabecera, clasesBoton, Pastilla, Tabla, Th, Td, Tr, Vacio } from "@/components/ui";
 import { calcularRangoFecha, type FiltroFecha } from "@/lib/rango-fecha";
 import { formatearGuarani, formatearNumero } from "@/lib/format";
 import { etiquetaFormaPagoPos, FORMAS_PAGO_POS } from "@/lib/turno-pos";
@@ -23,7 +23,9 @@ export default async function CuentasPosPage({
 }: {
   searchParams: Promise<{ fecha?: string; desde?: string; hasta?: string; formaPago?: string }>;
 }) {
-  await pantallaConPermiso("pos.verHistorico");
+  // Vive en "Día a día": cualquier cajero que puede vender también tiene
+  // que poder buscar una cuenta y cancelarla si hizo falta.
+  await pantallaConPermiso("pos.vender");
 
   const { fecha, desde, hasta, formaPago } = await searchParams;
   const fechaActiva: FiltroFecha = (fecha as FiltroFecha) ?? "hoy";
@@ -61,10 +63,19 @@ export default async function CuentasPosPage({
   const ventas = await db.ventaPos.findMany({
     where: { creadoEn: { gte: rango.gte, lt: rango.lt }, formaPago: formaPago || undefined },
     orderBy: { creadoEn: "desc" },
-    select: { id: true, numero: true, total: true, formaPago: true, registradoPor: true, creadoEn: true },
+    select: {
+      id: true,
+      numero: true,
+      total: true,
+      formaPago: true,
+      registradoPor: true,
+      creadoEn: true,
+      cancelada: true,
+    },
   });
 
-  const totalGeneral = ventas.reduce((s, v) => s + Number(v.total), 0);
+  // Las canceladas no suman: no son plata que haya entrado a la caja.
+  const totalGeneral = ventas.filter((v) => !v.cancelada).reduce((s, v) => s + Number(v.total), 0);
 
   return (
     <div>
@@ -178,6 +189,7 @@ export default async function CuentasPosPage({
               <Th>Hora</Th>
               <Th>Forma de pago</Th>
               <Th>Cajero</Th>
+              <Th>Estado</Th>
               <Th className="text-right">Total</Th>
             </tr>
           </thead>
@@ -186,7 +198,7 @@ export default async function CuentasPosPage({
               <Tr key={v.id}>
                 <Td>
                   <Link
-                    href={`/admin/pos/venta/${v.id}/ticket`}
+                    href={`/admin/pos/venta/${v.id}`}
                     className="font-medium text-azul-oscuro hover:underline"
                   >
                     {formatearNumero(v.numero)}
@@ -203,7 +215,16 @@ export default async function CuentasPosPage({
                 </Td>
                 <Td>{etiquetaFormaPagoPos(v.formaPago)}</Td>
                 <Td>{v.registradoPor}</Td>
-                <Td className="cifra text-right font-medium text-tinta">
+                <Td>
+                  <Pastilla color={v.cancelada ? "peligro" : "exito"}>
+                    {v.cancelada ? "Cancelada" : "Activa"}
+                  </Pastilla>
+                </Td>
+                <Td
+                  className={`cifra text-right font-medium ${
+                    v.cancelada ? "text-tinta-suave line-through" : "text-tinta"
+                  }`}
+                >
                   {formatearGuarani(Number(v.total))}
                 </Td>
               </Tr>
@@ -211,8 +232,8 @@ export default async function CuentasPosPage({
           </tbody>
           <tfoot>
             <tr>
-              <Td colSpan={4} className="text-right font-medium">
-                Total
+              <Td colSpan={5} className="text-right font-medium">
+                Total (sin canceladas)
               </Td>
               <Td className="cifra text-right font-semibold text-tinta">
                 {formatearGuarani(totalGeneral)}

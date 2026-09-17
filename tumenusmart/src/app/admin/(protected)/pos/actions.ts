@@ -169,7 +169,7 @@ export async function cerrarTurno(
   if (turno.estado !== "abierto") return { ok: false, error: "Ese turno ya está cerrado." };
 
   const ventas = await db.ventaPos.findMany({
-    where: { turnoPosId: turnoId },
+    where: { turnoPosId: turnoId, cancelada: false },
     select: { total: true, formaPago: true },
   });
   const resumen = resumirTurno(ventas);
@@ -212,4 +212,42 @@ export async function cerrarTurno(
   revalidatePath("/admin/pos");
   revalidatePath("/admin/pos/turnos");
   return { ok: true, turnoId };
+}
+
+export type ResultadoCancelarVenta = { ok: true } | { ok: false; error: string };
+
+/**
+ * Anula una cuenta ya cobrada.
+ *
+ * No borra nada ni recalcula el turno: si esa venta ya formaba parte de un
+ * turno cerrado, el comprobante de ese cierre sigue mostrando los montos que
+ * se congelaron al cerrar (mismo criterio que Rendicion) — el aviso de
+ * "esto se modificó después" que ya tiene ese comprobante es lo que refleja
+ * la cancelación, no un recálculo silencioso de números ya firmados.
+ */
+export async function cancelarVenta(ventaId: string, motivo: string): Promise<ResultadoCancelarVenta> {
+  const sesion = await exigirPermiso("pos.vender");
+  const storeId = await idLocalActual();
+  const db = prismaDelLocal(storeId);
+
+  const venta = await db.ventaPos.findUnique({
+    where: { id: ventaId },
+    select: { id: true, cancelada: true },
+  });
+  if (!venta) return { ok: false, error: "Esa cuenta no existe." };
+  if (venta.cancelada) return { ok: false, error: "Esa cuenta ya estaba cancelada." };
+
+  await db.ventaPos.update({
+    where: { id: ventaId },
+    data: {
+      cancelada: true,
+      canceladaPor: sesion.nombre?.trim() || sesion.email,
+      canceladaEn: new Date(),
+      motivoCancelacion: motivo.trim() || null,
+    },
+  });
+
+  revalidatePath("/admin/pos/cuentas");
+  revalidatePath(`/admin/pos/venta/${ventaId}`);
+  return { ok: true };
 }
