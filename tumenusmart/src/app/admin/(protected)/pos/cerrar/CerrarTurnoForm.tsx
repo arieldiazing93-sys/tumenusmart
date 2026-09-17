@@ -16,27 +16,29 @@ const ICONOS_FORMA: Record<FormaPagoPos, string> = {
 
 type Props = {
   turnoId: string;
+  /** Solo para el chequeo anti-carrera al confirmar — nunca se muestran en pantalla. */
   cantidad: number;
   totalGeneral: number;
-  porForma: Record<FormaPagoPos, number>;
 };
 
 /**
  * Declarar lo que hay en caja y cerrar el turno.
  *
- * Los 4 campos arrancan precargados con lo que calculó el sistema — el
- * cajero los ajusta si al contar la plata dio distinto, y ve la diferencia
- * en el momento (no recién en el comprobante). Pide confirmación porque es
- * irreversible: una vez cerrado, ese turno sale del listado de turnos
- * abiertos y no se puede seguir vendiendo en él.
+ * El corte es CIEGO a propósito, como se estila acá: el cajero cuenta y
+ * carga sin ver cuánto calculó el sistema. Si lo viera de antemano,
+ * terminaría copiando ese número en vez de contar la plata de verdad, y el
+ * cierre dejaría de servir para detectar un error o un faltante — por eso
+ * los campos arrancan vacíos, sin ningún monto precargado ni de referencia.
+ * La comparación (sistema vs. declarado) recién aparece en el comprobante,
+ * después de confirmar.
  */
-export function CerrarTurnoForm({ turnoId, cantidad, totalGeneral, porForma }: Props) {
+export function CerrarTurnoForm({ turnoId, cantidad, totalGeneral }: Props) {
   const router = useRouter();
   const [declarado, setDeclarado] = useState<Record<FormaPagoPos, string>>({
-    efectivo: String(Math.round(porForma.efectivo)),
-    transferencia: String(Math.round(porForma.transferencia)),
-    tarjeta_debito: String(Math.round(porForma.tarjeta_debito)),
-    tarjeta_credito: String(Math.round(porForma.tarjeta_credito)),
+    efectivo: "",
+    transferencia: "",
+    tarjeta_debito: "",
+    tarjeta_credito: "",
   });
   const [notas, setNotas] = useState("");
   const [confirmando, setConfirmando] = useState(false);
@@ -67,67 +69,39 @@ export function CerrarTurnoForm({ turnoId, cantidad, totalGeneral, porForma }: P
   }
 
   const totalDeclarado = FORMAS_PAGO_POS.reduce((s, f) => s + (parseFloat(declarado[f.valor]) || 0), 0);
-  const diferenciaTotal = totalDeclarado - totalGeneral;
 
   return (
     <div className="flex flex-col gap-5">
       <div className="rounded-lg border border-linea bg-papel-suave px-3.5 py-3 text-[0.85rem] text-tinta-media">
-        {cantidad} {cantidad === 1 ? "cuenta" : "cuentas"} (mostrador + pedidos cobrados acá)
-        <br />
-        Total del sistema: <strong className="cifra text-tinta">{formatearGuarani(totalGeneral)}</strong>
+        Vas a cerrar {cantidad} {cantidad === 1 ? "cuenta" : "cuentas"} (mostrador + pedidos cobrados
+        acá). Contá la caja y cargá lo que tenés en cada forma de pago.
       </div>
 
       <div className="flex flex-col gap-2.5">
-        {FORMAS_PAGO_POS.map((f) => {
-          const valor = parseFloat(declarado[f.valor]) || 0;
-          const diferencia = valor - porForma[f.valor];
-          return (
-            <div
-              key={f.valor}
-              className="flex items-center gap-3 rounded-lg border border-linea bg-white p-3"
-            >
-              <span aria-hidden="true" className="flex-none text-lg leading-none">
-                {ICONOS_FORMA[f.valor]}
-              </span>
-              <div className="min-w-0 flex-1">
-                <p className="text-[0.85rem] font-medium text-tinta">{f.etiqueta}</p>
-                <p className="text-[0.74rem] text-tinta-suave">
-                  Sistema: {formatearGuarani(porForma[f.valor])}
-                  {diferencia !== 0 && (
-                    <span className={diferencia > 0 ? "text-exito" : "text-peligro"}>
-                      {" "}
-                      · {diferencia > 0 ? "+" : ""}
-                      {formatearGuarani(diferencia)}
-                    </span>
-                  )}
-                </p>
-              </div>
-              <div className="w-28 flex-none sm:w-32">
-                <Entrada
-                  type="number"
-                  min={0}
-                  step={1000}
-                  value={declarado[f.valor]}
-                  onChange={(e) => setDeclarado((d) => ({ ...d, [f.valor]: e.target.value }))}
-                  className="text-right"
-                />
-              </div>
+        {FORMAS_PAGO_POS.map((f) => (
+          <div key={f.valor} className="flex items-center gap-3 rounded-lg border border-linea bg-white p-3">
+            <span aria-hidden="true" className="flex-none text-lg leading-none">
+              {ICONOS_FORMA[f.valor]}
+            </span>
+            <p className="min-w-0 flex-1 text-[0.85rem] font-medium text-tinta">{f.etiqueta}</p>
+            <div className="w-28 flex-none sm:w-32">
+              <Entrada
+                type="number"
+                min={0}
+                step={1000}
+                placeholder="0"
+                value={declarado[f.valor]}
+                onChange={(e) => setDeclarado((d) => ({ ...d, [f.valor]: e.target.value }))}
+                className="text-right"
+              />
             </div>
-          );
-        })}
+          </div>
+        ))}
       </div>
 
       <div className="flex items-center justify-between border-t border-linea pt-3">
         <span className="text-[0.85rem] text-tinta-media">Total declarado</span>
-        <span className="cifra text-[1.2rem] font-bold text-tinta">
-          {formatearGuarani(totalDeclarado)}
-          {diferenciaTotal !== 0 && (
-            <span className={`ml-2 text-[0.85rem] font-semibold ${diferenciaTotal > 0 ? "text-exito" : "text-peligro"}`}>
-              ({diferenciaTotal > 0 ? "+" : ""}
-              {formatearGuarani(diferenciaTotal)})
-            </span>
-          )}
-        </span>
+        <span className="cifra text-[1.2rem] font-bold text-tinta">{formatearGuarani(totalDeclarado)}</span>
       </div>
 
       <Area

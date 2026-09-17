@@ -31,8 +31,8 @@ function armarGrupos(hayIdeaSinVer: boolean, rol: string): GrupoSecciones[] {
     {
       titulo: "Día a día",
       secciones: [
-        { href: "/admin/pedidos", label: "Pedidos", icono: "pedidos" as const,
-          ver: conPermiso("pedidos.ver") },
+        // Punto de venta va primero: es lo que más se toca en el momento,
+        // varias veces por hora. Pedidos (online) queda debajo.
         { href: "/admin/pos", label: "Punto de venta", icono: "pos" as const,
           ver: conPermiso("pos.vender") },
         // Vive acá y no en "Cómo va el negocio": el cajero necesita buscar
@@ -40,6 +40,8 @@ function armarGrupos(hayIdeaSinVer: boolean, rol: string): GrupoSecciones[] {
         // repasando el día después.
         { href: "/admin/pos/cuentas", label: "Cuentas del mostrador", icono: "pedidos" as const,
           ver: conPermiso("pos.vender") },
+        { href: "/admin/pedidos", label: "Pedidos", icono: "pedidos" as const,
+          ver: conPermiso("pedidos.ver") },
         // Mismo permiso y misma pantalla que "Pedidos" — solo entra con el
         // filtro de tipo puesto en "mesa", para que los pedidos de comer en
         // el local queden aparte de un clic sin duplicar toda la pantalla.

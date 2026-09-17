@@ -37,14 +37,19 @@ export default async function CerrarTurnoPage() {
     <div>
       <Cabecera
         titulo="Cerrar turno"
-        bajada="Contá la caja y declará cuánto tenés en cada forma de pago."
+        bajada="Corte ciego: contá la caja y declará cada forma de pago antes de ver lo que calculó el sistema."
       />
       <Tarjeta className="max-w-lg shadow-sm">
+        {/* A propósito NO se le pasa a este formulario lo que calculó el
+            sistema (resumen.porForma): un corte de caja en Paraguay es
+            ciego — si el cajero viera el número de antemano, terminaría
+            copiándolo en vez de contar de verdad, y el cierre dejaría de
+            servir para detectar un error o un faltante. La comparación
+            recién se muestra en el comprobante, después de confirmar. */}
         <CerrarTurnoForm
           turnoId={turno.id}
           cantidad={resumen.cantidad}
           totalGeneral={resumen.totalGeneral}
-          porForma={resumen.porForma}
         />
       </Tarjeta>
     </div>
