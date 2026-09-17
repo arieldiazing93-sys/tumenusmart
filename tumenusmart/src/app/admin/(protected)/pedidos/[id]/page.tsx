@@ -76,7 +76,7 @@ export default async function DetallePedidoPage({
             rel="noopener noreferrer"
             className="rounded-lg border border-linea px-3 py-2 text-sm font-semibold text-tinta-media hover:border-brand hover:text-brand"
           >
-            🧾 Ticket
+            {pedido.comprobanteTipo === "factura" && pedido.facturaNumero ? "🧾 Factura" : "🧾 Ticket"}
           </a>
         </div>
       </div>
@@ -147,10 +147,18 @@ export default async function DetallePedidoPage({
 
           {pedido.comprobanteTipo === "factura" && (
             <div className="mt-3 rounded bg-aviso-luz px-2 py-1.5 text-sm text-aviso">
-              <p className="font-medium">Factura</p>
+              <p className="font-medium">
+                {pedido.facturaNumero ? `Factura N° ${pedido.facturaNumero}` : "Factura (todavía sin emitir)"}
+              </p>
               <p>Razón social: {pedido.facturaRazonSocial}</p>
               <p>RUC: {pedido.facturaRuc}</p>
               {pedido.facturaEmail && <p>Correo: {pedido.facturaEmail}</p>}
+              {!pedido.facturaNumero && (
+                <p className="mt-1 text-tinta-media">
+                  Se emite al pasar a {pedido.tipoEntrega === "delivery" ? '"En despacho"' : '"Entregado"'}, si
+                  esta computadora tiene una estación con punto de expedición vigente.
+                </p>
+              )}
             </div>
           )}
 
