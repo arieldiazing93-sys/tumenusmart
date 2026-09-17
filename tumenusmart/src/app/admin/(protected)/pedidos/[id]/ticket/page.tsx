@@ -128,8 +128,8 @@ export default async function TicketPage({
         <Separador />
 
         {esFactura ? (
-          <div className="text-center">
-            <p className="text-[1.05rem] font-bold tracking-titular">FACTURA</p>
+          <div>
+            <p className="text-center text-[1.05rem] font-bold tracking-titular">FACTURA</p>
             <p className="text-xs leading-tight">Razón social: {pedido.facturaRazonSocialEmisor}</p>
             <p className="text-xs leading-tight">RUC: {pedido.facturaRucEmisor}</p>
             <p className="mt-1 text-xs leading-tight">Timbrado N°: {pedido.facturaTimbrado}</p>
@@ -139,7 +139,7 @@ export default async function TicketPage({
                 {pedido.facturaVencimiento.toLocaleDateString("es-PY", { timeZone: ZONA_NEGOCIO })}
               </p>
             )}
-            <p className="mt-1 text-[1rem] font-semibold tracking-titular">N°: {pedido.facturaNumero}</p>
+            <p className="mt-1 text-center text-[1rem] font-semibold tracking-titular">N°: {pedido.facturaNumero}</p>
             <p className="text-xs">Fecha: {fecha}</p>
           </div>
         ) : (
@@ -174,7 +174,12 @@ export default async function TicketPage({
 
         <Separador />
 
-        <div>
+        {/* text-xs acá es lo que hace que las 40 columnas de filaTabla
+            entren en una sola línea sin envolver — al tamaño de letra del
+            resto del ticket (text-sm) no entran, aunque el string mida
+            exactamente lo mismo que las líneas de Gravadas/IVA de más
+            abajo, que sí usan text-xs y por eso nunca se cortaban. */}
+        <div className="text-xs leading-tight">
           {esFactura && (
             <p className="mb-1 whitespace-pre-wrap">
               {filaTabla("Ctd", "Descripción", "Monto")}
@@ -189,12 +194,8 @@ export default async function TicketPage({
                   formatearMiles(item.cantidad * Number(item.precioUnitario))
                 )}
               </p>
-              {item.opcionesTexto && (
-                <p className="pl-3 text-xs leading-tight">+ {item.opcionesTexto}</p>
-              )}
-              {item.ingredientesQuitadosTexto && (
-                <p className="pl-3 text-xs leading-tight">{item.ingredientesQuitadosTexto}</p>
-              )}
+              {item.opcionesTexto && <p className="pl-3">+ {item.opcionesTexto}</p>}
+              {item.ingredientesQuitadosTexto && <p className="pl-3">{item.ingredientesQuitadosTexto}</p>}
             </div>
           ))}
         </div>
