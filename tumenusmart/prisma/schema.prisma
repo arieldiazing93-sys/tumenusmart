@@ -562,6 +562,26 @@ model Order {
   facturaRazonSocial   String?
   facturaRuc           String?
   facturaEmail         String?
+
+  // Fiscales — se completan y se CONGELAN solo cuando se emite como
+  // factura de verdad (retiro/mesa al marcar "entregado", delivery al
+  // pasar a "en_despacho" — ver cambiarEstadoPedido en pedidos/actions.ts).
+  // A diferencia de VentaPos (que lee el emisor en vivo vía
+  // turnoPos.estacion.puntoExpedicion porque una venta de mostrador SIEMPRE
+  // tiene turno), acá también se congela razonSocialEmisor/rucEmisor: un
+  // pedido de delivery nunca tiene turno, así que no hay otra forma de
+  // rastrear después qué punto de expedición lo emitió.
+  facturaNumero            String?
+  facturaTimbrado          String?
+  facturaVencimiento       DateTime?
+  facturaGravado10         Decimal?  @db.Decimal(10, 2)
+  facturaGravado5          Decimal?  @db.Decimal(10, 2)
+  facturaExento            Decimal?  @db.Decimal(10, 2)
+  facturaIva10             Decimal?  @db.Decimal(10, 2)
+  facturaIva5              Decimal?  @db.Decimal(10, 2)
+  facturaRazonSocialEmisor String?
+  facturaRucEmisor         String?
+
   notas                String?
   // El pedido se guarda ANTES de que el cliente apriete "Enviar por
   // WhatsApp". Esta marca distingue los pedidos realmente enviados de los
@@ -597,6 +617,10 @@ model OrderItem {
   nombreProducto String // snapshot: el nombre al momento del pedido
   cantidad       Int
   precioUnitario Decimal @db.Decimal(10, 2)
+  // Snapshot de la tasa de IVA al momento del pedido — igual que
+  // VentaPosItem.iva: si el producto cambia de tasa después, las facturas
+  // viejas no se mueven solas.
+  iva            String  @default("gravado10")
   opcionesTexto  String? // snapshot de las opciones elegidas, en texto legible
   ingredientesQuitadosTexto String? // snapshot de ingredientes que el cliente sacó, ej: "tomate, cebolla"
   /// Snapshot de cuánto costaban (sumados) los agregados/variantes elegidos

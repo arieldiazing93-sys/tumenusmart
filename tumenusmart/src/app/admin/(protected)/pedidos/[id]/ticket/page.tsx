@@ -107,21 +107,48 @@ export default async function TicketPage({
 
         <Separador />
 
-        <div>
-          <p className="text-[1.1rem] font-semibold tracking-titular">Pedido {formatearNumero(pedido.numero)}</p>
-          <p className="text-xs">{fecha}</p>
-          <p className="mt-1">Cliente: {pedido.clienteNombre}</p>
-          <p>Tel: {pedido.clienteTelefono}</p>
-        </div>
+        {pedido.comprobanteTipo === "factura" && pedido.facturaNumero ? (
+          <div className="text-center">
+            <p className="text-[1.05rem] font-bold tracking-titular">FACTURA AUTOIMPRESOR</p>
+            <p className="text-xs leading-tight">
+              {pedido.facturaRazonSocialEmisor} — RUC: {pedido.facturaRucEmisor}
+            </p>
+            <p className="mt-1 text-xs leading-tight">Timbrado N° {pedido.facturaTimbrado}</p>
+            {pedido.facturaVencimiento && (
+              <p className="text-xs leading-tight">
+                Válido hasta{" "}
+                {pedido.facturaVencimiento.toLocaleDateString("es-PY", { timeZone: ZONA_NEGOCIO })}
+              </p>
+            )}
+            <p className="mt-1 text-[1rem] font-semibold tracking-titular">N° {pedido.facturaNumero}</p>
+            <p className="text-xs">{fecha}</p>
+          </div>
+        ) : (
+          <div>
+            <p className="text-[1.1rem] font-semibold tracking-titular">Pedido {formatearNumero(pedido.numero)}</p>
+            <p className="text-xs">{fecha}</p>
+            <p className="mt-1">Cliente: {pedido.clienteNombre}</p>
+            <p>Tel: {pedido.clienteTelefono}</p>
+          </div>
+        )}
 
         {pedido.comprobanteTipo === "factura" && (
           <>
             <Separador />
             <div className="text-xs">
-              <p className="font-bold uppercase">Datos para factura</p>
-              <p>Razon social: {pedido.facturaRazonSocial}</p>
-              <p>RUC: {pedido.facturaRuc}</p>
-              {pedido.facturaEmail && <p>Correo: {pedido.facturaEmail}</p>}
+              {pedido.facturaNumero ? (
+                <>
+                  <p>Cliente: {pedido.facturaRazonSocial}</p>
+                  <p>RUC: {pedido.facturaRuc}</p>
+                </>
+              ) : (
+                <>
+                  <p className="font-bold uppercase">Datos para factura</p>
+                  <p>Razon social: {pedido.facturaRazonSocial}</p>
+                  <p>RUC: {pedido.facturaRuc}</p>
+                  {pedido.facturaEmail && <p>Correo: {pedido.facturaEmail}</p>}
+                </>
+              )}
             </div>
           </>
         )}
@@ -167,6 +194,29 @@ export default async function TicketPage({
 
         <Separador />
 
+        {pedido.comprobanteTipo === "factura" && pedido.facturaNumero && (
+          <>
+            <div className="text-xs leading-tight">
+              {Number(pedido.facturaGravado10 ?? 0) > 0 && (
+                <p>{filaConMonto("Gravadas 10%", formatearGuarani(Number(pedido.facturaGravado10)), ANCHO_RENGLON)}</p>
+              )}
+              {Number(pedido.facturaGravado5 ?? 0) > 0 && (
+                <p>{filaConMonto("Gravadas 5%", formatearGuarani(Number(pedido.facturaGravado5)), ANCHO_RENGLON)}</p>
+              )}
+              {Number(pedido.facturaExento ?? 0) > 0 && (
+                <p>{filaConMonto("Exentas", formatearGuarani(Number(pedido.facturaExento)), ANCHO_RENGLON)}</p>
+              )}
+              {Number(pedido.facturaIva10 ?? 0) > 0 && (
+                <p>{filaConMonto("IVA 10%", formatearGuarani(Number(pedido.facturaIva10)), ANCHO_RENGLON)}</p>
+              )}
+              {Number(pedido.facturaIva5 ?? 0) > 0 && (
+                <p>{filaConMonto("IVA 5%", formatearGuarani(Number(pedido.facturaIva5)), ANCHO_RENGLON)}</p>
+              )}
+            </div>
+            <Separador />
+          </>
+        )}
+
         <div className="text-xs">
           <p>
             <span className="font-bold">Pago:</span>{" "}
@@ -190,7 +240,9 @@ export default async function TicketPage({
         <p className="pt-1 text-center text-xs">
           Gracias por su compra!
           <br />
-          Este comprobante no es una factura legal.
+          {pedido.comprobanteTipo === "factura" && pedido.facturaNumero
+            ? "Documento válido como Factura Autoimpresor."
+            : "Este comprobante no es una factura legal."}
         </p>
 
         <Separador />

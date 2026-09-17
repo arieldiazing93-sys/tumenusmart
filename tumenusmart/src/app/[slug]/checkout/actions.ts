@@ -287,6 +287,7 @@ export async function crearPedido(datos: DatosCheckout): Promise<ResultadoPedido
           nombreProducto: l.nombreProducto,
           cantidad: l.cantidad,
           precioUnitario: l.precioUnitario,
+          iva: l.iva,
           opcionesTexto: l.opcionesTexto,
           ingredientesQuitadosTexto: l.ingredientesQuitadosTexto,
           costoAgregados: l.costoAgregados,

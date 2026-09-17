@@ -2,10 +2,11 @@
 
 import { exigirPermiso } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
-import { prismaDelLocal } from "@/lib/prisma-local";
+import { prismaDelLocal, type PrismaLocal } from "@/lib/prisma-local";
 import { idLocalActual } from "@/lib/local-actual";
 import { normalizarFormaPagoPos } from "@/lib/turno-pos";
 import { estacionActual } from "@/lib/estacion-actual";
+import { desglosarIva, formatearNumeroFactura } from "@/lib/factura-pos";
 import { turnoAbierto } from "../pos/turno-actual";
 
 const ESTADOS_VALIDOS = [
@@ -17,7 +18,84 @@ const ESTADOS_VALIDOS = [
   "cancelado",
 ];
 
-export type ResultadoPedidoAccion = { ok: true } | { ok: false; error: string };
+export type ResultadoPedidoAccion = { ok: true; aviso?: string } | { ok: false; error: string };
+
+/**
+ * Si este pedido pidió factura y todavía no se le emitió número, intenta
+ * emitirlo con el punto de expedición de la estación vinculada a ESTA
+ * computadora (mismo mecanismo de cookie que usa el Punto de Venta — sin
+ * turno de caja de por medio, acá solo hace falta el punto de expedición
+ * para numerar).
+ *
+ * Nunca lanza ni bloquea el cambio de estado: si no hay estación vinculada,
+ * o su punto de expedición no está asignado o está vencido, el pedido sigue
+ * avanzando igual como comprobante informal — pero devuelve un aviso para
+ * que quien hizo el cambio sepa que no salió una factura de verdad.
+ */
+async function intentarEmitirFactura(
+  prisma: PrismaLocal,
+  pedido: {
+    comprobanteTipo: string;
+    facturaNumero: string | null;
+    items: { precioUnitario: unknown; cantidad: number; iva: string }[];
+    /** Costo de envío (delivery), gravado al 10% igual que cualquier
+     *  servicio — si no se suma acá, Gravadas+Exentas queda por debajo del
+     *  total real del pedido en la factura impresa. */
+    costoEnvio?: unknown;
+  }
+): Promise<{ datos: Record<string, unknown>; aviso?: string }> {
+  if (pedido.comprobanteTipo !== "factura" || pedido.facturaNumero) {
+    // No pidió factura, o ya se emitió antes (idempotencia: nunca quema un
+    // segundo número para el mismo pedido).
+    return { datos: {} };
+  }
+
+  const estacion = await estacionActual(prisma);
+  const conPunto = estacion
+    ? await prisma.estacion.findUnique({ where: { id: estacion.id }, select: { puntoExpedicion: true } })
+    : null;
+  const pe = conPunto?.puntoExpedicion;
+  if (!pe || !pe.activo || pe.timbradoHasta < new Date()) {
+    return {
+      datos: {},
+      aviso:
+        "El cliente pidió factura, pero esta computadora no tiene un punto de expedición vigente — se imprime como comprobante informal, no como factura.",
+    };
+  }
+
+  const peActualizado = await prisma.puntoExpedicion.update({
+    where: { id: pe.id },
+    data: { ultimoNumeroFactura: { increment: 1 } },
+    select: { ultimoNumeroFactura: true },
+  });
+  // pedido.items.precioUnitario llega como Decimal de Prisma — desglosarIva
+  // pide number. El envío entra como una línea más, gravada al 10%.
+  const lineas = pedido.items.map((i) => ({
+    precioUnitario: Number(i.precioUnitario),
+    cantidad: i.cantidad,
+    iva: i.iva,
+  }));
+  const costoEnvio = Number(pedido.costoEnvio ?? 0);
+  if (costoEnvio > 0) {
+    lineas.push({ precioUnitario: costoEnvio, cantidad: 1, iva: "gravado10" });
+  }
+  const desglose = desglosarIva(lineas);
+
+  return {
+    datos: {
+      facturaNumero: formatearNumeroFactura(pe.establecimiento, pe.puntoExpedicion, peActualizado.ultimoNumeroFactura),
+      facturaTimbrado: pe.numeroTimbrado,
+      facturaVencimiento: pe.timbradoHasta,
+      facturaGravado10: desglose.gravado10,
+      facturaGravado5: desglose.gravado5,
+      facturaExento: desglose.exento,
+      facturaIva10: desglose.iva10,
+      facturaIva5: desglose.iva5,
+      facturaRazonSocialEmisor: pe.razonSocialEmisor,
+      facturaRucEmisor: pe.rucEmisor,
+    },
+  };
+}
 
 /**
  * Devuelve un resultado en vez de lanzar los errores de validación: Next.js
@@ -37,16 +115,34 @@ export async function cambiarEstadoPedido(
     return { ok: false, error: "Estado inválido" };
   }
 
+  let datosFactura: Record<string, unknown> = {};
+  let aviso: string | undefined;
+
   if (estado === "en_despacho") {
     const pedido = await prisma.order.findUnique({
       where: { id: orderId },
-      select: { tipoEntrega: true, repartidorId: true },
+      select: {
+        tipoEntrega: true,
+        repartidorId: true,
+        comprobanteTipo: true,
+        facturaNumero: true,
+        costoEnvio: true,
+        items: { select: { precioUnitario: true, cantidad: true, iva: true } },
+      },
     });
     if (pedido?.tipoEntrega === "delivery" && !pedido.repartidorId) {
       return {
         ok: false,
         error: 'Asigná un repartidor antes de pasar el pedido a "En despacho".',
       };
+    }
+    // La factura de un delivery tiene que estar impresa ANTES de que el
+    // repartidor se vaya — a "entregado" ya llega tarde, para entonces se
+    // fue sin el papel. Retiro/mesa se numera más abajo, al entregar.
+    if (pedido?.tipoEntrega === "delivery") {
+      const resultado = await intentarEmitirFactura(prisma, pedido);
+      datosFactura = resultado.datos;
+      aviso = resultado.aviso;
     }
   }
 
@@ -59,7 +155,14 @@ export async function cambiarEstadoPedido(
   if (estado === "entregado") {
     const pedido = await prisma.order.findUnique({
       where: { id: orderId },
-      select: { tipoEntrega: true, estado: true },
+      select: {
+        tipoEntrega: true,
+        estado: true,
+        comprobanteTipo: true,
+        facturaNumero: true,
+        costoEnvio: true,
+        items: { select: { precioUnitario: true, cantidad: true, iva: true } },
+      },
     });
     if (pedido && pedido.tipoEntrega !== "delivery" && pedido.estado !== "entregado") {
       // Se ata al turno de la MISMA computadora desde la que se marca
@@ -77,17 +180,24 @@ export async function cambiarEstadoPedido(
         }
         datosExtra = { formaPagoPos: normalizarFormaPagoPos(formaPagoPos), turnoPosId: turno.id };
       }
+
+      const resultado = await intentarEmitirFactura(prisma, pedido);
+      datosFactura = resultado.datos;
+      aviso = resultado.aviso;
     }
   }
 
-  await prisma.order.update({ where: { id: orderId }, data: { estado, ...datosExtra } });
+  await prisma.order.update({
+    where: { id: orderId },
+    data: { estado, ...datosExtra, ...datosFactura },
+  });
   revalidatePath("/admin/pedidos");
   revalidatePath(`/admin/pedidos/${orderId}`);
   if ("turnoPosId" in datosExtra) {
     revalidatePath("/admin/pos");
     revalidatePath("/admin/pos/turnos");
   }
-  return { ok: true };
+  return { ok: true, aviso };
 }
 
 export async function asignarRepartidor(

@@ -21,6 +21,7 @@ export function EstadoBotones({
 }) {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [aviso, setAviso] = useState<string | null>(null);
   const [pidiendoPago, setPidiendoPago] = useState(false);
 
   const faltaRepartidor = tipoEntrega === "delivery" && !repartidorId;
@@ -31,15 +32,20 @@ export function EstadoBotones({
 
   function confirmarEntregado(formaPago: FormaPagoPos) {
     setError(null);
+    setAviso(null);
     startTransition(async () => {
       const resultado = await cambiarEstadoPedido(orderId, "entregado", formaPago);
       if (!resultado.ok) setError(resultado.error);
-      else setPidiendoPago(false);
+      else {
+        setPidiendoPago(false);
+        if (resultado.aviso) setAviso(resultado.aviso);
+      }
     });
   }
 
   function handleClick(estado: string) {
     setError(null);
+    setAviso(null);
     if (estado === "en_despacho" && faltaRepartidor) {
       setError("Asigná un repartidor antes de pasar el pedido a \"En despacho\".");
       return;
@@ -51,6 +57,7 @@ export function EstadoBotones({
     startTransition(async () => {
       const resultado = await cambiarEstadoPedido(orderId, estado);
       if (!resultado.ok) setError(resultado.error);
+      else if (resultado.aviso) setAviso(resultado.aviso);
     });
   }
 
@@ -81,6 +88,7 @@ export function EstadoBotones({
         })}
       </div>
       {error && <p className="mt-2 text-sm text-peligro">{error}</p>}
+      {aviso && !error && <p className="mt-2 text-sm text-aviso">{aviso}</p>}
       {faltaRepartidor && !error && (
         <p className="mt-2 text-xs text-tinta-suave">
           Este pedido es delivery y todavía no tiene repartidor asignado.
