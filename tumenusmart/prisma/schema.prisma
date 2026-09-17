@@ -783,6 +783,9 @@ model VentaPosItem {
   nombreProducto String   // snapshot: el nombre al momento de la venta
   cantidad       Int
   precioUnitario Decimal  @db.Decimal(10, 2)
+  // Snapshot de los agregados elegidos, en texto legible — igual que
+  // OrderItem.opcionesTexto. Null si no se eligió ninguno.
+  opcionesTexto  String?
 
   @@index([storeId])
   @@index([ventaPosId])

@@ -24,7 +24,18 @@ export default async function PosPage() {
       productos: {
         where: { disponible: true },
         orderBy: { orden: "asc" },
-        select: { id: true, nombre: true, precio: true, mitadYMitadGrupo: true, mitadYMitadModo: true },
+        select: {
+          id: true,
+          nombre: true,
+          precio: true,
+          mitadYMitadGrupo: true,
+          mitadYMitadModo: true,
+          opciones: {
+            where: { tipo: "agregado" },
+            orderBy: { orden: "asc" },
+            select: { id: true, nombre: true, precioExtra: true },
+          },
+        },
       },
     },
   });
@@ -34,7 +45,12 @@ export default async function PosPage() {
     .map((c) => ({
       id: c.id,
       nombre: c.nombre,
-      productos: c.productos.map((p) => ({ id: p.id, nombre: p.nombre, precio: Number(p.precio) })),
+      productos: c.productos.map((p) => ({
+        id: p.id,
+        nombre: p.nombre,
+        precio: Number(p.precio),
+        agregados: p.opciones.map((o) => ({ id: o.id, nombre: o.nombre, precioExtra: Number(o.precioExtra) })),
+      })),
     }));
 
   // Mismo agrupado que el menú público (ver src/app/[slug]/page.tsx): los

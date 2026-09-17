@@ -79,6 +79,9 @@ export default async function ComandaVentaPosPage({
               <p className="text-[1.4rem] font-semibold tracking-titular uppercase leading-tight">
                 {item.cantidad} x {item.nombreProducto}
               </p>
+              {item.opcionesTexto && (
+                <p className="mt-0.5 text-base leading-tight">+ {item.opcionesTexto}</p>
+              )}
             </li>
           ))}
         </ul>

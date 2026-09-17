@@ -56,7 +56,7 @@ export type ResultadoVenta =
   | { ok: false; error: string };
 
 export type ItemVentaInput =
-  | { productId: string; cantidad: number }
+  | { productId: string; opcionIds?: string[]; cantidad: number }
   | { mitadYMitad: { productIdA: string; productIdB: string }; cantidad: number };
 
 export type DatosVenta = {
@@ -100,9 +100,10 @@ export async function registrarVenta(turnoId: string, datos: DatosVenta): Promis
     return { ok: false, error: "El carrito está vacío." };
   }
 
-  // El POS no ofrece variantes/agregados en ningún producto — la carta se
-  // relee igual que en el checkout, solo que acá "opciones" siempre queda
-  // vacío porque nunca se le pide al catálogo.
+  // El POS no ofrece variantes ni ingredientes-a-sacar (esos siguen siendo
+  // exclusivos del menú online) — pero sí agregados, para ahorrarle al
+  // cajero cargar "con queso extra" como una nota suelta. Se relee la carta
+  // real igual que el checkout, con los agregados de cada producto.
   const productosDelLocal = await db.product.findMany({
     // Mismo filtro que el checkout público: si una categoría se desactivó
     // justo mientras el cajero tenía la pantalla abierta, sus productos no
@@ -116,6 +117,11 @@ export async function registrarVenta(turnoId: string, datos: DatosVenta): Promis
       ingredientes: true,
       mitadYMitadGrupo: true,
       mitadYMitadModo: true,
+      opciones: {
+        where: { tipo: "agregado" },
+        orderBy: { orden: "asc" },
+        select: { id: true, nombre: true, tipo: true, precioExtra: true, costo: true },
+      },
     },
   });
   const catalogo: ProductoBase[] = productosDelLocal.map((p) => ({
@@ -126,13 +132,13 @@ export async function registrarVenta(turnoId: string, datos: DatosVenta): Promis
     ingredientes: p.ingredientes,
     mitadYMitadGrupo: p.mitadYMitadGrupo,
     mitadYMitadModo: p.mitadYMitadModo,
-    opciones: [],
+    opciones: p.opciones,
   }));
 
   const pedidas: LineaPedida[] = datos.items.map((it) =>
     "mitadYMitad" in it
       ? { mitadYMitad: it.mitadYMitad, cantidad: it.cantidad }
-      : { productId: it.productId, cantidad: it.cantidad }
+      : { productId: it.productId, opcionIds: it.opcionIds ?? [], cantidad: it.cantidad }
   );
 
   const armado = armarPedido(catalogo, pedidas);
@@ -178,6 +184,7 @@ export async function registrarVenta(turnoId: string, datos: DatosVenta): Promis
             nombreProducto: f.nombreProducto,
             cantidad: f.cantidad,
             precioUnitario: f.precioUnitario,
+            opcionesTexto: f.opcionesTexto ?? null,
           })),
         },
       },

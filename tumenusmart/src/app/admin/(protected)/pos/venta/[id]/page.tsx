@@ -139,13 +139,18 @@ export default async function DetalleVentaPosPage({
 
           <div className="flex flex-col gap-2 border-t border-linea pt-3">
             {venta.items.map((item) => (
-              <div key={item.id} className="flex items-center justify-between text-[0.85rem]">
-                <span className="text-tinta">
-                  {item.cantidad}x {item.nombreProducto}
-                </span>
-                <span className="cifra text-tinta-media">
-                  {formatearGuarani(item.cantidad * Number(item.precioUnitario))}
-                </span>
+              <div key={item.id} className="text-[0.85rem]">
+                <div className="flex items-center justify-between">
+                  <span className="text-tinta">
+                    {item.cantidad}x {item.nombreProducto}
+                  </span>
+                  <span className="cifra text-tinta-media">
+                    {formatearGuarani(item.cantidad * Number(item.precioUnitario))}
+                  </span>
+                </div>
+                {item.opcionesTexto && (
+                  <p className="pl-3 text-[0.78rem] text-tinta-suave">+ {item.opcionesTexto}</p>
+                )}
               </div>
             ))}
           </div>

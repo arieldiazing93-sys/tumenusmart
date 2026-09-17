@@ -10,16 +10,23 @@ import { type FormaPagoPos } from "@/lib/turno-pos";
 import { registrarVenta } from "./actions";
 import { CobrarModal } from "./CobrarModal";
 import { MitadYMitadPickerPos } from "./MitadYMitadPickerPos";
+import { AgregadosPickerPos } from "./AgregadosPickerPos";
 
-type Producto = { id: string; nombre: string; precio: number };
+type Agregado = { id: string; nombre: string; precioExtra: number };
+type Producto = { id: string; nombre: string; precio: number; agregados: Agregado[] };
 type Categoria = { id: string; nombre: string; productos: Producto[] };
 type ProductoMitad = { id: string; nombre: string; precio: number; mitadYMitadModo: string };
 type GrupoMitad = { nombreVisible: string; categoriaId: string; productos: ProductoMitad[] };
 type TipoEntregaPos = "local" | "llevar";
 
-/** Un producto normal o un combo mitad y mitad ya armado, con su propia clave. */
-type ItemCarrito = { key: string; nombre: string; precio: number; cantidad: number } & (
-  | { tipo: "producto"; productId: string }
+/**
+ * Un producto normal (con o sin agregados elegidos) o un combo mitad y
+ * mitad ya armado, con su propia clave. Un mismo producto con distintos
+ * agregados son líneas distintas del carrito — mismo criterio que el menú
+ * público (construirKey por producto + opciones elegidas).
+ */
+type ItemCarrito = { key: string; nombre: string; precio: number; cantidad: number; detalle?: string } & (
+  | { tipo: "producto"; productId: string; agregadoIds: string[] }
   | { tipo: "combo"; productIdA: string; productIdB: string }
 );
 
@@ -27,7 +34,7 @@ const TODOS = "__todos__";
 
 const TIPOS_ENTREGA_POS: { value: TipoEntregaPos; label: string }[] = [
   { value: "local", label: "🏪 En el local" },
-  { value: "llevar", label: "🛵 Despacho" },
+  { value: "llevar", label: "🛵 Para llevar" },
 ];
 
 /**
@@ -58,11 +65,15 @@ export function PantallaVenta({
   const [mostrarCobro, setMostrarCobro] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [cobrando, setCobrando] = useState(false);
+  const [productoEligiendo, setProductoEligiendo] = useState<Producto | null>(null);
 
+  // Suma, no pisa: un mismo producto puede estar en el carrito varias veces
+  // con distintos agregados (líneas distintas), y el número sobre la
+  // tarjeta tiene que mostrar el total, no la última línea agregada.
   const cantidadesPorProducto = useMemo(() => {
     const mapa = new Map<string, number>();
     for (const i of carrito) {
-      if (i.tipo === "producto") mapa.set(i.productId, i.cantidad);
+      if (i.tipo === "producto") mapa.set(i.productId, (mapa.get(i.productId) ?? 0) + i.cantidad);
     }
     return mapa;
   }, [carrito]);
@@ -81,6 +92,12 @@ export function PantallaVenta({
 
   function agregarProducto(p: Producto) {
     setError(null);
+    // Con agregados para elegir, siempre abre el selector — igual que "Elegir
+    // agregados" en el menú público, en vez de sumar 1 a ciegas sin preguntar.
+    if (p.agregados.length > 0) {
+      setProductoEligiendo(p);
+      return;
+    }
     setCarrito((actual) => {
       const existente = actual.find((i) => i.key === p.id);
       if (existente) {
@@ -88,9 +105,32 @@ export function PantallaVenta({
       }
       return [
         ...actual,
-        { key: p.id, tipo: "producto", productId: p.id, nombre: p.nombre, precio: p.precio, cantidad: 1 },
+        { key: p.id, tipo: "producto", productId: p.id, agregadoIds: [], nombre: p.nombre, precio: p.precio, cantidad: 1 },
       ];
     });
+  }
+
+  function confirmarAgregadosProducto(agregadoIds: string[], cantidad: number) {
+    const p = productoEligiendo;
+    if (!p) return;
+    const elegidos = p.agregados.filter((a) => agregadoIds.includes(a.id));
+    const precio = p.precio + elegidos.reduce((s, a) => s + a.precioExtra, 0);
+    const idsOrdenados = [...agregadoIds].sort();
+    const key = idsOrdenados.length > 0 ? `${p.id}::${idsOrdenados.join(",")}` : p.id;
+    const detalle = elegidos.length > 0 ? elegidos.map((a) => a.nombre).join(", ") : undefined;
+
+    setError(null);
+    setCarrito((actual) => {
+      const existente = actual.find((i) => i.key === key);
+      if (existente) {
+        return actual.map((i) => (i.key === key ? { ...i, cantidad: i.cantidad + cantidad } : i));
+      }
+      return [
+        ...actual,
+        { key, tipo: "producto", productId: p.id, agregadoIds: idsOrdenados, nombre: p.nombre, precio, cantidad, detalle },
+      ];
+    });
+    setProductoEligiendo(null);
   }
 
   function agregarCombo(a: ProductoMitad, b: ProductoMitad, precio: number, cantidad: number) {
@@ -137,7 +177,7 @@ export function PantallaVenta({
       items: carrito.map((i) =>
         i.tipo === "combo"
           ? { mitadYMitad: { productIdA: i.productIdA, productIdB: i.productIdB }, cantidad: i.cantidad }
-          : { productId: i.productId, cantidad: i.cantidad }
+          : { productId: i.productId, opcionIds: i.agregadoIds, cantidad: i.cantidad }
       ),
     });
     setCobrando(false);
@@ -275,6 +315,7 @@ export function PantallaVenta({
                 >
                   <div className="min-w-0">
                     <p className="truncate text-[0.85rem] font-medium text-tinta">{i.nombre}</p>
+                    {i.detalle && <p className="truncate text-[0.76rem] text-tinta-suave">+ {i.detalle}</p>}
                     <p className="text-[0.78rem] text-tinta-suave">
                       {formatearGuarani(i.precio)} c/u · subtotal {formatearGuarani(i.precio * i.cantidad)}
                     </p>
@@ -361,6 +402,16 @@ export function PantallaVenta({
           error={error}
           onCerrar={() => setMostrarCobro(false)}
           onCobrar={confirmarCobro}
+        />
+      )}
+
+      {productoEligiendo && (
+        <AgregadosPickerPos
+          nombre={productoEligiendo.nombre}
+          precioBase={productoEligiendo.precio}
+          agregados={productoEligiendo.agregados}
+          onCerrar={() => setProductoEligiendo(null)}
+          onAgregar={confirmarAgregadosProducto}
         />
       )}
     </div>

@@ -99,13 +99,18 @@ export default async function TicketVentaPosPage({
 
         <div>
           {venta.items.map((item) => (
-            <p key={item.id} className="whitespace-pre-wrap">
-              {filaConMonto(
-                `${item.cantidad}x ${item.nombreProducto}`,
-                formatearGuarani(item.cantidad * Number(item.precioUnitario)),
-                ANCHO_RENGLON
+            <div key={item.id} className="mb-1.5 last:mb-0">
+              <p className="whitespace-pre-wrap">
+                {filaConMonto(
+                  `${item.cantidad}x ${item.nombreProducto}`,
+                  formatearGuarani(item.cantidad * Number(item.precioUnitario)),
+                  ANCHO_RENGLON
+                )}
+              </p>
+              {item.opcionesTexto && (
+                <p className="pl-3 text-xs leading-tight">+ {item.opcionesTexto}</p>
               )}
-            </p>
+            </div>
           ))}
         </div>
 
