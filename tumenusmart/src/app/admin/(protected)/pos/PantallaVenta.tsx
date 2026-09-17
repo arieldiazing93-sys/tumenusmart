@@ -357,7 +357,7 @@ export function PantallaVenta({
               <button
                 type="button"
                 onClick={limpiarCarrito}
-                className="flex-none rounded-full px-2 py-1 text-[0.8rem] font-medium text-tinta-suave transition-colors hover:bg-peligro-luz hover:text-peligro"
+                className="flex-none rounded-full border border-linea bg-white px-3 py-1.5 text-[0.8rem] font-medium text-tinta-media shadow-sm transition-colors hover:border-peligro hover:bg-peligro-luz hover:text-peligro"
               >
                 Vaciar
               </button>
@@ -387,7 +387,7 @@ export function PantallaVenta({
                       type="button"
                       onClick={() => cambiarCantidad(i.key, -1)}
                       aria-label={`Restar ${i.nombre}`}
-                      className="flex h-8 w-8 items-center justify-center rounded-full border border-linea text-tinta-media transition-all hover:border-brand hover:bg-brand-light hover:text-brand active:scale-90"
+                      className="flex h-8 w-8 items-center justify-center rounded-full bg-peligro-luz text-peligro transition-all hover:bg-peligro hover:text-white active:scale-90"
                     >
                       −
                     </button>
@@ -398,7 +398,7 @@ export function PantallaVenta({
                       type="button"
                       onClick={() => cambiarCantidad(i.key, 1)}
                       aria-label={`Sumar ${i.nombre}`}
-                      className="flex h-8 w-8 items-center justify-center rounded-full border border-linea text-tinta-media transition-all hover:border-brand hover:bg-brand-light hover:text-brand active:scale-90"
+                      className="flex h-8 w-8 items-center justify-center rounded-full bg-exito-luz text-exito transition-all hover:bg-exito hover:text-white active:scale-90"
                     >
                       +
                     </button>
@@ -406,7 +406,7 @@ export function PantallaVenta({
                       type="button"
                       onClick={() => quitarProducto(i.key)}
                       aria-label={`Quitar ${i.nombre}`}
-                      className="ml-0.5 flex h-8 w-8 items-center justify-center rounded-full text-tinta-suave transition-colors hover:bg-peligro-luz hover:text-peligro"
+                      className="ml-0.5 flex h-8 w-8 items-center justify-center rounded-full bg-peligro-luz text-peligro transition-all hover:bg-peligro hover:text-white active:scale-90"
                     >
                       ✕
                     </button>
