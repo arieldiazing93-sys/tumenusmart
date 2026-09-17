@@ -29,6 +29,21 @@ export function dondeEntregado(montoMinimo?: number | null) {
   };
 }
 
+/**
+ * Lo mismo que `dondeEntregado`, pero para ventas de mostrador (Punto de
+ * Venta): ahí no hay "entregado" — se cobra y se cierra en el momento, así
+ * que lo que la reemplaza es simplemente "no cancelada". El teléfono es
+ * opcional en una VentaPos, así que se excluyen las que no lo cargaron: no
+ * hay a quién sumarle el sello.
+ */
+export function dondeEntregadoPos(montoMinimo?: number | null) {
+  return {
+    cancelada: false,
+    clienteTelefono: { not: null },
+    ...(montoMinimo ? { total: { gte: montoMinimo } } : {}),
+  };
+}
+
 function armarProgreso(
   telefono: string,
   entregados: number,
@@ -58,23 +73,37 @@ export async function calcularProgresoFidelidad(
   { umbral, montoMinimo }: OpcionesFidelidad
 ): Promise<Map<string, ProgresoFidelidad>> {
   const db = prismaDelLocal(storeId);
-  const [entregas, clientes] = await Promise.all([
+  const [entregasOrder, entregasPos, clientes] = await Promise.all([
     db.order.groupBy({
       by: ["clienteTelefono"],
       where: dondeEntregado(montoMinimo),
       _count: { _all: true },
     }),
+    // Una venta de mostrador suma el mismo sello que un pedido online: al
+    // cliente no le importa por dónde compró, y separar los dos conteos
+    // dejaría "casi listo" a alguien que en realidad ya llegó al umbral.
+    db.ventaPos.groupBy({
+      by: ["clienteTelefono"],
+      where: dondeEntregadoPos(montoMinimo),
+      _count: { _all: true },
+    }),
     db.customer.findMany({ select: { telefono: true, pedidosCanjeados: true } }),
   ]);
 
+  const entregadosPorTelefono = new Map<string, number>();
+  for (const e of entregasOrder) {
+    entregadosPorTelefono.set(e.clienteTelefono, (entregadosPorTelefono.get(e.clienteTelefono) ?? 0) + e._count._all);
+  }
+  for (const e of entregasPos) {
+    if (!e.clienteTelefono) continue; // ya excluido por el `where`, es solo para el tipo
+    entregadosPorTelefono.set(e.clienteTelefono, (entregadosPorTelefono.get(e.clienteTelefono) ?? 0) + e._count._all);
+  }
+
   const canjeadosPorTelefono = new Map(clientes.map((c) => [c.telefono, c.pedidosCanjeados]));
   const mapa = new Map<string, ProgresoFidelidad>();
-  for (const e of entregas) {
-    const canjeados = canjeadosPorTelefono.get(e.clienteTelefono) ?? 0;
-    mapa.set(
-      e.clienteTelefono,
-      armarProgreso(e.clienteTelefono, e._count._all, canjeados, umbral)
-    );
+  for (const [telefono, entregados] of entregadosPorTelefono) {
+    const canjeados = canjeadosPorTelefono.get(telefono) ?? 0;
+    mapa.set(telefono, armarProgreso(telefono, entregados, canjeados, umbral));
   }
   return mapa;
 }
@@ -86,8 +115,9 @@ export async function progresoDeCliente(
   { umbral, montoMinimo }: OpcionesFidelidad
 ): Promise<ProgresoFidelidad> {
   const db = prismaDelLocal(storeId);
-  const [entregados, customer] = await Promise.all([
+  const [entregadosOrder, entregadosPos, customer] = await Promise.all([
     db.order.count({ where: { clienteTelefono: telefono, ...dondeEntregado(montoMinimo) } }),
+    db.ventaPos.count({ where: { clienteTelefono: telefono, ...dondeEntregadoPos(montoMinimo) } }),
     // Plain `prisma`, no `prismaDelLocal`, acá: la clave compuesta
     // storeId_telefono ya fija el local sola, igual que en el upsert del
     // checkout — no hace falta la capa extra para esto.
@@ -96,5 +126,5 @@ export async function progresoDeCliente(
       select: { pedidosCanjeados: true },
     }),
   ]);
-  return armarProgreso(telefono, entregados, customer?.pedidosCanjeados ?? 0, umbral);
+  return armarProgreso(telefono, entregadosOrder + entregadosPos, customer?.pedidosCanjeados ?? 0, umbral);
 }

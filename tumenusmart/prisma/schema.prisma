@@ -744,6 +744,18 @@ model VentaPos {
   creadoEn      DateTime @default(now())
   items         VentaPosItem[]
 
+  // Opcionales: mucha venta de mostrador es un cliente de paso que no vale
+  // la pena frenar para pedirle el teléfono. Cuando SÍ se carga, cuenta
+  // para el mismo programa de fidelización que los pedidos online (ver
+  // src/lib/fidelidad.ts) — mismo criterio de "guardado tal cual lo tipea"
+  // que ya usa Order.clienteTelefono, para que las dos fuentes sumen al
+  // mismo cliente sin tener que reformatear nada.
+  clienteNombre   String?
+  clienteTelefono String?
+  // "local" (se consume ahí) | "llevar" (para llevar, necesita empaque).
+  tipoEntrega     String  @default("local")
+  nota            String?
+
   // Anular una cuenta ya cobrada (se cargó mal, el cliente se arrepintió,
   // etc.) sin borrar el registro — deja rastro de quién y por qué. No
   // recalcula turnos ya cerrados: si el turno ya se cerró, el comprobante

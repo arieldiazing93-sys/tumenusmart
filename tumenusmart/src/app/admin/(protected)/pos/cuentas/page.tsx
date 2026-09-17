@@ -71,6 +71,7 @@ export default async function CuentasPosPage({
       registradoPor: true,
       creadoEn: true,
       cancelada: true,
+      clienteNombre: true,
     },
   });
 
@@ -187,6 +188,7 @@ export default async function CuentasPosPage({
             <tr>
               <Th>Cuenta</Th>
               <Th>Hora</Th>
+              <Th>Cliente</Th>
               <Th>Forma de pago</Th>
               <Th>Cajero</Th>
               <Th>Estado</Th>
@@ -213,6 +215,7 @@ export default async function CuentasPosPage({
                     timeZone: ZONA_NEGOCIO,
                   })}
                 </Td>
+                <Td>{v.clienteNombre ?? "—"}</Td>
                 <Td>{etiquetaFormaPagoPos(v.formaPago)}</Td>
                 <Td>{v.registradoPor}</Td>
                 <Td>
@@ -232,7 +235,7 @@ export default async function CuentasPosPage({
           </tbody>
           <tfoot>
             <tr>
-              <Td colSpan={5} className="text-right font-medium">
+              <Td colSpan={6} className="text-right font-medium">
                 Total (sin canceladas)
               </Td>
               <Td className="cifra text-right font-semibold text-tinta">

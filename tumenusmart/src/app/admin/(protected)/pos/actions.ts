@@ -54,17 +54,29 @@ export type ResultadoVenta =
   | { ok: true; ventaId: string; total: number }
   | { ok: false; error: string };
 
+export type DatosVenta = {
+  formaPago: string;
+  /** "local" (se consume ahí) | "llevar" (para llevar). Cualquier otro valor cae en "local". */
+  tipoEntrega: string;
+  /** Opcionales: se guardan tal cual se tipean, sin normalizar — igual que
+   *  Order.clienteTelefono — para que sumen al mismo cliente si después pide
+   *  algo por el menú online. */
+  clienteNombre: string;
+  clienteTelefono: string;
+  nota: string;
+  items: { productId: string; cantidad: number }[];
+};
+
 /**
  * Cobra el carrito y cierra la cuenta.
  *
  * El precio se relee de la base, nunca se confía en el que mande el
- * navegador — mismo criterio que crearPedido en el checkout público.
+ * navegador — mismo criterio que crearPedido en el checkout público. Si se
+ * cargó el teléfono del cliente, además se le da de alta (o se actualiza)
+ * su ficha de `Customer` — mismo upsert que hace el checkout — para que la
+ * venta cuente para su progreso de fidelización.
  */
-export async function registrarVenta(
-  turnoId: string,
-  formaPago: string,
-  items: { productId: string; cantidad: number }[]
-): Promise<ResultadoVenta> {
+export async function registrarVenta(turnoId: string, datos: DatosVenta): Promise<ResultadoVenta> {
   const sesion = await exigirPermiso("pos.vender");
   const storeId = await idLocalActual();
   const db = prismaDelLocal(storeId);
@@ -79,7 +91,7 @@ export async function registrarVenta(
   }
 
   const cantidadesPorProducto = new Map<string, number>();
-  for (const it of items) {
+  for (const it of datos.items) {
     if (!it.productId || !Number.isFinite(it.cantidad) || it.cantidad <= 0) continue;
     const cantidad = Math.round(it.cantidad);
     cantidadesPorProducto.set(it.productId, (cantidadesPorProducto.get(it.productId) ?? 0) + cantidad);
@@ -110,7 +122,19 @@ export async function registrarVenta(
 
   const numero = await siguienteNumeroVentaPos(storeId);
   const registradoPor = sesion.nombre?.trim() || sesion.email;
-  const formaPagoNormalizada = normalizarFormaPagoPos(formaPago);
+  const formaPagoNormalizada = normalizarFormaPagoPos(datos.formaPago);
+  const tipoEntrega = datos.tipoEntrega === "llevar" ? "llevar" : "local";
+  const clienteNombre = datos.clienteNombre.trim() || null;
+  const clienteTelefono = datos.clienteTelefono.trim() || null;
+  const nota = datos.nota.trim() || null;
+
+  if (clienteTelefono) {
+    await prisma.customer.upsert({
+      where: { storeId_telefono: { storeId, telefono: clienteTelefono } },
+      update: clienteNombre ? { nombre: clienteNombre } : {},
+      create: { storeId, nombre: clienteNombre || "Cliente de mostrador", telefono: clienteTelefono },
+    });
+  }
 
   const ventaId = await prisma.$transaction(async (tx) => {
     const venta = await tx.ventaPos.create({
@@ -121,6 +145,10 @@ export async function registrarVenta(
         formaPago: formaPagoNormalizada,
         total,
         registradoPor,
+        clienteNombre,
+        clienteTelefono,
+        tipoEntrega,
+        nota,
         items: {
           create: filas.map((f) => ({
             storeId,

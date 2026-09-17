@@ -85,6 +85,24 @@ export default async function DetalleVentaPosPage({
 
         <Tarjeta>
           <dl className="mb-3 flex flex-wrap gap-x-8 gap-y-2 text-[0.85rem]">
+            {venta.clienteNombre && (
+              <div>
+                <dt className="text-tinta-suave">Cliente</dt>
+                <dd className="font-semibold text-tinta">{venta.clienteNombre}</dd>
+              </div>
+            )}
+            {venta.clienteTelefono && (
+              <div>
+                <dt className="text-tinta-suave">Teléfono</dt>
+                <dd className="font-semibold text-tinta">{venta.clienteTelefono}</dd>
+              </div>
+            )}
+            <div>
+              <dt className="text-tinta-suave">Entrega</dt>
+              <dd className="font-semibold text-tinta">
+                {venta.tipoEntrega === "llevar" ? "Para llevar" : "En el local"}
+              </dd>
+            </div>
             <div>
               <dt className="text-tinta-suave">Cajero</dt>
               <dd className="font-semibold text-tinta">{venta.registradoPor}</dd>
@@ -102,6 +120,12 @@ export default async function DetalleVentaPosPage({
               </dd>
             </div>
           </dl>
+
+          {venta.nota && (
+            <p className="mb-3 rounded-lg border border-linea bg-papel-suave px-3 py-2 text-[0.82rem] text-tinta-media">
+              Nota: {venta.nota}
+            </p>
+          )}
 
           <div className="flex flex-col gap-2 border-t border-linea pt-3">
             {venta.items.map((item) => (
