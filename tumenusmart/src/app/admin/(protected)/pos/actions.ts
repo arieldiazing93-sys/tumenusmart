@@ -57,7 +57,7 @@ export type ResultadoVenta =
 
 export type ItemVentaInput =
   | { productId: string; opcionIds?: string[]; cantidad: number }
-  | { mitadYMitad: { productIdA: string; productIdB: string }; cantidad: number };
+  | { mitadYMitad: { productIdA: string; productIdB: string }; opcionIds?: string[]; cantidad: number };
 
 export type DatosVenta = {
   formaPago: string;
@@ -137,7 +137,7 @@ export async function registrarVenta(turnoId: string, datos: DatosVenta): Promis
 
   const pedidas: LineaPedida[] = datos.items.map((it) =>
     "mitadYMitad" in it
-      ? { mitadYMitad: it.mitadYMitad, cantidad: it.cantidad }
+      ? { mitadYMitad: it.mitadYMitad, opcionIds: it.opcionIds ?? [], cantidad: it.cantidad }
       : { productId: it.productId, opcionIds: it.opcionIds ?? [], cantidad: it.cantidad }
   );
 
@@ -269,6 +269,33 @@ export async function cerrarTurno(
   revalidatePath("/admin/pos");
   revalidatePath("/admin/pos/turnos");
   return { ok: true, turnoId };
+}
+
+export type ResultadoBuscarCliente = { ok: true; nombre: string } | { ok: false };
+
+/**
+ * Busca si ese teléfono ya es cliente del local, para autocompletar el
+ * nombre al cargar una venta — un cliente recurrente no tiene por qué
+ * repetir su nombre cada vez que compra en el mostrador.
+ *
+ * Devuelve `{ok:false}` tanto si no existe como ante cualquier problema: es
+ * una comodidad, no una validación, así que nunca tiene sentido cortar la
+ * venta por esto.
+ */
+export async function buscarClientePorTelefono(telefono: string): Promise<ResultadoBuscarCliente> {
+  await exigirPermiso("pos.vender");
+  const storeId = await idLocalActual();
+  const db = prismaDelLocal(storeId);
+
+  const limpio = telefono.trim();
+  if (!limpio) return { ok: false };
+
+  const cliente = await db.customer.findUnique({
+    where: { storeId_telefono: { storeId, telefono: limpio } },
+    select: { nombre: true },
+  });
+  if (!cliente) return { ok: false };
+  return { ok: true, nombre: cliente.nombre };
 }
 
 export type ResultadoCancelarVenta = { ok: true } | { ok: false; error: string };

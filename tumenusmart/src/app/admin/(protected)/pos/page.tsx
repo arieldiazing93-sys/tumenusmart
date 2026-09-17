@@ -57,7 +57,13 @@ export default async function PosPage() {
   // productos con el mismo mitadYMitadGrupo (sin distinguir mayúsculas ni
   // espacios de más) arman un combo, mostrado dentro de la categoría donde
   // están sus productos.
-  type ProductoMitad = { id: string; nombre: string; precio: number; mitadYMitadModo: string };
+  type ProductoMitad = {
+    id: string;
+    nombre: string;
+    precio: number;
+    mitadYMitadModo: string;
+    agregados: { id: string; nombre: string; precioExtra: number }[];
+  };
   const gruposPorClave = new Map<
     string,
     { nombreVisible: string; categoriaId: string; productos: ProductoMitad[] }
@@ -68,7 +74,13 @@ export default async function PosPage() {
       if (!nombreGrupo) continue;
       const clave = nombreGrupo.toLowerCase();
       const entrada = gruposPorClave.get(clave) ?? { nombreVisible: nombreGrupo, categoriaId: c.id, productos: [] };
-      entrada.productos.push({ id: p.id, nombre: p.nombre, precio: Number(p.precio), mitadYMitadModo: p.mitadYMitadModo });
+      entrada.productos.push({
+        id: p.id,
+        nombre: p.nombre,
+        precio: Number(p.precio),
+        mitadYMitadModo: p.mitadYMitadModo,
+        agregados: p.opciones.map((o) => ({ id: o.id, nombre: o.nombre, precioExtra: Number(o.precioExtra) })),
+      });
       gruposPorClave.set(clave, entrada);
     }
   }

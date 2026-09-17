@@ -7,7 +7,7 @@ import { Area, Boton, Cabecera, Entrada, Tarjeta, clasesBoton } from "@/componen
 import { Segmentado } from "@/components/Segmentado";
 import { formatearGuarani } from "@/lib/format";
 import { type FormaPagoPos } from "@/lib/turno-pos";
-import { registrarVenta } from "./actions";
+import { buscarClientePorTelefono, registrarVenta } from "./actions";
 import { CobrarModal } from "./CobrarModal";
 import { MitadYMitadPickerPos } from "./MitadYMitadPickerPos";
 import { AgregadosPickerPos } from "./AgregadosPickerPos";
@@ -15,19 +15,20 @@ import { AgregadosPickerPos } from "./AgregadosPickerPos";
 type Agregado = { id: string; nombre: string; precioExtra: number };
 type Producto = { id: string; nombre: string; precio: number; agregados: Agregado[] };
 type Categoria = { id: string; nombre: string; productos: Producto[] };
-type ProductoMitad = { id: string; nombre: string; precio: number; mitadYMitadModo: string };
+type ProductoMitad = { id: string; nombre: string; precio: number; mitadYMitadModo: string; agregados: Agregado[] };
 type GrupoMitad = { nombreVisible: string; categoriaId: string; productos: ProductoMitad[] };
 type TipoEntregaPos = "local" | "llevar";
 
 /**
  * Un producto normal (con o sin agregados elegidos) o un combo mitad y
- * mitad ya armado, con su propia clave. Un mismo producto con distintos
- * agregados son líneas distintas del carrito — mismo criterio que el menú
- * público (construirKey por producto + opciones elegidas).
+ * mitad ya armado (con o sin agregados), con su propia clave. Un mismo
+ * producto/combo con distintos agregados son líneas distintas del carrito —
+ * mismo criterio que el menú público (construirKey por producto + opciones
+ * elegidas).
  */
 type ItemCarrito = { key: string; nombre: string; precio: number; cantidad: number; detalle?: string } & (
   | { tipo: "producto"; productId: string; agregadoIds: string[] }
-  | { tipo: "combo"; productIdA: string; productIdB: string }
+  | { tipo: "combo"; productIdA: string; productIdB: string; agregadoIds: string[] }
 );
 
 const TODOS = "__todos__";
@@ -66,6 +67,8 @@ export function PantallaVenta({
   const [error, setError] = useState<string | null>(null);
   const [cobrando, setCobrando] = useState(false);
   const [productoEligiendo, setProductoEligiendo] = useState<Producto | null>(null);
+  const [buscandoCliente, setBuscandoCliente] = useState(false);
+  const [clienteEsNuevo, setClienteEsNuevo] = useState(false);
 
   // Suma, no pisa: un mismo producto puede estar en el carrito varias veces
   // con distintos agregados (líneas distintas), y el número sobre la
@@ -133,11 +136,19 @@ export function PantallaVenta({
     setProductoEligiendo(null);
   }
 
-  function agregarCombo(a: ProductoMitad, b: ProductoMitad, precio: number, cantidad: number) {
+  function agregarCombo(
+    a: ProductoMitad,
+    b: ProductoMitad,
+    agregadosElegidos: Agregado[],
+    precio: number,
+    cantidad: number
+  ) {
     setError(null);
     const parIds = [a.id, b.id].sort();
-    const key = `combo:${parIds.join("+")}`;
+    const idsAgregados = agregadosElegidos.map((x) => x.id).sort();
+    const key = `combo:${parIds.join("+")}${idsAgregados.length > 0 ? `::${idsAgregados.join(",")}` : ""}`;
     const nombre = `Mitad ${a.nombre} / Mitad ${b.nombre}`;
+    const detalle = agregadosElegidos.length > 0 ? agregadosElegidos.map((x) => x.nombre).join(", ") : undefined;
     setCarrito((actual) => {
       const existente = actual.find((i) => i.key === key);
       if (existente) {
@@ -145,7 +156,17 @@ export function PantallaVenta({
       }
       return [
         ...actual,
-        { key, tipo: "combo", productIdA: a.id, productIdB: b.id, nombre, precio, cantidad },
+        {
+          key,
+          tipo: "combo",
+          productIdA: a.id,
+          productIdB: b.id,
+          agregadoIds: idsAgregados,
+          nombre,
+          precio,
+          cantidad,
+          detalle,
+        },
       ];
     });
   }
@@ -165,6 +186,23 @@ export function PantallaVenta({
     setError(null);
   }
 
+  // Al tipear el teléfono y apretar Enter: si ya es cliente del local, le
+  // completa el nombre solo. Si no, avisa que es nuevo — el cajero sigue y
+  // lo carga a mano, y esa carga es lo que da de alta al cliente al cobrar.
+  async function buscarCliente() {
+    const telefono = clienteTelefono.trim();
+    if (!telefono) return;
+    setBuscandoCliente(true);
+    setClienteEsNuevo(false);
+    const r = await buscarClientePorTelefono(telefono);
+    setBuscandoCliente(false);
+    if (r.ok) {
+      setClienteNombre(r.nombre);
+    } else {
+      setClienteEsNuevo(true);
+    }
+  }
+
   async function confirmarCobro(formaPago: FormaPagoPos) {
     setCobrando(true);
     setError(null);
@@ -176,7 +214,11 @@ export function PantallaVenta({
       nota,
       items: carrito.map((i) =>
         i.tipo === "combo"
-          ? { mitadYMitad: { productIdA: i.productIdA, productIdB: i.productIdB }, cantidad: i.cantidad }
+          ? {
+              mitadYMitad: { productIdA: i.productIdA, productIdB: i.productIdB },
+              opcionIds: i.agregadoIds,
+              cantidad: i.cantidad,
+            }
           : { productId: i.productId, opcionIds: i.agregadoIds, cantidad: i.cantidad }
       ),
     });
@@ -361,13 +403,28 @@ export function PantallaVenta({
             <Entrada
               placeholder="0981 234 567"
               value={clienteTelefono}
-              onChange={(e) => setClienteTelefono(e.target.value)}
+              onChange={(e) => {
+                setClienteTelefono(e.target.value);
+                setClienteEsNuevo(false);
+              }}
+              onKeyDown={(e) => {
+                if (e.key !== "Enter") return;
+                e.preventDefault();
+                buscarCliente();
+              }}
             />
           </div>
-          <p className="-mt-2 text-[0.74rem] text-tinta-suave">
-            Opcional. Se guarda con +595 automático, no hace falta escribirlo. Si el local tiene
-            fidelización activa, suma el sello.
-          </p>
+          {clienteEsNuevo ? (
+            <p className="-mt-2 text-[0.74rem] font-medium text-aviso">
+              Cliente nuevo — cargá el nombre para cobrar.
+            </p>
+          ) : (
+            <p className="-mt-2 text-[0.74rem] text-tinta-suave">
+              {buscandoCliente
+                ? "Buscando…"
+                : "Opcional. Escribí el teléfono y apretá Enter: si ya es cliente, completa el nombre solo. Se guarda con +595 automático."}
+            </p>
+          )}
 
           <Segmentado opciones={TIPOS_ENTREGA_POS} valor={tipoEntrega} onChange={setTipoEntrega} />
 

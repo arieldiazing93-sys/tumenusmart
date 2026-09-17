@@ -1,19 +1,22 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { formatearGuarani } from "@/lib/format";
 import { calcularPrecioMitadYMitad } from "@/lib/mitad-mitad";
 
-type ProductoMitad = { id: string; nombre: string; precio: number; mitadYMitadModo: string };
+type Agregado = { id: string; nombre: string; precioExtra: number };
+type ProductoMitad = { id: string; nombre: string; precio: number; mitadYMitadModo: string; agregados: Agregado[] };
 
 /**
  * Armar un combo mitad y mitad en el mostrador.
  *
- * Calcado del selector del menú público (MitadYMitadPicker.tsx), sin
- * agregados: el POS no ofrece variantes/agregados en ningún producto, así
- * que tampoco acá. El precio que se ve es solo para mostrar en el momento —
- * el que vale es el que recalcula el servidor en registrarVenta, con la
- * misma función `armarPedido` que usa el checkout público.
+ * Calcado del selector del menú público (MitadYMitadPicker.tsx), agregados
+ * incluidos: los de las dos mitades elegidas se juntan sin repetir nombre
+ * (mismo criterio que `agregadosDeCombo` en precio-pedido.ts), así que un
+ * "Queso extra" que esté en las dos mitades aparece una sola vez. El precio
+ * que se ve es solo para mostrar en el momento — el que vale es el que
+ * recalcula el servidor en registrarVenta, con la misma función
+ * `armarPedido` que usa el checkout público.
  */
 export function MitadYMitadPickerPos({
   grupoNombre,
@@ -22,25 +25,60 @@ export function MitadYMitadPickerPos({
 }: {
   grupoNombre: string;
   productos: ProductoMitad[];
-  onAgregar: (a: ProductoMitad, b: ProductoMitad, precio: number, cantidad: number) => void;
+  onAgregar: (
+    a: ProductoMitad,
+    b: ProductoMitad,
+    agregadosElegidos: Agregado[],
+    precioTotal: number,
+    cantidad: number
+  ) => void;
 }) {
   const [idA, setIdA] = useState("");
   const [idB, setIdB] = useState("");
+  const [agregadosIds, setAgregadosIds] = useState<string[]>([]);
   const [cantidad, setCantidad] = useState(1);
 
   const productoA = productos.find((p) => p.id === idA);
   const productoB = productos.find((p) => p.id === idB);
   const modo = productoA?.mitadYMitadModo === "proporcional" ? "proporcional" : "mayor";
-  const precio =
+
+  const agregadosDisponibles = useMemo(() => {
+    if (!productoA || !productoB) return [];
+    const vistos = new Set<string>();
+    const lista: Agregado[] = [];
+    for (const p of [productoA, productoB]) {
+      for (const a of p.agregados) {
+        const clave = a.nombre.trim().toLowerCase();
+        if (vistos.has(clave)) continue;
+        vistos.add(clave);
+        lista.push(a);
+      }
+    }
+    return lista;
+  }, [productoA, productoB]);
+
+  const agregadosElegidos = agregadosDisponibles.filter((a) => agregadosIds.includes(a.id));
+
+  const precioBase =
     productoA && productoB ? calcularPrecioMitadYMitad(productoA.precio, productoB.precio, modo) : null;
+  const precioTotal =
+    precioBase != null ? precioBase + agregadosElegidos.reduce((s, a) => s + a.precioExtra, 0) : null;
+
   const mismoDoble = !!idA && idA === idB;
   const listo = !!productoA && !!productoB && !mismoDoble;
 
+  function toggleAgregado(id: string) {
+    setAgregadosIds((actuales) =>
+      actuales.includes(id) ? actuales.filter((x) => x !== id) : [...actuales, id]
+    );
+  }
+
   function agregar() {
-    if (!listo || !productoA || !productoB || precio == null) return;
-    onAgregar(productoA, productoB, precio, cantidad);
+    if (!listo || !productoA || !productoB || precioTotal == null) return;
+    onAgregar(productoA, productoB, agregadosElegidos, precioTotal, cantidad);
     setIdA("");
     setIdB("");
+    setAgregadosIds([]);
     setCantidad(1);
   }
 
@@ -58,7 +96,10 @@ export function MitadYMitadPickerPos({
       <div className="flex flex-col gap-2 sm:flex-row">
         <select
           value={idA}
-          onChange={(e) => setIdA(e.target.value)}
+          onChange={(e) => {
+            setIdA(e.target.value);
+            setAgregadosIds([]);
+          }}
           className="min-w-0 flex-1 rounded-lg border border-linea bg-white px-2.5 py-1.5 text-[0.82rem] focus:border-brand focus:outline-none"
         >
           <option value="">Mitad 1...</option>
@@ -70,7 +111,10 @@ export function MitadYMitadPickerPos({
         </select>
         <select
           value={idB}
-          onChange={(e) => setIdB(e.target.value)}
+          onChange={(e) => {
+            setIdB(e.target.value);
+            setAgregadosIds([]);
+          }}
           className="min-w-0 flex-1 rounded-lg border border-linea bg-white px-2.5 py-1.5 text-[0.82rem] focus:border-brand focus:outline-none"
         >
           <option value="">Mitad 2...</option>
@@ -84,9 +128,33 @@ export function MitadYMitadPickerPos({
 
       {mismoDoble && <p className="mt-1.5 text-[0.74rem] text-aviso">Elegí dos sabores distintos.</p>}
 
+      {agregadosDisponibles.length > 0 && (
+        <div className="mt-2.5 flex flex-wrap gap-1.5">
+          {agregadosDisponibles.map((a) => (
+            <label
+              key={a.id}
+              className={`cursor-pointer rounded-full border bg-white px-2.5 py-1 text-[0.78rem] ${
+                agregadosIds.includes(a.id)
+                  ? "border-brand bg-brand-light text-brand-texto"
+                  : "border-linea text-tinta-media"
+              }`}
+            >
+              <input
+                type="checkbox"
+                className="hidden"
+                checked={agregadosIds.includes(a.id)}
+                onChange={() => toggleAgregado(a.id)}
+              />
+              + {a.nombre}
+              {a.precioExtra > 0 && ` (${formatearGuarani(a.precioExtra)})`}
+            </label>
+          ))}
+        </div>
+      )}
+
       <div className="mt-2.5 flex items-center justify-between gap-2">
-        {precio != null ? (
-          <span className="cifra text-[0.9rem] font-semibold text-tinta">{formatearGuarani(precio)}</span>
+        {precioTotal != null ? (
+          <span className="cifra text-[0.9rem] font-semibold text-tinta">{formatearGuarani(precioTotal)}</span>
         ) : (
           <span className="text-[0.76rem] text-tinta-suave">Elegí las dos mitades</span>
         )}
