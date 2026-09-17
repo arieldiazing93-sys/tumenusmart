@@ -3,6 +3,7 @@ import { pantallaConPermiso } from "@/lib/auth";
 import { prismaDelLocal } from "@/lib/prisma-local";
 import { idLocalActual } from "@/lib/local-actual";
 import { estacionActual } from "@/lib/estacion-actual";
+import { diasParaVencer } from "@/lib/factura-pos";
 import { turnoAbierto } from "./turno-actual";
 import { PantallaVenta } from "./PantallaVenta";
 import { EstacionNoVinculada } from "./EstacionNoVinculada";
@@ -19,6 +20,16 @@ export default async function PosPage() {
 
   const turno = await turnoAbierto(db, estacion.id);
   if (!turno) redirect("/admin/pos/abrir");
+
+  // Si esta estación tiene un punto de expedición vigente, el cajero puede
+  // elegir Factura además de Ticket al cobrar (ver PantallaVenta).
+  const estacionConPunto = await db.estacion.findUnique({
+    where: { id: estacion.id },
+    select: { puntoExpedicion: { select: { activo: true, timbradoHasta: true } } },
+  });
+  const puntoExpedicion = estacionConPunto?.puntoExpedicion ?? null;
+  const puedeFacturar = !!puntoExpedicion?.activo && puntoExpedicion.timbradoHasta > new Date();
+  const diasParaVencerTimbrado = puntoExpedicion ? diasParaVencer(puntoExpedicion.timbradoHasta) : null;
 
   const categorias = await db.category.findMany({
     where: { activa: true },
@@ -91,5 +102,13 @@ export default async function PosPage() {
   }
   const gruposMitad = [...gruposPorClave.values()].filter((g) => g.productos.length > 1);
 
-  return <PantallaVenta turnoId={turno.id} categorias={categoriasVenta} gruposMitad={gruposMitad} />;
+  return (
+    <PantallaVenta
+      turnoId={turno.id}
+      categorias={categoriasVenta}
+      gruposMitad={gruposMitad}
+      puedeFacturar={puedeFacturar}
+      diasParaVencerTimbrado={diasParaVencerTimbrado}
+    />
+  );
 }

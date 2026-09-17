@@ -184,6 +184,7 @@ export async function crearPedido(datos: DatosCheckout): Promise<ResultadoPedido
     ingredientes: p.ingredientes,
     mitadYMitadGrupo: p.mitadYMitadGrupo,
     mitadYMitadModo: p.mitadYMitadModo,
+    iva: p.iva,
     opciones: p.opciones.map((o) => ({
       id: o.id,
       nombre: o.nombre,

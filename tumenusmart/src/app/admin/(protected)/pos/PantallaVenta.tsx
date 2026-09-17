@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Area, Boton, Cabecera, Entrada, Tarjeta, clasesBoton } from "@/components/ui";
+import { Area, Boton, Cabecera, Campo, Entrada, Tarjeta, clasesBoton } from "@/components/ui";
 import { Segmentado } from "@/components/Segmentado";
 import { formatearGuarani } from "@/lib/format";
 import { type FormaPagoPos } from "@/lib/turno-pos";
@@ -58,10 +58,16 @@ export function PantallaVenta({
   turnoId,
   categorias,
   gruposMitad,
+  puedeFacturar,
+  diasParaVencerTimbrado,
 }: {
   turnoId: string;
   categorias: Categoria[];
   gruposMitad: GrupoMitad[];
+  /** Si la estación de este turno tiene un punto de expedición vigente. */
+  puedeFacturar: boolean;
+  /** Días hasta que venza el timbrado de esa estación, o null si no aplica. */
+  diasParaVencerTimbrado: number | null;
 }) {
   const router = useRouter();
   const [categoriaId, setCategoriaId] = useState<string>(categorias[0]?.id ?? TODOS);
@@ -70,6 +76,9 @@ export function PantallaVenta({
   const [clienteTelefono, setClienteTelefono] = useState("");
   const [tipoEntrega, setTipoEntrega] = useState<TipoEntregaPos>("local");
   const [nota, setNota] = useState("");
+  const [comprobanteTipo, setComprobanteTipo] = useState<"ticket" | "factura">("ticket");
+  const [facturaRazonSocial, setFacturaRazonSocial] = useState("");
+  const [facturaRuc, setFacturaRuc] = useState("");
   const [mostrarCobro, setMostrarCobro] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [cobrando, setCobrando] = useState(false);
@@ -211,6 +220,10 @@ export function PantallaVenta({
   }
 
   async function confirmarCobro(formaPago: FormaPagoPos) {
+    if (comprobanteTipo === "factura" && (!facturaRazonSocial.trim() || !facturaRuc.trim())) {
+      setError("Para factura hacen falta la razón social y el RUC.");
+      return;
+    }
     setCobrando(true);
     setError(null);
     const r = await registrarVenta(turnoId, {
@@ -219,6 +232,9 @@ export function PantallaVenta({
       clienteNombre,
       clienteTelefono,
       nota,
+      comprobanteTipo,
+      facturaRazonSocial: comprobanteTipo === "factura" ? facturaRazonSocial : undefined,
+      facturaRuc: comprobanteTipo === "factura" ? facturaRuc : undefined,
       items: carrito.map((i) =>
         i.tipo === "combo"
           ? {
@@ -452,6 +468,46 @@ export function PantallaVenta({
               </p>
             )}
           </div>
+
+          {puedeFacturar && (
+            <div className="flex flex-col gap-2 border-t border-linea pt-3.5">
+              <p className="text-[0.72rem] font-semibold uppercase tracking-rotulo text-tinta-suave">
+                Comprobante
+              </p>
+              {diasParaVencerTimbrado != null && diasParaVencerTimbrado <= 30 && (
+                <p className="rounded-lg bg-aviso-luz px-3 py-2 text-[0.78rem] font-medium text-aviso">
+                  El timbrado de esta estación vence en {diasParaVencerTimbrado} día
+                  {diasParaVencerTimbrado === 1 ? "" : "s"}.
+                </p>
+              )}
+              <Segmentado
+                opciones={[
+                  { value: "ticket", label: "Ticket" },
+                  { value: "factura", label: "Factura" },
+                ]}
+                valor={comprobanteTipo}
+                onChange={setComprobanteTipo}
+              />
+              {comprobanteTipo === "factura" && (
+                <div className="flex flex-col gap-2 rounded-lg border border-linea bg-papel-suave p-3">
+                  <Campo etiqueta="Razón social">
+                    <Entrada
+                      value={facturaRazonSocial}
+                      onChange={(e) => setFacturaRazonSocial(e.target.value)}
+                      placeholder="Nombre de la empresa o del titular"
+                    />
+                  </Campo>
+                  <Campo etiqueta="RUC">
+                    <Entrada
+                      value={facturaRuc}
+                      onChange={(e) => setFacturaRuc(e.target.value)}
+                      placeholder="80012345-6"
+                    />
+                  </Campo>
+                </div>
+              )}
+            </div>
+          )}
 
           <Segmentado opciones={TIPOS_ENTREGA_POS} valor={tipoEntrega} onChange={setTipoEntrega} />
 

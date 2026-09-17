@@ -47,6 +47,23 @@ export async function alternarActivaEstacion(id: string, activa: boolean) {
 }
 
 /**
+ * Qué punto de expedición usa esta estación para emitir Factura Autoimpresor.
+ * Sin punto asignado (`puntoExpedicionId: null`), la estación solo puede
+ * vender como ticket — ver `registrarVenta` en `pos/actions.ts`.
+ */
+export async function asignarPuntoExpedicion(
+  estacionId: string,
+  puntoExpedicionId: string | null
+): Promise<ResultadoEstacion> {
+  await exigirPermiso("pos.gestionarEstaciones");
+  const prisma = prismaDelLocal(await idLocalActual());
+
+  await prisma.estacion.update({ where: { id: estacionId }, data: { puntoExpedicionId } });
+  revalidatePath("/admin/pos/estaciones");
+  return { ok: true };
+}
+
+/**
  * Vincula ESTE navegador (el de la computadora física desde la que se hace
  * clic) a una estación, guardando el id en una cookie de larga duración.
  *

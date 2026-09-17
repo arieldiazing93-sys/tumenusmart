@@ -133,6 +133,7 @@ model Store {
   ventasPos        VentaPos[]
   ventaPosItems    VentaPosItem[]
   estaciones       Estacion[]
+  puntosExpedicion PuntoExpedicion[]
 }
 
 /// Las direcciones que este local tuvo antes.
@@ -769,6 +770,47 @@ model Estacion {
   createdAt DateTime   @default(now())
   turnos    TurnoPos[]
 
+  // Sin punto asignado, esta estación solo puede vender como Ticket (no
+  // Factura) — ver PuntoExpedicion.
+  puntoExpedicionId String?
+  puntoExpedicion   PuntoExpedicion? @relation(fields: [puntoExpedicionId], references: [id])
+
+  @@index([storeId])
+}
+
+/// Un punto de expedición autorizado por la DNIT para Factura Autoimpresor.
+/// Una o varias Estacion pueden usar el MISMO punto de expedición (comparten
+/// numeración) o cada una el suyo (numeran por separado) — lo decide el
+/// dueño asignándolo en /admin/pos/estaciones, no hay lógica especial acá.
+model PuntoExpedicion {
+  id              String     @id @default(cuid())
+  storeId         String
+  store           Store      @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  nombre          String // etiqueta interna, ej "Mostrador"
+  establecimiento String // 3 dígitos, ej "001"
+  puntoExpedicion String // 3 dígitos, ej "001"
+  numeroTimbrado  String
+  timbradoDesde   DateTime
+  timbradoHasta   DateTime
+
+  // La razón social/RUC del EMISOR (el negocio, a nombre de quién la DNIT
+  // autorizó el timbrado) que va impresa en la factura — distinto de
+  // Store.razonSocial/ruc, que son datos internos de TuMenuSmart para
+  // facturarle al dueño y ni siquiera se le muestran a él en su panel.
+  razonSocialEmisor String
+  rucEmisor         String
+
+  // Cuántas facturas ya salieron de este punto — mismo patrón que
+  // Store.contadorVentasPos: arranca en 0, se incrementa ATÓMICAMENTE y el
+  // valor YA incrementado es el número que le toca a esa factura (nunca se
+  // lee primero y se incrementa después, porque entre esas dos operaciones
+  // dos ventas en simultáneo podrían agarrar el mismo número).
+  ultimoNumeroFactura Int @default(0)
+
+  activo     Boolean    @default(true)
+  createdAt  DateTime   @default(now())
+  estaciones Estacion[]
+
   @@index([storeId])
 }
 
@@ -811,6 +853,24 @@ model VentaPos {
   canceladaEn       DateTime?
   motivoCancelacion String?
 
+  // Mismos campos informales que Order ya tiene: lo que pide el cliente
+  // para que le facturen. "ticket" | "factura".
+  comprobanteTipo    String  @default("ticket")
+  facturaRazonSocial String?
+  facturaRuc         String?
+
+  // Fiscales — se completan y se CONGELAN solo cuando comprobanteTipo pasa
+  // a "factura" (ver registrarVenta en pos/actions.ts). Nunca se recalculan
+  // después, mismo criterio que TurnoPos.calculado*/Rendicion.
+  facturaNumero      String? // "001-001-0000001", ya formateado
+  facturaTimbrado    String?
+  facturaVencimiento DateTime?
+  facturaGravado10   Decimal?  @db.Decimal(10, 2)
+  facturaGravado5    Decimal?  @db.Decimal(10, 2)
+  facturaExento      Decimal?  @db.Decimal(10, 2)
+  facturaIva10       Decimal?  @db.Decimal(10, 2)
+  facturaIva5        Decimal?  @db.Decimal(10, 2)
+
   @@index([storeId])
   @@index([turnoPosId])
   @@index([storeId, creadoEn])
@@ -827,6 +887,10 @@ model VentaPosItem {
   nombreProducto String   // snapshot: el nombre al momento de la venta
   cantidad       Int
   precioUnitario Decimal  @db.Decimal(10, 2)
+  // Snapshot de la tasa de IVA al momento de la venta — igual que
+  // nombreProducto/precioUnitario: si el producto cambia de tasa después,
+  // las facturas viejas no se mueven solas.
+  iva            String   @default("gravado10")
   // Snapshot de los agregados elegidos, en texto legible — igual que
   // OrderItem.opcionesTexto. Null si no se eligió ninguno.
   opcionesTexto  String?

@@ -7,6 +7,7 @@ import { idLocalActual } from "@/lib/local-actual";
 import { exigirPermiso } from "@/lib/auth";
 import { normalizarFormaPagoPos, resumirTurno, type DeclaradoPorForma } from "@/lib/turno-pos";
 import { armarPedido, type LineaPedida, type ProductoBase } from "@/lib/precio-pedido";
+import { desglosarIva, formatearNumeroFactura } from "@/lib/factura-pos";
 import { turnoAbierto, pedidosDelTurno } from "./turno-actual";
 
 export type ResultadoAbrirTurno =
@@ -78,6 +79,11 @@ export type DatosVenta = {
   clienteTelefono: string;
   nota: string;
   items: ItemVentaInput[];
+  /** "ticket" (default) | "factura" — factura solo si la estación de este
+   *  turno tiene un punto de expedición vigente asignado. */
+  comprobanteTipo: string;
+  facturaRazonSocial?: string;
+  facturaRuc?: string;
 };
 
 /**
@@ -97,7 +103,7 @@ export async function registrarVenta(turnoId: string, datos: DatosVenta): Promis
 
   const turno = await db.turnoPos.findUnique({
     where: { id: turnoId },
-    select: { id: true, estado: true },
+    select: { id: true, estado: true, estacion: { select: { puntoExpedicion: true } } },
   });
   if (!turno) return { ok: false, error: "Ese turno no existe." };
   if (turno.estado !== "abierto") {
@@ -106,6 +112,24 @@ export async function registrarVenta(turnoId: string, datos: DatosVenta): Promis
 
   if (!Array.isArray(datos.items) || datos.items.length === 0) {
     return { ok: false, error: "El carrito está vacío." };
+  }
+
+  const esFactura = datos.comprobanteTipo === "factura";
+  const puntoExpedicion = turno.estacion.puntoExpedicion;
+  if (esFactura) {
+    if (!datos.facturaRazonSocial?.trim() || !datos.facturaRuc?.trim()) {
+      return { ok: false, error: "Para factura hacen falta la razón social y el RUC." };
+    }
+    if (!puntoExpedicion) {
+      return {
+        ok: false,
+        error:
+          "Esta estación no tiene un punto de expedición asignado. Vendé como ticket, o pedile al dueño que lo asigne en Estaciones.",
+      };
+    }
+    if (!puntoExpedicion.activo || puntoExpedicion.timbradoHasta < new Date()) {
+      return { ok: false, error: "El timbrado de este punto de expedición está vencido. No se puede emitir factura." };
+    }
   }
 
   // El POS no ofrece variantes ni ingredientes-a-sacar (esos siguen siendo
@@ -125,6 +149,7 @@ export async function registrarVenta(turnoId: string, datos: DatosVenta): Promis
       ingredientes: true,
       mitadYMitadGrupo: true,
       mitadYMitadModo: true,
+      iva: true,
       opciones: {
         where: { tipo: "agregado" },
         orderBy: { orden: "asc" },
@@ -140,6 +165,7 @@ export async function registrarVenta(turnoId: string, datos: DatosVenta): Promis
     ingredientes: p.ingredientes,
     mitadYMitadGrupo: p.mitadYMitadGrupo,
     mitadYMitadModo: p.mitadYMitadModo,
+    iva: p.iva,
     opciones: p.opciones,
   }));
 
@@ -173,6 +199,38 @@ export async function registrarVenta(turnoId: string, datos: DatosVenta): Promis
   }
 
   const ventaId = await prisma.$transaction(async (tx) => {
+    let datosFactura: Record<string, unknown> = { comprobanteTipo: "ticket" };
+
+    if (esFactura && puntoExpedicion) {
+      // Atómico: se incrementa PRIMERO y se usa el valor YA incrementado —
+      // igual que siguienteNumeroVentaPos. Leer el número y recién después
+      // incrementar dejaría una ventana donde dos ventas en simultáneo
+      // podrían agarrar el mismo número.
+      const peActualizado = await tx.puntoExpedicion.update({
+        where: { id: puntoExpedicion.id },
+        data: { ultimoNumeroFactura: { increment: 1 } },
+        select: { ultimoNumeroFactura: true },
+      });
+      const desglose = desglosarIva(filas);
+      datosFactura = {
+        comprobanteTipo: "factura",
+        facturaRazonSocial: datos.facturaRazonSocial!.trim(),
+        facturaRuc: datos.facturaRuc!.trim(),
+        facturaNumero: formatearNumeroFactura(
+          puntoExpedicion.establecimiento,
+          puntoExpedicion.puntoExpedicion,
+          peActualizado.ultimoNumeroFactura
+        ),
+        facturaTimbrado: puntoExpedicion.numeroTimbrado,
+        facturaVencimiento: puntoExpedicion.timbradoHasta,
+        facturaGravado10: desglose.gravado10,
+        facturaGravado5: desglose.gravado5,
+        facturaExento: desglose.exento,
+        facturaIva10: desglose.iva10,
+        facturaIva5: desglose.iva5,
+      };
+    }
+
     const venta = await tx.ventaPos.create({
       data: {
         storeId,
@@ -185,6 +243,7 @@ export async function registrarVenta(turnoId: string, datos: DatosVenta): Promis
         clienteTelefono,
         tipoEntrega,
         nota,
+        ...datosFactura,
         items: {
           create: filas.map((f) => ({
             storeId,
@@ -192,6 +251,7 @@ export async function registrarVenta(turnoId: string, datos: DatosVenta): Promis
             nombreProducto: f.nombreProducto,
             cantidad: f.cantidad,
             precioUnitario: f.precioUnitario,
+            iva: f.iva,
             opcionesTexto: f.opcionesTexto ?? null,
           })),
         },

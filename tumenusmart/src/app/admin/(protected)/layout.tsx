@@ -90,9 +90,19 @@ function armarGrupos(hayIdeaSinVer: boolean, rol: string): GrupoSecciones[] {
           ver: conPermiso("pos.verHistorico") },
         { href: "/admin/pos/reporte-general", label: "Reporte general", icono: "estadisticas" as const,
           ver: conPermiso("pos.verHistorico") },
-        // Configuración de infraestructura (qué notebook es qué caja), no
-        // algo operativo del día a día — por eso vive acá y no en "Día a día".
+      ],
+    },
+    {
+      // Todo lo que hace falta configurar UNA VEZ para poder facturar (hoy
+      // Estaciones, más adelante puntos de expedición y timbrados de la
+      // Factura Autoimpresor) vive junto y separado de "Ajustes" —
+      // "Ajustes" es del negocio en general, esto es específico de
+      // facturación.
+      titulo: "Configuración de facturas",
+      secciones: [
         { href: "/admin/pos/estaciones", label: "Estaciones", icono: "configuracion" as const,
+          ver: conPermiso("pos.gestionarEstaciones") },
+        { href: "/admin/pos/puntos-expedicion", label: "Puntos de expedición", icono: "configuracion" as const,
           ver: conPermiso("pos.gestionarEstaciones") },
       ],
     },

@@ -123,6 +123,17 @@ export default async function DetalleVentaPosPage({
               <dt className="text-tinta-suave">Forma de pago</dt>
               <dd className="font-semibold text-tinta">{etiquetaFormaPagoPos(venta.formaPago)}</dd>
             </div>
+            {venta.comprobanteTipo === "factura" && (
+              <div>
+                <dt className="text-tinta-suave">Factura</dt>
+                <dd className="font-semibold text-tinta">
+                  {venta.facturaNumero}
+                  <span className="ml-1 font-normal text-tinta-media">
+                    ({venta.facturaRazonSocial} — RUC {venta.facturaRuc})
+                  </span>
+                </dd>
+              </div>
+            )}
             <div>
               <dt className="text-tinta-suave">Estado</dt>
               <dd>

@@ -43,6 +43,8 @@ export type ProductoBase = {
   ingredientes: string[];
   mitadYMitadGrupo: string | null;
   mitadYMitadModo: string;
+  /** "gravado10" | "gravado5" | "exento" — ver src/lib/iva.ts. */
+  iva: string;
   /** Ya ordenadas como las ve el cliente. */
   opciones: OpcionBase[];
 };
@@ -70,6 +72,8 @@ export type LineaArmada = {
   nombreProducto: string;
   cantidad: number;
   precioUnitario: number;
+  /** "gravado10" | "gravado5" | "exento" — ver src/lib/iva.ts. */
+  iva: string;
   opcionesTexto?: string;
   ingredientesQuitadosTexto?: string;
   /**
@@ -294,6 +298,7 @@ function armarProducto(
       nombreProducto: producto.nombre,
       cantidad: pedida.cantidad,
       precioUnitario,
+      iva: producto.iva,
       opcionesTexto: textoOpciones(elegidas.opciones),
       ingredientesQuitadosTexto:
         quitadosOrdenados.length > 0 ? `Sin: ${quitadosOrdenados.join(", ")}` : undefined,
@@ -349,6 +354,9 @@ function armarCombo(
       nombreProducto: `Mitad ${a.nombre} / Mitad ${b.nombre}`,
       cantidad: pedida.cantidad,
       precioUnitario,
+      // El combo usa el IVA del producto A: en la práctica las dos mitades
+      // de un mismo grupo (pizzas) siempre van a tener la misma tasa.
+      iva: a.iva,
       opcionesTexto: textoOpciones(elegidas.opciones),
       costoAgregados: sumaCostoOpciones(elegidas.opciones),
       precioAgregados,

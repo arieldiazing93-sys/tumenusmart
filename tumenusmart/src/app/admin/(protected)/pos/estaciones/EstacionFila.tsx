@@ -2,8 +2,15 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { renombrarEstacion, alternarActivaEstacion, vincularEstacion } from "./actions";
+import { renombrarEstacion, alternarActivaEstacion, vincularEstacion, asignarPuntoExpedicion } from "./actions";
 import { Boton, clasesBoton } from "@/components/ui";
+
+type PuntoExpedicionOpcion = {
+  id: string;
+  nombre: string;
+  establecimiento: string;
+  puntoExpedicion: string;
+};
 
 export function EstacionFila({
   id,
@@ -11,6 +18,8 @@ export function EstacionFila({
   activa,
   cantidadTurnos,
   esEstaComputadora,
+  puntoExpedicionId,
+  puntosExpedicion,
 }: {
   id: string;
   nombre: string;
@@ -18,6 +27,9 @@ export function EstacionFila({
   cantidadTurnos: number;
   /** Si la cookie de ESTE navegador ya apunta a esta estación. */
   esEstaComputadora: boolean;
+  puntoExpedicionId: string | null;
+  /** Puntos de expedición activos del local, para elegir a cuál queda atada. */
+  puntosExpedicion: PuntoExpedicionOpcion[];
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -26,6 +38,15 @@ export function EstacionFila({
   const [error, setError] = useState<string | null>(null);
   const [guardado, setGuardado] = useState(false);
   const [vinculando, setVinculando] = useState(false);
+  const [asignando, setAsignando] = useState(false);
+
+  async function cambiarPuntoExpedicion(valor: string) {
+    setAsignando(true);
+    setError(null);
+    const resultado = await asignarPuntoExpedicion(id, valor || null);
+    setAsignando(false);
+    if (!resultado.ok) setError(resultado.error);
+  }
 
   function guardarNombre() {
     setError(null);
@@ -109,6 +130,22 @@ export function EstacionFila({
         {!editando && (
           <div className="flex flex-wrap items-center gap-3 text-sm">
             <span className="text-tinta-media">{cantidadTurnos} turno(s)</span>
+            <label className="flex items-center gap-1.5 text-tinta-media">
+              Punto de expedición
+              <select
+                value={puntoExpedicionId ?? ""}
+                disabled={asignando}
+                onChange={(e) => cambiarPuntoExpedicion(e.target.value)}
+                className="rounded-lg border border-linea px-2 py-1 text-sm text-tinta"
+              >
+                <option value="">Sin asignar — solo tickets</option>
+                {puntosExpedicion.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.nombre} ({p.establecimiento}-{p.puntoExpedicion})
+                  </option>
+                ))}
+              </select>
+            </label>
             {activa && !esEstaComputadora && (
               <Boton tono="navegar" tam="sm" onClick={vincular} disabled={vinculando}>
                 {vinculando ? "Vinculando…" : "Vincular esta computadora"}
