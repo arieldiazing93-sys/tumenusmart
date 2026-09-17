@@ -257,8 +257,8 @@ export function PantallaVenta({
         titulo="Punto de venta"
         bajada="Venta rápida de mostrador."
         acciones={
-          <Link href="/admin/pos/cerrar" className={clasesBoton("suave", "sm")}>
-            Cerrar turno
+          <Link href="/admin/pos/cerrar" className={clasesBoton("navegar", "sm")}>
+            🔒 Cerrar turno
           </Link>
         }
       />
