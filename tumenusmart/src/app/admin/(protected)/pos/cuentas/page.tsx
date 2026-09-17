@@ -72,6 +72,8 @@ export default async function CuentasPosPage({
       creadoEn: true,
       cancelada: true,
       clienteNombre: true,
+      comprobanteTipo: true,
+      facturaNumero: true,
     },
   });
 
@@ -205,6 +207,11 @@ export default async function CuentasPosPage({
                   >
                     {formatearNumero(v.numero)}
                   </Link>
+                  {v.comprobanteTipo === "factura" && v.facturaNumero && (
+                    <span className="mt-0.5 block text-[10px] font-medium uppercase text-tinta-suave">
+                      Factura {v.facturaNumero}
+                    </span>
+                  )}
                 </Td>
                 <Td>
                   {v.creadoEn.toLocaleString("es-PY", {

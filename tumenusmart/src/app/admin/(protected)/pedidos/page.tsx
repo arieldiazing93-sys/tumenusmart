@@ -542,6 +542,11 @@ export default async function AdminPedidosPage({
                             sin enviar
                           </span>
                         )}
+                        {pedido.comprobanteTipo === "factura" && pedido.facturaNumero && (
+                          <span className="mt-0.5 block text-[10px] font-medium uppercase text-tinta-suave">
+                            Factura {pedido.facturaNumero}
+                          </span>
+                        )}
                       </Link>
                     </td>
                     <td className="px-3 py-3">
