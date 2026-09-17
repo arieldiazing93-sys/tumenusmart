@@ -23,13 +23,40 @@ function Separador() {
   return <p className="py-1.5 text-center text-xs">{"- ".repeat(18).trim()}</p>;
 }
 
+// Se usa para las líneas de dos columnas (desglose de IVA, encabezados) —
+// para el detalle de productos ver `filaTabla`, que calibra 3 columnas fijas.
 function filaConMonto(texto: string, monto: string, ancho: number): string {
   const espacio = ancho - texto.length - monto.length;
   if (espacio < 2) return `${texto}\n${monto}`;
   return texto + " ".repeat(espacio) + monto;
 }
 
-const ANCHO_RENGLON = 32;
+// Calibrado para una impresora térmica de 75mm a 40 caracteres por línea.
+const ANCHO_RENGLON = 40;
+const COL_CANTIDAD = 3; // columnas 1-3
+const COL_DESCRIPCION = 5; // la descripción arranca acá (columna 4 = espacio)
+const COL_MONTO = 32; // el monto arranca acá
+
+/**
+ * Fila de la tabla de productos con 3 columnas fijas: cantidad (3
+ * caracteres), descripción (arranca en la columna 5, se corta si no entra
+ * antes de la columna 32) y monto (arranca en la columna 32). Nunca se le
+ * corta un dígito al monto: si no entra en lo que queda del renglón, se
+ * imprime completo igual, aunque la línea se pase de 40 caracteres — es
+ * preferible eso a mostrar una cifra de dinero incompleta.
+ */
+function filaTabla(cantidad: string, descripcion: string, monto: string): string {
+  const anchoDescripcion = COL_MONTO - COL_DESCRIPCION;
+  const colCantidad = cantidad.padEnd(COL_CANTIDAD).slice(0, COL_CANTIDAD);
+  const espacio = " ".repeat(COL_DESCRIPCION - COL_CANTIDAD - 1);
+  const colDescripcion =
+    descripcion.length > anchoDescripcion
+      ? descripcion.slice(0, anchoDescripcion)
+      : descripcion.padEnd(anchoDescripcion);
+  const anchoMonto = ANCHO_RENGLON - COL_MONTO + 1;
+  const colMonto = monto.length >= anchoMonto ? monto : monto.padStart(anchoMonto);
+  return colCantidad + espacio + colDescripcion + colMonto;
+}
 
 export default async function TicketVentaPosPage({
   params,
@@ -144,16 +171,16 @@ export default async function TicketVentaPosPage({
         <div>
           {esFactura && (
             <p className="mb-1 whitespace-pre-wrap font-bold">
-              {filaConMonto("Cant. Descripción", "Monto", ANCHO_RENGLON)}
+              {filaTabla("Cant", "Descripción", "Monto")}
             </p>
           )}
           {venta.items.map((item) => (
             <div key={item.id} className="mb-1.5 last:mb-0">
               <p className="whitespace-pre-wrap">
-                {filaConMonto(
-                  `${item.cantidad}x ${item.nombreProducto}`,
-                  formatearGuarani(item.cantidad * Number(item.precioUnitario)),
-                  ANCHO_RENGLON
+                {filaTabla(
+                  String(item.cantidad),
+                  item.nombreProducto,
+                  formatearGuarani(item.cantidad * Number(item.precioUnitario))
                 )}
               </p>
               {item.opcionesTexto && (
