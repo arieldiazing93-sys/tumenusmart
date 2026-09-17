@@ -24,6 +24,19 @@ export function formatearGuarani(valor: number | string): string {
   return `Gs. ${miles}`;
 }
 
+/**
+ * Igual que formatearGuarani pero sin el prefijo "Gs." — para la columna
+ * "Monto" de la tabla de productos del ticket (filaTabla), calibrada a un
+ * ancho fijo de columna donde el prefijo no entra. El resto del ticket
+ * (Total, Subtotal, desglose de IVA) sigue usando formatearGuarani con
+ * prefijo, porque ahí sí hay lugar y no van en una tabla de columnas fijas.
+ */
+export function formatearMiles(valor: number | string): string {
+  const numero = typeof valor === "string" ? parseFloat(valor) : valor;
+  if (!Number.isFinite(numero)) return "0";
+  return new Intl.NumberFormat("es-PY", { maximumFractionDigits: 0 }).format(Math.round(numero));
+}
+
 // Número correlativo simple para mostrarle al cliente (ej: "#0042") en vez
 // del id interno (cuid, con letras) — mucho más fácil de leer por teléfono.
 export function formatearNumero(numero: number): string {

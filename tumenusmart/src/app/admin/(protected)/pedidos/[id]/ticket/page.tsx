@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { pantallaConPermiso } from "@/lib/auth";
 import { prismaDelLocal } from "@/lib/prisma-local";
 import { idLocalActual } from "@/lib/local-actual";
-import { formatearGuarani, formatearNumero, formatearTelefonoLocal } from "@/lib/format";
+import { formatearGuarani, formatearMiles, formatearNumero, formatearTelefonoLocal } from "@/lib/format";
 import { etiquetaMetodoPago } from "@/lib/metodos-pago";
 import { ZONA_NEGOCIO } from "@/lib/timezone";
 import { ImprimirAuto } from "@/components/ImprimirAuto";
@@ -176,8 +176,8 @@ export default async function TicketPage({
 
         <div>
           {esFactura && (
-            <p className="mb-1 whitespace-pre-wrap font-bold">
-              {filaTabla("Cant", "Descripción", "Monto")}
+            <p className="mb-1 whitespace-pre-wrap">
+              {filaTabla("Ctd", "Descripción", "Monto")}
             </p>
           )}
           {pedido.items.map((item) => (
@@ -186,7 +186,7 @@ export default async function TicketPage({
                 {filaTabla(
                   String(item.cantidad),
                   item.nombreProducto,
-                  formatearGuarani(item.cantidad * Number(item.precioUnitario))
+                  formatearMiles(item.cantidad * Number(item.precioUnitario))
                 )}
               </p>
               {item.opcionesTexto && (

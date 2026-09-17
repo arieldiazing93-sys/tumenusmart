@@ -42,7 +42,9 @@ export const SIN_REGISTRO_FISCAL = {
   tipo: "sin_nombre" as const,
   numero: "X",
   codigoSet: "15",
-  etiquetaDisplay: "Consumidor Final",
+  // Término oficial de la Tabla 3 de la SET para el código 15 — es lo que
+  // va impreso como razón social en la factura, no una etiqueta amigable.
+  etiquetaDisplay: "Sin Nombre",
 };
 
 export function etiquetaTipoIdentificacion(valor: string): string {

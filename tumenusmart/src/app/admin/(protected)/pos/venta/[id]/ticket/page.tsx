@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { pantallaConPermiso } from "@/lib/auth";
 import { prismaDelLocal } from "@/lib/prisma-local";
 import { idLocalActual } from "@/lib/local-actual";
-import { formatearGuarani, formatearNumero, formatearTelefonoLocal } from "@/lib/format";
+import { formatearGuarani, formatearMiles, formatearNumero, formatearTelefonoLocal } from "@/lib/format";
 import { etiquetaFormaPagoPos } from "@/lib/turno-pos";
 import { SIN_REGISTRO_FISCAL, etiquetaTipoIdentificacion } from "@/lib/tipo-cliente";
 import { ZONA_NEGOCIO } from "@/lib/timezone";
@@ -162,16 +162,22 @@ export default async function TicketVentaPosPage({
         {esFactura && (
           <>
             <div className="text-xs leading-tight">
-              {venta.facturaTipoIdentificacion === SIN_REGISTRO_FISCAL.tipo ? (
-                <p>Cliente: {SIN_REGISTRO_FISCAL.etiquetaDisplay}</p>
-              ) : (
-                <>
-                  <p>Razón social: {venta.facturaRazonSocial}</p>
-                  <p>
-                    {etiquetaTipoIdentificacion(venta.facturaTipoIdentificacion ?? "ruc")}: {venta.facturaRuc}
-                  </p>
-                </>
-              )}
+              {/* Siempre las dos líneas, con o sin registro fiscal — el
+                  timbrado Autoimpresor obliga a facturar toda venta, así que
+                  "sin nombre" también necesita su razón social y su RUC
+                  impresos (Sin Nombre / X), no un texto aparte. */}
+              <p>
+                Razón social:{" "}
+                {venta.facturaTipoIdentificacion === SIN_REGISTRO_FISCAL.tipo
+                  ? SIN_REGISTRO_FISCAL.etiquetaDisplay
+                  : venta.facturaRazonSocial}
+              </p>
+              <p>
+                {venta.facturaTipoIdentificacion === SIN_REGISTRO_FISCAL.tipo
+                  ? "RUC"
+                  : etiquetaTipoIdentificacion(venta.facturaTipoIdentificacion ?? "ruc")}
+                : {venta.facturaRuc}
+              </p>
             </div>
             <Separador />
           </>
@@ -179,8 +185,8 @@ export default async function TicketVentaPosPage({
 
         <div>
           {esFactura && (
-            <p className="mb-1 whitespace-pre-wrap font-bold">
-              {filaTabla("Cant", "Descripción", "Monto")}
+            <p className="mb-1 whitespace-pre-wrap">
+              {filaTabla("Ctd", "Descripción", "Monto")}
             </p>
           )}
           {venta.items.map((item) => (
@@ -189,7 +195,7 @@ export default async function TicketVentaPosPage({
                 {filaTabla(
                   String(item.cantidad),
                   item.nombreProducto,
-                  formatearGuarani(item.cantidad * Number(item.precioUnitario))
+                  formatearMiles(item.cantidad * Number(item.precioUnitario))
                 )}
               </p>
               {item.opcionesTexto && (
