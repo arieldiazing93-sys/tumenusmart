@@ -536,6 +536,7 @@ export function PantallaVenta({
                     ]}
                     valor={registroFiscal}
                     onChange={setRegistroFiscal}
+                    color="tinta"
                   />
                   {registroFiscal === "sin" ? (
                     <p className="text-[0.8rem] text-tinta-media">
@@ -617,7 +618,17 @@ export function PantallaVenta({
             </div>
           )}
 
-          <Segmentado opciones={TIPOS_ENTREGA_POS} valor={tipoEntrega} onChange={setTipoEntrega} />
+          <div className="flex flex-col gap-2 border-t border-linea pt-3.5">
+            <p className="text-[0.72rem] font-semibold uppercase tracking-rotulo text-tinta-suave">
+              Entrega
+            </p>
+            <Segmentado
+              opciones={TIPOS_ENTREGA_POS}
+              valor={tipoEntrega}
+              onChange={setTipoEntrega}
+              color="exito"
+            />
+          </div>
 
           <div className="flex items-center justify-between border-t border-linea pt-3">
             <span className="text-[0.85rem] text-tinta-media">Total ({cantidadTotal})</span>
