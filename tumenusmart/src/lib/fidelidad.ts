@@ -117,7 +117,10 @@ export async function progresoDeCliente(
   const db = prismaDelLocal(storeId);
   const [entregadosOrder, entregadosPos, customer] = await Promise.all([
     db.order.count({ where: { clienteTelefono: telefono, ...dondeEntregado(montoMinimo) } }),
-    db.ventaPos.count({ where: { clienteTelefono: telefono, ...dondeEntregadoPos(montoMinimo) } }),
+    // dondeEntregadoPos ya trae "clienteTelefono: { not: null }" (para el
+    // groupBy general); acá el spread va PRIMERO para que el teléfono
+    // puntual lo pise a propósito, en vez de al revés.
+    db.ventaPos.count({ where: { ...dondeEntregadoPos(montoMinimo), clienteTelefono: telefono } }),
     // Plain `prisma`, no `prismaDelLocal`, acá: la clave compuesta
     // storeId_telefono ya fija el local sola, igual que en el upsert del
     // checkout — no hace falta la capa extra para esto.
