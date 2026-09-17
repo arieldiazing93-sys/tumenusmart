@@ -39,7 +39,7 @@ export default async function CerrarTurnoPage() {
         titulo="Cerrar turno"
         bajada="Contá la caja y declará cuánto tenés en cada forma de pago."
       />
-      <Tarjeta className="max-w-lg">
+      <Tarjeta className="max-w-lg shadow-sm">
         <CerrarTurnoForm
           turnoId={turno.id}
           cantidad={resumen.cantidad}

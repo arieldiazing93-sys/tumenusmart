@@ -38,6 +38,9 @@ const TIPOS_ENTREGA_POS: { value: TipoEntregaPos; label: string }[] = [
   { value: "llevar", label: "🛵 Para llevar" },
 ];
 
+const CHIP_ACTIVO = "border-brand bg-brand text-white";
+const CHIP_INACTIVO = "border-linea text-tinta-media hover:border-brand hover:text-brand";
+
 /**
  * La pantalla de venta rápida de mostrador.
  *
@@ -46,6 +49,10 @@ const TIPOS_ENTREGA_POS: { value: TipoEntregaPos; label: string }[] = [
  * elige la forma de pago y, si es efectivo, se calcula el vuelto. Al cobrar
  * se va al ticket; volver de ahí a esta pantalla la deja en blanco de
  * nuevo, lista para la próxima cuenta.
+ *
+ * En pantallas angostas el carrito baja debajo de la grilla y una barra
+ * flotante con el total se queda fija abajo para no tener que scrollear
+ * hasta el final cada vez; en desktop el carrito queda fijo al costado.
  */
 export function PantallaVenta({
   turnoId,
@@ -245,7 +252,7 @@ export function PantallaVenta({
   }
 
   return (
-    <div>
+    <div className="pb-28 lg:pb-0">
       <Cabecera
         titulo="Punto de venta"
         bajada="Venta rápida de mostrador."
@@ -256,32 +263,34 @@ export function PantallaVenta({
         }
       />
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_22rem]">
-        <div>
-          <div className="mb-3 flex flex-wrap gap-2">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1fr_23rem] lg:items-start">
+        <div className="min-w-0">
+          <div className="-mx-0.5 mb-4 flex gap-2 overflow-x-auto px-0.5 pb-1">
             <button
               type="button"
               onClick={() => setCategoriaId(TODOS)}
-              className={`rounded-lg border px-3 py-1.5 text-[0.85rem] font-medium transition-colors ${
-                categoriaId === TODOS
-                  ? "border-brand bg-brand-light text-brand-texto"
-                  : "border-linea text-tinta-media hover:border-brand/40"
+              className={`flex-none rounded-full border px-3.5 py-1.5 text-[0.85rem] font-medium transition-colors ${
+                categoriaId === TODOS ? CHIP_ACTIVO : CHIP_INACTIVO
               }`}
             >
-              Todos <span className="text-tinta-suave">{totalProductos}</span>
+              ✨ Todos{" "}
+              <span className={categoriaId === TODOS ? "text-white/80" : "text-tinta-suave"}>
+                {totalProductos}
+              </span>
             </button>
             {categorias.map((c) => (
               <button
                 key={c.id}
                 type="button"
                 onClick={() => setCategoriaId(c.id)}
-                className={`rounded-lg border px-3 py-1.5 text-[0.85rem] font-medium transition-colors ${
-                  c.id === categoriaId
-                    ? "border-brand bg-brand-light text-brand-texto"
-                    : "border-linea text-tinta-media hover:border-brand/40"
+                className={`flex-none rounded-full border px-3.5 py-1.5 text-[0.85rem] font-medium transition-colors ${
+                  c.id === categoriaId ? CHIP_ACTIVO : CHIP_INACTIVO
                 }`}
               >
-                {c.nombre} <span className="text-tinta-suave">{c.productos.length}</span>
+                {c.nombre}{" "}
+                <span className={c.id === categoriaId ? "text-white/80" : "text-tinta-suave"}>
+                  {c.productos.length}
+                </span>
               </button>
             ))}
           </div>
@@ -295,7 +304,7 @@ export function PantallaVenta({
             />
           ))}
 
-          <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
             {productosVisibles.map((p) => {
               const cantidadEnCarrito = cantidadesPorProducto.get(p.id) ?? 0;
               return (
@@ -303,17 +312,26 @@ export function PantallaVenta({
                   key={p.id}
                   type="button"
                   onClick={() => agregarProducto(p)}
-                  className="relative rounded-xl border border-linea bg-white p-3 text-left transition-colors hover:border-brand"
+                  className={`relative flex flex-col rounded-xl border bg-white p-3.5 text-left shadow-sm transition-all active:scale-[0.96] ${
+                    cantidadEnCarrito > 0
+                      ? "border-brand/50 ring-1 ring-brand/20"
+                      : "border-linea hover:-translate-y-0.5 hover:border-brand/40 hover:shadow-media"
+                  }`}
                 >
                   {cantidadEnCarrito > 0 && (
-                    <span className="absolute -right-1.5 -top-1.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-brand px-1 text-[0.72rem] font-semibold text-white">
+                    <span className="absolute -right-2 -top-2 flex h-6 min-w-6 items-center justify-center rounded-full border-2 border-papel-suave bg-brand px-1.5 text-[0.74rem] font-bold text-white shadow-sm">
                       {cantidadEnCarrito}
                     </span>
                   )}
-                  <p className="text-[0.86rem] font-medium text-tinta">{p.nombre}</p>
-                  <p className="mt-1 text-[0.82rem] font-semibold text-brand-texto">
+                  <p className="text-[0.86rem] font-medium leading-snug text-tinta">{p.nombre}</p>
+                  <p className="cifra mt-1.5 text-[0.9rem] font-semibold text-brand-texto">
                     {formatearGuarani(p.precio)}
                   </p>
+                  {p.agregados.length > 0 && (
+                    <span className="mt-1 text-[0.68rem] font-medium uppercase tracking-rotulo text-tinta-suave">
+                      + agregados
+                    </span>
+                  )}
                 </button>
               );
             })}
@@ -325,13 +343,13 @@ export function PantallaVenta({
           </div>
         </div>
 
-        <Tarjeta className="flex h-fit flex-col gap-3">
+        <Tarjeta className="flex flex-col gap-4 lg:sticky lg:top-[4.5rem] lg:max-h-[calc(100vh-5.5rem)] lg:overflow-y-auto">
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0">
               <p className="truncate text-[0.7rem] font-semibold uppercase tracking-rotulo text-tinta-suave">
                 {clienteNombre.trim() || "Cuenta"}
               </p>
-              <p className="text-[0.95rem] font-semibold tracking-titular text-tinta">
+              <p className="text-[1rem] font-semibold tracking-titular text-tinta">
                 {cantidadTotal} {cantidadTotal === 1 ? "item" : "items"}
               </p>
             </div>
@@ -339,7 +357,7 @@ export function PantallaVenta({
               <button
                 type="button"
                 onClick={limpiarCarrito}
-                className="flex-none text-[0.8rem] font-medium text-tinta-suave hover:text-peligro"
+                className="flex-none rounded-full px-2 py-1 text-[0.8rem] font-medium text-tinta-suave transition-colors hover:bg-peligro-luz hover:text-peligro"
               >
                 Vaciar
               </button>
@@ -347,36 +365,40 @@ export function PantallaVenta({
           </div>
 
           {carrito.length === 0 ? (
-            <p className="text-[0.85rem] text-tinta-suave">Tocá un producto para agregarlo.</p>
+            <p className="rounded-lg border border-dashed border-linea bg-papel-suave px-3 py-6 text-center text-[0.85rem] text-tinta-suave">
+              Tocá un producto para agregarlo.
+            </p>
           ) : (
-            <div className="flex flex-col gap-2">
+            <div className="flex flex-col gap-2.5">
               {carrito.map((i) => (
                 <div
                   key={i.key}
-                  className="flex items-center justify-between gap-2 border-b border-linea-fina pb-2"
+                  className="flex items-center justify-between gap-2 border-b border-linea-fina pb-2.5 last:border-0 last:pb-0"
                 >
                   <div className="min-w-0">
                     <p className="truncate text-[0.85rem] font-medium text-tinta">{i.nombre}</p>
                     {i.detalle && <p className="truncate text-[0.76rem] text-tinta-suave">+ {i.detalle}</p>}
-                    <p className="text-[0.78rem] text-tinta-suave">
-                      {formatearGuarani(i.precio)} c/u · subtotal {formatearGuarani(i.precio * i.cantidad)}
+                    <p className="cifra text-[0.78rem] text-tinta-suave">
+                      {formatearGuarani(i.precio)} c/u · {formatearGuarani(i.precio * i.cantidad)}
                     </p>
                   </div>
-                  <div className="flex flex-none items-center gap-1.5">
+                  <div className="flex flex-none items-center gap-1">
                     <button
                       type="button"
                       onClick={() => cambiarCantidad(i.key, -1)}
-                      className="flex h-7 w-7 items-center justify-center rounded-lg border border-linea text-tinta-media hover:border-brand hover:text-brand"
+                      aria-label={`Restar ${i.nombre}`}
+                      className="flex h-8 w-8 items-center justify-center rounded-full border border-linea text-tinta-media transition-all hover:border-brand hover:bg-brand-light hover:text-brand active:scale-90"
                     >
                       −
                     </button>
-                    <span className="w-5 text-center text-[0.85rem] font-semibold text-tinta">
+                    <span className="cifra w-5 text-center text-[0.85rem] font-semibold text-tinta">
                       {i.cantidad}
                     </span>
                     <button
                       type="button"
                       onClick={() => cambiarCantidad(i.key, 1)}
-                      className="flex h-7 w-7 items-center justify-center rounded-lg border border-linea text-tinta-media hover:border-brand hover:text-brand"
+                      aria-label={`Sumar ${i.nombre}`}
+                      className="flex h-8 w-8 items-center justify-center rounded-full border border-linea text-tinta-media transition-all hover:border-brand hover:bg-brand-light hover:text-brand active:scale-90"
                     >
                       +
                     </button>
@@ -384,7 +406,7 @@ export function PantallaVenta({
                       type="button"
                       onClick={() => quitarProducto(i.key)}
                       aria-label={`Quitar ${i.nombre}`}
-                      className="ml-1 text-tinta-suave hover:text-peligro"
+                      className="ml-0.5 flex h-8 w-8 items-center justify-center rounded-full text-tinta-suave transition-colors hover:bg-peligro-luz hover:text-peligro"
                     >
                       ✕
                     </button>
@@ -394,37 +416,42 @@ export function PantallaVenta({
             </div>
           )}
 
-          <div className="grid grid-cols-2 gap-2">
-            <Entrada
-              placeholder="Nombre"
-              value={clienteNombre}
-              onChange={(e) => setClienteNombre(e.target.value)}
-            />
-            <Entrada
-              placeholder="0981 234 567"
-              value={clienteTelefono}
-              onChange={(e) => {
-                setClienteTelefono(e.target.value);
-                setClienteEsNuevo(false);
-              }}
-              onKeyDown={(e) => {
-                if (e.key !== "Enter") return;
-                e.preventDefault();
-                buscarCliente();
-              }}
-            />
+          <div className="flex flex-col gap-2 border-t border-linea pt-3.5">
+            <p className="text-[0.72rem] font-semibold uppercase tracking-rotulo text-tinta-suave">
+              Cliente (opcional)
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              <Entrada
+                placeholder="Nombre"
+                value={clienteNombre}
+                onChange={(e) => setClienteNombre(e.target.value)}
+              />
+              <Entrada
+                placeholder="0981 234 567"
+                value={clienteTelefono}
+                onChange={(e) => {
+                  setClienteTelefono(e.target.value);
+                  setClienteEsNuevo(false);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key !== "Enter") return;
+                  e.preventDefault();
+                  buscarCliente();
+                }}
+              />
+            </div>
+            {clienteEsNuevo ? (
+              <p className="text-[0.74rem] font-medium text-aviso">
+                Cliente nuevo — cargá el nombre para cobrar.
+              </p>
+            ) : (
+              <p className="text-[0.74rem] text-tinta-suave">
+                {buscandoCliente
+                  ? "Buscando…"
+                  : "Enter en el teléfono completa el nombre si ya es cliente. Se guarda con +595 automático."}
+              </p>
+            )}
           </div>
-          {clienteEsNuevo ? (
-            <p className="-mt-2 text-[0.74rem] font-medium text-aviso">
-              Cliente nuevo — cargá el nombre para cobrar.
-            </p>
-          ) : (
-            <p className="-mt-2 text-[0.74rem] text-tinta-suave">
-              {buscandoCliente
-                ? "Buscando…"
-                : "Opcional. Escribí el teléfono y apretá Enter: si ya es cliente, completa el nombre solo. Se guarda con +595 automático."}
-            </p>
-          )}
 
           <Segmentado opciones={TIPOS_ENTREGA_POS} valor={tipoEntrega} onChange={setTipoEntrega} />
 
@@ -435,20 +462,50 @@ export function PantallaVenta({
             rows={2}
           />
 
-          <div className="flex items-center justify-between border-t border-linea pt-2">
+          <div className="flex items-center justify-between border-t border-linea pt-3">
             <span className="text-[0.85rem] text-tinta-media">Total ({cantidadTotal})</span>
-            <span className="cifra text-[1.3rem] font-semibold text-tinta">{formatearGuarani(total)}</span>
+            <span className="cifra text-[1.4rem] font-bold text-tinta">{formatearGuarani(total)}</span>
           </div>
 
-          {error && !mostrarCobro && (
-            <p className="text-[0.82rem] font-medium text-peligro">{error}</p>
+          {error && (
+            <p className="rounded-lg bg-peligro-luz px-3 py-2 text-[0.82rem] font-medium text-peligro">
+              {error}
+            </p>
           )}
 
-          <Boton onClick={() => setMostrarCobro(true)} disabled={carrito.length === 0} tam="lg">
-            Confirmar pedido
-          </Boton>
+          <div className="hidden lg:block">
+            <Boton
+              onClick={() => setMostrarCobro(true)}
+              disabled={carrito.length === 0}
+              tam="lg"
+              className="w-full"
+            >
+              Confirmar pedido
+            </Boton>
+          </div>
         </Tarjeta>
       </div>
+
+      {/* Barra de cobro fija en celular/tablet angosto: el carrito queda
+          debajo de toda la grilla, así que sin esto habría que scrollear
+          hasta el final cada vez para cobrar. */}
+      {carrito.length > 0 && (
+        <div
+          className="fixed inset-x-0 bottom-0 z-30 border-t border-linea bg-papel/95 px-4 py-3 shadow-alta backdrop-blur-sm lg:hidden"
+          style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom, 0px))" }}
+        >
+          <button
+            type="button"
+            onClick={() => setMostrarCobro(true)}
+            className="flex w-full items-center justify-between rounded-lg bg-brand px-4 py-3 text-white shadow-sm transition-transform active:scale-[0.98]"
+          >
+            <span className="text-[0.85rem] font-semibold">
+              {cantidadTotal} {cantidadTotal === 1 ? "item" : "items"} · Confirmar pedido
+            </span>
+            <span className="cifra text-[1.05rem] font-bold">{formatearGuarani(total)}</span>
+          </button>
+        </div>
+      )}
 
       {mostrarCobro && (
         <CobrarModal

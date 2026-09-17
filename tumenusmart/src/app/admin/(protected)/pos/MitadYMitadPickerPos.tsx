@@ -83,9 +83,9 @@ export function MitadYMitadPickerPos({
   }
 
   return (
-    <div className="mb-3 rounded-xl border border-azul/35 bg-azul-luz p-3">
-      <h4 className="mb-1 text-[0.88rem] font-semibold tracking-titular text-azul-oscuro">
-        Armá mitad y mitad — {grupoNombre}
+    <div className="mb-4 rounded-xl border border-azul/35 bg-azul-luz p-3.5 shadow-sm">
+      <h4 className="mb-1 flex items-center gap-1.5 text-[0.88rem] font-semibold tracking-titular text-azul-oscuro">
+        <span aria-hidden="true">🍕</span> Armá mitad y mitad — {grupoNombre}
       </h4>
       <p className="mb-2 text-[0.74rem] leading-snug text-tinta-media">
         {modo === "mayor"
@@ -160,10 +160,10 @@ export function MitadYMitadPickerPos({
         )}
 
         <div className="flex flex-none items-center gap-2">
-          <div className="flex items-center rounded-lg border border-linea bg-white">
+          <div className="flex items-center rounded-full border border-linea bg-white">
             <button
               type="button"
-              className="px-2 py-1 text-tinta-media"
+              className="flex h-7 w-7 items-center justify-center text-tinta-media transition-transform active:scale-90"
               onClick={() => setCantidad((c) => Math.max(1, c - 1))}
               aria-label="Restar cantidad"
             >
@@ -172,7 +172,7 @@ export function MitadYMitadPickerPos({
             <span className="cifra w-5 text-center text-[0.82rem]">{cantidad}</span>
             <button
               type="button"
-              className="px-2 py-1 text-tinta-media"
+              className="flex h-7 w-7 items-center justify-center text-tinta-media transition-transform active:scale-90"
               onClick={() => setCantidad((c) => c + 1)}
               aria-label="Sumar cantidad"
             >
@@ -184,7 +184,7 @@ export function MitadYMitadPickerPos({
             type="button"
             onClick={agregar}
             disabled={!listo}
-            className="rounded-lg bg-brand px-3 py-1.5 text-[0.82rem] font-semibold text-white transition hover:bg-brand-dark disabled:cursor-not-allowed disabled:bg-linea disabled:text-tinta-suave"
+            className="rounded-lg bg-brand px-3 py-1.5 text-[0.82rem] font-semibold text-white shadow-sm transition-all active:scale-95 hover:bg-brand-dark disabled:cursor-not-allowed disabled:bg-linea disabled:text-tinta-suave disabled:shadow-none"
           >
             Agregar
           </button>

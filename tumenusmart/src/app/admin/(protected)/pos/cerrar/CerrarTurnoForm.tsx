@@ -7,6 +7,13 @@ import { formatearGuarani } from "@/lib/format";
 import { FORMAS_PAGO_POS, type FormaPagoPos } from "@/lib/turno-pos";
 import { cerrarTurno } from "../actions";
 
+const ICONOS_FORMA: Record<FormaPagoPos, string> = {
+  efectivo: "💵",
+  transferencia: "🏦",
+  tarjeta_debito: "💳",
+  tarjeta_credito: "💳",
+};
+
 type Props = {
   turnoId: string;
   cantidad: number;
@@ -18,9 +25,10 @@ type Props = {
  * Declarar lo que hay en caja y cerrar el turno.
  *
  * Los 4 campos arrancan precargados con lo que calculó el sistema — el
- * cajero los ajusta si al contar la plata dio distinto. Pide confirmación
- * porque es irreversible: una vez cerrado, ese turno sale del listado de
- * turnos abiertos y no se puede seguir vendiendo en él.
+ * cajero los ajusta si al contar la plata dio distinto, y ve la diferencia
+ * en el momento (no recién en el comprobante). Pide confirmación porque es
+ * irreversible: una vez cerrado, ese turno sale del listado de turnos
+ * abiertos y no se puede seguir vendiendo en él.
  */
 export function CerrarTurnoForm({ turnoId, cantidad, totalGeneral, porForma }: Props) {
   const router = useRouter();
@@ -58,40 +66,68 @@ export function CerrarTurnoForm({ turnoId, cantidad, totalGeneral, porForma }: P
     router.push(`/admin/pos/turnos/${r.turnoId}`);
   }
 
+  const totalDeclarado = FORMAS_PAGO_POS.reduce((s, f) => s + (parseFloat(declarado[f.valor]) || 0), 0);
+  const diferenciaTotal = totalDeclarado - totalGeneral;
+
   return (
-    <div className="flex flex-col gap-4">
-      <div className="rounded-lg border border-linea bg-papel-suave px-3 py-2.5 text-[0.85rem] text-tinta-media">
-        {cantidad} {cantidad === 1 ? "cuenta" : "cuentas"} (mostrador + pedidos cobrados acá) · Total del
-        sistema:{" "}
-        <strong className="text-tinta">{formatearGuarani(totalGeneral)}</strong>
+    <div className="flex flex-col gap-5">
+      <div className="rounded-lg border border-linea bg-papel-suave px-3.5 py-3 text-[0.85rem] text-tinta-media">
+        {cantidad} {cantidad === 1 ? "cuenta" : "cuentas"} (mostrador + pedidos cobrados acá)
+        <br />
+        Total del sistema: <strong className="cifra text-tinta">{formatearGuarani(totalGeneral)}</strong>
       </div>
 
-      <div className="flex flex-col gap-3">
-        {FORMAS_PAGO_POS.map((f) => (
-          <label key={f.valor} className="flex items-center justify-between gap-3">
-            <span className="text-[0.85rem] font-medium text-tinta">
-              {f.etiqueta}
-              <span className="ml-1.5 block text-[0.76rem] font-normal text-tinta-suave">
-                Sistema: {formatearGuarani(porForma[f.valor])}
+      <div className="flex flex-col gap-2.5">
+        {FORMAS_PAGO_POS.map((f) => {
+          const valor = parseFloat(declarado[f.valor]) || 0;
+          const diferencia = valor - porForma[f.valor];
+          return (
+            <div
+              key={f.valor}
+              className="flex items-center gap-3 rounded-lg border border-linea bg-white p-3"
+            >
+              <span aria-hidden="true" className="flex-none text-lg leading-none">
+                {ICONOS_FORMA[f.valor]}
               </span>
-            </span>
-            {/* El ancho fijo va en el contenedor, no en el input: Entrada ya
-                trae "w-full" en su clase base, y mezclar dos utilidades de
-                ancho en el mismo elemento deja el resultado a merced del
-                orden en que Tailwind las genera. Adentro de un contenedor
-                angosto, "w-full" simplemente llena ESE ancho. */}
-            <div className="w-32 flex-none">
-              <Entrada
-                type="number"
-                min={0}
-                step={1000}
-                value={declarado[f.valor]}
-                onChange={(e) => setDeclarado((d) => ({ ...d, [f.valor]: e.target.value }))}
-                className="text-right"
-              />
+              <div className="min-w-0 flex-1">
+                <p className="text-[0.85rem] font-medium text-tinta">{f.etiqueta}</p>
+                <p className="text-[0.74rem] text-tinta-suave">
+                  Sistema: {formatearGuarani(porForma[f.valor])}
+                  {diferencia !== 0 && (
+                    <span className={diferencia > 0 ? "text-exito" : "text-peligro"}>
+                      {" "}
+                      · {diferencia > 0 ? "+" : ""}
+                      {formatearGuarani(diferencia)}
+                    </span>
+                  )}
+                </p>
+              </div>
+              <div className="w-28 flex-none sm:w-32">
+                <Entrada
+                  type="number"
+                  min={0}
+                  step={1000}
+                  value={declarado[f.valor]}
+                  onChange={(e) => setDeclarado((d) => ({ ...d, [f.valor]: e.target.value }))}
+                  className="text-right"
+                />
+              </div>
             </div>
-          </label>
-        ))}
+          );
+        })}
+      </div>
+
+      <div className="flex items-center justify-between border-t border-linea pt-3">
+        <span className="text-[0.85rem] text-tinta-media">Total declarado</span>
+        <span className="cifra text-[1.2rem] font-bold text-tinta">
+          {formatearGuarani(totalDeclarado)}
+          {diferenciaTotal !== 0 && (
+            <span className={`ml-2 text-[0.85rem] font-semibold ${diferenciaTotal > 0 ? "text-exito" : "text-peligro"}`}>
+              ({diferenciaTotal > 0 ? "+" : ""}
+              {formatearGuarani(diferenciaTotal)})
+            </span>
+          )}
+        </span>
       </div>
 
       <Area
@@ -101,14 +137,16 @@ export function CerrarTurnoForm({ turnoId, cantidad, totalGeneral, porForma }: P
         rows={2}
       />
 
-      {error && <p className="text-[0.82rem] font-medium text-peligro">{error}</p>}
+      {error && (
+        <p className="rounded-lg bg-peligro-luz px-3 py-2 text-[0.82rem] font-medium text-peligro">{error}</p>
+      )}
 
       {!confirmando ? (
         <Boton onClick={() => setConfirmando(true)} tam="lg">
           Cerrar turno
         </Boton>
       ) : (
-        <div className="rounded-xl border border-linea bg-papel-suave p-3">
+        <div className="rounded-xl border border-linea bg-papel-suave p-3.5">
           <p className="text-[0.85rem] text-tinta">
             ¿Confirmás el cierre del turno con estos montos? No se puede deshacer.
           </p>
