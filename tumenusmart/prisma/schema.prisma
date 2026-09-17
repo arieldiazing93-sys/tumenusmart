@@ -106,6 +106,7 @@ model Store {
   // la misma transacción que crea el pedido o la reserva.
   contadorPedidos  Int @default(0)
   contadorReservas Int @default(0)
+  contadorVentasPos Int @default(0)
 
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
@@ -127,6 +128,9 @@ model Store {
   pagos            Pago[]
   urlsAnteriores   SlugAnterior[]
   rendiciones      Rendicion[]
+  turnosPos        TurnoPos[]
+  ventasPos        VentaPos[]
+  ventaPosItems    VentaPosItem[]
 }
 
 /// Las direcciones que este local tuvo antes.
@@ -404,6 +408,7 @@ model Product {
   destacado   Boolean         @default(false)
   opciones    ProductOption[]
   orderItems  OrderItem[]
+  ventaPosItems VentaPosItem[]
   createdAt   DateTime        @default(now())
   updatedAt   DateTime        @updatedAt
 
@@ -678,4 +683,84 @@ model Rendicion {
 
   @@index([storeId])
   @@index([repartidorId])
+}
+
+/// El turno de caja del Punto de Venta (mostrador).
+///
+/// A diferencia de Rendicion (que se calcula sobre pedidos de delivery ya
+/// entregados), acá el turno tiene apertura y cierre EXPLÍCITOS: el cajero
+/// abre declarando el vuelto inicial, vende, y al cerrar declara cuánto tiene
+/// en cada una de las 4 formas de pago. Un solo turno puede estar "abierto"
+/// por local a la vez (ver el índice único parcial en la migración SQL).
+///
+/// Los "calculado*" y "declarado*" quedan congelados al cerrar, mismo
+/// criterio que Rendicion: si después se corrige algo, el cierre ya firmado
+/// no se mueve solo.
+model TurnoPos {
+  id      String @id @default(cuid())
+  storeId String
+  store   Store  @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  estado String @default("abierto") // "abierto" | "cerrado"
+
+  montoInicial Decimal  @db.Decimal(10, 2) @default(0)
+  abiertoPor   String
+  abiertoEn    DateTime @default(now())
+
+  cantidadVentas          Int?
+  calculadoEfectivo       Decimal? @db.Decimal(10, 2)
+  calculadoTransferencia  Decimal? @db.Decimal(10, 2)
+  calculadoTarjetaDebito  Decimal? @db.Decimal(10, 2)
+  calculadoTarjetaCredito Decimal? @db.Decimal(10, 2)
+
+  declaradoEfectivo       Decimal? @db.Decimal(10, 2)
+  declaradoTransferencia  Decimal? @db.Decimal(10, 2)
+  declaradoTarjetaDebito  Decimal? @db.Decimal(10, 2)
+  declaradoTarjetaCredito Decimal? @db.Decimal(10, 2)
+
+  notas      String?
+  cerradoPor String?
+  cerradoEn  DateTime?
+
+  ventas VentaPos[]
+
+  @@index([storeId])
+  @@index([storeId, estado])
+}
+
+/// Una cuenta cobrada en el mostrador (venta rápida de POS).
+model VentaPos {
+  id            String   @id @default(cuid())
+  storeId       String
+  store         Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  turnoPosId    String
+  turnoPos      TurnoPos @relation(fields: [turnoPosId], references: [id])
+  // Mismo criterio que Order.numero: sale de contadorVentasPos del local y
+  // deliberadamente no tiene valor por defecto.
+  numero        Int
+  formaPago     String   // "efectivo" | "transferencia" | "tarjeta_debito" | "tarjeta_credito"
+  total         Decimal  @db.Decimal(10, 2)
+  registradoPor String
+  creadoEn      DateTime @default(now())
+  items         VentaPosItem[]
+
+  @@index([storeId])
+  @@index([turnoPosId])
+  @@index([storeId, creadoEn])
+}
+
+model VentaPosItem {
+  id             String   @id @default(cuid())
+  storeId        String
+  store          Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  ventaPosId     String
+  ventaPos       VentaPos @relation(fields: [ventaPosId], references: [id], onDelete: Cascade)
+  productId      String?
+  product        Product? @relation(fields: [productId], references: [id])
+  nombreProducto String   // snapshot: el nombre al momento de la venta
+  cantidad       Int
+  precioUnitario Decimal  @db.Decimal(10, 2)
+
+  @@index([storeId])
+  @@index([ventaPosId])
 }

@@ -23,6 +23,9 @@ export const MODELOS_POR_LOCAL = new Set([
   "IdeaSemanal",
   "Pago",
   "Rendicion",
+  "TurnoPos",
+  "VentaPos",
+  "VentaPosItem",
 ]);
 
 /** Operaciones que leen o modifican filas existentes: se filtran por `where`. */

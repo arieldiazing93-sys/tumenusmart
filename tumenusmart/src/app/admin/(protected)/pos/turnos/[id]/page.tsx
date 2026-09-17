@@ -1,0 +1,294 @@
+import { notFound } from "next/navigation";
+import { pantallaConPermiso } from "@/lib/auth";
+import { prismaDelLocal } from "@/lib/prisma-local";
+import { idLocalActual } from "@/lib/local-actual";
+import { Volver } from "@/components/Volver";
+import { ImprimirBoton } from "../../../estadisticas/imprimir/ImprimirBoton";
+import { formatearGuarani, formatearNumero } from "@/lib/format";
+import { compararCierre, contrastarTurno, etiquetaFormaPagoPos, type FormaPagoPos } from "@/lib/turno-pos";
+import { ZONA_NEGOCIO } from "@/lib/timezone";
+
+export const dynamic = "force-dynamic";
+
+/** "Jueves 27 de agosto de 2026, 21:40" — como lo diría el cajero. */
+function fechaLarga(fecha: Date): string {
+  const texto = fecha.toLocaleDateString("es-PY", {
+    timeZone: ZONA_NEGOCIO,
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+  const hora = fecha.toLocaleTimeString("es-PY", {
+    timeZone: ZONA_NEGOCIO,
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+  return `${texto.charAt(0).toUpperCase() + texto.slice(1)}, ${hora}`;
+}
+
+function horaCorta(fecha: Date | null): string {
+  if (!fecha) return "—";
+  return fecha.toLocaleString("es-PY", {
+    timeZone: ZONA_NEGOCIO,
+    day: "2-digit",
+    month: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+/**
+ * El comprobante de un turno de POS ya cerrado.
+ *
+ * Mismo criterio que el comprobante de rendición de repartidores: los
+ * totales salen de lo que se congeló en TurnoPos al cerrar, no de sumar las
+ * ventas otra vez. Si algo se corrigió después, esta hoja lo avisa en vez de
+ * disimularlo.
+ */
+export default async function ComprobanteTurnoPosPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  await pantallaConPermiso("pos.vender");
+  const storeId = await idLocalActual();
+  const db = prismaDelLocal(storeId);
+  const { id } = await params;
+
+  const [store, turno] = await Promise.all([
+    db.store.findUnique({ where: { id: storeId }, select: { nombre: true } }),
+    db.turnoPos.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        estado: true,
+        abiertoPor: true,
+        abiertoEn: true,
+        cerradoPor: true,
+        cerradoEn: true,
+        notas: true,
+        cantidadVentas: true,
+        calculadoEfectivo: true,
+        calculadoTransferencia: true,
+        calculadoTarjetaDebito: true,
+        calculadoTarjetaCredito: true,
+        declaradoEfectivo: true,
+        declaradoTransferencia: true,
+        declaradoTarjetaDebito: true,
+        declaradoTarjetaCredito: true,
+        ventas: {
+          orderBy: { creadoEn: "asc" },
+          select: { id: true, numero: true, total: true, formaPago: true, creadoEn: true },
+        },
+      },
+    }),
+  ]);
+
+  if (!turno || turno.estado !== "cerrado") notFound();
+
+  const calculado: Record<FormaPagoPos, number> = {
+    efectivo: Number(turno.calculadoEfectivo ?? 0),
+    transferencia: Number(turno.calculadoTransferencia ?? 0),
+    tarjeta_debito: Number(turno.calculadoTarjetaDebito ?? 0),
+    tarjeta_credito: Number(turno.calculadoTarjetaCredito ?? 0),
+  };
+  const declarado: Record<FormaPagoPos, number> = {
+    efectivo: Number(turno.declaradoEfectivo ?? 0),
+    transferencia: Number(turno.declaradoTransferencia ?? 0),
+    tarjeta_debito: Number(turno.declaradoTarjetaDebito ?? 0),
+    tarjeta_credito: Number(turno.declaradoTarjetaCredito ?? 0),
+  };
+  const totalCalculadoCongelado =
+    calculado.efectivo + calculado.transferencia + calculado.tarjeta_debito + calculado.tarjeta_credito;
+  const cierre = compararCierre(
+    { cantidad: turno.cantidadVentas ?? 0, totalGeneral: totalCalculadoCongelado, porForma: calculado },
+    declarado
+  );
+  const { totalCalculado, totalDeclarado, diferenciaTotal } = cierre;
+
+  const contraste = contrastarTurno(
+    turno.ventas.map((v) => ({ total: Number(v.total), formaPago: v.formaPago })),
+    { cantidadVentas: turno.cantidadVentas ?? 0, calculado }
+  );
+
+  return (
+    <div className="print:text-[11pt]">
+      {/* --- lo que solo se ve en pantalla --- */}
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-3 print:hidden">
+        <Volver href="/admin/pos/turnos" texto="Volver a cierres de turno" />
+        <ImprimirBoton />
+      </div>
+
+      {/* --- la hoja --- */}
+      <div className="rounded-xl border border-linea bg-white p-6 print:rounded-none print:border-0 print:p-0">
+        <header className="mb-5 border-b border-linea pb-4 print:mb-4 print:pb-3">
+          <p className="rotulo">Cierre de turno · Punto de venta</p>
+          <h1 className="mt-1 text-[1.35rem] font-semibold tracking-titular text-tinta print:text-[16pt]">
+            {store?.nombre ?? "Cierre de turno"}
+          </h1>
+          <p className="mt-0.5 text-[0.9rem] text-tinta-media">
+            {fechaLarga(turno.cerradoEn ?? turno.abiertoEn)}
+          </p>
+
+          <dl className="mt-3 flex flex-wrap gap-x-8 gap-y-1 text-[0.85rem]">
+            <div>
+              <dt className="text-tinta-suave">Abrió</dt>
+              <dd className="font-semibold text-tinta">{turno.abiertoPor}</dd>
+            </div>
+            <div>
+              <dt className="text-tinta-suave">Cerró</dt>
+              <dd className="font-semibold text-tinta">{turno.cerradoPor}</dd>
+            </div>
+            <div>
+              <dt className="text-tinta-suave">Ventas</dt>
+              <dd className="cifra font-semibold text-tinta">{turno.cantidadVentas}</dd>
+            </div>
+            <div>
+              <dt className="text-tinta-suave">Comprobante</dt>
+              <dd className="cifra font-semibold text-tinta">{turno.id.slice(-8).toUpperCase()}</dd>
+            </div>
+          </dl>
+        </header>
+
+        <div className="mb-5 rounded-xl border border-exito/25 bg-exito-luz p-4 print:rounded-none print:border print:border-linea print:bg-transparent">
+          <p className="text-[0.85rem] text-tinta-media">Total declarado</p>
+          <p className="cifra mt-0.5 text-[1.9rem] font-semibold leading-tight text-exito print:text-[20pt] print:text-tinta">
+            {formatearGuarani(totalDeclarado)}
+          </p>
+          {diferenciaTotal !== 0 && (
+            <p className="mt-1 text-[0.82rem] text-tinta-media">
+              {diferenciaTotal > 0 ? "Sobró" : "Faltó"} {formatearGuarani(Math.abs(diferenciaTotal))}{" "}
+              respecto de lo que calculó el sistema ({formatearGuarani(totalCalculado)}).
+            </p>
+          )}
+        </div>
+
+        {!contraste.coincide && (
+          <p className="mb-5 rounded-xl border border-aviso/25 bg-aviso-luz px-4 py-3 text-[0.85rem] text-tinta print:rounded-none print:border-linea print:bg-transparent">
+            Alguna venta de este turno se modificó después de cerrarlo: hoy suman{" "}
+            <span className="cifra font-semibold">{formatearGuarani(contraste.totalAhora)}</span> en{" "}
+            {contraste.cantidadAhora} {contraste.cantidadAhora === 1 ? "venta" : "ventas"}. Lo que se
+            calculó al cerrar fue {formatearGuarani(contraste.totalCongelado)} y es lo que vale este
+            comprobante.
+          </p>
+        )}
+
+        <section className="mb-5 break-inside-avoid">
+          <h2 className="mb-2 text-[0.95rem] font-semibold tracking-titular text-tinta">
+            Por forma de pago
+          </h2>
+          <table className="w-full border-collapse text-left">
+            <thead>
+              <tr className="text-[0.7rem] uppercase tracking-rotulo text-tinta-suave">
+                <th className="border-b border-linea pb-1.5 font-semibold">Forma</th>
+                <th className="border-b border-linea pb-1.5 text-right font-semibold">Sistema</th>
+                <th className="border-b border-linea pb-1.5 text-right font-semibold">Declarado</th>
+                <th className="border-b border-linea pb-1.5 text-right font-semibold">Diferencia</th>
+              </tr>
+            </thead>
+            <tbody>
+              {cierre.porForma.map((f) => (
+                <tr key={f.forma}>
+                  <td className="border-b border-linea-fina py-2 text-[0.85rem] text-tinta">
+                    {f.etiqueta}
+                  </td>
+                  <td className="cifra border-b border-linea-fina py-2 text-right text-[0.85rem] text-tinta-media">
+                    {formatearGuarani(f.calculado)}
+                  </td>
+                  <td className="cifra border-b border-linea-fina py-2 text-right text-[0.85rem] font-medium text-tinta">
+                    {formatearGuarani(f.declarado)}
+                  </td>
+                  <td
+                    className={`cifra border-b border-linea-fina py-2 text-right text-[0.85rem] font-medium ${
+                      f.diferencia === 0
+                        ? "text-tinta-suave"
+                        : f.diferencia > 0
+                          ? "text-exito"
+                          : "text-peligro"
+                    }`}
+                  >
+                    {f.diferencia === 0 ? "—" : formatearGuarani(f.diferencia)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot>
+              <tr>
+                <td className="pt-2.5 text-right text-[0.85rem] text-tinta-media">Total</td>
+                <td className="cifra pt-2.5 text-right text-[0.85rem] text-tinta-media">
+                  {formatearGuarani(totalCalculado)}
+                </td>
+                <td className="cifra pt-2.5 text-right text-[0.95rem] font-semibold text-tinta">
+                  {formatearGuarani(totalDeclarado)}
+                </td>
+                <td className="cifra pt-2.5 text-right text-[0.85rem] font-medium text-tinta">
+                  {diferenciaTotal === 0 ? "—" : formatearGuarani(diferenciaTotal)}
+                </td>
+              </tr>
+            </tfoot>
+          </table>
+        </section>
+
+        <section className="break-inside-avoid">
+          <h2 className="mb-2 text-[0.95rem] font-semibold tracking-titular text-tinta">
+            Ventas del turno
+          </h2>
+          {turno.ventas.length === 0 ? (
+            <p className="text-[0.85rem] text-tinta-suave">No hubo ventas en este turno.</p>
+          ) : (
+            <table className="w-full border-collapse text-left">
+              <thead>
+                <tr className="text-[0.7rem] uppercase tracking-rotulo text-tinta-suave">
+                  <th className="w-20 border-b border-linea pb-1.5 font-semibold">Venta</th>
+                  <th className="w-32 border-b border-linea pb-1.5 font-semibold">Hora</th>
+                  <th className="border-b border-linea pb-1.5 font-semibold">Forma de pago</th>
+                  <th className="w-32 border-b border-linea pb-1.5 text-right font-semibold">Monto</th>
+                </tr>
+              </thead>
+              <tbody>
+                {turno.ventas.map((v) => (
+                  <tr key={v.id} className="break-inside-avoid align-top">
+                    <td className="cifra border-b border-linea-fina py-2 text-[0.85rem] font-medium text-tinta">
+                      {formatearNumero(v.numero)}
+                    </td>
+                    <td className="cifra border-b border-linea-fina py-2 text-[0.82rem] text-tinta-media">
+                      {horaCorta(v.creadoEn)}
+                    </td>
+                    <td className="border-b border-linea-fina py-2 text-[0.82rem] text-tinta-media">
+                      {etiquetaFormaPagoPos(v.formaPago)}
+                    </td>
+                    <td className="cifra border-b border-linea-fina py-2 text-right text-[0.85rem] font-medium text-tinta">
+                      {formatearGuarani(Number(v.total))}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </section>
+
+        {turno.notas && (
+          <section className="mt-5 break-inside-avoid">
+            <h2 className="mb-1 text-[0.8rem] font-semibold uppercase tracking-rotulo text-tinta-suave">
+              Observaciones
+            </h2>
+            <p className="text-[0.85rem] text-tinta">{turno.notas}</p>
+          </section>
+        )}
+
+        <section className="mt-10 flex flex-wrap gap-8 break-inside-avoid print:mt-12">
+          <div className="min-w-[13rem] flex-1">
+            <div className="border-b border-tinta" />
+            <p className="mt-1.5 text-[0.78rem] text-tinta-media">Cerró · {turno.cerradoPor}</p>
+          </div>
+        </section>
+
+        <footer className="mt-6 border-t border-linea pt-3 text-[0.72rem] text-tinta-suave">
+          Los montos de este comprobante son los que se registraron al cerrar el turno. Generado
+          desde TuMenuSmart.
+        </footer>
+      </div>
+    </div>
+  );
+}

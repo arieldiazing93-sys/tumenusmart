@@ -32,6 +32,10 @@ export type Permiso =
   | "repartidores.gestionar"
   // El cierre de caja del repartidor: ver cuánto debe y darlo por recibido.
   | "rendiciones.gestionar"
+  // Punto de venta: abrir/cerrar SU turno y vender por mostrador.
+  | "pos.vender"
+  // Ver el histórico completo de cuentas y cierres de TODOS los cajeros.
+  | "pos.verHistorico"
   // --- la carta ---
   | "productos.ver"
   | "productos.disponibilidad"
@@ -70,6 +74,7 @@ const PERMISOS_EMPLEADO: Permiso[] = [
   "reservas.ver",
   "reservas.gestionar",
   "repartidores.ver",
+  "pos.vender",
   "productos.ver",
   "productos.disponibilidad",
   "categorias.ver",
@@ -90,6 +95,8 @@ const PERMISOS_LOCAL: Permiso[] = [
   // Queda fuera del empleado a propósito: acá se decide que la plata que
   // trajo el repartidor está bien. Es del dueño hasta que él diga otra cosa.
   "rendiciones.gestionar",
+  // El dueño ve el histórico de TODOS los cajeros, no solo el suyo.
+  "pos.verHistorico",
   "productos.editar",
   "categorias.editar",
   "estadisticas.ver",

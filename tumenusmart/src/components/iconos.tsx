@@ -213,6 +213,14 @@ export const IconoCierre = (p: Props) => (
   </Svg>
 );
 
+/** Punto de venta: el ticket de una cuenta cobrada en el mostrador. */
+export const IconoPos = (p: Props) => (
+  <Svg {...p}>
+    <path d="M6 3h12v18l-2-1.4-2 1.4-2-1.4-2 1.4-2-1.4-2 1.4V3Z" />
+    <path d="M9 8h6M9 12h6" />
+  </Svg>
+);
+
 /** Foto pendiente: el marco vacío que reemplaza el bloque liso sin imagen. */
 export const IconoFoto = (p: Props) => (
   <Svg {...p}>
@@ -276,6 +284,7 @@ export const ICONOS = {
   configuracion: IconoConfiguracion,
   repartidores: IconoRepartidores,
   cierre: IconoCierre,
+  pos: IconoPos,
   cuenta: IconoCuenta,
   cartera: IconoCartera,
   usuarios: IconoUsuarios,

@@ -63,3 +63,13 @@ export async function siguienteNumeroReserva(storeId: string): Promise<number> {
   });
   return local.contadorReservas;
 }
+
+/** Igual que el anterior, para ventas del Punto de Venta. */
+export async function siguienteNumeroVentaPos(storeId: string): Promise<number> {
+  const local = await prisma.store.update({
+    where: { id: storeId },
+    data: { contadorVentasPos: { increment: 1 } },
+    select: { contadorVentasPos: true },
+  });
+  return local.contadorVentasPos;
+}
