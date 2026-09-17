@@ -7,6 +7,7 @@ import { idLocalActual } from "@/lib/local-actual";
 import { prismaDelLocal } from "@/lib/prisma-local";
 import { moverEnLista, cambiosDeOrden, type Direccion } from "@/lib/ordenar";
 import { subirImagenProducto } from "@/lib/supabase-storage";
+import { normalizarIva } from "@/lib/iva";
 
 export type ResultadoFoto = { ok: true; url: string } | { ok: false; error: string };
 
@@ -132,6 +133,7 @@ export async function actualizarProducto(
     String(formData.get("mitadYMitadModo") ?? "mayor") === "proporcional"
       ? "proporcional"
       : "mayor";
+  const iva = normalizarIva(formData.get("iva"));
 
   await prisma.product.update({
     where: { id: productId },
@@ -147,6 +149,7 @@ export async function actualizarProducto(
       costo: leerCosto(formData),
       mitadYMitadGrupo,
       mitadYMitadModo,
+      iva,
     },
   });
 

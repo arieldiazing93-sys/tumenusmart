@@ -1,9 +1,10 @@
-import { clasesBoton } from "@/components/ui";
+import { clasesBoton, Pastilla } from "@/components/ui";
 import { Suspense } from "react";
 import Link from "next/link";
 import { prismaDelLocal } from "@/lib/prisma-local";
 import { idLocalActual } from "@/lib/local-actual";
 import { formatearGuarani } from "@/lib/format";
+import { etiquetaIva } from "@/lib/iva";
 import { moverProducto } from "./actions";
 import { BotonesMover } from "@/components/BotonesMover";
 import { DisponibleToggle } from "./DisponibleToggle";
@@ -165,6 +166,7 @@ export default async function AdminProductosPage({
                 {formatearGuarani(Number(p.precio))}
               </span>
             </Link>
+            <Pastilla color="neutro">{etiquetaIva(p.iva)}</Pastilla>
             <DisponibleToggle id={p.id} disponible={p.disponible} nombre={p.nombre} />
           </div>
         ))}

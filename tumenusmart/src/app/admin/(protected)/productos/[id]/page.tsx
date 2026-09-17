@@ -67,6 +67,7 @@ export default async function EditarProductoPage({
             categoryId: producto.categoryId,
             precio: Number(producto.precio),
             costo: producto.costo != null ? Number(producto.costo) : null,
+            iva: producto.iva,
             imagenUrl: producto.imagenUrl,
             disponible: producto.disponible,
             destacado: producto.destacado,

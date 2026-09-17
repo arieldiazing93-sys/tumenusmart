@@ -5,6 +5,7 @@ import { Tarjeta, Campo, Entrada, Area, Selector, clasesBoton } from "@/componen
 import { actualizarProducto } from "../actions";
 import { ImagenProductoField } from "../ImagenProductoField";
 import { IngredientesField } from "../IngredientesField";
+import { TASAS_IVA } from "@/lib/iva";
 
 type Categoria = { id: string; nombre: string };
 type Producto = {
@@ -14,6 +15,7 @@ type Producto = {
   categoryId: string;
   precio: number;
   costo: number | null;
+  iva: string;
   imagenUrl: string | null;
   disponible: boolean;
   destacado: boolean;
@@ -92,6 +94,15 @@ export function EditarProductoForm({
             placeholder="Lo que te cuesta prepararlo"
             defaultValue={producto.costo != null ? producto.costo : ""}
           />
+        </Campo>
+        <Campo etiqueta="IVA" ayuda="Para el desglose de la Factura Autoimpresor.">
+          <Selector name="iva" defaultValue={producto.iva}>
+            {TASAS_IVA.map((t) => (
+              <option key={t.valor} value={t.valor}>
+                {t.etiqueta}
+              </option>
+            ))}
+          </Selector>
         </Campo>
       </Tarjeta>
 

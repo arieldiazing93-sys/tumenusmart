@@ -390,6 +390,11 @@ model Product {
   /// esté vacío, el analista comercial habla de facturación pero no de
   /// margen, en vez de inventarlo.
   costo       Decimal?        @db.Decimal(10, 2)
+  // "gravado10" | "gravado5" | "exento" — string simple con whitelist en la
+  // Server Action, no enum de Prisma (mismo criterio que mitadYMitadModo).
+  // Todavía no lo consume ningún cálculo: es la base para el desglose de
+  // IVA de la futura Factura Autoimpresor.
+  iva         String          @default("gravado10")
   imagenUrl   String?
   disponible  Boolean         @default(true)
   orden       Int             @default(0)
