@@ -1,5 +1,6 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { pantallaConPermiso } from "@/lib/auth";
+import { puede } from "@/lib/permisos";
 import { prismaDelLocal } from "@/lib/prisma-local";
 import { idLocalActual } from "@/lib/local-actual";
 import { Volver } from "@/components/Volver";
@@ -51,7 +52,7 @@ export default async function ComprobanteTurnoPosPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  await pantallaConPermiso("pos.vender");
+  const sesion = await pantallaConPermiso("pos.vender");
   const storeId = await idLocalActual();
   const db = prismaDelLocal(storeId);
   const { id } = await params;
@@ -107,6 +108,19 @@ export default async function ComprobanteTurnoPosPage({
   ]);
 
   if (!turno || turno.estado !== "cerrado") notFound();
+
+  // "pos.vender" alcanza para ver el propio comprobante recién cerrado —a
+  // esta pantalla lo manda directo cerrarTurno— pero ver el cierre de OTRO
+  // cajero es histórico, y el histórico completo de todos los cajeros es
+  // solo del dueño (pos.verHistorico). Sin este chequeo, cualquier empleado
+  // que consiga la URL (por ejemplo del historial del navegador de una
+  // terminal compartida) podía ver cuánto declaró y si le faltó plata a
+  // otro cajero.
+  const miIdentidad = sesion.nombre?.trim() || sesion.email;
+  const esPropio = turno.abiertoPor === miIdentidad || turno.cerradoPor === miIdentidad;
+  if (!esPropio && !puede(sesion.rol, "pos.verHistorico")) {
+    redirect("/admin/pedidos");
+  }
 
   const calculado: Record<FormaPagoPos, number> = {
     efectivo: Number(turno.calculadoEfectivo ?? 0),

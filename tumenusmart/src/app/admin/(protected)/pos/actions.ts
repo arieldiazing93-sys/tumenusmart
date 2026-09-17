@@ -225,6 +225,22 @@ export async function cerrarTurno(
   if (!turno) return { ok: false, error: "Ese turno no existe." };
   if (turno.estado !== "abierto") return { ok: false, error: "Ese turno ya está cerrado." };
 
+  // El formulario nunca manda algo inválido, pero esto es plata que se
+  // congela para siempre en el comprobante: se rechaza el cierre entero en
+  // vez de reemplazar en silencio un valor raro por 0 (mismo espíritu que la
+  // validación de montoInicial en abrirTurno, pero acá no corresponde
+  // "corregir" un monto declarado — corresponde frenar y que el cajero lo
+  // vuelva a cargar bien).
+  const declaradoValores = [
+    declarado.efectivo,
+    declarado.transferencia,
+    declarado.tarjetaDebito,
+    declarado.tarjetaCredito,
+  ];
+  if (declaradoValores.some((v) => !Number.isFinite(v) || v < 0)) {
+    return { ok: false, error: "Los montos declarados tienen que ser números válidos, cero o más." };
+  }
+
   // Un solo cierre: lo cobrado en el mostrador (VentaPos) y los pedidos de
   // retiro/mesa marcados "entregado" durante este turno (Order.turnoPosId)
   // se suman juntos, no en dos cuentas separadas.
