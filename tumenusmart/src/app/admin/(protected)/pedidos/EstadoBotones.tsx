@@ -3,27 +3,49 @@
 import { useState, useTransition } from "react";
 import { cambiarEstadoPedido } from "./actions";
 import { ESTADOS_PEDIDO } from "@/lib/estados-pedido";
+import { FORMAS_PAGO_POS, type FormaPagoPos } from "@/lib/turno-pos";
 
 export function EstadoBotones({
   orderId,
   estadoActual,
   tipoEntrega,
   repartidorId,
+  turnoAbiertoId,
 }: {
   orderId: string;
   estadoActual: string;
   tipoEntrega: string;
   repartidorId: string | null;
+  /** Id del turno de caja del Punto de Venta abierto ahora, o null si no hay. */
+  turnoAbiertoId: string | null;
 }) {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [pidiendoPago, setPidiendoPago] = useState(false);
 
   const faltaRepartidor = tipoEntrega === "delivery" && !repartidorId;
+  // Retiro/mesa se cobra en el mostrador: si hay un turno de caja abierto,
+  // marcarlo "entregado" tiene que decir con qué se cobró para que entre en
+  // ese mismo cierre. El delivery sigue su propio camino (Rendición).
+  const pideFormaPago = tipoEntrega !== "delivery" && turnoAbiertoId != null;
+
+  function confirmarEntregado(formaPago: FormaPagoPos) {
+    setError(null);
+    startTransition(async () => {
+      const resultado = await cambiarEstadoPedido(orderId, "entregado", formaPago);
+      if (!resultado.ok) setError(resultado.error);
+      else setPidiendoPago(false);
+    });
+  }
 
   function handleClick(estado: string) {
     setError(null);
     if (estado === "en_despacho" && faltaRepartidor) {
       setError("Asigná un repartidor antes de pasar el pedido a \"En despacho\".");
+      return;
+    }
+    if (estado === "entregado" && estadoActual !== "entregado" && pideFormaPago) {
+      setPidiendoPago(true);
       return;
     }
     startTransition(async () => {
@@ -63,6 +85,35 @@ export function EstadoBotones({
         <p className="mt-2 text-xs text-tinta-suave">
           Este pedido es delivery y todavía no tiene repartidor asignado.
         </p>
+      )}
+
+      {pidiendoPago && (
+        <div className="mt-3 rounded-lg border border-linea bg-papel-suave p-3">
+          <p className="mb-2 text-sm text-tinta">¿Con qué se cobró este pedido?</p>
+          <div className="flex flex-wrap gap-2">
+            {FORMAS_PAGO_POS.map((f) => (
+              <button
+                key={f.valor}
+                type="button"
+                disabled={pending}
+                onClick={() => confirmarEntregado(f.valor)}
+                className="rounded-full border border-linea px-3 py-1.5 text-sm font-medium text-tinta-media hover:border-brand hover:text-brand disabled:opacity-50"
+              >
+                {f.etiqueta}
+              </button>
+            ))}
+          </div>
+          <button
+            type="button"
+            onClick={() => setPidiendoPago(false)}
+            className="mt-2 text-xs font-medium text-tinta-suave hover:text-peligro"
+          >
+            Cancelar
+          </button>
+          <p className="mt-2 text-xs text-tinta-suave">
+            Se suma al cierre del turno que está abierto ahora en el Punto de Venta.
+          </p>
+        </div>
       )}
     </div>
   );

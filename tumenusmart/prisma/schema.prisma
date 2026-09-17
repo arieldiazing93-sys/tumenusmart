@@ -538,6 +538,18 @@ model Order {
   /// A qué cierre de caja pertenece. null = todavía no lo rindió.
   rendicionId          String?
   rendicion            Rendicion? @relation(fields: [rendicionId], references: [id])
+
+  /// Solo para retiro/mesa (nunca delivery, que sigue yendo por
+  /// rendicionId/cobroMetodo): forma de pago declarada al marcar el pedido
+  /// "entregado", y a qué turno de caja del Punto de Venta quedó atado —
+  /// mismos 4 valores y mismo cierre que una venta de mostrador, sin un
+  /// segundo paso de caja aparte. Null si no había un turno abierto en ese
+  /// momento (el pedido queda entregado igual, simplemente no entra en
+  /// ningún cierre).
+  formaPagoPos         String?
+  turnoPosId           String?
+  turnoPos             TurnoPos?     @relation(fields: [turnoPosId], references: [id])
+
   comprobanteTipo      String        @default("ticket") // "ticket" | "factura"
   facturaRazonSocial   String?
   facturaRuc           String?
@@ -555,6 +567,7 @@ model Order {
   updatedAt            DateTime      @updatedAt
 
   @@index([rendicionId])
+  @@index([turnoPosId])
   @@unique([storeId, numero])
   @@index([storeId])
   @@index([storeId, createdAt])
@@ -722,7 +735,10 @@ model TurnoPos {
   cerradoPor String?
   cerradoEn  DateTime?
 
-  ventas VentaPos[]
+  ventas  VentaPos[]
+  // Pedidos de retiro/mesa cobrados en este turno (ver Order.turnoPosId) —
+  // el mismo cierre que las ventas de mostrador, no uno aparte.
+  pedidos Order[]
 
   @@index([storeId])
   @@index([storeId, estado])

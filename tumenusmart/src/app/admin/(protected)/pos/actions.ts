@@ -7,7 +7,7 @@ import { idLocalActual } from "@/lib/local-actual";
 import { exigirPermiso } from "@/lib/auth";
 import { normalizarFormaPagoPos, resumirTurno, type DeclaradoPorForma } from "@/lib/turno-pos";
 import { armarPedido, type LineaPedida, type ProductoBase } from "@/lib/precio-pedido";
-import { turnoAbierto } from "./turno-actual";
+import { turnoAbierto, pedidosDelTurno } from "./turno-actual";
 
 export type ResultadoAbrirTurno =
   | { ok: true; turnoId: string; yaAbierto: boolean }
@@ -225,11 +225,22 @@ export async function cerrarTurno(
   if (!turno) return { ok: false, error: "Ese turno no existe." };
   if (turno.estado !== "abierto") return { ok: false, error: "Ese turno ya está cerrado." };
 
-  const ventas = await db.ventaPos.findMany({
-    where: { turnoPosId: turnoId, cancelada: false },
-    select: { total: true, formaPago: true },
-  });
-  const resumen = resumirTurno(ventas);
+  // Un solo cierre: lo cobrado en el mostrador (VentaPos) y los pedidos de
+  // retiro/mesa marcados "entregado" durante este turno (Order.turnoPosId)
+  // se suman juntos, no en dos cuentas separadas.
+  const [ventas, pedidos] = await Promise.all([
+    db.ventaPos.findMany({
+      where: { turnoPosId: turnoId, cancelada: false },
+      select: { total: true, formaPago: true },
+    }),
+    pedidosDelTurno(db, turnoId),
+  ]);
+  const resumen = resumirTurno([
+    ...ventas,
+    ...pedidos
+      .filter((p) => p.estado !== "cancelado")
+      .map((p) => ({ total: p.total, formaPago: p.formaPagoPos ?? "efectivo" })),
+  ]);
 
   if (resumen.cantidad !== cantidadVista || Math.round(resumen.totalGeneral) !== Math.round(totalVisto)) {
     return {

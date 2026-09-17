@@ -88,6 +88,20 @@ export default async function ComprobanteTurnoPosPage({
             cancelada: true,
           },
         },
+        // Pedidos de retiro/mesa cobrados durante este turno (ver
+        // cambiarEstadoPedido en pedidos/actions.ts) — mismo cierre que las
+        // ventas de mostrador, se listan junto a ellas.
+        pedidos: {
+          orderBy: { updatedAt: "asc" },
+          select: {
+            id: true,
+            numero: true,
+            total: true,
+            formaPagoPos: true,
+            estado: true,
+            updatedAt: true,
+          },
+        },
       },
     }),
   ]);
@@ -114,13 +128,19 @@ export default async function ComprobanteTurnoPosPage({
   );
   const { totalCalculado, totalDeclarado, diferenciaTotal } = cierre;
 
-  // Una venta cancelada DESPUÉS de cerrar el turno es justo el tipo de
-  // cambio que este contraste tiene que sacar a la luz: hoy ya no cuenta
-  // para el total, aunque el cierre siga firmado con el número de aquel día.
+  // Una venta cancelada, o un pedido que pasó a "cancelado", DESPUÉS de
+  // cerrar el turno es justo el tipo de cambio que este contraste tiene que
+  // sacar a la luz: hoy ya no cuenta para el total, aunque el cierre siga
+  // firmado con el número de aquel día.
   const contraste = contrastarTurno(
-    turno.ventas
-      .filter((v) => !v.cancelada)
-      .map((v) => ({ total: Number(v.total), formaPago: v.formaPago })),
+    [
+      ...turno.ventas
+        .filter((v) => !v.cancelada)
+        .map((v) => ({ total: Number(v.total), formaPago: v.formaPago })),
+      ...turno.pedidos
+        .filter((p) => p.estado !== "cancelado")
+        .map((p) => ({ total: Number(p.total), formaPago: p.formaPagoPos ?? "efectivo" })),
+    ],
     { cantidadVentas: turno.cantidadVentas ?? 0, calculado }
   );
 
@@ -153,7 +173,7 @@ export default async function ComprobanteTurnoPosPage({
               <dd className="font-semibold text-tinta">{turno.cerradoPor}</dd>
             </div>
             <div>
-              <dt className="text-tinta-suave">Ventas</dt>
+              <dt className="text-tinta-suave">Cuentas</dt>
               <dd className="cifra font-semibold text-tinta">{turno.cantidadVentas}</dd>
             </div>
             <div>
@@ -178,9 +198,9 @@ export default async function ComprobanteTurnoPosPage({
 
         {!contraste.coincide && (
           <p className="mb-5 rounded-xl border border-aviso/25 bg-aviso-luz px-4 py-3 text-[0.85rem] text-tinta print:rounded-none print:border-linea print:bg-transparent">
-            Alguna venta de este turno se modificó después de cerrarlo: hoy suman{" "}
+            Alguna venta o pedido de este turno se modificó después de cerrarlo: hoy suman{" "}
             <span className="cifra font-semibold">{formatearGuarani(contraste.totalAhora)}</span> en{" "}
-            {contraste.cantidadAhora} {contraste.cantidadAhora === 1 ? "venta" : "ventas"}. Lo que se
+            {contraste.cantidadAhora} {contraste.cantidadAhora === 1 ? "cuenta" : "cuentas"}. Lo que se
             calculó al cerrar fue {formatearGuarani(contraste.totalCongelado)} y es lo que vale este
             comprobante.
           </p>
@@ -284,6 +304,47 @@ export default async function ComprobanteTurnoPosPage({
             </table>
           )}
         </section>
+
+        {turno.pedidos.length > 0 && (
+          <section className="mt-5 break-inside-avoid">
+            <h2 className="mb-2 text-[0.95rem] font-semibold tracking-titular text-tinta">
+              Pedidos de retiro/mesa cobrados en este turno
+            </h2>
+            <table className="w-full border-collapse text-left">
+              <thead>
+                <tr className="text-[0.7rem] uppercase tracking-rotulo text-tinta-suave">
+                  <th className="w-20 border-b border-linea pb-1.5 font-semibold">Pedido</th>
+                  <th className="w-32 border-b border-linea pb-1.5 font-semibold">Hora</th>
+                  <th className="border-b border-linea pb-1.5 font-semibold">Forma de pago</th>
+                  <th className="w-32 border-b border-linea pb-1.5 text-right font-semibold">Monto</th>
+                </tr>
+              </thead>
+              <tbody>
+                {turno.pedidos.map((p) => (
+                  <tr key={p.id} className="break-inside-avoid align-top">
+                    <td className="cifra border-b border-linea-fina py-2 text-[0.85rem] font-medium text-tinta">
+                      {formatearNumero(p.numero)}
+                    </td>
+                    <td className="cifra border-b border-linea-fina py-2 text-[0.82rem] text-tinta-media">
+                      {horaCorta(p.updatedAt)}
+                    </td>
+                    <td className="border-b border-linea-fina py-2 text-[0.82rem] text-tinta-media">
+                      {etiquetaFormaPagoPos(p.formaPagoPos ?? "efectivo")}
+                      {p.estado === "cancelado" && <span className="text-peligro"> (cancelado)</span>}
+                    </td>
+                    <td
+                      className={`cifra border-b border-linea-fina py-2 text-right text-[0.85rem] font-medium ${
+                        p.estado === "cancelado" ? "text-tinta-suave line-through" : "text-tinta"
+                      }`}
+                    >
+                      {formatearGuarani(Number(p.total))}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </section>
+        )}
 
         {turno.notas && (
           <section className="mt-5 break-inside-avoid">

@@ -61,7 +61,8 @@ export function CerrarTurnoForm({ turnoId, cantidad, totalGeneral, porForma }: P
   return (
     <div className="flex flex-col gap-4">
       <div className="rounded-lg border border-linea bg-papel-suave px-3 py-2.5 text-[0.85rem] text-tinta-media">
-        {cantidad} {cantidad === 1 ? "venta" : "ventas"} · Total del sistema:{" "}
+        {cantidad} {cantidad === 1 ? "cuenta" : "cuentas"} (mostrador + pedidos cobrados acá) · Total del
+        sistema:{" "}
         <strong className="text-tinta">{formatearGuarani(totalGeneral)}</strong>
       </div>
 

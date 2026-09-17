@@ -4,6 +4,8 @@ import { exigirPermiso } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 import { prismaDelLocal } from "@/lib/prisma-local";
 import { idLocalActual } from "@/lib/local-actual";
+import { normalizarFormaPagoPos } from "@/lib/turno-pos";
+import { turnoAbierto } from "../pos/turno-actual";
 
 const ESTADOS_VALIDOS = [
   "pendiente",
@@ -23,7 +25,8 @@ export type ResultadoPedidoAccion = { ok: true } | { ok: false; error: string };
  */
 export async function cambiarEstadoPedido(
   orderId: string,
-  estado: string
+  estado: string,
+  formaPagoPos?: string
 ): Promise<ResultadoPedidoAccion> {
   await exigirPermiso("pedidos.cambiarEstado");
   // Todas las consultas de acá abajo quedan atadas a este local.
@@ -46,9 +49,38 @@ export async function cambiarEstadoPedido(
     }
   }
 
-  await prisma.order.update({ where: { id: orderId }, data: { estado } });
+  // Retiro y mesa se cobran en el mostrador, con la misma persona y la misma
+  // caja que el Punto de Venta — así que van al mismo cierre, no a uno
+  // aparte. El delivery queda afuera: ese cierre sigue siendo la Rendición
+  // del repartidor (ahí sí conviene un cierre separado, porque es plata que
+  // anduvo circulando fuera del local).
+  let datosExtra: { formaPagoPos: string; turnoPosId: string } | Record<string, never> = {};
+  if (estado === "entregado") {
+    const pedido = await prisma.order.findUnique({
+      where: { id: orderId },
+      select: { tipoEntrega: true, estado: true },
+    });
+    if (pedido && pedido.tipoEntrega !== "delivery" && pedido.estado !== "entregado") {
+      const turno = await turnoAbierto(prisma);
+      // Sin turno abierto no hay a qué cierre atarlo: se marca entregado
+      // igual, sin pedir forma de pago — no romper el flujo de todos los
+      // días para un local que todavía no abrió la caja del POS.
+      if (turno) {
+        if (!formaPagoPos) {
+          return { ok: false, error: "Declará con qué se cobró antes de marcarlo entregado." };
+        }
+        datosExtra = { formaPagoPos: normalizarFormaPagoPos(formaPagoPos), turnoPosId: turno.id };
+      }
+    }
+  }
+
+  await prisma.order.update({ where: { id: orderId }, data: { estado, ...datosExtra } });
   revalidatePath("/admin/pedidos");
   revalidatePath(`/admin/pedidos/${orderId}`);
+  if ("turnoPosId" in datosExtra) {
+    revalidatePath("/admin/pos");
+    revalidatePath("/admin/pos/turnos");
+  }
   return { ok: true };
 }
 

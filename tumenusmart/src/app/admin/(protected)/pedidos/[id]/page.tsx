@@ -7,6 +7,7 @@ import { formatearGuarani, formatearNumero } from "@/lib/format";
 import { EstadoBotones } from "../EstadoBotones";
 import { RepartidorSelect } from "../RepartidorSelect";
 import { ZONA_NEGOCIO } from "@/lib/timezone";
+import { turnoAbierto } from "../../pos/turno-actual";
 
 export const dynamic = "force-dynamic";
 
@@ -25,12 +26,13 @@ export default async function DetallePedidoPage({
 
   const { id } = await params;
 
-  const [pedido, repartidores] = await Promise.all([
+  const [pedido, repartidores, turno] = await Promise.all([
     prisma.order.findUnique({
       where: { id },
       include: { items: true, deliveryZone: true, repartidor: true },
     }),
     prisma.repartidor.findMany({ where: { activo: true }, orderBy: { nombre: "asc" } }),
+    turnoAbierto(prisma),
   ]);
 
   if (!pedido) notFound();
@@ -85,6 +87,7 @@ export default async function DetallePedidoPage({
           estadoActual={pedido.estado}
           tipoEntrega={pedido.tipoEntrega}
           repartidorId={pedido.repartidorId}
+          turnoAbiertoId={turno?.id ?? null}
         />
       </div>
 

@@ -13,3 +13,24 @@ export async function turnoAbierto(db: PrismaLocal) {
     orderBy: { abiertoEn: "desc" },
   });
 }
+
+/**
+ * Pedidos de mostrador (retiro/mesa) cobrados durante este turno — el mismo
+ * cierre que las ventas de mostrador, no uno aparte. Se atan acá al marcarse
+ * "entregado" (ver cambiarEstadoPedido en pedidos/actions.ts).
+ */
+export async function pedidosDelTurno(db: PrismaLocal, turnoId: string) {
+  return db.order.findMany({
+    where: { turnoPosId: turnoId },
+    orderBy: { updatedAt: "asc" },
+    select: {
+      id: true,
+      numero: true,
+      total: true,
+      formaPagoPos: true,
+      clienteNombre: true,
+      estado: true,
+      updatedAt: true,
+    },
+  });
+}
