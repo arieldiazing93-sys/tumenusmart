@@ -62,3 +62,22 @@ export function formatearTelefonoLocal(numero: string): string {
   if (local.length !== 10) return numero;
   return `${local.slice(0, 4)}-${local.slice(4, 7)}-${local.slice(7)}`;
 }
+
+/**
+ * Saca tildes, ñ/Ñ y el símbolo ° de un texto — para todo dato DINÁMICO
+ * (nombre del local, razón social, nombre de producto, forma de pago, etc.)
+ * que va a parar a la impresora térmica del ticket.
+ *
+ * Muchas impresoras ESC/POS (o el driver "Genérico / Solo texto" de Windows
+ * que las maneja) imprimen con una página de códigos que no tiene esos
+ * caracteres: en vez de fallar, el mismo byte sale como el símbolo que le
+ * toca en OTRA tabla — "Razón" sale "Raz³n", "Válido" sale "Vßlido". Sacarlos
+ * de raíz antes de imprimir es lo único que funciona igual en cualquier
+ * impresora, sin depender de configurar el driver a mano en cada
+ * computadora. El texto ESTÁTICO del ticket (las etiquetas fijas) va escrito
+ * directamente sin tildes en el código — esta función es solo para lo que
+ * viene de la base de datos.
+ */
+export function sinAcentos(texto: string): string {
+  return texto.normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/°/g, "");
+}

@@ -2,7 +2,8 @@ import { notFound } from "next/navigation";
 import { pantallaConPermiso } from "@/lib/auth";
 import { prismaDelLocal } from "@/lib/prisma-local";
 import { idLocalActual } from "@/lib/local-actual";
-import { formatearGuarani, formatearMiles, formatearNumero, formatearTelefonoLocal } from "@/lib/format";
+import { formatearGuarani, formatearMiles, formatearNumero, formatearTelefonoLocal, sinAcentos } from "@/lib/format";
+import { numeroALetras } from "@/lib/numero-a-letras";
 import { etiquetaFormaPagoPos } from "@/lib/turno-pos";
 import { SIN_REGISTRO_FISCAL, etiquetaTipoIdentificacion } from "@/lib/tipo-cliente";
 import { ZONA_NEGOCIO } from "@/lib/timezone";
@@ -22,16 +23,23 @@ const ESTILOS_IMPRESION = `
 // Mismo criterio que el ticket de pedidos: línea con tinta de verdad
 // (guiones), no un borde CSS, porque algunas impresoras térmicas recortan el
 // papel al contenido real y una separación solo visual se pierde.
-function Separador() {
-  return <p className="py-1.5 text-center">{"- ".repeat(18).trim()}</p>;
+//
+// La factura usa "=" en vez de "-" (estructura de talonario/imprenta que
+// pidió el dueño) — el ticket informal sigue con guiones.
+function Separador({ factura = false }: { factura?: boolean }) {
+  return <p className="py-1.5 text-center">{factura ? "=".repeat(ANCHO_RENGLON) : "- ".repeat(18).trim()}</p>;
 }
 
-// Se usa para las líneas de dos columnas (desglose de IVA, encabezados) —
-// para el detalle de productos ver `filaTabla`, que calibra 3 columnas fijas.
-function filaConMonto(texto: string, monto: string, ancho: number): string {
-  const espacio = ancho - texto.length - monto.length;
-  if (espacio < 2) return `${texto}\n${monto}`;
-  return texto + " ".repeat(espacio) + monto;
+// Se usa para las líneas de dos columnas del desglose de IVA — para el
+// detalle de productos ver `filaTabla`, que calibra 3 columnas fijas.
+//
+// A diferencia de filaTabla, acá el monto va PEGADO a la etiqueta (no
+// alineado a la derecha del renglón) — la etiqueta se rellena con espacios
+// hasta `anchoEtiqueta` para que los ":" de un mismo bloque (Detalle fiscal,
+// Liquidación IVA) queden alineados entre sí aunque las etiquetas midan
+// distinto ("IVA 10%" vs "TOTAL IVA").
+function filaEtiqueta(etiqueta: string, monto: string, anchoEtiqueta: number): string {
+  return `${etiqueta.padEnd(anchoEtiqueta)}: ${monto}`;
 }
 
 // Calibrado para una impresora térmica de 75mm (67mm imprimibles) a 40
@@ -103,6 +111,17 @@ export default async function TicketVentaPosPage({
     minute: "2-digit",
     timeZone: ZONA_NEGOCIO,
   });
+  // Con segundos, solo para la factura — el ticket informal sigue con la
+  // fecha corta de siempre.
+  const fechaFactura = venta.creadoEn.toLocaleString("es-PY", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    timeZone: ZONA_NEGOCIO,
+  });
 
   return (
     <>
@@ -122,44 +141,48 @@ export default async function TicketVentaPosPage({
           </a>
         </div>
 
-        <Separador />
+        <Separador factura={esFactura} />
 
         <div className="text-center">
-          <p className="uppercase">{store?.nombre ?? "Comprobante"}</p>
-          {store?.direccion && <p>{store.direccion}</p>}
+          <p className="uppercase">{sinAcentos(store?.nombre ?? "Comprobante")}</p>
+          {store?.direccion && <p>{sinAcentos(store.direccion)}</p>}
           {store?.whatsappNumero && <p>Tel: {formatearTelefonoLocal(store.whatsappNumero)}</p>}
         </div>
 
-        <Separador />
+        <Separador factura={esFactura} />
 
         {esFactura ? (
           <div>
             <p className="text-center">FACTURA</p>
             {puntoExpedicion && (
               <>
-                <p>Razón social: {puntoExpedicion.razonSocialEmisor}</p>
+                <p>Razon social: {sinAcentos(puntoExpedicion.razonSocialEmisor)}</p>
                 <p>RUC: {puntoExpedicion.rucEmisor}</p>
+                <p className="mt-1">
+                  Timbrado: {venta.facturaTimbrado}
+                  {venta.facturaVencimiento && (
+                    <>
+                      {"  "}
+                      Vto: {venta.facturaVencimiento.toLocaleDateString("es-PY", { timeZone: ZONA_NEGOCIO })}
+                    </>
+                  )}
+                </p>
               </>
             )}
-            <p className="mt-1">Timbrado N°: {venta.facturaTimbrado}</p>
-            {venta.facturaVencimiento && (
-              <p>
-                Válido hasta:{" "}
-                {venta.facturaVencimiento.toLocaleDateString("es-PY", { timeZone: ZONA_NEGOCIO })}
-              </p>
-            )}
-            <p className="mt-1">Factura N°: {venta.facturaNumero}</p>
-            <p>Fecha: {fecha}</p>
+            <p className="mt-1">Factura: {venta.facturaNumero}</p>
+            <p>Condicion de venta: CONTADO</p>
+            <p>Fecha: {fechaFactura}</p>
+            <p>Metodo de pago: {sinAcentos(etiquetaFormaPagoPos(venta.formaPago))}</p>
           </div>
         ) : (
           <div>
-            <p>Servicio rápido</p>
+            <p>Servicio rapido</p>
             <p>{fecha}</p>
             <p className="mt-1">Venta {formatearNumero(venta.numero)}</p>
           </div>
         )}
 
-        <Separador />
+        <Separador factura={esFactura} />
 
         {esFactura && (
           <>
@@ -169,26 +192,26 @@ export default async function TicketVentaPosPage({
                   "sin nombre" también necesita su razón social y su RUC
                   impresos (Sin Nombre / X), no un texto aparte. */}
               <p>
-                Razón social:{" "}
+                Razon social:{" "}
                 {venta.facturaTipoIdentificacion === SIN_REGISTRO_FISCAL.tipo
                   ? SIN_REGISTRO_FISCAL.etiquetaDisplay
-                  : venta.facturaRazonSocial}
+                  : sinAcentos(venta.facturaRazonSocial ?? "")}
               </p>
               <p>
                 {venta.facturaTipoIdentificacion === SIN_REGISTRO_FISCAL.tipo
                   ? "RUC"
-                  : etiquetaTipoIdentificacion(venta.facturaTipoIdentificacion ?? "ruc")}
+                  : sinAcentos(etiquetaTipoIdentificacion(venta.facturaTipoIdentificacion ?? "ruc"))}
                 : {venta.facturaRuc}
               </p>
             </div>
-            <Separador />
+            <Separador factura />
           </>
         )}
 
         <div>
           {esFactura && (
             <p className="mb-1 whitespace-pre-wrap">
-              {filaTabla("Ctd", "Descripción", "Monto")}
+              {filaTabla("Ctd", "Descripcion", "Importe")}
             </p>
           )}
           {venta.items.map((item) => (
@@ -196,54 +219,73 @@ export default async function TicketVentaPosPage({
               <p className="whitespace-pre-wrap">
                 {filaTabla(
                   String(item.cantidad),
-                  item.nombreProducto,
+                  sinAcentos(item.nombreProducto),
                   formatearMiles(item.cantidad * Number(item.precioUnitario))
                 )}
               </p>
-              {item.opcionesTexto && <p className="pl-3">+ {item.opcionesTexto}</p>}
+              {item.opcionesTexto && <p className="pl-3">+ {sinAcentos(item.opcionesTexto)}</p>}
             </div>
           ))}
         </div>
 
-        <Separador />
+        <Separador factura={esFactura} />
 
         <p>TOTAL: {formatearGuarani(Number(venta.total))}</p>
+        {esFactura && (
+          <p>
+            SON: {numeroALetras(Number(venta.total))} GUARANIES
+          </p>
+        )}
 
-        <Separador />
+        <Separador factura={esFactura} />
 
         {esFactura && (
           <>
+            <p>Detalle fiscal</p>
             <div>
               {Number(venta.facturaGravado10 ?? 0) > 0 && (
-                <p>{filaConMonto("Gravadas 10%:", formatearGuarani(Number(venta.facturaGravado10)), ANCHO_RENGLON)}</p>
+                <p>{filaEtiqueta("GRAVADAS 10%", formatearGuarani(Number(venta.facturaGravado10)), 12)}</p>
               )}
               {Number(venta.facturaGravado5 ?? 0) > 0 && (
-                <p>{filaConMonto("Gravadas 5%:", formatearGuarani(Number(venta.facturaGravado5)), ANCHO_RENGLON)}</p>
+                <p>{filaEtiqueta("GRAVADAS 5%", formatearGuarani(Number(venta.facturaGravado5)), 12)}</p>
               )}
               {Number(venta.facturaExento ?? 0) > 0 && (
-                <p>{filaConMonto("Exentas:", formatearGuarani(Number(venta.facturaExento)), ANCHO_RENGLON)}</p>
-              )}
-              {Number(venta.facturaIva10 ?? 0) > 0 && (
-                <p>{filaConMonto("IVA 10%:", formatearGuarani(Number(venta.facturaIva10)), ANCHO_RENGLON)}</p>
-              )}
-              {Number(venta.facturaIva5 ?? 0) > 0 && (
-                <p>{filaConMonto("IVA 5%:", formatearGuarani(Number(venta.facturaIva5)), ANCHO_RENGLON)}</p>
+                <p>{filaEtiqueta("EXENTAS", formatearGuarani(Number(venta.facturaExento)), 12)}</p>
               )}
             </div>
-            <Separador />
+            <Separador factura />
+            <p>Liquidacion IVA</p>
+            <div>
+              {Number(venta.facturaIva10 ?? 0) > 0 && (
+                <p>{filaEtiqueta("IVA 10%", formatearGuarani(Number(venta.facturaIva10)), 9)}</p>
+              )}
+              {Number(venta.facturaIva5 ?? 0) > 0 && (
+                <p>{filaEtiqueta("IVA 5%", formatearGuarani(Number(venta.facturaIva5)), 9)}</p>
+              )}
+              <p>
+                {filaEtiqueta(
+                  "TOTAL IVA",
+                  formatearGuarani(Number(venta.facturaIva10 ?? 0) + Number(venta.facturaIva5 ?? 0)),
+                  9
+                )}
+              </p>
+            </div>
+            <Separador factura />
+            <p className="mt-1">Original: Cliente</p>
+            <p>Duplicado: Archivo tributario</p>
           </>
         )}
 
         {/* La forma de pago es un dato operativo del cobro, no del documento
-            fiscal — una factura de verdad no lo muestra, pero el
-            comprobante informal (ticket normal) sí lo necesita. */}
+            fiscal — la factura ya la muestra arriba junto con condición de
+            venta; acá solo hace falta para el comprobante informal. */}
         {!esFactura && (
           <>
             <div>
-              <p>Pago: {etiquetaFormaPagoPos(venta.formaPago)}</p>
+              <p>Pago: {sinAcentos(etiquetaFormaPagoPos(venta.formaPago))}</p>
             </div>
 
-            <Separador />
+            <Separador factura={esFactura} />
           </>
         )}
 
@@ -251,11 +293,11 @@ export default async function TicketVentaPosPage({
           Gracias por su compra!
           <br />
           {esFactura
-            ? "Documento válido como Factura Autoimpresor."
+            ? "Documento valido como Factura Autoimpresor."
             : "Este comprobante no es una factura legal."}
         </p>
 
-        <Separador />
+        <Separador factura={esFactura} />
       </div>
     </>
   );
