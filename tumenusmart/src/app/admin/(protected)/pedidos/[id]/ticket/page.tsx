@@ -9,10 +9,12 @@ import { ImprimirAuto } from "@/components/ImprimirAuto";
 
 export const dynamic = "force-dynamic";
 
+// El papel de la impresora es de 75mm (no 80mm) — con el mismo margen de
+// 4mm de cada lado, el ancho real disponible para imprimir es 67mm.
 const ESTILOS_IMPRESION = `
-  @page { size: 80mm auto; margin: 4mm; }
+  @page { size: 75mm auto; margin: 4mm; }
   @media print {
-    html, body { width: 72mm; background: #fff; }
+    html, body { width: 67mm; background: #fff; }
   }
 `;
 
@@ -26,7 +28,7 @@ const ESTILOS_IMPRESION = `
 // (cabecera, pedido, ítems, totales, pago, pie) separa del siguiente con
 // esta línea en vez de con un borde.
 function Separador() {
-  return <p className="py-1.5 text-center text-xs">{"- ".repeat(18).trim()}</p>;
+  return <p className="py-1.5 text-center">{"- ".repeat(18).trim()}</p>;
 }
 
 /**
@@ -42,7 +44,11 @@ function filaConMonto(texto: string, monto: string, ancho: number): string {
   return texto + " ".repeat(espacio) + monto;
 }
 
-// Calibrado para una impresora térmica de 75mm a 40 caracteres por línea.
+// Calibrado para una impresora térmica de 75mm (67mm imprimibles) a 40
+// caracteres por línea, con TODO el ticket al mismo tamaño de letra fijo
+// (9px, ver el contenedor de más abajo) — a un tamaño más grande (como el
+// que tenía antes la tabla, heredado del texto normal del ticket) 40
+// caracteres reales no entran y la fila se corta a la mitad.
 const ANCHO_RENGLON = 40;
 const COL_CANTIDAD = 3; // columnas 1-3
 const COL_DESCRIPCION = 5; // la descripción arranca acá (columna 4 = espacio)
@@ -110,42 +116,38 @@ export default async function TicketPage({
     <>
       <style dangerouslySetInnerHTML={{ __html: ESTILOS_IMPRESION }} />
 
-      <div className="mx-auto max-w-[76mm] font-mono text-sm text-black">
+      <div className="mx-auto max-w-[75mm] font-mono text-[9px] leading-tight text-black">
         <ImprimirAuto />
 
         <Separador />
 
         <div className="text-center">
-          <p className="text-base font-bold uppercase leading-tight">
-            {store?.nombre ?? "Comprobante"}
-          </p>
-          {store?.direccion && <p className="text-xs leading-tight">{store.direccion}</p>}
-          {store?.whatsappNumero && (
-            <p className="text-xs leading-tight">Tel: {formatearTelefonoLocal(store.whatsappNumero)}</p>
-          )}
+          <p className="uppercase">{store?.nombre ?? "Comprobante"}</p>
+          {store?.direccion && <p>{store.direccion}</p>}
+          {store?.whatsappNumero && <p>Tel: {formatearTelefonoLocal(store.whatsappNumero)}</p>}
         </div>
 
         <Separador />
 
         {esFactura ? (
           <div>
-            <p className="text-center text-[1.05rem] font-bold tracking-titular">FACTURA</p>
-            <p className="text-xs leading-tight">Razón social: {pedido.facturaRazonSocialEmisor}</p>
-            <p className="text-xs leading-tight">RUC: {pedido.facturaRucEmisor}</p>
-            <p className="mt-1 text-xs leading-tight">Timbrado N°: {pedido.facturaTimbrado}</p>
+            <p className="text-center">FACTURA</p>
+            <p>Razón social: {pedido.facturaRazonSocialEmisor}</p>
+            <p>RUC: {pedido.facturaRucEmisor}</p>
+            <p className="mt-1">Timbrado N°: {pedido.facturaTimbrado}</p>
             {pedido.facturaVencimiento && (
-              <p className="text-xs leading-tight">
+              <p>
                 Válido hasta:{" "}
                 {pedido.facturaVencimiento.toLocaleDateString("es-PY", { timeZone: ZONA_NEGOCIO })}
               </p>
             )}
-            <p className="mt-1 text-center text-[1rem] font-semibold tracking-titular">N°: {pedido.facturaNumero}</p>
-            <p className="text-xs">Fecha: {fecha}</p>
+            <p className="mt-1">Factura N°: {pedido.facturaNumero}</p>
+            <p>Fecha: {fecha}</p>
           </div>
         ) : (
           <div>
-            <p className="text-[1.1rem] font-semibold tracking-titular">Pedido {formatearNumero(pedido.numero)}</p>
-            <p className="text-xs">{fecha}</p>
+            <p>Pedido {formatearNumero(pedido.numero)}</p>
+            <p>{fecha}</p>
             <p className="mt-1">Cliente: {pedido.clienteNombre}</p>
             <p>Tel: {pedido.clienteTelefono}</p>
           </div>
@@ -154,7 +156,7 @@ export default async function TicketPage({
         {pedido.comprobanteTipo === "factura" && (
           <>
             <Separador />
-            <div className="text-xs">
+            <div>
               {esFactura ? (
                 <>
                   <p>Razón social: {pedido.facturaRazonSocial}</p>
@@ -162,7 +164,7 @@ export default async function TicketPage({
                 </>
               ) : (
                 <>
-                  <p className="font-bold uppercase">Datos para factura</p>
+                  <p className="uppercase">Datos para factura</p>
                   <p>Razon social: {pedido.facturaRazonSocial}</p>
                   <p>RUC: {pedido.facturaRuc}</p>
                   {pedido.facturaEmail && <p>Correo: {pedido.facturaEmail}</p>}
@@ -174,12 +176,7 @@ export default async function TicketPage({
 
         <Separador />
 
-        {/* text-xs acá es lo que hace que las 40 columnas de filaTabla
-            entren en una sola línea sin envolver — al tamaño de letra del
-            resto del ticket (text-sm) no entran, aunque el string mida
-            exactamente lo mismo que las líneas de Gravadas/IVA de más
-            abajo, que sí usan text-xs y por eso nunca se cortaban. */}
-        <div className="text-xs leading-tight">
+        <div>
           {esFactura && (
             <p className="mb-1 whitespace-pre-wrap">
               {filaTabla("Ctd", "Descripción", "Monto")}
@@ -212,16 +209,14 @@ export default async function TicketPage({
                 : "A coordinar"}
             </p>
           )}
-          <p className="mt-1 text-[1.1rem] font-semibold tracking-titular">
-            TOTAL: {formatearGuarani(Number(pedido.total))}
-          </p>
+          <p className="mt-1">TOTAL: {formatearGuarani(Number(pedido.total))}</p>
         </div>
 
         <Separador />
 
         {esFactura && (
           <>
-            <div className="text-xs leading-tight">
+            <div>
               {Number(pedido.facturaGravado10 ?? 0) > 0 && (
                 <p>{filaConMonto("Gravadas 10%:", formatearGuarani(Number(pedido.facturaGravado10)), ANCHO_RENGLON)}</p>
               )}
@@ -247,13 +242,10 @@ export default async function TicketPage({
             comprobante informal (ticket normal) sí los necesita. */}
         {!esFactura && (
           <>
-            <div className="text-xs">
+            <div>
+              <p>Pago: {etiquetaMetodoPago(pedido.metodoPagoReferencia)}</p>
               <p>
-                <span className="font-bold">Pago:</span>{" "}
-                {etiquetaMetodoPago(pedido.metodoPagoReferencia)}
-              </p>
-              <p>
-                <span className="font-bold">Entrega:</span>{" "}
+                Entrega:{" "}
                 {esDelivery
                   ? `Delivery - ${pedido.deliveryZone?.nombre ?? "a coordinar"}`
                   : pedido.tipoEntrega === "mesa"
@@ -269,7 +261,7 @@ export default async function TicketPage({
           </>
         )}
 
-        <p className="pt-1 text-center text-xs">
+        <p className="pt-1 text-center">
           Gracias por su compra!
           <br />
           {esFactura
