@@ -6,6 +6,7 @@ import { prismaDelLocal, siguienteNumeroVentaPos } from "@/lib/prisma-local";
 import { idLocalActual } from "@/lib/local-actual";
 import { exigirPermiso } from "@/lib/auth";
 import { normalizarFormaPagoPos, resumirTurno, type DeclaradoPorForma } from "@/lib/turno-pos";
+import { armarPedido, type LineaPedida, type ProductoBase } from "@/lib/precio-pedido";
 import { turnoAbierto } from "./turno-actual";
 
 export type ResultadoAbrirTurno =
@@ -54,6 +55,10 @@ export type ResultadoVenta =
   | { ok: true; ventaId: string; total: number }
   | { ok: false; error: string };
 
+export type ItemVentaInput =
+  | { productId: string; cantidad: number }
+  | { mitadYMitad: { productIdA: string; productIdB: string }; cantidad: number };
+
 export type DatosVenta = {
   formaPago: string;
   /** "local" (se consume ahí) | "llevar" (para llevar). Cualquier otro valor cae en "local". */
@@ -64,17 +69,18 @@ export type DatosVenta = {
   clienteNombre: string;
   clienteTelefono: string;
   nota: string;
-  items: { productId: string; cantidad: number }[];
+  items: ItemVentaInput[];
 };
 
 /**
  * Cobra el carrito y cierra la cuenta.
  *
- * El precio se relee de la base, nunca se confía en el que mande el
- * navegador — mismo criterio que crearPedido en el checkout público. Si se
- * cargó el teléfono del cliente, además se le da de alta (o se actualiza)
- * su ficha de `Customer` — mismo upsert que hace el checkout — para que la
- * venta cuente para su progreso de fidelización.
+ * El precio (y los combos mitad y mitad) se recalculan con `armarPedido`, la
+ * misma función pura que usa el checkout público — nunca se confía en lo
+ * que mande el navegador. Si se cargó el teléfono del cliente, además se le
+ * da de alta (o se actualiza) su ficha de `Customer` — mismo upsert que
+ * hace el checkout — para que la venta cuente para su progreso de
+ * fidelización.
  */
 export async function registrarVenta(turnoId: string, datos: DatosVenta): Promise<ResultadoVenta> {
   const sesion = await exigirPermiso("pos.vender");
@@ -90,34 +96,50 @@ export async function registrarVenta(turnoId: string, datos: DatosVenta): Promis
     return { ok: false, error: "Ese turno ya está cerrado. Abrí uno nuevo para seguir vendiendo." };
   }
 
-  const cantidadesPorProducto = new Map<string, number>();
-  for (const it of datos.items) {
-    if (!it.productId || !Number.isFinite(it.cantidad) || it.cantidad <= 0) continue;
-    const cantidad = Math.round(it.cantidad);
-    cantidadesPorProducto.set(it.productId, (cantidadesPorProducto.get(it.productId) ?? 0) + cantidad);
-  }
-  if (cantidadesPorProducto.size === 0) {
+  if (!Array.isArray(datos.items) || datos.items.length === 0) {
     return { ok: false, error: "El carrito está vacío." };
   }
 
-  const productos = await db.product.findMany({
-    where: { id: { in: [...cantidadesPorProducto.keys()] }, disponible: true },
-    select: { id: true, nombre: true, precio: true },
+  // El POS no ofrece variantes/agregados en ningún producto — la carta se
+  // relee igual que en el checkout, solo que acá "opciones" siempre queda
+  // vacío porque nunca se le pide al catálogo.
+  const productosDelLocal = await db.product.findMany({
+    // Mismo filtro que el checkout público: si una categoría se desactivó
+    // justo mientras el cajero tenía la pantalla abierta, sus productos no
+    // se pueden seguir vendiendo.
+    where: { category: { activa: true } },
+    select: {
+      id: true,
+      nombre: true,
+      precio: true,
+      disponible: true,
+      ingredientes: true,
+      mitadYMitadGrupo: true,
+      mitadYMitadModo: true,
+    },
   });
-  if (productos.length !== cantidadesPorProducto.size) {
-    return {
-      ok: false,
-      error: "Alguno de los productos ya no está disponible. Actualizá la pantalla e intentá de nuevo.",
-    };
-  }
-
-  const filas = productos.map((p) => ({
-    productId: p.id,
-    nombreProducto: p.nombre,
-    cantidad: cantidadesPorProducto.get(p.id)!,
-    precioUnitario: Number(p.precio),
+  const catalogo: ProductoBase[] = productosDelLocal.map((p) => ({
+    id: p.id,
+    nombre: p.nombre,
+    precio: p.precio,
+    disponible: p.disponible,
+    ingredientes: p.ingredientes,
+    mitadYMitadGrupo: p.mitadYMitadGrupo,
+    mitadYMitadModo: p.mitadYMitadModo,
+    opciones: [],
   }));
-  const total = filas.reduce((s, f) => s + f.precioUnitario * f.cantidad, 0);
+
+  const pedidas: LineaPedida[] = datos.items.map((it) =>
+    "mitadYMitad" in it
+      ? { mitadYMitad: it.mitadYMitad, cantidad: it.cantidad }
+      : { productId: it.productId, cantidad: it.cantidad }
+  );
+
+  const armado = armarPedido(catalogo, pedidas);
+  if (!armado.ok) return { ok: false, error: armado.motivo };
+
+  const filas = armado.lineas;
+  const total = armado.subtotal;
   if (total <= 0) return { ok: false, error: "El total tiene que ser mayor a cero." };
 
   const numero = await siguienteNumeroVentaPos(storeId);

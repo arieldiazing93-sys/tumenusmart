@@ -64,6 +64,17 @@ export default async function TicketVentaPosPage({
       <div className="mx-auto max-w-[76mm] font-mono text-sm text-black">
         <ImprimirAuto />
 
+        <div className="mb-2 flex justify-center print:hidden">
+          <a
+            href={`/admin/pos/venta/${venta.id}/comanda`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="rounded-lg border border-neutral-300 px-4 py-2 text-sm font-medium text-neutral-600 hover:border-neutral-400"
+          >
+            🍳 Ver comanda para cocina
+          </a>
+        </div>
+
         <Separador />
 
         <div className="text-center">

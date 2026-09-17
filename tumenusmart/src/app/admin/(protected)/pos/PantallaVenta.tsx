@@ -9,11 +9,19 @@ import { formatearGuarani } from "@/lib/format";
 import { type FormaPagoPos } from "@/lib/turno-pos";
 import { registrarVenta } from "./actions";
 import { CobrarModal } from "./CobrarModal";
+import { MitadYMitadPickerPos } from "./MitadYMitadPickerPos";
 
 type Producto = { id: string; nombre: string; precio: number };
 type Categoria = { id: string; nombre: string; productos: Producto[] };
-type ItemCarrito = { productId: string; nombre: string; precio: number; cantidad: number };
+type ProductoMitad = { id: string; nombre: string; precio: number; mitadYMitadModo: string };
+type GrupoMitad = { nombreVisible: string; categoriaId: string; productos: ProductoMitad[] };
 type TipoEntregaPos = "local" | "llevar";
+
+/** Un producto normal o un combo mitad y mitad ya armado, con su propia clave. */
+type ItemCarrito = { key: string; nombre: string; precio: number; cantidad: number } & (
+  | { tipo: "producto"; productId: string }
+  | { tipo: "combo"; productIdA: string; productIdB: string }
+);
 
 const TODOS = "__todos__";
 
@@ -34,9 +42,11 @@ const TIPOS_ENTREGA_POS: { value: TipoEntregaPos; label: string }[] = [
 export function PantallaVenta({
   turnoId,
   categorias,
+  gruposMitad,
 }: {
   turnoId: string;
   categorias: Categoria[];
+  gruposMitad: GrupoMitad[];
 }) {
   const router = useRouter();
   const [categoriaId, setCategoriaId] = useState<string>(categorias[0]?.id ?? TODOS);
@@ -51,7 +61,9 @@ export function PantallaVenta({
 
   const cantidadesPorProducto = useMemo(() => {
     const mapa = new Map<string, number>();
-    for (const i of carrito) mapa.set(i.productId, i.cantidad);
+    for (const i of carrito) {
+      if (i.tipo === "producto") mapa.set(i.productId, i.cantidad);
+    }
     return mapa;
   }, [carrito]);
 
@@ -60,6 +72,9 @@ export function PantallaVenta({
       ? categorias.flatMap((c) => c.productos)
       : categorias.find((c) => c.id === categoriaId)?.productos ?? [];
 
+  const gruposVisibles =
+    categoriaId === TODOS ? gruposMitad : gruposMitad.filter((g) => g.categoriaId === categoriaId);
+
   const totalProductos = categorias.reduce((s, c) => s + c.productos.length, 0);
   const total = useMemo(() => carrito.reduce((s, i) => s + i.precio * i.cantidad, 0), [carrito]);
   const cantidadTotal = useMemo(() => carrito.reduce((s, i) => s + i.cantidad, 0), [carrito]);
@@ -67,24 +82,42 @@ export function PantallaVenta({
   function agregarProducto(p: Producto) {
     setError(null);
     setCarrito((actual) => {
-      const existente = actual.find((i) => i.productId === p.id);
+      const existente = actual.find((i) => i.key === p.id);
       if (existente) {
-        return actual.map((i) => (i.productId === p.id ? { ...i, cantidad: i.cantidad + 1 } : i));
+        return actual.map((i) => (i.key === p.id ? { ...i, cantidad: i.cantidad + 1 } : i));
       }
-      return [...actual, { productId: p.id, nombre: p.nombre, precio: p.precio, cantidad: 1 }];
+      return [
+        ...actual,
+        { key: p.id, tipo: "producto", productId: p.id, nombre: p.nombre, precio: p.precio, cantidad: 1 },
+      ];
     });
   }
 
-  function cambiarCantidad(productId: string, delta: number) {
+  function agregarCombo(a: ProductoMitad, b: ProductoMitad, precio: number, cantidad: number) {
+    setError(null);
+    const parIds = [a.id, b.id].sort();
+    const key = `combo:${parIds.join("+")}`;
+    const nombre = `Mitad ${a.nombre} / Mitad ${b.nombre}`;
+    setCarrito((actual) => {
+      const existente = actual.find((i) => i.key === key);
+      if (existente) {
+        return actual.map((i) => (i.key === key ? { ...i, cantidad: i.cantidad + cantidad } : i));
+      }
+      return [
+        ...actual,
+        { key, tipo: "combo", productIdA: a.id, productIdB: b.id, nombre, precio, cantidad },
+      ];
+    });
+  }
+
+  function cambiarCantidad(key: string, delta: number) {
     setCarrito((actual) =>
-      actual
-        .map((i) => (i.productId === productId ? { ...i, cantidad: i.cantidad + delta } : i))
-        .filter((i) => i.cantidad > 0)
+      actual.map((i) => (i.key === key ? { ...i, cantidad: i.cantidad + delta } : i)).filter((i) => i.cantidad > 0)
     );
   }
 
-  function quitarProducto(productId: string) {
-    setCarrito((actual) => actual.filter((i) => i.productId !== productId));
+  function quitarProducto(key: string) {
+    setCarrito((actual) => actual.filter((i) => i.key !== key));
   }
 
   function limpiarCarrito() {
@@ -101,7 +134,11 @@ export function PantallaVenta({
       clienteNombre,
       clienteTelefono,
       nota,
-      items: carrito.map((i) => ({ productId: i.productId, cantidad: i.cantidad })),
+      items: carrito.map((i) =>
+        i.tipo === "combo"
+          ? { mitadYMitad: { productIdA: i.productIdA, productIdB: i.productIdB }, cantidad: i.cantidad }
+          : { productId: i.productId, cantidad: i.cantidad }
+      ),
     });
     setCobrando(false);
     if (!r.ok) {
@@ -167,6 +204,15 @@ export function PantallaVenta({
             ))}
           </div>
 
+          {gruposVisibles.map((g) => (
+            <MitadYMitadPickerPos
+              key={g.nombreVisible}
+              grupoNombre={g.nombreVisible}
+              productos={g.productos}
+              onAgregar={agregarCombo}
+            />
+          ))}
+
           <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
             {productosVisibles.map((p) => {
               const cantidadEnCarrito = cantidadesPorProducto.get(p.id) ?? 0;
@@ -224,7 +270,7 @@ export function PantallaVenta({
             <div className="flex flex-col gap-2">
               {carrito.map((i) => (
                 <div
-                  key={i.productId}
+                  key={i.key}
                   className="flex items-center justify-between gap-2 border-b border-linea-fina pb-2"
                 >
                   <div className="min-w-0">
@@ -236,7 +282,7 @@ export function PantallaVenta({
                   <div className="flex flex-none items-center gap-1.5">
                     <button
                       type="button"
-                      onClick={() => cambiarCantidad(i.productId, -1)}
+                      onClick={() => cambiarCantidad(i.key, -1)}
                       className="flex h-7 w-7 items-center justify-center rounded-lg border border-linea text-tinta-media hover:border-brand hover:text-brand"
                     >
                       −
@@ -246,14 +292,14 @@ export function PantallaVenta({
                     </span>
                     <button
                       type="button"
-                      onClick={() => cambiarCantidad(i.productId, 1)}
+                      onClick={() => cambiarCantidad(i.key, 1)}
                       className="flex h-7 w-7 items-center justify-center rounded-lg border border-linea text-tinta-media hover:border-brand hover:text-brand"
                     >
                       +
                     </button>
                     <button
                       type="button"
-                      onClick={() => quitarProducto(i.productId)}
+                      onClick={() => quitarProducto(i.key)}
                       aria-label={`Quitar ${i.nombre}`}
                       className="ml-1 text-tinta-suave hover:text-peligro"
                     >

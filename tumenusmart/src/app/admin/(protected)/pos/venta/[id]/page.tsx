@@ -53,14 +53,24 @@ export default async function DetalleVentaPosPage({
         titulo={`Cuenta ${formatearNumero(venta.numero)}`}
         bajada={fecha}
         acciones={
-          <a
-            href={`/admin/pos/venta/${venta.id}/ticket`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className={clasesBoton("navegar", "sm")}
-          >
-            Ver ticket
-          </a>
+          <>
+            <a
+              href={`/admin/pos/venta/${venta.id}/comanda`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={clasesBoton("suave", "sm")}
+            >
+              Ver comanda
+            </a>
+            <a
+              href={`/admin/pos/venta/${venta.id}/ticket`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={clasesBoton("navegar", "sm")}
+            >
+              Ver ticket
+            </a>
+          </>
         }
       />
 
