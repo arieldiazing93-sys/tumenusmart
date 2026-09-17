@@ -1,17 +1,11 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { formatearGuarani } from "@/lib/format";
+import { etiquetaMetodoPago } from "@/lib/metodos-pago";
 import { ZONA_NEGOCIO, inicioDeHoyEnAsuncion } from "@/lib/timezone";
 import { EntregarBoton } from "./EntregarBoton";
 
 export const dynamic = "force-dynamic";
-
-const ETIQUETAS_PAGO: Record<string, string> = {
-  efectivo: "Efectivo",
-  transferencia: "Transferencia",
-  tarjeta: "Tarjeta (POS al recibir)",
-  otro: "A coordinar",
-};
 
 export default async function RepartidorPage({
   params,
@@ -107,7 +101,7 @@ export default async function RepartidorPage({
                   {formatearGuarani(Number(pedido.total))}
                 </span>
                 <span className="text-neutral-500">
-                  {ETIQUETAS_PAGO[pedido.metodoPagoReferencia] ?? pedido.metodoPagoReferencia}
+                  {etiquetaMetodoPago(pedido.metodoPagoReferencia)}
                 </span>
               </div>
 

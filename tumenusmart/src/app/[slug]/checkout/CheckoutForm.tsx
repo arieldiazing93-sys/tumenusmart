@@ -10,6 +10,7 @@ import { Tarjeta, Campo, Entrada, Aviso } from "@/components/ui";
 import { Segmentado } from "@/components/Segmentado";
 import { BotonEnviar } from "@/components/BotonEnviar";
 import { IconoWhatsapp } from "@/components/iconos";
+import { METODOS_PAGO_PEDIDO, type MetodoPagoPedido } from "@/lib/metodos-pago";
 import { crearPedido } from "./actions";
 
 // Leaflet usa `window`, así que el mapa se carga solo en el navegador.
@@ -20,14 +21,7 @@ const MapPicker = dynamic(
 
 type Zona = { id: string; nombre: string; radioKm: number; costoEnvio: number };
 
-type MetodoPago = "efectivo" | "transferencia" | "tarjeta";
 type TipoEntrega = "delivery" | "retiro" | "mesa";
-
-const METODOS_PAGO: { value: MetodoPago; label: string; sublabel?: string }[] = [
-  { value: "efectivo", label: "Efectivo" },
-  { value: "transferencia", label: "Transferencia" },
-  { value: "tarjeta", label: "Tarjeta", sublabel: "POS al recibir" },
-];
 
 const TIPOS_ENTREGA: { value: TipoEntrega; label: string; sublabel?: string }[] = [
   { value: "delivery", label: "Delivery" },
@@ -47,7 +41,8 @@ type Props = {
   /** Qué métodos de pago y formas de entrega tiene habilitados este local. */
   aceptaEfectivo: boolean;
   aceptaTransferencia: boolean;
-  aceptaTarjeta: boolean;
+  aceptaTarjetaDebito: boolean;
+  aceptaTarjetaCredito: boolean;
   aceptaDelivery: boolean;
   aceptaRetiro: boolean;
   aceptaMesa: boolean;
@@ -63,7 +58,8 @@ export function CheckoutForm({
   motivoBloqueo,
   aceptaEfectivo,
   aceptaTransferencia,
-  aceptaTarjeta,
+  aceptaTarjetaDebito,
+  aceptaTarjetaCredito,
   aceptaDelivery,
   aceptaRetiro,
   aceptaMesa,
@@ -76,13 +72,16 @@ export function CheckoutForm({
   // nunca ve una opción que ese negocio no puede cumplir.
   const metodosDisponibles = useMemo(
     () =>
-      METODOS_PAGO.filter(
+      METODOS_PAGO_PEDIDO.filter(
         (m) =>
-          ({ efectivo: aceptaEfectivo, transferencia: aceptaTransferencia, tarjeta: aceptaTarjeta })[
-            m.value
-          ]
+          ({
+            efectivo: aceptaEfectivo,
+            transferencia: aceptaTransferencia,
+            tarjeta_debito: aceptaTarjetaDebito,
+            tarjeta_credito: aceptaTarjetaCredito,
+          })[m.value]
       ),
-    [aceptaEfectivo, aceptaTransferencia, aceptaTarjeta]
+    [aceptaEfectivo, aceptaTransferencia, aceptaTarjetaDebito, aceptaTarjetaCredito]
   );
   const entregasDisponibles = useMemo(
     () =>
@@ -107,7 +106,7 @@ export function CheckoutForm({
   const [clienteLng, setClienteLng] = useState<number | null>(null);
   const [direccion, setDireccion] = useState("");
   const [mesaNumero, setMesaNumero] = useState("");
-  const [metodoPago, setMetodoPago] = useState<MetodoPago>(
+  const [metodoPago, setMetodoPago] = useState<MetodoPagoPedido>(
     metodosDisponibles[0]?.value ?? "efectivo"
   );
   const [comprobanteTipo, setComprobanteTipo] = useState<"ticket" | "factura">("ticket");

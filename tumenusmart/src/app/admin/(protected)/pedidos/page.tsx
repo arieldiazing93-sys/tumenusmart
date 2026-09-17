@@ -5,6 +5,7 @@ import { pantallaConPermiso } from "@/lib/auth";
 import { prismaDelLocal } from "@/lib/prisma-local";
 import { formatearGuarani, formatearNumero } from "@/lib/format";
 import { ESTADOS_PEDIDO, etiquetaEstado, colorEstado } from "@/lib/estados-pedido";
+import { etiquetaMetodoPago } from "@/lib/metodos-pago";
 import { calcularRangoFecha, type FiltroFecha } from "@/lib/rango-fecha";
 import { ZONA_NEGOCIO } from "@/lib/timezone";
 import { obtenerEstadoTienda } from "@/lib/estado-tienda";
@@ -593,7 +594,7 @@ export default async function AdminPedidosPage({
                     </td>
                     <td className="px-3 py-3">
                       <Link prefetch={false} href={`/admin/pedidos/${pedido.id}`} className="block">
-                        {pedido.metodoPagoReferencia}
+                        {etiquetaMetodoPago(pedido.metodoPagoReferencia)}
                       </Link>
                     </td>
                     <td className="px-3 py-3">

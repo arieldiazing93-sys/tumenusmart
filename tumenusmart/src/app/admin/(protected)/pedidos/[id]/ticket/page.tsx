@@ -3,6 +3,7 @@ import { pantallaConPermiso } from "@/lib/auth";
 import { prismaDelLocal } from "@/lib/prisma-local";
 import { idLocalActual } from "@/lib/local-actual";
 import { formatearGuarani, formatearNumero } from "@/lib/format";
+import { etiquetaMetodoPago } from "@/lib/metodos-pago";
 import { ZONA_NEGOCIO } from "@/lib/timezone";
 import { ImprimirAuto } from "@/components/ImprimirAuto";
 
@@ -14,13 +15,6 @@ const ESTILOS_IMPRESION = `
     html, body { width: 72mm; background: #fff; }
   }
 `;
-
-const ETIQUETAS_PAGO: Record<string, string> = {
-  efectivo: "Efectivo",
-  transferencia: "Transferencia",
-  tarjeta: "Tarjeta (POS al recibir)",
-  otro: "A coordinar",
-};
 
 // Línea con tinta de verdad (guiones), no un borde CSS (`border-dashed`) ni
 // un salto de línea en blanco. Algunas impresoras térmicas ajustan el papel
@@ -176,7 +170,7 @@ export default async function TicketPage({
         <div className="text-xs">
           <p>
             <span className="font-bold">Pago:</span>{" "}
-            {ETIQUETAS_PAGO[pedido.metodoPagoReferencia] ?? pedido.metodoPagoReferencia}
+            {etiquetaMetodoPago(pedido.metodoPagoReferencia)}
           </p>
           <p>
             <span className="font-bold">Entrega:</span>{" "}

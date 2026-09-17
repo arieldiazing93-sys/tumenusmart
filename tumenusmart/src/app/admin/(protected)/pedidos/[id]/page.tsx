@@ -4,6 +4,7 @@ import { pantallaConPermiso } from "@/lib/auth";
 import { prismaDelLocal } from "@/lib/prisma-local";
 import { idLocalActual } from "@/lib/local-actual";
 import { formatearGuarani, formatearNumero } from "@/lib/format";
+import { etiquetaMetodoPago } from "@/lib/metodos-pago";
 import { EstadoBotones } from "../EstadoBotones";
 import { RepartidorSelect } from "../RepartidorSelect";
 import { ZONA_NEGOCIO } from "@/lib/timezone";
@@ -137,7 +138,7 @@ export default async function DetallePedidoPage({
           <p className="mb-1 text-sm font-bold uppercase tracking-wide text-tinta">
             Pago
           </p>
-          <p className="text-sm text-tinta">{pedido.metodoPagoReferencia}</p>
+          <p className="text-sm text-tinta">{etiquetaMetodoPago(pedido.metodoPagoReferencia)}</p>
 
           {pedido.comprobanteTipo === "factura" && (
             <div className="mt-3 rounded bg-aviso-luz px-2 py-1.5 text-sm text-aviso">

@@ -123,14 +123,15 @@ export async function guardarFormasPagoEntrega(formData: FormData): Promise<void
 
   const aceptaEfectivo = formData.get("aceptaEfectivo") === "on";
   const aceptaTransferencia = formData.get("aceptaTransferencia") === "on";
-  const aceptaTarjeta = formData.get("aceptaTarjeta") === "on";
+  const aceptaTarjetaDebito = formData.get("aceptaTarjetaDebito") === "on";
+  const aceptaTarjetaCredito = formData.get("aceptaTarjetaCredito") === "on";
   const aceptaDelivery = formData.get("aceptaDelivery") === "on";
   const aceptaRetiro = formData.get("aceptaRetiro") === "on";
   const aceptaMesa = formData.get("aceptaMesa") === "on";
 
   // Sin al menos una opción tildada en cada grupo, el checkout público se
   // queda sin nada para ofrecerle al cliente.
-  if (!aceptaEfectivo && !aceptaTransferencia && !aceptaTarjeta) {
+  if (!aceptaEfectivo && !aceptaTransferencia && !aceptaTarjetaDebito && !aceptaTarjetaCredito) {
     redirect(`/admin/configuracion?error=${encodeURIComponent("Elegí al menos una forma de pago")}`);
   }
   if (!aceptaDelivery && !aceptaRetiro && !aceptaMesa) {
@@ -139,7 +140,15 @@ export async function guardarFormasPagoEntrega(formData: FormData): Promise<void
 
   await prisma.store.update({
     where: { id: await idLocalActual() },
-    data: { aceptaEfectivo, aceptaTransferencia, aceptaTarjeta, aceptaDelivery, aceptaRetiro, aceptaMesa },
+    data: {
+      aceptaEfectivo,
+      aceptaTransferencia,
+      aceptaTarjetaDebito,
+      aceptaTarjetaCredito,
+      aceptaDelivery,
+      aceptaRetiro,
+      aceptaMesa,
+    },
   });
   refrescarPantallas();
   redirect("/admin/configuracion?guardado=1");

@@ -251,10 +251,18 @@ export default async function AdminConfiguracionPage() {
               <label className="flex items-center gap-2 text-sm font-medium text-tinta-media">
                 <input
                   type="checkbox"
-                  name="aceptaTarjeta"
-                  defaultChecked={store?.aceptaTarjeta ?? true}
+                  name="aceptaTarjetaDebito"
+                  defaultChecked={store?.aceptaTarjetaDebito ?? true}
                 />
-                Tarjeta (POS al recibir)
+                Tarjeta débito (POS al recibir)
+              </label>
+              <label className="flex items-center gap-2 text-sm font-medium text-tinta-media">
+                <input
+                  type="checkbox"
+                  name="aceptaTarjetaCredito"
+                  defaultChecked={store?.aceptaTarjetaCredito ?? true}
+                />
+                Tarjeta crédito (POS al recibir)
               </label>
             </div>
           </div>

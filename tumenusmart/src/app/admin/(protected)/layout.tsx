@@ -88,6 +88,8 @@ function armarGrupos(hayIdeaSinVer: boolean, rol: string): GrupoSecciones[] {
         // operativo del día a día.
         { href: "/admin/pos/turnos", label: "Cierres de turno", icono: "cierre" as const,
           ver: conPermiso("pos.verHistorico") },
+        { href: "/admin/pos/reporte-general", label: "Reporte general", icono: "estadisticas" as const,
+          ver: conPermiso("pos.verHistorico") },
       ],
     },
     {

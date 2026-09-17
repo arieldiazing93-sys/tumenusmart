@@ -79,7 +79,8 @@ export async function crearPedido(datos: DatosCheckout): Promise<ResultadoPedido
   const metodosHabilitados: Record<string, boolean> = {
     efectivo: local.aceptaEfectivo,
     transferencia: local.aceptaTransferencia,
-    tarjeta: local.aceptaTarjeta,
+    tarjeta_debito: local.aceptaTarjetaDebito,
+    tarjeta_credito: local.aceptaTarjetaCredito,
   };
   // "otro" no lo ofrece el checkout público — no está en este objeto, así
   // que pasa sin bloquearse (queda fuera del alcance de este control).

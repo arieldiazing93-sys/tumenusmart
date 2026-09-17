@@ -33,12 +33,13 @@ model Store {
   // Qué opciones ve el cliente en el checkout público. Todas arrancan en true
   // para que los locales existentes sigan viendo las mismas 6 opciones de
   // siempre hasta que el dueño entre a Configuración y destilde alguna.
-  aceptaEfectivo      Boolean @default(true)
-  aceptaTransferencia Boolean @default(true)
-  aceptaTarjeta       Boolean @default(true)
-  aceptaDelivery      Boolean @default(true)
-  aceptaRetiro        Boolean @default(true)
-  aceptaMesa          Boolean @default(true)
+  aceptaEfectivo       Boolean @default(true)
+  aceptaTransferencia  Boolean @default(true)
+  aceptaTarjetaDebito  Boolean @default(true)
+  aceptaTarjetaCredito Boolean @default(true)
+  aceptaDelivery       Boolean @default(true)
+  aceptaRetiro         Boolean @default(true)
+  aceptaMesa           Boolean @default(true)
 
   // Si este local reserva mesas con anticipación. Es OTRA cosa que
   // "aceptaMesa" de arriba (ese es "comer en el local" al hacer un pedido

@@ -39,7 +39,8 @@ export default async function CheckoutPage({
         motivoBloqueo={motivoSinPedidos(estadoTienda)}
         aceptaEfectivo={store.aceptaEfectivo}
         aceptaTransferencia={store.aceptaTransferencia}
-        aceptaTarjeta={store.aceptaTarjeta}
+        aceptaTarjetaDebito={store.aceptaTarjetaDebito}
+        aceptaTarjetaCredito={store.aceptaTarjetaCredito}
         aceptaDelivery={store.aceptaDelivery}
         aceptaRetiro={store.aceptaRetiro}
         aceptaMesa={store.aceptaMesa}

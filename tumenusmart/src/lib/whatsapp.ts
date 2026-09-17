@@ -1,4 +1,5 @@
 import { formatearGuarani, formatearNumero } from "./format";
+import { etiquetaMetodoPago } from "./metodos-pago";
 
 type ItemPedido = {
   nombreProducto: string;
@@ -32,13 +33,6 @@ type DatosMensaje = {
   linkSeguimiento?: string | null;
 };
 
-const ETIQUETAS_PAGO: Record<string, string> = {
-  efectivo: "Efectivo",
-  transferencia: "Transferencia",
-  tarjeta: "Tarjeta (POS al recibir)",
-  otro: "A coordinar",
-};
-
 /**
  * Arma el texto del pedido, prolijo y legible, tal como lo va a
  * recibir el restaurante en WhatsApp.
@@ -57,7 +51,7 @@ export function construirMensajePedido(datos: DatosMensaje): string {
     if (datos.facturaRuc) lineas.push(`RUC: ${datos.facturaRuc}`);
     if (datos.facturaEmail) lineas.push(`Correo: ${datos.facturaEmail}`);
   }
-  lineas.push(`Método de pago: ${ETIQUETAS_PAGO[datos.metodoPagoReferencia] ?? datos.metodoPagoReferencia}`);
+  lineas.push(`Método de pago: ${etiquetaMetodoPago(datos.metodoPagoReferencia)}`);
 
   lineas.push("");
   lineas.push("Detalle:");
