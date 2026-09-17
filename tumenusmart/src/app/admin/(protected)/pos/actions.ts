@@ -8,6 +8,7 @@ import { exigirPermiso } from "@/lib/auth";
 import { normalizarFormaPagoPos, resumirTurno, type DeclaradoPorForma } from "@/lib/turno-pos";
 import { armarPedido, type LineaPedida, type ProductoBase } from "@/lib/precio-pedido";
 import { desglosarIva, formatearNumeroFactura } from "@/lib/factura-pos";
+import { SIN_REGISTRO_FISCAL } from "@/lib/tipo-cliente";
 import { turnoAbierto, pedidosDelTurno } from "./turno-actual";
 
 export type ResultadoAbrirTurno =
@@ -82,8 +83,13 @@ export type DatosVenta = {
   /** "ticket" (default) | "factura" — factura solo si la estación de este
    *  turno tiene un punto de expedición vigente asignado. */
   comprobanteTipo: string;
+  /** Clasificación SET del comprador — incluye "sin_nombre" (Consumidor
+   *  Final, timbrado Autoimpresor obliga a facturar toda venta). Ver
+   *  src/lib/tipo-cliente.ts. */
+  facturaTipoIdentificacion?: string;
+  /** No aplica si facturaTipoIdentificacion es "sin_nombre". */
+  facturaNumeroIdentificacion?: string;
   facturaRazonSocial?: string;
-  facturaRuc?: string;
 };
 
 /**
@@ -115,10 +121,14 @@ export async function registrarVenta(turnoId: string, datos: DatosVenta): Promis
   }
 
   const esFactura = datos.comprobanteTipo === "factura";
+  const esSinRegistroFiscal = datos.facturaTipoIdentificacion === SIN_REGISTRO_FISCAL.tipo;
   const puntoExpedicion = turno.estacion.puntoExpedicion;
   if (esFactura) {
-    if (!datos.facturaRazonSocial?.trim() || !datos.facturaRuc?.trim()) {
-      return { ok: false, error: "Para factura hacen falta la razón social y el RUC." };
+    if (!datos.facturaTipoIdentificacion) {
+      return { ok: false, error: "Elegí con o sin registro fiscal." };
+    }
+    if (!esSinRegistroFiscal && (!datos.facturaNumeroIdentificacion?.trim() || !datos.facturaRazonSocial?.trim())) {
+      return { ok: false, error: "Para factura con registro fiscal hacen falta el número y la razón social." };
     }
     if (!puntoExpedicion) {
       return {
@@ -202,6 +212,30 @@ export async function registrarVenta(turnoId: string, datos: DatosVenta): Promis
     let datosFactura: Record<string, unknown> = { comprobanteTipo: "ticket" };
 
     if (esFactura && puntoExpedicion) {
+      // Con registro fiscal: la ficha del cliente queda guardada por su
+      // tipo+número (RUC, Cédula, etc.), para que la próxima vez que
+      // factura ya no haga falta volver a elegir el tipo — mismo upsert
+      // que ya hace este archivo por teléfono, pero por identificación
+      // fiscal. "Sin nombre" no tiene a quién guardarle nada.
+      if (!esSinRegistroFiscal) {
+        await tx.customer.upsert({
+          where: {
+            storeId_tipoIdentificacion_numeroIdentificacion: {
+              storeId,
+              tipoIdentificacion: datos.facturaTipoIdentificacion!,
+              numeroIdentificacion: datos.facturaNumeroIdentificacion!.trim(),
+            },
+          },
+          update: { nombre: datos.facturaRazonSocial!.trim() },
+          create: {
+            storeId,
+            nombre: datos.facturaRazonSocial!.trim(),
+            tipoIdentificacion: datos.facturaTipoIdentificacion!,
+            numeroIdentificacion: datos.facturaNumeroIdentificacion!.trim(),
+          },
+        });
+      }
+
       // Atómico: se incrementa PRIMERO y se usa el valor YA incrementado —
       // igual que siguienteNumeroVentaPos. Leer el número y recién después
       // incrementar dejaría una ventana donde dos ventas en simultáneo
@@ -214,8 +248,9 @@ export async function registrarVenta(turnoId: string, datos: DatosVenta): Promis
       const desglose = desglosarIva(filas);
       datosFactura = {
         comprobanteTipo: "factura",
-        facturaRazonSocial: datos.facturaRazonSocial!.trim(),
-        facturaRuc: datos.facturaRuc!.trim(),
+        facturaTipoIdentificacion: datos.facturaTipoIdentificacion,
+        facturaRazonSocial: esSinRegistroFiscal ? null : datos.facturaRazonSocial!.trim(),
+        facturaRuc: esSinRegistroFiscal ? SIN_REGISTRO_FISCAL.numero : datos.facturaNumeroIdentificacion!.trim(),
         facturaNumero: formatearNumeroFactura(
           puntoExpedicion.establecimiento,
           puntoExpedicion.puntoExpedicion,
@@ -391,6 +426,35 @@ export async function buscarClientePorTelefono(telefono: string): Promise<Result
   });
   if (!cliente) return { ok: false };
   return { ok: true, nombre: cliente.nombre };
+}
+
+export type ResultadoBuscarClienteFiscal =
+  | { ok: true; nombre: string; tipoIdentificacion: string }
+  | { ok: false };
+
+/**
+ * Busca un cliente por su número de identificación fiscal (RUC, Cédula,
+ * etc.), sin pedir el tipo primero — si es un cliente recurrente, con el
+ * número solo alcanza para reconocerlo, tipo incluido, y no hace falta que
+ * el cajero se acuerde con qué tipo se lo cargó la vez pasada.
+ *
+ * Mismo criterio que `buscarClientePorTelefono`: es una comodidad, nunca
+ * corta la venta.
+ */
+export async function buscarClientePorIdentificacion(numero: string): Promise<ResultadoBuscarClienteFiscal> {
+  await exigirPermiso("pos.vender");
+  const storeId = await idLocalActual();
+  const db = prismaDelLocal(storeId);
+
+  const limpio = numero.trim();
+  if (!limpio) return { ok: false };
+
+  const cliente = await db.customer.findFirst({
+    where: { numeroIdentificacion: limpio },
+    select: { nombre: true, tipoIdentificacion: true },
+  });
+  if (!cliente?.tipoIdentificacion) return { ok: false };
+  return { ok: true, nombre: cliente.nombre, tipoIdentificacion: cliente.tipoIdentificacion };
 }
 
 export type ResultadoCancelarVenta = { ok: true } | { ok: false; error: string };

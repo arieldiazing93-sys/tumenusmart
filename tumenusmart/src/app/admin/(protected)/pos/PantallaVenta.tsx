@@ -3,11 +3,12 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Boton, Cabecera, Campo, Entrada, Tarjeta, clasesBoton } from "@/components/ui";
+import { Boton, Cabecera, Campo, Entrada, Selector, Tarjeta, clasesBoton } from "@/components/ui";
 import { Segmentado } from "@/components/Segmentado";
 import { formatearGuarani } from "@/lib/format";
 import { type FormaPagoPos } from "@/lib/turno-pos";
-import { buscarClientePorTelefono, registrarVenta } from "./actions";
+import { SIN_REGISTRO_FISCAL, TIPOS_IDENTIFICACION_FISCAL, etiquetaTipoIdentificacion } from "@/lib/tipo-cliente";
+import { buscarClientePorIdentificacion, buscarClientePorTelefono, registrarVenta } from "./actions";
 import { CobrarModal } from "./CobrarModal";
 import { MitadYMitadPickerPos } from "./MitadYMitadPickerPos";
 import { AgregadosPickerPos } from "./AgregadosPickerPos";
@@ -76,8 +77,15 @@ export function PantallaVenta({
   const [clienteTelefono, setClienteTelefono] = useState("");
   const [tipoEntrega, setTipoEntrega] = useState<TipoEntregaPos>("local");
   const [comprobanteTipo, setComprobanteTipo] = useState<"ticket" | "factura">("ticket");
+  const [registroFiscal, setRegistroFiscal] = useState<"con" | "sin">("con");
   const [facturaRazonSocial, setFacturaRazonSocial] = useState("");
-  const [facturaRuc, setFacturaRuc] = useState("");
+  const [facturaNumeroIdentificacion, setFacturaNumeroIdentificacion] = useState("");
+  const [facturaTipoIdentificacionElegido, setFacturaTipoIdentificacionElegido] = useState<string>(
+    TIPOS_IDENTIFICACION_FISCAL[0].valor
+  );
+  const [clienteFiscalEsNuevo, setClienteFiscalEsNuevo] = useState(false);
+  const [clienteFiscalEncontrado, setClienteFiscalEncontrado] = useState(false);
+  const [buscandoClienteFiscal, setBuscandoClienteFiscal] = useState(false);
   const [mostrarCobro, setMostrarCobro] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [cobrando, setCobrando] = useState(false);
@@ -218,13 +226,40 @@ export function PantallaVenta({
     }
   }
 
+  // Mismo patrón que buscarCliente(), pero por identificación fiscal: si ya
+  // facturó antes con ese número, autocompleta razón social y tipo. Si no,
+  // avisa que es nuevo y el cajero carga tipo + razón social a mano.
+  async function buscarClienteFiscal() {
+    const numero = facturaNumeroIdentificacion.trim();
+    if (!numero) return;
+    setBuscandoClienteFiscal(true);
+    setClienteFiscalEsNuevo(false);
+    setClienteFiscalEncontrado(false);
+    const r = await buscarClientePorIdentificacion(numero);
+    setBuscandoClienteFiscal(false);
+    if (r.ok) {
+      setFacturaRazonSocial(r.nombre);
+      setFacturaTipoIdentificacionElegido(r.tipoIdentificacion);
+      setClienteFiscalEncontrado(true);
+    } else {
+      setFacturaRazonSocial("");
+      setClienteFiscalEsNuevo(true);
+    }
+  }
+
   async function confirmarCobro(formaPago: FormaPagoPos) {
-    if (comprobanteTipo === "factura" && (!facturaRazonSocial.trim() || !facturaRuc.trim())) {
-      setError("Para factura hacen falta la razón social y el RUC.");
+    if (
+      comprobanteTipo === "factura" &&
+      registroFiscal === "con" &&
+      (!facturaNumeroIdentificacion.trim() || !facturaRazonSocial.trim())
+    ) {
+      setError("Para factura con registro fiscal hacen falta el número y la razón social.");
       return;
     }
     setCobrando(true);
     setError(null);
+    const esFactura = comprobanteTipo === "factura";
+    const esSinRegistroFiscal = esFactura && registroFiscal === "sin";
     const r = await registrarVenta(turnoId, {
       formaPago,
       tipoEntrega,
@@ -232,8 +267,13 @@ export function PantallaVenta({
       clienteTelefono,
       nota: "",
       comprobanteTipo,
-      facturaRazonSocial: comprobanteTipo === "factura" ? facturaRazonSocial : undefined,
-      facturaRuc: comprobanteTipo === "factura" ? facturaRuc : undefined,
+      facturaTipoIdentificacion: esFactura
+        ? esSinRegistroFiscal
+          ? SIN_REGISTRO_FISCAL.tipo
+          : facturaTipoIdentificacionElegido
+        : undefined,
+      facturaNumeroIdentificacion: esFactura && !esSinRegistroFiscal ? facturaNumeroIdentificacion.trim() : undefined,
+      facturaRazonSocial: esFactura && !esSinRegistroFiscal ? facturaRazonSocial : undefined,
       items: carrito.map((i) =>
         i.tipo === "combo"
           ? {
@@ -489,20 +529,89 @@ export function PantallaVenta({
               />
               {comprobanteTipo === "factura" && (
                 <div className="flex flex-col gap-2 rounded-lg border border-linea bg-papel-suave p-3">
-                  <Campo etiqueta="Razón social">
-                    <Entrada
-                      value={facturaRazonSocial}
-                      onChange={(e) => setFacturaRazonSocial(e.target.value)}
-                      placeholder="Nombre de la empresa o del titular"
-                    />
-                  </Campo>
-                  <Campo etiqueta="RUC">
-                    <Entrada
-                      value={facturaRuc}
-                      onChange={(e) => setFacturaRuc(e.target.value)}
-                      placeholder="80012345-6"
-                    />
-                  </Campo>
+                  <Segmentado
+                    opciones={[
+                      { value: "con", label: "Con registro fiscal" },
+                      { value: "sin", label: "Sin registro fiscal" },
+                    ]}
+                    valor={registroFiscal}
+                    onChange={setRegistroFiscal}
+                  />
+                  {registroFiscal === "sin" ? (
+                    <p className="text-[0.8rem] text-tinta-media">
+                      Se factura a Consumidor Final (Sin Nombre).
+                    </p>
+                  ) : (
+                    <>
+                      <Campo etiqueta="N° de RUC / Cédula / etc.">
+                        <Entrada
+                          value={facturaNumeroIdentificacion}
+                          onChange={(e) => {
+                            setFacturaNumeroIdentificacion(e.target.value);
+                            setClienteFiscalEsNuevo(false);
+                            setClienteFiscalEncontrado(false);
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key !== "Enter") return;
+                            e.preventDefault();
+                            buscarClienteFiscal();
+                          }}
+                          placeholder="80012345-6"
+                        />
+                      </Campo>
+                      {clienteFiscalEncontrado ? (
+                        <div className="flex flex-col items-start gap-1 rounded-lg bg-white px-3 py-2">
+                          <p className="text-[0.85rem] font-medium text-tinta">{facturaRazonSocial}</p>
+                          <p className="text-[0.76rem] text-tinta-suave">
+                            {etiquetaTipoIdentificacion(facturaTipoIdentificacionElegido)}
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setClienteFiscalEncontrado(false);
+                              setClienteFiscalEsNuevo(true);
+                            }}
+                            className="text-[0.76rem] font-medium text-brand-texto underline"
+                          >
+                            ¿No es este cliente?
+                          </button>
+                        </div>
+                      ) : (
+                        <>
+                          {buscandoClienteFiscal ? (
+                            <p className="text-[0.74rem] text-tinta-suave">Buscando…</p>
+                          ) : clienteFiscalEsNuevo ? (
+                            <p className="text-[0.74rem] font-medium text-aviso">
+                              Cliente nuevo — cargá los datos.
+                            </p>
+                          ) : (
+                            <p className="text-[0.74rem] text-tinta-suave">
+                              Enter completa los datos si ya es cliente.
+                            </p>
+                          )}
+                          <Campo etiqueta="Tipo">
+                            <Selector
+                              value={facturaTipoIdentificacionElegido}
+                              onChange={(e) => setFacturaTipoIdentificacionElegido(e.target.value)}
+                            >
+                              {TIPOS_IDENTIFICACION_FISCAL.map((t) => (
+                                <option key={t.valor} value={t.valor}>
+                                  {t.etiqueta}
+                                </option>
+                              ))}
+                            </Selector>
+                          </Campo>
+                          <Campo etiqueta="Razón social">
+                            <Entrada
+                              value={facturaRazonSocial}
+                              onChange={(e) => setFacturaRazonSocial(e.target.value)}
+                              placeholder="Nombre de la empresa o del titular"
+                            />
+                          </Campo>
+                        </>
+                      )}
+                    </>
+                  )}
                 </div>
               )}
             </div>

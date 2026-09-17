@@ -87,7 +87,15 @@ export async function calcularProgresoFidelidad(
       where: dondeEntregadoPos(montoMinimo),
       _count: { _all: true },
     }),
-    db.customer.findMany({ select: { telefono: true, pedidosCanjeados: true } }),
+    // "telefono" es opcional desde la Fase 5 de Factura Autoimpresor (un
+    // cliente puede existir solo por su identificación fiscal, sin
+    // teléfono) — ese tipo de cliente queda afuera de este mapa a
+    // propósito, porque no puede sumar a una fidelización por teléfono que
+    // nunca dio.
+    db.customer.findMany({
+      where: { telefono: { not: null } },
+      select: { telefono: true, pedidosCanjeados: true },
+    }),
   ]);
 
   const entregadosPorTelefono = new Map<string, number>();
@@ -99,7 +107,10 @@ export async function calcularProgresoFidelidad(
     entregadosPorTelefono.set(e.clienteTelefono, (entregadosPorTelefono.get(e.clienteTelefono) ?? 0) + e._count._all);
   }
 
-  const canjeadosPorTelefono = new Map(clientes.map((c) => [c.telefono, c.pedidosCanjeados]));
+  // Mismo caso que arriba: ya excluidos por el `where`, es solo para el tipo.
+  const canjeadosPorTelefono = new Map(
+    clientes.filter((c): c is typeof c & { telefono: string } => c.telefono != null).map((c) => [c.telefono, c.pedidosCanjeados])
+  );
   const mapa = new Map<string, ProgresoFidelidad>();
   for (const [telefono, entregados] of entregadosPorTelefono) {
     const canjeados = canjeadosPorTelefono.get(telefono) ?? 0;

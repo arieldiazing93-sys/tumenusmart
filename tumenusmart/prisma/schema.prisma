@@ -470,7 +470,11 @@ model Customer {
   storeId   String
   store     Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
   nombre    String
-  telefono  String
+  // Opcional: un cliente que se da de alta solo por facturar (Fase 5 de
+  // Factura Autoimpresor, ver identificación fiscal más abajo) puede no
+  // dar el teléfono — eso no le impide facturar, solo lo deja afuera de la
+  // fidelización por teléfono.
+  telefono  String?
   orders    Order[]
   createdAt DateTime @default(now())
 
@@ -480,9 +484,20 @@ model Customer {
   // que hizo antes de que alguien marcara el canje.
   pedidosCanjeados Int @default(0)
 
+  // Identificación fiscal (RUC/Cédula/Pasaporte/etc. — ver
+  // src/lib/tipo-cliente.ts) para la Factura Autoimpresor del POS. Se carga
+  // la primera vez que el cliente factura con registro fiscal y queda para
+  // las próximas visitas. Null en los clientes que solo existen por
+  // fidelización y nunca facturaron.
+  tipoIdentificacion   String?
+  numeroIdentificacion String?
+
   // El mismo número puede ser cliente de dos locales distintos: son
-  // personas distintas para cada negocio.
+  // personas distintas para cada negocio. Postgres no choca dos NULL entre
+  // sí, así que un cliente sin teléfono y otro sin identificación fiscal
+  // conviven sin problema con estos dos índices.
   @@unique([storeId, telefono])
+  @@unique([storeId, tipoIdentificacion, numeroIdentificacion])
   @@index([storeId])
 }
 
@@ -880,8 +895,18 @@ model VentaPos {
   // Mismos campos informales que Order ya tiene: lo que pide el cliente
   // para que le facturen. "ticket" | "factura".
   comprobanteTipo    String  @default("ticket")
-  facturaRazonSocial String?
+  facturaRazonSocial String? // null si facturaTipoIdentificacion es "sin_nombre" (Consumidor Final)
+  // Número de identificación del comprador, sea cual sea el tipo (RUC,
+  // Cédula, Pasaporte, "X" para Sin Nombre, etc. — ver facturaTipoIdentificacion
+  // y src/lib/tipo-cliente.ts). El nombre del campo quedó de la Fase 3,
+  // cuando solo existía RUC; el ticket usa etiquetaTipoIdentificacion() para
+  // imprimir la etiqueta correcta en vez de "RUC" fijo.
   facturaRuc         String?
+  // Clasificación fiscal SET del comprador (Tabla 3, RG 90/2021) — "ruc" |
+  // "cedula" | "pasaporte" | "cedula_extranjera" | "diplomatico" |
+  // "identificacion_tributaria" | "sin_nombre". Null en facturas viejas de
+  // antes de la Fase 5, donde solo se guardaba RUC a secas.
+  facturaTipoIdentificacion String?
 
   // Fiscales — se completan y se CONGELAN solo cuando comprobanteTipo pasa
   // a "factura" (ver registrarVenta en pos/actions.ts). Nunca se recalculan

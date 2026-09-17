@@ -4,6 +4,7 @@ import { prismaDelLocal } from "@/lib/prisma-local";
 import { idLocalActual } from "@/lib/local-actual";
 import { formatearGuarani, formatearNumero, formatearTelefonoLocal } from "@/lib/format";
 import { etiquetaFormaPagoPos } from "@/lib/turno-pos";
+import { SIN_REGISTRO_FISCAL, etiquetaTipoIdentificacion } from "@/lib/tipo-cliente";
 import { ZONA_NEGOCIO } from "@/lib/timezone";
 import { ImprimirAuto } from "@/components/ImprimirAuto";
 
@@ -161,8 +162,16 @@ export default async function TicketVentaPosPage({
         {esFactura && (
           <>
             <div className="text-xs leading-tight">
-              <p>Razón social: {venta.facturaRazonSocial}</p>
-              <p>RUC: {venta.facturaRuc}</p>
+              {venta.facturaTipoIdentificacion === SIN_REGISTRO_FISCAL.tipo ? (
+                <p>Cliente: {SIN_REGISTRO_FISCAL.etiquetaDisplay}</p>
+              ) : (
+                <>
+                  <p>Razón social: {venta.facturaRazonSocial}</p>
+                  <p>
+                    {etiquetaTipoIdentificacion(venta.facturaTipoIdentificacion ?? "ruc")}: {venta.facturaRuc}
+                  </p>
+                </>
+              )}
             </div>
             <Separador />
           </>
