@@ -34,6 +34,18 @@ const nextConfig = {
       { protocol: "https", hostname: "**" },
     ],
   },
+  // La librería qz-tray (impresión silenciosa) trae un `require('lna')`
+  // opcional para un paquete que no instalamos a propósito — en el navegador
+  // de verdad ese require está en un try/catch y la librería sigue andando
+  // sin él, pero el bundler de Next intenta resolverlo en build y el
+  // paquete no existe, lo que rompe el build entero. Se le dice a webpack
+  // que ignore ese require puntual (queda como un módulo que tira al
+  // requerirlo, exactamente el caso que el propio try/catch de qz-tray ya
+  // contempla) en vez de intentar resolverlo de verdad.
+  webpack: (config, { webpack }) => {
+    config.plugins.push(new webpack.IgnorePlugin({ resourceRegExp: /^lna$/ }));
+    return config;
+  },
   async headers() {
     return [
       {
