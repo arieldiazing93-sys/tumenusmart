@@ -246,6 +246,12 @@ export function EstacionFila({
           <p className="mb-2 text-xs font-bold uppercase tracking-wide text-tinta-media">
             Impresoras por área — impresión automática (QZ Tray)
           </p>
+          <p className="mb-2 text-xs text-tinta-suave">
+            Elegí la impresora configurada como "raw" (driver Generic / Text
+            Only en Windows) — no la impresora normal con el driver del
+            fabricante, que se usa solo para ver/imprimir a mano desde el
+            navegador.
+          </p>
 
           {esEstaComputadora ? (
             <>

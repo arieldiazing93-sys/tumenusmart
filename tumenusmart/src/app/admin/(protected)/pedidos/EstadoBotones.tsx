@@ -61,13 +61,15 @@ export function EstadoBotones({
    * impresora real — salían líneas superpuestas/ilegibles salteadas).
    */
   async function imprimirSegunEstado(estado: string, resultado: Extract<ResultadoPedidoAccion, { ok: true }>) {
-    const tareas: { label: string; url: string; impresora: string | null; ancho: number }[] = (
+    // `urlCrudo` es lo que se manda a imprimir (texto ESC/POS); `urlManual`
+    // es la página HTML normal, para el link de "abrir a mano" si falla.
+    const tareas: { label: string; urlCrudo: string; urlManual: string; impresora: string | null }[] = (
       resultado.areasImpresion ?? []
     ).map((areaId) => ({
       label: "Comanda de cocina",
-      url: `/admin/pedidos/${orderId}/comanda?area=${areaId}`,
+      urlCrudo: `/admin/pedidos/${orderId}/comanda/crudo?area=${areaId}`,
+      urlManual: `/admin/pedidos/${orderId}/comanda?area=${areaId}`,
       impresora: impresorasPorArea[areaId] ?? null,
-      ancho: 72,
     }));
 
     const tocaTicket =
@@ -76,16 +78,16 @@ export function EstadoBotones({
     if (tocaTicket) {
       tareas.push({
         label: "Ticket/factura",
-        url: `/admin/pedidos/${orderId}/ticket`,
+        urlCrudo: `/admin/pedidos/${orderId}/ticket/crudo`,
+        urlManual: `/admin/pedidos/${orderId}/ticket`,
         impresora: nombreImpresoraTicket,
-        ancho: 67,
       });
     }
 
     const fallos: { label: string; url: string }[] = [];
     for (const t of tareas) {
-      const r = await imprimirComprobante(t.url, t.impresora, t.ancho);
-      if (!r.ok) fallos.push({ label: t.label, url: t.url });
+      const r = await imprimirComprobante(t.urlCrudo, t.impresora);
+      if (!r.ok) fallos.push({ label: t.label, url: t.urlManual });
     }
     if (fallos.length > 0) setFallback((actual) => [...actual, ...fallos]);
   }

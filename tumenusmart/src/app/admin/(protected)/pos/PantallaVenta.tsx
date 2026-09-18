@@ -326,10 +326,13 @@ export function PantallaVenta({
     const resultadosComandas: ResultadoImpresion[] = [];
     for (const areaId of r.areasImpresion) {
       resultadosComandas.push(
-        await imprimirComprobante(`/admin/pos/venta/${r.ventaId}/comanda?area=${areaId}`, impresorasPorArea[areaId] ?? null, 72)
+        await imprimirComprobante(
+          `/admin/pos/venta/${r.ventaId}/comanda/crudo?area=${areaId}`,
+          impresorasPorArea[areaId] ?? null
+        )
       );
     }
-    const resultadoTicket = await imprimirComprobante(urlTicket, nombreImpresoraTicket, 67);
+    const resultadoTicket = await imprimirComprobante(`/admin/pos/venta/${r.ventaId}/ticket/crudo`, nombreImpresoraTicket);
 
     // Las comandas que no salieron solas se avisan en la pantalla del
     // ticket (esta pantalla ya se desmonta al navegar) — nunca con un

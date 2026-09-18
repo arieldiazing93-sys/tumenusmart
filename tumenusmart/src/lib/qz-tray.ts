@@ -68,33 +68,24 @@ export async function listarImpresoras(): Promise<string[]> {
 }
 
 /**
- * Imprime un HTML ya renderizado en la impresora indicada. `flavor: 'plain'`
- * es intencional: con `flavor: 'file'` QZ Tray (proceso Java aparte, sin la
- * cookie de sesión del navegador) bajaría la URL él mismo y una pantalla
- * protegida por sesión le devolvería el login en vez del comprobante.
+ * Imprime texto crudo (ESC/POS, ver src/lib/escpos.ts) en la impresora
+ * indicada. Reemplaza al enfoque anterior (HTML renderizado como imagen vía
+ * el driver gráfico de Windows) — probado en impresora térmica real: ese
+ * camino salía borroso, con espaciado impredecible y sin corte de papel
+ * confiable, y dependía de la calidad del driver gráfico de cada modelo.
+ * Texto crudo es el estándar de facto que casi todas las impresoras
+ * térmicas soportan igual — así imprimen la mayoría de los sistemas de
+ * punto de venta comerciales.
+ *
+ * La impresora indicada tiene que estar configurada como "raw" en Windows
+ * (driver Generic / Text Only, mismo puerto que la impresora real) — ver
+ * /admin/pos/estaciones. `flavor: 'plain'` no aplica acá (es para HTML/PDF);
+ * un string simple en el array de datos ya se interpreta como
+ * `{type: 'raw', format: 'command', flavor: 'plain'}`.
  */
-export async function imprimirHtml(nombreImpresora: string, html: string, anchoMm: number): Promise<void> {
+export async function imprimirTexto(nombreImpresora: string, texto: string): Promise<void> {
   await conectarQz();
   const qz = await cargarQz();
-  const config = qz.configs.create(nombreImpresora, {
-    units: "mm",
-    // Probado en impresora térmica real, dos veces: con una altura fija de
-    // 297mm sobraba papel en blanco después del contenido; con 3276mm
-    // (el valor "rollo continuo" que se recomienda para otros drivers)
-    // sobraba TODAVÍA MÁS — este driver no recorta solo, imprime el alto
-    // que se le pida. Sin `size.height` (solo ancho), QZ Tray mide el
-    // contenido real y arma la página a esa altura.
-    size: { width: anchoMm },
-    scaleContent: false,
-    rasterize: false,
-    // Sin esto, QZ Tray renderiza el HTML a 72 DPI (la resolución típica de
-    // pantalla) y después lo estira para cubrir el ancho físico del papel
-    // — probado en una impresora térmica real: sale borroso, con
-    // interlineado exagerado y muy poco texto por línea. 203 DPI es la
-    // densidad estándar de las impresoras térmicas de recibos (8
-    // puntos/mm) — con esto renderiza a la resolución real del papel en
-    // vez de escalar una imagen de baja resolución.
-    density: 203,
-  });
-  await qz.print(config, [{ type: "pixel", format: "html", flavor: "plain", data: html }]);
+  const config = qz.configs.create(nombreImpresora);
+  await qz.print(config, [texto]);
 }
