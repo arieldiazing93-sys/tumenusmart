@@ -55,40 +55,39 @@ export function EstadoBotones({
    * ticket/factura al pasar a "en despacho" (delivery) o "entregado" (no
    * delivery) — los mismos dos casos donde cambiarEstadoPedido YA emite el
    * número de factura, así que nunca se imprime dos veces el mismo pedido.
+   *
+   * Uno por vez, NUNCA en paralelo: mandar varios trabajos juntos a la
+   * misma impresora física los mezcla en su buffer (confirmado con una
+   * impresora real — salían líneas superpuestas/ilegibles salteadas).
    */
-  function imprimirSegunEstado(estado: string, resultado: Extract<ResultadoPedidoAccion, { ok: true }>) {
-    const tareas: Promise<{ label: string; url: string; ok: boolean }>[] = [];
-
-    for (const areaId of resultado.areasImpresion ?? []) {
-      const url = `/admin/pedidos/${orderId}/comanda?area=${areaId}`;
-      tareas.push(
-        imprimirComprobante(url, impresorasPorArea[areaId] ?? null, 72).then((r) => ({
-          label: "Comanda de cocina",
-          url,
-          ok: r.ok,
-        }))
-      );
-    }
+  async function imprimirSegunEstado(estado: string, resultado: Extract<ResultadoPedidoAccion, { ok: true }>) {
+    const tareas: { label: string; url: string; impresora: string | null; ancho: number }[] = (
+      resultado.areasImpresion ?? []
+    ).map((areaId) => ({
+      label: "Comanda de cocina",
+      url: `/admin/pedidos/${orderId}/comanda?area=${areaId}`,
+      impresora: impresorasPorArea[areaId] ?? null,
+      ancho: 72,
+    }));
 
     const tocaTicket =
       (estado === "en_despacho" && tipoEntrega === "delivery") ||
       (estado === "entregado" && tipoEntrega !== "delivery");
     if (tocaTicket) {
-      const url = `/admin/pedidos/${orderId}/ticket`;
-      tareas.push(
-        imprimirComprobante(url, nombreImpresoraTicket, 67).then((r) => ({
-          label: "Ticket/factura",
-          url,
-          ok: r.ok,
-        }))
-      );
+      tareas.push({
+        label: "Ticket/factura",
+        url: `/admin/pedidos/${orderId}/ticket`,
+        impresora: nombreImpresoraTicket,
+        ancho: 67,
+      });
     }
 
-    if (tareas.length === 0) return;
-    Promise.all(tareas).then((resultados) => {
-      const fallos = resultados.filter((r) => !r.ok).map(({ label, url }) => ({ label, url }));
-      if (fallos.length > 0) setFallback((actual) => [...actual, ...fallos]);
-    });
+    const fallos: { label: string; url: string }[] = [];
+    for (const t of tareas) {
+      const r = await imprimirComprobante(t.url, t.impresora, t.ancho);
+      if (!r.ok) fallos.push({ label: t.label, url: t.url });
+    }
+    if (fallos.length > 0) setFallback((actual) => [...actual, ...fallos]);
   }
 
   function confirmarEntregado(formaPago: FormaPagoPos) {

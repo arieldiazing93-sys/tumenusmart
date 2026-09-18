@@ -13,7 +13,7 @@ import { CobrarModal } from "./CobrarModal";
 import { ClienteFiscalModal, type DatosClienteFiscal } from "./ClienteFiscalModal";
 import { MitadYMitadPickerPos } from "./MitadYMitadPickerPos";
 import { AgregadosPickerPos } from "./AgregadosPickerPos";
-import { imprimirComprobante } from "@/lib/impresion-comprobantes";
+import { imprimirComprobante, type ResultadoImpresion } from "@/lib/impresion-comprobantes";
 
 type Agregado = { id: string; nombre: string; precioExtra: number };
 type Producto = { id: string; nombre: string; precio: number; agregados: Agregado[] };
@@ -317,14 +317,19 @@ export function PantallaVenta({
     // El POS no tiene una fase de "preparación" separada del cobro: ticket
     // y comanda(s) se imprimen solos en el mismo momento — una comanda por
     // cada Área de Impresión presente en el carrito (ver
-    // src/lib/impresion-comprobantes.ts).
+    // src/lib/impresion-comprobantes.ts). Uno por vez, NUNCA en paralelo:
+    // mandar varios trabajos juntos a la misma impresora física los mezcla
+    // en su buffer (confirmado con una impresora real — salían líneas
+    // superpuestas/ilegibles salteadas). Comandas primero (para que la
+    // cocina las tenga antes), el ticket al final.
     const urlTicket = `/admin/pos/venta/${r.ventaId}/ticket`;
-    const [resultadoTicket, ...resultadosComandas] = await Promise.all([
-      imprimirComprobante(urlTicket, nombreImpresoraTicket, 67),
-      ...r.areasImpresion.map((areaId) =>
-        imprimirComprobante(`/admin/pos/venta/${r.ventaId}/comanda?area=${areaId}`, impresorasPorArea[areaId] ?? null, 72)
-      ),
-    ]);
+    const resultadosComandas: ResultadoImpresion[] = [];
+    for (const areaId of r.areasImpresion) {
+      resultadosComandas.push(
+        await imprimirComprobante(`/admin/pos/venta/${r.ventaId}/comanda?area=${areaId}`, impresorasPorArea[areaId] ?? null, 72)
+      );
+    }
+    const resultadoTicket = await imprimirComprobante(urlTicket, nombreImpresoraTicket, 67);
 
     // Las comandas que no salieron solas se avisan en la pantalla del
     // ticket (esta pantalla ya se desmonta al navegar) — nunca con un
