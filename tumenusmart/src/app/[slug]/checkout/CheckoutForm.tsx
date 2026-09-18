@@ -258,9 +258,9 @@ export function CheckoutForm({
           </Campo>
         </Tarjeta>
 
-        {puedeFacturar && (
-          <Tarjeta className="flex flex-col gap-4">
-            <p className="rotulo">Comprobante</p>
+        <Tarjeta className="flex flex-col gap-4">
+          <p className="rotulo">Comprobante</p>
+          {puedeFacturar ? (
             <Segmentado
               opciones={[
                 { value: "ticket", label: "Ticket" },
@@ -269,44 +269,57 @@ export function CheckoutForm({
               valor={comprobanteTipo}
               onChange={setComprobanteTipo}
             />
-
-            {comprobanteTipo === "factura" && (
-              <div
-                key={campoInvalido === "factura" ? `sac-${intento}` : "factura"}
-                className={`flex flex-col gap-3 rounded-lg border p-3 ${
-                  campoInvalido === "factura"
-                    ? "animate-[sacudir_0.32s_ease] border-peligro/50 bg-peligro-luz/30"
-                    : "border-linea bg-papel-suave"
-                }`}
-              >
-                <Campo etiqueta="Razón social">
-                  <Entrada
-                    required
-                    value={facturaRazonSocial}
-                    onChange={(e) => setFacturaRazonSocial(e.target.value)}
-                    placeholder="Nombre de la empresa o del titular"
-                  />
-                </Campo>
-                <Campo etiqueta="RUC">
-                  <Entrada
-                    required
-                    value={facturaRuc}
-                    onChange={(e) => setFacturaRuc(e.target.value)}
-                    placeholder="80012345-6"
-                  />
-                </Campo>
-                <Campo etiqueta="Correo electrónico" ayuda="Opcional">
-                  <Entrada
-                    type="email"
-                    value={facturaEmail}
-                    onChange={(e) => setFacturaEmail(e.target.value)}
-                    placeholder="nombre@correo.com"
-                  />
-                </Campo>
+          ) : (
+            // Este local no tiene ningún equipo con punto de expedición
+            // vigente (puede que nunca use el Punto de Venta, solo el menú
+            // público para recibir pedidos) — Ticket sigue siempre
+            // disponible, Factura se ve pero no se puede elegir.
+            <div className="flex gap-3">
+              <div className="flex-1 rounded-lg border border-brand bg-brand-light px-3 py-2 text-center text-[0.85rem] font-medium text-brand-texto">
+                Ticket
               </div>
-            )}
-          </Tarjeta>
-        )}
+              <div className="flex-1 cursor-not-allowed rounded-lg border border-linea px-3 py-2 text-center text-[0.85rem] font-medium text-tinta-suave opacity-50">
+                Factura
+              </div>
+            </div>
+          )}
+
+          {puedeFacturar && comprobanteTipo === "factura" && (
+            <div
+              key={campoInvalido === "factura" ? `sac-${intento}` : "factura"}
+              className={`flex flex-col gap-3 rounded-lg border p-3 ${
+                campoInvalido === "factura"
+                  ? "animate-[sacudir_0.32s_ease] border-peligro/50 bg-peligro-luz/30"
+                  : "border-linea bg-papel-suave"
+              }`}
+            >
+              <Campo etiqueta="Razón social">
+                <Entrada
+                  required
+                  value={facturaRazonSocial}
+                  onChange={(e) => setFacturaRazonSocial(e.target.value)}
+                  placeholder="Nombre de la empresa o del titular"
+                />
+              </Campo>
+              <Campo etiqueta="RUC">
+                <Entrada
+                  required
+                  value={facturaRuc}
+                  onChange={(e) => setFacturaRuc(e.target.value)}
+                  placeholder="80012345-6"
+                />
+              </Campo>
+              <Campo etiqueta="Correo electrónico" ayuda="Opcional">
+                <Entrada
+                  type="email"
+                  value={facturaEmail}
+                  onChange={(e) => setFacturaEmail(e.target.value)}
+                  placeholder="nombre@correo.com"
+                />
+              </Campo>
+            </div>
+          )}
+        </Tarjeta>
 
         <Tarjeta className="flex flex-col gap-4">
           <p className="rotulo">Entrega y pago</p>
