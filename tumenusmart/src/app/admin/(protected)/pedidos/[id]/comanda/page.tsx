@@ -10,7 +10,9 @@ export const dynamic = "force-dynamic";
 
 // Pensado para rollo térmico de 80 mm, que es lo que usan casi todos los
 // locales. Si se imprime en hoja común sale como una tira angosta, que
-// también sirve para cortar y colgar en la cocina.
+// también sirve para cortar y colgar en la cocina. Mismo tamaño/tipografía
+// que el ticket (9px, sin negritas) — pedido explícito del dueño, para que
+// comanda y ticket se vean parejos.
 const ESTILOS_IMPRESION = `
   @page { size: 80mm auto; margin: 4mm; }
   @media print {
@@ -28,7 +30,7 @@ const ESTILOS_IMPRESION = `
 // (cabecera, hora/tipo, ítems, nota, pie) separa del siguiente con esta
 // línea en vez de con un borde.
 function Separador() {
-  return <p className="py-1.5 text-center text-xs">{"- ".repeat(18).trim()}</p>;
+  return <p className="py-1.5 text-center">{"- ".repeat(18).trim()}</p>;
 }
 
 export default async function ComandaPage({
@@ -80,21 +82,19 @@ export default async function ComandaPage({
     <>
       <style dangerouslySetInnerHTML={{ __html: ESTILOS_IMPRESION }} />
 
-      <div id="comprobante-imprimible" className="mx-auto max-w-[76mm] font-mono text-black">
+      <div id="comprobante-imprimible" className="mx-auto max-w-[76mm] font-mono text-[9px] leading-tight text-black">
         {!esSilencioso && <ImprimirAuto />}
 
         <Separador />
 
         <div className="text-center">
-          <p className="text-3xl font-bold leading-tight">
-            {formatearNumero(pedido.numero)}
-          </p>
-          {areaImpresion && <p className="text-sm font-bold uppercase">{areaImpresion.nombre}</p>}
+          <p>{formatearNumero(pedido.numero)}</p>
+          {areaImpresion && <p className="uppercase">{areaImpresion.nombre}</p>}
         </div>
 
         <Separador />
 
-        <div className="text-sm font-bold">
+        <div>
           <p>{hora}</p>
           <p>
             {esDelivery
@@ -109,17 +109,13 @@ export default async function ComandaPage({
 
         <ul>
           {items.map((item) => (
-            <li key={item.id} className="mb-2.5 last:mb-0">
-              <p className="text-[1.4rem] font-semibold tracking-titular uppercase leading-tight">
+            <li key={item.id} className="mb-1.5 last:mb-0">
+              <p className="uppercase">
                 {item.cantidad} x {item.nombreProducto}
               </p>
-              {item.opcionesTexto && (
-                <p className="mt-0.5 text-base leading-tight">+ {item.opcionesTexto}</p>
-              )}
+              {item.opcionesTexto && <p>+ {item.opcionesTexto}</p>}
               {item.ingredientesQuitadosTexto && (
-                <p className="mt-0.5 text-base font-bold uppercase leading-tight">
-                  ** {item.ingredientesQuitadosTexto} **
-                </p>
+                <p className="font-bold uppercase">** {item.ingredientesQuitadosTexto} **</p>
               )}
             </li>
           ))}
@@ -129,15 +125,15 @@ export default async function ComandaPage({
           <>
             <Separador />
             <div>
-              <p className="text-sm font-bold uppercase">Nota del cliente</p>
-              <p className="text-base leading-tight">{pedido.notas}</p>
+              <p className="uppercase">Nota del cliente</p>
+              <p>{pedido.notas}</p>
             </div>
           </>
         )}
 
         <Separador />
 
-        <p className="text-center text-sm">Cliente: {pedido.clienteNombre}</p>
+        <p className="text-center">Cliente: {pedido.clienteNombre}</p>
 
         <Separador />
       </div>

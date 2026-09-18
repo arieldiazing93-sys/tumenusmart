@@ -9,7 +9,8 @@ import { ImprimirAuto } from "@/components/ImprimirAuto";
 export const dynamic = "force-dynamic";
 
 // Mismo criterio que la comanda de pedidos: pensado para rollo térmico de
-// 80mm, letra grande para leer de un vistazo en la cocina.
+// 80mm. Mismo tamaño/tipografía que el ticket (9px, sin negritas) — pedido
+// explícito del dueño, para que comanda y ticket se vean parejos.
 const ESTILOS_IMPRESION = `
   @page { size: 80mm auto; margin: 4mm; }
   @media print {
@@ -21,7 +22,7 @@ const ESTILOS_IMPRESION = `
 // comentario en la comanda de pedidos: algunas impresoras térmicas recortan
 // el papel al contenido real, y un borde o un salto en blanco se pierde.
 function Separador() {
-  return <p className="py-1.5 text-center text-xs">{"- ".repeat(18).trim()}</p>;
+  return <p className="py-1.5 text-center">{"- ".repeat(18).trim()}</p>;
 }
 
 export default async function ComandaVentaPosPage({
@@ -66,19 +67,19 @@ export default async function ComandaVentaPosPage({
     <>
       <style dangerouslySetInnerHTML={{ __html: ESTILOS_IMPRESION }} />
 
-      <div id="comprobante-imprimible" className="mx-auto max-w-[76mm] font-mono text-black">
+      <div id="comprobante-imprimible" className="mx-auto max-w-[76mm] font-mono text-[9px] leading-tight text-black">
         {!esSilencioso && <ImprimirAuto />}
 
         <Separador />
 
         <div className="text-center">
-          <p className="text-3xl font-bold leading-tight">{formatearNumero(venta.numero)}</p>
-          {areaImpresion && <p className="text-sm font-bold uppercase">{areaImpresion.nombre}</p>}
+          <p>{formatearNumero(venta.numero)}</p>
+          {areaImpresion && <p className="uppercase">{areaImpresion.nombre}</p>}
         </div>
 
         <Separador />
 
-        <div className="text-sm font-bold">
+        <div>
           <p>{hora}</p>
           {/* En mayúscula y solo, para que el cocinero lo vea sin tener que
               buscarlo entre el resto del texto: es el dato que decide si
@@ -90,13 +91,11 @@ export default async function ComandaVentaPosPage({
 
         <ul>
           {items.map((item) => (
-            <li key={item.id} className="mb-2.5 last:mb-0">
-              <p className="text-[1.4rem] font-semibold tracking-titular uppercase leading-tight">
+            <li key={item.id} className="mb-1.5 last:mb-0">
+              <p className="uppercase">
                 {item.cantidad} x {item.nombreProducto}
               </p>
-              {item.opcionesTexto && (
-                <p className="mt-0.5 text-base leading-tight">+ {item.opcionesTexto}</p>
-              )}
+              {item.opcionesTexto && <p>+ {item.opcionesTexto}</p>}
             </li>
           ))}
         </ul>
@@ -105,8 +104,8 @@ export default async function ComandaVentaPosPage({
           <>
             <Separador />
             <div>
-              <p className="text-sm font-bold uppercase">Nota</p>
-              <p className="text-base leading-tight">{venta.nota}</p>
+              <p className="uppercase">Nota</p>
+              <p>{venta.nota}</p>
             </div>
           </>
         )}
@@ -114,7 +113,7 @@ export default async function ComandaVentaPosPage({
         {venta.clienteNombre && (
           <>
             <Separador />
-            <p className="text-center text-sm">Cliente: {venta.clienteNombre}</p>
+            <p className="text-center">Cliente: {venta.clienteNombre}</p>
           </>
         )}
 
