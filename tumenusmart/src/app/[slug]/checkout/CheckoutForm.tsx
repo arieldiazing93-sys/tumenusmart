@@ -47,8 +47,6 @@ type Props = {
   aceptaRetiro: boolean;
   aceptaMesa: boolean;
   zonas: Zona[];
-  /** Si ALGUNA estación del local tiene un punto de expedición vigente. */
-  puedeFacturar: boolean;
 };
 
 export function CheckoutForm({
@@ -66,7 +64,6 @@ export function CheckoutForm({
   aceptaRetiro,
   aceptaMesa,
   zonas,
-  puedeFacturar,
 }: Props) {
   const router = useRouter();
   const { items, subtotal, vaciarCarrito } = useCart();
@@ -260,31 +257,16 @@ export function CheckoutForm({
 
         <Tarjeta className="flex flex-col gap-4">
           <p className="rotulo">Comprobante</p>
-          {puedeFacturar ? (
-            <Segmentado
-              opciones={[
-                { value: "ticket", label: "Ticket" },
-                { value: "factura", label: "Factura" },
-              ]}
-              valor={comprobanteTipo}
-              onChange={setComprobanteTipo}
-            />
-          ) : (
-            // Este local no tiene ningún equipo con punto de expedición
-            // vigente (puede que nunca use el Punto de Venta, solo el menú
-            // público para recibir pedidos) — Ticket sigue siempre
-            // disponible, Factura se ve pero no se puede elegir.
-            <div className="flex gap-3">
-              <div className="flex-1 rounded-lg border border-brand bg-brand-light px-3 py-2 text-center text-[0.85rem] font-medium text-brand-texto">
-                Ticket
-              </div>
-              <div className="flex-1 cursor-not-allowed rounded-lg border border-linea px-3 py-2 text-center text-[0.85rem] font-medium text-tinta-suave opacity-50">
-                Factura
-              </div>
-            </div>
-          )}
+          <Segmentado
+            opciones={[
+              { value: "ticket", label: "Ticket" },
+              { value: "factura", label: "Factura" },
+            ]}
+            valor={comprobanteTipo}
+            onChange={setComprobanteTipo}
+          />
 
-          {puedeFacturar && comprobanteTipo === "factura" && (
+          {comprobanteTipo === "factura" && (
             <div
               key={campoInvalido === "factura" ? `sac-${intento}` : "factura"}
               className={`flex flex-col gap-3 rounded-lg border p-3 ${
