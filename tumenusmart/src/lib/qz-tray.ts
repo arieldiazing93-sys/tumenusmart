@@ -1,11 +1,26 @@
 "use client";
 
-import qz from "qz-tray";
+// `qz-tray` es una librería pensada solo para el navegador (websocket,
+// firma, impresoras). Un `import` normal la carga también durante el
+// render en el servidor (así funciona un Client Component en Next.js: se
+// renderiza una vez en el servidor para el HTML inicial, y otra vez en el
+// navegador al hidratar) — ahí se comporta distinto y el HTML del servidor
+// no coincide con el del cliente, lo que rompe la hidratación de TODA la
+// página (React error #418) apenas algo importa este módulo. Por eso se
+// carga con `import()` dinámico, recién cuando de verdad hace falta
+// conectar o imprimir — nunca durante un render.
+type Qz = typeof import("qz-tray")["default"];
+
+let qzPromise: Promise<Qz> | null = null;
+function cargarQz(): Promise<Qz> {
+  if (!qzPromise) qzPromise = import("qz-tray").then((m) => m.default);
+  return qzPromise;
+}
 
 let configurado = false;
 let conexionEnCurso: Promise<void> | null = null;
 
-function configurarFirma() {
+function configurarFirma(qz: Qz) {
   if (configurado) return;
   configurado = true;
   qz.security.setSignatureAlgorithm("SHA512");
@@ -36,7 +51,8 @@ function configurarFirma() {
  * para caer al fallback manual.
  */
 export async function conectarQz(): Promise<void> {
-  configurarFirma();
+  const qz = await cargarQz();
+  configurarFirma(qz);
   if (qz.websocket.isActive()) return;
   if (conexionEnCurso) return conexionEnCurso;
   conexionEnCurso = qz.websocket.connect({ retries: 2, delay: 1 }).finally(() => {
@@ -47,6 +63,7 @@ export async function conectarQz(): Promise<void> {
 
 export async function listarImpresoras(): Promise<string[]> {
   await conectarQz();
+  const qz = await cargarQz();
   return qz.printers.find();
 }
 
@@ -58,6 +75,7 @@ export async function listarImpresoras(): Promise<string[]> {
  */
 export async function imprimirHtml(nombreImpresora: string, html: string, anchoMm: number): Promise<void> {
   await conectarQz();
+  const qz = await cargarQz();
   const config = qz.configs.create(nombreImpresora, {
     units: "mm",
     size: { width: anchoMm, height: 297 },
