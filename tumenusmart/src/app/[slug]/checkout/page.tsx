@@ -15,13 +15,26 @@ export default async function CheckoutPage({
   const { slug } = await params;
   const store = await localPorSlug(slug);
 
-  const [zonas, estadoTienda] = await Promise.all([
+  const [zonas, estadoTienda, estacionConPunto] = await Promise.all([
     prisma.deliveryZone.findMany({
       where: { storeId: store.id, activo: true },
       orderBy: { radioKm: "asc" },
     }),
     obtenerEstadoTienda(store.id),
+    // Si NINGUNA estación del local tiene un punto de expedición vigente,
+    // pedir factura acá está garantizado a caer al aviso informal cuando el
+    // staff despache el pedido (ver intentarEmitirFactura en
+    // admin/pedidos/actions.ts) — mejor no ofrecer la opción de entrada.
+    prisma.estacion.findFirst({
+      where: {
+        storeId: store.id,
+        activa: true,
+        puntoExpedicion: { activo: true, timbradoHasta: { gt: new Date() } },
+      },
+      select: { id: true },
+    }),
   ]);
+  const puedeFacturar = !!estacionConPunto;
 
   return (
     <main className="mx-auto max-w-2xl px-4 py-8">
@@ -44,6 +57,7 @@ export default async function CheckoutPage({
         aceptaDelivery={store.aceptaDelivery}
         aceptaRetiro={store.aceptaRetiro}
         aceptaMesa={store.aceptaMesa}
+        puedeFacturar={puedeFacturar}
         zonas={zonas.map((z) => ({
           id: z.id,
           nombre: z.nombre,

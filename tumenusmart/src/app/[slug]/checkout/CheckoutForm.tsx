@@ -47,6 +47,8 @@ type Props = {
   aceptaRetiro: boolean;
   aceptaMesa: boolean;
   zonas: Zona[];
+  /** Si ALGUNA estación del local tiene un punto de expedición vigente. */
+  puedeFacturar: boolean;
 };
 
 export function CheckoutForm({
@@ -64,6 +66,7 @@ export function CheckoutForm({
   aceptaRetiro,
   aceptaMesa,
   zonas,
+  puedeFacturar,
 }: Props) {
   const router = useRouter();
   const { items, subtotal, vaciarCarrito } = useCart();
@@ -255,53 +258,55 @@ export function CheckoutForm({
           </Campo>
         </Tarjeta>
 
-        <Tarjeta className="flex flex-col gap-4">
-          <p className="rotulo">Comprobante</p>
-          <Segmentado
-            opciones={[
-              { value: "ticket", label: "Ticket" },
-              { value: "factura", label: "Factura" },
-            ]}
-            valor={comprobanteTipo}
-            onChange={setComprobanteTipo}
-          />
+        {puedeFacturar && (
+          <Tarjeta className="flex flex-col gap-4">
+            <p className="rotulo">Comprobante</p>
+            <Segmentado
+              opciones={[
+                { value: "ticket", label: "Ticket" },
+                { value: "factura", label: "Factura" },
+              ]}
+              valor={comprobanteTipo}
+              onChange={setComprobanteTipo}
+            />
 
-          {comprobanteTipo === "factura" && (
-            <div
-              key={campoInvalido === "factura" ? `sac-${intento}` : "factura"}
-              className={`flex flex-col gap-3 rounded-lg border p-3 ${
-                campoInvalido === "factura"
-                  ? "animate-[sacudir_0.32s_ease] border-peligro/50 bg-peligro-luz/30"
-                  : "border-linea bg-papel-suave"
-              }`}
-            >
-              <Campo etiqueta="Razón social">
-                <Entrada
-                  required
-                  value={facturaRazonSocial}
-                  onChange={(e) => setFacturaRazonSocial(e.target.value)}
-                  placeholder="Nombre de la empresa o del titular"
-                />
-              </Campo>
-              <Campo etiqueta="RUC">
-                <Entrada
-                  required
-                  value={facturaRuc}
-                  onChange={(e) => setFacturaRuc(e.target.value)}
-                  placeholder="80012345-6"
-                />
-              </Campo>
-              <Campo etiqueta="Correo electrónico" ayuda="Opcional">
-                <Entrada
-                  type="email"
-                  value={facturaEmail}
-                  onChange={(e) => setFacturaEmail(e.target.value)}
-                  placeholder="nombre@correo.com"
-                />
-              </Campo>
-            </div>
-          )}
-        </Tarjeta>
+            {comprobanteTipo === "factura" && (
+              <div
+                key={campoInvalido === "factura" ? `sac-${intento}` : "factura"}
+                className={`flex flex-col gap-3 rounded-lg border p-3 ${
+                  campoInvalido === "factura"
+                    ? "animate-[sacudir_0.32s_ease] border-peligro/50 bg-peligro-luz/30"
+                    : "border-linea bg-papel-suave"
+                }`}
+              >
+                <Campo etiqueta="Razón social">
+                  <Entrada
+                    required
+                    value={facturaRazonSocial}
+                    onChange={(e) => setFacturaRazonSocial(e.target.value)}
+                    placeholder="Nombre de la empresa o del titular"
+                  />
+                </Campo>
+                <Campo etiqueta="RUC">
+                  <Entrada
+                    required
+                    value={facturaRuc}
+                    onChange={(e) => setFacturaRuc(e.target.value)}
+                    placeholder="80012345-6"
+                  />
+                </Campo>
+                <Campo etiqueta="Correo electrónico" ayuda="Opcional">
+                  <Entrada
+                    type="email"
+                    value={facturaEmail}
+                    onChange={(e) => setFacturaEmail(e.target.value)}
+                    placeholder="nombre@correo.com"
+                  />
+                </Campo>
+              </div>
+            )}
+          </Tarjeta>
+        )}
 
         <Tarjeta className="flex flex-col gap-4">
           <p className="rotulo">Entrega y pago</p>
