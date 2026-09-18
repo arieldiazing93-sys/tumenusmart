@@ -36,8 +36,26 @@ export function certificadoQz(): string {
 export function firmarParaQz(mensaje: string): string {
   const clave = process.env.QZ_PRIVATE_KEY;
   if (!clave) throw new Error("Falta QZ_PRIVATE_KEY");
+  const pem = normalizarPem(clave);
   const firmador = createSign("SHA512");
   firmador.update(mensaje);
   firmador.end();
-  return firmador.sign(normalizarPem(clave), "base64");
+  try {
+    return firmador.sign(pem, "base64");
+  } catch (err) {
+    // Diagnóstico temporal — nunca loguea la clave en sí, solo su forma
+    // (largo, si tiene las marcas BEGIN/END, cuántas líneas), para saber
+    // SIN adivinar si lo que llegó del env var es reconstruible o está
+    // directamente corrompido/incompleto.
+    console.error("Diagnóstico QZ_PRIVATE_KEY:", {
+      largoOriginal: clave.length,
+      largoPem: pem.length,
+      tieneBegin: clave.includes("-----BEGIN"),
+      tieneEnd: clave.includes("-----END"),
+      cantidadLineasOriginal: clave.split("\n").length,
+      primeros20: clave.slice(0, 20),
+      ultimos20: clave.slice(-20),
+    });
+    throw err;
+  }
 }
