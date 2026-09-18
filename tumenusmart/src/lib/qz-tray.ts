@@ -98,22 +98,3 @@ export async function imprimirHtml(nombreImpresora: string, html: string, anchoM
   });
   await qz.print(config, [{ type: "pixel", format: "html", flavor: "plain", data: html }]);
 }
-
-/**
- * Corta el papel — comando ESC/POS crudo (GS V 0, corte completo), mandado
- * como un trabajo aparte DESPUÉS del HTML. Probado en impresora térmica
- * real: el driver de Windows tiene una opción "Cut paper per job", pero no
- * corta de verdad para los trabajos que manda QZ Tray — otros programas de
- * punto de venta (ej. SoftRestaurant) SÍ cortan en la misma impresora
- * porque mandan el comando de corte directo, sin depender del driver.
- * `forceRaw` no está soportado en Windows (según la propia librería), así
- * que esto pasa igual por el driver — pero al ser un trabajo de impresión
- * aparte y posterior, el driver lo procesa después de haber terminado con
- * el HTML.
- */
-export async function cortarPapel(nombreImpresora: string): Promise<void> {
-  await conectarQz();
-  const qz = await cargarQz();
-  const config = qz.configs.create(nombreImpresora);
-  await qz.print(config, [{ type: "raw", format: "command", flavor: "plain", data: "\x1D\x56\x00" }]);
-}
