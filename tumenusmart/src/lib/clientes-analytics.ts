@@ -14,8 +14,11 @@ export async function calcularClientesDelRango(
   storeId: string,
   rango: RangoFecha
 ): Promise<ClienteRankeado[]> {
+  // Mismo criterio que calcularEstadisticas/calcularRankingProductos: un
+  // pedido cancelado no es una venta real, no puede sumar ni a la
+  // frecuencia de compra ni al gasto total de un cliente.
   const pedidos = await prismaDelLocal(storeId).order.findMany({
-    where: { createdAt: rango, ...PEDIDO_REAL },
+    where: { createdAt: rango, estado: { not: "cancelado" }, ...PEDIDO_REAL },
     select: { clienteTelefono: true, clienteNombre: true, createdAt: true, total: true },
   });
 

@@ -131,9 +131,32 @@ export async function cambiarEstadoPedido(
   // un facturaNumero asignado, ese número queda consumido para siempre (no
   // se revierte el contador del punto de expedición, igual que un
   // talonario de papel al que se le anula una hoja).
+  //
+  // Igual que cancelarVenta: una vez que este pedido ya quedó adentro de un
+  // cierre firmado — el turno de caja (retiro/mesa) o la rendición del
+  // repartidor (delivery) — no se puede cancelar. Esos montos ya se
+  // declararon en el corte ciego/la rendición; permitir cancelar después
+  // abriría la puerta a "cobrar, cerrar caja, y después borrar el pedido
+  // para que no quede registro".
   if (estado === "cancelado") {
     if (!motivo?.trim()) {
       return { ok: false, error: "Decí por qué se cancela — queda en el historial." };
+    }
+    const pedidoActual = await prisma.order.findUnique({
+      where: { id: orderId },
+      select: { rendicionId: true, turnoPos: { select: { estado: true } } },
+    });
+    if (pedidoActual?.rendicionId) {
+      return {
+        ok: false,
+        error: "Este pedido ya está en una rendición cerrada. Una vez rendido, no se puede cancelar.",
+      };
+    }
+    if (pedidoActual?.turnoPos && pedidoActual.turnoPos.estado !== "abierto") {
+      return {
+        ok: false,
+        error: "El turno de este pedido ya está cerrado. Una vez cerrado el turno, no se puede cancelar.",
+      };
     }
     datosFactura = {
       canceladaPor: sesion.nombre?.trim() || sesion.email,
