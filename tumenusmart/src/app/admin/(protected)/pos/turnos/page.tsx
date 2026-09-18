@@ -93,6 +93,43 @@ export default async function TurnosPosPage({
     },
   });
 
+  // Contraste "hoy" vs. lo congelado al cerrar — mismo criterio que el
+  // comprobante individual (ver turnos/[id]/page.tsx, contrastarTurno), pero
+  // calculado para toda la lista de una sola vez (2 groupBy en vez de N
+  // consultas) para poder avisar acá sin entrar turno por turno. Una venta
+  // cancelada o un pedido pasado a "cancelado" DESPUÉS de cerrar el turno es
+  // justo lo que esto saca a la luz.
+  const turnoIds = turnos.map((t) => t.id);
+  const [ventasHoy, pedidosHoy] = turnoIds.length
+    ? await Promise.all([
+        db.ventaPos.groupBy({
+          by: ["turnoPosId"],
+          where: { turnoPosId: { in: turnoIds }, cancelada: false },
+          _count: { _all: true },
+          _sum: { total: true },
+        }),
+        db.order.groupBy({
+          by: ["turnoPosId"],
+          where: { turnoPosId: { in: turnoIds }, estado: { not: "cancelado" } },
+          _count: { _all: true },
+          _sum: { total: true },
+        }),
+      ])
+    : [[], []];
+  const hoyPorTurno = new Map<string, { cantidad: number; total: number }>();
+  for (const v of ventasHoy) {
+    const actual = hoyPorTurno.get(v.turnoPosId!) ?? { cantidad: 0, total: 0 };
+    actual.cantidad += v._count._all;
+    actual.total += Number(v._sum.total ?? 0);
+    hoyPorTurno.set(v.turnoPosId!, actual);
+  }
+  for (const p of pedidosHoy) {
+    const actual = hoyPorTurno.get(p.turnoPosId!) ?? { cantidad: 0, total: 0 };
+    actual.cantidad += p._count._all;
+    actual.total += Number(p._sum.total ?? 0);
+    hoyPorTurno.set(p.turnoPosId!, actual);
+  }
+
   return (
     <div>
       <Cabecera
@@ -161,6 +198,9 @@ export default async function TurnosPosPage({
               const declarado = totalDeclarado(t);
               const calculado = totalCalculado(t);
               const diferencia = declarado - calculado;
+              const hoy = hoyPorTurno.get(t.id) ?? { cantidad: 0, total: 0 };
+              const coincideHoy =
+                (t.cantidadVentas ?? 0) === hoy.cantidad && Math.round(calculado) === Math.round(hoy.total);
               return (
                 <Tr key={t.id}>
                   <Td>
@@ -170,6 +210,14 @@ export default async function TurnosPosPage({
                     >
                       {t.cerradoPor ?? t.abiertoPor}
                     </Link>
+                    {!coincideHoy && (
+                      <span
+                        title="Algo de este turno se canceló después del cierre — el comprobante sigue valiendo lo congelado, ver detalle."
+                        className="ml-1.5 text-peligro"
+                      >
+                        ⚠
+                      </span>
+                    )}
                   </Td>
                   <Td>{t.estacion.nombre}</Td>
                   <Td>

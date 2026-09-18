@@ -200,7 +200,7 @@ export default async function AdminEstadisticasPage({
 
       <div className="mb-8 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
         <Tarjeta color="dinero" etiqueta="Ingresos" valor={formatearGuarani(stats.ingresos)} detalle="Sin contar cancelados" />
-        <Tarjeta color="volumen" etiqueta="Pedidos" valor={String(stats.pedidosTotales)} detalle={`${stats.pedidosValidos} válidos`} />
+        <Tarjeta color="volumen" etiqueta="Ventas" valor={String(stats.ventasTotales)} detalle={`${stats.ventasValidas} válidas · pedidos + mostrador`} />
         <Tarjeta color="promedio" etiqueta="Ticket promedio" valor={formatearGuarani(Math.round(stats.ticketPromedio))} />
         <Tarjeta color="clientes" etiqueta="Clientes únicos" valor={String(stats.clientesUnicos)} />
         <Tarjeta color="volumen" etiqueta="Unidades vendidas" valor={String(stats.unidadesVendidas)} />
@@ -219,8 +219,8 @@ export default async function AdminEstadisticasPage({
       <div className="mb-8">
         <h2 className="mb-3 font-semibold text-tinta">Ventas por tipo de entrega</h2>
         <div className="rounded-lg border border-linea bg-white p-4">
-          {stats.pedidosValidos === 0 ? (
-            <p className="text-sm text-tinta-suave">Sin pedidos en este período.</p>
+          {stats.ventasValidas === 0 ? (
+            <p className="text-sm text-tinta-suave">Sin ventas en este período.</p>
           ) : (
             <div className="flex flex-col gap-3">
               {(["delivery", "retiro", "mesa"] as const).map((t) => {
@@ -231,7 +231,7 @@ export default async function AdminEstadisticasPage({
                     <div className="mb-1 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5 text-sm">
                       <span className="font-medium text-tinta">{ETIQUETAS_TIPO_ENTREGA[t]}</span>
                       <span className="text-tinta-media">
-                        {fila.cantidad} {fila.cantidad === 1 ? "pedido" : "pedidos"} ·{" "}
+                        {fila.cantidad} {fila.cantidad === 1 ? "venta" : "ventas"} ·{" "}
                         <span className="font-semibold text-tinta">
                           {formatearGuarani(Math.round(fila.ingresos))}
                         </span>{" "}

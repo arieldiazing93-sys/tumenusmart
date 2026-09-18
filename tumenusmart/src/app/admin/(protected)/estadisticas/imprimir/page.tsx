@@ -44,8 +44,8 @@ export default async function ImprimirEstadisticasPage({
 
   const filasKpi: [string, string][] = [
     ["Ingresos", formatearGuarani(stats.ingresos)],
-    ["Pedidos totales", String(stats.pedidosTotales)],
-    ["Pedidos válidos", String(stats.pedidosValidos)],
+    ["Ventas totales", String(stats.ventasTotales)],
+    ["Ventas válidas", String(stats.ventasValidas)],
     ["Ticket promedio", formatearGuarani(Math.round(stats.ticketPromedio))],
     ["Clientes únicos", String(stats.clientesUnicos)],
     ["Unidades vendidas", String(stats.unidadesVendidas)],
@@ -135,7 +135,7 @@ export default async function ImprimirEstadisticasPage({
         <thead>
           <tr className="border-b border-linea text-left text-xs uppercase tracking-wide text-tinta-media">
             <th className="py-1.5">Tipo</th>
-            <th className="py-1.5 text-right">Pedidos</th>
+            <th className="py-1.5 text-right">Ventas</th>
             <th className="py-1.5 text-right">Ingresos</th>
           </tr>
         </thead>

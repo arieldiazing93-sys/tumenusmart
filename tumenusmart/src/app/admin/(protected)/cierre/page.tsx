@@ -5,7 +5,7 @@ import { idLocalActual } from "@/lib/local-actual";
 import { ZONA_NEGOCIO } from "@/lib/timezone";
 import { Cabecera, Tarjeta, Vacio } from "@/components/ui";
 import { formatearGuarani, formatearNumero } from "@/lib/format";
-import { resumirCierre, etiquetaDeCobro, rindeEfectivo } from "@/lib/rendicion";
+import { resumirCierre, etiquetaDeCobro, rindeEfectivo, normalizarCobro } from "@/lib/rendicion";
 import { CerrarBoton } from "./CerrarBoton";
 import { FiltroTurno } from "./FiltroTurno";
 import { jornadaDe, jornadaAnterior, revisarRango, type Rango } from "@/lib/turno";
@@ -105,6 +105,35 @@ export default async function CierrePage({
       },
     }),
   ]);
+
+  // Contraste "hoy" vs. lo congelado al rendir — mismo criterio que el
+  // comprobante individual (ver cierre/[id]/page.tsx, contrastarRendicion),
+  // calculado para toda la lista de una sola vez (1 groupBy en vez de N
+  // consultas) para poder avisar acá sin entrar rendición por rendición. Un
+  // pedido pasado a "cancelado" DESPUÉS de rendido es justo lo que esto
+  // saca a la luz.
+  const rendicionIds = ultimas.map((u) => u.id);
+  const pedidosHoy = rendicionIds.length
+    ? await db.order.groupBy({
+        // Por método de cobro también: la rendición solo congela el
+        // EFECTIVO (lo que el repartidor tiene que poner sobre el
+        // mostrador, ver resumirCierre) — no alcanza con sumar `total` a
+        // secas, hay que separar cobrado en efectivo de lo que no.
+        by: ["rendicionId", "cobroMetodo"],
+        where: { rendicionId: { in: rendicionIds }, estado: { not: "cancelado" } },
+        _count: { _all: true },
+        _sum: { total: true },
+      })
+    : [];
+  const hoyPorRendicion = new Map<string, { cantidad: number; efectivo: number }>();
+  for (const p of pedidosHoy) {
+    const actual = hoyPorRendicion.get(p.rendicionId!) ?? { cantidad: 0, efectivo: 0 };
+    actual.cantidad += p._count._all;
+    if (rindeEfectivo(normalizarCobro(p.cobroMetodo))) {
+      actual.efectivo += Number(p._sum.total ?? 0);
+    }
+    hoyPorRendicion.set(p.rendicionId!, actual);
+  }
 
   const conDeuda = repartidores.filter((r) => r.orders.length > 0);
 
@@ -289,13 +318,28 @@ export default async function CierrePage({
           <div className="flex flex-col gap-1.5">
             {/* Cada una lleva a su comprobante: es donde está el detalle de
                 los pedidos y las firmas. */}
-            {ultimas.map((v) => (
+            {ultimas.map((v) => {
+              const hoy = hoyPorRendicion.get(v.id) ?? { cantidad: 0, efectivo: 0 };
+              const coincideHoy =
+                v.cantidadPedidos === hoy.cantidad &&
+                Math.round(Number(v.totalEfectivo)) === Math.round(hoy.efectivo);
+              return (
               <Link
                 key={v.id}
                 href={`/admin/cierre/${v.id}`}
                 className="flex flex-wrap items-baseline justify-between gap-2 rounded-lg border border-linea bg-white px-3 py-2 text-[0.85rem] transition-colors hover:border-brand hover:bg-papel-suave"
               >
-                <span className="font-medium text-tinta">{v.repartidor.nombre}</span>
+                <span className="font-medium text-tinta">
+                  {v.repartidor.nombre}
+                  {!coincideHoy && (
+                    <span
+                      title="Algún pedido de esta rendición se canceló después de rendido — el comprobante sigue valiendo lo congelado, ver detalle."
+                      className="ml-1.5 text-peligro"
+                    >
+                      ⚠
+                    </span>
+                  )}
+                </span>
                 <span className="text-tinta-suave">
                   {cuando(v.creadoEn)} · {v.cantidadPedidos}{" "}
                   {v.cantidadPedidos === 1 ? "pedido" : "pedidos"} · recibió {v.recibidoPor}
@@ -307,7 +351,8 @@ export default async function CierrePage({
                   <span className="w-full text-[0.8rem] text-tinta-media">↳ {v.notas}</span>
                 )}
               </Link>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}

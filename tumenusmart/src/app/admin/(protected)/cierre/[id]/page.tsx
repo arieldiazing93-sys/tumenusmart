@@ -88,6 +88,7 @@ export default async function ComprobanteRendicionPage({
             cobroMetodo: true,
             clienteNombre: true,
             entregadoEn: true,
+            estado: true,
           },
         },
       },
@@ -98,7 +99,17 @@ export default async function ComprobanteRendicionPage({
 
   const efectivo = Number(rendicion.totalEfectivo);
   const otros = Number(rendicion.totalOtros);
-  const contraste = contrastarRendicion(rendicion.pedidos, rendicion);
+  // Mismo criterio que el turno de caja del POS (ver contrastarTurno): si
+  // un pedido de esta rendición se cancela DESPUÉS de cerrada, tiene que
+  // dejar de contar en el contraste de "hoy" — antes de este filtro, un
+  // pedido cancelado seguía sumando lo mismo que cuando se rindió, y el
+  // aviso de contraste nunca se disparaba. La lista completa (con
+  // cancelados incluidos) se sigue mostrando más abajo, para no esconder
+  // que ese pedido estuvo ahí.
+  const contraste = contrastarRendicion(
+    rendicion.pedidos.filter((p) => p.estado !== "cancelado"),
+    rendicion
+  );
 
   return (
     <div className="print:text-[11pt]">
@@ -193,6 +204,9 @@ export default async function ComprobanteRendicionPage({
                     </td>
                     <td className="border-b border-linea-fina py-2 pr-3 text-[0.85rem] text-tinta">
                       {p.clienteNombre}
+                      {p.estado === "cancelado" && (
+                        <span className="ml-1 text-peligro">(cancelado después de rendido)</span>
+                      )}
                     </td>
                     <td className="cifra border-b border-linea-fina py-2 text-[0.82rem] text-tinta-media">
                       {horaCorta(p.entregadoEn)}

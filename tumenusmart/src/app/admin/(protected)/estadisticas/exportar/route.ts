@@ -77,8 +77,8 @@ export async function GET(request: NextRequest) {
     hoja,
     [
       "Ingresos (Gs.)",
-      "Pedidos totales",
-      "Pedidos válidos",
+      "Ventas totales",
+      "Ventas válidas",
       "Ticket promedio (Gs.)",
       "Clientes únicos",
       "Unidades vendidas",
@@ -90,8 +90,8 @@ export async function GET(request: NextRequest) {
   );
   hoja.addRow([
     Math.round(stats.ingresos),
-    stats.pedidosTotales,
-    stats.pedidosValidos,
+    stats.ventasTotales,
+    stats.ventasValidas,
     Math.round(stats.ticketPromedio),
     stats.clientesUnicos,
     stats.unidadesVendidas,
@@ -108,7 +108,7 @@ export async function GET(request: NextRequest) {
   }
 
   hoja.addRow([]);
-  filaTitulo(hoja, ["Tipo de entrega", "Pedidos", "Ingresos (Gs.)"], 3);
+  filaTitulo(hoja, ["Tipo de entrega", "Ventas", "Ingresos (Gs.)"], 3);
   hoja.addRow(["Delivery", stats.porTipoEntrega.delivery.cantidad, Math.round(stats.porTipoEntrega.delivery.ingresos)]);
   hoja.addRow(["Retiro en el local", stats.porTipoEntrega.retiro.cantidad, Math.round(stats.porTipoEntrega.retiro.ingresos)]);
   hoja.addRow(["Comer en el local", stats.porTipoEntrega.mesa.cantidad, Math.round(stats.porTipoEntrega.mesa.ingresos)]);

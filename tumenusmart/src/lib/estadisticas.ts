@@ -14,70 +14,126 @@ export const PEDIDO_REAL = {
   OR: [{ enviadoWhatsapp: true }, { estado: { not: "pendiente" } }],
 };
 
+/**
+ * Ventas del período, combinando las dos fuentes que existen hoy: pedidos
+ * online (`Order`, cualquier tipo de entrega) y ventas de mostrador
+ * (`VentaPos`, cobradas directo en el POS). Antes esta función solo miraba
+ * `Order` — un local que factura una parte relevante por mostrador veía
+ * "Ingresos"/"Pedidos"/ranking de productos sistemáticamente por debajo de
+ * lo real. `reporte-general-pos.ts` y `fidelidad.ts` ya combinaban las dos
+ * fuentes para sus propios cálculos; acá se sigue el mismo criterio.
+ */
 export async function calcularEstadisticas(storeId: string, rango: RangoFecha) {
-  const [store, pedidos, primerPedidoPorCliente] = await Promise.all([
+  const [store, pedidos, ventasPos, primerPedidoPorCliente, primeraVentaPorCliente] = await Promise.all([
     prisma.store.findUnique({ where: { id: storeId } }),
     prisma.order.findMany({
       where: { storeId, createdAt: rango, ...PEDIDO_REAL },
       include: { items: true },
       orderBy: { createdAt: "asc" },
     }),
+    prisma.ventaPos.findMany({
+      where: { storeId, creadoEn: rango },
+      include: { items: true },
+      orderBy: { creadoEn: "asc" },
+    }),
     prisma.order.groupBy({
       by: ["clienteTelefono"],
       where: { storeId, ...PEDIDO_REAL },
       _min: { createdAt: true },
     }),
+    // Mucha venta de mostrador es un cliente de paso sin teléfono cargado
+    // (ver comentario en VentaPos.clienteTelefono) — esas quedan afuera de
+    // este agrupado, no pueden sumar a una fidelización/novedad que
+    // depende del teléfono.
+    prisma.ventaPos.groupBy({
+      by: ["clienteTelefono"],
+      where: { storeId, clienteTelefono: { not: null } },
+      _min: { creadoEn: true },
+    }),
   ]);
 
-  const validos = pedidos.filter((p) => p.estado !== "cancelado");
-  const cancelados = pedidos.filter((p) => p.estado === "cancelado");
+  const validosPedidos = pedidos.filter((p) => p.estado !== "cancelado");
+  const canceladosPedidos = pedidos.filter((p) => p.estado === "cancelado");
+  const validasVentas = ventasPos.filter((v) => !v.cancelada);
+  const canceladasVentas = ventasPos.filter((v) => v.cancelada);
 
-  const ingresos = validos.reduce((s, p) => s + Number(p.total), 0);
-  const pedidosTotales = pedidos.length;
-  const pedidosValidos = validos.length;
-  const ticketPromedio = pedidosValidos > 0 ? ingresos / pedidosValidos : 0;
+  const ingresos =
+    validosPedidos.reduce((s, p) => s + Number(p.total), 0) +
+    validasVentas.reduce((s, v) => s + Number(v.total), 0);
+  const ventasTotales = pedidos.length + ventasPos.length;
+  const ventasValidas = validosPedidos.length + validasVentas.length;
+  const ticketPromedio = ventasValidas > 0 ? ingresos / ventasValidas : 0;
 
-  const unidadesVendidas = validos.reduce(
-    (s, p) => s + p.items.reduce((si, it) => si + it.cantidad, 0),
-    0
-  );
-  const productosPorPedido = pedidosValidos > 0 ? unidadesVendidas / pedidosValidos : 0;
+  const unidadesVendidas =
+    validosPedidos.reduce((s, p) => s + p.items.reduce((si, it) => si + it.cantidad, 0), 0) +
+    validasVentas.reduce((s, v) => s + v.items.reduce((si, it) => si + it.cantidad, 0), 0);
+  const productosPorPedido = ventasValidas > 0 ? unidadesVendidas / ventasValidas : 0;
 
-  const clientesUnicos = new Set(pedidos.map((p) => p.clienteTelefono)).size;
+  // Clientes únicos por teléfono, combinando las dos fuentes — el mismo
+  // cliente que compró online y en el mostrador cuenta una sola vez.
+  const telefonos = new Set<string>();
+  for (const p of pedidos) if (p.clienteTelefono) telefonos.add(p.clienteTelefono);
+  for (const v of ventasPos) if (v.clienteTelefono) telefonos.add(v.clienteTelefono);
+  const clientesUnicos = telefonos.size;
 
-  const clientesNuevos = primerPedidoPorCliente.filter((c) => {
-    const primera = c._min.createdAt;
-    return primera && primera >= rango.gte && primera < rango.lt;
-  }).length;
+  // "Nuevo" = su primera compra de SIEMPRE (por cualquiera de los dos
+  // canales) cae en este período — si ya había comprado antes por el otro
+  // canal, no es nuevo aunque sea su primer pedido online.
+  const primeraCompraPorTelefono = new Map<string, Date>();
+  for (const c of primerPedidoPorCliente) {
+    if (!c._min.createdAt) continue;
+    const actual = primeraCompraPorTelefono.get(c.clienteTelefono);
+    if (!actual || c._min.createdAt < actual) primeraCompraPorTelefono.set(c.clienteTelefono, c._min.createdAt);
+  }
+  for (const c of primeraVentaPorCliente) {
+    if (!c._min.creadoEn || !c.clienteTelefono) continue;
+    const actual = primeraCompraPorTelefono.get(c.clienteTelefono);
+    if (!actual || c._min.creadoEn < actual) primeraCompraPorTelefono.set(c.clienteTelefono, c._min.creadoEn);
+  }
+  const clientesNuevos = [...primeraCompraPorTelefono.values()].filter(
+    (primera) => primera >= rango.gte && primera < rango.lt
+  ).length;
 
   const dias = listarDias(rango.gte, rango.lt);
   const totalesPorDia = new Map<string, number>();
   for (const d of dias) totalesPorDia.set(claveDia(d), 0);
-  for (const p of validos) {
+  for (const p of validosPedidos) {
     const clave = claveDia(new Date(p.createdAt));
     totalesPorDia.set(clave, (totalesPorDia.get(clave) ?? 0) + Number(p.total));
   }
+  for (const v of validasVentas) {
+    const clave = claveDia(new Date(v.creadoEn));
+    totalesPorDia.set(clave, (totalesPorDia.get(clave) ?? 0) + Number(v.total));
+  }
 
   // Cuánto entró por cada vía — delivery, retiro, comer en el local. Se
-  // arma acá y no en un reporte aparte porque ya se tiene `validos` en
-  // memoria: no hace falta una segunda consulta a la base para esto.
+  // arma acá y no en un reporte aparte porque ya se tiene todo en memoria:
+  // no hace falta una segunda consulta a la base para esto.
   const porTipoEntrega = {
     delivery: { cantidad: 0, ingresos: 0 },
     retiro: { cantidad: 0, ingresos: 0 },
     mesa: { cantidad: 0, ingresos: 0 },
   };
-  for (const p of validos) {
+  for (const p of validosPedidos) {
     const grupo =
       p.tipoEntrega === "delivery" || p.tipoEntrega === "mesa" ? p.tipoEntrega : "retiro";
     porTipoEntrega[grupo].cantidad += 1;
     porTipoEntrega[grupo].ingresos += Number(p.total);
   }
+  // El POS no tiene delivery — "local" (se consume ahí) equivale a "mesa" y
+  // "llevar" (para llevar) equivale a "retiro", mismo par de categorías que
+  // ya usa el propio ticket del POS para diferenciar el comprobante.
+  for (const v of validasVentas) {
+    const grupo = v.tipoEntrega === "local" ? "mesa" : "retiro";
+    porTipoEntrega[grupo].cantidad += 1;
+    porTipoEntrega[grupo].ingresos += Number(v.total);
+  }
 
   return {
     store,
-    pedidosTotales,
-    pedidosValidos,
-    cancelados: cancelados.length,
+    ventasTotales,
+    ventasValidas,
+    cancelados: canceladosPedidos.length + canceladasVentas.length,
     ingresos,
     ticketPromedio,
     unidadesVendidas,
@@ -119,12 +175,18 @@ export async function calcularRankingProductos(
   rango: RangoFecha,
   limite = 10
 ): Promise<RankingProductos> {
-  const [items, productosActivos] = await Promise.all([
+  const [items, itemsPos, productosActivos] = await Promise.all([
     prisma.orderItem.findMany({
       where: {
         storeId,
         order: { createdAt: rango, estado: { not: "cancelado" }, ...PEDIDO_REAL },
       },
+      select: { nombreProducto: true, cantidad: true, precioUnitario: true },
+    }),
+    // Un producto que solo se vende por mostrador (POS) no puede figurar
+    // como "sin ventas" solo porque nadie lo pidió online.
+    prisma.ventaPosItem.findMany({
+      where: { storeId, ventaPos: { creadoEn: rango, cancelada: false } },
       select: { nombreProducto: true, cantidad: true, precioUnitario: true },
     }),
     prisma.product.findMany({
@@ -134,7 +196,7 @@ export async function calcularRankingProductos(
   ]);
 
   const acumulado = new Map<string, { unidades: number; facturacion: number }>();
-  for (const item of items) {
+  for (const item of [...items, ...itemsPos]) {
     const clave = item.nombreProducto;
     const actual = acumulado.get(clave) ?? { unidades: 0, facturacion: 0 };
     actual.unidades += item.cantidad;

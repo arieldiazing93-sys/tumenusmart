@@ -86,7 +86,13 @@ export type ReporteProductosVendidos = {
  *
  * Usa el mismo criterio de "venta real" que Estadísticas (PEDIDO_REAL, sin
  * cancelados) — un mismo pedido no puede contar como venta en una pantalla
- * y no contar en otra.
+ * y no contar en otra. También incluye las ventas de mostrador (`VentaPos`),
+ * con una limitación real: `VentaPosItem` no guarda por separado cuánto de
+ * lo cobrado correspondía a agregados (no tiene `precioAgregados`/
+ * `costoAgregados`, a diferencia de `OrderItem`) — para esas líneas el
+ * monto completo se cuenta como venta del producto, y si el ítem tenía
+ * agregados elegidos, la categoría queda marcada con costo incompleto en
+ * vez de calcular una ganancia que podría estar inflada.
  *
  * Los combos "mitad y mitad" no tienen un producto único (`productId` nulo
  * en el ítem), así que no se les puede calcular costo ni categoría real:
@@ -109,26 +115,44 @@ export async function calcularReporteProductosVendidos(
   rango: RangoFecha
 ): Promise<ReporteProductosVendidos> {
   const db = prismaDelLocal(storeId);
-  const items = await db.orderItem.findMany({
-    where: {
-      order: { createdAt: rango, estado: { not: "cancelado" }, ...PEDIDO_REAL },
-    },
-    select: {
-      productId: true,
-      nombreProducto: true,
-      cantidad: true,
-      precioUnitario: true,
-      precioAgregados: true,
-      costoAgregados: true,
-      opcionesTexto: true,
-      product: {
-        select: {
-          costo: true,
-          category: { select: { id: true, nombre: true, orden: true } },
+  const [items, itemsPos] = await Promise.all([
+    db.orderItem.findMany({
+      where: {
+        order: { createdAt: rango, estado: { not: "cancelado" }, ...PEDIDO_REAL },
+      },
+      select: {
+        productId: true,
+        nombreProducto: true,
+        cantidad: true,
+        precioUnitario: true,
+        precioAgregados: true,
+        costoAgregados: true,
+        opcionesTexto: true,
+        product: {
+          select: {
+            costo: true,
+            category: { select: { id: true, nombre: true, orden: true } },
+          },
         },
       },
-    },
-  });
+    }),
+    db.ventaPosItem.findMany({
+      where: { ventaPos: { creadoEn: rango, cancelada: false } },
+      select: {
+        productId: true,
+        nombreProducto: true,
+        cantidad: true,
+        precioUnitario: true,
+        opcionesTexto: true,
+        product: {
+          select: {
+            costo: true,
+            category: { select: { id: true, nombre: true, orden: true } },
+          },
+        },
+      },
+    }),
+  ]);
 
   type Acumulado = {
     nombre: string;
@@ -237,6 +261,43 @@ export async function calcularReporteProductosVendidos(
         entrada.costoIncompleto = true;
       }
       actual.detalleAgregados.set(texto, entrada);
+    }
+
+    acumulado.set(clave, actual);
+  }
+
+  // Ventas de mostrador: mismo agrupado, pero sin el desglose de agregados
+  // (ver la nota en el comentario de la función) — todo el monto cobrado
+  // cuenta como venta del producto/combo, y si tenía agregados elegidos la
+  // categoría queda marcada con costo incompleto en vez de inventar una
+  // ganancia.
+  for (const item of itemsPos) {
+    const clave = item.productId ?? `combo:${item.nombreProducto}`;
+    const esCombo = !item.productId;
+    const actual = acumulado.get(clave) ?? {
+      nombre: item.nombreProducto,
+      cantidad: 0,
+      esCombo,
+      costoCatalogo: !esCombo && item.product?.costo != null ? Number(item.product.costo) : null,
+      totalVentaBase: 0,
+      totalVentaCombo: 0,
+      totalVentaAgregados: 0,
+      totalCostoAgregadosConocido: 0,
+      costoAgregadosIncompleto: false,
+      detalleAgregados: new Map(),
+      categoriaId: item.product?.category?.id ?? null,
+      categoriaNombre: item.product?.category?.nombre ?? "Mitad y mitad / combos",
+      categoriaOrden: item.product?.category?.orden ?? Number.MAX_SAFE_INTEGER,
+    };
+
+    actual.cantidad += item.cantidad;
+    if (esCombo) {
+      actual.totalVentaCombo += item.cantidad * Number(item.precioUnitario);
+    } else {
+      actual.totalVentaBase += item.cantidad * Number(item.precioUnitario);
+    }
+    if (!esCombo && item.opcionesTexto) {
+      actual.costoAgregadosIncompleto = true;
     }
 
     acumulado.set(clave, actual);
