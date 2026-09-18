@@ -1,3 +1,4 @@
+import type { Prisma, PrismaClient } from "@prisma/client";
 import { prisma } from "./prisma";
 import { aplicarLocal, type ArgsConsulta } from "./alcance-local";
 
@@ -72,4 +73,26 @@ export async function siguienteNumeroVentaPos(storeId: string): Promise<number> 
     select: { contadorVentasPos: true },
   });
   return local.contadorVentasPos;
+}
+
+/**
+ * Igual que las anteriores, para la Clave del cliente — con una diferencia:
+ * tiene que poder recibir el `tx` de una transacción en curso, no solo el
+ * `prisma` de módulo. Un pedido/reserva/venta se crea SIEMPRE que se pide
+ * su número; un Customer se da de alta con upsert, y la mayoría de las
+ * veces ya existe. Pedirle la Clave antes de saber si hace falta un CREATE
+ * gastaría un número cada vez que un cliente recurrente vuelve a facturar
+ * — por eso quien llama a esto lo hace solo en la rama que de verdad va a
+ * crear la fila, con el mismo `tx` de esa transacción.
+ */
+export async function siguienteNumeroCliente(
+  db: PrismaClient | Prisma.TransactionClient,
+  storeId: string
+): Promise<number> {
+  const local = await db.store.update({
+    where: { id: storeId },
+    data: { contadorClientes: { increment: 1 } },
+    select: { contadorClientes: true },
+  });
+  return local.contadorClientes;
 }

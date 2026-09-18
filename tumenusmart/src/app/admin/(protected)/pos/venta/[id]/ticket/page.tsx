@@ -26,8 +26,19 @@ const ESTILOS_IMPRESION = `
 //
 // La factura usa "=" en vez de "-" (estructura de talonario/imprenta que
 // pidió el dueño) — el ticket informal sigue con guiones.
+//
+// Se genera de sobra (60 "=", o 40 pares "- ") — mucho más de lo que puede
+// llegar a entrar en una sola línea a este tamaño de letra — y se recorta
+// con overflow-hidden + whitespace-nowrap: así la línea siempre llega justo
+// hasta el borde real del papel, sin dejar un hueco a la derecha, sin
+// depender de adivinar cuántos caracteres entran exactos a 9px — y como es
+// siempre el mismo patrón repetido, cortar de más no se nota.
 function Separador({ factura = false }: { factura?: boolean }) {
-  return <p className="py-1.5 text-center">{factura ? "=".repeat(ANCHO_RENGLON) : "- ".repeat(18).trim()}</p>;
+  return (
+    <p className="overflow-hidden whitespace-nowrap py-1.5 text-center">
+      {factura ? "=".repeat(60) : "- ".repeat(40)}
+    </p>
+  );
 }
 
 // Se usa para las líneas de dos columnas del desglose de IVA — para el

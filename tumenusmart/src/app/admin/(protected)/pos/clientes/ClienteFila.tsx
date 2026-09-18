@@ -1,96 +1,72 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState } from "react";
+import { createPortal } from "react-dom";
 import { Td, Tr } from "@/components/ui";
 import { etiquetaTipoIdentificacion } from "@/lib/tipo-cliente";
-import { actualizarNombreCliente } from "./actions";
+import { formatearNumero } from "@/lib/format";
+import { ClienteEditarModal } from "./ClienteEditarModal";
 
 type Props = {
   id: string;
+  numero: number | null;
   nombre: string;
+  email: string | null;
   telefono: string | null;
   tipoIdentificacion: string | null;
   numeroIdentificacion: string | null;
 };
 
-export function ClienteFila({ id, nombre, telefono, tipoIdentificacion, numeroIdentificacion }: Props) {
-  const [pending, startTransition] = useTransition();
+export function ClienteFila({
+  id,
+  numero,
+  nombre,
+  email,
+  telefono,
+  tipoIdentificacion,
+  numeroIdentificacion,
+}: Props) {
   const [editando, setEditando] = useState(false);
-  const [valor, setValor] = useState(nombre);
-  const [error, setError] = useState<string | null>(null);
-
-  function guardar() {
-    setError(null);
-    startTransition(async () => {
-      const r = await actualizarNombreCliente(id, valor);
-      if (!r.ok) {
-        setError(r.error);
-        return;
-      }
-      setEditando(false);
-    });
-  }
 
   return (
-    <Tr>
-      <Td>
-        {editando ? (
-          <div className="flex items-center gap-2">
-            <input
-              value={valor}
-              onChange={(e) => setValor(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  guardar();
-                }
-                if (e.key === "Escape") {
-                  setValor(nombre);
-                  setEditando(false);
-                  setError(null);
-                }
-              }}
-              autoFocus
-              className="w-full rounded-md border border-linea px-2 py-1 text-[0.86rem]"
-            />
-            <button
-              type="button"
-              disabled={pending}
-              onClick={guardar}
-              className="text-[0.8rem] font-medium text-brand-texto hover:underline disabled:opacity-50"
-            >
-              Guardar
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setValor(nombre);
-                setEditando(false);
-                setError(null);
-              }}
-              className="text-[0.8rem] text-tinta-suave hover:underline"
-            >
-              Cancelar
-            </button>
-          </div>
-        ) : (
+    <>
+      <Tr>
+        <Td>{numero != null ? formatearNumero(numero) : "—"}</Td>
+        <Td>{nombre}</Td>
+        <Td>{telefono ?? "—"}</Td>
+        <Td>
+          {tipoIdentificacion && numeroIdentificacion
+            ? `${etiquetaTipoIdentificacion(tipoIdentificacion)}: ${numeroIdentificacion}`
+            : "—"}
+        </Td>
+        <Td>{email ?? "—"}</Td>
+        <Td>
           <button
             type="button"
             onClick={() => setEditando(true)}
-            className="text-left text-tinta hover:underline"
-            title="Corregir nombre"
+            className="text-[0.8rem] font-medium text-brand-texto hover:underline"
           >
-            {nombre}
+            Editar
           </button>
+        </Td>
+      </Tr>
+      {/* Portal a document.body: <tr> solo puede tener <td>/<th> como hijos
+          directos — un modal con position:fixed adentro de la fila es HTML
+          inválido y el navegador lo puede reubicar o descartar. */}
+      {editando &&
+        createPortal(
+          <ClienteEditarModal
+            id={id}
+            numero={numero}
+            nombre={nombre}
+            email={email}
+            tipoIdentificacion={tipoIdentificacion}
+            numeroIdentificacion={numeroIdentificacion}
+            onCerrar={() => setEditando(false)}
+            onGuardado={() => setEditando(false)}
+          />,
+          document.body
         )}
-        {error && <p className="mt-1 text-xs text-peligro">{error}</p>}
-      </Td>
-      <Td>{telefono ?? "—"}</Td>
-      <Td>
-        {tipoIdentificacion && numeroIdentificacion
-          ? `${etiquetaTipoIdentificacion(tipoIdentificacion)}: ${numeroIdentificacion}`
-          : "—"}
-      </Td>
-    </Tr>
+    </>
   );
 }

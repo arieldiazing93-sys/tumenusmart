@@ -32,7 +32,15 @@ export default async function ClientesPosPage({
         }
       : undefined,
     orderBy: { createdAt: "desc" },
-    select: { id: true, nombre: true, telefono: true, tipoIdentificacion: true, numeroIdentificacion: true },
+    select: {
+      id: true,
+      numero: true,
+      nombre: true,
+      email: true,
+      telefono: true,
+      tipoIdentificacion: true,
+      numeroIdentificacion: true,
+    },
     take: 200,
   });
 
@@ -68,9 +76,12 @@ export default async function ClientesPosPage({
         <Tabla>
           <thead>
             <tr>
+              <Th>Clave</Th>
               <Th>Nombre / Razón social</Th>
               <Th>Teléfono</Th>
               <Th>Identificación fiscal</Th>
+              <Th>Correo</Th>
+              <Th></Th>
             </tr>
           </thead>
           <tbody>
@@ -78,7 +89,9 @@ export default async function ClientesPosPage({
               <ClienteFila
                 key={c.id}
                 id={c.id}
+                numero={c.numero}
                 nombre={c.nombre}
+                email={c.email}
                 telefono={c.telefono}
                 tipoIdentificacion={c.tipoIdentificacion}
                 numeroIdentificacion={c.numeroIdentificacion}

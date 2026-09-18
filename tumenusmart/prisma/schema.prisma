@@ -116,6 +116,8 @@ model Store {
   contadorPedidos  Int @default(0)
   contadorReservas Int @default(0)
   contadorVentasPos Int @default(0)
+  // Igual que los anteriores, para la Clave de Customer.numero.
+  contadorClientes Int @default(0)
 
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
@@ -500,12 +502,25 @@ model Customer {
   tipoIdentificacion   String?
   numeroIdentificacion String?
 
+  // Clave secuencial visible del cliente — nullable y SIN backfill (mismo
+  // criterio que tipoIdentificacion/numeroIdentificacion): los clientes ya
+  // cargados se quedan sin clave, no amerita un script de datos. Sale de
+  // Store.contadorClientes vía siguienteNumeroCliente(), y solo se asigna
+  // en el momento en que el Customer se crea de verdad (nunca en un update
+  // — evita gastar una clave nueva cada vez que un cliente que ya existe
+  // vuelve a facturar, que es el caso más común, no el raro).
+  numero Int?
+  // Pensado para el día que se implemente la factura electrónica — no se
+  // usa para enviar nada todavía.
+  email  String?
+
   // El mismo número puede ser cliente de dos locales distintos: son
   // personas distintas para cada negocio. Postgres no choca dos NULL entre
-  // sí, así que un cliente sin teléfono y otro sin identificación fiscal
-  // conviven sin problema con estos dos índices.
+  // sí, así que un cliente sin teléfono, otro sin identificación fiscal y
+  // otro sin clave conviven sin problema con estos índices.
   @@unique([storeId, telefono])
   @@unique([storeId, tipoIdentificacion, numeroIdentificacion])
+  @@unique([storeId, numero])
   @@index([storeId])
 }
 

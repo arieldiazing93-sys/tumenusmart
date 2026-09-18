@@ -3,13 +3,14 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Boton, Cabecera, Campo, Entrada, Selector, Tarjeta, clasesBoton } from "@/components/ui";
+import { Boton, Cabecera, Campo, Entrada, Tarjeta, clasesBoton } from "@/components/ui";
 import { Segmentado } from "@/components/Segmentado";
 import { formatearGuarani } from "@/lib/format";
 import { type FormaPagoPos } from "@/lib/turno-pos";
 import { SIN_REGISTRO_FISCAL, TIPOS_IDENTIFICACION_FISCAL, etiquetaTipoIdentificacion } from "@/lib/tipo-cliente";
 import { buscarClientePorIdentificacion, buscarClientePorTelefono, registrarVenta } from "./actions";
 import { CobrarModal } from "./CobrarModal";
+import { ClienteFiscalModal, type DatosClienteFiscal } from "./ClienteFiscalModal";
 import { MitadYMitadPickerPos } from "./MitadYMitadPickerPos";
 import { AgregadosPickerPos } from "./AgregadosPickerPos";
 
@@ -94,9 +95,11 @@ export function PantallaVenta({
   const [facturaTipoIdentificacionElegido, setFacturaTipoIdentificacionElegido] = useState<string>(
     TIPOS_IDENTIFICACION_FISCAL[0].valor
   );
+  const [facturaEmail, setFacturaEmail] = useState("");
   const [clienteFiscalEsNuevo, setClienteFiscalEsNuevo] = useState(false);
   const [clienteFiscalEncontrado, setClienteFiscalEncontrado] = useState(false);
   const [buscandoClienteFiscal, setBuscandoClienteFiscal] = useState(false);
+  const [mostrarModalClienteFiscal, setMostrarModalClienteFiscal] = useState(false);
   const [mostrarCobro, setMostrarCobro] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [cobrando, setCobrando] = useState(false);
@@ -251,6 +254,7 @@ export function PantallaVenta({
     if (r.ok) {
       setFacturaRazonSocial(r.nombre);
       setFacturaTipoIdentificacionElegido(r.tipoIdentificacion);
+      setFacturaEmail("");
       setClienteFiscalEncontrado(true);
     } else {
       setFacturaRazonSocial("");
@@ -285,6 +289,7 @@ export function PantallaVenta({
         : undefined,
       facturaNumeroIdentificacion: esFactura && !esSinRegistroFiscal ? facturaNumeroIdentificacion.trim() : undefined,
       facturaRazonSocial: esFactura && !esSinRegistroFiscal ? facturaRazonSocial : undefined,
+      facturaEmail: esFactura && !esSinRegistroFiscal ? facturaEmail.trim() || undefined : undefined,
       items: carrito.map((i) =>
         i.tipo === "combo"
           ? {
@@ -569,6 +574,7 @@ export function PantallaVenta({
                             setFacturaNumeroIdentificacion(e.target.value);
                             setClienteFiscalEsNuevo(false);
                             setClienteFiscalEncontrado(false);
+                            setFacturaEmail("");
                           }}
                           onKeyDown={(e) => {
                             if (e.key !== "Enter") return;
@@ -595,39 +601,38 @@ export function PantallaVenta({
                             ¿No es este cliente?
                           </button>
                         </div>
-                      ) : (
-                        <>
-                          {buscandoClienteFiscal ? (
-                            <p className="text-[0.74rem] text-tinta-suave">Buscando…</p>
-                          ) : clienteFiscalEsNuevo ? (
+                      ) : buscandoClienteFiscal ? (
+                        <p className="text-[0.74rem] text-tinta-suave">Buscando…</p>
+                      ) : clienteFiscalEsNuevo ? (
+                        facturaRazonSocial.trim() ? (
+                          <div className="flex flex-col items-start gap-1 rounded-lg bg-white px-3 py-2">
+                            <p className="text-[0.85rem] font-medium text-tinta">{facturaRazonSocial}</p>
+                            <p className="text-[0.76rem] text-tinta-suave">
+                              {etiquetaTipoIdentificacion(facturaTipoIdentificacionElegido)}
+                              {facturaEmail && ` · ${facturaEmail}`}
+                            </p>
+                            <button
+                              type="button"
+                              onClick={() => setMostrarModalClienteFiscal(true)}
+                              className="text-[0.76rem] font-medium text-brand-texto underline"
+                            >
+                              Editar datos
+                            </button>
+                          </div>
+                        ) : (
+                          <>
                             <p className="text-[0.74rem] font-medium text-aviso">
                               Cliente nuevo — cargá los datos.
                             </p>
-                          ) : (
-                            <p className="text-[0.74rem] text-tinta-suave">
-                              Enter completa los datos si ya es cliente.
-                            </p>
-                          )}
-                          <Campo etiqueta="Tipo">
-                            <Selector
-                              value={facturaTipoIdentificacionElegido}
-                              onChange={(e) => setFacturaTipoIdentificacionElegido(e.target.value)}
-                            >
-                              {TIPOS_IDENTIFICACION_FISCAL.map((t) => (
-                                <option key={t.valor} value={t.valor}>
-                                  {t.etiqueta}
-                                </option>
-                              ))}
-                            </Selector>
-                          </Campo>
-                          <Campo etiqueta="Razón social">
-                            <Entrada
-                              value={facturaRazonSocial}
-                              onChange={(e) => setFacturaRazonSocial(e.target.value)}
-                              placeholder="Nombre de la empresa o del titular"
-                            />
-                          </Campo>
-                        </>
+                            <Boton tono="navegar" tam="sm" onClick={() => setMostrarModalClienteFiscal(true)}>
+                              Cargar datos del cliente
+                            </Boton>
+                          </>
+                        )
+                      ) : (
+                        <p className="text-[0.74rem] text-tinta-suave">
+                          Enter completa los datos si ya es cliente.
+                        </p>
                       )}
                     </>
                   )}
@@ -713,6 +718,21 @@ export function PantallaVenta({
           error={error}
           onCerrar={() => setMostrarCobro(false)}
           onCobrar={confirmarCobro}
+        />
+      )}
+
+      {mostrarModalClienteFiscal && (
+        <ClienteFiscalModal
+          numeroInicial={facturaNumeroIdentificacion}
+          tipoInicial={facturaTipoIdentificacionElegido}
+          onCerrar={() => setMostrarModalClienteFiscal(false)}
+          onGuardar={(datos: DatosClienteFiscal) => {
+            setFacturaNumeroIdentificacion(datos.numeroIdentificacion);
+            setFacturaTipoIdentificacionElegido(datos.tipoIdentificacion);
+            setFacturaRazonSocial(datos.razonSocial);
+            setFacturaEmail(datos.email);
+            setMostrarModalClienteFiscal(false);
+          }}
         />
       )}
 
