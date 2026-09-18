@@ -23,14 +23,25 @@ type PuntoExpedicionOpcion = {
 type AreaImpresionOpcion = { id: string; nombre: string };
 type ImpresoraAsignada = { areaImpresionId: string; nombreImpresora: string };
 
-// Mismo lenguaje visual que clasesDeCampo() (foco, transición, colores) pero
-// sin el w-full de un campo de formulario normal — estos <select> viven
-// dentro de una fila compacta, al lado de texto, y ancho completo los
-// estiraría a lo loco dentro de un flex sin ancho propio.
-const CLASES_SELECT_COMPACTO =
-  "rounded-lg border border-linea bg-white px-2 py-1.5 text-[0.82rem] text-tinta " +
-  "transition-colors duration-150 focus:border-brand focus:outline-none " +
-  "focus:ring-2 focus:ring-brand/15 disabled:opacity-50";
+// Mismo lenguaje visual que clasesDeCampo() (foco, transición) pero sin el
+// w-full de un campo de formulario normal — estos <select> viven dentro de
+// una fila compacta, al lado de texto, y ancho completo los estiraría a lo
+// loco dentro de un flex sin ancho propio.
+//
+// El color depende de si ya tiene algo asignado: antes los tres selects
+// (punto de expedición, área de ticket, impresora por área) eran blancos
+// como el resto de la fila, así que había que leer cada uno para saber si
+// faltaba configurar algo. Con el fondo puesto, "sin asignar" salta a la
+// vista sin leer texto.
+function clasesSelectCompacto(asignado: boolean): string {
+  return (
+    "rounded-lg border px-2 py-1.5 text-[0.82rem] font-medium transition-colors duration-150 " +
+    "focus:outline-none focus:ring-2 disabled:opacity-50 " +
+    (asignado
+      ? "border-exito/30 bg-exito-luz text-exito focus:border-exito focus:ring-exito/15"
+      : "border-aviso/30 bg-aviso-luz text-aviso focus:border-aviso focus:ring-aviso/15")
+  );
+}
 
 export function EstacionFila({
   id,
@@ -199,7 +210,7 @@ export function EstacionFila({
                 value={puntoExpedicionId ?? ""}
                 disabled={asignando}
                 onChange={(e) => cambiarPuntoExpedicion(e.target.value)}
-                className={CLASES_SELECT_COMPACTO}
+                className={clasesSelectCompacto(!!puntoExpedicionId)}
               >
                 <option value="">Sin asignar — solo tickets</option>
                 {puntosExpedicion.map((p) => (
@@ -215,7 +226,7 @@ export function EstacionFila({
                 value={areaTicketId ?? ""}
                 disabled={asignandoTicket}
                 onChange={(e) => cambiarAreaTicket(e.target.value)}
-                className={CLASES_SELECT_COMPACTO}
+                className={clasesSelectCompacto(!!areaTicketId)}
               >
                 <option value="">Sin asignar — imprime manual</option>
                 {areasImpresion.map((a) => (
@@ -230,21 +241,17 @@ export function EstacionFila({
                 {vinculando ? "Vinculando…" : "Vincular esta computadora"}
               </Boton>
             )}
-            <button
-              type="button"
-              onClick={() => setEditando(true)}
-              className="text-tinta-media hover:underline"
-            >
+            <Boton tono="suave" tam="sm" onClick={() => setEditando(true)}>
               Renombrar
-            </button>
-            <button
-              type="button"
+            </Boton>
+            <Boton
+              tono={activa ? "peligro" : "suave"}
+              tam="sm"
               disabled={pending}
               onClick={() => startTransition(() => alternarActivaEstacion(id, !activa))}
-              className="text-tinta-media hover:underline disabled:opacity-50"
             >
               {activa ? "Desactivar" : "Reactivar"}
-            </button>
+            </Boton>
           </div>
         )}
       </div>
@@ -285,7 +292,7 @@ export function EstacionFila({
                         value={actual}
                         disabled={asignandoArea === a.id}
                         onChange={(e) => cambiarImpresoraDeArea(a.id, e.target.value)}
-                        className={CLASES_SELECT_COMPACTO}
+                        className={clasesSelectCompacto(!!actual)}
                       >
                         <option value="">Sin asignar — imprime manual</option>
                         {actual && !impresorasDetectadas.includes(actual) && (
