@@ -12,16 +12,24 @@ export default async function EstacionesPage() {
   await pantallaConPermiso("pos.gestionarEstaciones");
   const prisma = prismaDelLocal(await idLocalActual());
 
-  const [estaciones, vinculada, puntosExpedicion] = await Promise.all([
+  const [estaciones, vinculada, puntosExpedicion, areasImpresion] = await Promise.all([
     prisma.estacion.findMany({
       orderBy: { createdAt: "asc" },
-      include: { _count: { select: { turnos: true } } },
+      include: {
+        _count: { select: { turnos: true } },
+        impresoras: { select: { areaImpresionId: true, nombreImpresora: true } },
+      },
     }),
     estacionActual(prisma),
     prisma.puntoExpedicion.findMany({
       where: { activo: true },
       orderBy: { nombre: "asc" },
       select: { id: true, nombre: true, establecimiento: true, puntoExpedicion: true },
+    }),
+    prisma.areaImpresion.findMany({
+      where: { activa: true },
+      orderBy: [{ orden: "asc" }, { createdAt: "asc" }],
+      select: { id: true, nombre: true },
     }),
   ]);
 
@@ -52,6 +60,9 @@ export default async function EstacionesPage() {
             esEstaComputadora={vinculada?.id === e.id}
             puntoExpedicionId={e.puntoExpedicionId}
             puntosExpedicion={puntosExpedicion}
+            areaTicketId={e.areaTicketId}
+            impresoras={e.impresoras}
+            areasImpresion={areasImpresion}
           />
         ))}
         {estaciones.length === 0 && (

@@ -86,13 +86,30 @@ function filaTabla(cantidad: string, descripcion: string, monto: string): string
 
 export default async function TicketVentaPosPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ silencioso?: string; comandasFallidas?: string }>;
 }) {
   await pantallaConPermiso("pos.vender");
   const storeId = await idLocalActual();
   const db = prismaDelLocal(storeId);
   const { id } = await params;
+  // Presente cuando QZ Tray pide este HTML para imprimir solo — ver
+  // src/lib/impresion-comprobantes.ts. Oculta los controles manuales
+  // (ImprimirAuto, el link a la comanda), que no tienen sentido en un
+  // documento que ya se manda directo a la impresora.
+  const { silencioso, comandasFallidas } = await searchParams;
+  const esSilencioso = silencioso === "1";
+  // Áreas cuya comanda NO se pudo imprimir sola al cobrar (ver
+  // PantallaVenta.tsx confirmarCobro) — se avisa acá, con un link manual
+  // por área, en vez de un window.open automático que el navegador podría
+  // bloquear.
+  const idsComandasFallidas = comandasFallidas ? comandasFallidas.split(",").filter(Boolean) : [];
+  const areasFallidas =
+    idsComandasFallidas.length > 0
+      ? await db.areaImpresion.findMany({ where: { id: { in: idsComandasFallidas } }, select: { id: true, nombre: true } })
+      : [];
 
   const [venta, store] = await Promise.all([
     db.ventaPos.findUnique({
@@ -138,8 +155,8 @@ export default async function TicketVentaPosPage({
     <>
       <style dangerouslySetInnerHTML={{ __html: ESTILOS_IMPRESION }} />
 
-      <div className="mx-auto max-w-[75mm] font-mono text-[9px] leading-tight text-black">
-        <ImprimirAuto />
+      <div id="comprobante-imprimible" className="mx-auto max-w-[75mm] font-mono text-[9px] leading-tight text-black">
+        {!esSilencioso && <ImprimirAuto />}
 
         {venta.cancelada && (
           <div className="mb-2 text-center">
@@ -148,16 +165,35 @@ export default async function TicketVentaPosPage({
           </div>
         )}
 
-        <div className="mb-2 flex justify-center print:hidden">
-          <a
-            href={`/admin/pos/venta/${venta.id}/comanda`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="rounded-lg border border-neutral-300 px-4 py-2 text-sm font-medium text-neutral-600 hover:border-neutral-400"
-          >
-            🍳 Ver comanda para cocina
-          </a>
-        </div>
+        {!esSilencioso && (
+          <div className="mb-2 flex justify-center print:hidden">
+            <a
+              href={`/admin/pos/venta/${venta.id}/comanda`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="rounded-lg border border-neutral-300 px-4 py-2 text-sm font-medium text-neutral-600 hover:border-neutral-400"
+            >
+              🍳 Ver comanda para cocina
+            </a>
+          </div>
+        )}
+
+        {areasFallidas.length > 0 && (
+          <div className="mb-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-center text-xs text-amber-800 print:hidden">
+            <p className="mb-1 font-medium">No se imprimió sola la comanda de:</p>
+            {areasFallidas.map((a) => (
+              <a
+                key={a.id}
+                href={`/admin/pos/venta/${venta.id}/comanda?area=${a.id}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mr-2 underline"
+              >
+                {a.nombre}
+              </a>
+            ))}
+          </div>
+        )}
 
         <Separador factura={esFactura} />
 

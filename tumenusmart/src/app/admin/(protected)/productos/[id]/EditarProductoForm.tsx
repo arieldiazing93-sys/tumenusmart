@@ -8,11 +8,13 @@ import { IngredientesField } from "../IngredientesField";
 import { TASAS_IVA } from "@/lib/iva";
 
 type Categoria = { id: string; nombre: string };
+type AreaImpresion = { id: string; nombre: string };
 type Producto = {
   id: string;
   nombre: string;
   descripcion: string | null;
   categoryId: string;
+  areaImpresionId: string | null;
   precio: number;
   costo: number | null;
   iva: string;
@@ -35,9 +37,11 @@ type Producto = {
 export function EditarProductoForm({
   producto,
   categorias,
+  areasImpresion,
 }: {
   producto: Producto;
   categorias: Categoria[];
+  areasImpresion: AreaImpresion[];
 }) {
   const [pendiente, iniciar] = useTransition();
 
@@ -67,6 +71,19 @@ export function EditarProductoForm({
         </Campo>
         <Campo etiqueta="Descripción (opcional)">
           <Area name="descripcion" rows={2} defaultValue={producto.descripcion ?? ""} />
+        </Campo>
+        <Campo
+          etiqueta="Área de impresión"
+          ayuda="A dónde se manda este producto en la comanda automática. Sin área, no imprime en ninguna comanda."
+        >
+          <Selector name="areaImpresionId" defaultValue={producto.areaImpresionId ?? ""}>
+            <option value="">Sin área — no imprime en comanda</option>
+            {areasImpresion.map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.nombre}
+              </option>
+            ))}
+          </Selector>
         </Campo>
       </Tarjeta>
 

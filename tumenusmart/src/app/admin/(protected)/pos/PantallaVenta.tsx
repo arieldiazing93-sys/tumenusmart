@@ -13,6 +13,7 @@ import { CobrarModal } from "./CobrarModal";
 import { ClienteFiscalModal, type DatosClienteFiscal } from "./ClienteFiscalModal";
 import { MitadYMitadPickerPos } from "./MitadYMitadPickerPos";
 import { AgregadosPickerPos } from "./AgregadosPickerPos";
+import { imprimirComprobante } from "@/lib/impresion-comprobantes";
 
 type Agregado = { id: string; nombre: string; precioExtra: number };
 type Producto = { id: string; nombre: string; precio: number; agregados: Agregado[] };
@@ -63,6 +64,8 @@ export function PantallaVenta({
   puedeFacturar,
   diasParaVencerTimbrado,
   facturaObligatoria,
+  nombreImpresoraTicket,
+  impresorasPorArea,
 }: {
   turnoId: string;
   categorias: Categoria[];
@@ -73,6 +76,10 @@ export function PantallaVenta({
   diasParaVencerTimbrado: number | null;
   /** Si el local exige facturar TODA venta (timbrado Autoimpresor). */
   facturaObligatoria: boolean;
+  /** Impresora QZ Tray para el ticket/factura, en esta estación — null = sin configurar, cae al manual. */
+  nombreImpresoraTicket: string | null;
+  /** Mapa Área de Impresión → impresora QZ Tray, en esta estación. */
+  impresorasPorArea: Record<string, string>;
 }) {
   const router = useRouter();
   // Si el local exige facturar todo y esta estación puede hacerlo, no hay
@@ -306,7 +313,37 @@ export function PantallaVenta({
       return;
     }
     setMostrarCobro(false);
-    router.push(`/admin/pos/venta/${r.ventaId}/ticket`);
+
+    // El POS no tiene una fase de "preparación" separada del cobro: ticket
+    // y comanda(s) se imprimen solos en el mismo momento — una comanda por
+    // cada Área de Impresión presente en el carrito (ver
+    // src/lib/impresion-comprobantes.ts).
+    const urlTicket = `/admin/pos/venta/${r.ventaId}/ticket`;
+    const [resultadoTicket, ...resultadosComandas] = await Promise.all([
+      imprimirComprobante(urlTicket, nombreImpresoraTicket, 67),
+      ...r.areasImpresion.map((areaId) =>
+        imprimirComprobante(`/admin/pos/venta/${r.ventaId}/comanda?area=${areaId}`, impresorasPorArea[areaId] ?? null, 72)
+      ),
+    ]);
+
+    // Las comandas que no salieron solas se avisan en la pantalla del
+    // ticket (esta pantalla ya se desmonta al navegar) — nunca con un
+    // window.open ciego: entre el clic original y este momento pasaron
+    // varios `await` (conectar QZ, traer el HTML, imprimir), y para
+    // entonces los navegadores ya no lo consideran un gesto directo del
+    // usuario, así que un popup automático se bloquearía en silencio.
+    const areasFallidas = r.areasImpresion.filter((_, i) => !resultadosComandas[i].ok);
+    const parametroFallidas = areasFallidas.length > 0 ? `&comandasFallidas=${areasFallidas.join(",")}` : "";
+
+    // Si el ticket se imprimió solo, se navega con ?silencioso=1 para no
+    // disparar además el diálogo de impresión del navegador encima de algo
+    // que ya salió — si no se pudo, se navega igual que siempre y el propio
+    // ImprimirAuto de esa pantalla ofrece la impresión manual.
+    router.push(
+      resultadoTicket.ok
+        ? `${urlTicket}?silencioso=1${parametroFallidas}`
+        : `${urlTicket}${parametroFallidas ? `?${parametroFallidas.slice(1)}` : ""}`
+    );
   }
 
   if (categorias.length === 0) {

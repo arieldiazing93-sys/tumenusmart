@@ -15,7 +15,10 @@ const CSP = [
   // (Leaflet + OpenStreetMap, usado para marcar la ubicación de entrega).
   "img-src 'self' data: blob: https://*.supabase.co https://*.tile.openstreetmap.org",
   "font-src 'self' data:",
-  "connect-src 'self'",
+  // wss/ws a localhost: QZ Tray (impresión silenciosa) escucha ahí en la
+  // computadora de cada estación — sin esto el navegador corta el
+  // WebSocket en silencio y se confunde con "QZ Tray no está instalado".
+  "connect-src 'self' wss://localhost:* ws://localhost:*",
   // Nadie puede embeber el panel ni la carta en un <iframe> ajeno —
   // reemplaza y refuerza a X-Frame-Options.
   "frame-ancestors 'none'",

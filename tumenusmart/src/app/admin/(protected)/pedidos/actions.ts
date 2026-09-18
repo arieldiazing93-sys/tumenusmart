@@ -18,7 +18,9 @@ const ESTADOS_VALIDOS = [
   "cancelado",
 ];
 
-export type ResultadoPedidoAccion = { ok: true; aviso?: string } | { ok: false; error: string };
+export type ResultadoPedidoAccion =
+  | { ok: true; aviso?: string; areasImpresion?: string[] }
+  | { ok: false; error: string };
 
 /**
  * Si este pedido pidió factura y todavía no se le emitió número, intenta
@@ -118,6 +120,11 @@ export async function cambiarEstadoPedido(
 
   let datosFactura: Record<string, unknown> = {};
   let aviso: string | undefined;
+  // Áreas de Impresión presentes en este pedido — para la impresión
+  // automática de comanda por área al pasar a "en preparación" (ver
+  // src/lib/impresion-comprobantes.ts). Ítems sin producto (combo mitad y
+  // mitad) o sin área asignada quedan afuera a propósito.
+  let areasImpresion: string[] | undefined;
 
   // Mismo criterio que cancelarVenta del POS: motivo obligatorio, queda
   // quién y cuándo — para cualquier pedido, tenga factura o no. Si ya tenía
@@ -133,6 +140,18 @@ export async function cambiarEstadoPedido(
       canceladaEn: new Date(),
       motivoCancelacion: motivo.trim(),
     };
+  }
+
+  if (estado === "en_preparacion") {
+    const pedido = await prisma.order.findUnique({
+      where: { id: orderId },
+      select: { items: { select: { product: { select: { areaImpresionId: true } } } } },
+    });
+    areasImpresion = [
+      ...new Set(
+        (pedido?.items ?? []).map((i) => i.product?.areaImpresionId).filter((a): a is string => !!a)
+      ),
+    ];
   }
 
   if (estado === "en_despacho") {
@@ -214,7 +233,7 @@ export async function cambiarEstadoPedido(
     revalidatePath("/admin/pos");
     revalidatePath("/admin/pos/turnos");
   }
-  return { ok: true, aviso };
+  return { ok: true, aviso, areasImpresion };
 }
 
 export async function asignarRepartidor(

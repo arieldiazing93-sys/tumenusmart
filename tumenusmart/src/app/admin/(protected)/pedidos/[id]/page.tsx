@@ -33,14 +33,31 @@ export default async function DetallePedidoPage({
   // — misma cookie de estación que usa el Punto de Venta.
   const estacion = await estacionActual(prisma);
 
-  const [pedido, repartidores, turno] = await Promise.all([
+  const [pedido, repartidores, turno, estacionConImpresoras] = await Promise.all([
     prisma.order.findUnique({
       where: { id },
       include: { items: true, deliveryZone: true, repartidor: true },
     }),
     prisma.repartidor.findMany({ where: { activo: true }, orderBy: { nombre: "asc" } }),
     estacion ? turnoAbierto(prisma, estacion.id) : Promise.resolve(null),
+    estacion
+      ? prisma.estacion.findUnique({
+          where: { id: estacion.id },
+          select: {
+            areaTicketId: true,
+            impresoras: { select: { areaImpresionId: true, nombreImpresora: true } },
+          },
+        })
+      : Promise.resolve(null),
   ]);
+
+  // Impresión automática (QZ Tray) — ver src/lib/impresion-comprobantes.ts.
+  const impresorasPorArea = Object.fromEntries(
+    (estacionConImpresoras?.impresoras ?? []).map((i) => [i.areaImpresionId, i.nombreImpresora])
+  );
+  const nombreImpresoraTicket = estacionConImpresoras?.areaTicketId
+    ? (impresorasPorArea[estacionConImpresoras.areaTicketId] ?? null)
+    : null;
 
   if (!pedido) notFound();
 
@@ -97,6 +114,8 @@ export default async function DetallePedidoPage({
           turnoAbiertoId={turno?.id ?? null}
           comprobanteTipo={pedido.comprobanteTipo}
           facturaNumero={pedido.facturaNumero}
+          nombreImpresoraTicket={nombreImpresoraTicket}
+          impresorasPorArea={impresorasPorArea}
         />
       </div>
 

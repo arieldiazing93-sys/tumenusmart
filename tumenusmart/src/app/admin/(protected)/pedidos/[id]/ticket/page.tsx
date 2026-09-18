@@ -93,13 +93,20 @@ function filaTabla(cantidad: string, descripcion: string, monto: string): string
 
 export default async function TicketPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ silencioso?: string }>;
 }) {
   // Layout y página se renderizan en paralelo: sin este chequeo acá, una
   // sesión vencida podía terminar en el `throw` de idLocalActual() de acá
   // abajo antes de que el layout redirigiera a /admin/login.
   await pantallaConPermiso("pedidos.ver");
+  // Presente cuando QZ Tray pide este HTML para imprimir solo — ver
+  // src/lib/impresion-comprobantes.ts. Oculta ImprimirAuto, que no tiene
+  // sentido en un documento que ya se manda directo a la impresora.
+  const { silencioso } = await searchParams;
+  const esSilencioso = silencioso === "1";
 
   // Todas las consultas de acá abajo quedan atadas a este local.
   const prisma = prismaDelLocal(await idLocalActual());
@@ -145,8 +152,8 @@ export default async function TicketPage({
     <>
       <style dangerouslySetInnerHTML={{ __html: ESTILOS_IMPRESION }} />
 
-      <div className="mx-auto max-w-[75mm] font-mono text-[9px] leading-tight text-black">
-        <ImprimirAuto />
+      <div id="comprobante-imprimible" className="mx-auto max-w-[75mm] font-mono text-[9px] leading-tight text-black">
+        {!esSilencioso && <ImprimirAuto />}
 
         {esAnulado && (
           <div className="mb-2 text-center">

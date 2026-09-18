@@ -63,7 +63,7 @@ export async function abrirTurno(
 }
 
 export type ResultadoVenta =
-  | { ok: true; ventaId: string; total: number }
+  | { ok: true; ventaId: string; total: number; areasImpresion: string[] }
   | { ok: false; error: string };
 
 export type ItemVentaInput =
@@ -194,6 +194,7 @@ export async function registrarVenta(turnoId: string, datos: DatosVenta): Promis
       mitadYMitadGrupo: true,
       mitadYMitadModo: true,
       iva: true,
+      areaImpresionId: true,
       opciones: {
         where: { tipo: "agregado" },
         orderBy: { orden: "asc" },
@@ -201,6 +202,11 @@ export async function registrarVenta(turnoId: string, datos: DatosVenta): Promis
       },
     },
   });
+  // Para la impresión automática de comanda por área — ver
+  // src/lib/impresion-comprobantes.ts. Los ítems "mitad y mitad" no tienen
+  // un único producto (f.productId queda null) y, junto con los productos
+  // sin área asignada, simplemente no aparecen en ninguna comanda impresa.
+  const areaDelProducto = new Map(productosDelLocal.map((p) => [p.id, p.areaImpresionId]));
   const catalogo: ProductoBase[] = productosDelLocal.map((p) => ({
     id: p.id,
     nombre: p.nombre,
@@ -225,6 +231,14 @@ export async function registrarVenta(turnoId: string, datos: DatosVenta): Promis
   const filas = armado.lineas;
   const total = armado.subtotal;
   if (total <= 0) return { ok: false, error: "El total tiene que ser mayor a cero." };
+
+  const areasImpresion = [
+    ...new Set(
+      filas
+        .map((f) => (f.productId ? areaDelProducto.get(f.productId) : null))
+        .filter((a): a is string => !!a)
+    ),
+  ];
 
   const numero = await siguienteNumeroVentaPos(storeId);
   const registradoPor = sesion.nombre?.trim() || sesion.email;
@@ -374,7 +388,7 @@ export async function registrarVenta(turnoId: string, datos: DatosVenta): Promis
 
   revalidatePath("/admin/pos");
   revalidatePath("/admin/pos/cuentas");
-  return { ok: true, ventaId, total };
+  return { ok: true, ventaId, total, areasImpresion };
 }
 
 export type ResultadoCierreTurno = { ok: true; turnoId: string } | { ok: false; error: string };

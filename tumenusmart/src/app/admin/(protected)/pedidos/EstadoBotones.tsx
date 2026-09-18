@@ -1,9 +1,10 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { cambiarEstadoPedido } from "./actions";
+import { cambiarEstadoPedido, type ResultadoPedidoAccion } from "./actions";
 import { ESTADOS_PEDIDO } from "@/lib/estados-pedido";
 import { FORMAS_PAGO_POS, type FormaPagoPos } from "@/lib/turno-pos";
+import { imprimirComprobante } from "@/lib/impresion-comprobantes";
 
 export function EstadoBotones({
   orderId,
@@ -13,6 +14,8 @@ export function EstadoBotones({
   turnoAbiertoId,
   comprobanteTipo,
   facturaNumero,
+  nombreImpresoraTicket,
+  impresorasPorArea,
 }: {
   orderId: string;
   estadoActual: string;
@@ -22,6 +25,10 @@ export function EstadoBotones({
   turnoAbiertoId: string | null;
   comprobanteTipo: string;
   facturaNumero: string | null;
+  /** Impresora QZ Tray para el ticket/factura, en esta estación — null = sin configurar, cae al manual. */
+  nombreImpresoraTicket: string | null;
+  /** Mapa Área de Impresión → impresora QZ Tray, en esta estación. */
+  impresorasPorArea: Record<string, string>;
 }) {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -29,6 +36,11 @@ export function EstadoBotones({
   const [pidiendoPago, setPidiendoPago] = useState(false);
   const [pidiendoMotivoCancelacion, setPidiendoMotivoCancelacion] = useState(false);
   const [motivoCancelacion, setMotivoCancelacion] = useState("");
+  // Impresión automática (QZ Tray) que no salió sola — link manual, nunca
+  // un window.open ciego (ver src/lib/impresion-comprobantes.ts: entre el
+  // clic y este momento pasaron varios `await`, un popup automático se
+  // bloquea en silencio en la mayoría de los navegadores).
+  const [fallback, setFallback] = useState<{ label: string; url: string }[]>([]);
 
   const faltaRepartidor = tipoEntrega === "delivery" && !repartidorId;
   // Retiro/mesa se cobra en el mostrador: si hay un turno de caja abierto,
@@ -36,6 +48,48 @@ export function EstadoBotones({
   // ese mismo cierre. El delivery sigue su propio camino (Rendición).
   const pideFormaPago = tipoEntrega !== "delivery" && turnoAbiertoId != null;
   const esFactura = comprobanteTipo === "factura" && !!facturaNumero;
+
+  /**
+   * Comanda al pasar a "en preparación" (una por Área de Impresión presente
+   * en el pedido, resueltas por el propio cambiarEstadoPedido) y
+   * ticket/factura al pasar a "en despacho" (delivery) o "entregado" (no
+   * delivery) — los mismos dos casos donde cambiarEstadoPedido YA emite el
+   * número de factura, así que nunca se imprime dos veces el mismo pedido.
+   */
+  function imprimirSegunEstado(estado: string, resultado: Extract<ResultadoPedidoAccion, { ok: true }>) {
+    const tareas: Promise<{ label: string; url: string; ok: boolean }>[] = [];
+
+    for (const areaId of resultado.areasImpresion ?? []) {
+      const url = `/admin/pedidos/${orderId}/comanda?area=${areaId}`;
+      tareas.push(
+        imprimirComprobante(url, impresorasPorArea[areaId] ?? null, 72).then((r) => ({
+          label: "Comanda de cocina",
+          url,
+          ok: r.ok,
+        }))
+      );
+    }
+
+    const tocaTicket =
+      (estado === "en_despacho" && tipoEntrega === "delivery") ||
+      (estado === "entregado" && tipoEntrega !== "delivery");
+    if (tocaTicket) {
+      const url = `/admin/pedidos/${orderId}/ticket`;
+      tareas.push(
+        imprimirComprobante(url, nombreImpresoraTicket, 67).then((r) => ({
+          label: "Ticket/factura",
+          url,
+          ok: r.ok,
+        }))
+      );
+    }
+
+    if (tareas.length === 0) return;
+    Promise.all(tareas).then((resultados) => {
+      const fallos = resultados.filter((r) => !r.ok).map(({ label, url }) => ({ label, url }));
+      if (fallos.length > 0) setFallback((actual) => [...actual, ...fallos]);
+    });
+  }
 
   function confirmarEntregado(formaPago: FormaPagoPos) {
     setError(null);
@@ -46,6 +100,7 @@ export function EstadoBotones({
       else {
         setPidiendoPago(false);
         if (resultado.aviso) setAviso(resultado.aviso);
+        imprimirSegunEstado("entregado", resultado);
       }
     });
   }
@@ -84,7 +139,10 @@ export function EstadoBotones({
     startTransition(async () => {
       const resultado = await cambiarEstadoPedido(orderId, estado);
       if (!resultado.ok) setError(resultado.error);
-      else if (resultado.aviso) setAviso(resultado.aviso);
+      else {
+        if (resultado.aviso) setAviso(resultado.aviso);
+        imprimirSegunEstado(estado, resultado);
+      }
     });
   }
 
@@ -120,6 +178,24 @@ export function EstadoBotones({
         <p className="mt-2 text-xs text-tinta-suave">
           Este pedido es delivery y todavía no tiene repartidor asignado.
         </p>
+      )}
+
+      {fallback.length > 0 && (
+        <div className="mt-3 rounded-lg border border-aviso/30 bg-aviso-luz p-3 text-sm">
+          <p className="mb-1 font-medium text-aviso">No se pudo imprimir solo:</p>
+          {fallback.map((c, i) => (
+            <a
+              key={`${c.url}-${i}`}
+              href={c.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={() => setFallback((actual) => actual.filter((_, j) => j !== i))}
+              className="mr-3 underline text-brand-texto"
+            >
+              Abrir {c.label}
+            </a>
+          ))}
+        </div>
       )}
 
       {pidiendoPago && (

@@ -144,6 +144,8 @@ model Store {
   ventaPosItems    VentaPosItem[]
   estaciones       Estacion[]
   puntosExpedicion PuntoExpedicion[]
+  areasImpresion   AreaImpresion[]
+  estacionesImpresoras EstacionImpresora[]
 }
 
 /// Las direcciones que este local tuvo antes.
@@ -395,6 +397,12 @@ model Product {
   store       Store           @relation(fields: [storeId], references: [id], onDelete: Cascade)
   categoryId  String
   category    Category        @relation(fields: [categoryId], references: [id])
+  // A qué Área de Impresión (Cocina, Barra, Caja...) se manda este producto
+  // en la comanda automática — ver AreaImpresion. Null = no imprime en
+  // ninguna comanda automática (comportamiento esperado, no un error; el
+  // producto se sigue viendo en la comanda completa manual).
+  areaImpresionId String?
+  areaImpresion   AreaImpresion? @relation(fields: [areaImpresionId], references: [id], onDelete: SetNull)
   nombre      String
   descripcion String?
   precio      Decimal         @db.Decimal(10, 2)
@@ -850,7 +858,59 @@ model Estacion {
   puntoExpedicionId String?
   puntoExpedicion   PuntoExpedicion? @relation(fields: [puntoExpedicionId], references: [id])
 
+  // Qué Área de Impresión maneja el ticket/factura EN ESTA estación — la
+  // impresora real se resuelve igual que cualquier otra área, vía
+  // EstacionImpresora (estacionId, areaTicketId). Null = ticket sin
+  // impresión automática, cae al fallback manual.
+  areaTicketId String?
+  areaTicket   AreaImpresion? @relation(fields: [areaTicketId], references: [id], onDelete: SetNull)
+  // Mapeo de cada Área de Impresión a la impresora real que QZ Tray ve EN
+  // ESTA notebook — una fila por área configurada (ver EstacionImpresora).
+  impresoras   EstacionImpresora[]
+
   @@index([storeId])
+}
+
+/// Un "destino" de impresión configurable (Cocina, Barra, Caja...). Cada
+/// Product se asocia a una (ver Product.areaImpresionId) y cada Estacion
+/// mapea cada área a la impresora real que ve esa notebook (ver
+/// EstacionImpresora) — el mapeo NO se comparte entre estaciones porque
+/// Windows puede nombrar la misma impresora de red distinto en cada una.
+model AreaImpresion {
+  id        String   @id @default(cuid())
+  storeId   String
+  store     Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  nombre    String
+  orden     Int      @default(0)
+  activa    Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  productos          Product[]
+  impresorasEstacion EstacionImpresora[]
+  estacionesTicket   Estacion[]
+
+  @@index([storeId])
+}
+
+/// Para una Estacion puntual, qué impresora real (nombre EXACTO tal cual lo
+/// reporta qz.printers.find() en esa notebook) maneja cada Área de
+/// Impresión — no es un catálogo, es lo que esa máquina ve en ese momento.
+model EstacionImpresora {
+  id         String   @id @default(cuid())
+  // Se repite el local acá (aunque se podría deducir de la estación) para
+  // que el filtro automático funcione igual en todas las tablas — mismo
+  // criterio que OrderItem/VentaPosItem.
+  storeId    String
+  store      Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  estacionId String
+  estacion   Estacion @relation(fields: [estacionId], references: [id], onDelete: Cascade)
+  areaImpresionId String
+  areaImpresion   AreaImpresion @relation(fields: [areaImpresionId], references: [id], onDelete: Cascade)
+  nombreImpresora String
+
+  @@unique([estacionId, areaImpresionId])
+  @@index([storeId])
+  @@index([estacionId])
 }
 
 /// Un punto de expedición autorizado por la DNIT para Factura Autoimpresor.

@@ -33,8 +33,10 @@ function Separador() {
 
 export default async function ComandaPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ area?: string; silencioso?: string }>;
 }) {
   // Layout y página se renderizan en paralelo: sin este chequeo acá, una
   // sesión vencida podía terminar en el `throw` de idLocalActual() de acá
@@ -45,12 +47,24 @@ export default async function ComandaPage({
   const prisma = prismaDelLocal(await idLocalActual());
 
   const { id } = await params;
-  const pedido = await prisma.order.findUnique({
-    where: { id },
-    include: { items: true, deliveryZone: true },
-  });
+  // `area`: filtra a solo los ítems de esa Área de Impresión (impresión
+  // automática por área — ver src/lib/impresion-comprobantes.ts). Sin
+  // `area`, se sigue mostrando TODO (link manual "Ver comanda completa").
+  // `silencioso`: oculta ImprimirAuto cuando QZ Tray pide este HTML.
+  const { area, silencioso } = await searchParams;
+  const esSilencioso = silencioso === "1";
+
+  const [pedido, areaImpresion] = await Promise.all([
+    prisma.order.findUnique({
+      where: { id },
+      include: { items: { include: { product: { select: { areaImpresionId: true } } } }, deliveryZone: true },
+    }),
+    area ? prisma.areaImpresion.findUnique({ where: { id: area }, select: { nombre: true } }) : Promise.resolve(null),
+  ]);
 
   if (!pedido) notFound();
+
+  const items = area ? pedido.items.filter((i) => i.product?.areaImpresionId === area) : pedido.items;
 
   const hora = new Date(pedido.createdAt).toLocaleString("es-PY", {
     day: "2-digit",
@@ -66,8 +80,8 @@ export default async function ComandaPage({
     <>
       <style dangerouslySetInnerHTML={{ __html: ESTILOS_IMPRESION }} />
 
-      <div className="mx-auto max-w-[76mm] font-mono text-black">
-        <ImprimirAuto />
+      <div id="comprobante-imprimible" className="mx-auto max-w-[76mm] font-mono text-black">
+        {!esSilencioso && <ImprimirAuto />}
 
         <Separador />
 
@@ -76,6 +90,7 @@ export default async function ComandaPage({
           <p className="text-3xl font-bold leading-tight">
             {formatearNumero(pedido.numero)}
           </p>
+          {areaImpresion && <p className="text-sm font-bold uppercase">{areaImpresion.nombre}</p>}
         </div>
 
         <Separador />
@@ -94,7 +109,7 @@ export default async function ComandaPage({
         <Separador />
 
         <ul>
-          {pedido.items.map((item) => (
+          {items.map((item) => (
             <li key={item.id} className="mb-2.5 last:mb-0">
               <p className="text-[1.4rem] font-semibold tracking-titular uppercase leading-tight">
                 {item.cantidad} x {item.nombreProducto}

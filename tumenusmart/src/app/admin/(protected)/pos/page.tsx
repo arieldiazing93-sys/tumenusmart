@@ -26,11 +26,25 @@ export default async function PosPage() {
   // elegir Factura además de Ticket al cobrar (ver PantallaVenta).
   const estacionConPunto = await db.estacion.findUnique({
     where: { id: estacion.id },
-    select: { puntoExpedicion: { select: { activo: true, timbradoHasta: true } } },
+    select: {
+      puntoExpedicion: { select: { activo: true, timbradoHasta: true } },
+      areaTicketId: true,
+      impresoras: { select: { areaImpresionId: true, nombreImpresora: true } },
+    },
   });
   const puntoExpedicion = estacionConPunto?.puntoExpedicion ?? null;
   const puedeFacturar = !!puntoExpedicion?.activo && puntoExpedicion.timbradoHasta > new Date();
   const diasParaVencerTimbrado = puntoExpedicion ? diasParaVencer(puntoExpedicion.timbradoHasta) : null;
+
+  // Impresión automática (QZ Tray) — ver src/lib/impresion-comprobantes.ts.
+  // Un mapa área → impresora de ESTA estación, más cuál área imprime el
+  // ticket/factura acá.
+  const impresorasPorArea = Object.fromEntries(
+    (estacionConPunto?.impresoras ?? []).map((i) => [i.areaImpresionId, i.nombreImpresora])
+  );
+  const nombreImpresoraTicket = estacionConPunto?.areaTicketId
+    ? (impresorasPorArea[estacionConPunto.areaTicketId] ?? null)
+    : null;
 
   // Store no pertenece a ningún local (no está en MODELOS_POR_LOCAL), por
   // eso se lee con el cliente global, no con `db`.
@@ -118,6 +132,8 @@ export default async function PosPage() {
       puedeFacturar={puedeFacturar}
       diasParaVencerTimbrado={diasParaVencerTimbrado}
       facturaObligatoria={store?.facturaObligatoria ?? false}
+      nombreImpresoraTicket={nombreImpresoraTicket}
+      impresorasPorArea={impresorasPorArea}
     />
   );
 }

@@ -84,6 +84,7 @@ export async function crearProducto(formData: FormData): Promise<ResultadoProduc
 
   const nombre = String(formData.get("nombre") ?? "").trim();
   const categoryId = String(formData.get("categoryId") ?? "");
+  const areaImpresionId = String(formData.get("areaImpresionId") ?? "").trim() || null;
   const precio = parseFloat(String(formData.get("precio") ?? "0"));
 
   if (!nombre || !categoryId || isNaN(precio)) {
@@ -94,6 +95,7 @@ export async function crearProducto(formData: FormData): Promise<ResultadoProduc
     data: {
       nombre,
       categoryId,
+      areaImpresionId,
       precio,
       descripcion: String(formData.get("descripcion") ?? "") || null,
       imagenUrl: String(formData.get("imagenUrl") ?? "") || null,
@@ -122,6 +124,7 @@ export async function actualizarProducto(
 
   const nombre = String(formData.get("nombre") ?? "").trim();
   const categoryId = String(formData.get("categoryId") ?? "");
+  const areaImpresionId = String(formData.get("areaImpresionId") ?? "").trim() || null;
   const precio = parseFloat(String(formData.get("precio") ?? "0"));
 
   if (!nombre || !categoryId || isNaN(precio)) {
@@ -140,6 +143,7 @@ export async function actualizarProducto(
     data: {
       nombre,
       categoryId,
+      areaImpresionId,
       precio,
       descripcion: String(formData.get("descripcion") ?? "") || null,
       imagenUrl: String(formData.get("imagenUrl") ?? "") || null,

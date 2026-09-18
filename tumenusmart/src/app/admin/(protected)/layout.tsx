@@ -110,6 +110,8 @@ function armarGrupos(hayIdeaSinVer: boolean, rol: string): GrupoSecciones[] {
           ver: conPermiso("pos.gestionarEstaciones") },
         { href: "/admin/pos/puntos-expedicion", label: "Puntos de expedición", icono: "configuracion" as const,
           ver: conPermiso("pos.gestionarEstaciones") },
+        { href: "/admin/pos/areas-impresion", label: "Áreas de impresión", icono: "configuracion" as const,
+          ver: conPermiso("pos.gestionarEstaciones") },
       ],
     },
     {

@@ -64,6 +64,52 @@ export async function asignarPuntoExpedicion(
 }
 
 /**
+ * Qué impresora (reportada por QZ Tray en la computadora de esta estación)
+ * maneja un Área de Impresión puntual, EN ESTA estación — el mapeo no se
+ * comparte entre estaciones porque Windows puede nombrar la misma impresora
+ * de red distinto en cada notebook. `null` borra la asignación (esa área
+ * vuelve a caer al fallback manual en esta estación).
+ */
+export async function asignarImpresoraDeArea(
+  estacionId: string,
+  areaImpresionId: string,
+  nombreImpresora: string | null
+): Promise<ResultadoEstacion> {
+  await exigirPermiso("pos.gestionarEstaciones");
+  const idLocal = await idLocalActual();
+  const prisma = prismaDelLocal(idLocal);
+
+  if (!nombreImpresora) {
+    await prisma.estacionImpresora.deleteMany({ where: { estacionId, areaImpresionId } });
+  } else {
+    await prisma.estacionImpresora.upsert({
+      where: { estacionId_areaImpresionId: { estacionId, areaImpresionId } },
+      update: { nombreImpresora },
+      create: { estacionId, areaImpresionId, nombreImpresora, storeId: idLocal },
+    });
+  }
+  revalidatePath("/admin/pos/estaciones");
+  return { ok: true };
+}
+
+/**
+ * Qué Área de Impresión maneja el ticket/factura EN ESTA estación — la
+ * impresora real se resuelve después vía EstacionImpresora, igual que
+ * cualquier otra área.
+ */
+export async function asignarAreaTicket(
+  estacionId: string,
+  areaImpresionId: string | null
+): Promise<ResultadoEstacion> {
+  await exigirPermiso("pos.gestionarEstaciones");
+  const prisma = prismaDelLocal(await idLocalActual());
+
+  await prisma.estacion.update({ where: { id: estacionId }, data: { areaTicketId: areaImpresionId } });
+  revalidatePath("/admin/pos/estaciones");
+  return { ok: true };
+}
+
+/**
  * Vincula ESTE navegador (el de la computadora física desde la que se hace
  * clic) a una estación, guardando el id en una cookie de larga duración.
  *

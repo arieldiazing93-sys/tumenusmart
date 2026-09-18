@@ -26,18 +26,33 @@ function Separador() {
 
 export default async function ComandaVentaPosPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ area?: string; silencioso?: string }>;
 }) {
   await pantallaConPermiso("pos.vender");
   const db = prismaDelLocal(await idLocalActual());
   const { id } = await params;
+  // `area`: filtra a solo los ítems de esa Área de Impresión (impresión
+  // automática por área — ver src/lib/impresion-comprobantes.ts). Sin
+  // `area`, se sigue mostrando TODO (link manual "Ver comanda completa").
+  // `silencioso`: oculta ImprimirAuto cuando QZ Tray pide este HTML.
+  const { area, silencioso } = await searchParams;
+  const esSilencioso = silencioso === "1";
 
-  const venta = await db.ventaPos.findUnique({
-    where: { id },
-    include: { items: { orderBy: { id: "asc" } } },
-  });
+  const [venta, areaImpresion] = await Promise.all([
+    db.ventaPos.findUnique({
+      where: { id },
+      include: {
+        items: { orderBy: { id: "asc" }, include: { product: { select: { areaImpresionId: true } } } },
+      },
+    }),
+    area ? db.areaImpresion.findUnique({ where: { id: area }, select: { nombre: true } }) : Promise.resolve(null),
+  ]);
   if (!venta) notFound();
+
+  const items = area ? venta.items.filter((i) => i.product?.areaImpresionId === area) : venta.items;
 
   const hora = venta.creadoEn.toLocaleString("es-PY", {
     day: "2-digit",
@@ -51,14 +66,15 @@ export default async function ComandaVentaPosPage({
     <>
       <style dangerouslySetInnerHTML={{ __html: ESTILOS_IMPRESION }} />
 
-      <div className="mx-auto max-w-[76mm] font-mono text-black">
-        <ImprimirAuto />
+      <div id="comprobante-imprimible" className="mx-auto max-w-[76mm] font-mono text-black">
+        {!esSilencioso && <ImprimirAuto />}
 
         <Separador />
 
         <div className="text-center">
           <p className="text-[1.1rem] font-semibold tracking-titular tracking-widest">COMANDA</p>
           <p className="text-3xl font-bold leading-tight">{formatearNumero(venta.numero)}</p>
+          {areaImpresion && <p className="text-sm font-bold uppercase">{areaImpresion.nombre}</p>}
         </div>
 
         <Separador />
@@ -74,7 +90,7 @@ export default async function ComandaVentaPosPage({
         <Separador />
 
         <ul>
-          {venta.items.map((item) => (
+          {items.map((item) => (
             <li key={item.id} className="mb-2.5 last:mb-0">
               <p className="text-[1.4rem] font-semibold tracking-titular uppercase leading-tight">
                 {item.cantidad} x {item.nombreProducto}

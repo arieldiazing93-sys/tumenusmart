@@ -38,10 +38,17 @@ export default async function AdminProductosPage({
   // poder seguir cargando el siguiente sin tener que volver a desplegarlo.
   const mantenerFormularioAbierto = guardado === "1";
 
-  const categorias = await prisma.category.findMany({
-    orderBy: { orden: "asc" },
-    include: { _count: { select: { productos: true } } },
-  });
+  const [categorias, areasImpresion] = await Promise.all([
+    prisma.category.findMany({
+      orderBy: { orden: "asc" },
+      include: { _count: { select: { productos: true } } },
+    }),
+    prisma.areaImpresion.findMany({
+      where: { activa: true },
+      orderBy: [{ orden: "asc" }, { createdAt: "asc" }],
+      select: { id: true, nombre: true },
+    }),
+  ]);
 
   const categoriaActiva = categoriaId
     ? categorias.find((c) => c.id === categoriaId)
@@ -113,7 +120,11 @@ export default async function AdminProductosPage({
               </span>
             </summary>
             <div className="mt-3 rounded-lg border border-linea bg-white p-4">
-              <CrearProductoForm categorias={categorias} categoriaActivaId={categoriaActiva?.id} />
+              <CrearProductoForm
+                categorias={categorias}
+                categoriaActivaId={categoriaActiva?.id}
+                areasImpresion={areasImpresion}
+              />
             </div>
           </details>
           )}

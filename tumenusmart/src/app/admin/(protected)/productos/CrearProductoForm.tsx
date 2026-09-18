@@ -7,13 +7,16 @@ import { ImagenProductoField } from "./ImagenProductoField";
 import { IngredientesField } from "./IngredientesField";
 
 type Categoria = { id: string; nombre: string };
+type AreaImpresion = { id: string; nombre: string };
 
 export function CrearProductoForm({
   categorias,
   categoriaActivaId,
+  areasImpresion,
 }: {
   categorias: Categoria[];
   categoriaActivaId?: string;
+  areasImpresion: AreaImpresion[];
 }) {
   const [pendiente, iniciar] = useTransition();
 
@@ -51,6 +54,18 @@ export function CrearProductoForm({
         {categorias.map((c) => (
           <option key={c.id} value={c.id}>
             {c.nombre}
+          </option>
+        ))}
+      </select>
+      <select
+        name="areaImpresionId"
+        defaultValue=""
+        className="rounded-lg border border-linea px-3 py-2"
+      >
+        <option value="">Sin área — no imprime en comanda</option>
+        {areasImpresion.map((a) => (
+          <option key={a.id} value={a.id}>
+            {a.nombre}
           </option>
         ))}
       </select>
