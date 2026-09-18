@@ -428,10 +428,10 @@ export function PantallaVenta({
                   key={p.id}
                   type="button"
                   onClick={() => agregarProducto(p)}
-                  className={`relative flex flex-col rounded-xl border bg-white p-3.5 text-left shadow-sm transition-all active:scale-[0.96] ${
+                  className={`relative flex flex-col rounded-xl border p-3.5 text-left shadow-sm transition-all active:scale-[0.96] ${
                     cantidadEnCarrito > 0
-                      ? "border-brand/50 ring-1 ring-brand/20"
-                      : "border-linea hover:-translate-y-0.5 hover:border-brand/40 hover:shadow-media"
+                      ? "border-brand/50 bg-brand-light ring-1 ring-brand/20"
+                      : "border-linea bg-brand-light/40 hover:-translate-y-0.5 hover:border-brand/40 hover:bg-brand-light/70 hover:shadow-media"
                   }`}
                 >
                   {cantidadEnCarrito > 0 && (
