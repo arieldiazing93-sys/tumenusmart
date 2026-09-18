@@ -72,7 +72,6 @@ export default async function ComandaVentaPosPage({
         <Separador />
 
         <div className="text-center">
-          <p className="text-[1.1rem] font-semibold tracking-titular tracking-widest">COMANDA</p>
           <p className="text-3xl font-bold leading-tight">{formatearNumero(venta.numero)}</p>
           {areaImpresion && <p className="text-sm font-bold uppercase">{areaImpresion.nombre}</p>}
         </div>

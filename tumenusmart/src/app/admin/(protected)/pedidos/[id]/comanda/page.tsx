@@ -86,7 +86,6 @@ export default async function ComandaPage({
         <Separador />
 
         <div className="text-center">
-          <p className="text-[1.1rem] font-semibold tracking-titular tracking-widest">COMANDA</p>
           <p className="text-3xl font-bold leading-tight">
             {formatearNumero(pedido.numero)}
           </p>
