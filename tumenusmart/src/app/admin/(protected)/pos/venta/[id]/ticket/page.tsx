@@ -241,7 +241,7 @@ export default async function TicketVentaPosPage({
 
         {esFactura && (
           <>
-            <p>Detalle fiscal</p>
+            <p>DETALLE FISCAL</p>
             <div>
               {Number(venta.facturaGravado10 ?? 0) > 0 && (
                 <p>{filaEtiqueta("GRAVADAS 10%", formatearGuarani(Number(venta.facturaGravado10)), 12)}</p>
@@ -254,7 +254,7 @@ export default async function TicketVentaPosPage({
               )}
             </div>
             <Separador factura />
-            <p>Liquidacion IVA</p>
+            <p>LIQUIDACION IVA</p>
             <div>
               {Number(venta.facturaIva10 ?? 0) > 0 && (
                 <p>{filaEtiqueta("IVA 10%", formatearGuarani(Number(venta.facturaIva10)), 9)}</p>
@@ -271,8 +271,8 @@ export default async function TicketVentaPosPage({
               </p>
             </div>
             <Separador factura />
-            <p className="mt-1">Original: Cliente</p>
-            <p>Duplicado: Archivo tributario</p>
+            <p className="mt-1">ORIGINAL: CLIENTE</p>
+            <p>DUPLICADO: ARCHIVO TRIBUTARIO</p>
           </>
         )}
 
