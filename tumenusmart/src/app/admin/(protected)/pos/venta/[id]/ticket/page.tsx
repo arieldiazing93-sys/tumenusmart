@@ -141,6 +141,13 @@ export default async function TicketVentaPosPage({
       <div className="mx-auto max-w-[75mm] font-mono text-[9px] leading-tight text-black">
         <ImprimirAuto />
 
+        {venta.cancelada && (
+          <div className="mb-2 text-center">
+            <p className="text-[16px] font-bold">*** ANULADA ***</p>
+            <p>Venta cancelada — no es un comprobante valido.</p>
+          </div>
+        )}
+
         <div className="mb-2 flex justify-center print:hidden">
           <a
             href={`/admin/pos/venta/${venta.id}/comanda`}
@@ -309,6 +316,13 @@ export default async function TicketVentaPosPage({
         </p>
 
         <Separador factura={esFactura} />
+
+        {venta.cancelada && (
+          <div className="mt-2 text-center">
+            <p className="text-[16px] font-bold">*** ANULADA ***</p>
+            <p>Venta cancelada — no es un comprobante valido.</p>
+          </div>
+        )}
       </div>
     </>
   );

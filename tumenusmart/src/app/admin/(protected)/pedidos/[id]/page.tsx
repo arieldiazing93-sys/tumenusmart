@@ -95,6 +95,8 @@ export default async function DetallePedidoPage({
           tipoEntrega={pedido.tipoEntrega}
           repartidorId={pedido.repartidorId}
           turnoAbiertoId={turno?.id ?? null}
+          comprobanteTipo={pedido.comprobanteTipo}
+          facturaNumero={pedido.facturaNumero}
         />
       </div>
 

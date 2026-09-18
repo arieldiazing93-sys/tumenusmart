@@ -139,6 +139,7 @@ export default async function TicketPage({
   const esDelivery = pedido.tipoEntrega === "delivery";
   const esFactura = pedido.comprobanteTipo === "factura" && !!pedido.facturaNumero;
   const esSinNombre = pedido.facturaTipoIdentificacion === SIN_REGISTRO_FISCAL.tipo;
+  const esAnulado = pedido.estado === "cancelado";
 
   return (
     <>
@@ -146,6 +147,13 @@ export default async function TicketPage({
 
       <div className="mx-auto max-w-[75mm] font-mono text-[9px] leading-tight text-black">
         <ImprimirAuto />
+
+        {esAnulado && (
+          <div className="mb-2 text-center">
+            <p className="text-[16px] font-bold">*** ANULADA ***</p>
+            <p>Pedido cancelado — no es un comprobante valido.</p>
+          </div>
+        )}
 
         <Separador factura={esFactura} />
 
@@ -330,6 +338,13 @@ export default async function TicketPage({
         </p>
 
         <Separador factura={esFactura} />
+
+        {esAnulado && (
+          <div className="mt-2 text-center">
+            <p className="text-[16px] font-bold">*** ANULADA ***</p>
+            <p>Pedido cancelado — no es un comprobante valido.</p>
+          </div>
+        )}
       </div>
     </>
   );
