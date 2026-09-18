@@ -81,7 +81,9 @@ export default async function ClientesPosPage({
               <Th>Teléfono</Th>
               <Th>Identificación fiscal</Th>
               <Th>Correo</Th>
-              <Th></Th>
+              <Th>
+                <span className="sr-only">Acciones</span>
+              </Th>
             </tr>
           </thead>
           <tbody>
