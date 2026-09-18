@@ -10,7 +10,7 @@ import {
   asignarImpresoraDeArea,
   asignarAreaTicket,
 } from "./actions";
-import { Boton, clasesBoton } from "@/components/ui";
+import { Boton, Entrada, clasesBoton } from "@/components/ui";
 import { listarImpresoras } from "@/lib/qz-tray";
 
 type PuntoExpedicionOpcion = {
@@ -22,6 +22,15 @@ type PuntoExpedicionOpcion = {
 
 type AreaImpresionOpcion = { id: string; nombre: string };
 type ImpresoraAsignada = { areaImpresionId: string; nombreImpresora: string };
+
+// Mismo lenguaje visual que clasesDeCampo() (foco, transición, colores) pero
+// sin el w-full de un campo de formulario normal — estos <select> viven
+// dentro de una fila compacta, al lado de texto, y ancho completo los
+// estiraría a lo loco dentro de un flex sin ancho propio.
+const CLASES_SELECT_COMPACTO =
+  "rounded-lg border border-linea bg-white px-2 py-1.5 text-[0.82rem] text-tinta " +
+  "transition-colors duration-150 focus:border-brand focus:outline-none " +
+  "focus:ring-2 focus:ring-brand/15 disabled:opacity-50";
 
 export function EstacionFila({
   id,
@@ -144,11 +153,11 @@ export function EstacionFila({
       <div className="flex flex-wrap items-center justify-between gap-3">
         {editando ? (
           <div className="flex flex-1 items-center gap-2">
-            <input
+            <Entrada
               autoFocus
               value={nombreEditado}
               onChange={(e) => setNombreEditado(e.target.value)}
-              className="flex-1 rounded-lg border border-linea px-2 py-1 text-sm"
+              className="flex-1"
             />
             <button
               type="button"
@@ -190,7 +199,7 @@ export function EstacionFila({
                 value={puntoExpedicionId ?? ""}
                 disabled={asignando}
                 onChange={(e) => cambiarPuntoExpedicion(e.target.value)}
-                className="rounded-lg border border-linea px-2 py-1 text-sm text-tinta"
+                className={CLASES_SELECT_COMPACTO}
               >
                 <option value="">Sin asignar — solo tickets</option>
                 {puntosExpedicion.map((p) => (
@@ -206,7 +215,7 @@ export function EstacionFila({
                 value={areaTicketId ?? ""}
                 disabled={asignandoTicket}
                 onChange={(e) => cambiarAreaTicket(e.target.value)}
-                className="rounded-lg border border-linea px-2 py-1 text-sm text-tinta"
+                className={CLASES_SELECT_COMPACTO}
               >
                 <option value="">Sin asignar — imprime manual</option>
                 {areasImpresion.map((a) => (
@@ -276,7 +285,7 @@ export function EstacionFila({
                         value={actual}
                         disabled={asignandoArea === a.id}
                         onChange={(e) => cambiarImpresoraDeArea(a.id, e.target.value)}
-                        className="rounded-lg border border-linea px-2 py-1 text-sm text-tinta"
+                        className={CLASES_SELECT_COMPACTO}
                       >
                         <option value="">Sin asignar — imprime manual</option>
                         {actual && !impresorasDetectadas.includes(actual) && (

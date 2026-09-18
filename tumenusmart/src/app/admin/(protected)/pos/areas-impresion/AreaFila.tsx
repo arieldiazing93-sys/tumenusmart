@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { renombrarArea, alternarActivaArea } from "./actions";
-import { clasesBoton } from "@/components/ui";
+import { Entrada, clasesBoton } from "@/components/ui";
 
 export function AreaFila({
   id,
@@ -44,11 +44,11 @@ export function AreaFila({
       <div className="flex flex-wrap items-center justify-between gap-3">
         {editando ? (
           <div className="flex flex-1 items-center gap-2">
-            <input
+            <Entrada
               autoFocus
               value={nombreEditado}
               onChange={(e) => setNombreEditado(e.target.value)}
-              className="flex-1 rounded-lg border border-linea px-2 py-1 text-sm"
+              className="flex-1"
             />
             <button
               type="button"

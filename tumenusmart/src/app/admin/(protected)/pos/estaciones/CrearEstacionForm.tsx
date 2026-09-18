@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState, useTransition } from "react";
-import { clasesBoton } from "@/components/ui";
+import { Tarjeta, Campo, Entrada, clasesBoton } from "@/components/ui";
 import { crearEstacion } from "./actions";
 
 export function CrearEstacionForm() {
@@ -23,17 +23,21 @@ export function CrearEstacionForm() {
   }
 
   return (
-    <form ref={formRef} action={alCrear} className="mb-6 flex items-center gap-2">
-      <input
-        name="nombre"
-        required
-        placeholder="Nueva estación (ej: Mostrador, Delivery)"
-        className="flex-1 rounded-lg border border-linea px-3 py-2"
-      />
-      <button type="submit" disabled={pendiente} className={clasesBoton("principal")}>
-        Agregar
-      </button>
-      {agregada && <span className="text-xs font-medium text-exito">✓ Agregada</span>}
-    </form>
+    <Tarjeta className="mb-6 flex flex-col gap-3">
+      <p className="rotulo text-[0.8rem] font-bold">Nueva estación</p>
+      <form ref={formRef} action={alCrear} className="flex flex-wrap items-end gap-3">
+        <div className="min-w-[14rem] flex-1">
+          <Campo etiqueta="Nombre">
+            <Entrada name="nombre" required placeholder="Ej: Mostrador, Delivery" />
+          </Campo>
+        </div>
+        <div className="flex items-center gap-2">
+          <button type="submit" disabled={pendiente} className={clasesBoton("principal")}>
+            {pendiente ? "Agregando…" : "Agregar"}
+          </button>
+          {agregada && <span className="text-xs font-medium text-exito">✓ Agregada</span>}
+        </div>
+      </form>
+    </Tarjeta>
   );
 }
