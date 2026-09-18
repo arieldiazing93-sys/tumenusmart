@@ -3,12 +3,19 @@
  *
  * Los precios de la carta ya incluyen el IVA (como en cualquier mostrador).
  * El IVA de cada línea se extrae dividiendo el monto gravado por 11 (10%) o
- * por 21 (5%) — fórmula estándar cuando el precio es "IVA incluido".
+ * por 21 (5%) — fórmula VERIFICADA (no de memoria): Decreto N° 3107/2019
+ * (reglamento del IVA, Ley 6380/2019), Artículo 41: "...se dividirá por
+ * once (11) el precio total de la operación para las operaciones gravadas
+ * con la tasa del diez por ciento (10%), y por veintiuno (21) para las
+ * operaciones gravadas con la tasa del cinco por ciento (5%)".
  *
- * Esta fórmula sale de cómo se arma habitualmente una factura paraguaya, no
- * de una fuente oficial verificada de la DNIT — conviene que el dueño (o su
- * contador) revise el primer ticket de factura impreso antes de usarlo con
- * clientes de verdad.
+ * Redondeo: ni el Decreto 3107/2019 ni la Ley 6380/2019 establecen una
+ * regla de redondeo o cantidad de decimales para los montos de una factura
+ * — no está reglamentado. Acá el cálculo se hace sin redondear, se guarda
+ * con 2 decimales de precisión (columnas `Decimal(10,2)`) y se redondea al
+ * guaraní entero recién al mostrarlo (`formatearGuarani`/`formatearMiles`),
+ * porque el guaraní no tiene submúltiplo en uso — mismo criterio que
+ * cualquier factura paraguaya real, que nunca imprime decimales.
  */
 
 export type LineaConIva = { precioUnitario: number; cantidad: number; iva: string };

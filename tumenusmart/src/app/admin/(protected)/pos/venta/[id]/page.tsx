@@ -182,7 +182,11 @@ export default async function DetalleVentaPosPage({
               El turno de esta cuenta ya está cerrado — no se puede cancelar.
             </p>
           ) : (
-            <CancelarVentaBoton ventaId={venta.id} />
+            <CancelarVentaBoton
+              ventaId={venta.id}
+              comprobanteTipo={venta.comprobanteTipo}
+              facturaNumero={venta.facturaNumero}
+            />
           ))}
       </div>
     </div>

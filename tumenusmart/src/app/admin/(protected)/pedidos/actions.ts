@@ -105,9 +105,10 @@ async function intentarEmitirFactura(
 export async function cambiarEstadoPedido(
   orderId: string,
   estado: string,
-  formaPagoPos?: string
+  formaPagoPos?: string,
+  motivo?: string
 ): Promise<ResultadoPedidoAccion> {
-  await exigirPermiso("pedidos.cambiarEstado");
+  const sesion = await exigirPermiso("pedidos.cambiarEstado");
   // Todas las consultas de acá abajo quedan atadas a este local.
   const prisma = prismaDelLocal(await idLocalActual());
 
@@ -117,6 +118,22 @@ export async function cambiarEstadoPedido(
 
   let datosFactura: Record<string, unknown> = {};
   let aviso: string | undefined;
+
+  // Mismo criterio que cancelarVenta del POS: motivo obligatorio, queda
+  // quién y cuándo — para cualquier pedido, tenga factura o no. Si ya tenía
+  // un facturaNumero asignado, ese número queda consumido para siempre (no
+  // se revierte el contador del punto de expedición, igual que un
+  // talonario de papel al que se le anula una hoja).
+  if (estado === "cancelado") {
+    if (!motivo?.trim()) {
+      return { ok: false, error: "Decí por qué se cancela — queda en el historial." };
+    }
+    datosFactura = {
+      canceladaPor: sesion.nombre?.trim() || sesion.email,
+      canceladaEn: new Date(),
+      motivoCancelacion: motivo.trim(),
+    };
+  }
 
   if (estado === "en_despacho") {
     const pedido = await prisma.order.findUnique({

@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { Boton, Campo, Entrada, MensajeError } from "@/components/ui";
-import { etiquetaTipoIdentificacion } from "@/lib/tipo-cliente";
+import { Boton, Campo, Entrada, Selector, MensajeError } from "@/components/ui";
+import { TIPOS_IDENTIFICACION_FISCAL } from "@/lib/tipo-cliente";
 import { formatearNumero } from "@/lib/format";
 import { actualizarCliente } from "./actions";
 
@@ -10,10 +10,12 @@ import { actualizarCliente } from "./actions";
  * Edición de un cliente ya existente, en ventana modal (mismo estilo que
  * ClienteFiscalModal/CobrarModal del POS).
  *
- * Clave y tipo+número de identificación quedan de solo lectura: son la
- * clave única del registro, y editarlos arriesgaría reasignar la identidad
- * de un cliente que ya tiene ventas pasadas. Solo se editan Nombre y
- * Correo.
+ * Clave queda de solo lectura (correlativo interno, no algo que se
+ * "corrige"). Tipo + N° de identificación SÍ se pueden corregir: los datos
+ * de una venta ya emitida quedan congelados en sus propios campos
+ * (VentaPos/Order), así que editar esta ficha no altera ningún ticket ya
+ * impreso — sirve para arreglar un RUC/razón social mal tipeado de acá en
+ * adelante.
  */
 export function ClienteEditarModal({
   id,
@@ -36,6 +38,9 @@ export function ClienteEditarModal({
 }) {
   const [valorNombre, setValorNombre] = useState(nombre);
   const [valorEmail, setValorEmail] = useState(email ?? "");
+  const [valorTipo, setValorTipo] = useState(tipoIdentificacion ?? TIPOS_IDENTIFICACION_FISCAL[0].valor);
+  const [valorNumeroIdent, setValorNumeroIdent] = useState(numeroIdentificacion ?? "");
+  const [tieneIdentificacion, setTieneIdentificacion] = useState(!!numeroIdentificacion);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -50,7 +55,12 @@ export function ClienteEditarModal({
   function guardar() {
     setError(null);
     startTransition(async () => {
-      const r = await actualizarCliente(id, { nombre: valorNombre, email: valorEmail });
+      const r = await actualizarCliente(id, {
+        nombre: valorNombre,
+        email: valorEmail,
+        tipoIdentificacion: tieneIdentificacion ? valorTipo : "",
+        numeroIdentificacion: tieneIdentificacion ? valorNumeroIdent : "",
+      });
       if (!r.ok) {
         setError(r.error);
         return;
@@ -93,20 +103,44 @@ export function ClienteEditarModal({
             <Entrada value={numero != null ? formatearNumero(numero) : "—"} disabled />
           </Campo>
 
-          <Campo etiqueta="Identificación fiscal">
-            <Entrada
-              value={
-                tipoIdentificacion && numeroIdentificacion
-                  ? `${etiquetaTipoIdentificacion(tipoIdentificacion)}: ${numeroIdentificacion}`
-                  : "—"
-              }
-              disabled
-            />
-          </Campo>
-
           <Campo etiqueta="Nombre / Razón social">
             <Entrada value={valorNombre} onChange={(e) => setValorNombre(e.target.value)} autoFocus />
           </Campo>
+
+          {tieneIdentificacion ? (
+            <>
+              <Campo etiqueta="Tipo">
+                <Selector value={valorTipo} onChange={(e) => setValorTipo(e.target.value)}>
+                  {TIPOS_IDENTIFICACION_FISCAL.map((t) => (
+                    <option key={t.valor} value={t.valor}>
+                      {t.etiqueta}
+                    </option>
+                  ))}
+                </Selector>
+              </Campo>
+              <Campo etiqueta="N° de RUC / Cédula / etc.">
+                <Entrada value={valorNumeroIdent} onChange={(e) => setValorNumeroIdent(e.target.value)} />
+              </Campo>
+              <button
+                type="button"
+                onClick={() => {
+                  setTieneIdentificacion(false);
+                  setValorNumeroIdent("");
+                }}
+                className="self-start text-[0.76rem] font-medium text-tinta-suave underline"
+              >
+                Quitar identificación fiscal
+              </button>
+            </>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setTieneIdentificacion(true)}
+              className="self-start text-[0.76rem] font-medium text-brand-texto underline"
+            >
+              + Agregar identificación fiscal
+            </button>
+          )}
 
           <Campo etiqueta="Correo electrónico">
             <Entrada

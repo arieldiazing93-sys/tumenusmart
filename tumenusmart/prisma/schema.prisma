@@ -625,6 +625,15 @@ model Order {
   facturaRucEmisor         String?
 
   notas                String?
+
+  // Auditoría de cancelación — mismos campos y mismo criterio que
+  // VentaPos: no se borra la fila, queda quién y por qué. A diferencia de
+  // VentaPos (que tiene un booleano `cancelada` aparte), acá "cancelado" ya
+  // es uno de los valores posibles de `estado`.
+  canceladaPor      String?
+  canceladaEn       DateTime?
+  motivoCancelacion String?
+
   // El pedido se guarda ANTES de que el cliente apriete "Enviar por
   // WhatsApp". Esta marca distingue los pedidos realmente enviados de los
   // que el cliente armó y abandonó en el último paso.
