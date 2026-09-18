@@ -18,7 +18,8 @@ export async function GET() {
     return new NextResponse(certificadoQz(), {
       headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store" },
     });
-  } catch {
+  } catch (err) {
+    console.error("Fallo al servir el certificado de QZ Tray:", err);
     return new NextResponse("Impresión silenciosa no configurada", { status: 500 });
   }
 }

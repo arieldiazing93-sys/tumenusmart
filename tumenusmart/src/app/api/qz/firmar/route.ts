@@ -22,7 +22,10 @@ export async function POST(request: NextRequest) {
 
   try {
     return NextResponse.json({ firma: firmarParaQz(mensaje) });
-  } catch {
+  } catch (err) {
+    // Sin este log, un 500 acá es una caja negra — no se sabe si falta la
+    // variable de entorno o si la clave tiene un formato que Node rechaza.
+    console.error("Fallo al firmar para QZ Tray:", err);
     return NextResponse.json({ error: "Impresión silenciosa no configurada" }, { status: 500 });
   }
 }
