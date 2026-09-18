@@ -1,6 +1,6 @@
 "use client";
 
-import { imprimirHtml, conectarQz } from "./qz-tray";
+import { imprimirHtml, conectarQz, cortarPapel } from "./qz-tray";
 
 /**
  * Trae el fragmento imprimible de una de las páginas de ticket/comanda, SIN
@@ -60,8 +60,15 @@ export async function imprimirComprobante(
   try {
     const html = await traerFragmentoImprimible(url);
     await imprimirHtml(nombreImpresora, html, anchoMm);
-    return { ok: true };
   } catch (e) {
     return { ok: false, motivo: "error", detalle: String(e) };
   }
+  // El corte es "mejor esfuerzo": si falla, el comprobante ya salió impreso
+  // igual — no tiene sentido avisar de un fallo de impresión por esto.
+  try {
+    await cortarPapel(nombreImpresora);
+  } catch {
+    // no-op: mejor esfuerzo, no falla el comprobante por esto
+  }
+  return { ok: true };
 }
