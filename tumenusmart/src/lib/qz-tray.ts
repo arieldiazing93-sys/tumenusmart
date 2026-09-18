@@ -78,16 +78,14 @@ export async function imprimirHtml(nombreImpresora: string, html: string, anchoM
   const qz = await cargarQz();
   const config = qz.configs.create(nombreImpresora, {
     units: "mm",
-    // Probado en impresora térmica real: una altura fija (ej. 297mm, A4)
-    // hace que la impresora alimente esa hoja COMPLETA en cada trabajo,
-    // dejando en blanco todo lo que sobra después del contenido real (que
-    // mide mucho menos) — "medio metro de papel" para un ticket de 10
-    // líneas. 3276mm es el valor que QZ Tray/los drivers de impresoras de
-    // recibos tratan como "rollo continuo": el driver corta apenas termina
-    // el contenido real, no en un tamaño fijo. `custom: true` porque ese
-    // alto no es un tamaño de papel estándar de Windows.
-    size: { width: anchoMm, height: 3276, custom: true },
-    scaleContent: true,
+    // Probado en impresora térmica real, dos veces: con una altura fija de
+    // 297mm sobraba papel en blanco después del contenido; con 3276mm
+    // (el valor "rollo continuo" que se recomienda para otros drivers)
+    // sobraba TODAVÍA MÁS — este driver no recorta solo, imprime el alto
+    // que se le pida. Sin `size.height` (solo ancho), QZ Tray mide el
+    // contenido real y arma la página a esa altura.
+    size: { width: anchoMm },
+    scaleContent: false,
     rasterize: false,
     // Sin esto, QZ Tray renderiza el HTML a 72 DPI (la resolución típica de
     // pantalla) y después lo estira para cubrir el ancho físico del papel
