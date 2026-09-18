@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { pantallaConPermiso } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
 import { prismaDelLocal } from "@/lib/prisma-local";
 import { idLocalActual } from "@/lib/local-actual";
 import { estacionActual } from "@/lib/estacion-actual";
@@ -30,6 +31,13 @@ export default async function PosPage() {
   const puntoExpedicion = estacionConPunto?.puntoExpedicion ?? null;
   const puedeFacturar = !!puntoExpedicion?.activo && puntoExpedicion.timbradoHasta > new Date();
   const diasParaVencerTimbrado = puntoExpedicion ? diasParaVencer(puntoExpedicion.timbradoHasta) : null;
+
+  // Store no pertenece a ningún local (no está en MODELOS_POR_LOCAL), por
+  // eso se lee con el cliente global, no con `db`.
+  const store = await prisma.store.findUnique({
+    where: { id: storeId },
+    select: { facturaObligatoria: true },
+  });
 
   const categorias = await db.category.findMany({
     where: { activa: true },
@@ -109,6 +117,7 @@ export default async function PosPage() {
       gruposMitad={gruposMitad}
       puedeFacturar={puedeFacturar}
       diasParaVencerTimbrado={diasParaVencerTimbrado}
+      facturaObligatoria={store?.facturaObligatoria ?? false}
     />
   );
 }

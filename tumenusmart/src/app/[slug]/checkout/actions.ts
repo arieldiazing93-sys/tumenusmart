@@ -3,6 +3,7 @@
 import { localPorSlug, estaSuspendido } from "@/lib/local-por-slug";
 import { prisma } from "@/lib/prisma";
 import { siguienteNumeroPedido } from "@/lib/prisma-local";
+import { SIN_REGISTRO_FISCAL } from "@/lib/tipo-cliente";
 import { distanciaKm, encontrarZonaPorDistancia } from "@/lib/geo";
 import { obtenerEstadoTienda, motivoSinPedidos } from "@/lib/estado-tienda";
 import {
@@ -257,6 +258,16 @@ export async function crearPedido(datos: DatosCheckout): Promise<ResultadoPedido
   // falla en las validaciones de más arriba, no se gasta un número al pedo.
   const numero = await siguienteNumeroPedido(storeId);
 
+  // Si el local exige facturar TODA venta (timbrado Autoimpresor, RG
+  // 90/2021) y el cliente eligió "Ticket" (no quiso dar sus datos
+  // fiscales), se factura igual, a Consumidor Final ("Sin Nombre") —
+  // conversión transparente del servidor: el checkout público no cambia su
+  // UI ni su experiencia (ver también el mensaje de WhatsApp en
+  // src/app/[slug]/pedido/[id]/page.tsx, que tiene que seguir pareciendo un
+  // ticket para que esta transparencia sea real).
+  const facturaComoTicket = datos.comprobanteTipo === "ticket" && local.facturaObligatoria;
+  const comprobanteTipoFinal = facturaComoTicket ? "factura" : datos.comprobanteTipo;
+
   const order = await prisma.order.create({
     data: {
       storeId,
@@ -271,10 +282,22 @@ export async function crearPedido(datos: DatosCheckout): Promise<ResultadoPedido
       clienteLat: datos.clienteLat,
       clienteLng: datos.clienteLng,
       metodoPagoReferencia: datos.metodoPagoReferencia,
-      comprobanteTipo: datos.comprobanteTipo,
-      facturaRazonSocial:
-        datos.comprobanteTipo === "factura" ? recortar(datos.facturaRazonSocial, LARGO.razonSocial) : undefined,
-      facturaRuc: datos.comprobanteTipo === "factura" ? recortar(datos.facturaRuc, LARGO.ruc) : undefined,
+      comprobanteTipo: comprobanteTipoFinal,
+      // Con RUC real el checkout público no pide tipo — se guarda "ruc" fijo,
+      // solo para que el ticket sepa qué etiqueta imprimir después (ver
+      // src/lib/tipo-cliente.ts).
+      facturaTipoIdentificacion:
+        comprobanteTipoFinal === "factura" ? (facturaComoTicket ? SIN_REGISTRO_FISCAL.tipo : "ruc") : undefined,
+      facturaRazonSocial: facturaComoTicket
+        ? null
+        : datos.comprobanteTipo === "factura"
+          ? recortar(datos.facturaRazonSocial, LARGO.razonSocial)
+          : undefined,
+      facturaRuc: facturaComoTicket
+        ? SIN_REGISTRO_FISCAL.numero
+        : datos.comprobanteTipo === "factura"
+          ? recortar(datos.facturaRuc, LARGO.ruc)
+          : undefined,
       facturaEmail: datos.comprobanteTipo === "factura" ? recortar(datos.facturaEmail, LARGO.email) : undefined,
       notas: recortar(datos.notas, LARGO.notas),
       subtotal,

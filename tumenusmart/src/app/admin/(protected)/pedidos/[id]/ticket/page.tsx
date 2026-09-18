@@ -5,6 +5,7 @@ import { idLocalActual } from "@/lib/local-actual";
 import { formatearGuarani, formatearMiles, formatearNumero, formatearTelefonoLocal, sinAcentos } from "@/lib/format";
 import { numeroALetras } from "@/lib/numero-a-letras";
 import { etiquetaMetodoPago } from "@/lib/metodos-pago";
+import { SIN_REGISTRO_FISCAL, etiquetaTipoIdentificacion } from "@/lib/tipo-cliente";
 import { ZONA_NEGOCIO } from "@/lib/timezone";
 import { ImprimirAuto } from "@/components/ImprimirAuto";
 
@@ -126,6 +127,7 @@ export default async function TicketPage({
 
   const esDelivery = pedido.tipoEntrega === "delivery";
   const esFactura = pedido.comprobanteTipo === "factura" && !!pedido.facturaNumero;
+  const esSinNombre = pedido.facturaTipoIdentificacion === SIN_REGISTRO_FISCAL.tipo;
 
   return (
     <>
@@ -178,14 +180,24 @@ export default async function TicketPage({
             <div>
               {esFactura ? (
                 <>
-                  <p>Razon social: {sinAcentos(pedido.facturaRazonSocial ?? "")}</p>
-                  <p>RUC: {pedido.facturaRuc}</p>
+                  <p>
+                    Razon social: {esSinNombre ? SIN_REGISTRO_FISCAL.etiquetaDisplay : sinAcentos(pedido.facturaRazonSocial ?? "")}
+                  </p>
+                  <p>
+                    {esSinNombre ? "RUC" : sinAcentos(etiquetaTipoIdentificacion(pedido.facturaTipoIdentificacion ?? "ruc"))}
+                    : {pedido.facturaRuc}
+                  </p>
                 </>
               ) : (
                 <>
                   <p className="uppercase">Datos para factura</p>
-                  <p>Razon social: {sinAcentos(pedido.facturaRazonSocial ?? "")}</p>
-                  <p>RUC: {pedido.facturaRuc}</p>
+                  <p>
+                    Razon social: {esSinNombre ? SIN_REGISTRO_FISCAL.etiquetaDisplay : sinAcentos(pedido.facturaRazonSocial ?? "")}
+                  </p>
+                  <p>
+                    {esSinNombre ? "RUC" : sinAcentos(etiquetaTipoIdentificacion(pedido.facturaTipoIdentificacion ?? "ruc"))}
+                    : {pedido.facturaRuc}
+                  </p>
                   {pedido.facturaEmail && <p>Correo: {pedido.facturaEmail}</p>}
                 </>
               )}

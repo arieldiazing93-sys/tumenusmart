@@ -1,20 +1,25 @@
 import { pantallaConPermiso } from "@/lib/auth";
 import { prismaDelLocal } from "@/lib/prisma-local";
+import { prisma as prismaGlobal } from "@/lib/prisma";
 import { idLocalActual } from "@/lib/local-actual";
 import { Cabecera, Vacio } from "@/components/ui";
 import { claveDiaAsuncion } from "@/lib/timezone";
 import { CrearPuntoExpedicionForm } from "./CrearPuntoExpedicionForm";
 import { PuntoExpedicionFila } from "./PuntoExpedicionFila";
+import { FacturaObligatoriaToggle } from "./FacturaObligatoriaToggle";
 
 export const dynamic = "force-dynamic";
 
 export default async function PuntosExpedicionPage() {
   await pantallaConPermiso("pos.gestionarEstaciones");
-  const prisma = prismaDelLocal(await idLocalActual());
+  const idLocal = await idLocalActual();
+  const prisma = prismaDelLocal(idLocal);
 
-  const puntos = await prisma.puntoExpedicion.findMany({
-    orderBy: { createdAt: "asc" },
-  });
+  const [puntos, store] = await Promise.all([
+    prisma.puntoExpedicion.findMany({ orderBy: { createdAt: "asc" } }),
+    // Store no pertenece a ningún local, se lee con el cliente global.
+    prismaGlobal.store.findUnique({ where: { id: idLocal }, select: { facturaObligatoria: true } }),
+  ]);
 
   return (
     <div>
@@ -22,6 +27,8 @@ export default async function PuntosExpedicionPage() {
         titulo="Puntos de expedición"
         bajada="Los puntos de expedición que la DNIT autorizó para Factura Autoimpresor — cada uno con su propio timbrado y numeración. Se asignan a las estaciones en Estaciones."
       />
+
+      <FacturaObligatoriaToggle obligatoria={store?.facturaObligatoria ?? false} />
 
       <CrearPuntoExpedicionForm />
 

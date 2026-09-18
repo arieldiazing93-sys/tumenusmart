@@ -61,6 +61,14 @@ model Store {
   pedidosPausados Boolean @default(false)
   mensajePausa    String? // motivo opcional que ve el cliente al entrar
 
+  // Política a nivel LOCAL (no de un punto de expedición puntual): si el
+  // timbrado Autoimpresor de este negocio exige facturar TODA venta (RG
+  // 90/2021 SET/DNIT), el dueño lo prende acá. Prendido: el POS deja de
+  // ofrecer "Ticket" y el checkout público sigue mostrando las mismas dos
+  // opciones de siempre, pero "Ticket" se guarda igual como factura a
+  // Consumidor Final. Default false: comportamiento actual, sin cambios.
+  facturaObligatoria Boolean @default(false)
+
   // --- Fidelización ---
   // Cada N pedidos ENTREGADOS del mismo cliente suman uno para un premio.
   // Sin niveles ni puntos: un umbral y un premio en texto libre.
@@ -576,6 +584,10 @@ model Order {
   comprobanteTipo      String        @default("ticket") // "ticket" | "factura"
   facturaRazonSocial   String?
   facturaRuc           String?
+  // Clasificación fiscal SET del comprador (Tabla 3, RG 90/2021) — "ruc" |
+  // "sin_nombre" | etc. (ver src/lib/tipo-cliente.ts). Null en pedidos de
+  // antes de esta fase, donde solo se guardaba razón social/RUC a secas.
+  facturaTipoIdentificacion String?
   facturaEmail         String?
 
   // Fiscales — se completan y se CONGELAN solo cuando se emite como

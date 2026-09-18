@@ -12,6 +12,7 @@ import { Tarjeta, Aviso } from "@/components/ui";
 import { BotonWhatsapp } from "./BotonWhatsapp";
 import { localPorSlug } from "@/lib/local-por-slug";
 import { progresoDeCliente } from "@/lib/fidelidad";
+import { SIN_REGISTRO_FISCAL } from "@/lib/tipo-cliente";
 
 export const dynamic = "force-dynamic";
 
@@ -43,6 +44,13 @@ export default async function SeguimientoPedidoPage({
 
   const linkSeguimiento = await urlSeguimiento(slug, order.id);
 
+  // Si esto fue una conversión transparente (el cliente eligió "Ticket" pero
+  // el local factura todo — ver checkout/actions.ts), el mensaje de
+  // WhatsApp que el cliente ve en su propio teléfono tiene que seguir
+  // pareciendo un ticket: mostrarle "Comprobante: Factura" / "RUC: X"
+  // delataría una conversión que para él tiene que ser invisible.
+  const esConversionTransparente = order.facturaTipoIdentificacion === SIN_REGISTRO_FISCAL.tipo;
+
   const mensaje = construirMensajePedido({
     numero: order.numero,
     saludo: store.mensajeSaludo,
@@ -54,7 +62,7 @@ export default async function SeguimientoPedidoPage({
     clienteLat: order.clienteLat,
     clienteLng: order.clienteLng,
     metodoPagoReferencia: order.metodoPagoReferencia,
-    comprobanteTipo: order.comprobanteTipo,
+    comprobanteTipo: esConversionTransparente ? "ticket" : order.comprobanteTipo,
     facturaRazonSocial: order.facturaRazonSocial,
     facturaRuc: order.facturaRuc,
     facturaEmail: order.facturaEmail,

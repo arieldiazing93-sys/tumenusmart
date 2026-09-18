@@ -4,6 +4,7 @@ import { exigirPermiso } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 import { idLocalActual } from "@/lib/local-actual";
 import { prismaDelLocal } from "@/lib/prisma-local";
+import { prisma } from "@/lib/prisma";
 
 export type ResultadoPuntoExpedicion = { ok: true } | { ok: false; error: string };
 
@@ -108,4 +109,19 @@ export async function alternarActivoPuntoExpedicion(id: string, activo: boolean)
 
   await prisma.puntoExpedicion.update({ where: { id }, data: { activo } });
   revalidatePath("/admin/pos/puntos-expedicion");
+}
+
+/**
+ * Política a nivel de LOCAL, no de un punto de expedición puntual — ver
+ * Store.facturaObligatoria. Se guarda al instante, mismo patrón que
+ * alternarPausaPedidos (src/app/admin/(protected)/configuracion/actions.ts).
+ */
+export async function alternarFacturaObligatoria(obligatoria: boolean): Promise<void> {
+  await exigirPermiso("pos.gestionarEstaciones");
+  await prisma.store.update({
+    where: { id: await idLocalActual() },
+    data: { facturaObligatoria: obligatoria },
+  });
+  revalidatePath("/admin/pos/puntos-expedicion");
+  revalidatePath("/admin/pos");
 }

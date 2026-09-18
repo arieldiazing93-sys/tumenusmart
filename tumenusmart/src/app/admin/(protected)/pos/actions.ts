@@ -107,10 +107,13 @@ export async function registrarVenta(turnoId: string, datos: DatosVenta): Promis
   const storeId = await idLocalActual();
   const db = prismaDelLocal(storeId);
 
-  const turno = await db.turnoPos.findUnique({
-    where: { id: turnoId },
-    select: { id: true, estado: true, estacion: { select: { puntoExpedicion: true } } },
-  });
+  const [turno, store] = await Promise.all([
+    db.turnoPos.findUnique({
+      where: { id: turnoId },
+      select: { id: true, estado: true, estacion: { select: { puntoExpedicion: true } } },
+    }),
+    prisma.store.findUnique({ where: { id: storeId }, select: { facturaObligatoria: true } }),
+  ]);
   if (!turno) return { ok: false, error: "Ese turno no existe." };
   if (turno.estado !== "abierto") {
     return { ok: false, error: "Ese turno ya está cerrado. Abrí uno nuevo para seguir vendiendo." };
@@ -123,6 +126,30 @@ export async function registrarVenta(turnoId: string, datos: DatosVenta): Promis
   const esFactura = datos.comprobanteTipo === "factura";
   const esSinRegistroFiscal = datos.facturaTipoIdentificacion === SIN_REGISTRO_FISCAL.tipo;
   const puntoExpedicion = turno.estacion.puntoExpedicion;
+  const facturaObligatoria = store?.facturaObligatoria ?? false;
+  const puntoVigente = !!puntoExpedicion && puntoExpedicion.activo && puntoExpedicion.timbradoHasta > new Date();
+
+  // Si el local exige facturar toda venta (timbrado Autoimpresor, RG
+  // 90/2021): sin punto vigente en esta estación no hay forma legal de
+  // vender nada, y con punto vigente no se puede colar un "ticket". Nunca
+  // hay que confiar en lo que mande el navegador — PantallaVenta ya oculta
+  // estas opciones, pero esta validación es la que de verdad importa.
+  if (facturaObligatoria) {
+    if (!puntoVigente) {
+      return {
+        ok: false,
+        error:
+          "Este local exige facturar todas las ventas y esta estación no tiene un punto de expedición vigente asignado. Pedile al dueño que lo asigne en Puntos de expedición.",
+      };
+    }
+    if (!esFactura) {
+      return {
+        ok: false,
+        error: "Este local exige facturar todas las ventas — no se puede vender como ticket.",
+      };
+    }
+  }
+
   if (esFactura) {
     if (!datos.facturaTipoIdentificacion) {
       return { ok: false, error: "Elegí con o sin registro fiscal." };

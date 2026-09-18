@@ -61,6 +61,7 @@ export function PantallaVenta({
   gruposMitad,
   puedeFacturar,
   diasParaVencerTimbrado,
+  facturaObligatoria,
 }: {
   turnoId: string;
   categorias: Categoria[];
@@ -69,14 +70,24 @@ export function PantallaVenta({
   puedeFacturar: boolean;
   /** Días hasta que venza el timbrado de esa estación, o null si no aplica. */
   diasParaVencerTimbrado: number | null;
+  /** Si el local exige facturar TODA venta (timbrado Autoimpresor). */
+  facturaObligatoria: boolean;
 }) {
   const router = useRouter();
+  // Si el local exige facturar todo y esta estación puede hacerlo, no hay
+  // "Ticket" que elegir — arranca directo en factura. Si exige facturar
+  // todo pero esta estación NO puede (sin punto de expedición vigente), no
+  // se puede vender nada (ver bloqueadoSinFacturar más abajo).
+  const facturaForzada = facturaObligatoria && puedeFacturar;
+  const bloqueadoSinFacturar = facturaObligatoria && !puedeFacturar;
   const [categoriaId, setCategoriaId] = useState<string>(categorias[0]?.id ?? TODOS);
   const [carrito, setCarrito] = useState<ItemCarrito[]>([]);
   const [clienteNombre, setClienteNombre] = useState("");
   const [clienteTelefono, setClienteTelefono] = useState("");
   const [tipoEntrega, setTipoEntrega] = useState<TipoEntregaPos>("local");
-  const [comprobanteTipo, setComprobanteTipo] = useState<"ticket" | "factura">("ticket");
+  const [comprobanteTipo, setComprobanteTipo] = useState<"ticket" | "factura">(
+    facturaForzada ? "factura" : "ticket"
+  );
   const [registroFiscal, setRegistroFiscal] = useState<"con" | "sin">("con");
   const [facturaRazonSocial, setFacturaRazonSocial] = useState("");
   const [facturaNumeroIdentificacion, setFacturaNumeroIdentificacion] = useState("");
@@ -519,14 +530,21 @@ export function PantallaVenta({
                   {diasParaVencerTimbrado === 1 ? "" : "s"}.
                 </p>
               )}
-              <Segmentado
-                opciones={[
-                  { value: "ticket", label: "Ticket" },
-                  { value: "factura", label: "Factura" },
-                ]}
-                valor={comprobanteTipo}
-                onChange={setComprobanteTipo}
-              />
+              {facturaObligatoria ? (
+                <p className="rounded-lg bg-papel-suave px-3 py-2 text-[0.78rem] text-tinta-media">
+                  Este local factura todas las ventas — no se puede vender
+                  como ticket.
+                </p>
+              ) : (
+                <Segmentado
+                  opciones={[
+                    { value: "ticket", label: "Ticket" },
+                    { value: "factura", label: "Factura" },
+                  ]}
+                  valor={comprobanteTipo}
+                  onChange={setComprobanteTipo}
+                />
+              )}
               {comprobanteTipo === "factura" && (
                 <div className="flex flex-col gap-2 rounded-lg border border-linea bg-papel-suave p-3">
                   <Segmentado
@@ -618,6 +636,17 @@ export function PantallaVenta({
             </div>
           )}
 
+          {bloqueadoSinFacturar && (
+            <div className="flex flex-col gap-2 border-t border-linea pt-3.5">
+              <p className="rounded-lg bg-peligro-luz px-3 py-2 text-[0.82rem] font-medium text-peligro">
+                Este local exige facturar todas las ventas y esta estación no
+                tiene un punto de expedición vigente asignado. No se puede
+                cobrar hasta que el dueño le asigne uno en Configuración de
+                facturas → Puntos de expedición.
+              </p>
+            </div>
+          )}
+
           <div className="flex flex-col gap-2 border-t border-linea pt-3.5">
             <p className="text-[0.72rem] font-semibold uppercase tracking-rotulo text-tinta-suave">
               Entrega
@@ -644,7 +673,7 @@ export function PantallaVenta({
           <div className="hidden lg:block">
             <Boton
               onClick={() => setMostrarCobro(true)}
-              disabled={carrito.length === 0}
+              disabled={carrito.length === 0 || bloqueadoSinFacturar}
               tam="lg"
               className="w-full"
             >
@@ -657,7 +686,7 @@ export function PantallaVenta({
       {/* Barra de cobro fija en celular/tablet angosto: el carrito queda
           debajo de toda la grilla, así que sin esto habría que scrollear
           hasta el final cada vez para cobrar. */}
-      {carrito.length > 0 && (
+      {carrito.length > 0 && !bloqueadoSinFacturar && (
         <div
           className="fixed inset-x-0 bottom-0 z-30 border-t border-linea bg-papel/95 px-4 py-3 shadow-alta backdrop-blur-sm lg:hidden"
           style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom, 0px))" }}

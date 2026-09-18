@@ -5,6 +5,7 @@ import { prismaDelLocal } from "@/lib/prisma-local";
 import { idLocalActual } from "@/lib/local-actual";
 import { formatearGuarani, formatearNumero } from "@/lib/format";
 import { etiquetaMetodoPago } from "@/lib/metodos-pago";
+import { SIN_REGISTRO_FISCAL, etiquetaTipoIdentificacion } from "@/lib/tipo-cliente";
 import { EstadoBotones } from "../EstadoBotones";
 import { RepartidorSelect } from "../RepartidorSelect";
 import { ZONA_NEGOCIO } from "@/lib/timezone";
@@ -150,8 +151,18 @@ export default async function DetallePedidoPage({
               <p className="font-medium">
                 {pedido.facturaNumero ? `Factura N° ${pedido.facturaNumero}` : "Factura (todavía sin emitir)"}
               </p>
-              <p>Razón social: {pedido.facturaRazonSocial}</p>
-              <p>RUC: {pedido.facturaRuc}</p>
+              <p>
+                Razón social:{" "}
+                {pedido.facturaTipoIdentificacion === SIN_REGISTRO_FISCAL.tipo
+                  ? SIN_REGISTRO_FISCAL.etiquetaDisplay
+                  : pedido.facturaRazonSocial}
+              </p>
+              <p>
+                {pedido.facturaTipoIdentificacion === SIN_REGISTRO_FISCAL.tipo
+                  ? "RUC"
+                  : etiquetaTipoIdentificacion(pedido.facturaTipoIdentificacion ?? "ruc")}
+                : {pedido.facturaRuc}
+              </p>
               {pedido.facturaEmail && <p>Correo: {pedido.facturaEmail}</p>}
               {!pedido.facturaNumero && (
                 <p className="mt-1 text-tinta-media">
