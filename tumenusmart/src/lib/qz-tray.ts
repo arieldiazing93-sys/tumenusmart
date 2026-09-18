@@ -81,6 +81,14 @@ export async function imprimirHtml(nombreImpresora: string, html: string, anchoM
     size: { width: anchoMm, height: 297 },
     scaleContent: true,
     rasterize: false,
+    // Sin esto, QZ Tray renderiza el HTML a 72 DPI (la resolución típica de
+    // pantalla) y después lo estira para cubrir el ancho físico del papel
+    // — probado en una impresora térmica real: sale borroso, con
+    // interlineado exagerado y muy poco texto por línea. 203 DPI es la
+    // densidad estándar de las impresoras térmicas de recibos (8
+    // puntos/mm) — con esto renderiza a la resolución real del papel en
+    // vez de escalar una imagen de baja resolución.
+    density: 203,
   });
   await qz.print(config, [{ type: "pixel", format: "html", flavor: "plain", data: html }]);
 }
