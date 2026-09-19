@@ -7,6 +7,8 @@ import { idLocalActual } from "@/lib/local-actual";
 import { exigirPermiso } from "@/lib/auth";
 import { resumirCierre } from "@/lib/rendicion";
 import { instanteAsuncionDesdeTexto } from "@/lib/timezone";
+import { estacionActual } from "@/lib/estacion-actual";
+import { turnoAbierto } from "../pos/turno-actual";
 
 /**
  * Recibir la plata de un repartidor y cerrar su vuelta.
@@ -80,6 +82,14 @@ export async function cerrarRendicion(
     };
   }
 
+  // Si esta computadora tiene una estación vinculada con un turno de caja
+  // abierto, esta rendición queda atada a ese turno — así el cierre general
+  // del turno la puede sumar aparte (ver cerrarTurno en pos/actions.ts). Sin
+  // estación/turno (un local que no usa Punto de Venta), queda suelta como
+  // siempre.
+  const estacion = await estacionActual(db);
+  const turno = estacion ? await turnoAbierto(db, estacion.id) : null;
+
   // Se devuelve el id para poder abrir el comprobante recién cerrado sin
   // tener que buscarlo en la lista.
   const rendicionId = await prisma.$transaction(async (tx) => {
@@ -92,6 +102,7 @@ export async function cerrarRendicion(
         totalOtros: resumen.otros,
         recibidoPor: sesion.nombre?.trim() || sesion.email,
         notas: notas.trim() || null,
+        turnoPosId: turno?.id,
       },
     });
 
@@ -108,5 +119,10 @@ export async function cerrarRendicion(
 
   revalidatePath("/admin/cierre");
   revalidatePath("/admin/pedidos");
+  if (turno) {
+    revalidatePath("/admin/pos");
+    revalidatePath("/admin/pos/turnos");
+    revalidatePath(`/admin/pos/turnos/${turno.id}`);
+  }
   return { ok: true, efectivo: resumen.efectivo, rendicionId };
 }

@@ -37,3 +37,31 @@ export async function pedidosDelTurno(db: PrismaLocal, turnoId: string) {
     },
   });
 }
+
+/**
+ * Entregas de delivery "en la calle" — despachadas o entregadas pero
+ * todavía sin rendir (`rendicionId` vacío) — en TODO el local, sin importar
+ * la estación.
+ *
+ * Se usa para frenar el cierre de un turno: si un repartidor todavía tiene
+ * plata sin devolver, cerrar caja daría un corte general incompleto (ver
+ * cerrarTurno en pos/actions.ts). Es a propósito store-wide y no por
+ * estación — el reparto no es exclusivo de una computadora, y lo que importa
+ * acá es que no quede plata circulando sin cerrar, sin importar desde dónde
+ * se despachó.
+ */
+export async function entregasSinRendir(db: PrismaLocal) {
+  return db.order.findMany({
+    where: {
+      tipoEntrega: "delivery",
+      estado: { in: ["en_despacho", "entregado"] },
+      rendicionId: null,
+    },
+    select: {
+      id: true,
+      numero: true,
+      estado: true,
+      repartidor: { select: { nombre: true } },
+    },
+  });
+}

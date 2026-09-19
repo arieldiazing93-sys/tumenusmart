@@ -785,8 +785,17 @@ model Rendicion {
 
   pedidos      Order[]
 
+  // A qué turno de caja queda atada — el mismo criterio que Order.turnoPosId
+  // para retiro/mesa: se pega sola al turno abierto en la estación desde
+  // donde se recibió, para que el cierre general del turno pueda sumarla.
+  // Sin estación/turno vinculado (un local que no usa Punto de Venta) queda
+  // en null, exactamente como funcionaba antes de esto.
+  turnoPosId String?
+  turnoPos   TurnoPos? @relation(fields: [turnoPosId], references: [id])
+
   @@index([storeId])
   @@index([repartidorId])
+  @@index([turnoPosId])
 }
 
 /// El turno de caja del Punto de Venta (mostrador).
@@ -834,6 +843,11 @@ model TurnoPos {
   // Pedidos de retiro/mesa cobrados en este turno (ver Order.turnoPosId) —
   // el mismo cierre que las ventas de mostrador, no uno aparte.
   pedidos Order[]
+  // Rendiciones de repartidor recibidas mientras este turno estaba abierto
+  // (ver Rendicion.turnoPosId) — el corte general del turno las suma aparte,
+  // sin mezclar sus formas de cobro (efectivo/tarjeta/transferencia/ya
+  // pagado) con las 4 de mostrador, que no son exactamente lo mismo.
+  rendiciones Rendicion[]
 
   @@index([storeId])
   @@index([storeId, estado])

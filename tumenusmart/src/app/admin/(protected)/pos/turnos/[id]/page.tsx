@@ -104,6 +104,21 @@ export default async function ComprobanteTurnoPosPage({
             updatedAt: true,
           },
         },
+        // Rendiciones de repartidor recibidas mientras este turno estaba
+        // abierto (ver Rendicion.turnoPosId) — el corte general las suma
+        // aparte, sin mezclar sus formas de cobro con las 4 de mostrador.
+        rendiciones: {
+          orderBy: { creadoEn: "asc" },
+          select: {
+            id: true,
+            cantidadPedidos: true,
+            totalEfectivo: true,
+            totalOtros: true,
+            recibidoPor: true,
+            creadoEn: true,
+            repartidor: { select: { nombre: true } },
+          },
+        },
       },
     }),
   ]);
@@ -142,6 +157,15 @@ export default async function ComprobanteTurnoPosPage({
     declarado
   );
   const { totalCalculado, totalDeclarado, diferenciaTotal } = cierre;
+
+  // Corte general: mostrador + retiro/mesa (lo declarado arriba) más lo que
+  // cada repartidor rindió MIENTRAS este turno estaba abierto. No se mezcla
+  // con "Por forma de pago" porque el repartidor solo distingue
+  // efectivo/tarjeta/transferencia/ya pagado (ver src/lib/rendicion.ts), no
+  // las 4 formas de mostrador — se muestra aparte y se suma al final.
+  const totalRendicionesEfectivo = turno.rendiciones.reduce((s, r) => s + Number(r.totalEfectivo), 0);
+  const totalRendicionesOtros = turno.rendiciones.reduce((s, r) => s + Number(r.totalOtros), 0);
+  const totalGeneralTurno = totalDeclarado + totalRendicionesEfectivo + totalRendicionesOtros;
 
   // Una venta cancelada, o un pedido que pasó a "cancelado", DESPUÉS de
   // cerrar el turno es justo el tipo de cambio que este contraste tiene que
@@ -214,6 +238,22 @@ export default async function ComprobanteTurnoPosPage({
             </p>
           )}
         </div>
+
+        {turno.rendiciones.length > 0 && (
+          <div className="mb-5 rounded-xl border border-brand/25 bg-brand-light p-4 print:rounded-none print:border print:border-linea print:bg-transparent">
+            <p className="text-[0.85rem] text-tinta-media">
+              Total general del turno (mostrador + retiro/mesa + delivery rendido)
+            </p>
+            <p className="cifra mt-0.5 text-[1.9rem] font-semibold leading-tight text-brand-texto print:text-[20pt] print:text-tinta">
+              {formatearGuarani(totalGeneralTurno)}
+            </p>
+            <p className="mt-1 text-[0.82rem] text-tinta-media">
+              {formatearGuarani(totalDeclarado)} de mostrador/retiro/mesa +{" "}
+              {formatearGuarani(totalRendicionesEfectivo + totalRendicionesOtros)} rendidos por{" "}
+              {turno.rendiciones.length === 1 ? "el repartidor" : "los repartidores"} durante este turno.
+            </p>
+          </div>
+        )}
 
         {!contraste.coincide && (
           <p className="mb-5 rounded-xl border border-aviso/25 bg-aviso-luz px-4 py-3 text-[0.85rem] text-tinta print:rounded-none print:border-linea print:bg-transparent">
@@ -361,6 +401,59 @@ export default async function ComprobanteTurnoPosPage({
                   </tr>
                 ))}
               </tbody>
+            </table>
+          </section>
+        )}
+
+        {turno.rendiciones.length > 0 && (
+          <section className="mt-5 break-inside-avoid">
+            <h2 className="mb-2 text-[0.95rem] font-semibold tracking-titular text-tinta">
+              Delivery rendido durante este turno
+            </h2>
+            <table className="w-full border-collapse text-left">
+              <thead>
+                <tr className="text-[0.7rem] uppercase tracking-rotulo text-tinta-suave">
+                  <th className="border-b border-linea pb-1.5 font-semibold">Repartidor</th>
+                  <th className="w-32 border-b border-linea pb-1.5 font-semibold">Hora</th>
+                  <th className="w-20 border-b border-linea pb-1.5 text-right font-semibold">Entregas</th>
+                  <th className="w-32 border-b border-linea pb-1.5 text-right font-semibold">Efectivo</th>
+                  <th className="w-32 border-b border-linea pb-1.5 text-right font-semibold">Otros medios</th>
+                </tr>
+              </thead>
+              <tbody>
+                {turno.rendiciones.map((r) => (
+                  <tr key={r.id} className="break-inside-avoid align-top">
+                    <td className="border-b border-linea-fina py-2 text-[0.85rem] font-medium text-tinta">
+                      {r.repartidor.nombre}
+                    </td>
+                    <td className="cifra border-b border-linea-fina py-2 text-[0.82rem] text-tinta-media">
+                      {horaCorta(r.creadoEn)}
+                    </td>
+                    <td className="cifra border-b border-linea-fina py-2 text-right text-[0.85rem] text-tinta-media">
+                      {r.cantidadPedidos}
+                    </td>
+                    <td className="cifra border-b border-linea-fina py-2 text-right text-[0.85rem] font-medium text-tinta">
+                      {formatearGuarani(Number(r.totalEfectivo))}
+                    </td>
+                    <td className="cifra border-b border-linea-fina py-2 text-right text-[0.85rem] text-tinta-media">
+                      {formatearGuarani(Number(r.totalOtros))}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr>
+                  <td colSpan={3} className="pt-2.5 text-right text-[0.85rem] text-tinta-media">
+                    Total delivery
+                  </td>
+                  <td className="cifra pt-2.5 text-right text-[0.95rem] font-semibold text-tinta">
+                    {formatearGuarani(totalRendicionesEfectivo)}
+                  </td>
+                  <td className="cifra pt-2.5 text-right text-[0.85rem] text-tinta-media">
+                    {formatearGuarani(totalRendicionesOtros)}
+                  </td>
+                </tr>
+              </tfoot>
             </table>
           </section>
         )}
