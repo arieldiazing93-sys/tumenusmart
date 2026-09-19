@@ -129,7 +129,9 @@ export default async function TicketVentaPosPage({
   if (!venta) notFound();
 
   const puntoExpedicion = venta.turnoPos.estacion.puntoExpedicion;
-  const esFactura = venta.comprobanteTipo === "factura";
+  // Una factura anulada sola (cuenta viva) ya no cuenta como vigente para
+  // imprimir — cae al bloque informal, con el aviso de más abajo.
+  const esFactura = venta.comprobanteTipo === "factura" && !venta.facturaAnulada;
 
   const fecha = venta.creadoEn.toLocaleString("es-PY", {
     day: "2-digit",
@@ -233,14 +235,20 @@ export default async function TicketVentaPosPage({
             <p>Servicio rapido</p>
             <p>{fecha}</p>
             <p className="mt-1">Venta {formatearNumero(venta.numero)}</p>
+            {venta.facturaAnulada && venta.facturaNumero && (
+              <p className="mt-1">
+                Factura {venta.facturaNumero} ANULADA — no vale como comprobante fiscal.
+              </p>
+            )}
           </div>
         )}
 
         <Separador factura={esFactura} />
 
-        {esFactura && (
+        {venta.comprobanteTipo === "factura" && (
           <>
             <div>
+              {!esFactura && <p className="uppercase">Datos para factura</p>}
               {/* Siempre las dos líneas, con o sin registro fiscal — el
                   timbrado Autoimpresor obliga a facturar toda venta, así que
                   "sin nombre" también necesita su razón social y su RUC
@@ -258,7 +266,7 @@ export default async function TicketVentaPosPage({
                 : {venta.facturaRuc}
               </p>
             </div>
-            <Separador factura />
+            <Separador factura={esFactura} />
           </>
         )}
 

@@ -144,7 +144,11 @@ export default async function TicketPage({
   });
 
   const esDelivery = pedido.tipoEntrega === "delivery";
-  const esFactura = pedido.comprobanteTipo === "factura" && !!pedido.facturaNumero;
+  // Una factura anulada (ver src/app/admin/(protected)/facturas/actions.ts)
+  // ya no cuenta como factura vigente para IMPRIMIR, aunque el pedido en sí
+  // siga vivo — cae al mismo bloque informal que "pidió factura pero no se
+  // pudo emitir", con el aviso de más abajo explicando qué pasó.
+  const esFactura = pedido.comprobanteTipo === "factura" && !!pedido.facturaNumero && !pedido.facturaAnulada;
   const esSinNombre = pedido.facturaTipoIdentificacion === SIN_REGISTRO_FISCAL.tipo;
   const esAnulado = pedido.estado === "cancelado";
 
@@ -217,6 +221,9 @@ export default async function TicketPage({
               ) : (
                 <>
                   <p className="uppercase">Datos para factura</p>
+                  {pedido.facturaAnulada && pedido.facturaNumero && (
+                    <p>Factura {pedido.facturaNumero} ANULADA — no vale como comprobante fiscal.</p>
+                  )}
                   <p>
                     Razon social: {esSinNombre ? SIN_REGISTRO_FISCAL.etiquetaDisplay : sinAcentos(pedido.facturaRazonSocial ?? "")}
                   </p>

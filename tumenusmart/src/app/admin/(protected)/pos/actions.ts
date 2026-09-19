@@ -580,7 +580,13 @@ export async function cancelarVenta(ventaId: string, motivo: string): Promise<Re
 
   const venta = await db.ventaPos.findUnique({
     where: { id: ventaId },
-    select: { id: true, cancelada: true, turnoPos: { select: { estado: true } } },
+    select: {
+      id: true,
+      cancelada: true,
+      turnoPos: { select: { estado: true } },
+      facturaNumero: true,
+      facturaAnulada: true,
+    },
   });
   if (!venta) return { ok: false, error: "Esa cuenta no existe." };
   if (venta.cancelada) return { ok: false, error: "Esa cuenta ya estaba cancelada." };
@@ -591,13 +597,26 @@ export async function cancelarVenta(ventaId: string, motivo: string): Promise<Re
     };
   }
 
+  const identidad = sesion.nombre?.trim() || sesion.email;
+  const ahora = new Date();
+
   await db.ventaPos.update({
     where: { id: ventaId },
     data: {
       cancelada: true,
-      canceladaPor: sesion.nombre?.trim() || sesion.email,
-      canceladaEn: new Date(),
+      canceladaPor: identidad,
+      canceladaEn: ahora,
       motivoCancelacion: motivo.trim() || null,
+      // Cancelar la cuenta entera anula la factura de yapa: no puede quedar
+      // un número de timbrado vigente sobre una venta que ya no existe.
+      ...(venta.facturaNumero && !venta.facturaAnulada
+        ? {
+            facturaAnulada: true,
+            facturaAnuladaPor: identidad,
+            facturaAnuladaEn: ahora,
+            facturaMotivoAnulacion: motivo.trim() || null,
+          }
+        : {}),
     },
   });
 

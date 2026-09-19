@@ -171,6 +171,7 @@ export default async function DetallePedidoPage({
             <div className="mt-3 rounded bg-aviso-luz px-2 py-1.5 text-sm text-aviso">
               <p className="font-medium">
                 {pedido.facturaNumero ? `Factura N° ${pedido.facturaNumero}` : "Factura (todavía sin emitir)"}
+                {pedido.facturaAnulada && <span className="ml-1.5 text-peligro">(ANULADA)</span>}
               </p>
               <p>
                 Razón social:{" "}

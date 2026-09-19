@@ -7,6 +7,7 @@ import { calcularRangoFecha, type FiltroFecha } from "@/lib/rango-fecha";
 import { formatearGuarani, formatearNumero } from "@/lib/format";
 import { ZONA_NEGOCIO } from "@/lib/timezone";
 import { SIN_REGISTRO_FISCAL, etiquetaTipoIdentificacion } from "@/lib/tipo-cliente";
+import { CancelarFacturaBoton } from "./CancelarFacturaBoton";
 
 export const dynamic = "force-dynamic";
 
@@ -20,13 +21,19 @@ const FILTROS_FECHA: { value: FiltroFecha; label: string }[] = [
 
 type FilaFactura = {
   key: string;
+  origen: "pedido" | "venta";
+  id: string;
   facturaNumero: string;
   fecha: Date;
   razonSocial: string;
   etiquetaIdentificacion: string;
   identificacion: string;
   total: number;
-  anulada: boolean;
+  // Se cancela la cuenta entera (arrastra la factura de yapa) o se anula
+  // SOLO la factura, cuenta viva — dos cosas distintas, ver
+  // src/app/admin/(protected)/facturas/actions.ts.
+  cuentaAnulada: boolean;
+  facturaAnulada: boolean;
   origenLabel: string;
   href: string;
 };
@@ -79,6 +86,7 @@ export default async function FacturasPage({
         createdAt: true,
         total: true,
         estado: true,
+        facturaAnulada: true,
         facturaNumero: true,
         facturaRazonSocial: true,
         facturaRuc: true,
@@ -94,6 +102,7 @@ export default async function FacturasPage({
         creadoEn: true,
         total: true,
         cancelada: true,
+        facturaAnulada: true,
         facturaNumero: true,
         facturaRazonSocial: true,
         facturaRuc: true,
@@ -105,32 +114,40 @@ export default async function FacturasPage({
   const filas: FilaFactura[] = [
     ...pedidos.map((p) => ({
       key: `pedido-${p.id}`,
+      origen: "pedido" as const,
+      id: p.id,
       facturaNumero: p.facturaNumero!,
       fecha: p.createdAt,
       razonSocial: nombreCliente(p.facturaTipoIdentificacion, p.facturaRazonSocial),
       etiquetaIdentificacion: etiquetaTipoIdentificacion(p.facturaTipoIdentificacion ?? "ruc"),
       identificacion: p.facturaRuc ?? "—",
       total: Number(p.total),
-      anulada: p.estado === "cancelado",
+      cuentaAnulada: p.estado === "cancelado",
+      facturaAnulada: p.facturaAnulada,
       origenLabel: `Pedido ${formatearNumero(p.numero)}`,
       href: `/admin/pedidos/${p.id}`,
     })),
     ...ventas.map((v) => ({
       key: `venta-${v.id}`,
+      origen: "venta" as const,
+      id: v.id,
       facturaNumero: v.facturaNumero!,
       fecha: v.creadoEn,
       razonSocial: nombreCliente(v.facturaTipoIdentificacion, v.facturaRazonSocial),
       etiquetaIdentificacion: etiquetaTipoIdentificacion(v.facturaTipoIdentificacion ?? "ruc"),
       identificacion: v.facturaRuc ?? "—",
       total: Number(v.total),
-      anulada: v.cancelada,
+      cuentaAnulada: v.cancelada,
+      facturaAnulada: v.facturaAnulada,
       origenLabel: `Venta ${formatearNumero(v.numero)}`,
       href: `/admin/pos/venta/${v.id}`,
     })),
   ].sort((a, b) => b.fecha.getTime() - a.fecha.getTime());
 
-  const activas = filas.filter((f) => !f.anulada);
-  const totalFacturado = activas.reduce((s, f) => s + f.total, 0);
+  // "Vigente" = ni la cuenta ni la factura están anuladas. Solo esas suman
+  // al total facturado del período.
+  const vigentes = filas.filter((f) => !f.cuentaAnulada && !f.facturaAnulada);
+  const totalFacturado = vigentes.reduce((s, f) => s + f.total, 0);
 
   return (
     <div>
@@ -158,8 +175,8 @@ export default async function FacturasPage({
       {filas.length > 0 && (
         <div className="mb-4 flex flex-wrap gap-6 rounded-xl border border-linea bg-white px-4 py-3 text-[0.85rem]">
           <div>
-            <span className="text-tinta-media">Facturas activas: </span>
-            <span className="cifra font-semibold text-tinta">{activas.length}</span>
+            <span className="text-tinta-media">Facturas vigentes: </span>
+            <span className="cifra font-semibold text-tinta">{vigentes.length}</span>
           </div>
           <div>
             <span className="text-tinta-media">Total facturado: </span>
@@ -183,49 +200,60 @@ export default async function FacturasPage({
               <Th>Origen</Th>
               <Th className="text-right">Monto</Th>
               <Th className="text-right">Estado</Th>
+              <Th className="text-right">
+                <span className="sr-only">Acción</span>
+              </Th>
             </tr>
           </thead>
           <tbody>
-            {filas.map((f) => (
-              <Tr key={f.key}>
-                <Td>
-                  <span className="cifra font-medium text-tinta">{f.facturaNumero}</span>
-                </Td>
-                <Td>
-                  {f.fecha.toLocaleString("es-PY", {
-                    day: "2-digit",
-                    month: "2-digit",
-                    year: "numeric",
-                    hour: "2-digit",
-                    minute: "2-digit",
-                    timeZone: ZONA_NEGOCIO,
-                  })}
-                </Td>
-                <Td>
-                  <p className="text-tinta">{f.razonSocial}</p>
-                  <p className="text-[0.78rem] text-tinta-suave">
-                    {f.etiquetaIdentificacion}: {f.identificacion}
-                  </p>
-                </Td>
-                <Td>
-                  <Link href={f.href} className="text-azul-oscuro hover:underline">
-                    {f.origenLabel}
-                  </Link>
-                </Td>
-                <Td
-                  className={`text-right ${f.anulada ? "text-tinta-suave line-through" : "text-tinta"}`}
-                >
-                  <span className="cifra font-medium">{formatearGuarani(f.total)}</span>
-                </Td>
-                <Td className="text-right">
-                  {f.anulada ? (
-                    <Pastilla color="peligro">Anulada</Pastilla>
-                  ) : (
-                    <Pastilla color="exito">Activa</Pastilla>
-                  )}
-                </Td>
-              </Tr>
-            ))}
+            {filas.map((f) => {
+              const anulada = f.cuentaAnulada || f.facturaAnulada;
+              return (
+                <Tr key={f.key}>
+                  <Td>
+                    <span className="cifra font-medium text-tinta">{f.facturaNumero}</span>
+                  </Td>
+                  <Td>
+                    {f.fecha.toLocaleString("es-PY", {
+                      day: "2-digit",
+                      month: "2-digit",
+                      year: "numeric",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                      timeZone: ZONA_NEGOCIO,
+                    })}
+                  </Td>
+                  <Td>
+                    <p className="text-tinta">{f.razonSocial}</p>
+                    <p className="text-[0.78rem] text-tinta-suave">
+                      {f.etiquetaIdentificacion}: {f.identificacion}
+                    </p>
+                  </Td>
+                  <Td>
+                    <Link href={f.href} className="text-azul-oscuro hover:underline">
+                      {f.origenLabel}
+                    </Link>
+                  </Td>
+                  <Td className={`text-right ${anulada ? "text-tinta-suave line-through" : "text-tinta"}`}>
+                    <span className="cifra font-medium">{formatearGuarani(f.total)}</span>
+                  </Td>
+                  <Td className="text-right">
+                    {f.cuentaAnulada ? (
+                      <Pastilla color="peligro">Cuenta anulada</Pastilla>
+                    ) : f.facturaAnulada ? (
+                      <Pastilla color="aviso">Factura anulada</Pastilla>
+                    ) : (
+                      <Pastilla color="exito">Vigente</Pastilla>
+                    )}
+                  </Td>
+                  <Td className="text-right">
+                    {!anulada && (
+                      <CancelarFacturaBoton origen={f.origen} id={f.id} facturaNumero={f.facturaNumero} />
+                    )}
+                  </Td>
+                </Tr>
+              );
+            })}
           </tbody>
         </Tabla>
       )}

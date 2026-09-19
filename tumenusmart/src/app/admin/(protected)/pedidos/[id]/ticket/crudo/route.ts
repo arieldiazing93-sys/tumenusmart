@@ -28,7 +28,9 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   if (!pedido) return new NextResponse("No encontrado", { status: 404 });
 
   const esDelivery = pedido.tipoEntrega === "delivery";
-  const esFactura = pedido.comprobanteTipo === "factura" && !!pedido.facturaNumero;
+  // Una factura anulada sola (cuenta viva) ya no cuenta como vigente para
+  // imprimir — ver la misma nota en ../page.tsx.
+  const esFactura = pedido.comprobanteTipo === "factura" && !!pedido.facturaNumero && !pedido.facturaAnulada;
   const esSinNombre = pedido.facturaTipoIdentificacion === SIN_REGISTRO_FISCAL.tipo;
   const esAnulado = pedido.estado === "cancelado";
   const sep = () => separador(esFactura ? "=" : "-");
@@ -77,6 +79,9 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
       l.push(`${esSinNombre ? "RUC" : sinAcentos(etiquetaTipoIdentificacion(pedido.facturaTipoIdentificacion ?? "ruc"))}: ${pedido.facturaRuc}`);
     } else {
       l.push("Datos para factura");
+      if (pedido.facturaAnulada && pedido.facturaNumero) {
+        l.push(`Factura ${pedido.facturaNumero} ANULADA - no vale como comprobante fiscal.`);
+      }
       l.push(`Razon social: ${esSinNombre ? SIN_REGISTRO_FISCAL.etiquetaDisplay : sinAcentos(pedido.facturaRazonSocial ?? "")}`);
       l.push(`${esSinNombre ? "RUC" : sinAcentos(etiquetaTipoIdentificacion(pedido.facturaTipoIdentificacion ?? "ruc"))}: ${pedido.facturaRuc}`);
       if (pedido.facturaEmail) l.push(`Correo: ${pedido.facturaEmail}`);

@@ -131,6 +131,9 @@ export default async function DetalleVentaPosPage({
                   <span className="ml-1 font-normal text-tinta-media">
                     ({venta.facturaRazonSocial} — RUC {venta.facturaRuc})
                   </span>
+                  {venta.facturaAnulada && (
+                    <span className="ml-1.5 text-peligro">(ANULADA)</span>
+                  )}
                 </dd>
               </div>
             )}

@@ -646,6 +646,20 @@ model Order {
   canceladaEn       DateTime?
   motivoCancelacion String?
 
+  // Anular SOLO la factura, sin cancelar el pedido — independiente de
+  // "cancelado" de arriba. Existe para el caso de una factura mal cargada
+  // (RUC equivocado, razón social mal escrita): se anula el número, pero el
+  // pedido en sí sigue siendo una venta real, entregada y cobrada. Cancelar
+  // el pedido entero SIGUE anulando la factura de yapa (ver
+  // cambiarEstadoPedido) — lo que cambia acá es que ahora también se puede
+  // anular la factura SIN tocar el pedido. Los campos facturaNumero/
+  // facturaRazonSocial/etc. de arriba NUNCA se pisan ni se limpian: quedan
+  // como el registro histórico de qué decía ese número antes de anularse.
+  facturaAnulada         Boolean   @default(false)
+  facturaAnuladaPor      String?
+  facturaAnuladaEn       DateTime?
+  facturaMotivoAnulacion String?
+
   // El pedido se guarda ANTES de que el cliente apriete "Enviar por
   // WhatsApp". Esta marca distingue los pedidos realmente enviados de los
   // que el cliente armó y abandonó en el último paso.
@@ -1033,6 +1047,15 @@ model VentaPos {
   facturaExento      Decimal?  @db.Decimal(10, 2)
   facturaIva10       Decimal?  @db.Decimal(10, 2)
   facturaIva5        Decimal?  @db.Decimal(10, 2)
+
+  // Anular SOLO la factura, sin cancelar la cuenta — mismo criterio que
+  // Order.facturaAnulada (ver ese comentario). Cancelar la cuenta entera
+  // SIGUE anulando la factura de yapa (ver cancelarVenta); esto agrega el
+  // camino inverso: anular solo el número, cuenta viva.
+  facturaAnulada         Boolean   @default(false)
+  facturaAnuladaPor      String?
+  facturaAnuladaEn       DateTime?
+  facturaMotivoAnulacion String?
 
   @@index([storeId])
   @@index([turnoPosId])

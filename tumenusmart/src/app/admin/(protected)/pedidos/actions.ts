@@ -144,7 +144,12 @@ export async function cambiarEstadoPedido(
     }
     const pedidoActual = await prisma.order.findUnique({
       where: { id: orderId },
-      select: { rendicionId: true, turnoPos: { select: { estado: true } } },
+      select: {
+        rendicionId: true,
+        turnoPos: { select: { estado: true } },
+        facturaNumero: true,
+        facturaAnulada: true,
+      },
     });
     if (pedidoActual?.rendicionId) {
       return {
@@ -158,10 +163,22 @@ export async function cambiarEstadoPedido(
         error: "El turno de este pedido ya está cerrado. Una vez cerrado el turno, no se puede cancelar.",
       };
     }
+    const identidad = sesion.nombre?.trim() || sesion.email;
+    const ahora = new Date();
     datosFactura = {
-      canceladaPor: sesion.nombre?.trim() || sesion.email,
-      canceladaEn: new Date(),
+      canceladaPor: identidad,
+      canceladaEn: ahora,
       motivoCancelacion: motivo.trim(),
+      // Cancelar el pedido entero anula la factura de yapa: no puede quedar
+      // un número de timbrado vigente sobre un pedido que ya no existe.
+      ...(pedidoActual?.facturaNumero && !pedidoActual.facturaAnulada
+        ? {
+            facturaAnulada: true,
+            facturaAnuladaPor: identidad,
+            facturaAnuladaEn: ahora,
+            facturaMotivoAnulacion: motivo.trim(),
+          }
+        : {}),
     };
   }
 
