@@ -304,17 +304,17 @@ export default async function ComprobanteTurnoPosPage({
             <tbody>
               {cierre.porForma.map((f) => (
                 <tr key={f.forma}>
-                  <td className="border-b border-linea-fina py-2 text-[0.85rem] text-tinta">
+                  <td className="border-b border-linea-fina py-1 text-[0.85rem] text-tinta">
                     {f.etiqueta}
                   </td>
-                  <td className="cifra border-b border-linea-fina py-2 text-right text-[0.85rem] text-tinta-media">
+                  <td className="cifra border-b border-linea-fina py-1 text-right text-[0.85rem] text-tinta-media">
                     {formatearGuarani(f.calculado)}
                   </td>
-                  <td className="cifra border-b border-linea-fina py-2 text-right text-[0.85rem] font-medium text-tinta">
+                  <td className="cifra border-b border-linea-fina py-1 text-right text-[0.85rem] font-medium text-tinta">
                     {formatearGuarani(f.declarado)}
                   </td>
                   <td
-                    className={`cifra border-b border-linea-fina py-2 text-right text-[0.85rem] font-medium ${
+                    className={`cifra border-b border-linea-fina py-1 text-right text-[0.85rem] font-medium ${
                       f.diferencia === 0
                         ? "text-tinta-suave"
                         : f.diferencia > 0
@@ -329,14 +329,14 @@ export default async function ComprobanteTurnoPosPage({
             </tbody>
             <tfoot>
               <tr>
-                <td className="pt-2.5 text-right text-[0.85rem] text-tinta-media">Total</td>
-                <td className="cifra pt-2.5 text-right text-[0.85rem] text-tinta-media">
+                <td className="pt-1.5 text-right text-[0.85rem] text-tinta-media">Total</td>
+                <td className="cifra pt-1.5 text-right text-[0.85rem] text-tinta-media">
                   {formatearGuarani(totalCalculado)}
                 </td>
-                <td className="cifra pt-2.5 text-right text-[0.95rem] font-semibold text-tinta">
+                <td className="cifra pt-1.5 text-right text-[0.95rem] font-semibold text-tinta">
                   {formatearGuarani(totalDeclarado)}
                 </td>
-                <td className="cifra pt-2.5 text-right text-[0.85rem] font-medium text-tinta">
+                <td className="cifra pt-1.5 text-right text-[0.85rem] font-medium text-tinta">
                   {diferenciaTotal === 0 ? "—" : formatearGuarani(diferenciaTotal)}
                 </td>
               </tr>
@@ -376,18 +376,18 @@ export default async function ComprobanteTurnoPosPage({
               <tbody>
                 {turno.ventas.map((v) => (
                   <tr key={v.id} className="break-inside-avoid align-top">
-                    <td className="cifra border-b border-linea-fina py-2 text-[0.85rem] font-medium text-tinta">
+                    <td className="cifra border-b border-linea-fina py-1 text-[0.85rem] font-medium text-tinta">
                       {formatearNumero(v.numero)}
                     </td>
-                    <td className="cifra border-b border-linea-fina py-2 text-[0.82rem] text-tinta-media">
+                    <td className="cifra border-b border-linea-fina py-1 text-[0.82rem] text-tinta-media">
                       {horaCorta(v.creadoEn)}
                     </td>
-                    <td className="border-b border-linea-fina py-2 text-[0.82rem] text-tinta-media">
+                    <td className="border-b border-linea-fina py-1 text-[0.82rem] text-tinta-media">
                       {etiquetaFormaPagoPos(v.formaPago)}
                       {v.cancelada && <span className="text-peligro"> (cancelada)</span>}
                     </td>
                     <td
-                      className={`cifra border-b border-linea-fina py-2 text-right text-[0.85rem] font-medium ${
+                      className={`cifra border-b border-linea-fina py-1 text-right text-[0.85rem] font-medium ${
                         v.cancelada ? "text-tinta-suave line-through" : "text-tinta"
                       }`}
                     >
@@ -417,18 +417,18 @@ export default async function ComprobanteTurnoPosPage({
               <tbody>
                 {turno.pedidos.map((p) => (
                   <tr key={p.id} className="break-inside-avoid align-top">
-                    <td className="cifra border-b border-linea-fina py-2 text-[0.85rem] font-medium text-tinta">
+                    <td className="cifra border-b border-linea-fina py-1 text-[0.85rem] font-medium text-tinta">
                       {formatearNumero(p.numero)}
                     </td>
-                    <td className="cifra border-b border-linea-fina py-2 text-[0.82rem] text-tinta-media">
+                    <td className="cifra border-b border-linea-fina py-1 text-[0.82rem] text-tinta-media">
                       {horaCorta(p.updatedAt)}
                     </td>
-                    <td className="border-b border-linea-fina py-2 text-[0.82rem] text-tinta-media">
+                    <td className="border-b border-linea-fina py-1 text-[0.82rem] text-tinta-media">
                       {etiquetaFormaPagoPos(p.formaPagoPos ?? "efectivo")}
                       {p.estado === "cancelado" && <span className="text-peligro"> (cancelado)</span>}
                     </td>
                     <td
-                      className={`cifra border-b border-linea-fina py-2 text-right text-[0.85rem] font-medium ${
+                      className={`cifra border-b border-linea-fina py-1 text-right text-[0.85rem] font-medium ${
                         p.estado === "cancelado" ? "text-tinta-suave line-through" : "text-tinta"
                       }`}
                     >
@@ -461,25 +461,25 @@ export default async function ComprobanteTurnoPosPage({
               <tbody>
                 {turno.rendiciones.map((r) => (
                   <tr key={r.id} className="break-inside-avoid align-top">
-                    <td className="border-b border-linea-fina py-2 text-[0.85rem] font-medium text-tinta">
+                    <td className="border-b border-linea-fina py-1 text-[0.85rem] font-medium text-tinta">
                       {r.repartidor.nombre}
                     </td>
-                    <td className="cifra border-b border-linea-fina py-2 text-[0.82rem] text-tinta-media">
+                    <td className="cifra border-b border-linea-fina py-1 text-[0.82rem] text-tinta-media">
                       {horaCorta(r.creadoEn)}
                     </td>
-                    <td className="cifra border-b border-linea-fina py-2 text-right text-[0.85rem] text-tinta-media">
+                    <td className="cifra border-b border-linea-fina py-1 text-right text-[0.85rem] text-tinta-media">
                       {r.cantidadPedidos}
                     </td>
-                    <td className="cifra border-b border-linea-fina py-2 text-right text-[0.85rem] font-medium text-tinta">
+                    <td className="cifra border-b border-linea-fina py-1 text-right text-[0.85rem] font-medium text-tinta">
                       {formatearGuarani(Number(r.totalEfectivo))}
                     </td>
-                    <td className="cifra border-b border-linea-fina py-2 text-right text-[0.85rem] text-tinta-media">
+                    <td className="cifra border-b border-linea-fina py-1 text-right text-[0.85rem] text-tinta-media">
                       {formatearGuarani(Number(r.totalTransferencia))}
                     </td>
-                    <td className="cifra border-b border-linea-fina py-2 text-right text-[0.85rem] text-tinta-media">
+                    <td className="cifra border-b border-linea-fina py-1 text-right text-[0.85rem] text-tinta-media">
                       {formatearGuarani(Number(r.totalTarjetaDebito))}
                     </td>
-                    <td className="cifra border-b border-linea-fina py-2 text-right text-[0.85rem] text-tinta-media">
+                    <td className="cifra border-b border-linea-fina py-1 text-right text-[0.85rem] text-tinta-media">
                       {formatearGuarani(Number(r.totalTarjetaCredito))}
                     </td>
                   </tr>
@@ -487,19 +487,19 @@ export default async function ComprobanteTurnoPosPage({
               </tbody>
               <tfoot>
                 <tr>
-                  <td colSpan={3} className="pt-2.5 text-right text-[0.85rem] text-tinta-media">
+                  <td colSpan={3} className="pt-1.5 text-right text-[0.85rem] text-tinta-media">
                     Total delivery
                   </td>
-                  <td className="cifra pt-2.5 text-right text-[0.95rem] font-semibold text-tinta">
+                  <td className="cifra pt-1.5 text-right text-[0.95rem] font-semibold text-tinta">
                     {formatearGuarani(totalRendicionesEfectivo)}
                   </td>
-                  <td className="cifra pt-2.5 text-right text-[0.85rem] text-tinta-media">
+                  <td className="cifra pt-1.5 text-right text-[0.85rem] text-tinta-media">
                     {formatearGuarani(totalRendicionesTransferencia)}
                   </td>
-                  <td className="cifra pt-2.5 text-right text-[0.85rem] text-tinta-media">
+                  <td className="cifra pt-1.5 text-right text-[0.85rem] text-tinta-media">
                     {formatearGuarani(totalRendicionesTarjetaDebito)}
                   </td>
-                  <td className="cifra pt-2.5 text-right text-[0.85rem] text-tinta-media">
+                  <td className="cifra pt-1.5 text-right text-[0.85rem] text-tinta-media">
                     {formatearGuarani(totalRendicionesTarjetaCredito)}
                   </td>
                 </tr>
