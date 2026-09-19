@@ -15,11 +15,18 @@
  * devuelve las cuentas. Así se puede probar de verdad.
  */
 
-export type FormaDeCobro = "efectivo" | "tarjeta" | "transferencia" | "ya_pagado";
+// Mismo vocabulario que MetodoPagoPedido (src/lib/metodos-pago.ts) — antes
+// esta lista tenía "tarjeta" a secas, sin distinguir débito de crédito,
+// mientras el checkout y el POS ya venían separados. Además de la
+// inconsistencia, eso rompía en silencio la sugerencia de "lo que el
+// cliente había dicho" en la pantalla del repartidor (EntregarBoton): un
+// pedido sugerido "tarjeta_debito" nunca coincidía con el botón "tarjeta".
+export type FormaDeCobro = "efectivo" | "tarjeta_debito" | "tarjeta_credito" | "transferencia" | "ya_pagado";
 
 export const FORMAS_DE_COBRO: { valor: FormaDeCobro; etiqueta: string; rinde: boolean }[] = [
   { valor: "efectivo", etiqueta: "Efectivo", rinde: true },
-  { valor: "tarjeta", etiqueta: "Tarjeta", rinde: false },
+  { valor: "tarjeta_debito", etiqueta: "Tarjeta débito", rinde: false },
+  { valor: "tarjeta_credito", etiqueta: "Tarjeta crédito", rinde: false },
   { valor: "transferencia", etiqueta: "Transferencia", rinde: false },
   // "Ya estaba pago" es el pedido que se pagó antes de salir del local. El
   // repartidor no cobró nada y no debe nada por él, pero tiene que poder
@@ -27,10 +34,18 @@ export const FORMAS_DE_COBRO: { valor: FormaDeCobro; etiqueta: string; rinde: bo
   { valor: "ya_pagado", etiqueta: "Ya estaba pago", rinde: false },
 ];
 
+// Pedidos rendidos ANTES de separar tarjeta en débito/crédito guardaron
+// "tarjeta" a secas. Ya no se ofrece como botón nuevo, pero un pedido viejo
+// tiene que seguir leyéndose exactamente igual que el día que se cerró —no
+// reclasificarse a "efectivo" solo porque cambió la lista de opciones.
+const FORMA_COBRO_LEGADO: Record<string, { etiqueta: string; rinde: boolean }> = {
+  tarjeta: { etiqueta: "Tarjeta (antes de separar débito/crédito)", rinde: false },
+};
+
 const VALIDAS = new Set(FORMAS_DE_COBRO.map((f) => f.valor));
 
 /**
- * Convierte lo que venga en una forma de cobro válida.
+ * Convierte lo que venga en una forma de cobro reconocida.
  *
  * Cae en "efectivo" cuando no reconoce el valor, y no en null, porque este
  * dato lo manda el teléfono del repartidor: si llegara cualquier cosa, el
@@ -38,18 +53,26 @@ const VALIDAS = new Set(FORMAS_DE_COBRO.map((f) => f.valor));
  * cuenta. Es preferible que el dueño pida una aclaración de más a que un
  * pedido cobrado no figure en ningún lado.
  */
-export function normalizarCobro(valor: unknown): FormaDeCobro {
+export function normalizarCobro(valor: unknown): string {
   const texto = String(valor ?? "").trim().toLowerCase();
-  return (VALIDAS.has(texto as FormaDeCobro) ? texto : "efectivo") as FormaDeCobro;
+  if (VALIDAS.has(texto as FormaDeCobro)) return texto;
+  if (texto in FORMA_COBRO_LEGADO) return texto;
+  return "efectivo";
 }
 
 export function etiquetaDeCobro(valor: string): string {
-  return FORMAS_DE_COBRO.find((f) => f.valor === valor)?.etiqueta ?? "Efectivo";
+  return (
+    FORMAS_DE_COBRO.find((f) => f.valor === valor)?.etiqueta ??
+    FORMA_COBRO_LEGADO[valor]?.etiqueta ??
+    "Efectivo"
+  );
 }
 
 /** Si esa forma de cobro implica que el repartidor tiene plata en el bolsillo. */
 export function rindeEfectivo(valor: string): boolean {
-  return FORMAS_DE_COBRO.find((f) => f.valor === valor)?.rinde ?? true;
+  return (
+    FORMAS_DE_COBRO.find((f) => f.valor === valor)?.rinde ?? FORMA_COBRO_LEGADO[valor]?.rinde ?? true
+  );
 }
 
 /**
@@ -91,7 +114,10 @@ function aNumero(valor: Monto): number {
 }
 
 export function resumirCierre(pedidos: PedidoDeCierre[]): ResumenCierre {
-  const acumulado = new Map<FormaDeCobro, { cantidad: number; monto: number }>();
+  // string y no FormaDeCobro: normalizarCobro también puede devolver un
+  // valor LEGADO ("tarjeta", de antes de separar débito/crédito) que ya no
+  // es parte de la unión — ver FORMA_COBRO_LEGADO más arriba.
+  const acumulado = new Map<string, { cantidad: number; monto: number }>();
   let efectivo = 0;
   let otros = 0;
 

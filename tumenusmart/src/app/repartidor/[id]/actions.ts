@@ -61,10 +61,10 @@ export async function marcarPedidoEntregado(
     data: {
       estado: "entregado",
       // Nunca se guarda lo que llegó tal cual: viene del teléfono del
-      // repartidor. `normalizarCobro` deja pasar solo las cuatro formas
-      // conocidas y, ante cualquier otra cosa, cuenta como efectivo — que es
-      // el lado seguro: el pedido queda como plata a rendir en vez de
-      // desaparecer de la cuenta.
+      // repartidor. `normalizarCobro` deja pasar solo las formas conocidas
+      // (ver FORMAS_DE_COBRO en src/lib/rendicion.ts) y, ante cualquier otra
+      // cosa, cuenta como efectivo — que es el lado seguro: el pedido queda
+      // como plata a rendir en vez de desaparecer de la cuenta.
       cobroMetodo: normalizarCobro(cobro),
       entregadoEn: new Date(),
     },

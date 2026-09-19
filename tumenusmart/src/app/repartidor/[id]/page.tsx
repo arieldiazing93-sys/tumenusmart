@@ -21,7 +21,16 @@ export default async function RepartidorPage({
   // enlace circule, nunca muestra pedidos de otro negocio.
   const storeId = repartidor.storeId;
 
-  const [pendientes, entregadosHoy] = await Promise.all([
+  const [store, pendientes, entregadosHoy] = await Promise.all([
+    prisma.store.findUnique({
+      where: { id: storeId },
+      select: {
+        aceptaEfectivo: true,
+        aceptaTransferencia: true,
+        aceptaTarjetaDebito: true,
+        aceptaTarjetaCredito: true,
+      },
+    }),
     prisma.order.findMany({
       where: { storeId, repartidorId: id, estado: "en_despacho" },
       include: { items: true },
@@ -109,6 +118,10 @@ export default async function RepartidorPage({
                   repartidorId={id}
                   orderId={pedido.id}
                   pagoSugerido={pedido.metodoPagoReferencia}
+                  aceptaEfectivo={store?.aceptaEfectivo ?? true}
+                  aceptaTransferencia={store?.aceptaTransferencia ?? true}
+                  aceptaTarjetaDebito={store?.aceptaTarjetaDebito ?? true}
+                  aceptaTarjetaCredito={store?.aceptaTarjetaCredito ?? true}
                 />
             </div>
           );
