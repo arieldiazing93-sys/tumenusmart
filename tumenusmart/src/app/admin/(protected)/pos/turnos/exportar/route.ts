@@ -35,6 +35,7 @@ export async function GET(request: NextRequest) {
         abiertoEn: true,
         cerradoEn: true,
         cantidadVentas: true,
+        montoInicial: true,
         declaradoEfectivo: true,
         declaradoTransferencia: true,
         declaradoTarjetaDebito: true,
@@ -138,7 +139,8 @@ export async function GET(request: NextRequest) {
       Math.round(Number(t.calculadoTransferencia ?? 0)) +
       Math.round(Number(t.calculadoTarjetaDebito ?? 0)) +
       Math.round(Number(t.calculadoTarjetaCredito ?? 0)) +
-      Math.round(rendidoPorTurno.get(t.id) ?? 0);
+      Math.round(rendidoPorTurno.get(t.id) ?? 0) +
+      Math.round(Number(t.montoInicial ?? 0));
     const diferencia = totalDeclarado - totalCalculado;
     totalDeclaradoGeneral += totalDeclarado;
     totalDiferenciaGeneral += diferencia;

@@ -82,6 +82,7 @@ export default async function TurnosPosPage({
       abiertoEn: true,
       cerradoEn: true,
       cantidadVentas: true,
+      montoInicial: true,
       declaradoEfectivo: true,
       declaradoTransferencia: true,
       declaradoTarjetaDebito: true,
@@ -217,7 +218,8 @@ export default async function TurnosPosPage({
           <tbody>
             {turnos.map((t) => {
               const calculadoBase = totalCalculado(t);
-              const calculado = calculadoBase + (rendidoPorTurno.get(t.id) ?? 0);
+              const calculado =
+                calculadoBase + (rendidoPorTurno.get(t.id) ?? 0) + Number(t.montoInicial ?? 0);
               const declarado = totalDeclarado(t);
               const diferencia = declarado - calculado;
               const hoy = hoyPorTurno.get(t.id) ?? { cantidad: 0, total: 0 };

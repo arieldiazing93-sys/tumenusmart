@@ -5,8 +5,6 @@ import { useRouter } from "next/navigation";
 import { Boton } from "@/components/ui";
 import { abrirTurno } from "../actions";
 
-const MONTOS_RAPIDOS = [0, 50000, 100000, 200000];
-
 export function AbrirTurnoForm({ estacionId }: { estacionId: string }) {
   const router = useRouter();
   const [monto, setMonto] = useState("0");
@@ -40,24 +38,10 @@ export function AbrirTurnoForm({ estacionId }: { estacionId: string }) {
           onWheel={(e) => e.currentTarget.blur()}
           className="w-full rounded-lg border border-linea bg-papel-suave px-3 py-3 text-center text-[1.4rem] font-semibold text-tinta transition-colors focus:border-brand focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand/15"
         />
-        <p className="mt-1.5 text-[0.78rem] text-tinta-suave">El vuelto con el que arrancás, en guaraníes.</p>
-      </div>
-
-      <div className="flex flex-wrap gap-2">
-        {MONTOS_RAPIDOS.map((m) => (
-          <button
-            key={m}
-            type="button"
-            onClick={() => setMonto(String(m))}
-            className={`rounded-full border px-3 py-1.5 text-[0.8rem] font-medium transition-colors ${
-              Number(monto) === m
-                ? "border-brand bg-brand-light text-brand-texto"
-                : "border-linea text-tinta-media hover:border-brand hover:text-brand"
-            }`}
-          >
-            {m === 0 ? "Sin vuelto" : `Gs. ${m.toLocaleString("es-PY")}`}
-          </button>
-        ))}
+        <p className="mt-1.5 text-[0.78rem] text-tinta-suave">
+          Contá el vuelto que tenés de verdad y cargalo acá — es plata real que se suma al arqueo de
+          este turno.
+        </p>
       </div>
 
       {error && (

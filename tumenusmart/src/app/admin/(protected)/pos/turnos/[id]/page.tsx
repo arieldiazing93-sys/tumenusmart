@@ -70,6 +70,7 @@ export default async function ComprobanteTurnoPosPage({
         cerradoEn: true,
         notas: true,
         estacion: { select: { nombre: true } },
+        montoInicial: true,
         cantidadVentas: true,
         calculadoEfectivo: true,
         calculadoTransferencia: true,
@@ -178,8 +179,14 @@ export default async function ComprobanteTurnoPosPage({
     (s, r) => s + Number(r.totalTarjetaCredito),
     0
   );
+  // El monto con el que se abrió el turno (para dar cambio) ya es plata que
+  // está en el cajón desde antes de la primera venta — el cajero la cuenta
+  // igual al hacer el corte ciego, así que el sistema también la tiene que
+  // esperar. Solo afecta Efectivo: se abre caja con billetes, no con una
+  // transferencia o una tarjeta.
+  const montoInicial = Number(turno.montoInicial ?? 0);
   const calculado: Record<FormaPagoPos, number> = {
-    efectivo: calculadoBase.efectivo + totalRendicionesEfectivo,
+    efectivo: calculadoBase.efectivo + totalRendicionesEfectivo + montoInicial,
     transferencia: calculadoBase.transferencia + totalRendicionesTransferencia,
     tarjeta_debito: calculadoBase.tarjeta_debito + totalRendicionesTarjetaDebito,
     tarjeta_credito: calculadoBase.tarjeta_credito + totalRendicionesTarjetaCredito,
@@ -245,6 +252,12 @@ export default async function ComprobanteTurnoPosPage({
               <dt className="text-tinta-suave">Cuentas</dt>
               <dd className="cifra font-semibold text-tinta">{turno.cantidadVentas}</dd>
             </div>
+            {montoInicial > 0 && (
+              <div>
+                <dt className="text-tinta-suave">Efectivo inicial</dt>
+                <dd className="cifra font-semibold text-tinta">{formatearGuarani(montoInicial)}</dd>
+              </div>
+            )}
             <div>
               <dt className="text-tinta-suave">Comprobante</dt>
               <dd className="cifra font-semibold text-tinta">{turno.id.slice(-8).toUpperCase()}</dd>
@@ -334,6 +347,12 @@ export default async function ComprobanteTurnoPosPage({
               Cada forma de acá arriba incluye lo que rindió{" "}
               {turno.rendiciones.length === 1 ? "el repartidor" : "los repartidores"} de delivery durante
               este turno — es la misma caja, la misma cuenta y el mismo resumen de POS.
+            </p>
+          )}
+          {montoInicial > 0 && (
+            <p className="mt-1 text-[0.78rem] text-tinta-suave">
+              El Efectivo de acá arriba también incluye los {formatearGuarani(montoInicial)} con los que
+              se abrió el turno.
             </p>
           )}
         </section>

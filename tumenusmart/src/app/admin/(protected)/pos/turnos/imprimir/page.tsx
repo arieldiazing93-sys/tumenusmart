@@ -63,6 +63,7 @@ export default async function ImprimirTurnosPosPage({
         abiertoEn: true,
         cerradoEn: true,
         cantidadVentas: true,
+        montoInicial: true,
         declaradoEfectivo: true,
         declaradoTransferencia: true,
         declaradoTarjetaDebito: true,
@@ -144,7 +145,8 @@ export default async function ImprimirTurnosPosPage({
           <tbody>
             {turnos.map((t) => {
               const declarado = totalDeclarado(t);
-              const calculado = totalCalculado(t) + (rendidoPorTurno.get(t.id) ?? 0);
+              const calculado =
+                totalCalculado(t) + (rendidoPorTurno.get(t.id) ?? 0) + Number(t.montoInicial ?? 0);
               return (
                 <tr key={t.id} className="border-b border-linea-fina">
                   <td className="py-1.5">{t.cerradoPor ?? t.abiertoPor}</td>
