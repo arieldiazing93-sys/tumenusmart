@@ -150,6 +150,7 @@ model Store {
   puntosExpedicion PuntoExpedicion[]
   areasImpresion   AreaImpresion[]
   estacionesImpresoras EstacionImpresora[]
+  facturasReemplazadas FacturaReemplazada[]
 }
 
 /// Las direcciones que este local tuvo antes.
@@ -660,6 +661,11 @@ model Order {
   facturaAnuladaEn       DateTime?
   facturaMotivoAnulacion String?
 
+  // Historial de remisiones: cada vez que se anula SOLO la factura y
+  // después se emite una nueva para el mismo pedido (ver Fase 11), la vieja
+  // queda congelada acá antes de pisarse.
+  facturasReemplazadas FacturaReemplazada[]
+
   // El pedido se guarda ANTES de que el cliente apriete "Enviar por
   // WhatsApp". Esta marca distingue los pedidos realmente enviados de los
   // que el cliente armó y abandonó en el último paso.
@@ -1058,6 +1064,14 @@ model VentaPos {
   facturaExento      Decimal?  @db.Decimal(10, 2)
   facturaIva10       Decimal?  @db.Decimal(10, 2)
   facturaIva5        Decimal?  @db.Decimal(10, 2)
+  // A diferencia de Order, esto quedaba SIN congelar — el ticket lo leía en
+  // vivo vía turnoPos.estacion.puntoExpedicion. Frágil (si la estación
+  // cambia de punto de expedición después, un ticket viejo imprime mal) y
+  // roto de frente para una remisión (Fase 11): la venta se re-emite desde
+  // la estación ACTUAL, no la del turno original. Se congela acá también,
+  // igual que Order, tanto en la emisión normal como en la remisión.
+  facturaRazonSocialEmisor String?
+  facturaRucEmisor         String?
 
   // Anular SOLO la factura, sin cancelar la cuenta — mismo criterio que
   // Order.facturaAnulada (ver ese comentario). Cancelar la cuenta entera
@@ -1067,6 +1081,9 @@ model VentaPos {
   facturaAnuladaPor      String?
   facturaAnuladaEn       DateTime?
   facturaMotivoAnulacion String?
+
+  // Historial de remisiones — ver Order.facturasReemplazadas.
+  facturasReemplazadas FacturaReemplazada[]
 
   @@index([storeId])
   @@index([turnoPosId])
@@ -1094,4 +1111,42 @@ model VentaPosItem {
 
   @@index([storeId])
   @@index([ventaPosId])
+}
+
+/// Snapshot de una factura anulada justo antes de reemplazarla por una
+/// nueva (remisión, Fase 11) — Order/VentaPos solo tienen lugar para UN
+/// número de factura vigente a la vez, así que la que se anula y se
+/// reemplaza queda congelada acá antes de pisarse. El número viejo nunca
+/// se reutiliza (sale de PuntoExpedicion.ultimoNumeroFactura, que solo
+/// incrementa); esta tabla es el rastro de A QUÉ pedido/venta perteneció.
+model FacturaReemplazada {
+  id      String @id @default(cuid())
+  storeId String
+  store   Store  @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  origen  String // "pedido" | "venta"
+  orderId String?
+  order   Order?    @relation(fields: [orderId], references: [id])
+  ventaId String?
+  venta   VentaPos? @relation(fields: [ventaId], references: [id])
+
+  // Lo que decía la factura ANULADA, congelado antes de pisarlo.
+  facturaNumero             String
+  facturaTimbrado           String?
+  facturaVencimiento        DateTime?
+  facturaRazonSocial        String?
+  facturaRuc                String?
+  facturaTipoIdentificacion String?
+  anuladaPor      String
+  anuladaEn       DateTime
+  motivoAnulacion String
+
+  // La factura nueva que la reemplazó, y quién/cuándo hizo la remisión.
+  facturaNuevaNumero String
+  remitidaPor         String
+  remitidaEn          DateTime @default(now())
+
+  @@index([storeId])
+  @@index([orderId])
+  @@index([ventaId])
 }

@@ -23,7 +23,7 @@ export function ClienteCrearModal({
   const [nombre, setNombre] = useState("");
   const [telefono, setTelefono] = useState("");
   const [email, setEmail] = useState("");
-  const [tipo, setTipo] = useState(TIPOS_IDENTIFICACION_FISCAL[0].valor);
+  const [tipo, setTipo] = useState<string>(TIPOS_IDENTIFICACION_FISCAL[0].valor);
   const [numeroIdent, setNumeroIdent] = useState("");
   const [tieneIdentificacion, setTieneIdentificacion] = useState(false);
   const [error, setError] = useState<string | null>(null);

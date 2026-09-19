@@ -1,4 +1,4 @@
-import type { Prisma, PrismaClient } from "@prisma/client";
+import { Prisma, type PrismaClient } from "@prisma/client";
 import { prisma } from "./prisma";
 import { aplicarLocal, type ArgsConsulta } from "./alcance-local";
 
@@ -95,4 +95,72 @@ export async function siguienteNumeroCliente(
     select: { contadorClientes: true },
   });
   return local.contadorClientes;
+}
+
+/**
+ * Alta o corrección de un cliente fiscal (RUC/Cédula/etc.), compartida entre
+ * todo lo que factura: el cobro del POS (registrarVenta) y la remisión de
+ * facturas (remitirFactura). La mayoría de las veces el cliente YA existe
+ * (se busca por tipo+número), así que la Clave nueva (siguienteNumeroCliente)
+ * se pide únicamente en la rama que de verdad crea la fila — nunca en un
+ * update, para no gastar números en clientes recurrentes.
+ *
+ * Necesita el `tx` de la transacción en curso: la carrera de dos cajas
+ * facturando el mismo RUC nuevo al mismo tiempo se resuelve con un `catch`
+ * de P2002 que cae a `update` en vez de fallar en medio del cobro.
+ */
+export async function upsertClienteFiscal(
+  db: PrismaClient | Prisma.TransactionClient,
+  storeId: string,
+  datos: {
+    tipoIdentificacion: string;
+    numeroIdentificacion: string;
+    razonSocial: string;
+    email: string;
+  }
+): Promise<void> {
+  const claveFiscal = {
+    storeId_tipoIdentificacion_numeroIdentificacion: {
+      storeId,
+      tipoIdentificacion: datos.tipoIdentificacion,
+      numeroIdentificacion: datos.numeroIdentificacion,
+    },
+  };
+  const emailFiscal = datos.email.trim();
+  const existente = await db.customer.findUnique({ where: claveFiscal, select: { id: true } });
+
+  if (existente) {
+    await db.customer.update({
+      where: claveFiscal,
+      // Solo se toca el email si vino algo: no hay que borrar uno ya
+      // cargado porque esta vez no se volvió a tipear.
+      data: { nombre: datos.razonSocial, ...(emailFiscal ? { email: emailFiscal } : {}) },
+    });
+    return;
+  }
+
+  const numeroCliente = await siguienteNumeroCliente(db, storeId);
+  try {
+    await db.customer.create({
+      data: {
+        storeId,
+        nombre: datos.razonSocial,
+        tipoIdentificacion: datos.tipoIdentificacion,
+        numeroIdentificacion: datos.numeroIdentificacion,
+        email: emailFiscal || null,
+        numero: numeroCliente,
+      },
+    });
+  } catch (err) {
+    // Otra venta/remisión con el mismo RUC lo creó justo entre el
+    // findUnique y este create (dos cajas, mismo instante).
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
+      await db.customer.update({
+        where: claveFiscal,
+        data: { nombre: datos.razonSocial, ...(emailFiscal ? { email: emailFiscal } : {}) },
+      });
+    } else {
+      throw err;
+    }
+  }
 }
