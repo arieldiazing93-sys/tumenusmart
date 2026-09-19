@@ -38,7 +38,12 @@ export function FormularioIngreso() {
       try {
         const r = await iniciarSesion(email, password);
         if (r.ok) {
-          router.push("/admin/pedidos");
+          // Al panel de Pedidos se llega desde el menú — lo primero que
+          // tiene que ver un cajero al entrar es Punto de venta, para abrir
+          // turno de una vez (o retomar el que ya tiene abierto). Si esta
+          // computadora no tiene estación vinculada, o el usuario no vende
+          // en mostrador, esa misma pantalla lo manda a donde corresponda.
+          router.push("/admin/pos");
           router.refresh();
           return;
         }
