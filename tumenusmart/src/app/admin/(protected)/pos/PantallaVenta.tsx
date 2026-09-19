@@ -459,7 +459,7 @@ export function PantallaVenta({
           </div>
         </div>
 
-        <Tarjeta className="flex flex-col gap-4 lg:sticky lg:top-[4.5rem] lg:max-h-[calc(100vh-5.5rem)] lg:overflow-y-auto">
+        <Tarjeta className="flex flex-col gap-4 ring-2 ring-brand/60 lg:sticky lg:top-[4.5rem] lg:max-h-[calc(100vh-5.5rem)] lg:overflow-y-auto">
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0">
               <p className="truncate text-[0.7rem] font-semibold uppercase tracking-rotulo text-tinta-suave">
