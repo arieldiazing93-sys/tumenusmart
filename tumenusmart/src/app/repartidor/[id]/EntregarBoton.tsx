@@ -16,8 +16,7 @@ import { FORMAS_DE_COBRO, type FormaDeCobro } from "@/lib/rendicion";
  * Solo se ofrecen los medios que el local tiene activados en Configuración
  * (aceptaEfectivo/etc.) — mostrar "Transferencia" a un repartidor de un
  * local que no la acepta solo suma una opción confusa que nunca corresponde
- * marcar. "Ya estaba pago" no es un medio de pago del local, es un estado
- * del pedido (se pagó al hacerlo, antes de salir) — siempre está disponible.
+ * marcar.
  *
  * Se sugiere lo que el cliente había elegido al pedir, aunque marcado como
  * sugerencia: en la puerta cambia seguido, y si la sugerencia viniera ya
@@ -52,7 +51,6 @@ export function EntregarBoton({
     tarjeta_debito: aceptaTarjetaDebito,
     tarjeta_credito: aceptaTarjetaCredito,
     transferencia: aceptaTransferencia,
-    ya_pagado: true,
   };
   const opciones = FORMAS_DE_COBRO.filter((f) => activadas[f.valor]);
 

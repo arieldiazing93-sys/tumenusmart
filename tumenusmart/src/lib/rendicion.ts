@@ -21,25 +21,26 @@
 // inconsistencia, eso rompía en silencio la sugerencia de "lo que el
 // cliente había dicho" en la pantalla del repartidor (EntregarBoton): un
 // pedido sugerido "tarjeta_debito" nunca coincidía con el botón "tarjeta".
-export type FormaDeCobro = "efectivo" | "tarjeta_debito" | "tarjeta_credito" | "transferencia" | "ya_pagado";
+export type FormaDeCobro = "efectivo" | "tarjeta_debito" | "tarjeta_credito" | "transferencia";
 
 export const FORMAS_DE_COBRO: { valor: FormaDeCobro; etiqueta: string; rinde: boolean }[] = [
   { valor: "efectivo", etiqueta: "Efectivo", rinde: true },
   { valor: "tarjeta_debito", etiqueta: "Tarjeta débito", rinde: false },
   { valor: "tarjeta_credito", etiqueta: "Tarjeta crédito", rinde: false },
   { valor: "transferencia", etiqueta: "Transferencia", rinde: false },
-  // "Ya estaba pago" es el pedido que se pagó antes de salir del local. El
-  // repartidor no cobró nada y no debe nada por él, pero tiene que poder
-  // decirlo: si no, la única opción honesta que le queda es mentir.
-  { valor: "ya_pagado", etiqueta: "Ya estaba pago", rinde: false },
 ];
 
-// Pedidos rendidos ANTES de separar tarjeta en débito/crédito guardaron
-// "tarjeta" a secas. Ya no se ofrece como botón nuevo, pero un pedido viejo
-// tiene que seguir leyéndose exactamente igual que el día que se cerró —no
-// reclasificarse a "efectivo" solo porque cambió la lista de opciones.
+// Valores que ya no se ofrecen como botón nuevo, pero un pedido viejo
+// rendido con alguno de estos tiene que seguir leyéndose exactamente igual
+// que el día que se cerró — no reclasificarse solo porque cambió la lista
+// de opciones.
 const FORMA_COBRO_LEGADO: Record<string, { etiqueta: string; rinde: boolean }> = {
+  // De antes de separar tarjeta en débito/crédito.
   tarjeta: { etiqueta: "Tarjeta (antes de separar débito/crédito)", rinde: false },
+  // De antes de sacar esta opción: el repartidor no cobraba nada porque ya
+  // se había resuelto antes de salir. Se sacó porque, cuando se sabía cuál
+  // de los 4 métodos reales fue, convenía marcar ESE directamente.
+  ya_pagado: { etiqueta: "Ya estaba pago", rinde: false },
 };
 
 const VALIDAS = new Set(FORMAS_DE_COBRO.map((f) => f.valor));
