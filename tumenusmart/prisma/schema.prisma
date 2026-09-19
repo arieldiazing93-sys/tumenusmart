@@ -794,7 +794,18 @@ model Rendicion {
   /// Cuántos pedidos entraron y cuánta plata de cada tipo, congelados.
   cantidadPedidos Int
   totalEfectivo   Decimal @db.Decimal(10, 2)
+  /// Suma de transferencia + tarjeta débito + tarjeta crédito — se mantiene
+  /// para lo que ya lo usa como bolsón único (comprobante de rendición).
   totalOtros      Decimal @db.Decimal(10, 2)
+  /// Mismas 3 formas de "otros", desglosadas — para que el cierre general
+  /// del turno (pos/turnos/[id]/page.tsx) pueda sumar cada una a su columna
+  /// correspondiente de mostrador, en vez de un bolsón que no se puede
+  /// repartir. Rendiciones de antes de este desglose quedan en 0 acá (no hay
+  /// forma de reconstruir retroactivamente qué parte de "otros" era cada
+  /// una), con el dato viejo intacto en totalOtros.
+  totalTransferencia  Decimal @default(0) @db.Decimal(10, 2)
+  totalTarjetaDebito  Decimal @default(0) @db.Decimal(10, 2)
+  totalTarjetaCredito Decimal @default(0) @db.Decimal(10, 2)
 
   /// Quién lo recibió, para que después se sepa a quién preguntarle.
   recibidoPor  String

@@ -93,6 +93,12 @@ export async function cerrarRendicion(
   // Se devuelve el id para poder abrir el comprobante recién cerrado sin
   // tener que buscarlo en la lista.
   const rendicionId = await prisma.$transaction(async (tx) => {
+    // Desglosado de "otros" para que el cierre general del turno pueda sumar
+    // cada forma a su columna correspondiente de mostrador (ver
+    // pos/turnos/[id]/page.tsx) — resumen.porMetodo ya lo trae calculado,
+    // acá solo se extrae cada uno.
+    const montoDe = (metodo: string) => resumen.porMetodo.find((m) => m.metodo === metodo)?.monto ?? 0;
+
     const rendicion = await tx.rendicion.create({
       data: {
         storeId,
@@ -100,6 +106,9 @@ export async function cerrarRendicion(
         cantidadPedidos: resumen.cantidad,
         totalEfectivo: resumen.efectivo,
         totalOtros: resumen.otros,
+        totalTransferencia: montoDe("transferencia"),
+        totalTarjetaDebito: montoDe("tarjeta_debito"),
+        totalTarjetaCredito: montoDe("tarjeta_credito"),
         recibidoPor: sesion.nombre?.trim() || sesion.email,
         notas: notas.trim() || null,
         turnoPosId: turno?.id,

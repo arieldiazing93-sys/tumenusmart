@@ -1,0 +1,3 @@
+ALTER TABLE "Rendicion" ADD COLUMN "totalTransferencia" DECIMAL(10,2) NOT NULL DEFAULT 0;
+ALTER TABLE "Rendicion" ADD COLUMN "totalTarjetaDebito" DECIMAL(10,2) NOT NULL DEFAULT 0;
+ALTER TABLE "Rendicion" ADD COLUMN "totalTarjetaCredito" DECIMAL(10,2) NOT NULL DEFAULT 0;

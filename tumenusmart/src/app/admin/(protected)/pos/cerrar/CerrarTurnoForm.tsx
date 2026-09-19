@@ -74,7 +74,9 @@ export function CerrarTurnoForm({ turnoId, cantidad, totalGeneral }: Props) {
     <div className="flex flex-col gap-5">
       <div className="rounded-lg border border-linea bg-papel-suave px-3.5 py-3 text-[0.85rem] text-tinta-media">
         Vas a cerrar {cantidad} {cantidad === 1 ? "cuenta" : "cuentas"} (mostrador + pedidos cobrados
-        acá). Contá la caja y cargá lo que tenés en cada forma de pago.
+        acá). Cargá TODO lo que corresponde a este turno en cada forma de pago —incluido lo que te
+        rindió el repartidor de delivery: el efectivo que te entregó, y las transferencias/tarjetas
+        que cobró y que también vas a ver en tu cuenta o resumen de POS.
       </div>
 
       <div className="flex flex-col gap-2.5">

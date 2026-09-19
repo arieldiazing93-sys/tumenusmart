@@ -105,15 +105,17 @@ export default async function ComprobanteTurnoPosPage({
           },
         },
         // Rendiciones de repartidor recibidas mientras este turno estaba
-        // abierto (ver Rendicion.turnoPosId) — el corte general las suma
-        // aparte, sin mezclar sus formas de cobro con las 4 de mostrador.
+        // abierto (ver Rendicion.turnoPosId) — el corte general suma cada
+        // una de sus 4 formas a la columna que le corresponde de mostrador.
         rendiciones: {
           orderBy: { creadoEn: "asc" },
           select: {
             id: true,
             cantidadPedidos: true,
             totalEfectivo: true,
-            totalOtros: true,
+            totalTransferencia: true,
+            totalTarjetaDebito: true,
+            totalTarjetaCredito: true,
             recibidoPor: true,
             creadoEn: true,
             repartidor: { select: { nombre: true } },
@@ -138,7 +140,11 @@ export default async function ComprobanteTurnoPosPage({
     redirect("/admin/pedidos");
   }
 
-  const calculado: Record<FormaPagoPos, number> = {
+  // Lo que quedó congelado en TurnoPos al cerrar: SOLO mostrador + retiro/
+  // mesa. Se usa tal cual (sin sumarle delivery) para el contraste contra
+  // "hoy" más abajo — ese contraste recalcula ventas/pedidos de este mismo
+  // turno, nunca rendiciones, así que mezclar acá los descuadraría.
+  const calculadoBase: Record<FormaPagoPos, number> = {
     efectivo: Number(turno.calculadoEfectivo ?? 0),
     transferencia: Number(turno.calculadoTransferencia ?? 0),
     tarjeta_debito: Number(turno.calculadoTarjetaDebito ?? 0),
@@ -150,6 +156,35 @@ export default async function ComprobanteTurnoPosPage({
     tarjeta_debito: Number(turno.declaradoTarjetaDebito ?? 0),
     tarjeta_credito: Number(turno.declaradoTarjetaCredito ?? 0),
   };
+
+  // Corte general: el cajero controla los dos canales (mostrador y
+  // delivery), así que lo que declara en cada forma de pago es UN SOLO
+  // número que ya incluye lo que rindieron los repartidores — el mismo
+  // cajón de efectivo, la misma cuenta bancaria de transferencias, el mismo
+  // resumen de POS para las tarjetas. Por eso lo que el sistema espera
+  // suma las 4 formas de la rendición a su columna correspondiente de
+  // mostrador; si no, el declarado (que sí las incluye) se ve como un
+  // sobrante que nunca existió.
+  const totalRendicionesEfectivo = turno.rendiciones.reduce((s, r) => s + Number(r.totalEfectivo), 0);
+  const totalRendicionesTransferencia = turno.rendiciones.reduce(
+    (s, r) => s + Number(r.totalTransferencia),
+    0
+  );
+  const totalRendicionesTarjetaDebito = turno.rendiciones.reduce(
+    (s, r) => s + Number(r.totalTarjetaDebito),
+    0
+  );
+  const totalRendicionesTarjetaCredito = turno.rendiciones.reduce(
+    (s, r) => s + Number(r.totalTarjetaCredito),
+    0
+  );
+  const calculado: Record<FormaPagoPos, number> = {
+    efectivo: calculadoBase.efectivo + totalRendicionesEfectivo,
+    transferencia: calculadoBase.transferencia + totalRendicionesTransferencia,
+    tarjeta_debito: calculadoBase.tarjeta_debito + totalRendicionesTarjetaDebito,
+    tarjeta_credito: calculadoBase.tarjeta_credito + totalRendicionesTarjetaCredito,
+  };
+
   const totalCalculadoCongelado =
     calculado.efectivo + calculado.transferencia + calculado.tarjeta_debito + calculado.tarjeta_credito;
   const cierre = compararCierre(
@@ -157,15 +192,6 @@ export default async function ComprobanteTurnoPosPage({
     declarado
   );
   const { totalCalculado, totalDeclarado, diferenciaTotal } = cierre;
-
-  // Corte general: mostrador + retiro/mesa (lo declarado arriba) más lo que
-  // cada repartidor rindió MIENTRAS este turno estaba abierto. No se mezcla
-  // con "Por forma de pago" porque el repartidor solo distingue
-  // efectivo/tarjeta/transferencia/ya pagado (ver src/lib/rendicion.ts), no
-  // las 4 formas de mostrador — se muestra aparte y se suma al final.
-  const totalRendicionesEfectivo = turno.rendiciones.reduce((s, r) => s + Number(r.totalEfectivo), 0);
-  const totalRendicionesOtros = turno.rendiciones.reduce((s, r) => s + Number(r.totalOtros), 0);
-  const totalGeneralTurno = totalDeclarado + totalRendicionesEfectivo + totalRendicionesOtros;
 
   // Una venta cancelada, o un pedido que pasó a "cancelado", DESPUÉS de
   // cerrar el turno es justo el tipo de cambio que este contraste tiene que
@@ -180,7 +206,7 @@ export default async function ComprobanteTurnoPosPage({
         .filter((p) => p.estado !== "cancelado")
         .map((p) => ({ total: Number(p.total), formaPago: p.formaPagoPos ?? "efectivo" })),
     ],
-    { cantidadVentas: turno.cantidadVentas ?? 0, calculado }
+    { cantidadVentas: turno.cantidadVentas ?? 0, calculado: calculadoBase }
   );
 
   return (
@@ -238,22 +264,6 @@ export default async function ComprobanteTurnoPosPage({
             </p>
           )}
         </div>
-
-        {turno.rendiciones.length > 0 && (
-          <div className="mb-5 rounded-xl border border-brand/25 bg-brand-light p-4 print:rounded-none print:border print:border-linea print:bg-transparent">
-            <p className="text-[0.85rem] text-tinta-media">
-              Total general del turno (mostrador + retiro/mesa + delivery rendido)
-            </p>
-            <p className="cifra mt-0.5 text-[1.9rem] font-semibold leading-tight text-brand-texto print:text-[20pt] print:text-tinta">
-              {formatearGuarani(totalGeneralTurno)}
-            </p>
-            <p className="mt-1 text-[0.82rem] text-tinta-media">
-              {formatearGuarani(totalDeclarado)} de mostrador/retiro/mesa +{" "}
-              {formatearGuarani(totalRendicionesEfectivo + totalRendicionesOtros)} rendidos por{" "}
-              {turno.rendiciones.length === 1 ? "el repartidor" : "los repartidores"} durante este turno.
-            </p>
-          </div>
-        )}
 
         {!contraste.coincide && (
           <p className="mb-5 rounded-xl border border-aviso/25 bg-aviso-luz px-4 py-3 text-[0.85rem] text-tinta print:rounded-none print:border-linea print:bg-transparent">
@@ -319,6 +329,13 @@ export default async function ComprobanteTurnoPosPage({
               </tr>
             </tfoot>
           </table>
+          {turno.rendiciones.length > 0 && (
+            <p className="mt-2 text-[0.78rem] text-tinta-suave">
+              Cada forma de acá arriba incluye lo que rindió{" "}
+              {turno.rendiciones.length === 1 ? "el repartidor" : "los repartidores"} de delivery durante
+              este turno — es la misma caja, la misma cuenta y el mismo resumen de POS.
+            </p>
+          )}
         </section>
 
         <section className="break-inside-avoid">
@@ -414,10 +431,12 @@ export default async function ComprobanteTurnoPosPage({
               <thead>
                 <tr className="text-[0.7rem] uppercase tracking-rotulo text-tinta-suave">
                   <th className="border-b border-linea pb-1.5 font-semibold">Repartidor</th>
-                  <th className="w-32 border-b border-linea pb-1.5 font-semibold">Hora</th>
-                  <th className="w-20 border-b border-linea pb-1.5 text-right font-semibold">Entregas</th>
-                  <th className="w-32 border-b border-linea pb-1.5 text-right font-semibold">Efectivo</th>
-                  <th className="w-32 border-b border-linea pb-1.5 text-right font-semibold">Otros medios</th>
+                  <th className="w-28 border-b border-linea pb-1.5 font-semibold">Hora</th>
+                  <th className="w-16 border-b border-linea pb-1.5 text-right font-semibold">Entregas</th>
+                  <th className="w-28 border-b border-linea pb-1.5 text-right font-semibold">Efectivo</th>
+                  <th className="w-28 border-b border-linea pb-1.5 text-right font-semibold">Transf.</th>
+                  <th className="w-28 border-b border-linea pb-1.5 text-right font-semibold">Débito</th>
+                  <th className="w-28 border-b border-linea pb-1.5 text-right font-semibold">Crédito</th>
                 </tr>
               </thead>
               <tbody>
@@ -436,7 +455,13 @@ export default async function ComprobanteTurnoPosPage({
                       {formatearGuarani(Number(r.totalEfectivo))}
                     </td>
                     <td className="cifra border-b border-linea-fina py-2 text-right text-[0.85rem] text-tinta-media">
-                      {formatearGuarani(Number(r.totalOtros))}
+                      {formatearGuarani(Number(r.totalTransferencia))}
+                    </td>
+                    <td className="cifra border-b border-linea-fina py-2 text-right text-[0.85rem] text-tinta-media">
+                      {formatearGuarani(Number(r.totalTarjetaDebito))}
+                    </td>
+                    <td className="cifra border-b border-linea-fina py-2 text-right text-[0.85rem] text-tinta-media">
+                      {formatearGuarani(Number(r.totalTarjetaCredito))}
                     </td>
                   </tr>
                 ))}
@@ -450,7 +475,13 @@ export default async function ComprobanteTurnoPosPage({
                     {formatearGuarani(totalRendicionesEfectivo)}
                   </td>
                   <td className="cifra pt-2.5 text-right text-[0.85rem] text-tinta-media">
-                    {formatearGuarani(totalRendicionesOtros)}
+                    {formatearGuarani(totalRendicionesTransferencia)}
+                  </td>
+                  <td className="cifra pt-2.5 text-right text-[0.85rem] text-tinta-media">
+                    {formatearGuarani(totalRendicionesTarjetaDebito)}
+                  </td>
+                  <td className="cifra pt-2.5 text-right text-[0.85rem] text-tinta-media">
+                    {formatearGuarani(totalRendicionesTarjetaCredito)}
                   </td>
                 </tr>
               </tfoot>
