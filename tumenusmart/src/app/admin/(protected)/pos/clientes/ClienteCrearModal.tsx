@@ -25,7 +25,6 @@ export function ClienteCrearModal({
   const [email, setEmail] = useState("");
   const [tipo, setTipo] = useState<string>(TIPOS_IDENTIFICACION_FISCAL[0].valor);
   const [numeroIdent, setNumeroIdent] = useState("");
-  const [tieneIdentificacion, setTieneIdentificacion] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -40,12 +39,15 @@ export function ClienteCrearModal({
   function guardar() {
     setError(null);
     startTransition(async () => {
+      // Sin identificación cargada, no se manda tipo tampoco: un cliente
+      // común no tiene por qué llevar un "RUC" vacío colgando.
+      const conIdentificacion = !!numeroIdent.trim();
       const r = await crearCliente({
         nombre,
         telefono,
         email,
-        tipoIdentificacion: tieneIdentificacion ? tipo : "",
-        numeroIdentificacion: tieneIdentificacion ? numeroIdent : "",
+        tipoIdentificacion: conIdentificacion ? tipo : "",
+        numeroIdentificacion: conIdentificacion ? numeroIdent : "",
       });
       if (!r.ok) {
         setError(r.error);
@@ -97,40 +99,18 @@ export function ClienteCrearModal({
             />
           </Campo>
 
-          {tieneIdentificacion ? (
-            <>
-              <Campo etiqueta="Tipo">
-                <Selector value={tipo} onChange={(e) => setTipo(e.target.value)}>
-                  {TIPOS_IDENTIFICACION_FISCAL.map((t) => (
-                    <option key={t.valor} value={t.valor}>
-                      {t.etiqueta}
-                    </option>
-                  ))}
-                </Selector>
-              </Campo>
-              <Campo etiqueta="N° de RUC / Cédula / etc.">
-                <Entrada value={numeroIdent} onChange={(e) => setNumeroIdent(e.target.value)} />
-              </Campo>
-              <button
-                type="button"
-                onClick={() => {
-                  setTieneIdentificacion(false);
-                  setNumeroIdent("");
-                }}
-                className="self-start text-[0.76rem] font-medium text-tinta-suave underline"
-              >
-                Quitar identificación fiscal
-              </button>
-            </>
-          ) : (
-            <button
-              type="button"
-              onClick={() => setTieneIdentificacion(true)}
-              className="self-start text-[0.76rem] font-medium text-brand-texto underline"
-            >
-              + Agregar identificación fiscal
-            </button>
-          )}
+          <Campo etiqueta="Tipo de identificación">
+            <Selector value={tipo} onChange={(e) => setTipo(e.target.value)}>
+              {TIPOS_IDENTIFICACION_FISCAL.map((t) => (
+                <option key={t.valor} value={t.valor}>
+                  {t.etiqueta}
+                </option>
+              ))}
+            </Selector>
+          </Campo>
+          <Campo etiqueta="N° de RUC / Cédula / etc." ayuda="Opcional — solo si va a facturar con registro fiscal">
+            <Entrada value={numeroIdent} onChange={(e) => setNumeroIdent(e.target.value)} />
+          </Campo>
 
           <Campo etiqueta="Correo electrónico">
             <Entrada
