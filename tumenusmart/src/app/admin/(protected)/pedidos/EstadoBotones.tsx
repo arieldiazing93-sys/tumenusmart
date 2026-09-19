@@ -36,6 +36,11 @@ export function EstadoBotones({
   const [pidiendoPago, setPidiendoPago] = useState(false);
   const [pidiendoMotivoCancelacion, setPidiendoMotivoCancelacion] = useState(false);
   const [motivoCancelacion, setMotivoCancelacion] = useState("");
+  // Se muestra una vez, justo al pasar a "En despacho" — un recordatorio
+  // corto, no un bloqueo: el cajero puede perfectamente marcar "Entregado"
+  // él mismo después (por ejemplo si el repartidor no tiene el teléfono a
+  // mano), y en ese caso ya queda cubierto por pideFormaPago más abajo.
+  const [avisoDespacho, setAvisoDespacho] = useState(false);
   // Impresión automática (QZ Tray) que no salió sola — link manual, nunca
   // un window.open ciego (ver src/lib/impresion-comprobantes.ts: entre el
   // clic y este momento pasaron varios `await`, un popup automático se
@@ -45,8 +50,12 @@ export function EstadoBotones({
   const faltaRepartidor = tipoEntrega === "delivery" && !repartidorId;
   // Retiro/mesa se cobra en el mostrador: si hay un turno de caja abierto,
   // marcarlo "entregado" tiene que decir con qué se cobró para que entre en
-  // ese mismo cierre. El delivery sigue su propio camino (Rendición).
-  const pideFormaPago = tipoEntrega !== "delivery" && turnoAbiertoId != null;
+  // ese mismo cierre. Delivery pregunta SIEMPRE, aunque lo normal sea
+  // confirmarlo desde la pantalla del repartidor (/repartidor/[id]) — si el
+  // cajero lo marca entregado desde acá (por ejemplo porque el repartidor
+  // no tiene el teléfono a mano), igual tiene que quedar con qué se cobró:
+  // si no, el pedido queda invisible en Rendición (ver cambiarEstadoPedido).
+  const pideFormaPago = tipoEntrega === "delivery" || turnoAbiertoId != null;
   const esFactura = comprobanteTipo === "factura" && !!facturaNumero;
 
   /**
@@ -143,6 +152,7 @@ export function EstadoBotones({
       else {
         if (resultado.aviso) setAviso(resultado.aviso);
         imprimirSegunEstado(estado, resultado);
+        if (estado === "en_despacho" && tipoEntrega === "delivery") setAvisoDespacho(true);
       }
     });
   }
@@ -223,7 +233,9 @@ export function EstadoBotones({
             Cancelar
           </button>
           <p className="mt-2 text-xs text-tinta-suave">
-            Se suma al cierre del turno que está abierto ahora en el Punto de Venta.
+            {tipoEntrega === "delivery"
+              ? "Queda pendiente de rendir en Cierre, igual que si lo confirmara el repartidor."
+              : "Se suma al cierre del turno que está abierto ahora en el Punto de Venta."}
           </p>
         </div>
       )}
@@ -257,6 +269,38 @@ export function EstadoBotones({
               className="rounded-full px-3 py-1.5 text-sm font-medium text-tinta-media hover:text-tinta"
             >
               Volver
+            </button>
+          </div>
+        </div>
+      )}
+
+      {avisoDespacho && (
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center bg-tinta/45 sm:items-center sm:p-4"
+          onClick={() => setAvisoDespacho(false)}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Pedido en despacho"
+            className="w-full max-w-sm rounded-t-xl bg-white p-5 text-center shadow-alta sm:rounded-xl"
+            style={{ paddingBottom: "max(1.25rem, env(safe-area-inset-bottom, 0px))" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <span aria-hidden="true" className="mb-2 block text-3xl">
+              🛵
+            </span>
+            <p className="text-[0.95rem] font-semibold text-tinta">Ya salió a entregar</p>
+            <p className="mt-1.5 text-[0.85rem] text-tinta-media">
+              El repartidor tiene que confirmar la entrega y el cobro desde su propio enlace. No
+              hace falta que marques &quot;Entregado&quot; acá, salvo que él no pueda hacerlo.
+            </p>
+            <button
+              type="button"
+              onClick={() => setAvisoDespacho(false)}
+              className="mt-4 w-full rounded-full bg-brand px-3 py-2 text-sm font-semibold text-white hover:bg-brand-dark"
+            >
+              Entendido
             </button>
           </div>
         </div>

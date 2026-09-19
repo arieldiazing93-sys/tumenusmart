@@ -590,7 +590,7 @@ model Order {
   /// caja del repartidor sirve lo que pasó, no lo que se pensaba hacer.
   ///
   /// null mientras el pedido no esté entregado.
-  cobroMetodo          String? // "efectivo" | "tarjeta" | "transferencia" | "ya_pagado"
+  cobroMetodo          String? // "efectivo" | "tarjeta_debito" | "tarjeta_credito" | "transferencia"
   entregadoEn          DateTime?
 
   /// A qué cierre de caja pertenece. null = todavía no lo rindió.

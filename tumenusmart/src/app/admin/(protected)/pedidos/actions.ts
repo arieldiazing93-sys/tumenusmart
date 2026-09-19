@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { prismaDelLocal, type PrismaLocal } from "@/lib/prisma-local";
 import { idLocalActual } from "@/lib/local-actual";
 import { normalizarFormaPagoPos } from "@/lib/turno-pos";
+import { normalizarCobro } from "@/lib/rendicion";
 import { estacionActual } from "@/lib/estacion-actual";
 import { desglosarIva, formatearNumeroFactura } from "@/lib/factura-pos";
 import { turnoAbierto } from "../pos/turno-actual";
@@ -224,10 +225,13 @@ export async function cambiarEstadoPedido(
 
   // Retiro y mesa se cobran en el mostrador, con la misma persona y la misma
   // caja que el Punto de Venta — así que van al mismo cierre, no a uno
-  // aparte. El delivery queda afuera: ese cierre sigue siendo la Rendición
-  // del repartidor (ahí sí conviene un cierre separado, porque es plata que
-  // anduvo circulando fuera del local).
-  let datosExtra: { formaPagoPos: string; turnoPosId: string } | Record<string, never> = {};
+  // aparte. El delivery queda afuera de ese cierre: sigue siendo la
+  // Rendición del repartidor (ahí sí conviene un cierre separado, porque es
+  // plata que anduvo circulando fuera del local).
+  let datosExtra:
+    | { formaPagoPos: string; turnoPosId: string }
+    | { cobroMetodo: string; entregadoEn: Date }
+    | Record<string, never> = {};
   if (estado === "entregado") {
     const pedido = await prisma.order.findUnique({
       where: { id: orderId },
@@ -240,21 +244,37 @@ export async function cambiarEstadoPedido(
         items: { select: { precioUnitario: true, cantidad: true, iva: true } },
       },
     });
-    if (pedido && pedido.tipoEntrega !== "delivery" && pedido.estado !== "entregado") {
-      // Se ata al turno de la MISMA computadora desde la que se marca
-      // entregado — misma cookie de estación que usa el Punto de Venta (ver
-      // src/lib/estacion-actual.ts). Sin estación vinculada, o sin turno
-      // abierto en esa estación, no hay a qué cierre atarlo: se marca
-      // entregado igual, sin pedir forma de pago — no romper el flujo de
-      // todos los días para quien mira Pedidos desde un dispositivo que no
-      // es una caja.
-      const estacion = await estacionActual(prisma);
-      const turno = estacion ? await turnoAbierto(prisma, estacion.id) : null;
-      if (turno) {
+    if (pedido && pedido.estado !== "entregado") {
+      if (pedido.tipoEntrega === "delivery") {
+        // Lo normal es que esto lo confirme el repartidor desde su propia
+        // pantalla (marcarPedidoEntregado, src/app/repartidor/[id]/actions.ts).
+        // Pero el botón de acá también deja marcar "Entregado" directo —por
+        // ejemplo si el repartidor no tiene el teléfono a mano— y en ese
+        // caso tiene que dejar EXACTAMENTE el mismo rastro: con qué se
+        // cobró y cuándo. Sin esto, el pedido queda con entregadoEn vacío
+        // —invisible en la Rendición, que filtra por ese campo (ver
+        // cierre/page.tsx)— pero sigue bloqueando el cierre general del
+        // turno para siempre (ver entregasSinRendir en pos/turno-actual.ts).
         if (!formaPagoPos) {
           return { ok: false, error: "Declará con qué se cobró antes de marcarlo entregado." };
         }
-        datosExtra = { formaPagoPos: normalizarFormaPagoPos(formaPagoPos), turnoPosId: turno.id };
+        datosExtra = { cobroMetodo: normalizarCobro(formaPagoPos), entregadoEn: new Date() };
+      } else {
+        // Se ata al turno de la MISMA computadora desde la que se marca
+        // entregado — misma cookie de estación que usa el Punto de Venta
+        // (ver src/lib/estacion-actual.ts). Sin estación vinculada, o sin
+        // turno abierto en esa estación, no hay a qué cierre atarlo: se
+        // marca entregado igual, sin pedir forma de pago — no romper el
+        // flujo de todos los días para quien mira Pedidos desde un
+        // dispositivo que no es una caja.
+        const estacion = await estacionActual(prisma);
+        const turno = estacion ? await turnoAbierto(prisma, estacion.id) : null;
+        if (turno) {
+          if (!formaPagoPos) {
+            return { ok: false, error: "Declará con qué se cobró antes de marcarlo entregado." };
+          }
+          datosExtra = { formaPagoPos: normalizarFormaPagoPos(formaPagoPos), turnoPosId: turno.id };
+        }
       }
 
       const resultado = await intentarEmitirFactura(prisma, pedido);
@@ -272,6 +292,9 @@ export async function cambiarEstadoPedido(
   if ("turnoPosId" in datosExtra) {
     revalidatePath("/admin/pos");
     revalidatePath("/admin/pos/turnos");
+  }
+  if ("cobroMetodo" in datosExtra) {
+    revalidatePath("/admin/cierre");
   }
   return { ok: true, aviso, areasImpresion };
 }
