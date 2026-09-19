@@ -3,6 +3,7 @@ import { prismaDelLocal } from "@/lib/prisma-local";
 import { idLocalActual } from "@/lib/local-actual";
 import { Cabecera, Tabla, Th, Vacio } from "@/components/ui";
 import { ClienteFila } from "./ClienteFila";
+import { NuevoClienteBoton } from "./NuevoClienteBoton";
 
 export const dynamic = "force-dynamic";
 
@@ -48,7 +49,8 @@ export default async function ClientesPosPage({
     <div>
       <Cabecera
         titulo="Clientes"
-        bajada="Histórico de clientes del local: los que facturaron con registro fiscal y los que sumaron fidelización por teléfono. Se dan de alta solos al vender — acá solo se puede corregir el nombre."
+        bajada="Histórico de clientes del local: los que facturaron con registro fiscal, los que sumaron fidelización por teléfono, y los que se cargan acá antes de su primera compra."
+        acciones={<NuevoClienteBoton />}
       />
 
       <form method="get" action="/admin/pos/clientes" className="mb-4 flex gap-2">
@@ -70,7 +72,7 @@ export default async function ClientesPosPage({
       {clientes.length === 0 ? (
         <Vacio
           titulo={busqueda ? "Ningún cliente coincide con esa búsqueda" : "Todavía no hay clientes cargados"}
-          detalle="Los clientes se dan de alta solos: al facturar con registro fiscal, o al cargar el teléfono en una venta o pedido."
+          detalle="Se dan de alta solos al facturar con registro fiscal o al cargar el teléfono en una venta o pedido — o cargalos vos con el botón de arriba."
         />
       ) : (
         <Tabla>
