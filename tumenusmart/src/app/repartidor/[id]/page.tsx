@@ -109,7 +109,7 @@ export default async function RepartidorPage({
                 <span className="font-semibold text-neutral-900">
                   {formatearGuarani(Number(pedido.total))}
                 </span>
-                <span className="text-neutral-500">
+                <span className="text-base font-bold text-brand">
                   {etiquetaMetodoPago(pedido.metodoPagoReferencia)}
                 </span>
               </div>
