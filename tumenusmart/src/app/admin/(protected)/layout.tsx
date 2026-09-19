@@ -90,6 +90,11 @@ function armarGrupos(hayIdeaSinVer: boolean, rol: string): GrupoSecciones[] {
           ver: conPermiso("pos.verHistorico") },
         { href: "/admin/pos/reporte-general", label: "Reporte general", icono: "estadisticas" as const,
           ver: conPermiso("pos.verHistorico") },
+        // Facturas de pedidos y de mostrador, juntas — repaso del dueño, no
+        // algo que se toca en el momento. Mismo permiso que "Cierres de
+        // turno"/"Reporte general".
+        { href: "/admin/facturas", label: "Facturas", icono: "cierre" as const,
+          ver: conPermiso("pos.verHistorico") },
         // Histórico de clientes (fidelización por teléfono + identificación
         // fiscal de la Factura Autoimpresor): repaso del dueño, no algo
         // operativo que el cajero abre en el momento — mismo permiso que
