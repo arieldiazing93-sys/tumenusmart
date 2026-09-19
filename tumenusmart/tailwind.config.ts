@@ -30,15 +30,22 @@ const config: Config = {
       },
 
       colors: {
+        // Variables CSS, no hex fijo: el panel admin nunca las toca (quedan
+        // en el naranja de siempre, definido en :root de globals.css), pero
+        // el layout del menú público (src/app/[slug]/layout.tsx) las
+        // reescribe por local si el dueño eligió un color de marca propio
+        // (ver src/lib/color-marca.ts). El formato rgb(var(--x) /
+        // <alpha-value>) es el que pide Tailwind para que sigan funcionando
+        // los modificadores de opacidad (bg-brand/20, etc.).
         brand: {
-          DEFAULT: "#D2501F",
-          dark: "#B0401A",
-          light: "#FCEDE6",
+          DEFAULT: "rgb(var(--brand) / <alpha-value>)",
+          dark: "rgb(var(--brand-dark) / <alpha-value>)",
+          light: "rgb(var(--brand-light) / <alpha-value>)",
           // "tinte" es el fondo de las pastillas de estado: más fuerte que
           // "light" para que se distingan de un vistazo en una tabla larga.
-          tinte: "#F7D9CB",
+          tinte: "rgb(var(--brand-tinte) / <alpha-value>)",
           // Para texto de acento sobre fondo claro: más oscuro, mejor contraste.
-          texto: "#A33A14",
+          texto: "rgb(var(--brand-texto) / <alpha-value>)",
         },
 
         /** Papel: los fondos. */

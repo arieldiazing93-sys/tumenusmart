@@ -3,6 +3,18 @@
 @tailwind utilities;
 
 @layer base {
+  /* El naranja de siempre, como variables — el panel admin siempre lee
+     estos valores. El menú público de un local con color propio los
+     reescribe en su layout (src/app/[slug]/layout.tsx), pero solo ADENTRO
+     de ese árbol; acá quedan los del panel y los del menú sin personalizar. */
+  :root {
+    --brand: 210 80 31;
+    --brand-dark: 176 64 26;
+    --brand-light: 252 237 230;
+    --brand-tinte: 247 217 203;
+    --brand-texto: 163 58 20;
+  }
+
   html {
     -webkit-text-size-adjust: 100%;
     scroll-behavior: smooth;
@@ -26,16 +38,21 @@
   table td, table th { font-variant-numeric: tabular-nums; }
 
   /* El foco del teclado siempre visible: hay gente que navega sin mouse, y
-     además es lo que hace que el panel se sienta terminado. */
+     además es lo que hace que el panel se sienta terminado.
+
+     Se referencian las variables directo (rgb(var(--brand))) y no con
+     theme("colors.brand.DEFAULT") — ese helper resuelve en tiempo de build,
+     así que perdería la reescritura por local que hace el layout del menú
+     público. Referenciando la variable, este estilo responde igual. */
   :focus-visible {
-    outline: 2px solid theme("colors.brand.DEFAULT");
+    outline: 2px solid rgb(var(--brand));
     outline-offset: 2px;
     border-radius: 3px;
   }
 
   ::selection {
-    background: theme("colors.brand.light");
-    color: theme("colors.brand.texto");
+    background: rgb(var(--brand-light));
+    color: rgb(var(--brand-texto));
   }
 }
 

@@ -22,6 +22,10 @@ model Store {
   nombre         String
   whatsappNumero String // formato internacional sin '+', ej: 595981234567
   logoUrl        String?
+  // Color de marca del local (hex, ej "#2E7D32") para el menú público — el
+  // panel admin sigue siempre naranja, esto es solo lo que ve el cliente del
+  // restaurante. Sin valor, el menú público usa el mismo naranja de siempre.
+  colorPrimario  String?
   direccion      String?
   mensajeSaludo  String? // texto opcional al inicio del mensaje de WhatsApp (pedidos)
   mensajeSaludoReserva String? // texto opcional al inicio del mensaje de WhatsApp (reservas)

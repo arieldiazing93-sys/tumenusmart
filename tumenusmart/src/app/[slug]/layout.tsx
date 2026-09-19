@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { CartProvider } from "@/components/CartProvider";
 import { localPorSlug, estaSuspendido } from "@/lib/local-por-slug";
+import { derivarPaletaMarca, esHexValido } from "@/lib/color-marca";
 
 export const dynamic = "force-dynamic";
 
@@ -45,7 +46,32 @@ export default async function LocalLayout({
     );
   }
 
+  // Color de marca propio del local, solo acá — el panel admin nunca entra
+  // por este layout, así que sigue siempre naranja. Sin colorPrimario (la
+  // mayoría de los locales, hoy), no se pisa nada: quedan los valores por
+  // defecto que ya trae :root en globals.css.
+  const paleta =
+    local.colorPrimario && esHexValido(local.colorPrimario)
+      ? derivarPaletaMarca(local.colorPrimario)
+      : null;
+
   // El carrito se guarda por local: si alguien abre dos menús distintos en el
   // mismo navegador, cada uno mantiene el suyo sin mezclarse.
-  return <CartProvider claveLocal={local.slug}>{children}</CartProvider>;
+  return (
+    <div
+      style={
+        paleta
+          ? ({
+              "--brand": paleta.brand,
+              "--brand-dark": paleta.brandDark,
+              "--brand-light": paleta.brandLight,
+              "--brand-tinte": paleta.brandTinte,
+              "--brand-texto": paleta.brandTexto,
+            } as React.CSSProperties)
+          : undefined
+      }
+    >
+      <CartProvider claveLocal={local.slug}>{children}</CartProvider>
+    </div>
+  );
 }

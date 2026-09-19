@@ -81,6 +81,29 @@ export default async function AdminConfiguracionPage() {
           </div>
           {store?.slug && <UrlPublicaField slug={store.slug} />}
           <LogoField initialUrl={store?.logoUrl ?? null} />
+
+          <div className="border-t border-linea pt-3">
+            <label className="flex items-center gap-2 text-sm font-medium text-tinta-media">
+              <input
+                type="checkbox"
+                name="personalizarColor"
+                defaultChecked={!!store?.colorPrimario}
+              />
+              Personalizar el color de mi menú público
+            </label>
+            <p className="mb-2 mt-1 text-xs text-tinta-media">
+              Sin activar, tu menú público usa el naranja de TuMenuSmart. El panel
+              administrativo (esta pantalla, pedidos, POS...) no cambia nunca — esto es
+              solo lo que ve tu cliente.
+            </p>
+            <input
+              type="color"
+              name="colorPrimario"
+              defaultValue={store?.colorPrimario ?? "#D2501F"}
+              className="h-10 w-20 cursor-pointer rounded-lg border border-linea"
+            />
+          </div>
+
           <div>
             <label className="mb-1 block text-sm font-medium text-tinta-media">
               Saludo del mensaje de WhatsApp — pedidos (opcional)

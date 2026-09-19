@@ -9,6 +9,7 @@ import { subirLogoNegocio } from "@/lib/supabase-storage";
 import { idLocalActual } from "@/lib/local-actual";
 import { normalizarSlug } from "@/lib/alcance-local";
 import { decidirCambioDeUrl } from "@/lib/url-publica";
+import { esHexValido } from "@/lib/color-marca";
 
 // Dos accesos a la base conviven acá a propósito:
 //
@@ -220,6 +221,17 @@ export async function actualizarStore(formData: FormData) {
   // puede mandar cualquier cosa.
   const estiloCarta =
     String(formData.get("estiloCarta") ?? "lista") === "tarjetas" ? "tarjetas" : "lista";
+  // El <input type="color"> del navegador SIEMPRE manda un hex (nunca vacío,
+  // arranca en #000000 si no se tocó) — por eso "personalizarColor" es lo
+  // que de verdad decide si se guarda: destildado, el menú público vuelve al
+  // naranja de siempre sin importar qué color haya quedado cargado en el
+  // selector. Tildado con un valor raro (llamada directa, no desde el
+  // formulario), tampoco se guarda — mejor volver al naranja que romper el
+  // menú público con un color inválido.
+  const personalizarColor = formData.get("personalizarColor") === "on";
+  const colorPrimarioRaw = String(formData.get("colorPrimario") ?? "").trim();
+  const colorPrimario =
+    personalizarColor && esHexValido(colorPrimarioRaw) ? colorPrimarioRaw : null;
 
   if (!nombre || !whatsappNumero) {
     // Este formulario queda atado con <form action={actualizarStore}> tal
@@ -241,6 +253,7 @@ export async function actualizarStore(formData: FormData) {
     whatsappNumero,
     direccion: String(formData.get("direccion") ?? "") || null,
     logoUrl: String(formData.get("logoUrl") ?? "") || null,
+    colorPrimario,
     mensajeSaludo: String(formData.get("mensajeSaludo") ?? "") || null,
     mensajeSaludoReserva: String(formData.get("mensajeSaludoReserva") ?? "") || null,
     estiloCarta,
