@@ -112,23 +112,12 @@ export default async function TicketVentaPosPage({
       : [];
 
   const [venta, store] = await Promise.all([
-    db.ventaPos.findUnique({
-      where: { id },
-      include: {
-        items: true,
-        // Solo hace falta cuando comprobanteTipo === "factura": ahí es
-        // donde vive la razón social/RUC del EMISOR (quien tiene el
-        // timbrado), distinta de Store.razonSocial/ruc (uso interno de
-        // TuMenuSmart, no se imprime nunca en un ticket).
-        turnoPos: { include: { estacion: { include: { puntoExpedicion: true } } } },
-      },
-    }),
+    db.ventaPos.findUnique({ where: { id }, include: { items: true } }),
     db.store.findUnique({ where: { id: storeId } }),
   ]);
 
   if (!venta) notFound();
 
-  const puntoExpedicion = venta.turnoPos.estacion.puntoExpedicion;
   // Una factura anulada sola (cuenta viva) ya no cuenta como vigente para
   // imprimir — cae al bloque informal, con el aviso de más abajo.
   const esFactura = venta.comprobanteTipo === "factura" && !venta.facturaAnulada;
@@ -210,10 +199,10 @@ export default async function TicketVentaPosPage({
         {esFactura ? (
           <div>
             <p className="text-center">FACTURA</p>
-            {puntoExpedicion && (
+            {venta.facturaRazonSocialEmisor && (
               <>
-                <p>Razon social: {sinAcentos(puntoExpedicion.razonSocialEmisor)}</p>
-                <p>RUC: {puntoExpedicion.rucEmisor}</p>
+                <p>Razon social: {sinAcentos(venta.facturaRazonSocialEmisor)}</p>
+                <p>RUC: {venta.facturaRucEmisor}</p>
                 <p className="mt-1">
                   Timbrado: {venta.facturaTimbrado}
                   {venta.facturaVencimiento && (

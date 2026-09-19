@@ -52,6 +52,7 @@ export async function crearCliente(datos: {
   try {
     await db.customer.create({
       data: {
+        storeId,
         nombre,
         telefono: telefono || null,
         email: email || null,

@@ -2,8 +2,11 @@
 
 import { revalidatePath } from "next/cache";
 import { exigirPermiso } from "@/lib/auth";
-import { prismaDelLocal } from "@/lib/prisma-local";
+import { prisma } from "@/lib/prisma";
+import { prismaDelLocal, upsertClienteFiscal } from "@/lib/prisma-local";
 import { idLocalActual } from "@/lib/local-actual";
+import { estacionActual } from "@/lib/estacion-actual";
+import { desglosarIva, formatearNumeroFactura } from "@/lib/factura-pos";
 import { cancelarVenta } from "../pos/actions";
 import { cambiarEstadoPedido } from "../pedidos/actions";
 
@@ -84,4 +87,402 @@ export async function cancelarFactura(
 
   revalidatePath("/admin/facturas");
   return { ok: true };
+}
+
+// ===========================================================================
+//  Remisión: emitir una factura nueva para una cuenta cuya factura se anuló
+//  sola (cancelarFactura de arriba, tambienCuenta=false) — mismo pedido/
+//  venta, mismos ítems, número de timbrado nuevo. Ver Fase 11 del plan.
+// ===========================================================================
+
+export type ResumenParaRemision = {
+  origen: "pedido" | "venta";
+  id: string;
+  numero: number;
+  cliente: string;
+  total: number;
+  facturaNumeroAnterior: string;
+  facturaAnuladaEn: Date;
+  facturaMotivoAnulacion: string;
+  tipoIdentificacion: string;
+  numeroIdentificacion: string;
+  razonSocial: string;
+  email: string;
+};
+
+export type ResultadoBuscarParaRemision =
+  | { ok: true; resumen: ResumenParaRemision }
+  | { ok: false; error: string };
+
+/**
+ * Busca por número de pedido o de venta de mostrador (el que ve el cliente,
+ * no el id interno) y valida que sea elegible: factura anulada SOLA (la
+ * cuenta sigue vigente). Devuelve un resumen con los datos viejos, para
+ * precargar el formulario de remisión y que el dueño solo corrija lo que
+ * estaba mal.
+ */
+export async function buscarParaRemision(
+  origen: "pedido" | "venta",
+  numero: number
+): Promise<ResultadoBuscarParaRemision> {
+  await exigirPermiso("pos.verHistorico");
+  const storeId = await idLocalActual();
+  const db = prismaDelLocal(storeId);
+
+  if (origen === "venta") {
+    const venta = await db.ventaPos.findFirst({
+      where: { numero },
+      select: {
+        id: true,
+        numero: true,
+        total: true,
+        clienteNombre: true,
+        cancelada: true,
+        facturaAnulada: true,
+        facturaNumero: true,
+        facturaAnuladaEn: true,
+        facturaMotivoAnulacion: true,
+        facturaTipoIdentificacion: true,
+        facturaRuc: true,
+        facturaRazonSocial: true,
+      },
+    });
+    if (!venta) return { ok: false, error: "No se encontró esa venta." };
+    if (venta.cancelada) {
+      return { ok: false, error: "Esa cuenta está cancelada — no se puede remitir." };
+    }
+    if (!venta.facturaAnulada || !venta.facturaNumero) {
+      return { ok: false, error: "Esa venta no tiene una factura anulada para remitir." };
+    }
+    return {
+      ok: true,
+      resumen: {
+        origen: "venta",
+        id: venta.id,
+        numero: venta.numero,
+        cliente: venta.clienteNombre?.trim() || "Cliente de mostrador",
+        total: Number(venta.total),
+        facturaNumeroAnterior: venta.facturaNumero,
+        facturaAnuladaEn: venta.facturaAnuladaEn!,
+        facturaMotivoAnulacion: venta.facturaMotivoAnulacion ?? "",
+        tipoIdentificacion: venta.facturaTipoIdentificacion ?? "",
+        numeroIdentificacion: venta.facturaRuc ?? "",
+        razonSocial: venta.facturaRazonSocial ?? "",
+        email: "",
+      },
+    };
+  }
+
+  const pedido = await db.order.findUnique({
+    where: { storeId_numero: { storeId, numero } },
+    select: {
+      id: true,
+      numero: true,
+      total: true,
+      clienteNombre: true,
+      estado: true,
+      facturaAnulada: true,
+      facturaNumero: true,
+      facturaAnuladaEn: true,
+      facturaMotivoAnulacion: true,
+      facturaTipoIdentificacion: true,
+      facturaRuc: true,
+      facturaRazonSocial: true,
+      facturaEmail: true,
+    },
+  });
+  if (!pedido) return { ok: false, error: "No se encontró ese pedido." };
+  if (pedido.estado === "cancelado") {
+    return { ok: false, error: "Ese pedido está cancelado — no se puede remitir." };
+  }
+  if (!pedido.facturaAnulada || !pedido.facturaNumero) {
+    return { ok: false, error: "Ese pedido no tiene una factura anulada para remitir." };
+  }
+  return {
+    ok: true,
+    resumen: {
+      origen: "pedido",
+      id: pedido.id,
+      numero: pedido.numero,
+      cliente: pedido.clienteNombre,
+      total: Number(pedido.total),
+      facturaNumeroAnterior: pedido.facturaNumero,
+      facturaAnuladaEn: pedido.facturaAnuladaEn!,
+      facturaMotivoAnulacion: pedido.facturaMotivoAnulacion ?? "",
+      tipoIdentificacion: pedido.facturaTipoIdentificacion ?? "",
+      numeroIdentificacion: pedido.facturaRuc ?? "",
+      razonSocial: pedido.facturaRazonSocial ?? "",
+      email: pedido.facturaEmail ?? "",
+    },
+  };
+}
+
+export type ResultadoRemitirFactura = { ok: true; url: string } | { ok: false; error: string };
+
+/**
+ * Emite una factura nueva para un pedido/venta cuya factura anterior se
+ * anuló sola — mismos ítems, mismo total, número de timbrado nuevo y datos
+ * del cliente corregidos. La factura vieja queda congelada en
+ * FacturaReemplazada antes de pisarse (nunca se pierde el rastro de qué
+ * número tuvo antes, aunque ese número en sí nunca se reutiliza).
+ *
+ * Vuelve a validar todo server-side — nunca confía en lo que ya validó
+ * buscarParaRemision del lado del cliente, que pudo quedar desactualizado
+ * mientras se completaba el formulario.
+ */
+export async function remitirFactura(
+  origen: "pedido" | "venta",
+  id: string,
+  datosCliente: {
+    tipoIdentificacion: string;
+    numeroIdentificacion: string;
+    razonSocial: string;
+    email: string;
+  },
+  motivo: string
+): Promise<ResultadoRemitirFactura> {
+  const sesion = await exigirPermiso("pos.verHistorico");
+  const storeId = await idLocalActual();
+  const db = prismaDelLocal(storeId);
+
+  if (!motivo.trim()) {
+    return { ok: false, error: "Decí por qué se remite — queda en el historial." };
+  }
+  const tipoIdentificacion = datosCliente.tipoIdentificacion.trim();
+  const numeroIdentificacion = datosCliente.numeroIdentificacion.trim();
+  const razonSocial = datosCliente.razonSocial.trim();
+  const email = datosCliente.email.trim();
+  if (!tipoIdentificacion || !numeroIdentificacion || !razonSocial) {
+    return { ok: false, error: "Completá tipo, número y razón social del cliente." };
+  }
+
+  // La remisión se emite desde el punto de expedición vigente de ESTA
+  // computadora, no el que emitió el número viejo — ese turno/estación
+  // puede estar cerrado hace rato, o ser directamente otro. A diferencia de
+  // una venta normal, acá no hay salida de "se imprime como informal": si
+  // se pidió remisión es porque hace falta un número real.
+  const estacion = await estacionActual(db);
+  const conPunto = estacion
+    ? await db.estacion.findUnique({ where: { id: estacion.id }, select: { puntoExpedicion: true } })
+    : null;
+  const pe = conPunto?.puntoExpedicion;
+  if (!pe || !pe.activo || pe.timbradoHasta < new Date()) {
+    return {
+      ok: false,
+      error:
+        "Esta computadora no tiene un punto de expedición vigente — no se puede generar una factura nueva desde acá.",
+    };
+  }
+
+  const identidad = sesion.nombre?.trim() || sesion.email;
+  const ahora = new Date();
+
+  if (origen === "venta") {
+    const venta = await db.ventaPos.findUnique({
+      where: { id },
+      select: {
+        cancelada: true,
+        facturaAnulada: true,
+        facturaNumero: true,
+        facturaTimbrado: true,
+        facturaVencimiento: true,
+        facturaRazonSocial: true,
+        facturaRuc: true,
+        facturaTipoIdentificacion: true,
+        facturaAnuladaPor: true,
+        facturaAnuladaEn: true,
+        facturaMotivoAnulacion: true,
+        items: { select: { precioUnitario: true, cantidad: true, iva: true } },
+      },
+    });
+    if (!venta) return { ok: false, error: "Esa venta no existe." };
+    if (venta.cancelada) return { ok: false, error: "Esa cuenta está cancelada — no se puede remitir." };
+    if (!venta.facturaAnulada || !venta.facturaNumero) {
+      return { ok: false, error: "Esa venta no tiene una factura anulada para remitir." };
+    }
+
+    // Se recalcula desde los ítems reales en vez de copiar los montos
+    // viejos — la venta en sí no cambió, pero es la fuente de verdad.
+    const desglose = desglosarIva(
+      venta.items.map((i) => ({ precioUnitario: Number(i.precioUnitario), cantidad: i.cantidad, iva: i.iva }))
+    );
+
+    try {
+      await prisma.$transaction(async (tx) => {
+        await upsertClienteFiscal(tx, storeId, { tipoIdentificacion, numeroIdentificacion, razonSocial, email });
+
+        // Atómico: se incrementa PRIMERO y se usa el valor YA incrementado.
+        const peActualizado = await tx.puntoExpedicion.update({
+          where: { id: pe.id },
+          data: { ultimoNumeroFactura: { increment: 1 } },
+          select: { ultimoNumeroFactura: true },
+        });
+        const facturaNumeroNueva = formatearNumeroFactura(
+          pe.establecimiento,
+          pe.puntoExpedicion,
+          peActualizado.ultimoNumeroFactura
+        );
+
+        await tx.facturaReemplazada.create({
+          data: {
+            storeId,
+            origen: "venta",
+            ventaId: id,
+            facturaNumero: venta.facturaNumero!,
+            facturaTimbrado: venta.facturaTimbrado,
+            facturaVencimiento: venta.facturaVencimiento,
+            facturaRazonSocial: venta.facturaRazonSocial,
+            facturaRuc: venta.facturaRuc,
+            facturaTipoIdentificacion: venta.facturaTipoIdentificacion,
+            anuladaPor: venta.facturaAnuladaPor ?? identidad,
+            anuladaEn: venta.facturaAnuladaEn ?? ahora,
+            motivoAnulacion: venta.facturaMotivoAnulacion ?? "",
+            facturaNuevaNumero: facturaNumeroNueva,
+            remitidaPor: identidad,
+          },
+        });
+
+        // updateMany con el mismo guard de elegibilidad que arriba: si algo
+        // cambió el estado de esta venta justo mientras se armaba la
+        // remisión (otra pestaña la canceló, o ya la remitieron), no se
+        // pisa nada — y al tirar el error, TODA la transacción se deshace,
+        // incluido el número ya incrementado, que no queda desperdiciado.
+        const actualizada = await tx.ventaPos.updateMany({
+          where: { id, cancelada: false, facturaAnulada: true },
+          data: {
+            facturaNumero: facturaNumeroNueva,
+            facturaTimbrado: pe.numeroTimbrado,
+            facturaVencimiento: pe.timbradoHasta,
+            facturaGravado10: desglose.gravado10,
+            facturaGravado5: desglose.gravado5,
+            facturaExento: desglose.exento,
+            facturaIva10: desglose.iva10,
+            facturaIva5: desglose.iva5,
+            facturaRazonSocialEmisor: pe.razonSocialEmisor,
+            facturaRucEmisor: pe.rucEmisor,
+            facturaTipoIdentificacion: tipoIdentificacion,
+            facturaRazonSocial: razonSocial,
+            facturaRuc: numeroIdentificacion,
+            facturaAnulada: false,
+            facturaAnuladaPor: null,
+            facturaAnuladaEn: null,
+            facturaMotivoAnulacion: null,
+          },
+        });
+        if (actualizada.count === 0) {
+          throw new Error("Esa cuenta cambió mientras se armaba la remisión. Volvé a intentar.");
+        }
+      });
+    } catch (err) {
+      return { ok: false, error: err instanceof Error ? err.message : "No se pudo generar la factura." };
+    }
+
+    revalidatePath("/admin/facturas");
+    revalidatePath(`/admin/pos/venta/${id}`);
+    return { ok: true, url: `/admin/pos/venta/${id}/ticket` };
+  }
+
+  const pedido = await db.order.findUnique({
+    where: { id },
+    select: {
+      estado: true,
+      facturaAnulada: true,
+      facturaNumero: true,
+      facturaTimbrado: true,
+      facturaVencimiento: true,
+      facturaRazonSocial: true,
+      facturaRuc: true,
+      facturaTipoIdentificacion: true,
+      facturaAnuladaPor: true,
+      facturaAnuladaEn: true,
+      facturaMotivoAnulacion: true,
+      costoEnvio: true,
+      items: { select: { precioUnitario: true, cantidad: true, iva: true } },
+    },
+  });
+  if (!pedido) return { ok: false, error: "Ese pedido no existe." };
+  if (pedido.estado === "cancelado") {
+    return { ok: false, error: "Ese pedido está cancelado — no se puede remitir." };
+  }
+  if (!pedido.facturaAnulada || !pedido.facturaNumero) {
+    return { ok: false, error: "Ese pedido no tiene una factura anulada para remitir." };
+  }
+
+  const lineas = pedido.items.map((i) => ({
+    precioUnitario: Number(i.precioUnitario),
+    cantidad: i.cantidad,
+    iva: i.iva,
+  }));
+  const costoEnvio = Number(pedido.costoEnvio ?? 0);
+  if (costoEnvio > 0) lineas.push({ precioUnitario: costoEnvio, cantidad: 1, iva: "gravado10" });
+  const desglose = desglosarIva(lineas);
+
+  try {
+    await prisma.$transaction(async (tx) => {
+      await upsertClienteFiscal(tx, storeId, { tipoIdentificacion, numeroIdentificacion, razonSocial, email });
+
+      const peActualizado = await tx.puntoExpedicion.update({
+        where: { id: pe.id },
+        data: { ultimoNumeroFactura: { increment: 1 } },
+        select: { ultimoNumeroFactura: true },
+      });
+      const facturaNumeroNueva = formatearNumeroFactura(
+        pe.establecimiento,
+        pe.puntoExpedicion,
+        peActualizado.ultimoNumeroFactura
+      );
+
+      await tx.facturaReemplazada.create({
+        data: {
+          storeId,
+          origen: "pedido",
+          orderId: id,
+          facturaNumero: pedido.facturaNumero!,
+          facturaTimbrado: pedido.facturaTimbrado,
+          facturaVencimiento: pedido.facturaVencimiento,
+          facturaRazonSocial: pedido.facturaRazonSocial,
+          facturaRuc: pedido.facturaRuc,
+          facturaTipoIdentificacion: pedido.facturaTipoIdentificacion,
+          anuladaPor: pedido.facturaAnuladaPor ?? identidad,
+          anuladaEn: pedido.facturaAnuladaEn ?? ahora,
+          motivoAnulacion: pedido.facturaMotivoAnulacion ?? "",
+          facturaNuevaNumero: facturaNumeroNueva,
+          remitidaPor: identidad,
+        },
+      });
+
+      const actualizado = await tx.order.updateMany({
+        where: { id, estado: { not: "cancelado" }, facturaAnulada: true },
+        data: {
+          facturaNumero: facturaNumeroNueva,
+          facturaTimbrado: pe.numeroTimbrado,
+          facturaVencimiento: pe.timbradoHasta,
+          facturaGravado10: desglose.gravado10,
+          facturaGravado5: desglose.gravado5,
+          facturaExento: desglose.exento,
+          facturaIva10: desglose.iva10,
+          facturaIva5: desglose.iva5,
+          facturaRazonSocialEmisor: pe.razonSocialEmisor,
+          facturaRucEmisor: pe.rucEmisor,
+          facturaTipoIdentificacion: tipoIdentificacion,
+          facturaRazonSocial: razonSocial,
+          facturaRuc: numeroIdentificacion,
+          facturaEmail: email || null,
+          facturaAnulada: false,
+          facturaAnuladaPor: null,
+          facturaAnuladaEn: null,
+          facturaMotivoAnulacion: null,
+        },
+      });
+      if (actualizado.count === 0) {
+        throw new Error("Ese pedido cambió mientras se armaba la remisión. Volvé a intentar.");
+      }
+    });
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "No se pudo generar la factura." };
+  }
+
+  revalidatePath("/admin/facturas");
+  revalidatePath(`/admin/pedidos/${id}`);
+  return { ok: true, url: `/admin/pedidos/${id}/ticket` };
 }

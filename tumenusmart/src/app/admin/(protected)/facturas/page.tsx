@@ -2,7 +2,7 @@ import Link from "next/link";
 import { pantallaConPermiso } from "@/lib/auth";
 import { prismaDelLocal } from "@/lib/prisma-local";
 import { idLocalActual } from "@/lib/local-actual";
-import { Cabecera, Tabla, Th, Td, Tr, Vacio, Pastilla } from "@/components/ui";
+import { Cabecera, Tabla, Th, Td, Tr, Vacio, Pastilla, clasesBoton } from "@/components/ui";
 import { calcularRangoFecha, type FiltroFecha } from "@/lib/rango-fecha";
 import { formatearGuarani, formatearNumero } from "@/lib/format";
 import { ZONA_NEGOCIO } from "@/lib/timezone";
@@ -154,6 +154,11 @@ export default async function FacturasPage({
       <Cabecera
         titulo="Facturas"
         bajada="Todas las facturas emitidas, de pedidos y de mostrador, juntas en un solo lugar."
+        acciones={
+          <Link href="/admin/facturas/nueva" className={clasesBoton("principal", "sm")}>
+            + Nueva factura
+          </Link>
+        }
       />
 
       <div className="mb-6 flex flex-wrap items-center gap-2">

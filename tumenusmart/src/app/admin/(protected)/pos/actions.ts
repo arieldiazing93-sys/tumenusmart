@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { prismaDelLocal, siguienteNumeroVentaPos, siguienteNumeroCliente } from "@/lib/prisma-local";
+import { prismaDelLocal, siguienteNumeroVentaPos, upsertClienteFiscal } from "@/lib/prisma-local";
 import { idLocalActual } from "@/lib/local-actual";
 import { exigirPermiso } from "@/lib/auth";
 import { normalizarFormaPagoPos, resumirTurno, type DeclaradoPorForma } from "@/lib/turno-pos";
@@ -264,66 +264,13 @@ export async function registrarVenta(turnoId: string, datos: DatosVenta): Promis
       // tipo+número (RUC, Cédula, etc.), para que la próxima vez que
       // factura ya no haga falta volver a elegir el tipo. "Sin nombre" no
       // tiene a quién guardarle nada.
-      //
-      // No es un upsert simple: a diferencia de Order/VentaPos/Reserva (que
-      // SIEMPRE se crean y por eso piden su número de entrada), acá la
-      // mayoría de las veces el cliente YA existe — pedirle una Clave nueva
-      // (siguienteNumeroCliente) sin saber si hace falta gastaría un número
-      // cada vez que un cliente recurrente vuelve a facturar. Por eso se
-      // separa en una rama explícita, y la Clave se pide únicamente cuando
-      // de verdad se va a crear la fila.
       if (!esSinRegistroFiscal) {
-        const emailFiscal = datos.facturaEmail?.trim();
-        const claveFiscal = {
-          storeId_tipoIdentificacion_numeroIdentificacion: {
-            storeId,
-            tipoIdentificacion: datos.facturaTipoIdentificacion!,
-            numeroIdentificacion: datos.facturaNumeroIdentificacion!.trim(),
-          },
-        };
-        const existente = await tx.customer.findUnique({ where: claveFiscal, select: { id: true } });
-
-        if (existente) {
-          await tx.customer.update({
-            where: claveFiscal,
-            data: {
-              nombre: datos.facturaRazonSocial!.trim(),
-              // Solo se toca si vino algo: no hay que borrar un email ya
-              // cargado porque esta vez el cajero no lo volvió a tipear.
-              ...(emailFiscal ? { email: emailFiscal } : {}),
-            },
-          });
-        } else {
-          const numeroCliente = await siguienteNumeroCliente(tx, storeId);
-          try {
-            await tx.customer.create({
-              data: {
-                storeId,
-                nombre: datos.facturaRazonSocial!.trim(),
-                tipoIdentificacion: datos.facturaTipoIdentificacion!,
-                numeroIdentificacion: datos.facturaNumeroIdentificacion!.trim(),
-                email: emailFiscal || null,
-                numero: numeroCliente,
-              },
-            });
-          } catch (err) {
-            // Otra venta en simultáneo con el mismo RUC ya lo creó justo
-            // entre el findUnique y este create (dos cajas, mismo
-            // instante) — se actualiza en vez de tirarle un error al
-            // cajero en medio del cobro.
-            if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
-              await tx.customer.update({
-                where: claveFiscal,
-                data: {
-                  nombre: datos.facturaRazonSocial!.trim(),
-                  ...(emailFiscal ? { email: emailFiscal } : {}),
-                },
-              });
-            } else {
-              throw err;
-            }
-          }
-        }
+        await upsertClienteFiscal(tx, storeId, {
+          tipoIdentificacion: datos.facturaTipoIdentificacion!,
+          numeroIdentificacion: datos.facturaNumeroIdentificacion!.trim(),
+          razonSocial: datos.facturaRazonSocial!.trim(),
+          email: datos.facturaEmail?.trim() ?? "",
+        });
       }
 
       // Atómico: se incrementa PRIMERO y se usa el valor YA incrementado —
@@ -353,6 +300,11 @@ export async function registrarVenta(turnoId: string, datos: DatosVenta): Promis
         facturaExento: desglose.exento,
         facturaIva10: desglose.iva10,
         facturaIva5: desglose.iva5,
+        // Congelado en el registro (a diferencia de antes, que se leía en
+        // vivo vía turnoPos.estacion.puntoExpedicion al imprimir) — ver
+        // comentario de estos campos en el schema (Fase 11, remisión).
+        facturaRazonSocialEmisor: puntoExpedicion.razonSocialEmisor,
+        facturaRucEmisor: puntoExpedicion.rucEmisor,
       };
     }
 

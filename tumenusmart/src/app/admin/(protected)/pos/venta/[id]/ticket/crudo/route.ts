@@ -25,19 +25,12 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   const { id } = await params;
 
   const [venta, store] = await Promise.all([
-    db.ventaPos.findUnique({
-      where: { id },
-      include: {
-        items: true,
-        turnoPos: { include: { estacion: { include: { puntoExpedicion: true } } } },
-      },
-    }),
+    db.ventaPos.findUnique({ where: { id }, include: { items: true } }),
     db.store.findUnique({ where: { id: storeId } }),
   ]);
 
   if (!venta) return new NextResponse("No encontrado", { status: 404 });
 
-  const puntoExpedicion = venta.turnoPos.estacion.puntoExpedicion;
   // Una factura anulada sola (cuenta viva) ya no cuenta como vigente para
   // imprimir — cae al bloque informal, con el aviso de más abajo.
   const esFactura = venta.comprobanteTipo === "factura" && !venta.facturaAnulada;
@@ -66,9 +59,9 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
 
   if (esFactura) {
     l.push(centrado("FACTURA"));
-    if (puntoExpedicion) {
-      l.push(`Razon social: ${sinAcentos(puntoExpedicion.razonSocialEmisor)}`);
-      l.push(`RUC: ${puntoExpedicion.rucEmisor}`);
+    if (venta.facturaRazonSocialEmisor) {
+      l.push(`Razon social: ${sinAcentos(venta.facturaRazonSocialEmisor)}`);
+      l.push(`RUC: ${venta.facturaRucEmisor}`);
       const vto = venta.facturaVencimiento
         ? `  Vto: ${venta.facturaVencimiento.toLocaleDateString("es-PY", { timeZone: ZONA_NEGOCIO })}`
         : "";
