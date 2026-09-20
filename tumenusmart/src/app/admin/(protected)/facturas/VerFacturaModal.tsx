@@ -122,7 +122,9 @@ export function VerFacturaModal({
         <div className="mt-4 flex flex-col gap-4 sm:grid sm:grid-cols-2 sm:items-start sm:gap-x-6">
         <div className="flex flex-col gap-3 text-[0.85rem]">
           <div>
-            {cuentaAnulada ? (
+            {reemplazadaPor ? (
+              <Pastilla color="neutro">Reemplazada</Pastilla>
+            ) : cuentaAnulada ? (
               <Pastilla color="peligro">Cuenta anulada</Pastilla>
             ) : facturaAnulada ? (
               <Pastilla color="aviso">Factura anulada</Pastilla>
@@ -130,6 +132,31 @@ export function VerFacturaModal({
               <Pastilla color="exito">Vigente</Pastilla>
             )}
           </div>
+
+          {reemplazadaPor && (
+            <div className="rounded-lg border border-linea bg-papel-suave p-2.5">
+              <p className="text-tinta">
+                Este número fue anulado y reemplazado por la factura N° {reemplazadaPor}.
+              </p>
+              {motivoAnulacion && (
+                <p className="mt-1 text-tinta-suave">Motivo: {motivoAnulacion}</p>
+              )}
+              {anuladaPor && (
+                <p className="mt-1 text-[0.78rem] text-tinta-suave">
+                  Anulado por {anuladaPor} el{" "}
+                  {fecha.toLocaleString("es-PY", {
+                    day: "2-digit",
+                    month: "2-digit",
+                    year: "numeric",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                    hour12: false,
+                    timeZone: ZONA_NEGOCIO,
+                  })}
+                </p>
+              )}
+            </div>
+          )}
 
           <div>
             <p className="text-[0.7rem] uppercase tracking-rotulo text-tinta-suave">Fecha</p>
