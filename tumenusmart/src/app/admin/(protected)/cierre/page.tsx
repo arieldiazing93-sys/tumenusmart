@@ -182,7 +182,7 @@ export default async function CierrePage({
         />
       ) : (
         <>
-          <div className="mb-5 rounded-xl border border-aviso/25 bg-aviso-luz p-4 print:hidden">
+          <div className="mb-4 rounded-xl border border-aviso/25 bg-aviso-luz p-3.5 print:hidden">
             <p className="text-[0.85rem] text-tinta-media">
               Efectivo en la calle ahora mismo
             </p>
@@ -195,7 +195,7 @@ export default async function CierrePage({
             </p>
           </div>
 
-          <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-3">
             {conDeuda.map((r) => {
               const resumen = resumirCierre(r.orders);
               return (
@@ -228,15 +228,15 @@ export default async function CierrePage({
                     </div>
                   </div>
 
-                  <div className="mt-3 overflow-x-auto">
+                  <div className="mt-2.5 overflow-x-auto">
                     <table className="w-full min-w-[26rem] text-[0.85rem]">
                       <thead>
                         <tr className="border-b border-linea text-left text-[0.72rem] uppercase tracking-[0.12em] text-tinta-suave">
-                          <th className="py-1.5 pr-2 font-semibold">Pedido</th>
-                          <th className="py-1.5 pr-2 font-semibold">Cliente</th>
-                          <th className="py-1.5 pr-2 font-semibold">Entregó</th>
-                          <th className="py-1.5 pr-2 font-semibold">Cobró con</th>
-                          <th className="py-1.5 text-right font-semibold">Monto</th>
+                          <th className="py-1 pr-2 font-semibold">Pedido</th>
+                          <th className="py-1 pr-2 font-semibold">Cliente</th>
+                          <th className="py-1 pr-2 font-semibold">Entregó</th>
+                          <th className="py-1 pr-2 font-semibold">Cobró con</th>
+                          <th className="py-1 text-right font-semibold">Monto</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -245,14 +245,14 @@ export default async function CierrePage({
                           const enMano = rindeEfectivo(metodo);
                           return (
                             <tr key={p.id} className="border-b border-linea-fina">
-                              <td className="cifra py-2 pr-2 font-medium text-tinta">
+                              <td className="cifra py-1 pr-2 font-medium text-tinta">
                                 {formatearNumero(p.numero)}
                               </td>
-                              <td className="py-2 pr-2 text-tinta-media">{p.clienteNombre}</td>
-                              <td className="py-2 pr-2 text-tinta-suave">
+                              <td className="py-1 pr-2 text-tinta-media">{p.clienteNombre}</td>
+                              <td className="py-1 pr-2 text-tinta-suave">
                                 {p.entregadoEn ? cuando(p.entregadoEn) : "—"}
                               </td>
-                              <td className="py-2 pr-2">
+                              <td className="py-1 pr-2">
                                 {/* El efectivo se marca en color y el resto no:
                                     de un vistazo se ve qué filas suman al
                                     número grande y cuáles no. */}
@@ -267,7 +267,7 @@ export default async function CierrePage({
                                 </span>
                               </td>
                               <td
-                                className={`cifra py-2 text-right font-medium ${
+                                className={`cifra py-1 text-right font-medium ${
                                   enMano ? "text-tinta" : "text-tinta-suave"
                                 }`}
                               >
@@ -291,7 +291,7 @@ export default async function CierrePage({
                     </p>
                   )}
 
-                  <div className="mt-3 print:hidden">
+                  <div className="mt-2.5 print:hidden">
                     <CerrarBoton
                       repartidorId={r.id}
                       nombre={r.nombre}
@@ -308,14 +308,14 @@ export default async function CierrePage({
       )}
 
       {ultimas.length > 0 && (
-        <div className="mt-8 print:hidden">
+        <div className="mt-6 print:hidden">
           <h2 className="mb-2 text-[0.95rem] font-semibold tracking-titular text-tinta">
             Últimas rendiciones recibidas
           </h2>
           <p className="mb-2 text-[0.82rem] text-tinta-media">
             Tocá una para ver e imprimir su comprobante.
           </p>
-          <div className="flex flex-col gap-1.5">
+          <div className="flex flex-col gap-1">
             {/* Cada una lleva a su comprobante: es donde está el detalle de
                 los pedidos y las firmas. */}
             {ultimas.map((v) => {
@@ -327,7 +327,7 @@ export default async function CierrePage({
               <Link
                 key={v.id}
                 href={`/admin/cierre/${v.id}`}
-                className="flex flex-wrap items-baseline justify-between gap-2 rounded-lg border border-linea bg-white px-3 py-2 text-[0.85rem] transition-colors hover:border-brand hover:bg-papel-suave"
+                className="flex flex-wrap items-baseline justify-between gap-2 rounded-lg border border-linea bg-white px-3 py-1.5 text-[0.85rem] transition-colors hover:border-brand hover:bg-papel-suave"
               >
                 <span className="font-medium text-tinta">
                   {v.repartidor.nombre}

@@ -114,14 +114,14 @@ export default async function ComprobanteRendicionPage({
   return (
     <div className="print:text-[11pt]">
       {/* --- lo que solo se ve en pantalla --- */}
-      <div className="mb-5 flex flex-wrap items-center justify-between gap-3 print:hidden">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3 print:hidden">
         <Volver href="/admin/cierre" texto="Volver a rendiciones" />
         <ImprimirBoton />
       </div>
 
       {/* --- la hoja --- */}
-      <div className="rounded-xl border border-linea bg-white p-6 print:rounded-none print:border-0 print:p-0">
-        <header className="mb-5 border-b border-linea pb-4 print:mb-4 print:pb-3">
+      <div className="rounded-xl border border-linea bg-white p-5 print:rounded-none print:border-0 print:p-0">
+        <header className="mb-4 border-b border-linea pb-3 print:mb-4 print:pb-3">
           <p className="rotulo">Rendición de repartidor</p>
           <h1 className="mt-1 text-[1.35rem] font-semibold tracking-titular text-tinta print:text-[16pt]">
             {store?.nombre ?? "Rendición"}
@@ -153,7 +153,7 @@ export default async function ComprobanteRendicionPage({
         </header>
 
         {/* El número grande es UNO: lo que pasó de mano a mano. */}
-        <div className="mb-5 rounded-xl border border-exito/25 bg-exito-luz p-4 print:rounded-none print:border print:border-linea print:bg-transparent">
+        <div className="mb-4 rounded-xl border border-exito/25 bg-exito-luz p-3.5 print:rounded-none print:border print:border-linea print:bg-transparent">
           <p className="text-[0.85rem] text-tinta-media">Efectivo entregado y recibido</p>
           <p className="cifra mt-0.5 text-[1.9rem] font-semibold leading-tight text-exito print:text-[20pt] print:text-tinta">
             {formatearGuarani(efectivo)}
@@ -167,7 +167,7 @@ export default async function ComprobanteRendicionPage({
         </div>
 
         {!contraste.coincide && (
-          <p className="mb-5 rounded-xl border border-aviso/25 bg-aviso-luz px-4 py-3 text-[0.85rem] text-tinta print:rounded-none print:border-linea print:bg-transparent">
+          <p className="mb-4 rounded-xl border border-aviso/25 bg-aviso-luz px-3.5 py-2.5 text-[0.85rem] text-tinta print:rounded-none print:border-linea print:bg-transparent">
             Alguno de estos pedidos se modificó después de cerrar la rendición: hoy suman{" "}
             <span className="cifra font-semibold">{formatearGuarani(contraste.efectivoAhora)}</span>{" "}
             en efectivo sobre {contraste.cantidadAhora}{" "}
@@ -199,26 +199,26 @@ export default async function ComprobanteRendicionPage({
                 const enMano = rindeEfectivo(metodo);
                 return (
                   <tr key={p.id} className="break-inside-avoid align-top">
-                    <td className="cifra border-b border-linea-fina py-2 text-[0.85rem] font-medium text-tinta">
+                    <td className="cifra border-b border-linea-fina py-1 text-[0.85rem] font-medium text-tinta">
                       {formatearNumero(p.numero)}
                     </td>
-                    <td className="border-b border-linea-fina py-2 pr-3 text-[0.85rem] text-tinta">
+                    <td className="border-b border-linea-fina py-1 pr-3 text-[0.85rem] text-tinta">
                       {p.clienteNombre}
                       {p.estado === "cancelado" && (
                         <span className="ml-1 text-peligro">(cancelado después de rendido)</span>
                       )}
                     </td>
-                    <td className="cifra border-b border-linea-fina py-2 text-[0.82rem] text-tinta-media">
+                    <td className="cifra border-b border-linea-fina py-1 text-[0.82rem] text-tinta-media">
                       {horaCorta(p.entregadoEn)}
                     </td>
                     {/* En papel no hay color: lo que no es efectivo se marca
                         con un signo, que se ve igual en una impresora térmica. */}
-                    <td className="border-b border-linea-fina py-2 text-[0.82rem] text-tinta-media">
+                    <td className="border-b border-linea-fina py-1 text-[0.82rem] text-tinta-media">
                       {etiquetaDeCobro(metodo)}
                       {!enMano && <span className="text-tinta-suave"> (no rinde)</span>}
                     </td>
                     <td
-                      className={`cifra border-b border-linea-fina py-2 text-right text-[0.85rem] font-medium ${
+                      className={`cifra border-b border-linea-fina py-1 text-right text-[0.85rem] font-medium ${
                         enMano ? "text-tinta" : "text-tinta-suave"
                       }`}
                     >
@@ -230,10 +230,10 @@ export default async function ComprobanteRendicionPage({
             </tbody>
             <tfoot>
               <tr>
-                <td colSpan={4} className="pt-2.5 text-right text-[0.85rem] text-tinta-media">
+                <td colSpan={4} className="pt-1.5 text-right text-[0.85rem] text-tinta-media">
                   Efectivo rendido
                 </td>
-                <td className="cifra pt-2.5 text-right text-[0.95rem] font-semibold text-tinta">
+                <td className="cifra pt-1.5 text-right text-[0.95rem] font-semibold text-tinta">
                   {formatearGuarani(efectivo)}
                 </td>
               </tr>
@@ -252,7 +252,7 @@ export default async function ComprobanteRendicionPage({
         </section>
 
         {rendicion.notas && (
-          <section className="mt-5 break-inside-avoid">
+          <section className="mt-4 break-inside-avoid">
             <h2 className="mb-1 text-[0.8rem] font-semibold uppercase tracking-rotulo text-tinta-suave">
               Observaciones
             </h2>
@@ -261,7 +261,7 @@ export default async function ComprobanteRendicionPage({
         )}
 
         {/* Las firmas son el motivo de que esto sea papel y no una pantalla. */}
-        <section className="mt-10 flex flex-wrap gap-8 break-inside-avoid print:mt-12">
+        <section className="mt-8 flex flex-wrap gap-8 break-inside-avoid print:mt-12">
           <div className="min-w-[13rem] flex-1">
             <div className="border-b border-tinta" />
             <p className="mt-1.5 text-[0.78rem] text-tinta-media">

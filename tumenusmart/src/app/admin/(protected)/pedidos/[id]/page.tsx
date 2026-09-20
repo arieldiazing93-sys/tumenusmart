@@ -63,11 +63,11 @@ export default async function DetallePedidoPage({
 
   return (
     <div>
-      <div className="mb-4">
+      <div className="mb-3">
         <Volver href="/admin/pedidos" texto="Volver a pedidos" />
       </div>
 
-      <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
+      <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-[1.4rem] font-semibold tracking-titular text-tinta">
             Pedido {formatearNumero(pedido.numero)}
@@ -99,12 +99,12 @@ export default async function DetallePedidoPage({
         </div>
       </div>
 
-      <div className="mb-6 rounded-lg border border-linea bg-white p-4">
+      <div className="mb-4 rounded-lg border border-linea bg-white p-3.5">
         <p className="font-medium text-tinta">{pedido.clienteNombre}</p>
         <p className="text-sm text-tinta-media">{pedido.clienteTelefono}</p>
       </div>
 
-      <div className="mb-6">
+      <div className="mb-4">
         <h2 className="mb-2 text-sm font-semibold text-tinta">Estado del pedido</h2>
         <EstadoBotones
           orderId={pedido.id}
@@ -119,8 +119,8 @@ export default async function DetallePedidoPage({
         />
       </div>
 
-      <div className="mb-6 grid gap-4 sm:grid-cols-2">
-        <div className="rounded-lg border border-linea bg-white p-4">
+      <div className="mb-4 grid gap-3 sm:grid-cols-2">
+        <div className="rounded-lg border border-linea bg-white p-3.5">
           <p className="mb-1 text-sm font-bold uppercase tracking-wide text-tinta">
             Entrega
           </p>
@@ -148,7 +148,7 @@ export default async function DetallePedidoPage({
             )}
 
           {pedido.tipoEntrega === "delivery" && (
-            <div className="mt-3 border-t border-linea-fina pt-3">
+            <div className="mt-2.5 border-t border-linea-fina pt-2.5">
               <p className="mb-1 text-sm font-bold uppercase tracking-wide text-tinta">
                 Repartidor
               </p>
@@ -161,14 +161,14 @@ export default async function DetallePedidoPage({
           )}
         </div>
 
-        <div className="rounded-lg border border-linea bg-white p-4">
+        <div className="rounded-lg border border-linea bg-white p-3.5">
           <p className="mb-1 text-sm font-bold uppercase tracking-wide text-tinta">
             Pago
           </p>
           <p className="text-sm text-tinta">{etiquetaMetodoPago(pedido.metodoPagoReferencia)}</p>
 
           {pedido.comprobanteTipo === "factura" && (
-            <div className="mt-3 rounded bg-aviso-luz px-2 py-1.5 text-sm text-aviso">
+            <div className="mt-2.5 rounded bg-aviso-luz px-2 py-1.5 text-sm text-aviso">
               <p className="font-medium">
                 {pedido.facturaNumero ? `Factura N° ${pedido.facturaNumero}` : "Factura (todavía sin emitir)"}
                 {pedido.facturaAnulada && <span className="ml-1.5 text-peligro">(ANULADA)</span>}
@@ -196,7 +196,7 @@ export default async function DetallePedidoPage({
           )}
 
           {pedido.notas && (
-            <div className="mt-3 border-t border-linea-fina pt-3">
+            <div className="mt-2.5 border-t border-linea-fina pt-2.5">
               <p className="mb-1 text-sm font-bold uppercase tracking-wide text-tinta">
                 Nota del cliente
               </p>
@@ -206,7 +206,7 @@ export default async function DetallePedidoPage({
         </div>
       </div>
 
-      <div className="mb-6 rounded-lg border border-linea bg-white p-4">
+      <div className="mb-4 rounded-lg border border-linea bg-white p-3.5">
         <p className="mb-2 text-sm font-bold uppercase tracking-wide text-tinta">
           Productos
         </p>
@@ -231,7 +231,7 @@ export default async function DetallePedidoPage({
           ))}
         </ul>
 
-        <div className="mt-4 flex flex-col gap-1 border-t border-linea-fina pt-3 text-sm">
+        <div className="mt-3 flex flex-col gap-1 border-t border-linea-fina pt-2.5 text-sm">
           <div className="flex justify-between text-tinta-media">
             <span>Subtotal</span>
             <span>{formatearGuarani(Number(pedido.subtotal))}</span>
