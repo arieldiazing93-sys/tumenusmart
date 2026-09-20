@@ -36,6 +36,9 @@ export function VerFacturaModal({
   href,
   cuentaAnulada,
   facturaAnulada,
+  reemplazadaPor,
+  motivoAnulacion,
+  anuladaPor,
   onCerrar,
 }: {
   origen: "pedido" | "venta";
@@ -50,6 +53,10 @@ export function VerFacturaModal({
   href: string;
   cuentaAnulada: boolean;
   facturaAnulada: boolean;
+  /** Solo si esta fila es un N° viejo ya remitido a uno nuevo. */
+  reemplazadaPor: string | null;
+  motivoAnulacion: string | null;
+  anuladaPor: string | null;
   onCerrar: () => void;
 }) {
   const [detalle, setDetalle] = useState<DetalleFactura | null>(null);

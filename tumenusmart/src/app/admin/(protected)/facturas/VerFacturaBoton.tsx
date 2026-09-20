@@ -18,6 +18,9 @@ type Props = {
   href: string;
   cuentaAnulada: boolean;
   facturaAnulada: boolean;
+  reemplazadaPor: string | null;
+  motivoAnulacion: string | null;
+  anuladaPor: string | null;
 };
 
 export function VerFacturaBoton(props: Props) {

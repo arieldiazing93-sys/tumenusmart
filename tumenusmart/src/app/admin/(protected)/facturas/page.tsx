@@ -34,6 +34,14 @@ type FilaFactura = {
   // src/app/admin/(protected)/facturas/actions.ts.
   cuentaAnulada: boolean;
   facturaAnulada: boolean;
+  // Solo en filas de FacturaReemplazada: este número YA NO es el vigente de
+  // la cuenta (se remitió a uno nuevo) — sin esto, el número viejo
+  // desaparecía de la lista por completo apenas se remitía, como si nunca
+  // hubiera existido. El documento sigue siendo auditable: motivo, quién y
+  // a qué número se reemplazó.
+  reemplazadaPor: string | null;
+  motivoAnulacion: string | null;
+  anuladaPor: string | null;
   origenLabel: string;
   href: string;
 };
@@ -76,7 +84,7 @@ export default async function FacturasPage({
   const storeId = await idLocalActual();
   const db = prismaDelLocal(storeId);
 
-  const [pedidos, ventas] = await Promise.all([
+  const [pedidos, ventas, reemplazadas] = await Promise.all([
     db.order.findMany({
       where: { facturaNumero: { not: null }, createdAt: rango },
       orderBy: { createdAt: "desc" },
@@ -109,6 +117,27 @@ export default async function FacturasPage({
         facturaTipoIdentificacion: true,
       },
     }),
+    // Números viejos que se anularon y después se remitieron a uno nuevo —
+    // ver Fase 11 (remisión). Sin esto, un número que ya no es el vigente de
+    // su cuenta no aparecía en ningún lado de esta pantalla.
+    db.facturaReemplazada.findMany({
+      where: { anuladaEn: rango },
+      orderBy: { anuladaEn: "desc" },
+      select: {
+        id: true,
+        origen: true,
+        facturaNumero: true,
+        anuladaEn: true,
+        anuladaPor: true,
+        motivoAnulacion: true,
+        facturaNuevaNumero: true,
+        facturaRazonSocial: true,
+        facturaRuc: true,
+        facturaTipoIdentificacion: true,
+        order: { select: { id: true, numero: true, total: true } },
+        venta: { select: { id: true, numero: true, total: true } },
+      },
+    }),
   ]);
 
   const filas: FilaFactura[] = [
@@ -124,6 +153,9 @@ export default async function FacturasPage({
       total: Number(p.total),
       cuentaAnulada: p.estado === "cancelado",
       facturaAnulada: p.facturaAnulada,
+      reemplazadaPor: null,
+      motivoAnulacion: null,
+      anuladaPor: null,
       origenLabel: `Pedido ${formatearNumero(p.numero)}`,
       href: `/admin/pedidos/${p.id}`,
     })),
@@ -139,9 +171,36 @@ export default async function FacturasPage({
       total: Number(v.total),
       cuentaAnulada: v.cancelada,
       facturaAnulada: v.facturaAnulada,
+      reemplazadaPor: null,
+      motivoAnulacion: null,
+      anuladaPor: null,
       origenLabel: `Venta ${formatearNumero(v.numero)}`,
       href: `/admin/pos/venta/${v.id}`,
     })),
+    ...reemplazadas.map((r) => {
+      const cuenta = r.origen === "venta" ? r.venta : r.order;
+      const origen = r.origen === "venta" ? ("venta" as const) : ("pedido" as const);
+      return {
+        key: `reemplazada-${r.id}`,
+        origen,
+        id: cuenta?.id ?? "",
+        facturaNumero: r.facturaNumero,
+        fecha: r.anuladaEn,
+        razonSocial: nombreCliente(r.facturaTipoIdentificacion, r.facturaRazonSocial),
+        etiquetaIdentificacion: etiquetaTipoIdentificacion(r.facturaTipoIdentificacion ?? "ruc"),
+        identificacion: r.facturaRuc ?? "—",
+        total: cuenta ? Number(cuenta.total) : 0,
+        cuentaAnulada: false,
+        facturaAnulada: true,
+        reemplazadaPor: r.facturaNuevaNumero,
+        motivoAnulacion: r.motivoAnulacion,
+        anuladaPor: r.anuladaPor,
+        origenLabel: cuenta
+          ? `${origen === "pedido" ? "Pedido" : "Venta"} ${formatearNumero(cuenta.numero)}`
+          : "—",
+        href: cuenta ? (origen === "pedido" ? `/admin/pedidos/${cuenta.id}` : `/admin/pos/venta/${cuenta.id}`) : "#",
+      };
+    }),
   ].sort((a, b) => b.fecha.getTime() - a.fecha.getTime());
 
   // "Vigente" = ni la cuenta ni la factura están anuladas. Solo esas suman
@@ -244,7 +303,9 @@ export default async function FacturasPage({
                     <span className="cifra font-medium">{formatearGuarani(f.total)}</span>
                   </Td>
                   <Td className="text-right">
-                    {f.cuentaAnulada ? (
+                    {f.reemplazadaPor ? (
+                      <Pastilla color="neutro">Reemplazada</Pastilla>
+                    ) : f.cuentaAnulada ? (
                       <Pastilla color="peligro">Cuenta anulada</Pastilla>
                     ) : f.facturaAnulada ? (
                       <Pastilla color="aviso">Factura anulada</Pastilla>
@@ -266,6 +327,9 @@ export default async function FacturasPage({
                       href={f.href}
                       cuentaAnulada={f.cuentaAnulada}
                       facturaAnulada={f.facturaAnulada}
+                      reemplazadaPor={f.reemplazadaPor}
+                      motivoAnulacion={f.motivoAnulacion}
+                      anuladaPor={f.anuladaPor}
                     />
                   </Td>
                 </Tr>
