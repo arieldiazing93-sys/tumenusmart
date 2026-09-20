@@ -147,13 +147,9 @@ export function NuevaFacturaForm() {
                   {!clienteAsignado && " · cliente nuevo"}
                 </p>
               </div>
-              <button
-                type="button"
-                onClick={buscarOtroCliente}
-                className="flex-none text-[0.78rem] font-medium text-tinta-suave underline hover:text-peligro"
-              >
+              <Boton tono="fantasma" tam="sm" onClick={buscarOtroCliente} className="flex-none">
                 Buscar otro
-              </button>
+              </Boton>
             </div>
           </div>
         ) : (
@@ -192,9 +188,9 @@ export function NuevaFacturaForm() {
                 <button
                   type="button"
                   onClick={() => setCargandoClienteNuevo(true)}
-                  className="self-start text-[0.78rem] font-medium text-brand-texto underline"
+                  className="rounded-lg border border-dashed border-brand/40 bg-brand-light/40 px-3 py-2 text-left text-[0.85rem] font-medium text-brand-texto transition-colors hover:border-brand hover:bg-brand-light"
                 >
-                  Ninguno de estos — crear cliente nuevo
+                  + Ninguno de estos — crear cliente nuevo
                 </button>
               </div>
             )}
@@ -252,13 +248,9 @@ export function NuevaFacturaForm() {
                   </p>
                   <p className="text-[0.85rem] text-tinta-media">{formatearGuarani(resumen.total)}</p>
                 </div>
-                <button
-                  type="button"
-                  onClick={limpiarCuenta}
-                  className="flex-none text-[0.78rem] font-medium text-tinta-suave underline hover:text-peligro"
-                >
+                <Boton tono="fantasma" tam="sm" onClick={limpiarCuenta} className="flex-none">
                   Buscar otra
-                </button>
+                </Boton>
               </div>
               <p className="mt-2 text-[0.78rem] text-tinta-media">
                 Factura N° {resumen.facturaNumeroAnterior} anulada el{" "}
