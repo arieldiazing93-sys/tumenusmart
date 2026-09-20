@@ -111,6 +111,7 @@ export default async function ImprimirTurnosPosPage({
     ...opcionesFecha,
     hour: "2-digit",
     minute: "2-digit",
+    hour12: false,
   };
 
   return (

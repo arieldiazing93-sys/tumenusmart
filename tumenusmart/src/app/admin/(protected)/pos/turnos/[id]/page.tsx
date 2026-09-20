@@ -24,10 +24,13 @@ function fechaLarga(fecha: Date): string {
     timeZone: ZONA_NEGOCIO,
     hour: "2-digit",
     minute: "2-digit",
+    hour12: false,
   });
   return `${texto.charAt(0).toUpperCase() + texto.slice(1)}, ${hora}`;
 }
 
+// hour12: false en toda esta hoja — con AM/PM ("a. m."/"p. m.") no entraba
+// en las columnas angostas de las tablas y la hora se cortaba a la mitad.
 function horaCorta(fecha: Date | null): string {
   if (!fecha) return "—";
   return fecha.toLocaleString("es-PY", {
@@ -36,6 +39,7 @@ function horaCorta(fecha: Date | null): string {
     month: "2-digit",
     hour: "2-digit",
     minute: "2-digit",
+    hour12: false,
   });
 }
 
@@ -219,14 +223,14 @@ export default async function ComprobanteTurnoPosPage({
   return (
     <div className="print:text-[11pt]">
       {/* --- lo que solo se ve en pantalla --- */}
-      <div className="mb-5 flex flex-wrap items-center justify-between gap-3 print:hidden">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3 print:hidden">
         <Volver href="/admin/pos/turnos" texto="Volver a cierres de turno" />
         <ImprimirBoton />
       </div>
 
       {/* --- la hoja --- */}
-      <div className="rounded-xl border border-linea bg-white p-6 print:rounded-none print:border-0 print:p-0">
-        <header className="mb-5 border-b border-linea pb-4 print:mb-4 print:pb-3">
+      <div className="rounded-xl border border-linea bg-white p-5 print:rounded-none print:border-0 print:p-0">
+        <header className="mb-4 border-b border-linea pb-3 print:mb-4 print:pb-3">
           <p className="rotulo">Cierre de turno · Punto de venta</p>
           <h1 className="mt-1 text-[1.35rem] font-semibold tracking-titular text-tinta print:text-[16pt]">
             {store?.nombre ?? "Cierre de turno"}
@@ -235,7 +239,7 @@ export default async function ComprobanteTurnoPosPage({
             {fechaLarga(turno.cerradoEn ?? turno.abiertoEn)}
           </p>
 
-          <dl className="mt-3 flex flex-wrap gap-x-8 gap-y-1 text-[0.85rem]">
+          <dl className="mt-2.5 flex flex-wrap gap-x-8 gap-y-1 text-[0.85rem]">
             <div>
               <dt className="text-tinta-suave">Estación</dt>
               <dd className="font-semibold text-tinta">{turno.estacion.nombre}</dd>
@@ -265,7 +269,7 @@ export default async function ComprobanteTurnoPosPage({
           </dl>
         </header>
 
-        <div className="mb-5 rounded-xl border border-exito/25 bg-exito-luz p-4 print:rounded-none print:border print:border-linea print:bg-transparent">
+        <div className="mb-4 rounded-xl border border-exito/25 bg-exito-luz p-3.5 print:rounded-none print:border print:border-linea print:bg-transparent">
           <p className="text-[0.85rem] text-tinta-media">Total declarado</p>
           <p className="cifra mt-0.5 text-[1.9rem] font-semibold leading-tight text-exito print:text-[20pt] print:text-tinta">
             {formatearGuarani(totalDeclarado)}
@@ -279,7 +283,7 @@ export default async function ComprobanteTurnoPosPage({
         </div>
 
         {!contraste.coincide && (
-          <p className="mb-5 rounded-xl border border-aviso/25 bg-aviso-luz px-4 py-3 text-[0.85rem] text-tinta print:rounded-none print:border-linea print:bg-transparent">
+          <p className="mb-4 rounded-xl border border-aviso/25 bg-aviso-luz px-3.5 py-2.5 text-[0.85rem] text-tinta print:rounded-none print:border-linea print:bg-transparent">
             Alguna venta o pedido de este turno se modificó después de cerrarlo: hoy suman{" "}
             <span className="cifra font-semibold">{formatearGuarani(contraste.totalAhora)}</span> en{" "}
             {contraste.cantidadAhora} {contraste.cantidadAhora === 1 ? "cuenta" : "cuentas"}. Lo que se
@@ -288,8 +292,8 @@ export default async function ComprobanteTurnoPosPage({
           </p>
         )}
 
-        <section className="mb-5 break-inside-avoid">
-          <h2 className="mb-2 text-[0.95rem] font-semibold tracking-titular text-tinta">
+        <section className="mb-4 break-inside-avoid">
+          <h2 className="mb-1.5 text-[0.95rem] font-semibold tracking-titular text-tinta">
             Por forma de pago
           </h2>
           <table className="w-full border-collapse text-left">
@@ -358,7 +362,7 @@ export default async function ComprobanteTurnoPosPage({
         </section>
 
         <section className="break-inside-avoid">
-          <h2 className="mb-2 text-[0.95rem] font-semibold tracking-titular text-tinta">
+          <h2 className="mb-1.5 text-[0.95rem] font-semibold tracking-titular text-tinta">
             Ventas del turno
           </h2>
           {turno.ventas.length === 0 ? (
@@ -401,8 +405,8 @@ export default async function ComprobanteTurnoPosPage({
         </section>
 
         {turno.pedidos.length > 0 && (
-          <section className="mt-5 break-inside-avoid">
-            <h2 className="mb-2 text-[0.95rem] font-semibold tracking-titular text-tinta">
+          <section className="mt-4 break-inside-avoid">
+            <h2 className="mb-1.5 text-[0.95rem] font-semibold tracking-titular text-tinta">
               Pedidos de retiro/mesa cobrados en este turno
             </h2>
             <table className="w-full border-collapse text-left">
@@ -442,8 +446,8 @@ export default async function ComprobanteTurnoPosPage({
         )}
 
         {turno.rendiciones.length > 0 && (
-          <section className="mt-5 break-inside-avoid">
-            <h2 className="mb-2 text-[0.95rem] font-semibold tracking-titular text-tinta">
+          <section className="mt-4 break-inside-avoid">
+            <h2 className="mb-1.5 text-[0.95rem] font-semibold tracking-titular text-tinta">
               Delivery rendido durante este turno
             </h2>
             <table className="w-full border-collapse text-left">
@@ -509,7 +513,7 @@ export default async function ComprobanteTurnoPosPage({
         )}
 
         {turno.notas && (
-          <section className="mt-5 break-inside-avoid">
+          <section className="mt-4 break-inside-avoid">
             <h2 className="mb-1 text-[0.8rem] font-semibold uppercase tracking-rotulo text-tinta-suave">
               Observaciones
             </h2>
@@ -517,14 +521,14 @@ export default async function ComprobanteTurnoPosPage({
           </section>
         )}
 
-        <section className="mt-10 flex flex-wrap gap-8 break-inside-avoid print:mt-12">
+        <section className="mt-8 flex flex-wrap gap-8 break-inside-avoid print:mt-12">
           <div className="min-w-[13rem] flex-1">
             <div className="border-b border-tinta" />
             <p className="mt-1.5 text-[0.78rem] text-tinta-media">Cerró · {turno.cerradoPor}</p>
           </div>
         </section>
 
-        <footer className="mt-6 border-t border-linea pt-3 text-[0.72rem] text-tinta-suave">
+        <footer className="mt-5 border-t border-linea pt-2.5 text-[0.72rem] text-tinta-suave">
           Los montos de este comprobante son los que se registraron al cerrar el turno. Generado
           desde TuMenuSmart.
         </footer>

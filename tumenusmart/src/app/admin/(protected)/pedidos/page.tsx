@@ -559,6 +559,7 @@ export default async function AdminPedidosPage({
                         {new Date(pedido.createdAt).toLocaleTimeString("es-PY", {
                           hour: "2-digit",
                           minute: "2-digit",
+                          hour12: false,
                           timeZone: ZONA_NEGOCIO,
                         })}
                       </Link>

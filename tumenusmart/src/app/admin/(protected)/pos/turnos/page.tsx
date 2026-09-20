@@ -251,6 +251,7 @@ export default async function TurnosPosPage({
                       month: "2-digit",
                       hour: "2-digit",
                       minute: "2-digit",
+                      hour12: false,
                       timeZone: ZONA_NEGOCIO,
                     })}
                   </Td>
@@ -261,6 +262,7 @@ export default async function TurnosPosPage({
                           month: "2-digit",
                           hour: "2-digit",
                           minute: "2-digit",
+                          hour12: false,
                           timeZone: ZONA_NEGOCIO,
                         })
                       : "—"}

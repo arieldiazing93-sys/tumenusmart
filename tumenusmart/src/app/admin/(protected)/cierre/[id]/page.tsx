@@ -24,10 +24,13 @@ function fechaLarga(fecha: Date): string {
     timeZone: ZONA_NEGOCIO,
     hour: "2-digit",
     minute: "2-digit",
+    hour12: false,
   });
   return `${texto.charAt(0).toUpperCase() + texto.slice(1)}, ${hora}`;
 }
 
+// hour12: false — con AM/PM ("a. m."/"p. m.") no entraba en las columnas
+// angostas de la tabla y la hora se cortaba a la mitad.
 function horaCorta(fecha: Date | null): string {
   if (!fecha) return "—";
   return fecha.toLocaleString("es-PY", {
@@ -36,6 +39,7 @@ function horaCorta(fecha: Date | null): string {
     month: "2-digit",
     hour: "2-digit",
     minute: "2-digit",
+    hour12: false,
   });
 }
 
