@@ -114,6 +114,7 @@ export default async function DetallePedidoPage({
           turnoAbiertoId={turno?.id ?? null}
           comprobanteTipo={pedido.comprobanteTipo}
           facturaNumero={pedido.facturaNumero}
+          facturaAnulada={pedido.facturaAnulada}
           nombreImpresoraTicket={nombreImpresoraTicket}
           impresorasPorArea={impresorasPorArea}
         />

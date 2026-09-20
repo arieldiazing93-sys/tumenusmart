@@ -189,6 +189,7 @@ export default async function DetalleVentaPosPage({
               ventaId={venta.id}
               comprobanteTipo={venta.comprobanteTipo}
               facturaNumero={venta.facturaNumero}
+              facturaAnulada={venta.facturaAnulada}
             />
           ))}
       </div>

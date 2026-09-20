@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import Link from "next/link";
+import { clasesBoton } from "@/components/ui";
 import { cambiarEstadoPedido, type ResultadoPedidoAccion } from "./actions";
 import { ESTADOS_PEDIDO } from "@/lib/estados-pedido";
 import { FORMAS_PAGO_POS, type FormaPagoPos } from "@/lib/turno-pos";
@@ -14,6 +16,7 @@ export function EstadoBotones({
   turnoAbiertoId,
   comprobanteTipo,
   facturaNumero,
+  facturaAnulada,
   nombreImpresoraTicket,
   impresorasPorArea,
 }: {
@@ -25,6 +28,7 @@ export function EstadoBotones({
   turnoAbiertoId: string | null;
   comprobanteTipo: string;
   facturaNumero: string | null;
+  facturaAnulada: boolean;
   /** Impresora QZ Tray para el ticket/factura, en esta estación — null = sin configurar, cae al manual. */
   nombreImpresoraTicket: string | null;
   /** Mapa Área de Impresión → impresora QZ Tray, en esta estación. */
@@ -56,7 +60,10 @@ export function EstadoBotones({
   // no tiene el teléfono a mano), igual tiene que quedar con qué se cobró:
   // si no, el pedido queda invisible en Rendición (ver cambiarEstadoPedido).
   const pideFormaPago = tipoEntrega === "delivery" || turnoAbiertoId != null;
-  const esFactura = comprobanteTipo === "factura" && !!facturaNumero;
+  // Si la factura ya está anulada, cancelar el pedido no le hace nada de
+  // yapa a un número que ya está muerto — se trata como cualquier
+  // cancelación común. Solo bloquea si TODAVÍA hay una factura viva.
+  const facturaVigente = comprobanteTipo === "factura" && !!facturaNumero && !facturaAnulada;
 
   /**
    * Comanda al pasar a "en preparación" (una por Área de Impresión presente
@@ -240,12 +247,31 @@ export function EstadoBotones({
         </div>
       )}
 
-      {pidiendoMotivoCancelacion && (
+      {pidiendoMotivoCancelacion && facturaVigente && (
+        <div className="mt-3 rounded-xl border border-aviso/25 bg-aviso-luz p-3">
+          <p className="text-sm text-tinta">
+            Este pedido tiene la factura N° {facturaNumero} activa. Primero anulá la factura desde
+            Facturas — recién después se puede cancelar el pedido.
+          </p>
+          <div className="mt-3 flex gap-2">
+            <Link href="/admin/facturas" className={clasesBoton("navegar", "sm")}>
+              Ir a Facturas
+            </Link>
+            <button
+              type="button"
+              onClick={() => setPidiendoMotivoCancelacion(false)}
+              className="rounded-full px-3 py-1.5 text-sm font-medium text-tinta-media hover:text-tinta"
+            >
+              Volver
+            </button>
+          </div>
+        </div>
+      )}
+
+      {pidiendoMotivoCancelacion && !facturaVigente && (
         <div className="mt-3 rounded-xl border border-peligro/25 bg-peligro-luz p-3">
           <p className="text-sm text-tinta">
-            {esFactura
-              ? `Este pedido es una FACTURA (N° ${facturaNumero}) con timbrado real — al cancelarlo, ese número queda consumido para siempre, no se puede reutilizar. Vas a tener que rehacer el pedido con los datos correctos. ¿Por qué se cancela?`
-              : "¿Por qué se cancela este pedido? Es obligatorio, queda en el historial."}
+            ¿Por qué se cancela este pedido? Es obligatorio, queda en el historial.
           </p>
           <textarea
             value={motivoCancelacion}

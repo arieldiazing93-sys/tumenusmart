@@ -2,29 +2,38 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Boton } from "@/components/ui";
+import Link from "next/link";
+import { Boton, clasesBoton } from "@/components/ui";
 import { cancelarVenta } from "../../actions";
 
 /**
  * Anular una cuenta ya cobrada.
  *
- * Pide el motivo porque queda registrado en el historial — sin eso, dentro
- * de un mes nadie se acuerda por qué se anuló esa venta puntual. Si es una
- * factura de verdad, el aviso es distinto: ese número de timbrado queda
- * consumido para siempre al cancelar (no se reutiliza, mismo criterio que
- * un talonario de papel) — hay que dejarlo bien claro antes de confirmar.
+ * Si la cuenta tiene una factura VIGENTE (con número y sin anular), no deja
+ * cancelar desde acá: cancelar la cuenta entera anularía la factura de
+ * yapa en el mismo paso, sin el registro/motivo propio que tiene esa acción
+ * en Facturas — dos cosas distintas mezcladas en un solo clic. El protocolo
+ * es: primero anular la factura (Facturas, "solo la factura" o "cancelar
+ * todo"), recién ahí esta cuenta queda libre para cancelarse sola si hace
+ * falta.
+ *
+ * Sin factura (o con la factura ya anulada), pide el motivo porque queda
+ * registrado en el historial — sin eso, dentro de un mes nadie se acuerda
+ * por qué se anuló esa venta puntual.
  */
 export function CancelarVentaBoton({
   ventaId,
   comprobanteTipo,
   facturaNumero,
+  facturaAnulada,
 }: {
   ventaId: string;
   comprobanteTipo: string;
   facturaNumero: string | null;
+  facturaAnulada: boolean;
 }) {
   const router = useRouter();
-  const esFactura = comprobanteTipo === "factura";
+  const facturaVigente = comprobanteTipo === "factura" && !!facturaNumero && !facturaAnulada;
   const [confirmando, setConfirmando] = useState(false);
   const [motivo, setMotivo] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -51,12 +60,29 @@ export function CancelarVentaBoton({
     );
   }
 
+  if (facturaVigente) {
+    return (
+      <div className="rounded-xl border border-aviso/25 bg-aviso-luz p-3">
+        <p className="text-[0.85rem] text-tinta">
+          Esta cuenta tiene la factura N° {facturaNumero} activa. Primero anulá la factura desde
+          Facturas — recién después se puede cancelar la cuenta.
+        </p>
+        <div className="mt-3 flex gap-2">
+          <Link href="/admin/facturas" className={clasesBoton("navegar", "sm")}>
+            Ir a Facturas
+          </Link>
+          <Boton tono="fantasma" tam="sm" onClick={() => setConfirmando(false)}>
+            Volver
+          </Boton>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="rounded-xl border border-peligro/25 bg-peligro-luz p-3">
       <p className="text-[0.85rem] text-tinta">
-        {esFactura
-          ? `Esta cuenta es una FACTURA (N° ${facturaNumero}) con timbrado real — al cancelarla, ese número queda consumido para siempre, no se puede reutilizar. Vas a tener que rehacer la venta con los datos correctos. ¿Por qué se cancela?`
-          : "¿Por qué se cancela esta cuenta? Es obligatorio, queda en el historial."}
+        ¿Por qué se cancela esta cuenta? Es obligatorio, queda en el historial.
       </p>
       <textarea
         value={motivo}
