@@ -7,6 +7,7 @@ import { Segmentado } from "@/components/Segmentado";
 import { TIPOS_IDENTIFICACION_FISCAL, etiquetaTipoIdentificacion } from "@/lib/tipo-cliente";
 import { formatearGuarani, formatearNumero } from "@/lib/format";
 import { ZONA_NEGOCIO } from "@/lib/timezone";
+import { imprimirComprobante } from "@/lib/impresion-comprobantes";
 import {
   buscarClientesFiscales,
   buscarParaRemision,
@@ -20,13 +21,20 @@ import {
  * social/nombre o RUC/Cédula; si no existe, se cargan sus datos acá mismo
  * y se crea solo al guardar), recién DESPUÉS se adjunta el N° de pedido o
  * de venta a remitir, y por último el motivo. Guardar genera la factura
- * nueva y abre el ticket para imprimir.
+ * nueva e imprime sola (QZ Tray, mismo mecanismo que el resto del panel —
+ * ver src/lib/impresion-comprobantes.ts), sin pasar por el diálogo de
+ * impresión del navegador.
  *
  * A propósito el cliente NO se precarga con lo que decía la factura
  * anulada: partir de un dato que puede estar mal (es justo lo que se está
  * por corregir) es lo que se quiere evitar buscando al cliente de cero.
  */
-export function NuevaFacturaForm() {
+export function NuevaFacturaForm({
+  nombreImpresoraTicket,
+}: {
+  /** Impresora QZ Tray para el ticket/factura, en esta estación — null = sin configurar, cae al manual. */
+  nombreImpresoraTicket: string | null;
+}) {
   const router = useRouter();
 
   // --- Paso 1: cliente ---
@@ -122,7 +130,13 @@ export function NuevaFacturaForm() {
         setErrorEnvio(r.error);
         return;
       }
-      router.push(r.url);
+      // Impresión automática vía QZ Tray, en vez del diálogo de impresión
+      // del navegador — mismo criterio que el resto del panel (ver
+      // PantallaVenta.tsx/EstadoBotones.tsx). Si no se pudo (sin QZ Tray, o
+      // sin impresora configurada en esta estación), se navega igual y esa
+      // pantalla ofrece la impresión manual sola.
+      const resultado = await imprimirComprobante(`${r.url}/crudo`, nombreImpresoraTicket);
+      router.push(resultado.ok ? `${r.url}?silencioso=1` : r.url);
     });
   }
 
