@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Area, Boton, Entrada } from "@/components/ui";
+import { Area, Boton, clasesDeCampo } from "@/components/ui";
+import { EntradaMonto } from "@/components/EntradaMonto";
 import { formatearGuarani } from "@/lib/format";
 import { FORMAS_PAGO_POS, type FormaPagoPos } from "@/lib/turno-pos";
 import { cerrarTurno } from "../actions";
@@ -87,14 +88,11 @@ export function CerrarTurnoForm({ turnoId, cantidad, totalGeneral }: Props) {
             </span>
             <p className="min-w-0 flex-1 text-[0.85rem] font-medium text-tinta">{f.etiqueta}</p>
             <div className="w-28 flex-none sm:w-32">
-              <Entrada
-                type="number"
-                min={0}
-                step={1000}
+              <EntradaMonto
                 placeholder="0"
                 value={declarado[f.valor]}
-                onChange={(e) => setDeclarado((d) => ({ ...d, [f.valor]: e.target.value }))}
-                className="text-right"
+                onChange={(v) => setDeclarado((d) => ({ ...d, [f.valor]: v }))}
+                className={`${clasesDeCampo()} text-right`}
               />
             </div>
           </div>
