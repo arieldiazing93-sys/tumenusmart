@@ -89,7 +89,7 @@ export function VerFacturaModal({
         role="dialog"
         aria-modal="true"
         aria-label={`Factura ${facturaNumero}`}
-        className="max-h-[90vh] w-full overflow-y-auto rounded-t-xl bg-white p-5 shadow-alta animate-[subirHoja_0.28s_cubic-bezier(0.22,0.7,0.3,1)] sm:max-w-sm sm:animate-[subir_0.22s_ease-out] sm:rounded-xl"
+        className="max-h-[90vh] w-full overflow-y-auto rounded-t-xl bg-white p-5 shadow-alta animate-[subirHoja_0.28s_cubic-bezier(0.22,0.7,0.3,1)] sm:max-w-2xl sm:animate-[subir_0.22s_ease-out] sm:rounded-xl"
         style={{ paddingBottom: "max(1.25rem, env(safe-area-inset-bottom, 0px))" }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -112,7 +112,8 @@ export function VerFacturaModal({
           </button>
         </div>
 
-        <div className="mt-4 flex flex-col gap-3 text-[0.85rem]">
+        <div className="mt-4 flex flex-col gap-4 sm:grid sm:grid-cols-2 sm:items-start sm:gap-x-6">
+        <div className="flex flex-col gap-3 text-[0.85rem]">
           <div>
             {cuentaAnulada ? (
               <Pastilla color="peligro">Cuenta anulada</Pastilla>
@@ -163,10 +164,9 @@ export function VerFacturaModal({
               {formatearGuarani(total)}
             </p>
           </div>
-
         </div>
 
-        <div className="mt-4 border-t border-linea pt-4">
+        <div className="border-t border-linea pt-4 sm:border-l sm:border-t-0 sm:pl-6 sm:pt-0">
           <p className="mb-2 text-[0.7rem] font-semibold uppercase tracking-rotulo text-tinta-suave">
             Contenido de la factura
           </p>
@@ -252,6 +252,7 @@ export function VerFacturaModal({
           >
             Abrir para imprimir
           </a>
+        </div>
         </div>
 
         {!anulada && (
