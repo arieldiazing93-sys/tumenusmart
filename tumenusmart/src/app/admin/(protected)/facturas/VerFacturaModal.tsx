@@ -1,18 +1,25 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Pastilla } from "@/components/ui";
+import { Pastilla, clasesBoton } from "@/components/ui";
 import { formatearGuarani } from "@/lib/format";
 import { ZONA_NEGOCIO } from "@/lib/timezone";
 import { CancelarFacturaBoton } from "./CancelarFacturaBoton";
+import { obtenerDetalleFactura, type DetalleFactura } from "./actions";
 
 /**
  * Vista previa de una factura de la lista, en modal — antes de decidir
- * anularla, el dueño ve primero de qué cuenta se trata (cliente, monto,
- * origen) en grande, en vez de jugarse el botón "Anular" directo desde la
- * fila. La acción de anular vive ADENTRO, reusando CancelarFacturaBoton tal
- * cual: arranca colapsado en un botón, y si la anulación sale bien,
+ * anularla, el dueño ve primero de qué cuenta se trata: cliente, monto,
+ * origen, Y el contenido real (productos, desglose de IVA, emisor), todo
+ * ACÁ ADENTRO — no un link que manda a abrir el ticket completo aparte
+ * (esa pantalla además viene envuelta en todo el panel de administración,
+ * pensada para imprimir un papel de 75mm, no para meterla en una ventanita).
+ * El detalle se trae con obtenerDetalleFactura recién al abrir, porque la
+ * lista no lo necesita para cada fila — solo cuando se lo pide.
+ *
+ * La acción de anular vive ADENTRO también, reusando CancelarFacturaBoton
+ * tal cual: arranca colapsado en un botón, y si la anulación sale bien,
  * router.refresh() actualiza el estado acá mismo (la fila de atrás queda al
  * día, y el botón de anular desaparece solo porque ya no aplica).
  */
@@ -45,6 +52,9 @@ export function VerFacturaModal({
   facturaAnulada: boolean;
   onCerrar: () => void;
 }) {
+  const [detalle, setDetalle] = useState<DetalleFactura | null>(null);
+  const [cargandoDetalle, setCargandoDetalle] = useState(true);
+
   useEffect(() => {
     function alTeclado(e: KeyboardEvent) {
       if (e.key === "Escape") onCerrar();
@@ -52,6 +62,19 @@ export function VerFacturaModal({
     window.addEventListener("keydown", alTeclado);
     return () => window.removeEventListener("keydown", alTeclado);
   }, [onCerrar]);
+
+  useEffect(() => {
+    let vigente = true;
+    obtenerDetalleFactura(origen, id).then((d) => {
+      if (vigente) {
+        setDetalle(d);
+        setCargandoDetalle(false);
+      }
+    });
+    return () => {
+      vigente = false;
+    };
+  }, [origen, id]);
 
   const anulada = cuentaAnulada || facturaAnulada;
   const ticketHref =
@@ -124,8 +147,8 @@ export function VerFacturaModal({
           </div>
 
           <div>
-            <p className="text-[0.7rem] uppercase tracking-rotulo text-tinta-suave">Origen</p>
-            <Link href={href} className="font-medium text-azul-oscuro hover:underline">
+            <p className="mb-1 text-[0.7rem] uppercase tracking-rotulo text-tinta-suave">Origen</p>
+            <Link href={href} className={clasesBoton("navegar", "sm")}>
               {origenLabel}
             </Link>
           </div>
@@ -141,13 +164,93 @@ export function VerFacturaModal({
             </p>
           </div>
 
+        </div>
+
+        <div className="mt-4 border-t border-linea pt-4">
+          <p className="mb-2 text-[0.7rem] font-semibold uppercase tracking-rotulo text-tinta-suave">
+            Contenido de la factura
+          </p>
+
+          {cargandoDetalle ? (
+            <p className="text-[0.82rem] text-tinta-suave">Cargando…</p>
+          ) : !detalle ? (
+            <p className="text-[0.82rem] text-tinta-suave">No se pudo cargar el detalle.</p>
+          ) : (
+            <div className="flex flex-col gap-3 text-[0.85rem]">
+              {detalle.facturaRazonSocialEmisor && (
+                <div>
+                  <p className="text-tinta">{detalle.facturaRazonSocialEmisor}</p>
+                  <p className="text-[0.78rem] text-tinta-suave">
+                    RUC: {detalle.facturaRucEmisor}
+                    {detalle.facturaTimbrado && ` · Timbrado: ${detalle.facturaTimbrado}`}
+                  </p>
+                  {detalle.facturaVencimiento && (
+                    <p className="text-[0.78rem] text-tinta-suave">
+                      Vence:{" "}
+                      {detalle.facturaVencimiento.toLocaleDateString("es-PY", { timeZone: ZONA_NEGOCIO })}
+                    </p>
+                  )}
+                </div>
+              )}
+
+              <div className="flex flex-col gap-1.5">
+                {detalle.items.map((it, i) => (
+                  <div key={i} className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="text-tinta">
+                        {it.cantidad}x {it.nombreProducto}
+                      </p>
+                      {it.opcionesTexto && (
+                        <p className="text-[0.78rem] text-tinta-suave">{it.opcionesTexto}</p>
+                      )}
+                    </div>
+                    <span className="cifra flex-none font-medium text-tinta">
+                      {formatearGuarani(it.cantidad * it.precioUnitario)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+
+              {(detalle.facturaGravado10 > 0 ||
+                detalle.facturaGravado5 > 0 ||
+                detalle.facturaExento > 0) && (
+                <div className="flex flex-col gap-1 border-t border-linea-fina pt-2.5">
+                  {detalle.facturaGravado10 > 0 && (
+                    <div className="flex justify-between text-tinta-media">
+                      <span>Gravadas 10%</span>
+                      <span className="cifra">{formatearGuarani(detalle.facturaGravado10)}</span>
+                    </div>
+                  )}
+                  {detalle.facturaGravado5 > 0 && (
+                    <div className="flex justify-between text-tinta-media">
+                      <span>Gravadas 5%</span>
+                      <span className="cifra">{formatearGuarani(detalle.facturaGravado5)}</span>
+                    </div>
+                  )}
+                  {detalle.facturaExento > 0 && (
+                    <div className="flex justify-between text-tinta-media">
+                      <span>Exentas</span>
+                      <span className="cifra">{formatearGuarani(detalle.facturaExento)}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between font-medium text-tinta">
+                    <span>Total IVA</span>
+                    <span className="cifra">
+                      {formatearGuarani(detalle.facturaIva10 + detalle.facturaIva5)}
+                    </span>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           <a
             href={ticketHref}
             target="_blank"
             rel="noopener noreferrer"
-            className="self-start text-[0.82rem] font-medium text-brand-texto underline"
+            className={`mt-3 inline-block ${clasesBoton("navegar", "sm")}`}
           >
-            Ver ticket completo / Imprimir
+            Abrir para imprimir
           </a>
         </div>
 

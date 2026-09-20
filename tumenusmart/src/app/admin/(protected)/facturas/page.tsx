@@ -236,7 +236,7 @@ export default async function FacturasPage({
                     </p>
                   </Td>
                   <Td>
-                    <Link href={f.href} className="text-azul-oscuro hover:underline">
+                    <Link href={f.href} className={clasesBoton("navegar", "sm")}>
                       {f.origenLabel}
                     </Link>
                   </Td>

@@ -12,6 +12,88 @@ import { cambiarEstadoPedido } from "../pedidos/actions";
 
 export type ResultadoCancelarFactura = { ok: true } | { ok: false; error: string };
 
+export type ItemDetalleFactura = {
+  nombreProducto: string;
+  cantidad: number;
+  precioUnitario: number;
+  opcionesTexto: string | null;
+};
+
+export type DetalleFactura = {
+  facturaTimbrado: string | null;
+  facturaVencimiento: Date | null;
+  facturaRazonSocialEmisor: string | null;
+  facturaRucEmisor: string | null;
+  items: ItemDetalleFactura[];
+  facturaGravado10: number;
+  facturaGravado5: number;
+  facturaExento: number;
+  facturaIva10: number;
+  facturaIva5: number;
+};
+
+/**
+ * El contenido de la factura (productos, desglose de IVA, emisor) para
+ * mostrar DENTRO del modal de "Ver" — sin esto, el modal solo repite lo que
+ * ya se ve en la fila de la lista y obliga a un clic más (abrir el ticket
+ * aparte) para ver de qué se trata de verdad.
+ */
+export async function obtenerDetalleFactura(
+  origen: "pedido" | "venta",
+  id: string
+): Promise<DetalleFactura | null> {
+  await exigirPermiso("pos.verHistorico");
+  const storeId = await idLocalActual();
+  const db = prismaDelLocal(storeId);
+
+  const registro =
+    origen === "venta"
+      ? await db.ventaPos.findUnique({
+          where: { id },
+          select: {
+            facturaTimbrado: true,
+            facturaVencimiento: true,
+            facturaRazonSocialEmisor: true,
+            facturaRucEmisor: true,
+            facturaGravado10: true,
+            facturaGravado5: true,
+            facturaExento: true,
+            facturaIva10: true,
+            facturaIva5: true,
+            items: { select: { nombreProducto: true, cantidad: true, precioUnitario: true, opcionesTexto: true } },
+          },
+        })
+      : await db.order.findUnique({
+          where: { id },
+          select: {
+            facturaTimbrado: true,
+            facturaVencimiento: true,
+            facturaRazonSocialEmisor: true,
+            facturaRucEmisor: true,
+            facturaGravado10: true,
+            facturaGravado5: true,
+            facturaExento: true,
+            facturaIva10: true,
+            facturaIva5: true,
+            items: { select: { nombreProducto: true, cantidad: true, precioUnitario: true, opcionesTexto: true } },
+          },
+        });
+  if (!registro) return null;
+
+  return {
+    facturaTimbrado: registro.facturaTimbrado,
+    facturaVencimiento: registro.facturaVencimiento,
+    facturaRazonSocialEmisor: registro.facturaRazonSocialEmisor,
+    facturaRucEmisor: registro.facturaRucEmisor,
+    items: registro.items.map((i) => ({ ...i, precioUnitario: Number(i.precioUnitario) })),
+    facturaGravado10: Number(registro.facturaGravado10 ?? 0),
+    facturaGravado5: Number(registro.facturaGravado5 ?? 0),
+    facturaExento: Number(registro.facturaExento ?? 0),
+    facturaIva10: Number(registro.facturaIva10 ?? 0),
+    facturaIva5: Number(registro.facturaIva5 ?? 0),
+  };
+}
+
 export type ClienteEncontrado = {
   id: string;
   numero: number | null;
