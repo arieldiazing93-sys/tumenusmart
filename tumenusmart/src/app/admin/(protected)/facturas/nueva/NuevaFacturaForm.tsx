@@ -197,7 +197,9 @@ export function NuevaFacturaForm() {
 
             {cargandoClienteNuevo && (
               <div className="mt-3 flex flex-col gap-3 rounded-lg border border-linea bg-papel-suave p-3">
-                <p className="text-[0.78rem] font-medium text-tinta-media">Cliente nuevo</p>
+                <p className="text-[0.82rem] font-medium text-aviso">
+                  No existe ningún cliente con ese dato — completá los datos para crear uno nuevo.
+                </p>
                 <Campo etiqueta="Tipo">
                   <Selector value={tipoIdentificacion} onChange={(e) => setTipoIdentificacion(e.target.value)}>
                     {TIPOS_IDENTIFICACION_FISCAL.map((t) => (
