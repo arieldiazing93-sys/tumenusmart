@@ -7,7 +7,7 @@ import { calcularRangoFecha, type FiltroFecha } from "@/lib/rango-fecha";
 import { formatearGuarani, formatearNumero } from "@/lib/format";
 import { ZONA_NEGOCIO } from "@/lib/timezone";
 import { SIN_REGISTRO_FISCAL, etiquetaTipoIdentificacion } from "@/lib/tipo-cliente";
-import { CancelarFacturaBoton } from "./CancelarFacturaBoton";
+import { VerFacturaBoton } from "./VerFacturaBoton";
 
 export const dynamic = "force-dynamic";
 
@@ -225,6 +225,7 @@ export default async function FacturasPage({
                       year: "numeric",
                       hour: "2-digit",
                       minute: "2-digit",
+                      hour12: false,
                       timeZone: ZONA_NEGOCIO,
                     })}
                   </Td>
@@ -252,9 +253,20 @@ export default async function FacturasPage({
                     )}
                   </Td>
                   <Td className="text-right">
-                    {!anulada && (
-                      <CancelarFacturaBoton origen={f.origen} id={f.id} facturaNumero={f.facturaNumero} />
-                    )}
+                    <VerFacturaBoton
+                      origen={f.origen}
+                      id={f.id}
+                      facturaNumero={f.facturaNumero}
+                      fecha={f.fecha}
+                      razonSocial={f.razonSocial}
+                      etiquetaIdentificacion={f.etiquetaIdentificacion}
+                      identificacion={f.identificacion}
+                      total={f.total}
+                      origenLabel={f.origenLabel}
+                      href={f.href}
+                      cuentaAnulada={f.cuentaAnulada}
+                      facturaAnulada={f.facturaAnulada}
+                    />
                   </Td>
                 </Tr>
               );
