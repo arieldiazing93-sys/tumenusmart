@@ -19,9 +19,10 @@ const FILTROS_FECHA: { value: FiltroFecha; label: string }[] = [
 
 /**
  * Reporte general de cuentas: pedidos de mostrador + ventas del Punto de
- * Venta en una sola lista, con el importe de cada una repartido en su
- * columna de forma de pago y una fila de totales al pie — mismo criterio
- * que un libro de caja.
+ * Venta + delivery ya entregado, en una sola lista, con el importe de cada
+ * una repartido en su columna de forma de pago y una fila de totales al
+ * pie — mismo criterio que un libro de caja. Ver
+ * src/lib/reporte-general-pos.ts para el detalle de cómo se arma.
  */
 export default async function ReporteGeneralPosPage({
   searchParams,
@@ -62,7 +63,7 @@ export default async function ReporteGeneralPosPage({
     <div>
       <Cabecera
         titulo="Reporte general de cuentas"
-        bajada="Pedidos de mostrador y ventas del Punto de Venta, detallado por forma de pago."
+        bajada="Todo lo que se cobró — mostrador, retiro/mesa y delivery ya entregado — detallado por forma de pago."
         acciones={
           <>
             <a
@@ -133,7 +134,7 @@ export default async function ReporteGeneralPosPage({
       {reporte.filas.length === 0 ? (
         <Vacio
           titulo="No hay cuentas en este período"
-          detalle="Los pedidos de mostrador y las ventas del Punto de Venta van a aparecer acá."
+          detalle="Los pedidos de mostrador, las ventas del Punto de Venta y el delivery entregado van a aparecer acá."
         />
       ) : (
         <Tabla>
@@ -208,7 +209,8 @@ export default async function ReporteGeneralPosPage({
       )}
 
       <p className="mt-3 text-[0.76rem] text-tinta-suave">
-        No incluye pedidos de delivery — esos tienen su propio cierre en "Rendiciones".
+        La forma de pago del delivery es la que declaró el repartidor al entregar. Esto es
+        independiente de si ya rindió esa plata: para controlar eso, entrá a "Rendiciones".
       </p>
     </div>
   );

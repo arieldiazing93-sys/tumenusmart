@@ -1,15 +1,22 @@
 /**
- * El reporte general de cuentas: pedidos de mostrador (retiro/mesa) y
- * ventas del Punto de Venta, mezclados en una sola lista ordenada por
- * fecha, con el importe de cada una repartido en su columna de forma de
- * pago — mismo criterio que un libro de caja de toda la vida.
+ * El reporte general de cuentas: ventas del Punto de Venta, pedidos de
+ * mostrador (retiro/mesa) y pedidos de delivery ya entregados, mezclados en
+ * una sola lista ordenada por fecha, con el importe de cada una repartido
+ * en su columna de forma de pago — mismo criterio que un libro de caja de
+ * toda la vida. "General" quiere decir general: todo lo que se cobró.
  *
- * A propósito NO incluye pedidos de delivery: esos tienen su propio cierre
- * con el repartidor (Rendición), con su propio criterio de qué es "cobrado
- * de verdad" (cobroMetodo). Mezclar los dos duplicaría o contradiría ese
- * reporte. Acá solo entra lo que ya comparte una sola forma de pago real y
- * un solo cierre: ventas de mostrador y pedidos atados a un turno de POS
- * (ver Order.turnoPosId, cambiarEstadoPedido en pedidos/actions.ts).
+ * El delivery entra con `cobroMetodo` (lo que el repartidor cobró de
+ * verdad, no lo que el cliente dijo al pedir) — desde que se unificó ese
+ * vocabulario con el de FormaPagoPos (mismos 4 valores:
+ * efectivo/transferencia/tarjeta_debito/tarjeta_credito, ver
+ * src/lib/rendicion.ts), normalizarFormaPagoPos ya lo reconoce sin
+ * necesitar una quinta columna ni un mapeo aparte.
+ *
+ * Esto es independiente de la Rendición del repartidor: ese es un control
+ * de plata en la calle (qué tiene que devolver, en mano), no un reporte de
+ * ventas — un mismo pedido de delivery puede aparecer acá (se vendió, se
+ * cobró) y seguir pendiente de rendir allá (todavía no se entregó la plata
+ * físicamente). No son la misma pregunta.
  */
 import { prismaDelLocal } from "./prisma-local";
 import { normalizarFormaPagoPos, FORMAS_PAGO_POS, type FormaPagoPos } from "./turno-pos";
@@ -39,7 +46,7 @@ export async function calcularReporteGeneralPos(
 ): Promise<ReporteGeneralPos> {
   const db = prismaDelLocal(storeId);
 
-  const [ventas, pedidos] = await Promise.all([
+  const [ventas, pedidos, deliveries] = await Promise.all([
     db.ventaPos.findMany({
       where: { creadoEn: { gte: rango.gte, lt: rango.lt }, cancelada: false },
       select: { id: true, numero: true, total: true, formaPago: true, creadoEn: true },
@@ -51,6 +58,17 @@ export async function calcularReporteGeneralPos(
         estado: { not: "cancelado" },
       },
       select: { id: true, numero: true, total: true, formaPagoPos: true, updatedAt: true },
+    }),
+    // Delivery ya entregado — fecha por entregadoEn (cuándo se cobró de
+    // verdad), no updatedAt: es el mismo campo que ya usa Rendición para su
+    // propio filtro de fecha, y retiro/mesa no lo tiene siempre cargado.
+    db.order.findMany({
+      where: {
+        tipoEntrega: "delivery",
+        estado: "entregado",
+        entregadoEn: { gte: rango.gte, lt: rango.lt },
+      },
+      select: { id: true, numero: true, total: true, cobroMetodo: true, entregadoEn: true },
     }),
   ]);
 
@@ -72,6 +90,15 @@ export async function calcularReporteGeneralPos(
       fecha: p.updatedAt,
       importe: Number(p.total),
       formaPago: normalizarFormaPagoPos(p.formaPagoPos),
+    })),
+    ...deliveries.map((d) => ({
+      idPedido: d.numero as number | null,
+      idVenta: null as number | null,
+      idPedidoDb: d.id as string | null,
+      idVentaDb: null as string | null,
+      fecha: d.entregadoEn!,
+      importe: Number(d.total),
+      formaPago: normalizarFormaPagoPos(d.cobroMetodo),
     })),
   ].sort((a, b) => a.fecha.getTime() - b.fecha.getTime());
 

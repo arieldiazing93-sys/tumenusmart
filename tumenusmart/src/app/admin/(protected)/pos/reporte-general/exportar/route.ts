@@ -50,7 +50,7 @@ export async function GET(request: NextRequest) {
   ];
 
   filaTitulo(hoja, ["Negocio", local.nombre], 2);
-  filaTitulo(hoja, ["Reporte", "Reporte general de cuentas (mostrador + POS)"], 2);
+  filaTitulo(hoja, ["Reporte", "Reporte general de cuentas (mostrador + POS + delivery entregado)"], 2);
   filaTitulo(hoja, ["Período", periodo], 2);
   hoja.addRow([]);
 

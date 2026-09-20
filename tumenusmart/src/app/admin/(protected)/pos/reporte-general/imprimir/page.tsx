@@ -48,7 +48,8 @@ export default async function ImprimirReporteGeneralPosPage({
           {finRangoInclusive.toLocaleDateString("es-PY", opcionesFecha)}
         </p>
         <p className="mt-1 text-xs text-tinta-suave">
-          Pedidos de mostrador y ventas del Punto de Venta. No incluye delivery (ver Rendiciones).
+          Mostrador, retiro/mesa y delivery ya entregado. La forma de pago del delivery es la
+          declarada al entregar — el control de si esa plata ya se rindió está en Rendiciones.
         </p>
       </div>
 
