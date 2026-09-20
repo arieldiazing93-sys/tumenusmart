@@ -36,7 +36,12 @@ export async function GET(request: NextRequest) {
     year: "numeric",
     timeZone: ZONA_NEGOCIO,
   };
-  const opcionesFechaHora: Intl.DateTimeFormatOptions = { ...opcionesFecha, hour: "2-digit", minute: "2-digit" };
+  const opcionesFechaHora: Intl.DateTimeFormatOptions = {
+    ...opcionesFecha,
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  };
   const periodo = `${rango.gte.toLocaleDateString("es-PY", opcionesFecha)} - ${finRangoInclusive.toLocaleDateString("es-PY", opcionesFecha)}`;
 
   const { libro, hoja } = nuevoLibro("Reporte general");

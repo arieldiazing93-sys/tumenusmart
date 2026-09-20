@@ -33,7 +33,12 @@ export default async function ImprimirReporteGeneralPosPage({
     year: "numeric",
     timeZone: ZONA_NEGOCIO,
   };
-  const opcionesFechaHora: Intl.DateTimeFormatOptions = { ...opcionesFecha, hour: "2-digit", minute: "2-digit" };
+  const opcionesFechaHora: Intl.DateTimeFormatOptions = {
+    ...opcionesFecha,
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  };
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-8 print:max-w-none print:px-0 print:py-0">

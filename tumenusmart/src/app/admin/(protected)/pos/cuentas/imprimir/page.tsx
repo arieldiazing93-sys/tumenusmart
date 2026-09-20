@@ -51,7 +51,7 @@ export default async function ImprimirCuentasPosPage({
   const esRangoConHora =
     fechaActiva === "rango" && ((desde?.includes("T") ?? false) || (hasta?.includes("T") ?? false));
   const periodoTexto = esRangoConHora
-    ? `${rango.gte.toLocaleString("es-PY", { ...opcionesFecha, hour: "2-digit", minute: "2-digit" })} – ${rango.lt.toLocaleString("es-PY", { ...opcionesFecha, hour: "2-digit", minute: "2-digit" })}`
+    ? `${rango.gte.toLocaleString("es-PY", { ...opcionesFecha, hour: "2-digit", minute: "2-digit", hour12: false })} – ${rango.lt.toLocaleString("es-PY", { ...opcionesFecha, hour: "2-digit", minute: "2-digit", hour12: false })}`
     : `${rango.gte.toLocaleDateString("es-PY", opcionesFecha)} – ${new Date(rango.lt.getTime() - 24 * 60 * 60 * 1000).toLocaleDateString("es-PY", opcionesFecha)}`;
   const total = ventas.filter((v) => !v.cancelada).reduce((s, v) => s + Number(v.total), 0);
 
@@ -90,6 +90,7 @@ export default async function ImprimirCuentasPosPage({
                     month: "2-digit",
                     hour: "2-digit",
                     minute: "2-digit",
+                    hour12: false,
                     timeZone: ZONA_NEGOCIO,
                   })}
                 </td>

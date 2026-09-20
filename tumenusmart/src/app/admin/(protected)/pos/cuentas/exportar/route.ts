@@ -54,7 +54,7 @@ export async function GET(request: NextRequest) {
   // del día 17.
   const esRangoConHora = fecha === "rango" && ((desde?.includes("T") ?? false) || (hasta?.includes("T") ?? false));
   const periodo = esRangoConHora
-    ? `${rango.gte.toLocaleString("es-PY", { ...opcionesFecha, hour: "2-digit", minute: "2-digit" })} - ${rango.lt.toLocaleString("es-PY", { ...opcionesFecha, hour: "2-digit", minute: "2-digit" })}`
+    ? `${rango.gte.toLocaleString("es-PY", { ...opcionesFecha, hour: "2-digit", minute: "2-digit", hour12: false })} - ${rango.lt.toLocaleString("es-PY", { ...opcionesFecha, hour: "2-digit", minute: "2-digit", hour12: false })}`
     : `${rango.gte.toLocaleDateString("es-PY", opcionesFecha)} - ${new Date(rango.lt.getTime() - 24 * 60 * 60 * 1000).toLocaleDateString("es-PY", opcionesFecha)}`;
 
   const { libro, hoja } = nuevoLibro("Cuentas POS");
@@ -82,7 +82,12 @@ export async function GET(request: NextRequest) {
     const fila = hoja.addRow([
       v.numero,
       v.creadoEn.toLocaleDateString("es-PY", opcionesFecha),
-      v.creadoEn.toLocaleTimeString("es-PY", { hour: "2-digit", minute: "2-digit", timeZone: ZONA_NEGOCIO }),
+      v.creadoEn.toLocaleTimeString("es-PY", {
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false,
+        timeZone: ZONA_NEGOCIO,
+      }),
       etiquetaFormaPagoPos(v.formaPago),
       v.registradoPor,
       v.cancelada ? "Cancelada" : "Activa",

@@ -56,6 +56,7 @@ export default async function ReporteGeneralPosPage({
     year: "numeric",
     hour: "2-digit",
     minute: "2-digit",
+    hour12: false,
     timeZone: ZONA_NEGOCIO,
   };
 

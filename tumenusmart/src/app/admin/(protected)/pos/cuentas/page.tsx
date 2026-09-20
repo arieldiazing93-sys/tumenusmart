@@ -2,7 +2,7 @@ import Link from "next/link";
 import { pantallaConPermiso } from "@/lib/auth";
 import { prismaDelLocal } from "@/lib/prisma-local";
 import { idLocalActual } from "@/lib/local-actual";
-import { Cabecera, clasesBoton, Pastilla, Tabla, Th, Td, Tr, Vacio } from "@/components/ui";
+import { Cabecera, clasesBoton, Pastilla, Tabla, Th, Td, Tr, Vacio, BotonEnlace } from "@/components/ui";
 import { calcularRangoFecha, type FiltroFecha } from "@/lib/rango-fecha";
 import { formatearGuarani, formatearNumero } from "@/lib/format";
 import { etiquetaFormaPagoPos, FORMAS_PAGO_POS } from "@/lib/turno-pos";
@@ -195,6 +195,9 @@ export default async function CuentasPosPage({
               <Th>Cajero</Th>
               <Th>Estado</Th>
               <Th className="text-right">Total</Th>
+              <Th className="text-right">
+                <span className="sr-only">Acción</span>
+              </Th>
             </tr>
           </thead>
           <tbody>
@@ -219,6 +222,7 @@ export default async function CuentasPosPage({
                     month: "2-digit",
                     hour: "2-digit",
                     minute: "2-digit",
+                    hour12: false,
                     timeZone: ZONA_NEGOCIO,
                   })}
                 </Td>
@@ -237,6 +241,11 @@ export default async function CuentasPosPage({
                 >
                   {formatearGuarani(Number(v.total))}
                 </Td>
+                <Td className="text-right">
+                  <BotonEnlace href={`/admin/pos/venta/${v.id}`} tono="navegar" tam="sm">
+                    Ver
+                  </BotonEnlace>
+                </Td>
               </Tr>
             ))}
           </tbody>
@@ -248,6 +257,7 @@ export default async function CuentasPosPage({
               <Td className="cifra text-right font-semibold text-tinta">
                 {formatearGuarani(totalGeneral)}
               </Td>
+              <Td>{null}</Td>
             </tr>
           </tfoot>
         </Tabla>
