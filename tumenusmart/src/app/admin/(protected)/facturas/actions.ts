@@ -12,6 +12,50 @@ import { cambiarEstadoPedido } from "../pedidos/actions";
 
 export type ResultadoCancelarFactura = { ok: true } | { ok: false; error: string };
 
+export type ClienteEncontrado = {
+  id: string;
+  numero: number | null;
+  nombre: string;
+  email: string | null;
+  tipoIdentificacion: string | null;
+  numeroIdentificacion: string | null;
+};
+
+/**
+ * Busca clientes ya cargados por razón social/nombre o por número de
+ * identificación (RUC, Cédula, etc.) — primer paso de "Nueva factura": el
+ * cajero busca al cliente correcto ANTES de tocar nada de la cuenta a
+ * remitir, en vez de partir de lo que decía la factura anulada (que puede
+ * estar mal, es justo lo que se está por corregir).
+ */
+export async function buscarClientesFiscales(query: string): Promise<ClienteEncontrado[]> {
+  await exigirPermiso("pos.verHistorico");
+  const storeId = await idLocalActual();
+  const db = prismaDelLocal(storeId);
+
+  const texto = query.trim();
+  if (!texto) return [];
+
+  return db.customer.findMany({
+    where: {
+      OR: [
+        { nombre: { contains: texto, mode: "insensitive" } },
+        { numeroIdentificacion: { contains: texto, mode: "insensitive" } },
+      ],
+    },
+    orderBy: { nombre: "asc" },
+    select: {
+      id: true,
+      numero: true,
+      nombre: true,
+      email: true,
+      tipoIdentificacion: true,
+      numeroIdentificacion: true,
+    },
+    take: 10,
+  });
+}
+
 /**
  * Anula una factura — con la cuenta que la sostiene, o sin ella.
  *
