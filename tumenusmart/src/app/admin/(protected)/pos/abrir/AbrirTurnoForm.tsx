@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Boton } from "@/components/ui";
+import { EntradaMonto } from "@/components/EntradaMonto";
 import { abrirTurno } from "../actions";
 
 export function AbrirTurnoForm({ estacionId }: { estacionId: string }) {
@@ -29,13 +30,9 @@ export function AbrirTurnoForm({ estacionId }: { estacionId: string }) {
         <p className="mb-1.5 text-[0.78rem] font-semibold uppercase tracking-rotulo text-tinta-suave">
           Monto inicial de caja
         </p>
-        <input
-          type="number"
-          min={0}
-          step={1000}
+        <EntradaMonto
           value={monto}
-          onChange={(e) => setMonto(e.target.value)}
-          onWheel={(e) => e.currentTarget.blur()}
+          onChange={setMonto}
           className="w-full rounded-lg border border-linea bg-papel-suave px-3 py-3 text-center text-[1.4rem] font-semibold text-tinta transition-colors focus:border-brand focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand/15"
         />
         <p className="mt-1.5 text-[0.78rem] text-tinta-suave">
