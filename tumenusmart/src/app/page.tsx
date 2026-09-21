@@ -104,8 +104,8 @@ export default async function PortadaPage() {
             <a href="#incluye" className="hidden hover:text-tinta sm:inline">
               Qué incluye
             </a>
-            <a href="#panel" className="hidden hover:text-tinta md:inline">
-              El panel
+            <a href="#pos" className="hidden hover:text-tinta md:inline">
+              Punto de venta
             </a>
 
             {/* Para el dueño que ya es cliente y perdió el enlace que le
@@ -253,20 +253,21 @@ export default async function PortadaPage() {
         </div>
       </section>
 
-      {/* ---------------- el panel ---------------- */}
-      <section id="panel" className="bg-noche py-16 text-noche-tinta lg:py-24">
+      {/* ---------------- punto de venta ---------------- */}
+      <section id="pos" className="bg-noche py-16 text-noche-tinta lg:py-24">
         <div className="mx-auto max-w-6xl px-5 sm:px-8">
-          <span className="rotulo">El panel del dueño</span>
+          <span className="rotulo">Punto de venta</span>
           <h2 className="mt-3 max-w-[24ch] text-[clamp(1.7rem,3.6vw,2.6rem)] font-semibold leading-tight">
-            No es un tablero de números. Le dice qué hacer.
+            Cobrá en segundos. La caja se cuadra sola.
           </h2>
           <p className="mt-4 max-w-[60ch] text-[1.06rem] text-noche-suave">
-            Un restaurante no necesita más gráficos. Necesita saber qué producto no se
-            vende, quién dejó de pedir, y en qué franja tiene la cocina vacía. Una idea por
-            semana, con el número que la respalda.
+            Abrís el turno al empezar el día, cobrás cada venta de mostrador en un par de
+            toques y cerrás con el arqueo hecho solo: cuánto entró en efectivo, tarjeta y
+            transferencia, sin sumar nada a mano. Cada turno cerrado queda con su reporte
+            detallado, listo para repasar cuando quieras.
           </p>
 
-          <PanelMuestra />
+          <PosMuestra />
         </div>
       </section>
 
@@ -485,80 +486,92 @@ function Plato({
   );
 }
 
-const PEDIDOS_MUESTRA = [
-  { n: "#0042", cliente: "Carlos B.", detalle: "2× Muzzarella, 1× Empanada", total: "Gs. 130.000", estado: "En preparación", tono: "ambar" },
-  { n: "#0041", cliente: "Lucía M.", detalle: "1× Napolitana Familiar", total: "Gs. 95.000", estado: "Entregado", tono: "verde" },
-  { n: "#0040", cliente: "Rodrigo A.", detalle: "3× Empanada, 1× Gaseosa", total: "Gs. 45.000", estado: "Entregado", tono: "verde" },
+const CATEGORIAS_MUESTRA = ["Todos 13", "Hamburguesas 6", "Pizzas 8", "Bebidas 3"];
+
+const PRODUCTOS_MUESTRA = [
+  { nombre: "Parrillita", precio: "100.000", enCuenta: true },
+  { nombre: "Marineras", precio: "50.000", enCuenta: true },
+  { nombre: "Milanesitas", precio: "60.000" },
+  { nombre: "Papas Fritas Grande", precio: "30.000" },
 ];
 
-function PanelMuestra() {
+function PosMuestra() {
   return (
     <div className="mt-10 overflow-hidden rounded-lg border border-noche-linea bg-noche-panel">
-      <div className="flex items-center gap-5 overflow-x-auto whitespace-nowrap border-b border-noche-linea px-4 py-2.5 text-[0.8rem] text-noche-suave">
+      <div className="flex items-center gap-3 overflow-x-auto whitespace-nowrap border-b border-noche-linea px-4 py-2.5 text-[0.8rem] text-noche-suave">
         <span className="flex items-center gap-1.5 font-semibold tracking-titular text-noche-tinta">
-            <Logo tam={16} color="#FFFFFF" hueco="#1D1F24" />
-            TuMenuSmart
-          </span>
-        <span className="font-semibold text-noche-tinta">Pedidos</span>
-        <span>Productos</span>
-        <span>Reservas</span>
-        <span>Estadísticas</span>
-        <span>Ideas</span>
+          <Logo tam={16} color="#FFFFFF" hueco="#1D1F24" />
+          TuMenuSmart
+        </span>
+        <span className="font-semibold text-noche-tinta">Punto de venta</span>
+        <span className="ml-auto flex flex-none items-center gap-1.5 rounded-full bg-emerald-500/15 px-2.5 py-1 text-[0.72rem] font-medium text-emerald-300">
+          ● Turno abierto · 4h 12m
+        </span>
       </div>
 
-      <div className="p-4 sm:p-6">
-        <div className="rounded-lg border border-brand-dark bg-brand/10 p-4">
-          <span className="inline-block rounded bg-brand px-1.5 py-0.5 text-[0.63rem] font-semibold text-white">
-            Tu idea de esta semana
-          </span>
-          <h3 className="mt-2 text-[0.96rem] font-semibold">
-            23 clientes habituales dejaron de pedir
-          </h3>
-          <p className="mt-1 text-[0.86rem] text-noche-suave">
-            Ya te compraron al menos dos veces y no vuelven hace 45 días. Entre todos
-            gastaron Gs. 8.400.000. Son los más baratos de recuperar: ya te conocen y tenés
-            su WhatsApp.
-          </p>
+      <div className="grid gap-5 p-4 sm:p-6 lg:grid-cols-[1.3fr_1fr] lg:gap-6">
+        <div>
+          <div className="flex gap-2 overflow-x-auto pb-3 text-[0.74rem]">
+            {CATEGORIAS_MUESTRA.map((c, i) => (
+              <span
+                key={c}
+                className={`flex-none whitespace-nowrap rounded-full px-3 py-1.5 font-medium ${
+                  i === 1 ? "bg-brand text-white" : "border border-noche-linea text-noche-suave"
+                }`}
+              >
+                {c}
+              </span>
+            ))}
+          </div>
+
+          <div className="grid grid-cols-2 gap-2.5">
+            {PRODUCTOS_MUESTRA.map((p) => (
+              <div
+                key={p.nombre}
+                className={`rounded-lg border p-3 ${
+                  p.enCuenta ? "border-brand bg-brand/10" : "border-noche-linea"
+                }`}
+              >
+                <p className="text-[0.82rem] font-medium leading-tight text-noche-tinta">
+                  {p.nombre}
+                </p>
+                <p className="cifra mt-1.5 text-[0.78rem] font-semibold text-brand">
+                  Gs. {p.precio}
+                </p>
+              </div>
+            ))}
+          </div>
         </div>
 
-        <div className="mt-4 overflow-x-auto">
-          <table className="w-full border-collapse text-[0.84rem]">
-            <thead>
-              <tr>
-                {["N°", "Cliente", "Productos", "Total", "Estado"].map((c, i) => (
-                  <th
-                    key={c}
-                    className={`border-b border-noche-linea px-2.5 py-2 font-mono text-[0.63rem] font-medium uppercase tracking-[0.14em] text-noche-suave ${i === 3 ? "text-right" : "text-left"}`}
-                  >
-                    {c}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {PEDIDOS_MUESTRA.map((p) => (
-                <tr key={p.n}>
-                  <td className="cifra border-b border-white/5 px-2.5 py-2.5">{p.n}</td>
-                  <td className="border-b border-white/5 px-2.5 py-2.5">{p.cliente}</td>
-                  <td className="border-b border-white/5 px-2.5 py-2.5">{p.detalle}</td>
-                  <td className="cifra whitespace-nowrap border-b border-white/5 px-2.5 py-2.5 text-right">
-                    {p.total}
-                  </td>
-                  <td className="border-b border-white/5 px-2.5 py-2.5">
-                    <span
-                      className={`inline-block rounded px-1.5 py-0.5 text-[0.68rem] font-semibold ${
-                        p.tono === "verde"
-                          ? "bg-emerald-500/20 text-emerald-300"
-                          : "bg-amber-500/20 text-amber-300"
-                      }`}
-                    >
-                      {p.estado}
-                    </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="flex flex-col rounded-lg border border-noche-linea bg-noche p-4">
+          <p className="font-mono text-[0.63rem] font-medium uppercase tracking-[0.14em] text-noche-suave">
+            Cuenta · 3 items
+          </p>
+
+          <div className="mt-3 flex flex-col gap-2.5 border-b border-noche-linea pb-3 text-[0.82rem]">
+            <div className="flex justify-between">
+              <span className="text-noche-tinta">1× Parrillita</span>
+              <span className="cifra text-noche-suave">Gs. 100.000</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-noche-tinta">2× Marineras</span>
+              <span className="cifra text-noche-suave">Gs. 100.000</span>
+            </div>
+          </div>
+
+          <div className="mt-3 flex items-center justify-between text-[0.94rem] font-semibold">
+            <span className="text-noche-tinta">Total</span>
+            <span className="cifra text-noche-tinta">Gs. 200.000</span>
+          </div>
+
+          <span className="mt-3 inline-flex items-center justify-center rounded bg-brand px-3 py-2 text-[0.82rem] font-semibold text-white">
+            Confirmar venta
+          </span>
+
+          <div className="mt-4 flex items-center justify-between rounded-lg border border-noche-linea bg-noche-panel px-3 py-2.5 text-[0.74rem]">
+            <span className="text-noche-suave">Arqueo de hoy</span>
+            <span className="cifra font-semibold text-emerald-300">Gs. 1.240.000</span>
+          </div>
         </div>
       </div>
     </div>
