@@ -1,20 +1,27 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { formatearGuarani } from "@/lib/format";
 import {
   buscarProductosParaGrupo,
   agregarProductoAGrupo,
   type ProductoParaGrupo,
-} from "../actions";
+} from "@/app/admin/(protected)/grupos-agregados/actions";
 
 /**
- * Agregar un modificador a este grupo es elegir un Producto ya existente
- * del catálogo (ej: "Salsa BBQ", cargado en /admin/productos con su propio
+ * Agregar un modificador a un grupo es elegir un Producto ya existente del
+ * catálogo (ej: "Salsa Pesto", cargado en /admin/productos con su propio
  * precio/IVA/unidad) — no se tipea un nombre/precio nuevo acá. Mismo
  * espíritu que SoftRestaurant: el modificador ES el producto.
+ *
+ * Se usa desde dos lugares: la pantalla propia de un grupo
+ * (/admin/grupos-agregados/[id]) y directo en la tarjeta "Grupos de
+ * agregados" de un producto — por eso vive en components/, no adentro de
+ * ninguna de las dos rutas.
  */
 export function BuscarProductoParaGrupo({ groupId }: { groupId: string }) {
+  const router = useRouter();
   const [query, setQuery] = useState("");
   const [resultados, setResultados] = useState<ProductoParaGrupo[]>([]);
   const [buscando, setBuscando] = useState(false);
@@ -44,6 +51,7 @@ export function BuscarProductoParaGrupo({ groupId }: { groupId: string }) {
       setResultados((prev) => prev.filter((p) => p.id !== productId));
       setAgregadoId(productId);
       setTimeout(() => setAgregadoId(null), 2000);
+      router.refresh();
     });
   }
 
@@ -52,7 +60,7 @@ export function BuscarProductoParaGrupo({ groupId }: { groupId: string }) {
       <input
         value={query}
         onChange={(e) => buscar(e.target.value)}
-        placeholder="Buscar un producto por nombre (ej: salsa bbq)"
+        placeholder="Buscar un producto por nombre (ej: salsa pesto)"
         className="rounded-lg border border-linea px-3 py-2 text-sm"
       />
       {buscando && <p className="text-xs text-tinta-suave">Buscando…</p>}

@@ -10,8 +10,8 @@ import { formatearGuarani } from "@/lib/format";
 import { etiquetaIva } from "@/lib/iva";
 import { etiquetaUnidadMedida } from "@/lib/unidad-medida";
 import { moverModificadorDeGrupo } from "../actions";
-import { BuscarProductoParaGrupo } from "./BuscarProductoParaGrupo";
-import { QuitarProductoDeGrupoBoton } from "./QuitarProductoDeGrupoBoton";
+import { BuscarProductoParaGrupo } from "@/components/BuscarProductoParaGrupo";
+import { QuitarProductoDeGrupoBoton } from "@/components/QuitarProductoDeGrupoBoton";
 
 export const dynamic = "force-dynamic";
 

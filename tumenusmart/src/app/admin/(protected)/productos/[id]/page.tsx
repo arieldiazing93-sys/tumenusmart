@@ -12,7 +12,9 @@ import { EditarNombreOpcion } from "./EditarNombreOpcion";
 import { EditarCostoOpcion } from "./EditarCostoOpcion";
 import { EditarPrecioExtraOpcion } from "./EditarPrecioExtraOpcion";
 import { EditarFiscalOpcion } from "./EditarFiscalOpcion";
-import { AsignarGruposProducto } from "./AsignarGruposProducto";
+import { GruposAgregadosProducto } from "./GruposAgregadosProducto";
+import { etiquetaIva } from "@/lib/iva";
+import { etiquetaUnidadMedida } from "@/lib/unidad-medida";
 import { GuardadoToast } from "@/components/GuardadoToast";
 import { BotonesMover } from "@/components/BotonesMover";
 import { moverOpcion } from "../actions";
@@ -32,12 +34,28 @@ export default async function EditarProductoPage({
 
   const { id } = await params;
 
-  const [producto, categorias, areasImpresion, gruposAgregados] = await Promise.all([
+  const [producto, categorias, areasImpresion, todosLosGrupos] = await Promise.all([
     prisma.product.findUnique({
       where: { id },
       include: {
         opciones: { orderBy: { orden: "asc" } },
-        gruposAgregados: { select: { groupId: true } },
+        gruposAgregados: {
+          orderBy: [{ orden: "asc" }, { id: "asc" }],
+          include: {
+            group: {
+              include: {
+                modificadores: {
+                  orderBy: [{ orden: "asc" }, { id: "asc" }],
+                  include: {
+                    product: {
+                      select: { id: true, nombre: true, precio: true, iva: true, unidadMedida: true },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
       },
     }),
     prisma.category.findMany({ orderBy: { orden: "asc" } }),
@@ -53,6 +71,11 @@ export default async function EditarProductoPage({
   ]);
 
   if (!producto) notFound();
+
+  const idsAdjuntados = new Set(producto.gruposAgregados.map((g) => g.groupId));
+  const gruposDisponibles = todosLosGrupos
+    .filter((g) => !idsAdjuntados.has(g.id))
+    .map((g) => ({ id: g.id, nombre: g.nombre, cantidadModificadores: g._count.modificadores }));
 
   return (
     <div className="flex flex-col gap-8">
@@ -168,18 +191,24 @@ export default async function EditarProductoPage({
           <p className="rotulo text-[0.8rem] font-bold">Grupos de agregados</p>
           <p className="text-sm text-tinta-media">
             Grupos reutilizables (ej: Salsas, Quesos) que se suman a los agregados propios de
-            arriba. Cada modificador es un producto real de tu catálogo. Se crean y editan en
-            Grupos de agregados, en el menú.
+            arriba. Cada modificador es un producto real de tu catálogo — buscalo y agregalo acá
+            mismo, sin salir de esta pantalla.
           </p>
         </div>
-        <AsignarGruposProducto
+        <GruposAgregadosProducto
           productId={producto.id}
-          grupos={gruposAgregados.map((g) => ({
-            id: g.id,
-            nombre: g.nombre,
-            cantidadItems: g._count.modificadores,
+          gruposAdjuntados={producto.gruposAgregados.map((pg) => ({
+            id: pg.group.id,
+            nombre: pg.group.nombre,
+            modificadores: pg.group.modificadores.map((m) => ({
+              productId: m.product.id,
+              nombre: m.product.nombre,
+              precio: Number(m.product.precio),
+              iva: etiquetaIva(m.product.iva),
+              unidadMedida: etiquetaUnidadMedida(m.product.unidadMedida),
+            })),
           }))}
-          gruposAdjuntadosIds={producto.gruposAgregados.map((g) => g.groupId)}
+          gruposDisponibles={gruposDisponibles}
         />
       </Tarjeta>
     </div>

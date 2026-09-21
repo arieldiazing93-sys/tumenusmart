@@ -501,6 +501,39 @@ export async function asignarGrupoAProducto(
   return { ok: true };
 }
 
+export type ResultadoCrearGrupo = { ok: true; groupId: string } | { ok: false; error: string };
+
+/**
+ * Crea un grupo de agregados nuevo y lo adjunta a este producto en el
+ * mismo paso — para no tener que ir primero a /admin/grupos-agregados a
+ * crearlo antes de poder buscarle modificadores. Después de esto, la
+ * pantalla de producto ya puede buscar y agregarle productos (ver
+ * BuscarProductoParaGrupo) sin salir de acá.
+ */
+export async function crearGrupoYAdjuntar(
+  productId: string,
+  nombreGrupo: string
+): Promise<ResultadoCrearGrupo> {
+  await exigirPermiso("productos.editar");
+  const idLocal = await idLocalActual();
+  const prisma = prismaDelLocal(idLocal);
+
+  const nombre = nombreGrupo.trim();
+  if (!nombre) return { ok: false, error: "El nombre del grupo es obligatorio" };
+
+  const grupo = await prisma.$transaction(async (tx) => {
+    const nuevoGrupo = await tx.optionGroup.create({ data: { nombre, storeId: idLocal } });
+    await tx.productOptionGroup.create({
+      data: { productId, groupId: nuevoGrupo.id, storeId: idLocal },
+    });
+    return nuevoGrupo;
+  });
+
+  revalidatePath(`/admin/productos/${productId}`);
+  revalidatePath("/admin/grupos-agregados");
+  return { ok: true, groupId: grupo.id };
+}
+
 /**
  * Sube o baja un agregado DENTRO de su producto.
  *
