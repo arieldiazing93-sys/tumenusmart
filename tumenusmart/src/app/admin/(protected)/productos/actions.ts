@@ -8,6 +8,7 @@ import { prismaDelLocal } from "@/lib/prisma-local";
 import { moverEnLista, cambiosDeOrden, type Direccion } from "@/lib/ordenar";
 import { subirImagenProducto } from "@/lib/supabase-storage";
 import { normalizarIva } from "@/lib/iva";
+import { normalizarUnidadMedida } from "@/lib/unidad-medida";
 
 export type ResultadoFoto = { ok: true; url: string } | { ok: false; error: string };
 
@@ -137,6 +138,7 @@ export async function actualizarProducto(
       ? "proporcional"
       : "mayor";
   const iva = normalizarIva(formData.get("iva"));
+  const unidadMedida = normalizarUnidadMedida(formData.get("unidadMedida"));
 
   await prisma.product.update({
     where: { id: productId },
@@ -154,6 +156,7 @@ export async function actualizarProducto(
       mitadYMitadGrupo,
       mitadYMitadModo,
       iva,
+      unidadMedida,
     },
   });
 
@@ -310,6 +313,61 @@ export async function actualizarPrecioExtraOpcion(
   return { ok: true };
 }
 
+/**
+ * Cambia el IVA de un agregado/variante que ya existe — mismo criterio que
+ * `actualizarCostoOpcion`. Ver el comentario de ProductOption.iva en el
+ * schema: hoy el ticket sigue facturando toda la línea a la tasa del
+ * producto principal, esto solo deja cargar el dato para cuando la futura
+ * API de factura electrónica lo necesite por agregado.
+ */
+export async function actualizarIvaOpcion(
+  productId: string,
+  optionId: string,
+  formData: FormData
+): Promise<ResultadoProducto> {
+  await exigirPermiso("productos.editar");
+  const prisma = prismaDelLocal(await idLocalActual());
+
+  const iva = normalizarIva(formData.get("iva"));
+
+  const resultado = await prisma.productOption.updateMany({
+    where: { id: optionId, productId },
+    data: { iva },
+  });
+  if (resultado.count === 0) {
+    return { ok: false, error: "Esa opción no existe o no es de este producto" };
+  }
+
+  revalidatePath(`/admin/productos/${productId}`);
+  return { ok: true };
+}
+
+/**
+ * Cambia la unidad de medida de un agregado/variante que ya existe — mismo
+ * criterio que `actualizarIvaOpcion`.
+ */
+export async function actualizarUnidadMedidaOpcion(
+  productId: string,
+  optionId: string,
+  formData: FormData
+): Promise<ResultadoProducto> {
+  await exigirPermiso("productos.editar");
+  const prisma = prismaDelLocal(await idLocalActual());
+
+  const unidadMedida = normalizarUnidadMedida(formData.get("unidadMedida"));
+
+  const resultado = await prisma.productOption.updateMany({
+    where: { id: optionId, productId },
+    data: { unidadMedida },
+  });
+  if (resultado.count === 0) {
+    return { ok: false, error: "Esa opción no existe o no es de este producto" };
+  }
+
+  revalidatePath(`/admin/productos/${productId}`);
+  return { ok: true };
+}
+
 export async function eliminarOpcion(productId: string, optionId: string) {
   await exigirPermiso("productos.editar");
   // Todas las consultas de acá abajo quedan atadas a este local.
@@ -344,7 +402,16 @@ export async function aplicarAgregadosACategoria(
     where: { id: productId },
     select: {
       categoryId: true,
-      opciones: { select: { nombre: true, tipo: true, precioExtra: true, costo: true } },
+      opciones: {
+        select: {
+          nombre: true,
+          tipo: true,
+          precioExtra: true,
+          costo: true,
+          iva: true,
+          unidadMedida: true,
+        },
+      },
     },
   });
   if (!producto) return { ok: false, error: "No encontré el producto" };
@@ -380,6 +447,8 @@ export async function aplicarAgregadosACategoria(
           tipo: o.tipo,
           precioExtra: o.precioExtra,
           costo: o.costo,
+          iva: o.iva,
+          unidadMedida: o.unidadMedida,
         })),
       })
     );

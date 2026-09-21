@@ -420,6 +420,11 @@ model Product {
   // Todavía no lo consume ningún cálculo: es la base para el desglose de
   // IVA de la futura Factura Autoimpresor.
   iva         String          @default("gravado10")
+  // "unidad" | "kilogramo" | "litro" — ver src/lib/unidad-medida.ts, con el
+  // código oficial de la Tabla 5 de SIFEN para cada valor. Mismo criterio
+  // que iva: todavía no lo consume ningún cálculo acá, pero es un dato que
+  // va a pedir la futura API de factura electrónica por cada ítem.
+  unidadMedida String         @default("unidad")
   imagenUrl   String?
   disponible  Boolean         @default(true)
   orden       Int             @default(0)
@@ -465,6 +470,12 @@ model ProductOption {
   /// antes esa plata quedaba contada como ganancia del producto principal,
   /// inflando su margen cada vez que se vendía con algo pago encima.
   costo       Decimal? @db.Decimal(10, 2)
+  // Mismo criterio que Product.iva/unidadMedida (ver ahí): un agregado
+  // (ej: "Extra queso") pasa a ser su propia línea al facturar, y la futura
+  // API de factura electrónica va a necesitar su propia tasa y unidad, no
+  // asumir la del producto al que se cuelga.
+  iva          String  @default("gravado10")
+  unidadMedida String  @default("unidad")
   orden       Int     @default(0)
 
   @@index([storeId])

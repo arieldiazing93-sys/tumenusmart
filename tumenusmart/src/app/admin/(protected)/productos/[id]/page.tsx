@@ -11,6 +11,7 @@ import { AplicarAgregadosBoton } from "./AplicarAgregadosBoton";
 import { EditarNombreOpcion } from "./EditarNombreOpcion";
 import { EditarCostoOpcion } from "./EditarCostoOpcion";
 import { EditarPrecioExtraOpcion } from "./EditarPrecioExtraOpcion";
+import { EditarFiscalOpcion } from "./EditarFiscalOpcion";
 import { GuardadoToast } from "@/components/GuardadoToast";
 import { BotonesMover } from "@/components/BotonesMover";
 import { moverOpcion } from "../actions";
@@ -74,6 +75,7 @@ export default async function EditarProductoPage({
             precio: Number(producto.precio),
             costo: producto.costo != null ? Number(producto.costo) : null,
             iva: producto.iva,
+            unidadMedida: producto.unidadMedida,
             imagenUrl: producto.imagenUrl,
             disponible: producto.disponible,
             destacado: producto.destacado,
@@ -134,6 +136,12 @@ export default async function EditarProductoPage({
                   productId={producto.id}
                   optionId={o.id}
                   costoActual={o.costo != null ? Number(o.costo) : null}
+                />
+                <EditarFiscalOpcion
+                  productId={producto.id}
+                  optionId={o.id}
+                  ivaActual={o.iva}
+                  unidadMedidaActual={o.unidadMedida}
                 />
                 <EliminarOpcionBoton productId={producto.id} optionId={o.id} />
               </div>

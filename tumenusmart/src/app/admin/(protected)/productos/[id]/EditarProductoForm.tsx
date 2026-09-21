@@ -6,6 +6,7 @@ import { actualizarProducto } from "../actions";
 import { ImagenProductoField } from "../ImagenProductoField";
 import { IngredientesField } from "../IngredientesField";
 import { TASAS_IVA } from "@/lib/iva";
+import { UNIDADES_MEDIDA } from "@/lib/unidad-medida";
 
 type Categoria = { id: string; nombre: string };
 type AreaImpresion = { id: string; nombre: string };
@@ -18,6 +19,7 @@ type Producto = {
   precio: number;
   costo: number | null;
   iva: string;
+  unidadMedida: string;
   imagenUrl: string | null;
   disponible: boolean;
   destacado: boolean;
@@ -117,6 +119,18 @@ export function EditarProductoForm({
             {TASAS_IVA.map((t) => (
               <option key={t.valor} value={t.valor}>
                 {t.etiqueta}
+              </option>
+            ))}
+          </Selector>
+        </Campo>
+        <Campo
+          etiqueta="Unidad de medida"
+          ayuda="Lo va a pedir la futura factura electrónica por cada producto."
+        >
+          <Selector name="unidadMedida" defaultValue={producto.unidadMedida}>
+            {UNIDADES_MEDIDA.map((u) => (
+              <option key={u.valor} value={u.valor}>
+                {u.etiqueta}
               </option>
             ))}
           </Selector>
