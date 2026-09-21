@@ -6,18 +6,11 @@ import { prismaDelLocal } from "@/lib/prisma-local";
 import { idLocalActual } from "@/lib/local-actual";
 import { EliminarProductoBoton, EliminarOpcionBoton } from "./EliminarBotones";
 import { EditarProductoForm } from "./EditarProductoForm";
-import { AgregarOpcionForm } from "./AgregarOpcionForm";
-import { AplicarAgregadosBoton } from "./AplicarAgregadosBoton";
-import { EditarNombreOpcion } from "./EditarNombreOpcion";
-import { EditarCostoOpcion } from "./EditarCostoOpcion";
-import { EditarPrecioExtraOpcion } from "./EditarPrecioExtraOpcion";
-import { EditarFiscalOpcion } from "./EditarFiscalOpcion";
 import { GruposAgregadosProducto } from "./GruposAgregadosProducto";
 import { etiquetaIva } from "@/lib/iva";
 import { etiquetaUnidadMedida } from "@/lib/unidad-medida";
+import { formatearGuarani } from "@/lib/format";
 import { GuardadoToast } from "@/components/GuardadoToast";
-import { BotonesMover } from "@/components/BotonesMover";
-import { moverOpcion } from "../actions";
 import { Tarjeta } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
@@ -38,7 +31,10 @@ export default async function EditarProductoPage({
     prisma.product.findUnique({
       where: { id },
       include: {
-        opciones: { orderBy: { orden: "asc" } },
+        opciones: {
+          orderBy: { orden: "asc" },
+          select: { id: true, nombre: true, precioExtra: true },
+        },
         gruposAgregados: {
           orderBy: [{ orden: "asc" }, { id: "asc" }],
           include: {
@@ -119,72 +115,31 @@ export default async function EditarProductoPage({
         />
       </div>
 
-      <Tarjeta className="flex flex-col gap-3">
-        <div className="flex flex-wrap items-start justify-between gap-3">
+      {producto.opciones.length > 0 && (
+        <Tarjeta className="flex flex-col gap-3">
           <div>
-            <p className="rotulo text-[0.8rem] font-bold">Agregados</p>
+            <p className="rotulo text-[0.8rem] font-bold">Agregados propios (forma vieja)</p>
             <p className="text-sm text-tinta-media">
-              Extras que el cliente puede sumar a este producto (ej: borde relleno, extra queso).
+              Cargados antes de que existieran los Grupos de agregados — ya no se pueden crear ni
+              editar acá, pero siguen ofreciéndose en la carta y el POS tal cual. Recreálos como
+              producto real (en Grupos de agregados) y sacá estos con "Quitar".
             </p>
           </div>
-          <AplicarAgregadosBoton
-            productId={producto.id}
-            categoriaNombre={
-              categorias.find((c) => c.id === producto.categoryId)?.nombre ?? "esta categoría"
-            }
-            cantidadAgregados={producto.opciones.length}
-          />
-        </div>
-
-        <div className="flex flex-col gap-2">
-          {producto.opciones.map((o, i) => (
-            <div
-              key={o.id}
-              className="flex flex-col gap-2 rounded-lg border border-linea bg-white px-3 py-2 text-sm sm:flex-row sm:items-center sm:justify-between"
-            >
-              <div className="flex flex-wrap items-center gap-2">
-                <BotonesMover
-                  id={o.id}
-                  accion={moverOpcion}
-                  esPrimero={i === 0}
-                  esUltimo={i === producto.opciones.length - 1}
-                  etiqueta={o.nombre}
-                />
-                <EditarNombreOpcion
-                  productId={producto.id}
-                  optionId={o.id}
-                  nombreActual={o.nombre}
-                  sinCosto={o.costo == null}
-                />
-              </div>
-              <div className="flex flex-wrap items-center gap-3">
-                <EditarPrecioExtraOpcion
-                  productId={producto.id}
-                  optionId={o.id}
-                  precioActual={Number(o.precioExtra)}
-                />
-                <EditarCostoOpcion
-                  productId={producto.id}
-                  optionId={o.id}
-                  costoActual={o.costo != null ? Number(o.costo) : null}
-                />
-                <EditarFiscalOpcion
-                  productId={producto.id}
-                  optionId={o.id}
-                  ivaActual={o.iva}
-                  unidadMedidaActual={o.unidadMedida}
-                />
+          <div className="flex flex-col gap-2">
+            {producto.opciones.map((o) => (
+              <div
+                key={o.id}
+                className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-linea bg-white px-3 py-2 text-sm"
+              >
+                <span>
+                  {o.nombre} <span className="text-tinta-suave">· {formatearGuarani(Number(o.precioExtra))}</span>
+                </span>
                 <EliminarOpcionBoton productId={producto.id} optionId={o.id} />
               </div>
-            </div>
-          ))}
-          {producto.opciones.length === 0 && (
-            <p className="text-sm text-tinta-suave">Sin agregados todavía.</p>
-          )}
-        </div>
-
-        <AgregarOpcionForm productId={producto.id} />
-      </Tarjeta>
+            ))}
+          </div>
+        </Tarjeta>
+      )}
 
       <Tarjeta className="flex flex-col gap-3">
         <div>

@@ -1,9 +1,8 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import Link from "next/link";
 import { renombrarGrupo, eliminarGrupo, type ResultadoGrupo } from "./actions";
-import { Entrada, clasesBoton } from "@/components/ui";
+import { Entrada, BotonEnlace, clasesBoton } from "@/components/ui";
 import { BotonesMover } from "@/components/BotonesMover";
 import type { Direccion } from "@/lib/ordenar";
 
@@ -90,9 +89,7 @@ export function GrupoFila({
               esUltimo={esUltimo}
               etiqueta={nombre}
             />
-            <Link href={`/admin/grupos-agregados/${id}`} className="font-medium hover:text-brand">
-              {nombre}
-            </Link>
+            <span className="font-medium">{nombre}</span>
           </div>
         )}
 
@@ -101,6 +98,9 @@ export function GrupoFila({
             <span className="text-tinta-media">
               {cantidadModificadores} modificador(es) · usado en {cantidadProductos} producto(s)
             </span>
+            <BotonEnlace href={`/admin/grupos-agregados/${id}`} tono="navegar" tam="sm">
+              Ver
+            </BotonEnlace>
             <button
               type="button"
               onClick={() => setEditando(true)}
