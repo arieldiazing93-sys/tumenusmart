@@ -151,6 +151,9 @@ model Store {
   areasImpresion   AreaImpresion[]
   estacionesImpresoras EstacionImpresora[]
   facturasReemplazadas FacturaReemplazada[]
+  optionGroups         OptionGroup[]
+  optionGroupItems     OptionGroupItem[]
+  productOptionGroups  ProductOptionGroup[]
 }
 
 /// Las direcciones que este local tuvo antes.
@@ -443,6 +446,7 @@ model Product {
   // Si está marcado, aparece en el carrusel de destacados del menú público.
   destacado   Boolean         @default(false)
   opciones    ProductOption[]
+  gruposAgregados ProductOptionGroup[]
   orderItems  OrderItem[]
   ventaPosItems VentaPosItem[]
   createdAt   DateTime        @default(now())
@@ -480,6 +484,67 @@ model ProductOption {
 
   @@index([storeId])
   @@index([productId])
+}
+
+// Un grupo con nombre (ej. "Salsas", "Quesos") reutilizable en varios
+// productos a la vez — a diferencia de ProductOption (agregado propio de
+// UN producto), acá se adjunta el MISMO grupo a varios productos vía
+// ProductOptionGroup, así que corregir un ítem del grupo corrige el precio
+// en todos los productos que lo usan, sin tener que recargarlo a mano en
+// cada uno (eso es justamente lo que "Aplicar a categoría" en ProductOption
+// no resuelve: copia filas independientes, no comparte la misma fila).
+model OptionGroup {
+  id        String   @id @default(cuid())
+  storeId   String
+  store     Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  nombre    String
+  orden     Int      @default(0)
+  createdAt DateTime @default(now())
+
+  items     OptionGroupItem[]
+  productos ProductOptionGroup[]
+
+  @@index([storeId])
+}
+
+// Los ítems de un OptionGroup. Mismos campos "fiscales" que ProductOption
+// (ver el comentario ahí) — sin tipo (un grupo es siempre de agregados, no
+// de variantes de elección única) ni productId (cuelga del grupo, no de un
+// producto puntual).
+model OptionGroupItem {
+  id           String      @id @default(cuid())
+  storeId      String
+  store        Store       @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  groupId      String
+  group        OptionGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  nombre       String
+  precioExtra  Decimal     @db.Decimal(10, 2) @default(0)
+  costo        Decimal?    @db.Decimal(10, 2)
+  iva          String      @default("gravado10")
+  unidadMedida String      @default("unidad")
+  orden        Int         @default(0)
+
+  @@index([storeId])
+  @@index([groupId])
+}
+
+// Join M:N — qué grupos están adjuntados a qué producto. Mismo patrón que
+// EstacionImpresora: se adjunta con un upsert, se desadjunta con un
+// deleteMany, nunca se pisa la fila de otro producto ni la de otro grupo.
+model ProductOptionGroup {
+  id        String      @id @default(cuid())
+  storeId   String
+  store     Store       @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
+  groupId   String
+  group     OptionGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  orden     Int         @default(0)
+
+  @@unique([productId, groupId])
+  @@index([storeId])
+  @@index([productId])
+  @@index([groupId])
 }
 
 // Solo se usa cuando Store.envioModo = "zonas". Cada zona es un anillo de

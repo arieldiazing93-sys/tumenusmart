@@ -11,6 +11,27 @@ import { categoriaOcultaPorHorario } from "@/lib/horario-atencion";
 
 export const dynamic = "force-dynamic";
 
+/**
+ * Un producto ofrece dos fuentes de agregados: los propios (ProductOption)
+ * y los de cualquier grupo reutilizable que tenga adjuntado (ver
+ * src/app/admin/(protected)/grupos-agregados/) — se combinan en un solo
+ * array acá, así el resto de la carta y el motor de precios
+ * (src/lib/precio-pedido.ts) siguen viendo un único `opciones` como
+ * siempre, sin saber ni importarles de dónde salió cada ítem. Los ítems de
+ * grupo son siempre "agregado" (los grupos no tienen variantes).
+ */
+function combinarOpciones<
+  O extends { id: string; nombre: string; tipo: string; precioExtra: unknown },
+  G extends { group: { items: { id: string; nombre: string; precioExtra: unknown }[] } },
+>(opciones: O[], gruposAgregados: G[]) {
+  return [
+    ...opciones,
+    ...gruposAgregados.flatMap((g) =>
+      g.group.items.map((it) => ({ ...it, tipo: "agregado" as const }))
+    ),
+  ];
+}
+
 export default async function CatalogoPage({
   params,
 }: {
@@ -28,7 +49,10 @@ export default async function CatalogoPage({
         productos: {
           where: { storeId, disponible: true },
           orderBy: { orden: "asc" },
-          include: { opciones: { orderBy: { orden: "asc" } } },
+          include: {
+            opciones: { orderBy: { orden: "asc" } },
+            gruposAgregados: { select: { group: { select: { items: true } } } },
+          },
         },
         horarios: { select: { diaSemana: true, abre: true, cierra: true } },
       },
@@ -73,7 +97,7 @@ export default async function CatalogoPage({
         nombre: producto.nombre,
         precio: Number(producto.precio),
         mitadYMitadModo: producto.mitadYMitadModo,
-        opciones: producto.opciones.map((o) => ({
+        opciones: combinarOpciones(producto.opciones, producto.gruposAgregados).map((o) => ({
           id: o.id,
           nombre: o.nombre,
           tipo: o.tipo,
@@ -94,7 +118,7 @@ export default async function CatalogoPage({
       precio: Number(p.precio),
       imagenUrl: p.imagenUrl,
       ingredientes: p.ingredientes,
-      opciones: p.opciones.map((o) => ({
+      opciones: combinarOpciones(p.opciones, p.gruposAgregados).map((o) => ({
         id: o.id,
         nombre: o.nombre,
         tipo: o.tipo,

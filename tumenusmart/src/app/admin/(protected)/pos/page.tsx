@@ -73,10 +73,25 @@ export default async function PosPage() {
             orderBy: { orden: "asc" },
             select: { id: true, nombre: true, precioExtra: true },
           },
+          gruposAgregados: {
+            select: { group: { select: { items: { select: { id: true, nombre: true, precioExtra: true } } } } },
+          },
         },
       },
     },
   });
+
+  // Los agregados propios (opciones, ya filtradas a tipo "agregado") más
+  // los de cualquier grupo reutilizable adjuntado — ver el mismo criterio
+  // en src/app/[slug]/page.tsx.
+  function agregadosDe(p: (typeof categorias)[number]["productos"][number]) {
+    return [
+      ...p.opciones.map((o) => ({ id: o.id, nombre: o.nombre, precioExtra: Number(o.precioExtra) })),
+      ...p.gruposAgregados.flatMap((g) =>
+        g.group.items.map((it) => ({ id: it.id, nombre: it.nombre, precioExtra: Number(it.precioExtra) }))
+      ),
+    ];
+  }
 
   const categoriasVenta = categorias
     .filter((c) => c.productos.length > 0)
@@ -87,7 +102,7 @@ export default async function PosPage() {
         id: p.id,
         nombre: p.nombre,
         precio: Number(p.precio),
-        agregados: p.opciones.map((o) => ({ id: o.id, nombre: o.nombre, precioExtra: Number(o.precioExtra) })),
+        agregados: agregadosDe(p),
       })),
     }));
 
@@ -117,7 +132,7 @@ export default async function PosPage() {
         nombre: p.nombre,
         precio: Number(p.precio),
         mitadYMitadModo: p.mitadYMitadModo,
-        agregados: p.opciones.map((o) => ({ id: o.id, nombre: o.nombre, precioExtra: Number(o.precioExtra) })),
+        agregados: agregadosDe(p),
       });
       gruposPorClave.set(clave, entrada);
     }

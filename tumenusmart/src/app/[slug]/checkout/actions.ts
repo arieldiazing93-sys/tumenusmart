@@ -174,7 +174,10 @@ export async function crearPedido(datos: DatosCheckout): Promise<ResultadoPedido
   const productos = await prisma.product.findMany({
     where: { storeId, id: { in: [...idsPedidos] }, category: { activa: true } },
     orderBy: { orden: "asc" },
-    include: { opciones: { orderBy: { orden: "asc" } } },
+    include: {
+      opciones: { orderBy: { orden: "asc" } },
+      gruposAgregados: { select: { group: { select: { items: true } } } },
+    },
   });
 
   const catalogo: ProductoBase[] = productos.map((p) => ({
@@ -186,13 +189,29 @@ export async function crearPedido(datos: DatosCheckout): Promise<ResultadoPedido
     mitadYMitadGrupo: p.mitadYMitadGrupo,
     mitadYMitadModo: p.mitadYMitadModo,
     iva: p.iva,
-    opciones: p.opciones.map((o) => ({
-      id: o.id,
-      nombre: o.nombre,
-      tipo: o.tipo,
-      precioExtra: o.precioExtra,
-      costo: o.costo,
-    })),
+    // Los agregados propios (ProductOption) más los de cualquier grupo
+    // reutilizable adjuntado (ver src/app/admin/(protected)/grupos-agregados/)
+    // — combinados acá para que armarPedido siga viendo un solo `opciones`
+    // como siempre, sin saber de dónde salió cada ítem. Los ítems de grupo
+    // son siempre "agregado" (los grupos no tienen variantes).
+    opciones: [
+      ...p.opciones.map((o) => ({
+        id: o.id,
+        nombre: o.nombre,
+        tipo: o.tipo,
+        precioExtra: o.precioExtra,
+        costo: o.costo,
+      })),
+      ...p.gruposAgregados.flatMap((g) =>
+        g.group.items.map((it) => ({
+          id: it.id,
+          nombre: it.nombre,
+          tipo: "agregado",
+          precioExtra: it.precioExtra,
+          costo: it.costo,
+        }))
+      ),
+    ],
   }));
 
   const armado = armarPedido(catalogo, datos.items);

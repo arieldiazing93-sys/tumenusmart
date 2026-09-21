@@ -200,6 +200,13 @@ export async function registrarVenta(turnoId: string, datos: DatosVenta): Promis
         orderBy: { orden: "asc" },
         select: { id: true, nombre: true, tipo: true, precioExtra: true, costo: true },
       },
+      gruposAgregados: {
+        select: {
+          group: {
+            select: { items: { select: { id: true, nombre: true, precioExtra: true, costo: true } } },
+          },
+        },
+      },
     },
   });
   // Para la impresión automática de comanda por área — ver
@@ -216,7 +223,20 @@ export async function registrarVenta(turnoId: string, datos: DatosVenta): Promis
     mitadYMitadGrupo: p.mitadYMitadGrupo,
     mitadYMitadModo: p.mitadYMitadModo,
     iva: p.iva,
-    opciones: p.opciones,
+    // Los agregados propios más los de cualquier grupo reutilizable
+    // adjuntado — mismo criterio que en checkout/actions.ts.
+    opciones: [
+      ...p.opciones,
+      ...p.gruposAgregados.flatMap((g) =>
+        g.group.items.map((it) => ({
+          id: it.id,
+          nombre: it.nombre,
+          tipo: "agregado",
+          precioExtra: it.precioExtra,
+          costo: it.costo,
+        }))
+      ),
+    ],
   }));
 
   const pedidas: LineaPedida[] = datos.items.map((it) =>

@@ -68,6 +68,8 @@ function armarGrupos(hayIdeaSinVer: boolean, rol: string): GrupoSecciones[] {
           ver: conPermiso("productos.ver") },
         { href: "/admin/categorias", label: "Categorías", icono: "categorias" as const,
           ver: conPermiso("categorias.ver") },
+        { href: "/admin/grupos-agregados", label: "Grupos de agregados", icono: "productos" as const,
+          ver: conPermiso("productos.ver") },
       ],
     },
     {
