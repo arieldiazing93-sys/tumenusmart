@@ -4,9 +4,9 @@ import { prisma } from "@/lib/prisma";
 import { construirLinkWhatsapp } from "@/lib/whatsapp";
 
 export const metadata = {
-  title: "TuMenuSmart — Pedidos por WhatsApp para restaurantes",
+  title: "TuMenuSmart — Pedidos por WhatsApp y punto de venta para restaurantes",
   description:
-    "Carta digital propia para cada restaurante, con reservas de mesa y pedidos que llegan por WhatsApp. Sin comisiones por venta y sin aplicaciones que instalar.",
+    "Carta digital propia para cada restaurante, con reservas de mesa, pedidos que llegan por WhatsApp y punto de venta con factura legal. Sin comisiones por venta y sin aplicaciones que instalar.",
 };
 
 /**
@@ -40,9 +40,9 @@ const INCLUYE = [
       "Con turnos, horarios y cupo por franja. El encargado confirma y deja su nota desde el mismo panel.",
   },
   {
-    titulo: "Comanda y ticket",
+    titulo: "Punto de venta con factura legal",
     texto:
-      "Imprimibles desde el navegador, pensados para locales que no tienen sistema de caja.",
+      "Cobrá en el mostrador, controlá la caja por turno y facturá con timbrado autorizado por la SET. La comanda sale sola en cocina y el ticket en caja, sin que nadie toque un botón.",
   },
   {
     titulo: "Repartidores",
@@ -130,7 +130,7 @@ export default async function PortadaPage() {
       {/* ---------------- portada ---------------- */}
       <section className="mx-auto grid max-w-6xl items-center gap-10 px-5 py-16 sm:px-8 lg:grid-cols-[1.05fr_0.95fr] lg:gap-16 lg:py-24">
         <div>
-          <p className="rotulo animate-subir">Pedidos · Reservas · Datos</p>
+          <p className="rotulo animate-subir">Pedidos · Reservas · Punto de venta</p>
           <h1 className="mt-4 animate-subir text-[clamp(2.35rem,5vw,4.05rem)] font-semibold leading-[1.02] [animation-delay:60ms]">
             El pedido llega al WhatsApp que tu local ya usa.
           </h1>
