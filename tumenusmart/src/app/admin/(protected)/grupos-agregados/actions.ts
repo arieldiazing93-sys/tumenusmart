@@ -5,8 +5,8 @@ import { revalidatePath } from "next/cache";
 import { idLocalActual } from "@/lib/local-actual";
 import { prismaDelLocal } from "@/lib/prisma-local";
 import { moverEnLista, cambiosDeOrden, type Direccion } from "@/lib/ordenar";
-import { normalizarIva } from "@/lib/iva";
-import { normalizarUnidadMedida } from "@/lib/unidad-medida";
+import { etiquetaIva } from "@/lib/iva";
+import { etiquetaUnidadMedida } from "@/lib/unidad-medida";
 
 export type ResultadoGrupo = { ok: true } | { ok: false; error: string };
 
@@ -97,182 +97,123 @@ export async function moverGrupo(id: string, direccion: Direccion) {
   revalidatePath("/admin/grupos-agregados");
 }
 
-export async function agregarGrupoItem(
+export type ProductoParaGrupo = {
+  id: string;
+  nombre: string;
+  precio: number;
+  categoriaNombre: string;
+  iva: string;
+  unidadMedida: string;
+};
+
+/**
+ * Busca productos del local para agregar como modificador a un grupo —
+ * excluye los que ya están en este grupo, y no filtra por categoría (el
+ * dueño escribe el nombre, ej. "salsa", y elige de la lista).
+ */
+export async function buscarProductosParaGrupo(
   groupId: string,
-  formData: FormData
+  query: string
+): Promise<ProductoParaGrupo[]> {
+  await exigirPermiso("productos.editar");
+  const prisma = prismaDelLocal(await idLocalActual());
+
+  const texto = query.trim();
+  if (!texto) return [];
+
+  const yaEnGrupo = await prisma.optionGroupProduct.findMany({
+    where: { groupId },
+    select: { productId: true },
+  });
+
+  const productos = await prisma.product.findMany({
+    where: {
+      nombre: { contains: texto, mode: "insensitive" },
+      id: { notIn: yaEnGrupo.map((o) => o.productId) },
+    },
+    orderBy: { nombre: "asc" },
+    take: 10,
+    select: {
+      id: true,
+      nombre: true,
+      precio: true,
+      iva: true,
+      unidadMedida: true,
+      category: { select: { nombre: true } },
+    },
+  });
+
+  return productos.map((p) => ({
+    id: p.id,
+    nombre: p.nombre,
+    precio: Number(p.precio),
+    categoriaNombre: p.category.nombre,
+    iva: etiquetaIva(p.iva),
+    unidadMedida: etiquetaUnidadMedida(p.unidadMedida),
+  }));
+}
+
+export async function agregarProductoAGrupo(
+  groupId: string,
+  productId: string
 ): Promise<ResultadoGrupo> {
   await exigirPermiso("productos.editar");
   const idLocal = await idLocalActual();
   const prisma = prismaDelLocal(idLocal);
 
-  const nombre = String(formData.get("nombre") ?? "").trim();
-  const precioExtra = parseFloat(String(formData.get("precioExtra") ?? "0")) || 0;
-  const crudo = String(formData.get("costo") ?? "").trim();
-  const costo = crudo && !isNaN(parseFloat(crudo)) ? parseFloat(crudo) : null;
-
-  if (!nombre) return { ok: false, error: "El nombre del ítem es obligatorio" };
-
-  await prisma.optionGroupItem.create({
-    data: { groupId, nombre, precioExtra, costo, storeId: idLocal },
+  await prisma.optionGroupProduct.upsert({
+    where: { groupId_productId: { groupId, productId } },
+    update: {},
+    create: { groupId, productId, storeId: idLocal },
   });
+
   revalidatePath(`/admin/grupos-agregados/${groupId}`);
+  revalidatePath("/[slug]", "layout");
   return { ok: true };
 }
 
-export async function actualizarNombreGrupoItem(
-  groupId: string,
-  itemId: string,
-  formData: FormData
-): Promise<ResultadoGrupo> {
+export async function quitarProductoDeGrupo(groupId: string, productId: string) {
   await exigirPermiso("productos.editar");
   const prisma = prismaDelLocal(await idLocalActual());
 
-  const nombre = String(formData.get("nombre") ?? "").trim();
-  if (!nombre) return { ok: false, error: "El nombre no puede quedar vacío" };
-
-  // El `where` con groupId de más, aparte de itemId, es defensa en
-  // profundidad: mismo criterio que en productos/actions.ts.
-  const resultado = await prisma.optionGroupItem.updateMany({
-    where: { id: itemId, groupId },
-    data: { nombre },
-  });
-  if (resultado.count === 0) {
-    return { ok: false, error: "Ese ítem no existe o no es de este grupo" };
-  }
-
+  await prisma.optionGroupProduct.deleteMany({ where: { groupId, productId } });
   revalidatePath(`/admin/grupos-agregados/${groupId}`);
-  return { ok: true };
-}
-
-export async function actualizarCostoGrupoItem(
-  groupId: string,
-  itemId: string,
-  formData: FormData
-): Promise<ResultadoGrupo> {
-  await exigirPermiso("productos.editar");
-  const prisma = prismaDelLocal(await idLocalActual());
-
-  const crudo = String(formData.get("costo") ?? "").trim();
-  const costo = crudo && !isNaN(parseFloat(crudo)) ? parseFloat(crudo) : null;
-
-  const resultado = await prisma.optionGroupItem.updateMany({
-    where: { id: itemId, groupId },
-    data: { costo },
-  });
-  if (resultado.count === 0) {
-    return { ok: false, error: "Ese ítem no existe o no es de este grupo" };
-  }
-
-  revalidatePath(`/admin/grupos-agregados/${groupId}`);
-  return { ok: true };
-}
-
-export async function actualizarPrecioExtraGrupoItem(
-  groupId: string,
-  itemId: string,
-  formData: FormData
-): Promise<ResultadoGrupo> {
-  await exigirPermiso("productos.editar");
-  const prisma = prismaDelLocal(await idLocalActual());
-
-  const precioExtra = parseFloat(String(formData.get("precioExtra") ?? "0")) || 0;
-
-  const resultado = await prisma.optionGroupItem.updateMany({
-    where: { id: itemId, groupId },
-    data: { precioExtra },
-  });
-  if (resultado.count === 0) {
-    return { ok: false, error: "Ese ítem no existe o no es de este grupo" };
-  }
-
-  revalidatePath(`/admin/grupos-agregados/${groupId}`);
-  return { ok: true };
-}
-
-export async function actualizarIvaGrupoItem(
-  groupId: string,
-  itemId: string,
-  formData: FormData
-): Promise<ResultadoGrupo> {
-  await exigirPermiso("productos.editar");
-  const prisma = prismaDelLocal(await idLocalActual());
-
-  const iva = normalizarIva(formData.get("iva"));
-
-  const resultado = await prisma.optionGroupItem.updateMany({
-    where: { id: itemId, groupId },
-    data: { iva },
-  });
-  if (resultado.count === 0) {
-    return { ok: false, error: "Ese ítem no existe o no es de este grupo" };
-  }
-
-  revalidatePath(`/admin/grupos-agregados/${groupId}`);
-  return { ok: true };
-}
-
-export async function actualizarUnidadMedidaGrupoItem(
-  groupId: string,
-  itemId: string,
-  formData: FormData
-): Promise<ResultadoGrupo> {
-  await exigirPermiso("productos.editar");
-  const prisma = prismaDelLocal(await idLocalActual());
-
-  const unidadMedida = normalizarUnidadMedida(formData.get("unidadMedida"));
-
-  const resultado = await prisma.optionGroupItem.updateMany({
-    where: { id: itemId, groupId },
-    data: { unidadMedida },
-  });
-  if (resultado.count === 0) {
-    return { ok: false, error: "Ese ítem no existe o no es de este grupo" };
-  }
-
-  revalidatePath(`/admin/grupos-agregados/${groupId}`);
-  return { ok: true };
-}
-
-export async function eliminarGrupoItem(groupId: string, itemId: string) {
-  await exigirPermiso("productos.editar");
-  const prisma = prismaDelLocal(await idLocalActual());
-
-  await prisma.optionGroupItem.deleteMany({ where: { id: itemId, groupId } });
-  revalidatePath(`/admin/grupos-agregados/${groupId}`);
+  revalidatePath("/[slug]", "layout");
 }
 
 /**
- * Sube o baja un ítem DENTRO de su grupo. Mismo criterio que `moverOpcion`.
+ * Sube o baja un modificador DENTRO de su grupo. Mismo criterio que
+ * `moverOpcion`.
  */
-export async function moverGrupoItem(id: string, direccion: Direccion) {
+export async function moverModificadorDeGrupo(id: string, direccion: Direccion) {
   await exigirPermiso("productos.editar");
   const prisma = prismaDelLocal(await idLocalActual());
 
-  const item = await prisma.optionGroupItem.findUnique({
+  const fila = await prisma.optionGroupProduct.findUnique({
     where: { id },
     select: { groupId: true },
   });
-  if (!item) return;
+  if (!fila) return;
 
-  const items = await prisma.optionGroupItem.findMany({
-    where: { groupId: item.groupId },
+  const filas = await prisma.optionGroupProduct.findMany({
+    where: { groupId: fila.groupId },
     orderBy: [{ orden: "asc" }, { id: "asc" }],
     select: { id: true, orden: true },
   });
 
-  const indice = items.findIndex((i) => i.id === id);
+  const indice = filas.findIndex((f) => f.id === id);
   if (indice === -1) return;
 
   const nuevoOrden = moverEnLista(
-    items.map((i) => i.id),
+    filas.map((f) => f.id),
     indice,
     direccion
   );
-  const cambios = cambiosDeOrden(nuevoOrden, new Map(items.map((i) => [i.id, i.orden])));
+  const cambios = cambiosDeOrden(nuevoOrden, new Map(filas.map((f) => [f.id, f.orden])));
   if (cambios.length === 0) return;
 
   await prisma.$transaction(
-    cambios.map((c) => prisma.optionGroupItem.update({ where: { id: c.id }, data: { orden: c.orden } }))
+    cambios.map((c) => prisma.optionGroupProduct.update({ where: { id: c.id }, data: { orden: c.orden } }))
   );
-  revalidatePath(`/admin/grupos-agregados/${item.groupId}`);
+  revalidatePath(`/admin/grupos-agregados/${fila.groupId}`);
 }

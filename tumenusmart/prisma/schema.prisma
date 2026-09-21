@@ -152,7 +152,7 @@ model Store {
   estacionesImpresoras EstacionImpresora[]
   facturasReemplazadas FacturaReemplazada[]
   optionGroups         OptionGroup[]
-  optionGroupItems     OptionGroupItem[]
+  optionGroupProductos OptionGroupProduct[]
   productOptionGroups  ProductOptionGroup[]
 }
 
@@ -447,6 +447,9 @@ model Product {
   destacado   Boolean         @default(false)
   opciones    ProductOption[]
   gruposAgregados ProductOptionGroup[]
+  // Grupos donde ESTE producto se usa como modificador de otro (ej: "Salsa
+  // BBQ" referenciada dentro del grupo "Salsas") — ver OptionGroupProduct.
+  usadoComoModificador OptionGroupProduct[]
   orderItems  OrderItem[]
   ventaPosItems VentaPosItem[]
   createdAt   DateTime        @default(now())
@@ -489,10 +492,9 @@ model ProductOption {
 // Un grupo con nombre (ej. "Salsas", "Quesos") reutilizable en varios
 // productos a la vez — a diferencia de ProductOption (agregado propio de
 // UN producto), acá se adjunta el MISMO grupo a varios productos vía
-// ProductOptionGroup, así que corregir un ítem del grupo corrige el precio
+// ProductOptionGroup, así que corregir un modificador del grupo lo corrige
 // en todos los productos que lo usan, sin tener que recargarlo a mano en
-// cada uno (eso es justamente lo que "Aplicar a categoría" en ProductOption
-// no resuelve: copia filas independientes, no comparte la misma fila).
+// cada uno.
 model OptionGroup {
   id        String   @id @default(cuid())
   storeId   String
@@ -501,31 +503,34 @@ model OptionGroup {
   orden     Int      @default(0)
   createdAt DateTime @default(now())
 
-  items     OptionGroupItem[]
-  productos ProductOptionGroup[]
+  modificadores OptionGroupProduct[]
+  productos     ProductOptionGroup[]
 
   @@index([storeId])
 }
 
-// Los ítems de un OptionGroup. Mismos campos "fiscales" que ProductOption
-// (ver el comentario ahí) — sin tipo (un grupo es siempre de agregados, no
-// de variantes de elección única) ni productId (cuelga del grupo, no de un
-// producto puntual).
-model OptionGroupItem {
-  id           String      @id @default(cuid())
-  storeId      String
-  store        Store       @relation(fields: [storeId], references: [id], onDelete: Cascade)
-  groupId      String
-  group        OptionGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
-  nombre       String
-  precioExtra  Decimal     @db.Decimal(10, 2) @default(0)
-  costo        Decimal?    @db.Decimal(10, 2)
-  iva          String      @default("gravado10")
-  unidadMedida String      @default("unidad")
-  orden        Int         @default(0)
+// Un modificador dentro de un grupo NO es una entidad con datos propios —
+// es un Product real (ej. "Salsa BBQ", cargado normalmente en
+// /admin/productos, con su propia categoría, precio, IVA y unidad de
+// medida) referenciado acá. Mismo patrón que SoftRestaurant (confirmado
+// por capturas del dueño): un "producto compuesto" arma sus modificadores
+// eligiendo productos ya existentes del catálogo, no tipeando de nuevo un
+// nombre/precio aparte. Editar el producto en su propia pantalla alcanza
+// para que el cambio se vea en todos los grupos donde se lo usa.
+model OptionGroupProduct {
+  id        String      @id @default(cuid())
+  storeId   String
+  store     Store       @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  groupId   String
+  group     OptionGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
+  orden     Int         @default(0)
 
+  @@unique([groupId, productId])
   @@index([storeId])
   @@index([groupId])
+  @@index([productId])
 }
 
 // Join M:N — qué grupos están adjuntados a qué producto. Mismo patrón que

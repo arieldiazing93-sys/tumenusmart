@@ -203,7 +203,12 @@ export async function registrarVenta(turnoId: string, datos: DatosVenta): Promis
       gruposAgregados: {
         select: {
           group: {
-            select: { items: { select: { id: true, nombre: true, precioExtra: true, costo: true } } },
+            select: {
+              modificadores: {
+                where: { product: { disponible: true } },
+                select: { product: { select: { id: true, nombre: true, precio: true, costo: true } } },
+              },
+            },
           },
         },
       },
@@ -224,16 +229,18 @@ export async function registrarVenta(turnoId: string, datos: DatosVenta): Promis
     mitadYMitadModo: p.mitadYMitadModo,
     iva: p.iva,
     // Los agregados propios más los de cualquier grupo reutilizable
-    // adjuntado — mismo criterio que en checkout/actions.ts.
+    // adjuntado — mismo criterio que en checkout/actions.ts: cada
+    // modificador de un grupo ES un Product real, se usa su propio
+    // precio/costo.
     opciones: [
       ...p.opciones,
       ...p.gruposAgregados.flatMap((g) =>
-        g.group.items.map((it) => ({
-          id: it.id,
-          nombre: it.nombre,
+        g.group.modificadores.map((m) => ({
+          id: m.product.id,
+          nombre: m.product.nombre,
           tipo: "agregado",
-          precioExtra: it.precioExtra,
-          costo: it.costo,
+          precioExtra: m.product.precio,
+          costo: m.product.costo,
         }))
       ),
     ],

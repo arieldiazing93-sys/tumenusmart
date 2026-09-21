@@ -12,7 +12,6 @@ import { EditarNombreOpcion } from "./EditarNombreOpcion";
 import { EditarCostoOpcion } from "./EditarCostoOpcion";
 import { EditarPrecioExtraOpcion } from "./EditarPrecioExtraOpcion";
 import { EditarFiscalOpcion } from "./EditarFiscalOpcion";
-import { ConvertirEnGrupoBoton } from "./ConvertirEnGrupoBoton";
 import { AsignarGruposProducto } from "./AsignarGruposProducto";
 import { GuardadoToast } from "@/components/GuardadoToast";
 import { BotonesMover } from "@/components/BotonesMover";
@@ -49,7 +48,7 @@ export default async function EditarProductoPage({
     }),
     prisma.optionGroup.findMany({
       orderBy: [{ orden: "asc" }, { createdAt: "asc" }],
-      select: { id: true, nombre: true, _count: { select: { items: true } } },
+      select: { id: true, nombre: true, _count: { select: { modificadores: true } } },
     }),
   ]);
 
@@ -105,20 +104,13 @@ export default async function EditarProductoPage({
               Extras que el cliente puede sumar a este producto (ej: borde relleno, extra queso).
             </p>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <AplicarAgregadosBoton
-              productId={producto.id}
-              categoriaNombre={
-                categorias.find((c) => c.id === producto.categoryId)?.nombre ?? "esta categoría"
-              }
-              cantidadAgregados={producto.opciones.length}
-            />
-            <ConvertirEnGrupoBoton
-              productId={producto.id}
-              nombreProducto={producto.nombre}
-              cantidadAgregados={producto.opciones.length}
-            />
-          </div>
+          <AplicarAgregadosBoton
+            productId={producto.id}
+            categoriaNombre={
+              categorias.find((c) => c.id === producto.categoryId)?.nombre ?? "esta categoría"
+            }
+            cantidadAgregados={producto.opciones.length}
+          />
         </div>
 
         <div className="flex flex-col gap-2">
@@ -176,7 +168,8 @@ export default async function EditarProductoPage({
           <p className="rotulo text-[0.8rem] font-bold">Grupos de agregados</p>
           <p className="text-sm text-tinta-media">
             Grupos reutilizables (ej: Salsas, Quesos) que se suman a los agregados propios de
-            arriba. Se crean y editan en Grupos de agregados, en el menú.
+            arriba. Cada modificador es un producto real de tu catálogo. Se crean y editan en
+            Grupos de agregados, en el menú.
           </p>
         </div>
         <AsignarGruposProducto
@@ -184,7 +177,7 @@ export default async function EditarProductoPage({
           grupos={gruposAgregados.map((g) => ({
             id: g.id,
             nombre: g.nombre,
-            cantidadItems: g._count.items,
+            cantidadItems: g._count.modificadores,
           }))}
           gruposAdjuntadosIds={producto.gruposAgregados.map((g) => g.groupId)}
         />

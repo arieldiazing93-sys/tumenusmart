@@ -74,7 +74,16 @@ export default async function PosPage() {
             select: { id: true, nombre: true, precioExtra: true },
           },
           gruposAgregados: {
-            select: { group: { select: { items: { select: { id: true, nombre: true, precioExtra: true } } } } },
+            select: {
+              group: {
+                select: {
+                  modificadores: {
+                    where: { product: { disponible: true } },
+                    select: { product: { select: { id: true, nombre: true, precio: true } } },
+                  },
+                },
+              },
+            },
           },
         },
       },
@@ -82,13 +91,18 @@ export default async function PosPage() {
   });
 
   // Los agregados propios (opciones, ya filtradas a tipo "agregado") más
-  // los de cualquier grupo reutilizable adjuntado — ver el mismo criterio
-  // en src/app/[slug]/page.tsx.
+  // los de cualquier grupo reutilizable adjuntado — cada modificador de un
+  // grupo ES un Product real (ver OptionGroupProduct), se usa su propio
+  // precio. Ver el mismo criterio en src/app/[slug]/page.tsx.
   function agregadosDe(p: (typeof categorias)[number]["productos"][number]) {
     return [
       ...p.opciones.map((o) => ({ id: o.id, nombre: o.nombre, precioExtra: Number(o.precioExtra) })),
       ...p.gruposAgregados.flatMap((g) =>
-        g.group.items.map((it) => ({ id: it.id, nombre: it.nombre, precioExtra: Number(it.precioExtra) }))
+        g.group.modificadores.map((m) => ({
+          id: m.product.id,
+          nombre: m.product.nombre,
+          precioExtra: Number(m.product.precio),
+        }))
       ),
     ];
   }

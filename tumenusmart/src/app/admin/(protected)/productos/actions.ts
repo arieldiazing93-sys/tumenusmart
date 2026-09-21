@@ -501,67 +501,6 @@ export async function asignarGrupoAProducto(
   return { ok: true };
 }
 
-export type ResultadoConvertirGrupo =
-  | { ok: true; groupId: string }
-  | { ok: false; error: string };
-
-/**
- * Copia los agregados PROPIOS de este producto (ProductOption) a un grupo
- * reutilizable nuevo, y lo adjunta acá mismo — para no tener que retipear
- * un producto que ya tenía sus salsas/quesos cargados antes de que
- * existieran los grupos. No borra las filas originales: el dueño las
- * borra a mano (botón "Quitar" que ya existe) una vez que confirma que el
- * grupo quedó bien — evita una migración destructiva de datos ya cargados.
- */
-export async function convertirAgregadosEnGrupo(
-  productId: string,
-  nombreGrupo: string
-): Promise<ResultadoConvertirGrupo> {
-  await exigirPermiso("productos.editar");
-  const idLocal = await idLocalActual();
-  const prisma = prismaDelLocal(idLocal);
-
-  const nombre = nombreGrupo.trim();
-  if (!nombre) return { ok: false, error: "El nombre del grupo es obligatorio" };
-
-  const producto = await prisma.product.findUnique({
-    where: { id: productId },
-    select: {
-      opciones: {
-        select: { nombre: true, precioExtra: true, costo: true, iva: true, unidadMedida: true },
-      },
-    },
-  });
-  if (!producto) return { ok: false, error: "No encontré el producto" };
-  if (producto.opciones.length === 0) {
-    return { ok: false, error: "Este producto todavía no tiene agregados propios para convertir" };
-  }
-
-  const grupo = await prisma.$transaction(async (tx) => {
-    const nuevoGrupo = await tx.optionGroup.create({ data: { nombre, storeId: idLocal } });
-    await tx.optionGroupItem.createMany({
-      data: producto.opciones.map((o) => ({
-        groupId: nuevoGrupo.id,
-        storeId: idLocal,
-        nombre: o.nombre,
-        precioExtra: o.precioExtra,
-        costo: o.costo,
-        iva: o.iva,
-        unidadMedida: o.unidadMedida,
-      })),
-    });
-    await tx.productOptionGroup.create({
-      data: { productId, groupId: nuevoGrupo.id, storeId: idLocal },
-    });
-    return nuevoGrupo;
-  });
-
-  revalidatePath(`/admin/productos/${productId}`);
-  revalidatePath("/admin/grupos-agregados");
-  revalidatePath("/[slug]", "layout");
-  return { ok: true, groupId: grupo.id };
-}
-
 /**
  * Sube o baja un agregado DENTRO de su producto.
  *

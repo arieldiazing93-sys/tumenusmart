@@ -31,7 +31,7 @@ export const MODELOS_POR_LOCAL = new Set([
   "AreaImpresion",
   "EstacionImpresora",
   "OptionGroup",
-  "OptionGroupItem",
+  "OptionGroupProduct",
   "ProductOptionGroup",
 ]);
 

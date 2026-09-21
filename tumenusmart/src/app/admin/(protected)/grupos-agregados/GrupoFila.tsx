@@ -10,7 +10,7 @@ import type { Direccion } from "@/lib/ordenar";
 export function GrupoFila({
   id,
   nombre,
-  cantidadItems,
+  cantidadModificadores,
   cantidadProductos,
   esPrimero,
   esUltimo,
@@ -18,7 +18,7 @@ export function GrupoFila({
 }: {
   id: string;
   nombre: string;
-  cantidadItems: number;
+  cantidadModificadores: number;
   cantidadProductos: number;
   esPrimero: boolean;
   esUltimo: boolean;
@@ -99,7 +99,7 @@ export function GrupoFila({
         {!editando && (
           <div className="flex flex-wrap items-center gap-3 text-sm">
             <span className="text-tinta-media">
-              {cantidadItems} ítem(s) · {cantidadProductos} producto(s)
+              {cantidadModificadores} modificador(es) · usado en {cantidadProductos} producto(s)
             </span>
             <button
               type="button"

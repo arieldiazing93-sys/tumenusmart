@@ -176,7 +176,18 @@ export async function crearPedido(datos: DatosCheckout): Promise<ResultadoPedido
     orderBy: { orden: "asc" },
     include: {
       opciones: { orderBy: { orden: "asc" } },
-      gruposAgregados: { select: { group: { select: { items: true } } } },
+      gruposAgregados: {
+        select: {
+          group: {
+            select: {
+              modificadores: {
+                where: { product: { disponible: true } },
+                select: { product: { select: { id: true, nombre: true, precio: true, costo: true } } },
+              },
+            },
+          },
+        },
+      },
     },
   });
 
@@ -192,8 +203,10 @@ export async function crearPedido(datos: DatosCheckout): Promise<ResultadoPedido
     // Los agregados propios (ProductOption) más los de cualquier grupo
     // reutilizable adjuntado (ver src/app/admin/(protected)/grupos-agregados/)
     // — combinados acá para que armarPedido siga viendo un solo `opciones`
-    // como siempre, sin saber de dónde salió cada ítem. Los ítems de grupo
-    // son siempre "agregado" (los grupos no tienen variantes).
+    // como siempre, sin saber de dónde salió cada ítem. Cada modificador de
+    // un grupo ES un Product real (ver OptionGroupProduct): se usa su
+    // propio precio/costo, no datos duplicados. Siempre cuenta como
+    // "agregado" (los grupos no tienen variantes).
     opciones: [
       ...p.opciones.map((o) => ({
         id: o.id,
@@ -203,12 +216,12 @@ export async function crearPedido(datos: DatosCheckout): Promise<ResultadoPedido
         costo: o.costo,
       })),
       ...p.gruposAgregados.flatMap((g) =>
-        g.group.items.map((it) => ({
-          id: it.id,
-          nombre: it.nombre,
+        g.group.modificadores.map((m) => ({
+          id: m.product.id,
+          nombre: m.product.nombre,
           tipo: "agregado",
-          precioExtra: it.precioExtra,
-          costo: it.costo,
+          precioExtra: m.product.precio,
+          costo: m.product.costo,
         }))
       ),
     ],

@@ -1,17 +1,17 @@
+import Link from "next/link";
 import { pantallaConPermiso } from "@/lib/auth";
 import { notFound } from "next/navigation";
 import { prismaDelLocal } from "@/lib/prisma-local";
 import { idLocalActual } from "@/lib/local-actual";
 import { Volver } from "@/components/Volver";
-import { Tarjeta } from "@/components/ui";
+import { Tarjeta, clasesBoton } from "@/components/ui";
 import { BotonesMover } from "@/components/BotonesMover";
-import { moverGrupoItem } from "../actions";
-import { AgregarGrupoItemForm } from "./AgregarGrupoItemForm";
-import { EditarNombreGrupoItem } from "./EditarNombreGrupoItem";
-import { EditarCostoGrupoItem } from "./EditarCostoGrupoItem";
-import { EditarPrecioExtraGrupoItem } from "./EditarPrecioExtraGrupoItem";
-import { EditarFiscalGrupoItem } from "./EditarFiscalGrupoItem";
-import { EliminarGrupoItemBoton } from "./EliminarGrupoItemBoton";
+import { formatearGuarani } from "@/lib/format";
+import { etiquetaIva } from "@/lib/iva";
+import { etiquetaUnidadMedida } from "@/lib/unidad-medida";
+import { moverModificadorDeGrupo } from "../actions";
+import { BuscarProductoParaGrupo } from "./BuscarProductoParaGrupo";
+import { QuitarProductoDeGrupoBoton } from "./QuitarProductoDeGrupoBoton";
 
 export const dynamic = "force-dynamic";
 
@@ -28,7 +28,14 @@ export default async function GrupoAgregadoDetallePage({
   const grupo = await prisma.optionGroup.findUnique({
     where: { id },
     include: {
-      items: { orderBy: [{ orden: "asc" }, { id: "asc" }] },
+      modificadores: {
+        orderBy: [{ orden: "asc" }, { id: "asc" }],
+        include: {
+          product: {
+            select: { id: true, nombre: true, precio: true, iva: true, unidadMedida: true, disponible: true },
+          },
+        },
+      },
       _count: { select: { productos: true } },
     },
   });
@@ -45,61 +52,52 @@ export default async function GrupoAgregadoDetallePage({
         <div className="mb-4">
           <h1 className="text-[1.4rem] font-semibold tracking-titular text-tinta">{grupo.nombre}</h1>
           <p className="text-sm text-tinta-media">
-            Adjuntado a {grupo._count.productos} producto(s). Corregir un ítem acá lo corrige en
-            todos ellos a la vez.
+            Adjuntado a {grupo._count.productos} producto(s). Cada modificador es un producto real
+            del catálogo — para corregirle el precio, el IVA o la unidad, editá el producto en su
+            propia pantalla.
           </p>
         </div>
       </div>
 
       <Tarjeta className="flex flex-col gap-3">
         <div className="flex flex-col gap-2">
-          {grupo.items.map((it, i) => (
+          {grupo.modificadores.map((m, i) => (
             <div
-              key={it.id}
+              key={m.id}
               className="flex flex-col gap-2 rounded-lg border border-linea bg-white px-3 py-2 text-sm sm:flex-row sm:items-center sm:justify-between"
             >
               <div className="flex flex-wrap items-center gap-2">
                 <BotonesMover
-                  id={it.id}
-                  accion={moverGrupoItem}
+                  id={m.id}
+                  accion={moverModificadorDeGrupo}
                   esPrimero={i === 0}
-                  esUltimo={i === grupo.items.length - 1}
-                  etiqueta={it.nombre}
+                  esUltimo={i === grupo.modificadores.length - 1}
+                  etiqueta={m.product.nombre}
                 />
-                <EditarNombreGrupoItem
-                  groupId={grupo.id}
-                  itemId={it.id}
-                  nombreActual={it.nombre}
-                  sinCosto={it.costo == null}
-                />
+                <Link
+                  href={`/admin/productos/${m.product.id}`}
+                  className={clasesBoton("navegar", "sm")}
+                >
+                  {m.product.nombre}
+                </Link>
+                {!m.product.disponible && (
+                  <span className="text-xs text-aviso">No disponible — no se ofrece ahora</span>
+                )}
               </div>
-              <div className="flex flex-wrap items-center gap-3">
-                <EditarPrecioExtraGrupoItem
-                  groupId={grupo.id}
-                  itemId={it.id}
-                  precioActual={Number(it.precioExtra)}
-                />
-                <EditarCostoGrupoItem
-                  groupId={grupo.id}
-                  itemId={it.id}
-                  costoActual={it.costo != null ? Number(it.costo) : null}
-                />
-                <EditarFiscalGrupoItem
-                  groupId={grupo.id}
-                  itemId={it.id}
-                  ivaActual={it.iva}
-                  unidadMedidaActual={it.unidadMedida}
-                />
-                <EliminarGrupoItemBoton groupId={grupo.id} itemId={it.id} />
+              <div className="flex flex-wrap items-center gap-3 text-xs text-tinta-media">
+                <span className="cifra">{formatearGuarani(Number(m.product.precio))}</span>
+                <span>{etiquetaIva(m.product.iva)}</span>
+                <span>{etiquetaUnidadMedida(m.product.unidadMedida)}</span>
+                <QuitarProductoDeGrupoBoton groupId={grupo.id} productId={m.product.id} />
               </div>
             </div>
           ))}
-          {grupo.items.length === 0 && (
-            <p className="text-sm text-tinta-suave">Este grupo todavía no tiene ítems.</p>
+          {grupo.modificadores.length === 0 && (
+            <p className="text-sm text-tinta-suave">Este grupo todavía no tiene modificadores.</p>
           )}
         </div>
 
-        <AgregarGrupoItemForm groupId={grupo.id} />
+        <BuscarProductoParaGrupo groupId={grupo.id} />
       </Tarjeta>
     </div>
   );

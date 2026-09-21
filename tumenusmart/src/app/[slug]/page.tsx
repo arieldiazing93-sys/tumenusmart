@@ -17,17 +17,24 @@ export const dynamic = "force-dynamic";
  * src/app/admin/(protected)/grupos-agregados/) — se combinan en un solo
  * array acá, así el resto de la carta y el motor de precios
  * (src/lib/precio-pedido.ts) siguen viendo un único `opciones` como
- * siempre, sin saber ni importarles de dónde salió cada ítem. Los ítems de
- * grupo son siempre "agregado" (los grupos no tienen variantes).
+ * siempre, sin saber ni importarles de dónde salió cada ítem. Cada
+ * modificador de un grupo ES un Product real (ver OptionGroupProduct) — se
+ * usa su propio nombre/precio, no datos duplicados — y siempre cuenta como
+ * "agregado" (los grupos no tienen variantes).
  */
 function combinarOpciones<
   O extends { id: string; nombre: string; tipo: string; precioExtra: unknown },
-  G extends { group: { items: { id: string; nombre: string; precioExtra: unknown }[] } },
+  G extends { group: { modificadores: { product: { id: string; nombre: string; precio: unknown } }[] } },
 >(opciones: O[], gruposAgregados: G[]) {
   return [
     ...opciones,
     ...gruposAgregados.flatMap((g) =>
-      g.group.items.map((it) => ({ ...it, tipo: "agregado" as const }))
+      g.group.modificadores.map((m) => ({
+        id: m.product.id,
+        nombre: m.product.nombre,
+        precioExtra: m.product.precio,
+        tipo: "agregado" as const,
+      }))
     ),
   ];
 }
@@ -51,7 +58,18 @@ export default async function CatalogoPage({
           orderBy: { orden: "asc" },
           include: {
             opciones: { orderBy: { orden: "asc" } },
-            gruposAgregados: { select: { group: { select: { items: true } } } },
+            gruposAgregados: {
+              select: {
+                group: {
+                  select: {
+                    modificadores: {
+                      where: { product: { disponible: true } },
+                      select: { product: { select: { id: true, nombre: true, precio: true } } },
+                    },
+                  },
+                },
+              },
+            },
           },
         },
         horarios: { select: { diaSemana: true, abre: true, cierra: true } },
