@@ -226,6 +226,82 @@ export async function asignarGrupoAProducto(
   return { ok: true };
 }
 
+export type ResultadoAplicarGrupos =
+  | { ok: true; productosActualizados: number; adjuntosCreados: number; productosSinCambios: number }
+  | { ok: false; error: string };
+
+/**
+ * Adjunta a los demás productos de la MISMA categoría todos los grupos que
+ * ya tiene este producto — para armar una vez la configuración de una
+ * pasta (ej: grupo "Salsas") y replicarla al resto de las pastas sin
+ * repetir el tildado producto por producto. Mismo espíritu que
+ * `aplicarAgregadosACategoria` (la versión vieja, para agregados propios):
+ * no duplica — si un producto destino ya tiene alguno de estos grupos
+ * adjuntado, ese no se vuelve a crear, así se puede apretar de nuevo
+ * después de sumar un grupo más sin pisar nada.
+ */
+export async function aplicarGruposACategoria(
+  productId: string
+): Promise<ResultadoAplicarGrupos> {
+  await exigirPermiso("productos.editar");
+  const idLocal = await idLocalActual();
+  const prisma = prismaDelLocal(idLocal);
+
+  const producto = await prisma.product.findUnique({
+    where: { id: productId },
+    select: {
+      categoryId: true,
+      gruposAgregados: { select: { groupId: true } },
+    },
+  });
+  if (!producto) return { ok: false, error: "No encontré el producto" };
+  if (producto.gruposAgregados.length === 0) {
+    return { ok: false, error: "Este producto todavía no tiene grupos de agregados para aplicar" };
+  }
+
+  const productosDestino = await prisma.product.findMany({
+    where: { categoryId: producto.categoryId, id: { not: productId } },
+    select: { id: true, gruposAgregados: { select: { groupId: true } } },
+  });
+  if (productosDestino.length === 0) {
+    return { ok: false, error: "No hay otros productos en esta categoría" };
+  }
+
+  const gruposOrigen = producto.gruposAgregados.map((g) => g.groupId);
+
+  let adjuntosCreados = 0;
+  let productosActualizados = 0;
+  const escrituras: ReturnType<typeof prisma.productOptionGroup.createMany>[] = [];
+
+  for (const destino of productosDestino) {
+    const yaTiene = new Set(destino.gruposAgregados.map((g) => g.groupId));
+    const faltantes = gruposOrigen.filter((id) => !yaTiene.has(id));
+    if (faltantes.length === 0) continue;
+
+    escrituras.push(
+      prisma.productOptionGroup.createMany({
+        data: faltantes.map((groupId) => ({ productId: destino.id, groupId, storeId: idLocal })),
+      })
+    );
+    adjuntosCreados += faltantes.length;
+    productosActualizados++;
+  }
+
+  if (escrituras.length > 0) {
+    await prisma.$transaction(escrituras);
+  }
+
+  revalidatePath("/admin/productos");
+  revalidatePath("/[slug]", "layout");
+
+  return {
+    ok: true,
+    productosActualizados,
+    adjuntosCreados,
+    productosSinCambios: productosDestino.length - productosActualizados,
+  };
+}
+
 export type ResultadoCrearGrupo = { ok: true; groupId: string } | { ok: false; error: string };
 
 /**

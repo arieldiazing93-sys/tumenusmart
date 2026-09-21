@@ -141,9 +141,9 @@ export default async function EditarProductoPage({
         </Tarjeta>
       )}
 
-      <Tarjeta className="flex flex-col gap-3">
+      <div className="flex flex-col gap-3 rounded-xl border border-azul/25 bg-azul-luz p-4">
         <div>
-          <p className="rotulo text-[0.8rem] font-bold">Grupos de agregados</p>
+          <p className="rotulo text-[0.8rem] font-bold text-azul-oscuro">Grupos de agregados</p>
           <p className="text-sm text-tinta-media">
             Grupos reutilizables (ej: Salsas, Quesos) que se suman a los agregados propios de
             arriba. Cada modificador es un producto real de tu catálogo — buscalo y agregalo acá
@@ -152,6 +152,9 @@ export default async function EditarProductoPage({
         </div>
         <GruposAgregadosProducto
           productId={producto.id}
+          categoriaNombre={
+            categorias.find((c) => c.id === producto.categoryId)?.nombre ?? "esta categoría"
+          }
           gruposAdjuntados={producto.gruposAgregados.map((pg) => ({
             id: pg.group.id,
             nombre: pg.group.nombre,
@@ -165,7 +168,7 @@ export default async function EditarProductoPage({
           }))}
           gruposDisponibles={gruposDisponibles}
         />
-      </Tarjeta>
+      </div>
     </div>
   );
 }

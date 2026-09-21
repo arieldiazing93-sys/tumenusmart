@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { formatearGuarani } from "@/lib/format";
 import { BuscarProductoParaGrupo } from "@/components/BuscarProductoParaGrupo";
 import { QuitarProductoDeGrupoBoton } from "@/components/QuitarProductoDeGrupoBoton";
+import { AplicarGruposBoton } from "./AplicarGruposBoton";
 import { asignarGrupoAProducto, crearGrupoYAdjuntar } from "../actions";
 
 type Modificador = {
@@ -30,10 +31,12 @@ type GrupoDisponible = { id: string; nombre: string; cantidadModificadores: numb
  */
 export function GruposAgregadosProducto({
   productId,
+  categoriaNombre,
   gruposAdjuntados,
   gruposDisponibles,
 }: {
   productId: string;
+  categoriaNombre: string;
   gruposAdjuntados: GrupoAdjuntado[];
   gruposDisponibles: GrupoDisponible[];
 }) {
@@ -88,6 +91,12 @@ export function GruposAgregadosProducto({
 
   return (
     <div className="flex flex-col gap-4">
+      <AplicarGruposBoton
+        productId={productId}
+        categoriaNombre={categoriaNombre}
+        cantidadGrupos={gruposAdjuntados.length}
+      />
+
       {gruposAdjuntados.map((g) => (
         <div key={g.id} className="rounded-lg border border-linea bg-papel-suave p-3">
           <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
