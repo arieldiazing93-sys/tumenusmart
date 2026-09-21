@@ -112,43 +112,40 @@ export function CategoriaFila({
             {/* Editar, ocultar y borrar son del dueño. El empleado ve la
                 categoría y cuántos productos tiene, y nada más. */}
             {puedeEditar && (
-              <>
-            <Link
-              href={`/admin/categorias/${id}/horario`}
-              className="text-tinta-media hover:underline"
-            >
-              Horario
-            </Link>
-            <button
-              type="button"
-              onClick={() => setEditando(true)}
-              className="text-tinta-media hover:underline"
-            >
-              Editar
-            </button>
-            <button
-              type="button"
-              disabled={pending}
-              onClick={() => startTransition(() => alternarActivaCategoria(id, !activa))}
-              className="text-tinta-media hover:underline disabled:opacity-50"
-            >
-              {activa ? "Ocultar" : "Mostrar"}
-            </button>
-            <button
-              type="button"
-              disabled={pending}
-              onClick={() => {
-                if (!confirm("¿Borrar esta categoría?")) return;
-                startTransition(async () => {
-                  const resultado = await eliminarCategoria(id);
-                  if (!resultado.ok) alert(resultado.error);
-                });
-              }}
-              className="text-peligro hover:underline disabled:opacity-50"
-            >
-              Borrar
-            </button>
-              </>
+              <div className="flex flex-wrap items-center gap-2">
+                <Link href={`/admin/categorias/${id}/horario`} className={clasesBoton("navegar", "sm")}>
+                  Horario
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => setEditando(true)}
+                  className={clasesBoton("suave", "sm")}
+                >
+                  Editar
+                </button>
+                <button
+                  type="button"
+                  disabled={pending}
+                  onClick={() => startTransition(() => alternarActivaCategoria(id, !activa))}
+                  className={`${clasesBoton("suave", "sm")} disabled:opacity-50`}
+                >
+                  {activa ? "Ocultar" : "Mostrar"}
+                </button>
+                <button
+                  type="button"
+                  disabled={pending}
+                  onClick={() => {
+                    if (!confirm("¿Borrar esta categoría?")) return;
+                    startTransition(async () => {
+                      const resultado = await eliminarCategoria(id);
+                      if (!resultado.ok) alert(resultado.error);
+                    });
+                  }}
+                  className={`${clasesBoton("peligro", "sm")} disabled:opacity-50`}
+                >
+                  Borrar
+                </button>
+              </div>
             )}
           </div>
         )}
