@@ -10,7 +10,8 @@ import { etiquetaUnidadMedida } from "@/lib/unidad-medida";
 
 export type LineaCompraInput = {
   insumoId: string;
-  almacenId: string | null;
+  /** Obligatorio: todo lo que se compra entra a un almacén. */
+  almacenId: string;
   cantidad: number;
   /** Costo de una unidad de compra: sin IVA, o con IVA si `costoIncluyeIva` es true. */
   costoUnitario: number;
@@ -122,16 +123,20 @@ export async function registrarCompra(datos: DatosCompra): Promise<ResultadoComp
     return { ok: false, error: "Agregá al menos un insumo con cantidad y costo unitario válidos." };
   }
 
+  // Todo lo que se compra entra a un almacén: sin almacén no hay dónde
+  // guardar el stock.
+  if (lineas.some((l) => !l.almacenId)) {
+    return { ok: false, error: "Elegí el almacén de cada insumo." };
+  }
+
   // Todo lo que viene del navegador se verifica contra el local: al ir por
   // prismaDelLocal, un id de otro negocio simplemente no aparece.
   const idsInsumos = [...new Set(lineas.map((l) => l.insumoId))];
-  const idsAlmacenes = [...new Set(lineas.map((l) => l.almacenId).filter((a): a is string => !!a))];
+  const idsAlmacenes = [...new Set(lineas.map((l) => l.almacenId))];
 
   const [insumos, almacenes, proveedor] = await Promise.all([
     prisma.insumo.findMany({ where: { id: { in: idsInsumos } }, select: { id: true, iva: true, rendimiento: true } }),
-    idsAlmacenes.length > 0
-      ? prisma.almacen.findMany({ where: { id: { in: idsAlmacenes } }, select: { id: true } })
-      : Promise.resolve([]),
+    prisma.almacen.findMany({ where: { id: { in: idsAlmacenes }, activo: true }, select: { id: true } }),
     datos.proveedorId
       ? prisma.proveedor.findUnique({ where: { id: datos.proveedorId }, select: { id: true } })
       : Promise.resolve(null),
@@ -141,7 +146,7 @@ export async function registrarCompra(datos: DatosCompra): Promise<ResultadoComp
     return { ok: false, error: "Alguno de los insumos ya no existe. Recargá la pantalla e intentá de nuevo." };
   }
   if (almacenes.length !== idsAlmacenes.length) {
-    return { ok: false, error: "Alguno de los almacenes elegidos ya no existe." };
+    return { ok: false, error: "Alguno de los almacenes elegidos ya no existe o está desactivado." };
   }
   if (datos.proveedorId && !proveedor) {
     return { ok: false, error: "Ese proveedor ya no existe." };
@@ -189,7 +194,7 @@ export async function registrarCompra(datos: DatosCompra): Promise<ResultadoComp
           create: lineas.map((l, i) => ({
             storeId: idLocal,
             insumoId: l.insumoId,
-            almacenId: l.almacenId || null,
+            almacenId: l.almacenId,
             cantidad: l.cantidad,
             rendimiento: rendimientoDe(l.insumoId),
             // Siempre neto: si se cargó con IVA, ya viene sin el impuesto.
@@ -222,6 +227,7 @@ export async function registrarCompra(datos: DatosCompra): Promise<ResultadoComp
         data: {
           storeId: idLocal,
           insumoId: linea.insumoId,
+          almacenId: linea.almacenId,
           tipo: "compra",
           cantidad: unidades,
           compraId: nuevaCompra.id,
@@ -281,7 +287,7 @@ export async function cancelarCompra(
     // de esta compra, sin re-derivar nada desde las líneas.
     const movimientos = await tx.movimientoStock.findMany({
       where: { compraId, tipo: "compra" },
-      select: { insumoId: true, cantidad: true },
+      select: { insumoId: true, almacenId: true, cantidad: true },
     });
     for (const m of movimientos) {
       const cantidad = Number(m.cantidad);
@@ -294,6 +300,8 @@ export async function cancelarCompra(
         data: {
           storeId: idLocal,
           insumoId: m.insumoId,
+          // Sale del mismo almacén al que había entrado.
+          almacenId: m.almacenId,
           tipo: "cancelacion",
           cantidad: -cantidad,
           compraId,

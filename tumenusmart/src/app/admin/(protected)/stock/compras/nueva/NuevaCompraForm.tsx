@@ -117,12 +117,10 @@ export function NuevaCompraForm({
   function agregarLinea(insumo: InsumoParaCompra) {
     setError(null);
     setLineas((actuales) => {
+      // Todo insumo entra a un almacén: cada línea arranca en el de la línea
+      // anterior, o en el primero de la lista si es la primera.
       const almacenPorDefecto =
-        actuales.length > 0
-          ? actuales[actuales.length - 1].almacenId
-          : almacenes.length === 1
-            ? almacenes[0].id
-            : "";
+        actuales.length > 0 ? actuales[actuales.length - 1].almacenId : (almacenes[0]?.id ?? "");
       contador.current += 1;
       return [
         ...actuales,
@@ -191,7 +189,7 @@ export function NuevaCompraForm({
         notas: notas.trim() || null,
         lineas: validas.map((l) => ({
           insumoId: l.insumoId,
-          almacenId: l.almacenId || null,
+          almacenId: l.almacenId,
           cantidad: aNumero(l.cantidad),
           costoUnitario: aNumero(l.costo),
           costoIncluyeIva: l.costoConIva,
@@ -343,7 +341,6 @@ export function NuevaCompraForm({
                         value={l.almacenId}
                         onChange={(e) => actualizarLinea(l.clave, { almacenId: e.target.value })}
                       >
-                        <option value="">Sin almacén</option>
                         {almacenes.map((a) => (
                           <option key={a.id} value={a.id}>
                             {a.nombre}

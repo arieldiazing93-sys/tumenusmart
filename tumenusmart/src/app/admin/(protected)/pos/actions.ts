@@ -9,6 +9,7 @@ import { exigirPermiso } from "@/lib/auth";
 import { normalizarFormaPagoPos, resumirTurno, type DeclaradoPorForma } from "@/lib/turno-pos";
 import { armarPedido, type LineaPedida, type ProductoBase } from "@/lib/precio-pedido";
 import { registrarConsumoVenta, revertirMovimientosVenta } from "@/lib/movimientos-stock";
+import { costoDelProducto } from "@/lib/costo-receta";
 import { desglosarIva, formatearNumeroFactura } from "@/lib/factura-pos";
 import { SIN_REGISTRO_FISCAL } from "@/lib/tipo-cliente";
 import { turnoAbierto, pedidosDelTurno, entregasSinRendir } from "./turno-actual";
@@ -196,6 +197,7 @@ export async function registrarVenta(turnoId: string, datos: DatosVenta): Promis
       mitadYMitadModo: true,
       iva: true,
       areaImpresionId: true,
+      almacenId: true,
       opciones: {
         where: { tipo: "agregado" },
         orderBy: { orden: "asc" },
@@ -216,8 +218,17 @@ export async function registrarVenta(turnoId: string, datos: DatosVenta): Promis
                       nombre: true,
                       precio: true,
                       costo: true,
-                      // Un modificador ES un Product: trae su propia receta.
-                      receta: { select: { insumoId: true, cantidad: true } },
+                      almacenId: true,
+                      // Un modificador ES un Product: trae su propia receta —
+                      // con el costo de cada insumo, porque el costo del
+                      // agregado sale de ahí (ver costo-receta.ts).
+                      receta: {
+                        select: {
+                          insumoId: true,
+                          cantidad: true,
+                          insumo: { select: { costoUnitario: true } },
+                        },
+                      },
                     },
                   },
                 },
@@ -243,21 +254,23 @@ export async function registrarVenta(turnoId: string, datos: DatosVenta): Promis
     mitadYMitadModo: p.mitadYMitadModo,
     iva: p.iva,
     receta: p.receta,
+    almacenId: p.almacenId,
     // Los agregados propios más los de cualquier grupo reutilizable
     // adjuntado — mismo criterio que en checkout/actions.ts: cada
     // modificador de un grupo ES un Product real, se usa su propio
     // precio/costo/receta. Un agregado propio (ProductOption) no es un
     // Product, no tiene receta propia — [] a propósito.
     opciones: [
-      ...p.opciones.map((o) => ({ ...o, receta: [] })),
+      ...p.opciones.map((o) => ({ ...o, receta: [], almacenId: null })),
       ...p.gruposAgregados.flatMap((g) =>
         g.group.modificadores.map((m) => ({
           id: m.product.id,
           nombre: m.product.nombre,
           tipo: "agregado",
           precioExtra: m.product.precio,
-          costo: m.product.costo,
+          costo: costoDelProducto(m.product.costo, m.product.receta),
           receta: m.product.receta,
+          almacenId: m.product.almacenId,
         }))
       ),
     ],

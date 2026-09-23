@@ -4,7 +4,7 @@ import { exigirPermiso } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { idLocalActual } from "@/lib/local-actual";
-import { prismaDelLocal } from "@/lib/prisma-local";
+import { prismaDelLocal, type PrismaLocal } from "@/lib/prisma-local";
 import { moverEnLista, cambiosDeOrden, type Direccion } from "@/lib/ordenar";
 import { subirImagenProducto } from "@/lib/supabase-storage";
 import { normalizarIva } from "@/lib/iva";
@@ -42,18 +42,16 @@ function parsearIngredientes(formData: FormData): string[] {
 
 
 /**
- * Lee el costo del formulario.
- *
- * Vacío significa "no lo sé todavía", que no es lo mismo que cero: por eso
- * devuelve null y no 0. Un cero haría creer al analista que el producto no
- * cuesta nada y que todo lo que factura es ganancia.
+ * El almacén del que descuenta la receta del producto. Tiene que ser de este
+ * local (al ir por el cliente del local, uno de otro negocio no aparece); si
+ * viene vacío o ya no existe, queda sin almacén elegido, que en la venta
+ * significa "el almacén principal".
  */
-function leerCosto(formData: FormData): number | null {
-  const crudo = String(formData.get("costo") ?? "").trim();
-  if (!crudo) return null;
-  const valor = parseFloat(crudo);
-  if (isNaN(valor) || valor < 0) return null;
-  return valor;
+async function leerAlmacen(prisma: PrismaLocal, formData: FormData): Promise<string | null> {
+  const id = String(formData.get("almacenId") ?? "").trim();
+  if (!id) return null;
+  const almacen = await prisma.almacen.findUnique({ where: { id }, select: { id: true } });
+  return almacen?.id ?? null;
 }
 
 export type ResultadoProducto = { ok: true } | { ok: false; error: string };
@@ -81,18 +79,20 @@ export async function crearProducto(formData: FormData): Promise<ResultadoProduc
     return { ok: false, error: "Faltan datos obligatorios" };
   }
 
+  const almacenId = await leerAlmacen(prisma, formData);
+
   const producto = await prisma.product.create({
     data: {
       nombre,
       categoryId,
       areaImpresionId,
+      almacenId,
       precio,
       descripcion: String(formData.get("descripcion") ?? "") || null,
       imagenUrl: String(formData.get("imagenUrl") ?? "") || null,
       disponible: formData.get("disponible") === "on",
       destacado: formData.get("destacado") === "on",
       ingredientes: parsearIngredientes(formData),
-      costo: leerCosto(formData),
       storeId: idLocal,
     },
   });
@@ -128,20 +128,23 @@ export async function actualizarProducto(
       : "mayor";
   const iva = normalizarIva(formData.get("iva"));
   const unidadMedida = normalizarUnidadMedida(formData.get("unidadMedida"));
+  const almacenId = await leerAlmacen(prisma, formData);
 
+  // El costo ya no se carga acá: sale de la receta (ver costo-receta.ts). Por
+  // eso el `update` no lo toca — un costo cargado a mano antes se conserva.
   await prisma.product.update({
     where: { id: productId },
     data: {
       nombre,
       categoryId,
       areaImpresionId,
+      almacenId,
       precio,
       descripcion: String(formData.get("descripcion") ?? "") || null,
       imagenUrl: String(formData.get("imagenUrl") ?? "") || null,
       disponible: formData.get("disponible") === "on",
       destacado: formData.get("destacado") === "on",
       ingredientes: parsearIngredientes(formData),
-      costo: leerCosto(formData),
       mitadYMitadGrupo,
       mitadYMitadModo,
       iva,

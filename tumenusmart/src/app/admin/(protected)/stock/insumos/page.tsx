@@ -10,9 +10,14 @@ export default async function InsumosPage() {
   await pantallaConPermiso("stock.ver");
   const prisma = prismaDelLocal(await idLocalActual());
 
-  const [insumos, categorias] = await Promise.all([
+  const [insumos, categorias, almacenes] = await Promise.all([
     prisma.insumo.findMany({ orderBy: [{ activo: "desc" }, { nombre: "asc" }] }),
     prisma.categoriaInsumo.findMany({ orderBy: { nombre: "asc" } }),
+    prisma.almacen.findMany({
+      where: { activo: true },
+      orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+      select: { id: true, nombre: true },
+    }),
   ]);
 
   return (
@@ -36,6 +41,7 @@ export default async function InsumosPage() {
           activo: i.activo,
         }))}
         categorias={categorias.map((c) => ({ id: c.id, nombre: c.nombre }))}
+        almacenes={almacenes}
       />
     </div>
   );

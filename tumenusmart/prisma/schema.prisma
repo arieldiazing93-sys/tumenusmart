@@ -428,12 +428,19 @@ model Product {
   // producto se sigue viendo en la comanda completa manual).
   areaImpresionId String?
   areaImpresion   AreaImpresion? @relation(fields: [areaImpresionId], references: [id], onDelete: SetNull)
+  // De qué almacén descuenta la receta de este producto cuando se vende
+  // (Control de stock). Null = el almacén principal (el más antiguo activo)
+  // — ver src/lib/movimientos-stock.ts.
+  almacenId   String?
+  almacen     Almacen?        @relation(fields: [almacenId], references: [id], onDelete: SetNull)
   nombre      String
   descripcion String?
   precio      Decimal         @db.Decimal(10, 2)
-  /// Lo que le cuesta al negocio preparar este producto. Opcional: mientras
-  /// esté vacío, el analista comercial habla de facturación pero no de
-  /// margen, en vez de inventarlo.
+  /// Costo cargado a mano (ya no se edita en el formulario de Productos). Si
+  /// el producto tiene receta, su costo sale de ahí — ver
+  /// src/lib/costo-receta.ts —; este valor solo se usa cuando no hay receta.
+  /// Si ninguno de los dos existe, el analista comercial habla de
+  /// facturación pero no de margen, en vez de inventarlo.
   costo       Decimal?        @db.Decimal(10, 2)
   // "gravado10" | "gravado5" | "exento" — string simple con whitelist en la
   // Server Action, no enum de Prisma (mismo criterio que mitadYMitadModo).
@@ -481,6 +488,7 @@ model Product {
 
   @@index([storeId])
   @@index([categoryId])
+  @@index([almacenId])
 }
 
 // Cubre tanto variantes (tamaño, sabor — normalmente eliges una)
@@ -1378,14 +1386,12 @@ model Proveedor {
   @@index([storeId])
 }
 
-/// Almacenes/depósitos (ej: "Almacén Cocina", "Almacén Bodega") — un
-/// catálogo simple para saber a cuál entró cada compra. OJO: esto NO
-/// reparte el stock de un Insumo por almacén (Insumo.stockActual sigue
-/// siendo un único total) — es solo el dato de "a dónde entró la
-/// mercadería" en cada línea de compra, para el día que haga falta
-/// reportar por depósito. Repartir el stock de verdad por almacén (y
-/// decidir de cuál descuenta cada venta) queda para más adelante, si se
-/// necesita.
+/// Almacenes/depósitos (ej: "Almacén Cocina", "Almacén Bodega"). El stock de
+/// un Insumo se reparte por almacén: cada MovimientoStock lleva el suyo, y
+/// lo que hay en un almacén es la suma de sus movimientos (ver
+/// src/lib/stock-almacen.ts). Insumo.stockActual sigue siendo el TOTAL de
+/// todos los almacenes. Cada compra entra a un almacén (CompraItem.almacenId)
+/// y cada producto descuenta del suyo al venderse (Product.almacenId).
 model Almacen {
   id        String   @id @default(cuid())
   storeId   String
@@ -1395,6 +1401,8 @@ model Almacen {
   createdAt DateTime @default(now())
 
   compraItems CompraItem[]
+  movimientos MovimientoStock[]
+  productos   Product[]
 
   @@index([storeId])
 }
@@ -1522,6 +1530,11 @@ model MovimientoStock {
   compraId   String?
   compra     Compra?   @relation(fields: [compraId], references: [id], onDelete: SetNull)
 
+  /// En qué almacén entra o de cuál sale este movimiento. Null solo en los
+  /// movimientos viejos, de antes de que el stock se repartiera por almacén.
+  almacenId String?
+  almacen   Almacen? @relation(fields: [almacenId], references: [id], onDelete: SetNull)
+
   motivo        String?
   registradoPor String?
   createdAt     DateTime @default(now())
@@ -1530,4 +1543,5 @@ model MovimientoStock {
   @@index([insumoId])
   @@index([orderId])
   @@index([ventaPosId])
+  @@index([almacenId])
 }

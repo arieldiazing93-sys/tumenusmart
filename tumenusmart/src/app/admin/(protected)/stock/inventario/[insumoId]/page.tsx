@@ -39,6 +39,7 @@ export default async function HistorialInsumoPage({
     orderBy: { createdAt: "desc" },
     take: 200,
     include: {
+      almacen: { select: { nombre: true } },
       order: { select: { numero: true } },
       ventaPos: { select: { numero: true } },
       compra: { select: { numeroComprobante: true, proveedor: { select: { nombre: true } } } },
@@ -61,6 +62,7 @@ export default async function HistorialInsumoPage({
             <tr>
               <Th>Fecha</Th>
               <Th>Tipo</Th>
+              <Th>Almacén</Th>
               <Th>Cantidad</Th>
               <Th>Referencia</Th>
               <Th>Quién</Th>
@@ -86,6 +88,7 @@ export default async function HistorialInsumoPage({
                       {ETIQUETA_TIPO[m.tipo] ?? m.tipo}
                     </Pastilla>
                   </Td>
+                  <Td>{m.almacen?.nombre ?? "—"}</Td>
                   <Td className={`font-semibold ${cantidad < 0 ? "text-peligro" : "text-exito"}`}>
                     {cantidad > 0 ? "+" : ""}
                     {cantidad} {etiquetaUnidadMedida(insumo.unidadMedida)}

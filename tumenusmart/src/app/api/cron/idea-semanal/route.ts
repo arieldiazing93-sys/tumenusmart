@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { prismaDelLocal } from "@/lib/prisma-local";
 import { ZONA_NEGOCIO } from "@/lib/timezone";
+import { costoDelProducto } from "@/lib/costo-receta";
 import {
   analizar,
   elegirIdeaDeLaSemana,
@@ -63,7 +64,12 @@ export async function GET(request: NextRequest) {
           orderBy: { createdAt: "desc" },
           take: TOPE_PEDIDOS,
         }),
-        db.product.findMany({ include: { category: true } }),
+        db.product.findMany({
+          include: {
+            category: true,
+            receta: { select: { cantidad: true, insumo: { select: { costoUnitario: true } } } },
+          },
+        }),
         db.ideaSemanal.findMany({
           orderBy: { semana: "desc" },
           take: SEMANAS_SIN_REPETIR,
@@ -95,7 +101,7 @@ export async function GET(request: NextRequest) {
         categoriaId: pr.categoryId,
         categoriaNombre: pr.category.nombre,
         precio: Number(pr.precio),
-        costo: pr.costo != null ? Number(pr.costo) : null,
+        costo: costoDelProducto(pr.costo, pr.receta),
         disponible: pr.disponible,
         creado: pr.createdAt,
       }));

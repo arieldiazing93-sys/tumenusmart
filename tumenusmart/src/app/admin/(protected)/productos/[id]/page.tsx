@@ -11,6 +11,7 @@ import { RecetaProducto } from "./RecetaProducto";
 import { etiquetaIva } from "@/lib/iva";
 import { etiquetaUnidadMedida } from "@/lib/unidad-medida";
 import { formatearGuarani } from "@/lib/format";
+import { costoDeReceta } from "@/lib/costo-receta";
 import { GuardadoToast } from "@/components/GuardadoToast";
 import { Tarjeta } from "@/components/ui";
 
@@ -28,7 +29,7 @@ export default async function EditarProductoPage({
 
   const { id } = await params;
 
-  const [producto, categorias, areasImpresion, todosLosGrupos] = await Promise.all([
+  const [producto, categorias, areasImpresion, todosLosAlmacenes, todosLosGrupos] = await Promise.all([
     prisma.product.findUnique({
       where: { id },
       include: {
@@ -39,7 +40,7 @@ export default async function EditarProductoPage({
         receta: {
           select: {
             cantidad: true,
-            insumo: { select: { id: true, nombre: true, unidadMedida: true } },
+            insumo: { select: { id: true, nombre: true, unidadMedida: true, costoUnitario: true } },
           },
         },
         gruposAgregados: {
@@ -67,6 +68,12 @@ export default async function EditarProductoPage({
       orderBy: [{ orden: "asc" }, { createdAt: "asc" }],
       select: { id: true, nombre: true },
     }),
+    // Todos, no solo los activos: uno desactivado que este producto ya tenía
+    // elegido se tiene que poder seguir viendo (se filtra abajo).
+    prisma.almacen.findMany({
+      orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+      select: { id: true, nombre: true, activo: true },
+    }),
     prisma.optionGroup.findMany({
       orderBy: [{ orden: "asc" }, { createdAt: "asc" }],
       select: { id: true, nombre: true, _count: { select: { modificadores: true } } },
@@ -74,6 +81,9 @@ export default async function EditarProductoPage({
   ]);
 
   if (!producto) notFound();
+
+  const almacenes = todosLosAlmacenes.filter((a) => a.activo || a.id === producto.almacenId);
+  const costoPorReceta = costoDeReceta(producto.receta);
 
   const idsAdjuntados = new Set(producto.gruposAgregados.map((g) => g.groupId));
   const gruposDisponibles = todosLosGrupos
@@ -106,8 +116,8 @@ export default async function EditarProductoPage({
             descripcion: producto.descripcion,
             categoryId: producto.categoryId,
             areaImpresionId: producto.areaImpresionId,
+            almacenId: producto.almacenId,
             precio: Number(producto.precio),
-            costo: producto.costo != null ? Number(producto.costo) : null,
             iva: producto.iva,
             unidadMedida: producto.unidadMedida,
             imagenUrl: producto.imagenUrl,
@@ -119,6 +129,7 @@ export default async function EditarProductoPage({
           }}
           categorias={categorias}
           areasImpresion={areasImpresion}
+          almacenes={almacenes}
         />
       </div>
 
@@ -196,6 +207,26 @@ export default async function EditarProductoPage({
             unidadMedida: etiquetaUnidadMedida(r.insumo.unidadMedida),
           }))}
         />
+        {/* El costo del producto ya no se carga a mano: sale de esta receta. */}
+        {producto.receta.length > 0 ? (
+          <p className="text-sm text-tinta-media">
+            {costoPorReceta != null ? (
+              <>
+                Costo de preparar una unidad, según esta receta:{" "}
+                <span className="font-semibold text-tinta">{formatearGuarani(costoPorReceta)}</span>
+              </>
+            ) : (
+              "Todavía no se puede calcular el costo: a algún insumo de la receta le falta el costo (se completa al registrar una compra)."
+            )}
+          </p>
+        ) : (
+          producto.costo != null && (
+            <p className="text-sm text-tinta-media">
+              Costo cargado antes a mano: {formatearGuarani(Number(producto.costo))}. Se sigue usando
+              hasta que armes la receta.
+            </p>
+          )
+        )}
       </div>
     </div>
   );

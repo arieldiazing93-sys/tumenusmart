@@ -8,13 +8,17 @@ import { TASAS_IVA } from "@/lib/iva";
 import { crearInsumo } from "./actions";
 
 type Categoria = { id: string; nombre: string };
+type Almacen = { id: string; nombre: string };
 
 export function CrearInsumoForm({
   categorias,
+  almacenes,
   categoriaInicialId,
   onCreado,
 }: {
   categorias: Categoria[];
+  /** Solo los activos. El stock inicial queda en el que se elija acá. */
+  almacenes: Almacen[];
   /** Categoría que ya está elegida en la lista — el insumo nuevo arranca en ella. */
   categoriaInicialId?: string;
   /** Se llama con el id del insumo recién creado, para abrirlo en el panel. */
@@ -97,6 +101,16 @@ export function CrearInsumoForm({
         </Campo>
         <Campo etiqueta="Stock inicial">
           <Entrada type="number" name="stockInicial" step="0.001" min="0" placeholder="0" />
+        </Campo>
+        <Campo etiqueta="Almacén" ayuda="Dónde queda el stock inicial.">
+          <Selector name="almacenId" defaultValue={almacenes[0]?.id ?? ""}>
+            {almacenes.length === 0 && <option value="">Primero creá un almacén</option>}
+            {almacenes.map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.nombre}
+              </option>
+            ))}
+          </Selector>
         </Campo>
         <Campo etiqueta="Stock mínimo (opcional)" ayuda="Para avisar cuando conviene reponer.">
           <Entrada type="number" name="stockMinimo" step="0.001" min="0" />

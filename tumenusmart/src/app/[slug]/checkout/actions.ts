@@ -13,6 +13,7 @@ import {
   type ProductoBase,
 } from "@/lib/precio-pedido";
 import { registrarConsumoVenta } from "@/lib/movimientos-stock";
+import { costoDelProducto } from "@/lib/costo-receta";
 
 export type DatosCheckout = {
   /** de qué local es el pedido, tomado de la URL que visitó el cliente */
@@ -193,9 +194,18 @@ export async function crearPedido(datos: DatosCheckout): Promise<ResultadoPedido
                       nombre: true,
                       precio: true,
                       costo: true,
+                      almacenId: true,
                       // Un modificador ES un Product (ver OptionGroupProduct):
-                      // trae su propia receta, igual que cualquier producto.
-                      receta: { select: { insumoId: true, cantidad: true } },
+                      // trae su propia receta, igual que cualquier producto —
+                      // con el costo de cada insumo, porque el costo del
+                      // agregado sale de ahí (ver costo-receta.ts).
+                      receta: {
+                        select: {
+                          insumoId: true,
+                          cantidad: true,
+                          insumo: { select: { costoUnitario: true } },
+                        },
+                      },
                     },
                   },
                 },
@@ -217,6 +227,7 @@ export async function crearPedido(datos: DatosCheckout): Promise<ResultadoPedido
     mitadYMitadModo: p.mitadYMitadModo,
     iva: p.iva,
     receta: p.receta,
+    almacenId: p.almacenId,
     // Los agregados propios (ProductOption) más los de cualquier grupo
     // reutilizable adjuntado (ver src/app/admin/(protected)/grupos-agregados/)
     // — combinados acá para que armarPedido siga viendo un solo `opciones`
@@ -234,6 +245,7 @@ export async function crearPedido(datos: DatosCheckout): Promise<ResultadoPedido
         precioExtra: o.precioExtra,
         costo: o.costo,
         receta: [],
+        almacenId: null,
       })),
       ...p.gruposAgregados.flatMap((g) =>
         g.group.modificadores.map((m) => ({
@@ -241,8 +253,9 @@ export async function crearPedido(datos: DatosCheckout): Promise<ResultadoPedido
           nombre: m.product.nombre,
           tipo: "agregado",
           precioExtra: m.product.precio,
-          costo: m.product.costo,
+          costo: costoDelProducto(m.product.costo, m.product.receta),
           receta: m.product.receta,
+          almacenId: m.product.almacenId,
         }))
       ),
     ],

@@ -43,6 +43,8 @@ export type OpcionBase = {
    * que trae la receta de SU PROPIA ficha, igual que cualquier producto.
    */
   receta: RecetaInsumoBase[];
+  /** Almacén del que descuenta esa receta. Null o ausente = el almacén principal del local. */
+  almacenId?: string | null;
 };
 
 export type ProductoBase = {
@@ -59,10 +61,16 @@ export type ProductoBase = {
   opciones: OpcionBase[];
   /** Insumos que consume este producto, por unidad vendida — ver OpcionBase.receta. */
   receta: RecetaInsumoBase[];
+  /** Almacén del que descuenta esa receta. Null o ausente = el almacén principal del local. */
+  almacenId?: string | null;
 };
 
-/** Cuánto de un insumo hay que descontar — ver Control de stock. */
-export type ConsumoInsumo = { insumoId: string; cantidad: number };
+/**
+ * Cuánto de un insumo hay que descontar, y de qué almacén — ver Control de
+ * stock. `almacenId` null significa "el almacén principal": quien guarda el
+ * movimiento (movimientos-stock.ts) lo resuelve, este módulo no toca la base.
+ */
+export type ConsumoInsumo = { insumoId: string; almacenId: string | null; cantidad: number };
 
 /**
  * Lo único que el navegador tiene derecho a mandar: qué eligió.
@@ -156,25 +164,40 @@ function sumaPrecioOpciones(opciones: OpcionBase[]): number {
   return opciones.reduce((s, o) => s + aNumero(o.precioExtra), 0);
 }
 
-/** Junta varias listas de consumo en una sola, sumando por insumoId repetido. */
+/**
+ * Junta varias listas de consumo en una sola, sumando lo repetido: el mismo
+ * insumo del mismo almacén. El mismo insumo en dos almacenes distintos queda
+ * en dos filas (cada una descuenta de su almacén).
+ */
 function combinarConsumo(...listas: ConsumoInsumo[][]): ConsumoInsumo[] {
-  const mapa = new Map<string, number>();
+  const mapa = new Map<string, ConsumoInsumo>();
   for (const lista of listas) {
     for (const c of lista) {
-      mapa.set(c.insumoId, (mapa.get(c.insumoId) ?? 0) + c.cantidad);
+      const clave = `${c.insumoId}|${c.almacenId ?? ""}`;
+      const actual = mapa.get(clave);
+      if (actual) actual.cantidad += c.cantidad;
+      else mapa.set(clave, { insumoId: c.insumoId, almacenId: c.almacenId, cantidad: c.cantidad });
     }
   }
-  return [...mapa.entries()].map(([insumoId, cantidad]) => ({ insumoId, cantidad }));
+  return [...mapa.values()];
 }
 
 /** Multiplica cada cantidad de una receta por un factor (ej: 0.5 para media mitad y mitad). */
-function escalarConsumo(receta: RecetaInsumoBase[], factor: number): ConsumoInsumo[] {
-  return receta.map((r) => ({ insumoId: r.insumoId, cantidad: aNumero(r.cantidad) * factor }));
+function escalarConsumo(
+  receta: RecetaInsumoBase[],
+  factor: number,
+  almacenId: string | null | undefined
+): ConsumoInsumo[] {
+  return receta.map((r) => ({
+    insumoId: r.insumoId,
+    almacenId: almacenId ?? null,
+    cantidad: aNumero(r.cantidad) * factor,
+  }));
 }
 
-/** El consumo de un grupo de opciones elegidas — su propia receta, sin escalar. */
+/** El consumo de un grupo de opciones elegidas — su propia receta, sin escalar, de su propio almacén. */
 function sumaConsumoOpciones(opciones: OpcionBase[]): ConsumoInsumo[] {
-  return combinarConsumo(...opciones.map((o) => escalarConsumo(o.receta, 1)));
+  return combinarConsumo(...opciones.map((o) => escalarConsumo(o.receta, 1, o.almacenId)));
 }
 
 /** Dos grupos de mitad y mitad son el mismo si difieren solo en mayúsculas o espacios. */
@@ -333,7 +356,10 @@ function armarProducto(
 
   const precioAgregados = sumaPrecioOpciones(elegidas.opciones);
   const precioUnitario = aNumero(producto.precio) + precioAgregados;
-  const consumo = combinarConsumo(escalarConsumo(producto.receta, 1), sumaConsumoOpciones(elegidas.opciones));
+  const consumo = combinarConsumo(
+    escalarConsumo(producto.receta, 1, producto.almacenId),
+    sumaConsumoOpciones(elegidas.opciones)
+  );
 
   return {
     ok: true,
@@ -395,8 +421,8 @@ function armarCombo(
   // el modo de precio ("mayor"/"proporcional" es solo para cobrar) — y los
   // agregados elegidos se preparan enteros, no se parten.
   const consumo = combinarConsumo(
-    escalarConsumo(a.receta, 0.5),
-    escalarConsumo(b.receta, 0.5),
+    escalarConsumo(a.receta, 0.5, a.almacenId),
+    escalarConsumo(b.receta, 0.5, b.almacenId),
     sumaConsumoOpciones(elegidas.opciones)
   );
 

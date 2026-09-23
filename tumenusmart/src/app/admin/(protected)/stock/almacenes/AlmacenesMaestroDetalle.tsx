@@ -17,7 +17,7 @@ export function AlmacenesMaestroDetalle({ almacenes }: { almacenes: AlmacenDatos
         },
       ]}
       textoNuevo="+ Nuevo almacén"
-      textoVacio="Todavía no cargaste ningún almacén — si tu negocio tiene un solo depósito, no hace falta."
+      textoVacio="Todavía no cargaste ningún almacén. Hace falta al menos uno: todo lo que se compra entra a un almacén y cada producto descuenta del suyo."
       textoPlaceholder="Hacé doble clic en un almacén de la lista para ver y editar sus datos, o creá uno nuevo con el botón de arriba."
       renderPanel={(almacen, alGuardar) => <AlmacenPanel almacen={almacen} alGuardar={alGuardar} />}
       renderNuevo={(alCrear) => <CrearAlmacenForm onCreado={alCrear} />}

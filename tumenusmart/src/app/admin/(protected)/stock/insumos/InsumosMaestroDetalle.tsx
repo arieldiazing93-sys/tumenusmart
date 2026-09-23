@@ -9,6 +9,7 @@ import { CrearInsumoForm } from "./CrearInsumoForm";
 import { InsumoPanel, type InsumoDatos } from "./InsumoPanel";
 
 type Categoria = { id: string; nombre: string };
+type Almacen = { id: string; nombre: string };
 
 /** "" = todas las categorías, "sin" = los que no tienen, o el id de una. */
 const TODAS = "";
@@ -23,9 +24,12 @@ const SIN_CATEGORIA = "sin";
 export function InsumosMaestroDetalle({
   insumos,
   categorias,
+  almacenes,
 }: {
   insumos: InsumoDatos[];
   categorias: Categoria[];
+  /** Para elegir dónde queda el stock inicial de un insumo nuevo. */
+  almacenes: Almacen[];
 }) {
   const router = useRouter();
   const [categoriaFiltro, setCategoriaFiltro] = useState(TODAS);
@@ -191,6 +195,7 @@ export function InsumosMaestroDetalle({
           {creando ? (
             <CrearInsumoForm
               categorias={categorias}
+              almacenes={almacenes}
               categoriaInicialId={
                 categoriaFiltro !== TODAS && categoriaFiltro !== SIN_CATEGORIA ? categoriaFiltro : undefined
               }

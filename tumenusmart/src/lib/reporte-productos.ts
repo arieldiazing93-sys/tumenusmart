@@ -1,5 +1,6 @@
 import { prismaDelLocal } from "./prisma-local";
 import { PEDIDO_REAL, type RangoFecha } from "./estadisticas";
+import { costoDelProducto } from "./costo-receta";
 
 export type FilaProductoReporte = {
   nombre: string;
@@ -131,6 +132,8 @@ export async function calcularReporteProductosVendidos(
         product: {
           select: {
             costo: true,
+            // El costo sale de la receta si se puede calcular (ver costo-receta.ts).
+            receta: { select: { cantidad: true, insumo: { select: { costoUnitario: true } } } },
             category: { select: { id: true, nombre: true, orden: true } },
           },
         },
@@ -147,6 +150,8 @@ export async function calcularReporteProductosVendidos(
         product: {
           select: {
             costo: true,
+            // El costo sale de la receta si se puede calcular (ver costo-receta.ts).
+            receta: { select: { cantidad: true, insumo: { select: { costoUnitario: true } } } },
             category: { select: { id: true, nombre: true, orden: true } },
           },
         },
@@ -206,7 +211,7 @@ export async function calcularReporteProductosVendidos(
       nombre: item.nombreProducto,
       cantidad: 0,
       esCombo,
-      costoCatalogo: !esCombo && item.product?.costo != null ? Number(item.product.costo) : null,
+      costoCatalogo: !esCombo && item.product ? costoDelProducto(item.product.costo, item.product.receta) : null,
       totalVentaBase: 0,
       totalVentaCombo: 0,
       totalVentaAgregados: 0,
@@ -278,7 +283,7 @@ export async function calcularReporteProductosVendidos(
       nombre: item.nombreProducto,
       cantidad: 0,
       esCombo,
-      costoCatalogo: !esCombo && item.product?.costo != null ? Number(item.product.costo) : null,
+      costoCatalogo: !esCombo && item.product ? costoDelProducto(item.product.costo, item.product.receta) : null,
       totalVentaBase: 0,
       totalVentaCombo: 0,
       totalVentaAgregados: 0,

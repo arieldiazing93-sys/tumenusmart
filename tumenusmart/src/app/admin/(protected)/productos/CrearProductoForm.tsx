@@ -8,15 +8,19 @@ import { IngredientesField } from "./IngredientesField";
 
 type Categoria = { id: string; nombre: string };
 type AreaImpresion = { id: string; nombre: string };
+type Almacen = { id: string; nombre: string };
 
 export function CrearProductoForm({
   categorias,
   categoriaActivaId,
   areasImpresion,
+  almacenes,
 }: {
   categorias: Categoria[];
   categoriaActivaId?: string;
   areasImpresion: AreaImpresion[];
+  /** Solo los activos, el más antiguo primero (queda elegido de entrada). */
+  almacenes: Almacen[];
 }) {
   const [pendiente, iniciar] = useTransition();
 
@@ -71,6 +75,20 @@ export function CrearProductoForm({
             </option>
           ))}
         </select>
+        {almacenes.length > 0 && (
+          <select
+            name="almacenId"
+            defaultValue={almacenes[0].id}
+            title="Almacén del que descuenta el stock cuando se vende"
+            className="rounded-lg border border-linea px-3 py-2"
+          >
+            {almacenes.map((a) => (
+              <option key={a.id} value={a.id}>
+                Descuenta de: {a.nombre}
+              </option>
+            ))}
+          </select>
+        )}
         <input
           type="number"
           name="precio"

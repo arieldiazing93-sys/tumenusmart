@@ -50,6 +50,17 @@ export async function crearInsumo(formData: FormData): Promise<ResultadoCrearIns
   const costoUnitario = aDecimalOpcional(formData.get("costoUnitario"));
   const registradoPor = sesion.nombre?.trim() || sesion.email;
 
+  // El stock siempre está en un almacén: si se carga stock inicial, hay que
+  // decir en cuál (y tiene que ser uno de este local, y estar activo).
+  const almacenId = String(formData.get("almacenId") ?? "").trim();
+  if (stockInicial !== 0) {
+    if (!almacenId) {
+      return { ok: false, error: "Elegí en qué almacén queda el stock inicial. Si todavía no creaste ninguno, hacelo en Almacenes." };
+    }
+    const almacen = await prisma.almacen.findFirst({ where: { id: almacenId, activo: true }, select: { id: true } });
+    if (!almacen) return { ok: false, error: "Ese almacén ya no existe o está desactivado." };
+  }
+
   const insumo = await prisma.$transaction(async (tx) => {
     let categoriaFinalId = categoriaId || null;
     if (!categoriaFinalId && categoriaNueva) {
@@ -78,6 +89,7 @@ export async function crearInsumo(formData: FormData): Promise<ResultadoCrearIns
         data: {
           storeId: idLocal,
           insumoId: nuevo.id,
+          almacenId,
           tipo: "ajuste",
           cantidad: stockInicial,
           motivo: "Carga inicial",

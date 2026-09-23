@@ -3,6 +3,8 @@ import Link from "next/link";
 import { prismaDelLocal } from "@/lib/prisma-local";
 import { idLocalActual } from "@/lib/local-actual";
 import { ZONA_NEGOCIO } from "@/lib/timezone";
+import { costoDelProducto } from "@/lib/costo-receta";
+import { clasesBoton } from "@/components/ui";
 import { ideaDeLaSemana, marcarIdeaVista } from "@/lib/idea-semanal";
 import {
   analizar,
@@ -60,7 +62,13 @@ export default async function AnalistaPage() {
       orderBy: { createdAt: "desc" },
       take: TOPE_PEDIDOS,
     }),
-    prisma.product.findMany({ include: { category: true } }),
+    // Con la receta: el costo de un producto sale de lo que cuestan sus insumos (ver costo-receta.ts).
+    prisma.product.findMany({
+      include: {
+        category: true,
+        receta: { select: { cantidad: true, insumo: { select: { costoUnitario: true } } } },
+      },
+    }),
   ]);
 
   const pedidos: PedidoAnalisis[] = pedidosCrudos.map((p) => ({
@@ -87,7 +95,7 @@ export default async function AnalistaPage() {
     categoriaId: pr.categoryId,
     categoriaNombre: pr.category.nombre,
     precio: Number(pr.precio),
-    costo: pr.costo != null ? Number(pr.costo) : null,
+    costo: costoDelProducto(pr.costo, pr.receta),
     disponible: pr.disponible,
     creado: pr.createdAt,
   }));
@@ -177,15 +185,14 @@ export default async function AnalistaPage() {
             Falta un dato para hablar de ganancia
           </h2>
           <p className="mt-1 text-sm text-tinta-media">
-            {sinCosto} de tus {productos.length} productos no tienen cargado el costo. Sin eso
-            puedo decirte qué producto <em>factura</em> más, pero no cuál te <em>deja</em> más
-            — y muchas veces no son el mismo.
+            {sinCosto} de tus {productos.length} productos no tienen costo. El costo sale de la
+            receta de cada producto (con lo que cuestan sus insumos), así que hace falta armar
+            la receta y haber registrado la compra de esos insumos. Sin eso puedo decirte qué
+            producto <em>factura</em> más, pero no cuál te <em>deja</em> más — y muchas veces no
+            son el mismo.
           </p>
-          <Link
-            href="/admin/productos"
-            className="mt-2 inline-block text-sm font-medium text-brand hover:underline"
-          >
-            Cargar costos en Productos →
+          <Link href="/admin/productos" className={`mt-3 ${clasesBoton("navegar", "sm")}`}>
+            Armar recetas en Productos
           </Link>
         </div>
       )}

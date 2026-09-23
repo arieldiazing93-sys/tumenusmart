@@ -10,14 +10,15 @@ import { UNIDADES_MEDIDA } from "@/lib/unidad-medida";
 
 type Categoria = { id: string; nombre: string };
 type AreaImpresion = { id: string; nombre: string };
+type Almacen = { id: string; nombre: string; activo: boolean };
 type Producto = {
   id: string;
   nombre: string;
   descripcion: string | null;
   categoryId: string;
   areaImpresionId: string | null;
+  almacenId: string | null;
   precio: number;
-  costo: number | null;
   iva: string;
   unidadMedida: string;
   imagenUrl: string | null;
@@ -40,10 +41,13 @@ export function EditarProductoForm({
   producto,
   categorias,
   areasImpresion,
+  almacenes,
 }: {
   producto: Producto;
   categorias: Categoria[];
   areasImpresion: AreaImpresion[];
+  /** Los activos, más el que ya tiene este producto aunque se haya desactivado; el más antiguo primero. */
+  almacenes: Almacen[];
 }) {
   const [pendiente, iniciar] = useTransition();
 
@@ -85,7 +89,7 @@ export function EditarProductoForm({
           <Campo
             etiqueta="Área de impresión"
             ayuda="A dónde se manda este producto en la comanda automática. Sin área, no imprime en ninguna comanda."
-            className="sm:col-span-2"
+            className={almacenes.length > 0 ? undefined : "sm:col-span-2"}
           >
             <Selector name="areaImpresionId" defaultValue={producto.areaImpresionId ?? ""}>
               <option value="">Sin área — no imprime en comanda</option>
@@ -96,11 +100,26 @@ export function EditarProductoForm({
               ))}
             </Selector>
           </Campo>
+          {almacenes.length > 0 && (
+            <Campo
+              etiqueta="Almacén del que descuenta"
+              ayuda="Cuando se vende este producto, su receta descuenta el stock de este almacén."
+            >
+              <Selector name="almacenId" defaultValue={producto.almacenId ?? almacenes[0].id}>
+                {almacenes.map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.nombre}
+                    {a.activo ? "" : " (desactivado)"}
+                  </option>
+                ))}
+              </Selector>
+            </Campo>
+          )}
         </div>
       </Tarjeta>
 
       <Tarjeta className="flex flex-col gap-3">
-        <p className="rotulo text-[0.8rem] font-bold">Precio y costo</p>
+        <p className="rotulo text-[0.8rem] font-bold">Precio</p>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Campo etiqueta="Precio de venta">
             <Entrada
@@ -110,19 +129,6 @@ export function EditarProductoForm({
               step="1"
               min="0"
               defaultValue={producto.precio}
-            />
-          </Campo>
-          <Campo
-            etiqueta="Costo (opcional)"
-            ayuda="Solo lo ves vos. Con esto, Ideas para vender más puede decirte qué producto te deja más ganancia, no solo cuál factura más."
-          >
-            <Entrada
-              type="number"
-              name="costo"
-              step="1"
-              min="0"
-              placeholder="Lo que te cuesta prepararlo"
-              defaultValue={producto.costo != null ? producto.costo : ""}
             />
           </Campo>
           <Campo etiqueta="IVA" ayuda="Para el desglose de la Factura Autoimpresor.">
