@@ -4,7 +4,7 @@ import { idLocalActual } from "@/lib/local-actual";
 import { Cabecera, Tabla, Th, Td, Tr, Vacio, Pastilla } from "@/components/ui";
 import { formatearGuarani } from "@/lib/format";
 import { CrearGastoForm } from "./CrearGastoForm";
-import { CATEGORIAS_GASTO } from "./actions";
+import { etiquetaCategoriaGasto } from "@/lib/categoria-gasto";
 
 export const dynamic = "force-dynamic";
 
@@ -24,9 +24,6 @@ export default async function GastosPage() {
       select: { id: true, nombre: true },
     }),
   ]);
-
-  const etiquetaCategoria = (valor: string) =>
-    CATEGORIAS_GASTO.find((c) => c.valor === valor)?.etiqueta ?? "Otros";
 
   return (
     <div>
@@ -56,7 +53,7 @@ export default async function GastosPage() {
                 <Td>{g.fecha.toLocaleDateString("es-PY")}</Td>
                 <Td className="font-medium text-tinta">{g.concepto}</Td>
                 <Td>
-                  <Pastilla>{etiquetaCategoria(g.categoria)}</Pastilla>
+                  <Pastilla>{etiquetaCategoriaGasto(g.categoria)}</Pastilla>
                 </Td>
                 <Td>{g.proveedor?.nombre ?? "—"}</Td>
                 <Td className="font-medium text-tinta">{formatearGuarani(Number(g.monto))}</Td>

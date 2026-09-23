@@ -4,21 +4,9 @@ import { exigirPermiso } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 import { idLocalActual } from "@/lib/local-actual";
 import { prismaDelLocal } from "@/lib/prisma-local";
+import { normalizarCategoriaGasto } from "@/lib/categoria-gasto";
 
 export type ResultadoGasto = { ok: true } | { ok: false; error: string };
-
-export const CATEGORIAS_GASTO = [
-  { valor: "alquiler", etiqueta: "Alquiler" },
-  { valor: "servicios", etiqueta: "Servicios" },
-  { valor: "sueldos", etiqueta: "Sueldos" },
-  { valor: "insumos", etiqueta: "Insumos" },
-  { valor: "otros", etiqueta: "Otros" },
-] as const;
-
-function normalizarCategoria(valor: FormDataEntryValue | null): string {
-  const texto = String(valor ?? "otros");
-  return CATEGORIAS_GASTO.some((c) => c.valor === texto) ? texto : "otros";
-}
 
 export async function crearGasto(formData: FormData): Promise<ResultadoGasto> {
   const sesion = await exigirPermiso("stock.editar");
@@ -40,7 +28,7 @@ export async function crearGasto(formData: FormData): Promise<ResultadoGasto> {
 
   const proveedorId = String(formData.get("proveedorId") ?? "").trim() || null;
   const notas = String(formData.get("notas") ?? "").trim() || null;
-  const categoria = normalizarCategoria(formData.get("categoria"));
+  const categoria = normalizarCategoriaGasto(formData.get("categoria"));
 
   await prisma.gasto.create({
     data: {

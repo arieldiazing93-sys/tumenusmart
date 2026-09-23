@@ -2,7 +2,8 @@
 
 import { useRef, useState, useTransition } from "react";
 import { Tarjeta, Campo, Entrada, Selector, clasesBoton } from "@/components/ui";
-import { crearGasto, CATEGORIAS_GASTO } from "./actions";
+import { CATEGORIAS_GASTO } from "@/lib/categoria-gasto";
+import { crearGasto } from "./actions";
 
 type Proveedor = { id: string; nombre: string };
 
