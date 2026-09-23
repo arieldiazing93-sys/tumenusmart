@@ -3,6 +3,7 @@
 import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { formatearGuarani } from "@/lib/format";
+import { clasesBoton } from "@/components/ui";
 import { BuscarProductoParaGrupo } from "@/components/BuscarProductoParaGrupo";
 import { QuitarProductoDeGrupoBoton } from "@/components/QuitarProductoDeGrupoBoton";
 import { AplicarGruposBoton } from "./AplicarGruposBoton";
@@ -179,7 +180,9 @@ export function GruposAgregadosProducto({
 
       {gruposDisponibles.length > 0 && (
         <div>
-          <p className="mb-1.5 text-xs text-tinta-suave">O usar un grupo que ya creaste:</p>
+          <p className="mb-2 text-[0.82rem] text-tinta-media">O usar un grupo que ya creaste:</p>
+          {/* Botones con fondo propio (blanco sobre el fondo azul de la tarjeta):
+              antes eran píldoras transparentes y no se notaba que se podían tocar. */}
           <div className="flex flex-wrap gap-2">
             {gruposDisponibles.map((g) => (
               <button
@@ -187,7 +190,7 @@ export function GruposAgregadosProducto({
                 type="button"
                 disabled={pendiente}
                 onClick={() => usarGrupoExistente(g.id)}
-                className="rounded-full border border-linea px-3 py-1.5 text-xs text-tinta-media hover:border-brand hover:text-brand disabled:opacity-50"
+                className={`${clasesBoton("suave", "md")} shadow-sm`}
               >
                 + {g.nombre} ({g.cantidadModificadores})
               </button>
