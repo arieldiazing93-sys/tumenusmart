@@ -177,10 +177,7 @@ export default async function CatalogoPage({
         viewport ya es más angosto que ese máximo).
       */}
       <div className="mx-auto max-w-2xl">
-        <div className="flex h-20 flex-col items-center justify-center gap-1 bg-brand px-4 text-center text-white sm:h-24">
-          <p className="text-[1rem] font-semibold tracking-titular sm:text-[1.1rem]">
-            Estamos en línea para recibir tu pedido
-          </p>
+        <div className="flex h-9 items-center justify-center bg-brand px-4 text-center text-white">
           <Link
             href="/"
             // El -mr compensa el espacio que "tracking" agrega DESPUÉS de la

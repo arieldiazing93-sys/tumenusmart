@@ -42,7 +42,7 @@ export default async function LocalLayout({
   // cliente del negocio, no el dueño.
   if (estaSuspendido(local)) {
     return (
-      <div data-tema={dataTema} className="min-h-screen bg-papel-suave">
+      <div data-tema={dataTema} className="min-h-screen bg-papel-suave text-tinta">
         <main className="mx-auto flex min-h-[70vh] max-w-md flex-col items-center justify-center px-6 text-center">
           <div className="mb-4 text-4xl">🕒</div>
           <h1 className="mb-2 text-[1.2rem] font-semibold tracking-titular text-tinta">
@@ -67,17 +67,20 @@ export default async function LocalLayout({
       : null;
 
   // <body> (layout raíz, compartido con el admin) pinta bg-papel-suave y
-  // nunca se toca acá — por eso este div, que si no quedaría con el fondo
-  // de <body> sin reescribir, pinta el suyo propio con el token ya
-  // reescrito: si no, en modo oscuro las tarjetas de adentro se verían
-  // oscuras pero el espacio alrededor seguiría claro.
+  // text-tinta y nunca se toca acá — por eso este div pinta los suyos
+  // propios, con el token ya reescrito. Las dos cosas hacen falta, no solo
+  // el fondo: <body> queda AFUERA del subárbol reescrito, así que cualquier
+  // texto de acá adentro sin color propio (heredado, sin clase text-*)
+  // hereda el color YA CALCULADO de <body> — fijo en el valor claro, nunca
+  // el de esta variable — y quedaría invisible en modo oscuro (texto oscuro
+  // sobre fondo oscuro) aunque el fondo de su tarjeta sí cambie bien.
   //
   // El carrito se guarda por local: si alguien abre dos menús distintos en el
   // mismo navegador, cada uno mantiene el suyo sin mezclarse.
   return (
     <div
       data-tema={dataTema}
-      className="min-h-screen bg-papel-suave"
+      className="min-h-screen bg-papel-suave text-tinta"
       style={
         paleta
           ? ({
