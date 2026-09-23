@@ -147,7 +147,9 @@ export default async function ProductosVendidosPage({
             </p>
             <p>
               El costo de cada producto sale de su receta, con lo que pagaste por cada insumo en su última
-              compra (sin IVA). Es el costo de hoy, no el del día en que se vendió.
+              compra (sin IVA), y queda guardado en cada venta: un período viejo no cambia si después suben los
+              precios. En las ventas anteriores a que se guardara, se usa el costo de hoy. En un mitad y mitad es la
+              mitad del costo de cada sabor.
             </p>
           </div>
 

@@ -846,6 +846,14 @@ model OrderItem {
   /// agregados o no — antes esos Gs. de más quedaban mezclados en el
   /// precio del producto y lo mostraban como si vendiera más caro.
   precioAgregados Decimal @db.Decimal(10, 2) @default(0)
+  /// Snapshot del costo del PRODUCTO en sí (sin agregados), por unidad, al
+  /// momento de la venta — sale de su receta (ver src/lib/costo-receta.ts). En
+  /// un combo mitad y mitad es la mitad de cada lado. Existe para que
+  /// Rentabilidad use el costo del día de la venta y no el de hoy, y para poder
+  /// costear los combos (el ítem no guarda cuáles son sus dos productos). Null
+  /// = no se conocía al vender (sin receta, o un insumo sin costo); en esos
+  /// casos el reporte cae al costo actual del producto, si lo tiene.
+  costoProducto Decimal? @db.Decimal(10, 2)
 
   @@index([storeId])
   @@index([orderId])
@@ -1230,7 +1238,20 @@ model VentaPosItem {
   // Snapshot de los agregados elegidos, en texto legible — igual que
   // OrderItem.opcionesTexto. Null si no se eligió ninguno.
   opcionesTexto  String?
-
+  opcionesTexto  String?
+  /// Snapshot del costo del PRODUCTO en sí (sin agregados), por unidad, al
+  /// momento de la venta — sale de su receta. Null = no se conocía (sin receta
+  /// o con algún insumo sin costo). Mismo criterio que OrderItem.costoProducto.
+  costoProducto  Decimal? @db.Decimal(10, 2)
+  /// Snapshot de cuánto costaron (sumados) los agregados elegidos en este
+  /// ítem, por unidad. 0 si no se eligió ninguno; null = desconocido. Igual
+  /// que OrderItem.costoAgregados. Los ítems viejos con agregados quedan en
+  /// null (no se guardaba); los viejos sin agregados se pasaron a 0.
+  costoAgregados Decimal? @db.Decimal(10, 2)
+  /// Cuánto de `precioUnitario` corresponde a agregados — igual que
+  /// OrderItem.precioAgregados, para que Rentabilidad separe producto y
+  /// agregados también en el mostrador.
+  precioAgregados Decimal @db.Decimal(10, 2) @default(0)
   @@index([storeId])
   @@index([ventaPosId])
 }

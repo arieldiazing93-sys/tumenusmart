@@ -76,7 +76,10 @@ export async function GET(request: NextRequest) {
   filaTitulo(hoja, ["Período", periodo], 2);
   filaTitulo(
     hoja,
-    ["Criterio", "Venta, costo, ganancia y margen sin IVA. El costo sale de la receta de cada producto (última compra de cada insumo): es el costo de hoy."],
+    [
+      "Criterio",
+      "Venta, costo, ganancia y margen sin IVA. El costo sale de la receta de cada producto (última compra de cada insumo) y queda guardado en cada venta; en las ventas anteriores a que se guardara se usa el costo de hoy. Mitad y mitad: la mitad del costo de cada sabor.",
+    ],
     2
   );
   hoja.addRow([]);

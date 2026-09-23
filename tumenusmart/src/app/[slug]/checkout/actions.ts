@@ -180,7 +180,14 @@ export async function crearPedido(datos: DatosCheckout): Promise<ResultadoPedido
       opciones: { orderBy: { orden: "asc" } },
       // Insumos que consume este producto — ver Control de stock. Un
       // producto sin receta armada simplemente trae [].
-      receta: { select: { insumoId: true, cantidad: true } },
+      receta: {
+        select: {
+          insumoId: true,
+          cantidad: true,
+          // Con el costo de cada insumo: de ahí sale el costo del producto (ver costo-receta.ts).
+          insumo: { select: { costoUnitario: true } },
+        },
+      },
       gruposAgregados: {
         select: {
           group: {
@@ -227,6 +234,8 @@ export async function crearPedido(datos: DatosCheckout): Promise<ResultadoPedido
     mitadYMitadModo: p.mitadYMitadModo,
     iva: p.iva,
     receta: p.receta,
+    // Lo que cuesta preparar una unidad, según su receta: se guarda en la línea vendida.
+    costo: costoDelProducto(p.costo, p.receta),
     almacenId: p.almacenId,
     // Los agregados propios (ProductOption) más los de cualquier grupo
     // reutilizable adjuntado (ver src/app/admin/(protected)/grupos-agregados/)
@@ -383,6 +392,7 @@ export async function crearPedido(datos: DatosCheckout): Promise<ResultadoPedido
             opcionesTexto: l.opcionesTexto,
             ingredientesQuitadosTexto: l.ingredientesQuitadosTexto,
             costoAgregados: l.costoAgregados,
+            costoProducto: l.costoProducto,
             precioAgregados: l.precioAgregados,
           })),
         },

@@ -198,13 +198,21 @@ export async function registrarVenta(turnoId: string, datos: DatosVenta): Promis
       iva: true,
       areaImpresionId: true,
       almacenId: true,
+      costo: true,
       opciones: {
         where: { tipo: "agregado" },
         orderBy: { orden: "asc" },
         select: { id: true, nombre: true, tipo: true, precioExtra: true, costo: true },
       },
       // Insumos que consume este producto — ver Control de stock.
-      receta: { select: { insumoId: true, cantidad: true } },
+      receta: {
+        select: {
+          insumoId: true,
+          cantidad: true,
+          // Con el costo de cada insumo: de ahí sale el costo del producto (ver costo-receta.ts).
+          insumo: { select: { costoUnitario: true } },
+        },
+      },
       gruposAgregados: {
         select: {
           group: {
@@ -254,6 +262,8 @@ export async function registrarVenta(turnoId: string, datos: DatosVenta): Promis
     mitadYMitadModo: p.mitadYMitadModo,
     iva: p.iva,
     receta: p.receta,
+    // Lo que cuesta preparar una unidad, según su receta: se guarda en la línea vendida.
+    costo: costoDelProducto(p.costo, p.receta),
     almacenId: p.almacenId,
     // Los agregados propios más los de cualquier grupo reutilizable
     // adjuntado — mismo criterio que en checkout/actions.ts: cada
@@ -387,6 +397,11 @@ export async function registrarVenta(turnoId: string, datos: DatosVenta): Promis
             precioUnitario: f.precioUnitario,
             iva: f.iva,
             opcionesTexto: f.opcionesTexto ?? null,
+            // Snapshot de costos y del precio de agregados: Rentabilidad separa producto y
+            // agregados también en el mostrador, y usa el costo del día de la venta.
+            costoProducto: f.costoProducto,
+            costoAgregados: f.costoAgregados,
+            precioAgregados: f.precioAgregados,
           })),
         },
       },

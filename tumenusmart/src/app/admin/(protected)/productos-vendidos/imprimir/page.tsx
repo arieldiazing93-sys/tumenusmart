@@ -109,8 +109,9 @@ export default async function ImprimirProductosVendidosPage({
 
           <p className="mb-6 text-xs text-tinta-suave">
             Venta, costo, ganancia y margen van sin IVA. El margen es la ganancia sobre la venta sin IVA. El costo de
-            cada producto sale de su receta, con lo que costó cada insumo en su última compra: es el costo de hoy, no
-            el del día en que se vendió.
+            cada producto sale de su receta, con lo que costó cada insumo en su última compra, y queda guardado en cada
+            venta (un período viejo no cambia si después suben los precios; en las ventas anteriores a que se guardara
+            se usa el costo de hoy). En un mitad y mitad es la mitad del costo de cada sabor.
           </p>
 
           {reporte.totalGeneral.costoIncompleto && (

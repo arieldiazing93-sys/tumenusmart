@@ -59,6 +59,13 @@ export type ProductoBase = {
   iva: string;
   /** Ya ordenadas como las ve el cliente. */
   opciones: OpcionBase[];
+  /**
+   * Cuánto cuesta preparar UNA unidad de este producto (sin agregados), según
+   * su receta — ver src/lib/costo-receta.ts. Null si no se puede calcular (sin
+   * receta, o un insumo sin costo). Solo sirve para guardar el costo en cada
+   * línea vendida; no interviene en el precio.
+   */
+  costo?: Monto | null;
   /** Insumos que consume este producto, por unidad vendida — ver OpcionBase.receta. */
   receta: RecetaInsumoBase[];
   /** Almacén del que descuenta esa receta. Null o ausente = el almacén principal del local. */
@@ -106,6 +113,14 @@ export type LineaArmada = {
    * agregados pero no sabemos cuánto cuestan", para no inventar un número.
    */
   costoAgregados: number | null;
+  /**
+   * Costo (por unidad) del PRODUCTO en sí, sin agregados, según su receta. En
+   * un combo mitad y mitad es la mitad del costo de cada lado. Null si no se
+   * puede calcular (un producto sin receta, o con un insumo sin costo — en un
+   * combo, con que UNO de los dos lados no lo tenga). Se guarda en el ítem al
+   * vender, para que Rentabilidad use el costo de ese día.
+   */
+  costoProducto: number | null;
   /** Precio (por unidad) de las opciones elegidas, sumadas. Nunca null: a
    * diferencia del costo, el precio de un agregado siempre está cargado. */
   precioAgregados: number;
@@ -373,6 +388,7 @@ function armarProducto(
       ingredientesQuitadosTexto:
         quitadosOrdenados.length > 0 ? `Sin: ${quitadosOrdenados.join(", ")}` : undefined,
       costoAgregados: sumaCostoOpciones(elegidas.opciones),
+      costoProducto: producto.costo != null ? aNumero(producto.costo) : null,
       precioAgregados,
       consumo,
     },
@@ -438,6 +454,10 @@ function armarCombo(
       iva: a.iva,
       opcionesTexto: textoOpciones(elegidas.opciones),
       costoAgregados: sumaCostoOpciones(elegidas.opciones),
+      // Físicamente se prepara la mitad de cada lado (igual que el consumo de
+      // stock): el costo del combo es la mitad de cada uno. Si a uno le falta,
+      // no se puede saber el del combo.
+      costoProducto: a.costo != null && b.costo != null ? (aNumero(a.costo) + aNumero(b.costo)) / 2 : null,
       precioAgregados,
       consumo,
     },
