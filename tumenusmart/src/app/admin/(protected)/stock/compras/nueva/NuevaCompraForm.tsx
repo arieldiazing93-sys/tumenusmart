@@ -10,7 +10,7 @@ import { registrarCompra, type InsumoParaCompra } from "../actions";
 import { BuscarInsumoParaCompra } from "./BuscarInsumoParaCompra";
 
 type Proveedor = { id: string; nombre: string; ruc: string | null };
-type Almacen = { id: string; codigo: string; nombre: string };
+type Almacen = { id: string; nombre: string };
 
 type Linea = {
   clave: number;
@@ -280,7 +280,7 @@ export function NuevaCompraForm({
                         <option value="">Sin almacén</option>
                         {almacenes.map((a) => (
                           <option key={a.id} value={a.id}>
-                            {a.codigo} — {a.nombre}
+                            {a.nombre}
                           </option>
                         ))}
                       </Selector>

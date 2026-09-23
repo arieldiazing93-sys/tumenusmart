@@ -1,12 +1,11 @@
 "use client";
 
-import { useRef, useState, useTransition } from "react";
+import { useRef, useTransition } from "react";
 import { Tarjeta, Campo, Entrada, clasesBoton } from "@/components/ui";
 import { crearProveedor } from "./actions";
 
-export function CrearProveedorForm() {
+export function CrearProveedorForm({ onCreado }: { onCreado: (proveedorId: string) => void }) {
   const [pendiente, iniciar] = useTransition();
-  const [agregado, setAgregado] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
 
   function alCrear(formData: FormData) {
@@ -17,17 +16,16 @@ export function CrearProveedorForm() {
         return;
       }
       formRef.current?.reset();
-      setAgregado(true);
-      setTimeout(() => setAgregado(false), 2500);
+      onCreado(resultado.proveedorId);
     });
   }
 
   return (
-    <Tarjeta className="mb-6 flex flex-col gap-3">
+    <Tarjeta className="flex flex-col gap-3">
       <p className="rotulo text-[0.8rem] font-bold">Nuevo proveedor</p>
       <form ref={formRef} action={alCrear} className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <Campo etiqueta="Nombre comercial">
-          <Entrada name="nombre" required placeholder="Ej: Distribuidora Central" />
+          <Entrada name="nombre" required autoFocus placeholder="Ej: Distribuidora Central" />
         </Campo>
         <Campo etiqueta="Razón social (opcional)">
           <Entrada name="razonSocial" placeholder="Ej: Distribuidora Central S.A." />
@@ -47,11 +45,10 @@ export function CrearProveedorForm() {
         <Campo etiqueta="Notas (opcional)" className="sm:col-span-2">
           <Entrada name="notas" placeholder="Ej: entrega los martes y viernes" />
         </Campo>
-        <div className="flex items-center gap-2 sm:col-span-2">
+        <div className="sm:col-span-2">
           <button type="submit" disabled={pendiente} className={clasesBoton("principal")}>
             {pendiente ? "Agregando…" : "Agregar"}
           </button>
-          {agregado && <span className="text-xs font-medium text-exito">✓ Agregado</span>}
         </div>
       </form>
     </Tarjeta>

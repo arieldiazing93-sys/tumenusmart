@@ -6,41 +6,32 @@ import { idLocalActual } from "@/lib/local-actual";
 import { prismaDelLocal } from "@/lib/prisma-local";
 
 export type ResultadoAlmacen = { ok: true } | { ok: false; error: string };
+export type ResultadoCrearAlmacen = { ok: true; almacenId: string } | { ok: false; error: string };
 
-export async function crearAlmacen(formData: FormData): Promise<ResultadoAlmacen> {
+export async function crearAlmacen(formData: FormData): Promise<ResultadoCrearAlmacen> {
   await exigirPermiso("stock.editar");
   const idLocal = await idLocalActual();
   const prisma = prismaDelLocal(idLocal);
 
-  const codigo = String(formData.get("codigo") ?? "").trim();
   const nombre = String(formData.get("nombre") ?? "").trim();
-  if (!codigo || !nombre) return { ok: false, error: "Código y nombre son obligatorios" };
+  if (!nombre) return { ok: false, error: "El nombre es obligatorio" };
 
-  await prisma.almacen.create({ data: { storeId: idLocal, codigo, nombre } });
+  const almacen = await prisma.almacen.create({ data: { storeId: idLocal, nombre } });
   revalidatePath("/admin/stock/almacenes");
-  return { ok: true };
+  return { ok: true, almacenId: almacen.id };
 }
 
-export async function editarAlmacen(
-  id: string,
-  datos: { codigo: string; nombre: string }
-): Promise<ResultadoAlmacen> {
+export async function editarAlmacen(id: string, formData: FormData): Promise<ResultadoAlmacen> {
   await exigirPermiso("stock.editar");
   const prisma = prismaDelLocal(await idLocalActual());
 
-  const codigo = datos.codigo.trim();
-  const nombre = datos.nombre.trim();
-  if (!codigo || !nombre) return { ok: false, error: "Código y nombre son obligatorios" };
+  const nombre = String(formData.get("nombre") ?? "").trim();
+  if (!nombre) return { ok: false, error: "El nombre es obligatorio" };
 
-  await prisma.almacen.update({ where: { id }, data: { codigo, nombre } });
+  await prisma.almacen.update({
+    where: { id },
+    data: { nombre, activo: formData.get("activo") === "on" },
+  });
   revalidatePath("/admin/stock/almacenes");
   return { ok: true };
-}
-
-export async function alternarActivoAlmacen(id: string, activo: boolean) {
-  await exigirPermiso("stock.editar");
-  const prisma = prismaDelLocal(await idLocalActual());
-
-  await prisma.almacen.update({ where: { id }, data: { activo } });
-  revalidatePath("/admin/stock/almacenes");
 }

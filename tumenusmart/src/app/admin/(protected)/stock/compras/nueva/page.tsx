@@ -19,8 +19,8 @@ export default async function NuevaCompraPage() {
     }),
     prisma.almacen.findMany({
       where: { activo: true },
-      orderBy: { codigo: "asc" },
-      select: { id: true, codigo: true, nombre: true },
+      orderBy: { nombre: "asc" },
+      select: { id: true, nombre: true },
     }),
   ]);
 

@@ -26,7 +26,7 @@ export default async function CompraDetallePage({ params }: { params: Promise<{ 
         orderBy: { id: "asc" },
         include: {
           insumo: { select: { nombre: true, unidadMedida: true } },
-          almacen: { select: { codigo: true, nombre: true } },
+          almacen: { select: { nombre: true } },
         },
       },
     },
@@ -114,7 +114,7 @@ export default async function CompraDetallePage({ params }: { params: Promise<{ 
           {compra.items.map((i) => (
             <Tr key={i.id}>
               <Td className="font-medium text-tinta">{i.insumo.nombre}</Td>
-              <Td>{i.almacen ? `${i.almacen.codigo} — ${i.almacen.nombre}` : "—"}</Td>
+              <Td>{i.almacen?.nombre ?? "—"}</Td>
               <Td>
                 {Number(i.rendimiento) === 1 ? (
                   <>

@@ -1390,7 +1390,6 @@ model Almacen {
   id        String   @id @default(cuid())
   storeId   String
   store     Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
-  codigo    String
   nombre    String
   activo    Boolean  @default(true)
   createdAt DateTime @default(now())
