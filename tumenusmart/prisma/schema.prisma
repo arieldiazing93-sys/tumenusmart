@@ -166,6 +166,7 @@ model Store {
   insumos          Insumo[]
   recetaItems      RecetaItem[]
   proveedores      Proveedor[]
+  almacenes        Almacen[]
   compras          Compra[]
   compraItems      CompraItem[]
   gastos           Gasto[]
@@ -1372,18 +1373,56 @@ model Proveedor {
   @@index([storeId])
 }
 
+/// Almacenes/depósitos (ej: "Almacén Cocina", "Almacén Bodega") — un
+/// catálogo simple para saber a cuál entró cada compra. OJO: esto NO
+/// reparte el stock de un Insumo por almacén (Insumo.stockActual sigue
+/// siendo un único total) — es solo el dato de "a dónde entró la
+/// mercadería" en cada línea de compra, para el día que haga falta
+/// reportar por depósito. Repartir el stock de verdad por almacén (y
+/// decidir de cuál descuenta cada venta) queda para más adelante, si se
+/// necesita.
+model Almacen {
+  id        String   @id @default(cuid())
+  storeId   String
+  store     Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  codigo    String
+  nombre    String
+  activo    Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  compraItems CompraItem[]
+
+  @@index([storeId])
+}
+
 model Compra {
   id                String     @id @default(cuid())
   storeId           String
   store             Store      @relation(fields: [storeId], references: [id], onDelete: Cascade)
   proveedorId       String?
   proveedor         Proveedor? @relation(fields: [proveedorId], references: [id], onDelete: SetNull)
+  /// Folio de la factura del proveedor (no un número propio del sistema).
   numeroComprobante String?
   fecha             DateTime   @default(now())
+  /// "contado" | "credito".
+  condicionPago     String     @default("contado")
+  /// Solo tiene sentido con condicionPago "credito" — cuándo vence el pago.
+  fechaVencimiento  DateTime?
+  /// Descuento sobre el total de la factura completa, además de los
+  /// descuentos por línea (CompraItem.descuentoPorcentaje).
+  descuentoGeneralPorcentaje Decimal? @db.Decimal(5, 2)
   total             Decimal    @db.Decimal(10, 2)
   notas             String?
   registradoPor     String?
   createdAt         DateTime   @default(now())
+
+  // Anular una compra ya registrada le devuelve el stock a sus insumos
+  // (ver MovimientoStock tipo "cancelacion") — mismo criterio que
+  // VentaPos.cancelada: nunca se borra la fila, queda quién y por qué.
+  cancelada         Boolean    @default(false)
+  canceladaPor      String?
+  canceladaEn       DateTime?
+  motivoCancelacion String?
 
   items       CompraItem[]
   movimientos MovimientoStock[]
@@ -1393,28 +1432,37 @@ model Compra {
 }
 
 model CompraItem {
-  id            String  @id @default(cuid())
+  id            String   @id @default(cuid())
   storeId       String
-  store         Store   @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  store         Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
   compraId      String
-  compra        Compra  @relation(fields: [compraId], references: [id], onDelete: Cascade)
+  compra        Compra   @relation(fields: [compraId], references: [id], onDelete: Cascade)
   insumoId      String
   // Restrict, no Cascade: borrar un insumo nunca debería borrar de yapa el
   // historial de lo que se compró de él. En la práctica Insumo se
   // desactiva (campo `activo`), no se borra — mismo patrón que Proveedor/
   // AreaImpresion.
-  insumo        Insumo  @relation(fields: [insumoId], references: [id], onDelete: Restrict)
-  cantidad      Decimal @db.Decimal(12, 3)
-  costoUnitario Decimal @db.Decimal(10, 2)
-  subtotal      Decimal @db.Decimal(10, 2)
+  insumo        Insumo   @relation(fields: [insumoId], references: [id], onDelete: Restrict)
+  // A qué almacén entró esta línea — opcional (ver comentario de Almacen).
+  almacenId     String?
+  almacen       Almacen? @relation(fields: [almacenId], references: [id], onDelete: SetNull)
+  cantidad      Decimal  @db.Decimal(12, 3)
+  costoUnitario Decimal  @db.Decimal(10, 2)
+  /// Descuento propio de esta línea — ej: el proveedor bonifica solo un
+  /// insumo puntual, no toda la factura.
+  descuentoPorcentaje Decimal? @db.Decimal(5, 2)
+  /// cantidad × costoUnitario, ya con el descuento de línea aplicado (sin
+  /// IVA — el IVA se desglosa aparte con el campo `iva` de abajo).
+  subtotal      Decimal  @db.Decimal(10, 2)
   // Snapshot del IVA del insumo al momento de la compra — igual que
   // OrderItem.iva/VentaPosItem.iva: si el insumo cambia de tasa después,
   // esta compra ya registrada no se mueve sola.
-  iva           String  @default("gravado10")
+  iva           String   @default("gravado10")
 
   @@index([storeId])
   @@index([compraId])
   @@index([insumoId])
+  @@index([almacenId])
 }
 
 model Gasto {

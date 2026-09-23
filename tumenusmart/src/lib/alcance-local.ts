@@ -37,6 +37,7 @@ export const MODELOS_POR_LOCAL = new Set([
   "Insumo",
   "RecetaItem",
   "Proveedor",
+  "Almacen",
   "Compra",
   "CompraItem",
   "Gasto",
