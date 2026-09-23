@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { Tarjeta, Campo, Entrada, Selector, clasesBoton } from "@/components/ui";
 import { CATEGORIAS_GASTO } from "@/lib/categoria-gasto";
 import { crearGasto } from "./actions";
@@ -11,7 +11,13 @@ export function CrearGastoForm({ proveedores }: { proveedores: Proveedor[] }) {
   const [pendiente, iniciar] = useTransition();
   const [agregado, setAgregado] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
-  const hoy = new Date().toISOString().slice(0, 10);
+  const [fecha, setFecha] = useState("");
+
+  // Se completa recién en el navegador: en el servidor "hoy" sería el de UTC,
+  // y de noche ya es "mañana" en Paraguay.
+  useEffect(() => {
+    setFecha(new Date().toLocaleDateString("en-CA"));
+  }, []);
 
   function alCrear(formData: FormData) {
     iniciar(async () => {
@@ -46,7 +52,7 @@ export function CrearGastoForm({ proveedores }: { proveedores: Proveedor[] }) {
           <Entrada type="number" name="monto" required step="1" min="0" placeholder="Gs." />
         </Campo>
         <Campo etiqueta="Fecha">
-          <Entrada type="date" name="fecha" defaultValue={hoy} />
+          <Entrada type="date" name="fecha" value={fecha} onChange={(e) => setFecha(e.target.value)} />
         </Campo>
         <Campo etiqueta="Proveedor (opcional)">
           <Selector name="proveedorId" defaultValue="">
