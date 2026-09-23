@@ -74,6 +74,22 @@ export function NavPanel({
   const ruta = usePathname();
   const [abierto, setAbierto] = useState(false);
   const [plegada, setPlegada] = useState(plegadaInicial);
+  // Qué grupos están colapsados (título tocado). Arranca vacío —todos
+  // desplegados, como siempre— porque en memoria y no en cookie: esto es
+  // para acomodar la vista mientras se navega, no una preferencia que haga
+  // falta recordar entre sesiones. Sigue vivo mientras se cambia de
+  // pantalla dentro del admin porque el layout no vuelve a montar este
+  // componente en cada navegación.
+  const [colapsados, setColapsados] = useState<Set<string>>(new Set());
+
+  function alternarGrupo(titulo: string) {
+    setColapsados((actuales) => {
+      const copia = new Set(actuales);
+      if (copia.has(titulo)) copia.delete(titulo);
+      else copia.add(titulo);
+      return copia;
+    });
+  }
 
   // Al cambiar de sección el cajón se cierra solo: si quedara abierto, en el
   // celular taparía la pantalla a la que se acaba de entrar.
@@ -121,7 +137,11 @@ export function NavPanel({
   function lista(compacta: boolean) {
     return (
       <nav className={`flex flex-col ${compacta ? "gap-3 p-2" : "gap-4 p-3"}`}>
-        {grupos.map((grupo) => (
+        {grupos.map((grupo) => {
+          // Plegado no hay título que tocar, así que tampoco hay nada para
+          // colapsar — ahí siempre se ven todos los iconos.
+          const colapsado = !compacta && colapsados.has(grupo.titulo);
+          return (
           <div
             key={grupo.titulo}
             // La línea de arriba separa las secciones sin gastar color, y sirve
@@ -150,12 +170,28 @@ export function NavPanel({
 
                 La separación entre letras baja de 0.19em a 0.15em porque a
                 este tamaño la anterior desarma las palabras.
+
+                Botón y no <p> suelto: con la lista ya larga (once secciones
+                repartidas en cinco grupos) hacía falta poder achicarla
+                mientras se navega. Un vistazo (la línea de arriba) alcanza
+                para saber que hay algo ahí aunque esté colapsado.
               */
-              <p className="px-3 pb-2 text-[0.75rem] font-bold uppercase tracking-[0.15em] text-tinta">
+              <button
+                type="button"
+                onClick={() => alternarGrupo(grupo.titulo)}
+                aria-expanded={!colapsado}
+                className="flex w-full items-center justify-between gap-2 rounded-lg px-3 pb-2 text-[0.75rem] font-bold uppercase tracking-[0.15em] text-tinta hover:text-brand"
+              >
                 {grupo.titulo}
-              </p>
+                <IconoPlegar
+                  className={`transition-transform duration-150 ${
+                    colapsado ? "rotate-180" : "-rotate-90"
+                  }`}
+                />
+              </button>
             )}
 
+            {!colapsado && (
             <ul className="flex flex-col gap-0.5">
               {grupo.secciones.map((s) => {
                 const esActiva = activa === s.href;
@@ -201,8 +237,10 @@ export function NavPanel({
                 );
               })}
             </ul>
+            )}
           </div>
-        ))}
+          );
+        })}
       </nav>
     );
   }
