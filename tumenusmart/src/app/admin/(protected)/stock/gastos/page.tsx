@@ -1,10 +1,10 @@
 import { pantallaConPermiso } from "@/lib/auth";
 import { prismaDelLocal } from "@/lib/prisma-local";
 import { idLocalActual } from "@/lib/local-actual";
-import { Cabecera, Tabla, Th, Td, Tr, Vacio, Pastilla } from "@/components/ui";
+import { Cabecera, Tabla, Th, Td, Tr, Vacio, Pastilla, Tarjeta, Campo, Entrada, Selector, clasesBoton } from "@/components/ui";
 import { formatearGuarani } from "@/lib/format";
 import { CrearGastoForm } from "./CrearGastoForm";
-import { etiquetaCategoriaGasto } from "@/lib/categoria-gasto";
+import { CATEGORIAS_GASTO, etiquetaCategoriaGasto } from "@/lib/categoria-gasto";
 
 export const dynamic = "force-dynamic";
 
@@ -33,6 +33,57 @@ export default async function GastosPage() {
       />
 
       <CrearGastoForm proveedores={proveedores} />
+
+      {/* Reporte: cada botón manda este mismo formulario a su propia dirección
+          (el Excel se descarga, el PDF se abre en otra pestaña), así que sale con
+          lo que está escrito acá. Sin fechas, es el mes actual. */}
+      <Tarjeta className="mb-6 flex flex-col gap-3">
+        <p className="rotulo text-[0.8rem] font-bold">Reporte de gastos</p>
+        <form method="get" className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <Campo etiqueta="Desde">
+            <Entrada type="date" name="desde" />
+          </Campo>
+          <Campo etiqueta="Hasta">
+            <Entrada type="date" name="hasta" />
+          </Campo>
+          <Campo etiqueta="Categoría">
+            <Selector name="categoria" defaultValue="">
+              <option value="">Todas</option>
+              {CATEGORIAS_GASTO.map((c) => (
+                <option key={c.valor} value={c.valor}>
+                  {c.etiqueta}
+                </option>
+              ))}
+            </Selector>
+          </Campo>
+          <Campo etiqueta="Proveedor">
+            <Selector name="proveedor" defaultValue="">
+              <option value="">Todos</option>
+              {proveedores.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.nombre}
+                </option>
+              ))}
+            </Selector>
+          </Campo>
+          <div className="flex flex-wrap items-center gap-2 sm:col-span-2 lg:col-span-4">
+            <button type="submit" formAction="/admin/stock/gastos/exportar" className={clasesBoton("principal", "sm")}>
+              Descargar Excel
+            </button>
+            <button
+              type="submit"
+              formAction="/admin/stock/gastos/imprimir"
+              formTarget="_blank"
+              className={clasesBoton("navegar", "sm")}
+            >
+              Ver reporte / PDF
+            </button>
+            <span className="text-xs text-tinta-suave">
+              Sin fechas, toma el mes actual. Los dos extremos entran en el reporte.
+            </span>
+          </div>
+        </form>
+      </Tarjeta>
 
       {gastos.length === 0 ? (
         <Vacio titulo="Todavía no cargaste ningún gasto" />

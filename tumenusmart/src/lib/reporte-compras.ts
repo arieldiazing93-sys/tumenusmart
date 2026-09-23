@@ -1,6 +1,6 @@
 import { prismaDelLocal } from "./prisma-local";
 import { calcularCompra } from "./compra-calculo";
-import { claveDiaAsuncion, inicioDeMesEnAsuncion } from "./timezone";
+import { rangoDeDias, limitesDelRango, fechaDeDia, diaEnTexto, type RangoDias } from "./rango-dias";
 import { etiquetaUnidadMedida } from "./unidad-medida";
 
 /**
@@ -15,7 +15,10 @@ import { etiquetaUnidadMedida } from "./unidad-medida";
  * (compras/imprimir), para que los dos digan siempre lo mismo.
  */
 
-export type RangoCompras = { desde: string; hasta: string };
+export type RangoCompras = RangoDias;
+
+// Los mismos helpers de rango que usa el reporte de Gastos (ver rango-dias.ts).
+export { rangoDeDias as rangoDeCompras, fechaDeDia as fechaDeCompra, diaEnTexto };
 
 export type LineaReporteCompra = {
   insumo: string;
@@ -80,36 +83,6 @@ export type ReporteCompras = {
   porProveedor: ProveedorReporte[];
 };
 
-const DIA_MS = 24 * 60 * 60 * 1000;
-const FORMATO_DIA = /^\d{4}-\d{2}-\d{2}$/;
-
-function esDiaValido(texto: string | null | undefined): texto is string {
-  return !!texto && FORMATO_DIA.test(texto) && !Number.isNaN(Date.parse(texto));
-}
-
-/**
- * El rango que pidió la URL. Si falta una fecha (o no es válida) se usa el mes
- * actual en Asunción: del día 1 hasta hoy. Si vienen al revés, se dan vuelta.
- */
-export function rangoDeCompras(desde?: string | null, hasta?: string | null): RangoCompras {
-  const ahora = new Date();
-  let inicio = esDiaValido(desde) ? desde : claveDiaAsuncion(inicioDeMesEnAsuncion(ahora));
-  let fin = esDiaValido(hasta) ? hasta : claveDiaAsuncion(ahora);
-  if (inicio > fin) [inicio, fin] = [fin, inicio];
-  return { desde: inicio, hasta: fin };
-}
-
-/** "23/09/2026" — sin correr el día por la zona horaria (las fechas de compra son días, no instantes). */
-export function fechaDeCompra(fecha: Date): string {
-  return fecha.toLocaleDateString("es-PY", { day: "2-digit", month: "2-digit", year: "numeric", timeZone: "UTC" });
-}
-
-/** "2026-09-23" → "23/09/2026". */
-export function diaEnTexto(dia: string): string {
-  const [y, m, d] = dia.split("-");
-  return `${d}/${m}/${y}`;
-}
-
 export async function calcularReporteCompras(
   storeId: string,
   rango: RangoCompras,
@@ -121,7 +94,7 @@ export async function calcularReporteCompras(
     db.compra.findMany({
       where: {
         cancelada: false,
-        fecha: { gte: new Date(rango.desde), lt: new Date(Date.parse(rango.hasta) + DIA_MS) },
+        fecha: limitesDelRango(rango),
         ...(proveedorId ? { proveedorId } : {}),
       },
       orderBy: [{ fecha: "asc" }, { createdAt: "asc" }],

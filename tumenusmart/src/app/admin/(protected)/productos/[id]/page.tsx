@@ -1,5 +1,5 @@
 import { pantallaConPermiso } from "@/lib/auth";
-import { Suspense } from "react";
+import { Suspense, type ReactNode } from "react";
 import { Volver } from "@/components/Volver";
 import { notFound } from "next/navigation";
 import { prismaDelLocal } from "@/lib/prisma-local";
@@ -8,10 +8,10 @@ import { EliminarProductoBoton, EliminarOpcionBoton } from "./EliminarBotones";
 import { EditarProductoForm } from "./EditarProductoForm";
 import { GruposAgregadosProducto } from "./GruposAgregadosProducto";
 import { RecetaProducto } from "./RecetaProducto";
-import { etiquetaIva } from "@/lib/iva";
+import { etiquetaIva, TASAS_IVA } from "@/lib/iva";
 import { etiquetaUnidadMedida } from "@/lib/unidad-medida";
 import { formatearGuarani } from "@/lib/format";
-import { costoDeReceta } from "@/lib/costo-receta";
+import { costoDeReceta, costoDelProducto } from "@/lib/costo-receta";
 import { GuardadoToast } from "@/components/GuardadoToast";
 import { Tarjeta } from "@/components/ui";
 
@@ -84,6 +84,15 @@ export default async function EditarProductoPage({
 
   const almacenes = todosLosAlmacenes.filter((a) => a.activo || a.id === producto.almacenId);
   const costoPorReceta = costoDeReceta(producto.receta);
+
+  // Costo y utilidad por unidad. Van sobre el precio SIN IVA: el precio de
+  // venta lleva el IVA adentro y ese impuesto no es del negocio, mientras que
+  // el costo de los insumos se guarda sin IVA — igual que en Rentabilidad.
+  const costoProducto = costoDelProducto(producto.costo, producto.receta);
+  const porcentajeIva = TASAS_IVA.find((t) => t.valor === producto.iva)?.porcentaje ?? 10;
+  const precioSinIva = Number(producto.precio) / (1 + porcentajeIva / 100);
+  const utilidad = costoProducto != null ? precioSinIva - costoProducto : null;
+  const sobrePrecio = (monto: number) => (precioSinIva > 0 ? (monto / precioSinIva) * 100 : 0);
 
   const idsAdjuntados = new Set(producto.gruposAgregados.map((g) => g.groupId));
   const gruposDisponibles = todosLosGrupos
@@ -208,30 +217,59 @@ export default async function EditarProductoPage({
           }))}
         />
         {/* El costo del producto ya no se carga a mano: sale de esta receta. */}
-        {producto.receta.length > 0 ? (
-          <p className="text-sm text-tinta-media">
-            {costoPorReceta != null ? (
-              <>
-                Costo de preparar una unidad, según esta receta:{" "}
-                <span className="font-semibold text-tinta">{formatearGuarani(costoPorReceta)}</span>
-                <span className="mt-0.5 block text-xs text-tinta-suave">
-                  Es la suma, por cada insumo, de la cantidad de la receta × el costo de ese insumo (el de su
-                  última compra, por unidad y sin IVA).
-                </span>
-              </>
-            ) : (
-              "Todavía no se puede calcular el costo: a algún insumo de la receta le falta el costo (se completa al registrar una compra)."
-            )}
-          </p>
+        {costoProducto != null && utilidad != null ? (
+          <div className="flex flex-col gap-2 border-t border-linea pt-3">
+            <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+              <p className="text-sm font-semibold text-tinta">Costo y utilidad por unidad</p>
+              <p className="text-xs text-tinta-suave">
+                Sobre el precio de venta sin IVA: {formatearGuarani(precioSinIva)} (precio{" "}
+                {formatearGuarani(Number(producto.precio))}, {etiquetaIva(producto.iva).toLowerCase()})
+              </p>
+            </div>
+            <div className="grid max-w-md grid-cols-[5.5rem_minmax(0,1fr)_5.5rem] items-center gap-x-2 gap-y-2">
+              <span className="text-sm text-tinta-media">Costo</span>
+              <CajaCosteo>{formatearGuarani(costoProducto)}</CajaCosteo>
+              <CajaCosteo>{porcentaje(sobrePrecio(costoProducto))}</CajaCosteo>
+              <span className="text-sm text-tinta-media">Utilidad</span>
+              <CajaCosteo tono={utilidad < 0 ? "negativo" : "normal"}>{formatearGuarani(utilidad)}</CajaCosteo>
+              <CajaCosteo tono={utilidad < 0 ? "negativo" : "normal"}>{porcentaje(sobrePrecio(utilidad))}</CajaCosteo>
+            </div>
+            <p className="text-xs text-tinta-suave">
+              {costoPorReceta != null
+                ? "El costo es la suma, por cada insumo, de la cantidad de la receta × el costo de ese insumo (el de su última compra, por unidad y sin IVA). La utilidad es el precio sin IVA menos el costo; los porcentajes son sobre el precio sin IVA."
+                : "Este costo se cargó a mano antes de que existieran las recetas y se sigue usando hasta que armes la receta. La utilidad es el precio sin IVA menos el costo; los porcentajes son sobre el precio sin IVA."}
+              {producto.receta.length > 0 &&
+                costoPorReceta == null &&
+                " La receta todavía no se puede costear: a algún insumo le falta el costo (se completa al registrar una compra)."}
+            </p>
+          </div>
         ) : (
-          producto.costo != null && (
-            <p className="text-sm text-tinta-media">
-              Costo cargado antes a mano: {formatearGuarani(Number(producto.costo))}. Se sigue usando
-              hasta que armes la receta.
+          producto.receta.length > 0 && (
+            <p className="border-t border-linea pt-3 text-sm text-tinta-media">
+              Todavía no se puede calcular el costo: a algún insumo de la receta le falta el costo (se completa al
+              registrar una compra).
             </p>
           )
         )}
       </div>
+    </div>
+  );
+}
+
+/** "16,7 %" — un porcentaje con un decimal, al estilo de acá. */
+function porcentaje(valor: number): string {
+  return `${new Intl.NumberFormat("es-PY", { maximumFractionDigits: 1 }).format(valor)} %`;
+}
+
+/** Un valor calculado, en una caja gris: se ve que ahí hay un dato, pero no se puede tipear. */
+function CajaCosteo({ children, tono = "normal" }: { children: ReactNode; tono?: "normal" | "negativo" }) {
+  return (
+    <div
+      className={`cifra rounded-lg border border-linea bg-papel-hundido px-3 py-2 text-right text-[0.88rem] font-semibold ${
+        tono === "negativo" ? "text-peligro" : "text-tinta"
+      }`}
+    >
+      {children}
     </div>
   );
 }
