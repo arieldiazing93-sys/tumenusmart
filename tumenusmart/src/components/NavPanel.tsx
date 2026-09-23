@@ -74,13 +74,15 @@ export function NavPanel({
   const ruta = usePathname();
   const [abierto, setAbierto] = useState(false);
   const [plegada, setPlegada] = useState(plegadaInicial);
-  // Qué grupos están colapsados (título tocado). Arranca vacío —todos
-  // desplegados, como siempre— porque en memoria y no en cookie: esto es
-  // para acomodar la vista mientras se navega, no una preferencia que haga
-  // falta recordar entre sesiones. Sigue vivo mientras se cambia de
-  // pantalla dentro del admin porque el layout no vuelve a montar este
-  // componente en cada navegación.
-  const [colapsados, setColapsados] = useState<Set<string>>(new Set());
+  // Qué grupos están colapsados (título tocado). Arranca con TODOS
+  // colapsados —la lista ya es larga y así se lee de un vistazo— y en
+  // memoria, no en cookie: esto es para acomodar la vista mientras se
+  // navega, no una preferencia que haga falta recordar entre sesiones.
+  // Sigue vivo mientras se cambia de pantalla dentro del admin porque el
+  // layout no vuelve a montar este componente en cada navegación.
+  const [colapsados, setColapsados] = useState<Set<string>>(
+    () => new Set(grupos.map((g) => g.titulo))
+  );
 
   function alternarGrupo(titulo: string) {
     setColapsados((actuales) => {
@@ -134,6 +136,11 @@ export function NavPanel({
     .filter((s) => ruta === s.href || ruta.startsWith(s.href + "/"))
     .sort((a, b) => b.href.length - a.href.length)[0]?.href;
 
+  // El grupo dueño de la sección activa, para marcar su título en naranja
+  // aunque esté colapsado — así se sabe dónde estás sin tener que
+  // desplegarlo primero.
+  const grupoActivo = grupos.find((g) => g.secciones.some((s) => s.href === activa))?.titulo;
+
   function lista(compacta: boolean) {
     return (
       <nav className={`flex flex-col ${compacta ? "gap-3 p-2" : "gap-4 p-3"}`}>
@@ -162,11 +169,10 @@ export function NavPanel({
             */}
             {!compacta && (
               /*
-                Los títulos son tinta oscura y negrita, NO naranja.
-                Probé las dos: con cinco títulos naranjas, el naranja deja de
-                significar "estás acá" y la sección activa se pierde entre
-                ellos. En tinta oscura las secciones se leen igual de bien y el
-                naranja queda para una sola cosa.
+                El título va en tinta oscura, salvo el del grupo que contiene
+                la sección activa: ese va en naranja aunque esté colapsado,
+                porque con todos los grupos arrancando colapsados hace falta
+                una forma de saber dónde estás sin abrir cada uno.
 
                 La separación entre letras baja de 0.19em a 0.15em porque a
                 este tamaño la anterior desarma las palabras.
@@ -180,11 +186,13 @@ export function NavPanel({
                 type="button"
                 onClick={() => alternarGrupo(grupo.titulo)}
                 aria-expanded={!colapsado}
-                className="flex w-full items-center justify-between gap-2 rounded-lg px-3 pb-2 text-[0.75rem] font-bold uppercase tracking-[0.15em] text-tinta hover:text-brand"
+                className={`flex w-full items-center justify-between gap-2 rounded-lg px-3 pb-2 text-[0.75rem] font-bold uppercase tracking-[0.15em] hover:text-brand ${
+                  grupoActivo === grupo.titulo ? "text-brand" : "text-tinta"
+                }`}
               >
-                {grupo.titulo}
+                <span className="flex-1 text-left">{grupo.titulo}</span>
                 <IconoPlegar
-                  className={`transition-transform duration-150 ${
+                  className={`flex-none transition-transform duration-150 ${
                     colapsado ? "rotate-180" : "-rotate-90"
                   }`}
                 />
