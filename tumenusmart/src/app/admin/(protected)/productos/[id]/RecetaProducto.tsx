@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { clasesBoton } from "@/components/ui";
 import { asignarInsumoAProducto } from "../actions";
 import { BuscarInsumoParaReceta } from "./BuscarInsumoParaReceta";
 import { QuitarInsumoDeRecetaBoton } from "./QuitarInsumoDeRecetaBoton";
@@ -90,7 +91,7 @@ export function RecetaProducto({ productId, receta }: { productId: string; recet
                       setCantidadEditada(String(r.cantidad));
                       setError(null);
                     }}
-                    className="text-xs text-tinta-media hover:underline"
+                    className={clasesBoton("suave", "sm")}
                     title="Cambiar la cantidad"
                   >
                     {r.cantidad} {r.unidadMedida}

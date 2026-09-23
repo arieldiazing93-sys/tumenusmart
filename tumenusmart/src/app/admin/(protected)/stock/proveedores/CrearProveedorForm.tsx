@@ -26,13 +26,22 @@ export function CrearProveedorForm() {
     <Tarjeta className="mb-6 flex flex-col gap-3">
       <p className="rotulo text-[0.8rem] font-bold">Nuevo proveedor</p>
       <form ref={formRef} action={alCrear} className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <Campo etiqueta="Nombre">
+        <Campo etiqueta="Nombre comercial">
           <Entrada name="nombre" required placeholder="Ej: Distribuidora Central" />
+        </Campo>
+        <Campo etiqueta="Razón social (opcional)">
+          <Entrada name="razonSocial" placeholder="Ej: Distribuidora Central S.A." />
+        </Campo>
+        <Campo etiqueta="RUC (opcional)">
+          <Entrada name="ruc" placeholder="Ej: 80012345-6" />
         </Campo>
         <Campo etiqueta="Teléfono (opcional)">
           <Entrada name="telefono" placeholder="Ej: 0981234567" />
         </Campo>
-        <Campo etiqueta="Email (opcional)" className="sm:col-span-2">
+        <Campo etiqueta="Ciudad (opcional)">
+          <Entrada name="ciudad" placeholder="Ej: Asunción" />
+        </Campo>
+        <Campo etiqueta="Email (opcional)">
           <Entrada type="email" name="email" placeholder="Ej: ventas@distribuidora.com" />
         </Campo>
         <Campo etiqueta="Notas (opcional)" className="sm:col-span-2">

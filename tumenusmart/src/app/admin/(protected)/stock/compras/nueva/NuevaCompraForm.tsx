@@ -138,7 +138,7 @@ export function NuevaCompraForm({ insumos, proveedores }: { insumos: Insumo[]; p
                     type="button"
                     onClick={() => quitarLinea(i)}
                     disabled={lineas.length === 1}
-                    className="text-xs text-peligro hover:underline disabled:opacity-40"
+                    className={clasesBoton("peligro", "sm")}
                   >
                     Quitar
                   </button>

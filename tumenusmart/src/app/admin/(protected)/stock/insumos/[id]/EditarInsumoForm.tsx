@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { Tarjeta, Campo, Entrada, Selector, clasesBoton } from "@/components/ui";
 import { UNIDADES_MEDIDA, etiquetaUnidadMedida } from "@/lib/unidad-medida";
+import { TASAS_IVA } from "@/lib/iva";
 import { actualizarInsumo } from "../actions";
 
 type Categoria = { id: string; nombre: string };
@@ -11,6 +12,7 @@ type Insumo = {
   nombre: string;
   categoriaId: string | null;
   unidadMedida: string;
+  iva: string;
   stockActual: number;
   stockMinimo: number | null;
   costoUnitario: number | null;
@@ -55,7 +57,7 @@ export function EditarInsumoForm({ insumo, categorias }: { insumo: Insumo; categ
             <button
               type="button"
               onClick={() => setNuevaCategoria((v) => !v)}
-              className="mt-1 text-xs text-brand hover:underline"
+              className={`mt-1.5 ${clasesBoton("suave", "sm")}`}
             >
               {nuevaCategoria ? "Elegir una categoría existente" : "+ Nueva categoría"}
             </button>
@@ -66,6 +68,15 @@ export function EditarInsumoForm({ insumo, categorias }: { insumo: Insumo; categ
               {UNIDADES_MEDIDA.map((u) => (
                 <option key={u.valor} value={u.valor}>
                   {u.etiqueta}
+                </option>
+              ))}
+            </Selector>
+          </Campo>
+          <Campo etiqueta="IVA" ayuda="Para armar la factura cuando se compra este insumo.">
+            <Selector name="iva" defaultValue={insumo.iva}>
+              {TASAS_IVA.map((t) => (
+                <option key={t.valor} value={t.valor}>
+                  {t.etiqueta}
                 </option>
               ))}
             </Selector>

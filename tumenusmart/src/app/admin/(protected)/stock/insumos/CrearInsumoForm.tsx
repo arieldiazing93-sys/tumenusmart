@@ -4,6 +4,7 @@ import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Tarjeta, Campo, Entrada, Selector, clasesBoton } from "@/components/ui";
 import { UNIDADES_MEDIDA } from "@/lib/unidad-medida";
+import { TASAS_IVA } from "@/lib/iva";
 import { crearInsumo } from "./actions";
 
 type Categoria = { id: string; nombre: string };
@@ -56,7 +57,7 @@ export function CrearInsumoForm({ categorias }: { categorias: Categoria[] }) {
           <button
             type="button"
             onClick={() => setNuevaCategoria((v) => !v)}
-            className="mt-1 text-xs text-brand hover:underline"
+            className={`mt-1.5 ${clasesBoton("suave", "sm")}`}
           >
             {nuevaCategoria ? "Elegir una categoría existente" : "+ Nueva categoría"}
           </button>
@@ -67,6 +68,15 @@ export function CrearInsumoForm({ categorias }: { categorias: Categoria[] }) {
             {UNIDADES_MEDIDA.map((u) => (
               <option key={u.valor} value={u.valor}>
                 {u.etiqueta}
+              </option>
+            ))}
+          </Selector>
+        </Campo>
+        <Campo etiqueta="IVA" ayuda="Para armar la factura cuando se compra este insumo.">
+          <Selector name="iva" defaultValue="gravado10">
+            {TASAS_IVA.map((t) => (
+              <option key={t.valor} value={t.valor}>
+                {t.etiqueta}
               </option>
             ))}
           </Selector>

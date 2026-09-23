@@ -1,10 +1,10 @@
-import Link from "next/link";
 import { pantallaConPermiso } from "@/lib/auth";
 import { prismaDelLocal } from "@/lib/prisma-local";
 import { idLocalActual } from "@/lib/local-actual";
-import { Cabecera, Tabla, Th, Td, Tr, Vacio, Pastilla } from "@/components/ui";
+import { Cabecera, Tabla, Th, Td, Tr, Vacio, Pastilla, BotonEnlace } from "@/components/ui";
 import { formatearGuarani } from "@/lib/format";
 import { etiquetaUnidadMedida } from "@/lib/unidad-medida";
+import { etiquetaIva } from "@/lib/iva";
 import { CrearInsumoForm } from "./CrearInsumoForm";
 
 export const dynamic = "force-dynamic";
@@ -42,6 +42,7 @@ export default async function InsumosPage() {
               <Th>Nombre</Th>
               <Th>Categoría</Th>
               <Th>Stock actual</Th>
+              <Th>IVA</Th>
               <Th>Costo unitario</Th>
               <Th>
                 <span className="sr-only">Acciones</span>
@@ -65,11 +66,12 @@ export default async function InsumosPage() {
                     </span>
                     {stock < 0 && <Pastilla color="peligro">Negativo</Pastilla>}
                   </Td>
+                  <Td>{etiquetaIva(i.iva)}</Td>
                   <Td>{i.costoUnitario != null ? formatearGuarani(Number(i.costoUnitario)) : "—"}</Td>
                   <Td>
-                    <Link href={`/admin/stock/insumos/${i.id}`} className="text-brand hover:underline">
+                    <BotonEnlace href={`/admin/stock/insumos/${i.id}`} tono="navegar" tam="sm">
                       Editar
-                    </Link>
+                    </BotonEnlace>
                   </Td>
                 </Tr>
               );

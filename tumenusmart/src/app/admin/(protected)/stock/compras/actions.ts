@@ -40,6 +40,15 @@ export async function registrarCompra(datos: DatosCompra): Promise<ResultadoComp
   const fechaParseada = datos.fecha ? new Date(datos.fecha) : new Date();
   const fecha = Number.isNaN(fechaParseada.getTime()) ? new Date() : fechaParseada;
 
+  // El IVA de cada línea es un snapshot del insumo al momento de comprar
+  // (ver comentario de CompraItem.iva en el schema) — se lee acá, antes de
+  // armar la compra.
+  const insumosInvolucrados = await prisma.insumo.findMany({
+    where: { id: { in: [...new Set(lineas.map((l) => l.insumoId))] } },
+    select: { id: true, iva: true },
+  });
+  const ivaPorInsumo = new Map(insumosInvolucrados.map((i) => [i.id, i.iva]));
+
   const compra = await prisma.$transaction(async (tx) => {
     const nuevaCompra = await tx.compra.create({
       data: {
@@ -57,6 +66,7 @@ export async function registrarCompra(datos: DatosCompra): Promise<ResultadoComp
             cantidad: l.cantidad,
             costoUnitario: l.costoUnitario,
             subtotal: l.cantidad * l.costoUnitario,
+            iva: ivaPorInsumo.get(l.insumoId) ?? "gravado10",
           })),
         },
       },

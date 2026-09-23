@@ -1301,6 +1301,11 @@ model Insumo {
   // "unidad" | "kilogramo" | "litro" — mismo whitelist que Product.unidadMedida,
   // ver src/lib/unidad-medida.ts.
   unidadMedida String           @default("unidad")
+  // "gravado10" | "gravado5" | "exento" — mismo whitelist que Product.iva,
+  // ver src/lib/iva.ts. Dato fiscal del insumo en sí (lo que paga el
+  // negocio al comprarlo) — cada línea de Compra lo copia como snapshot al
+  // momento de registrarse, para poder armar una factura de compra fiscal.
+  iva          String           @default("gravado10")
   /// Espejo del ledger (MovimientoStock) para lectura rápida — se actualiza
   /// siempre en la misma transacción que un movimiento, nunca por su cuenta.
   /// Puede quedar negativo: una venta nunca se bloquea por falta de stock,
@@ -1343,15 +1348,23 @@ model RecetaItem {
 }
 
 model Proveedor {
-  id        String   @id @default(cuid())
-  storeId   String
-  store     Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
-  nombre    String
-  telefono  String?
-  email     String?
-  notas     String?
-  activo    Boolean  @default(true)
-  createdAt DateTime @default(now())
+  id      String @id @default(cuid())
+  storeId String
+  store   Store  @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  /// Nombre comercial — con el que el negocio lo reconoce a diario. El
+  /// único obligatorio: los demás datos fiscales pueden no tenerse a mano
+  /// (proveedor informal) sin que eso impida cargarlo.
+  nombre       String
+  /// Razón social — el nombre legal/fiscal, puede ser distinto del
+  /// comercial (ej: "Distribuidora del Este S.A." vs. "Don Pedro Bebidas").
+  razonSocial  String?
+  ruc          String?
+  telefono     String?
+  ciudad       String?
+  email        String?
+  notas        String?
+  activo       Boolean  @default(true)
+  createdAt    DateTime @default(now())
 
   compras Compra[]
   gastos  Gasto[]
@@ -1394,6 +1407,10 @@ model CompraItem {
   cantidad      Decimal @db.Decimal(12, 3)
   costoUnitario Decimal @db.Decimal(10, 2)
   subtotal      Decimal @db.Decimal(10, 2)
+  // Snapshot del IVA del insumo al momento de la compra — igual que
+  // OrderItem.iva/VentaPosItem.iva: si el insumo cambia de tasa después,
+  // esta compra ya registrada no se mueve sola.
+  iva           String  @default("gravado10")
 
   @@index([storeId])
   @@index([compraId])

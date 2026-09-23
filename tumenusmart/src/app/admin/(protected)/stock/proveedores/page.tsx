@@ -30,7 +30,10 @@ export default async function ProveedoresPage() {
             key={p.id}
             id={p.id}
             nombre={p.nombre}
+            razonSocial={p.razonSocial ?? ""}
+            ruc={p.ruc ?? ""}
             telefono={p.telefono ?? ""}
+            ciudad={p.ciudad ?? ""}
             email={p.email ?? ""}
             notas={p.notas ?? ""}
             activo={p.activo}

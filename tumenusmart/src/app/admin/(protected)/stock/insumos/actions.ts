@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { idLocalActual } from "@/lib/local-actual";
 import { prismaDelLocal } from "@/lib/prisma-local";
 import { normalizarUnidadMedida } from "@/lib/unidad-medida";
+import { normalizarIva } from "@/lib/iva";
 
 export type ResultadoInsumo = { ok: true } | { ok: false; error: string };
 export type ResultadoCrearInsumo =
@@ -35,6 +36,7 @@ export async function crearInsumo(formData: FormData): Promise<ResultadoCrearIns
   const categoriaId = String(formData.get("categoriaId") ?? "").trim();
   const categoriaNueva = String(formData.get("categoriaNueva") ?? "").trim();
   const unidadMedida = normalizarUnidadMedida(formData.get("unidadMedida"));
+  const iva = normalizarIva(formData.get("iva"));
   const stockInicial = aDecimalOpcional(formData.get("stockInicial")) ?? 0;
   const stockMinimo = aDecimalOpcional(formData.get("stockMinimo"));
   const costoUnitario = aDecimalOpcional(formData.get("costoUnitario"));
@@ -54,6 +56,7 @@ export async function crearInsumo(formData: FormData): Promise<ResultadoCrearIns
         nombre,
         categoriaId: categoriaFinalId,
         unidadMedida,
+        iva,
         stockActual: stockInicial,
         stockMinimo,
         costoUnitario,
@@ -94,6 +97,7 @@ export async function actualizarInsumo(
   const categoriaId = String(formData.get("categoriaId") ?? "").trim();
   const categoriaNueva = String(formData.get("categoriaNueva") ?? "").trim();
   const unidadMedida = normalizarUnidadMedida(formData.get("unidadMedida"));
+  const iva = normalizarIva(formData.get("iva"));
   const stockMinimo = aDecimalOpcional(formData.get("stockMinimo"));
   const costoUnitario = aDecimalOpcional(formData.get("costoUnitario"));
   const activo = formData.get("activo") === "on";
@@ -108,7 +112,7 @@ export async function actualizarInsumo(
     }
     await tx.insumo.update({
       where: { id },
-      data: { nombre, categoriaId: categoriaFinalId, unidadMedida, stockMinimo, costoUnitario, activo },
+      data: { nombre, categoriaId: categoriaFinalId, unidadMedida, iva, stockMinimo, costoUnitario, activo },
     });
   });
 

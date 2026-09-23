@@ -101,10 +101,10 @@ export function InsumoInventarioFila({
             </>
           ) : (
             <>
-              <button type="button" onClick={() => setAjustando(true)} className="text-tinta-media hover:underline">
+              <button type="button" onClick={() => setAjustando(true)} className={clasesBoton("suave", "sm")}>
                 Ajustar
               </button>
-              <Link href={`/admin/stock/inventario/${id}`} className="text-brand hover:underline">
+              <Link href={`/admin/stock/inventario/${id}`} className={clasesBoton("navegar", "sm")}>
                 Historial
               </Link>
             </>

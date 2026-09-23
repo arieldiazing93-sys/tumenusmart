@@ -29,6 +29,7 @@ export default async function EditarInsumoPage({ params }: { params: Promise<{ i
           nombre: insumo.nombre,
           categoriaId: insumo.categoriaId,
           unidadMedida: insumo.unidadMedida,
+          iva: insumo.iva,
           stockActual: Number(insumo.stockActual),
           stockMinimo: insumo.stockMinimo != null ? Number(insumo.stockMinimo) : null,
           costoUnitario: insumo.costoUnitario != null ? Number(insumo.costoUnitario) : null,
