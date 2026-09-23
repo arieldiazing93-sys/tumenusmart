@@ -59,82 +59,94 @@ export function EditarProductoForm({
     <form action={alGuardar} className="flex flex-col gap-4">
       <Tarjeta className="flex flex-col gap-3">
         <p className="rotulo text-[0.8rem] font-bold">Datos básicos</p>
-        <Campo etiqueta="Categoría">
-          <Selector name="categoryId" required defaultValue={producto.categoryId}>
-            {categorias.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.nombre}
-              </option>
-            ))}
-          </Selector>
-        </Campo>
-        <Campo etiqueta="Nombre">
-          <Entrada name="nombre" required defaultValue={producto.nombre} />
-        </Campo>
-        <Campo etiqueta="Descripción (opcional)">
-          <Area name="descripcion" rows={2} defaultValue={producto.descripcion ?? ""} />
-        </Campo>
-        <Campo
-          etiqueta="Área de impresión"
-          ayuda="A dónde se manda este producto en la comanda automática. Sin área, no imprime en ninguna comanda."
-        >
-          <Selector name="areaImpresionId" defaultValue={producto.areaImpresionId ?? ""}>
-            <option value="">Sin área — no imprime en comanda</option>
-            {areasImpresion.map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.nombre}
-              </option>
-            ))}
-          </Selector>
-        </Campo>
+        {/*
+          Dos columnas desde sm: en una pantalla de escritorio, ocho campos
+          en una sola columna obligaban a scrollear de más para ver todo el
+          formulario. Descripción y Área de impresión ocupan las dos
+          columnas igual (col-span-2): son las que necesitan más ancho para
+          leerse cómodas (un textarea, una ayuda larga).
+        */}
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <Campo etiqueta="Categoría">
+            <Selector name="categoryId" required defaultValue={producto.categoryId}>
+              {categorias.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.nombre}
+                </option>
+              ))}
+            </Selector>
+          </Campo>
+          <Campo etiqueta="Nombre">
+            <Entrada name="nombre" required defaultValue={producto.nombre} />
+          </Campo>
+          <Campo etiqueta="Descripción (opcional)" className="sm:col-span-2">
+            <Area name="descripcion" rows={2} defaultValue={producto.descripcion ?? ""} />
+          </Campo>
+          <Campo
+            etiqueta="Área de impresión"
+            ayuda="A dónde se manda este producto en la comanda automática. Sin área, no imprime en ninguna comanda."
+            className="sm:col-span-2"
+          >
+            <Selector name="areaImpresionId" defaultValue={producto.areaImpresionId ?? ""}>
+              <option value="">Sin área — no imprime en comanda</option>
+              {areasImpresion.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.nombre}
+                </option>
+              ))}
+            </Selector>
+          </Campo>
+        </div>
       </Tarjeta>
 
       <Tarjeta className="flex flex-col gap-3">
         <p className="rotulo text-[0.8rem] font-bold">Precio y costo</p>
-        <Campo etiqueta="Precio de venta">
-          <Entrada
-            type="number"
-            name="precio"
-            required
-            step="1"
-            min="0"
-            defaultValue={producto.precio}
-          />
-        </Campo>
-        <Campo
-          etiqueta="Costo (opcional)"
-          ayuda="Solo lo ves vos. Con esto, Ideas para vender más puede decirte qué producto te deja más ganancia, no solo cuál factura más."
-        >
-          <Entrada
-            type="number"
-            name="costo"
-            step="1"
-            min="0"
-            placeholder="Lo que te cuesta prepararlo"
-            defaultValue={producto.costo != null ? producto.costo : ""}
-          />
-        </Campo>
-        <Campo etiqueta="IVA" ayuda="Para el desglose de la Factura Autoimpresor.">
-          <Selector name="iva" defaultValue={producto.iva}>
-            {TASAS_IVA.map((t) => (
-              <option key={t.valor} value={t.valor}>
-                {t.etiqueta}
-              </option>
-            ))}
-          </Selector>
-        </Campo>
-        <Campo
-          etiqueta="Unidad de medida"
-          ayuda="Lo va a pedir la futura factura electrónica por cada producto."
-        >
-          <Selector name="unidadMedida" defaultValue={producto.unidadMedida}>
-            {UNIDADES_MEDIDA.map((u) => (
-              <option key={u.valor} value={u.valor}>
-                {u.etiqueta}
-              </option>
-            ))}
-          </Selector>
-        </Campo>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <Campo etiqueta="Precio de venta">
+            <Entrada
+              type="number"
+              name="precio"
+              required
+              step="1"
+              min="0"
+              defaultValue={producto.precio}
+            />
+          </Campo>
+          <Campo
+            etiqueta="Costo (opcional)"
+            ayuda="Solo lo ves vos. Con esto, Ideas para vender más puede decirte qué producto te deja más ganancia, no solo cuál factura más."
+          >
+            <Entrada
+              type="number"
+              name="costo"
+              step="1"
+              min="0"
+              placeholder="Lo que te cuesta prepararlo"
+              defaultValue={producto.costo != null ? producto.costo : ""}
+            />
+          </Campo>
+          <Campo etiqueta="IVA" ayuda="Para el desglose de la Factura Autoimpresor.">
+            <Selector name="iva" defaultValue={producto.iva}>
+              {TASAS_IVA.map((t) => (
+                <option key={t.valor} value={t.valor}>
+                  {t.etiqueta}
+                </option>
+              ))}
+            </Selector>
+          </Campo>
+          <Campo
+            etiqueta="Unidad de medida"
+            ayuda="Lo va a pedir la futura factura electrónica por cada producto."
+          >
+            <Selector name="unidadMedida" defaultValue={producto.unidadMedida}>
+              {UNIDADES_MEDIDA.map((u) => (
+                <option key={u.valor} value={u.valor}>
+                  {u.etiqueta}
+                </option>
+              ))}
+            </Selector>
+          </Campo>
+        </div>
       </Tarjeta>
 
       <Tarjeta className="flex flex-col gap-3">
@@ -144,14 +156,16 @@ export function EditarProductoForm({
 
       <Tarjeta className="flex flex-col gap-2">
         <p className="rotulo text-[0.8rem] font-bold">Visibilidad</p>
-        <label className="flex items-center gap-2 text-sm">
-          <input type="checkbox" name="disponible" defaultChecked={producto.disponible} />
-          Disponible en el menú
-        </label>
-        <label className="flex items-center gap-2 text-sm">
-          <input type="checkbox" name="destacado" defaultChecked={producto.destacado} />
-          ⭐ Producto destacado (aparece en el carrusel de la cabecera del menú)
-        </label>
+        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:gap-x-6">
+          <label className="flex items-center gap-2 text-sm">
+            <input type="checkbox" name="disponible" defaultChecked={producto.disponible} />
+            Disponible en el menú
+          </label>
+          <label className="flex items-center gap-2 text-sm">
+            <input type="checkbox" name="destacado" defaultChecked={producto.destacado} />
+            ⭐ Producto destacado (aparece en el carrusel de la cabecera del menú)
+          </label>
+        </div>
       </Tarjeta>
 
       <Tarjeta className="flex flex-col gap-3">
@@ -166,15 +180,17 @@ export function EditarProductoForm({
           combinar este producto mitad y mitad con otros del MISMO grupo. Dejalo vacío
           si este producto no se combina.
         </p>
-        <Entrada
-          name="mitadYMitadGrupo"
-          defaultValue={producto.mitadYMitadGrupo ?? ""}
-          placeholder="Ej: Pizza Grande"
-        />
-        <Selector name="mitadYMitadModo" defaultValue={producto.mitadYMitadModo}>
-          <option value="mayor">Precio mayor (cobra el sabor más caro)</option>
-          <option value="proporcional">Precio proporcional (mitad de cada uno)</option>
-        </Selector>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <Entrada
+            name="mitadYMitadGrupo"
+            defaultValue={producto.mitadYMitadGrupo ?? ""}
+            placeholder="Ej: Pizza Grande"
+          />
+          <Selector name="mitadYMitadModo" defaultValue={producto.mitadYMitadModo}>
+            <option value="mayor">Precio mayor (cobra el sabor más caro)</option>
+            <option value="proporcional">Precio proporcional (mitad de cada uno)</option>
+          </Selector>
+        </div>
         <p className="text-xs text-tinta-suave">
           Usá el mismo modo en todos los productos de un mismo grupo.
         </p>

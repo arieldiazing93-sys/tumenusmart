@@ -52,37 +52,40 @@ export default async function AdminConfiguracionPage() {
         <h2 className="mb-4 text-[1.15rem] font-semibold tracking-titular text-tinta">Datos del negocio</h2>
 
         <form action={actualizarStore} className="flex flex-col gap-3">
-          <div>
-            <label className="mb-1 block text-sm font-medium text-tinta-media">
-              Nombre del negocio
-            </label>
-            <input
-              name="nombre"
-              required
-              defaultValue={store?.nombre ?? ""}
-              className="w-full rounded-lg border border-linea px-3 py-2"
-            />
-          </div>
-          <div>
-            <label className="mb-1 block text-sm font-medium text-tinta-media">
-              Número de WhatsApp (formato internacional, sin +, ej: 595981234567)
-            </label>
-            <input
-              name="whatsappNumero"
-              required
-              defaultValue={store?.whatsappNumero ?? ""}
-              className="w-full rounded-lg border border-linea px-3 py-2"
-            />
-          </div>
-          <div>
-            <label className="mb-1 block text-sm font-medium text-tinta-media">
-              Dirección (opcional)
-            </label>
-            <input
-              name="direccion"
-              defaultValue={store?.direccion ?? ""}
-              className="w-full rounded-lg border border-linea px-3 py-2"
-            />
+          {/* Dos columnas desde sm: menos scroll para llegar a lo que sigue. */}
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div>
+              <label className="mb-1 block text-sm font-medium text-tinta-media">
+                Nombre del negocio
+              </label>
+              <input
+                name="nombre"
+                required
+                defaultValue={store?.nombre ?? ""}
+                className="w-full rounded-lg border border-linea px-3 py-2"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-tinta-media">
+                Número de WhatsApp (formato internacional, sin +, ej: 595981234567)
+              </label>
+              <input
+                name="whatsappNumero"
+                required
+                defaultValue={store?.whatsappNumero ?? ""}
+                className="w-full rounded-lg border border-linea px-3 py-2"
+              />
+            </div>
+            <div className="sm:col-span-2">
+              <label className="mb-1 block text-sm font-medium text-tinta-media">
+                Dirección (opcional)
+              </label>
+              <input
+                name="direccion"
+                defaultValue={store?.direccion ?? ""}
+                className="w-full rounded-lg border border-linea px-3 py-2"
+              />
+            </div>
           </div>
           {store?.slug && <UrlPublicaField slug={store.slug} />}
           <LogoField initialUrl={store?.logoUrl ?? null} />
@@ -119,27 +122,29 @@ export default async function AdminConfiguracionPage() {
             </Selector>
           </div>
 
-          <div>
-            <label className="mb-1 block text-sm font-medium text-tinta-media">
-              Saludo del mensaje de WhatsApp — pedidos (opcional)
-            </label>
-            <input
-              name="mensajeSaludo"
-              defaultValue={store?.mensajeSaludo ?? ""}
-              placeholder="Ej: ¡Hola! Te paso mi pedido:"
-              className="w-full rounded-lg border border-linea px-3 py-2"
-            />
-          </div>
-          <div>
-            <label className="mb-1 block text-sm font-medium text-tinta-media">
-              Saludo del mensaje de WhatsApp — reservas (opcional)
-            </label>
-            <input
-              name="mensajeSaludoReserva"
-              defaultValue={store?.mensajeSaludoReserva ?? ""}
-              placeholder="Ej: ¡Hola! Te paso mi reserva:"
-              className="w-full rounded-lg border border-linea px-3 py-2"
-            />
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div>
+              <label className="mb-1 block text-sm font-medium text-tinta-media">
+                Saludo del mensaje de WhatsApp — pedidos (opcional)
+              </label>
+              <input
+                name="mensajeSaludo"
+                defaultValue={store?.mensajeSaludo ?? ""}
+                placeholder="Ej: ¡Hola! Te paso mi pedido:"
+                className="w-full rounded-lg border border-linea px-3 py-2"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-tinta-media">
+                Saludo del mensaje de WhatsApp — reservas (opcional)
+              </label>
+              <input
+                name="mensajeSaludoReserva"
+                defaultValue={store?.mensajeSaludoReserva ?? ""}
+                placeholder="Ej: ¡Hola! Te paso mi reserva:"
+                className="w-full rounded-lg border border-linea px-3 py-2"
+              />
+            </div>
           </div>
 
           <div className="mt-2 border-t border-linea pt-4">
@@ -267,70 +272,72 @@ export default async function AdminConfiguracionPage() {
           mostrar lo que dejes tildado acá.
         </p>
         <form action={guardarFormasPagoEntrega} className="flex flex-col gap-5">
-          <div>
-            <p className="mb-2 text-sm font-semibold text-tinta">Métodos de pago</p>
-            <div className="flex flex-col gap-2">
-              <label className="flex items-center gap-2 text-sm font-medium text-tinta-media">
-                <input
-                  type="checkbox"
-                  name="aceptaEfectivo"
-                  defaultChecked={store?.aceptaEfectivo ?? true}
-                />
-                Efectivo
-              </label>
-              <label className="flex items-center gap-2 text-sm font-medium text-tinta-media">
-                <input
-                  type="checkbox"
-                  name="aceptaTransferencia"
-                  defaultChecked={store?.aceptaTransferencia ?? true}
-                />
-                Transferencia
-              </label>
-              <label className="flex items-center gap-2 text-sm font-medium text-tinta-media">
-                <input
-                  type="checkbox"
-                  name="aceptaTarjetaDebito"
-                  defaultChecked={store?.aceptaTarjetaDebito ?? true}
-                />
-                Tarjeta débito (POS al recibir)
-              </label>
-              <label className="flex items-center gap-2 text-sm font-medium text-tinta-media">
-                <input
-                  type="checkbox"
-                  name="aceptaTarjetaCredito"
-                  defaultChecked={store?.aceptaTarjetaCredito ?? true}
-                />
-                Tarjeta crédito (POS al recibir)
-              </label>
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+            <div>
+              <p className="mb-2 text-sm font-semibold text-tinta">Métodos de pago</p>
+              <div className="flex flex-col gap-2">
+                <label className="flex items-center gap-2 text-sm font-medium text-tinta-media">
+                  <input
+                    type="checkbox"
+                    name="aceptaEfectivo"
+                    defaultChecked={store?.aceptaEfectivo ?? true}
+                  />
+                  Efectivo
+                </label>
+                <label className="flex items-center gap-2 text-sm font-medium text-tinta-media">
+                  <input
+                    type="checkbox"
+                    name="aceptaTransferencia"
+                    defaultChecked={store?.aceptaTransferencia ?? true}
+                  />
+                  Transferencia
+                </label>
+                <label className="flex items-center gap-2 text-sm font-medium text-tinta-media">
+                  <input
+                    type="checkbox"
+                    name="aceptaTarjetaDebito"
+                    defaultChecked={store?.aceptaTarjetaDebito ?? true}
+                  />
+                  Tarjeta débito (POS al recibir)
+                </label>
+                <label className="flex items-center gap-2 text-sm font-medium text-tinta-media">
+                  <input
+                    type="checkbox"
+                    name="aceptaTarjetaCredito"
+                    defaultChecked={store?.aceptaTarjetaCredito ?? true}
+                  />
+                  Tarjeta crédito (POS al recibir)
+                </label>
+              </div>
             </div>
-          </div>
-          <div>
-            <p className="mb-2 text-sm font-semibold text-tinta">Formas de entrega</p>
-            <div className="flex flex-col gap-2">
-              <label className="flex items-center gap-2 text-sm font-medium text-tinta-media">
-                <input
-                  type="checkbox"
-                  name="aceptaDelivery"
-                  defaultChecked={store?.aceptaDelivery ?? true}
-                />
-                Delivery
-              </label>
-              <label className="flex items-center gap-2 text-sm font-medium text-tinta-media">
-                <input
-                  type="checkbox"
-                  name="aceptaRetiro"
-                  defaultChecked={store?.aceptaRetiro ?? true}
-                />
-                Retiro en el local
-              </label>
-              <label className="flex items-center gap-2 text-sm font-medium text-tinta-media">
-                <input
-                  type="checkbox"
-                  name="aceptaMesa"
-                  defaultChecked={store?.aceptaMesa ?? true}
-                />
-                Comer en el local
-              </label>
+            <div>
+              <p className="mb-2 text-sm font-semibold text-tinta">Formas de entrega</p>
+              <div className="flex flex-col gap-2">
+                <label className="flex items-center gap-2 text-sm font-medium text-tinta-media">
+                  <input
+                    type="checkbox"
+                    name="aceptaDelivery"
+                    defaultChecked={store?.aceptaDelivery ?? true}
+                  />
+                  Delivery
+                </label>
+                <label className="flex items-center gap-2 text-sm font-medium text-tinta-media">
+                  <input
+                    type="checkbox"
+                    name="aceptaRetiro"
+                    defaultChecked={store?.aceptaRetiro ?? true}
+                  />
+                  Retiro en el local
+                </label>
+                <label className="flex items-center gap-2 text-sm font-medium text-tinta-media">
+                  <input
+                    type="checkbox"
+                    name="aceptaMesa"
+                    defaultChecked={store?.aceptaMesa ?? true}
+                  />
+                  Comer en el local
+                </label>
+              </div>
             </div>
           </div>
           <button type="submit" className={`self-start ${clasesBoton("principal")}`}>
@@ -377,47 +384,49 @@ export default async function AdminConfiguracionPage() {
             />
             Activar programa de fidelización
           </label>
-          <div>
-            <label className="mb-1 block text-sm font-medium text-tinta-media">
-              Pedidos entregados para ganar el premio
-            </label>
-            <input
-              type="number"
-              name="fidelizacionUmbral"
-              min={1}
-              max={50}
-              defaultValue={store?.fidelizacionUmbral ?? 10}
-              className="w-full rounded-lg border border-linea px-3 py-2 sm:w-40"
-            />
-          </div>
-          <div>
-            <label className="mb-1 block text-sm font-medium text-tinta-media">
-              Premio (lo que le vas a dar cuando llegue)
-            </label>
-            <input
-              name="fidelizacionPremio"
-              defaultValue={store?.fidelizacionPremio ?? ""}
-              placeholder="Ej: 1 empanada gratis"
-              className="w-full rounded-lg border border-linea px-3 py-2"
-            />
-          </div>
-          <div>
-            <label className="mb-1 block text-sm font-medium text-tinta-media">
-              Monto mínimo del pedido para que sume (opcional)
-            </label>
-            <input
-              type="number"
-              name="fidelizacionMontoMinimo"
-              min={0}
-              step={1000}
-              defaultValue={store?.fidelizacionMontoMinimo ?? ""}
-              placeholder="Ej: 50000 — dejalo vacío para no exigir un mínimo"
-              className="w-full rounded-lg border border-linea px-3 py-2 sm:w-64"
-            />
-            <p className="mt-1 text-xs text-tinta-suave">
-              Un pedido que no llega a este monto se entrega igual, pero no suma sello — así un
-              pedido muy chico no le gana el premio solo.
-            </p>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div>
+              <label className="mb-1 block text-sm font-medium text-tinta-media">
+                Pedidos entregados para ganar el premio
+              </label>
+              <input
+                type="number"
+                name="fidelizacionUmbral"
+                min={1}
+                max={50}
+                defaultValue={store?.fidelizacionUmbral ?? 10}
+                className="w-full rounded-lg border border-linea px-3 py-2"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-tinta-media">
+                Monto mínimo del pedido para que sume (opcional)
+              </label>
+              <input
+                type="number"
+                name="fidelizacionMontoMinimo"
+                min={0}
+                step={1000}
+                defaultValue={store?.fidelizacionMontoMinimo ?? ""}
+                placeholder="Ej: 50000 — dejalo vacío para no exigir un mínimo"
+                className="w-full rounded-lg border border-linea px-3 py-2"
+              />
+              <p className="mt-1 text-xs text-tinta-suave">
+                Un pedido que no llega a este monto se entrega igual, pero no suma sello — así un
+                pedido muy chico no le gana el premio solo.
+              </p>
+            </div>
+            <div className="sm:col-span-2">
+              <label className="mb-1 block text-sm font-medium text-tinta-media">
+                Premio (lo que le vas a dar cuando llegue)
+              </label>
+              <input
+                name="fidelizacionPremio"
+                defaultValue={store?.fidelizacionPremio ?? ""}
+                placeholder="Ej: 1 empanada gratis"
+                className="w-full rounded-lg border border-linea px-3 py-2"
+              />
+            </div>
           </div>
           <button
             type="submit"
