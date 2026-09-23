@@ -12,7 +12,10 @@ export type LineaCompraInput = {
   insumoId: string;
   almacenId: string | null;
   cantidad: number;
+  /** Costo de una unidad de compra: sin IVA, o con IVA si `costoIncluyeIva` es true. */
   costoUnitario: number;
+  /** true si el operador cargó el costo tal cual la factura, con el IVA adentro. */
+  costoIncluyeIva?: boolean;
   descuentoPorcentaje: number;
 };
 
@@ -153,6 +156,8 @@ export async function registrarCompra(datos: DatosCompra): Promise<ResultadoComp
     lineas.map((l) => ({
       cantidad: l.cantidad,
       costoUnitario: l.costoUnitario,
+      // El IVA que se le saca sale de la base (el del insumo), no del navegador.
+      costoIncluyeIva: l.costoIncluyeIva === true,
       descuentoPorcentaje: l.descuentoPorcentaje,
       iva: ivaPorInsumo.get(l.insumoId) ?? "gravado10",
     })),
@@ -187,7 +192,8 @@ export async function registrarCompra(datos: DatosCompra): Promise<ResultadoComp
             almacenId: l.almacenId || null,
             cantidad: l.cantidad,
             rendimiento: rendimientoDe(l.insumoId),
-            costoUnitario: l.costoUnitario,
+            // Siempre neto: si se cargó con IVA, ya viene sin el impuesto.
+            costoUnitario: calculo.lineas[i].costoUnitarioNeto,
             descuentoPorcentaje: l.descuentoPorcentaje > 0 ? Math.min(l.descuentoPorcentaje, 100) : null,
             subtotal: calculo.lineas[i].subtotal,
             // Snapshot del IVA del insumo al comprar (ver CompraItem.iva).

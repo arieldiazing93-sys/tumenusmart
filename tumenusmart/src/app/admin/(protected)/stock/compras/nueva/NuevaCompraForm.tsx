@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition, type ReactNode } from "react";
 import Link from "next/link";
 import { Tarjeta, Campo, Entrada, Selector, clasesBoton } from "@/components/ui";
 import { formatearGuarani } from "@/lib/format";
@@ -22,9 +22,21 @@ type Linea = {
   rendimiento: number;
   almacenId: string;
   cantidad: string;
-  costoUnitario: string;
+  /** Lo que se escribió como costo de una unidad de compra: sin IVA o con IVA, según `costoConIva`. */
+  costo: string;
+  /** true si `costo` se escribió en la columna "c/ IVA" — la otra columna se calcula sola. */
+  costoConIva: boolean;
   descuentoPorcentaje: string;
 };
+
+/**
+ * Las columnas de las líneas en pantalla ancha: insumo, cantidad, almacén,
+ * costo sin IVA, costo con IVA, descuento, importe y quitar. La cabecera y
+ * cada fila usan la misma, así quedan alineadas sin repetir las etiquetas.
+ * (En pantallas más chicas no entran tantas columnas: cada línea se apila.)
+ */
+const COLUMNAS_LINEA =
+  "xl:grid-cols-[minmax(0,1.5fr)_6rem_minmax(0,1fr)_6.5rem_6.5rem_5rem_7.5rem_5rem]";
 
 /** La fecha de hoy en la zona del navegador (toISOString daría la de UTC, y de noche ya es "mañana"). */
 function hoyLocal(): string {
@@ -34,6 +46,27 @@ function hoyLocal(): string {
 function aNumero(texto: string): number {
   const n = Number(texto);
   return Number.isFinite(n) ? n : 0;
+}
+
+/**
+ * Un campo de una línea. En pantalla ancha la etiqueta ya está en la cabecera
+ * de la tabla; en pantallas más chicas no hay cabecera, así que se muestra acá.
+ */
+function Celda({
+  etiqueta,
+  children,
+  className = "",
+}: {
+  etiqueta: string;
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <label className={`block ${className}`}>
+      <span className="mb-1 block text-[0.78rem] font-semibold text-tinta-media xl:hidden">{etiqueta}</span>
+      {children}
+    </label>
+  );
 }
 
 /**
@@ -71,7 +104,8 @@ export function NuevaCompraForm({
       calcularCompra(
         lineas.map((l) => ({
           cantidad: aNumero(l.cantidad),
-          costoUnitario: aNumero(l.costoUnitario),
+          costoUnitario: aNumero(l.costo),
+          costoIncluyeIva: l.costoConIva,
           descuentoPorcentaje: aNumero(l.descuentoPorcentaje),
           iva: l.iva,
         })),
@@ -101,7 +135,9 @@ export function NuevaCompraForm({
           rendimiento: insumo.rendimiento,
           almacenId: almacenPorDefecto,
           cantidad: "",
-          costoUnitario: insumo.ultimoCostoPorCompra != null ? String(insumo.ultimoCostoPorCompra) : "",
+          // El último costo que se guardó es neto.
+          costo: insumo.ultimoCostoPorCompra != null ? String(insumo.ultimoCostoPorCompra) : "",
+          costoConIva: false,
           descuentoPorcentaje: "",
         },
       ];
@@ -135,7 +171,7 @@ export function NuevaCompraForm({
 
   function guardar() {
     setError(null);
-    const validas = lineas.filter((l) => aNumero(l.cantidad) > 0 && l.costoUnitario !== "");
+    const validas = lineas.filter((l) => aNumero(l.cantidad) > 0 && l.costo !== "");
     if (validas.length === 0) {
       setError("Agregá al menos un insumo con cantidad y costo unitario.");
       return;
@@ -157,7 +193,8 @@ export function NuevaCompraForm({
           insumoId: l.insumoId,
           almacenId: l.almacenId || null,
           cantidad: aNumero(l.cantidad),
-          costoUnitario: aNumero(l.costoUnitario),
+          costoUnitario: aNumero(l.costo),
+          costoIncluyeIva: l.costoConIva,
           descuentoPorcentaje: aNumero(l.descuentoPorcentaje),
         })),
       });
@@ -234,36 +271,65 @@ export function NuevaCompraForm({
 
         <BuscarInsumoParaCompra onElegir={agregarLinea} />
 
+        {lineas.length > 0 && (
+          <p className="text-[0.78rem] text-tinta-suave">
+            Cargá el costo como dice la factura, sin IVA o con IVA: al escribir en una columna, la otra se calcula sola.
+          </p>
+        )}
+
         {lineas.length === 0 ? (
           <p className="rounded-lg border border-dashed border-linea px-3 py-6 text-center text-sm text-tinta-suave">
             Todavía no agregaste ningún insumo — buscalo arriba por nombre.
           </p>
         ) : (
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-col">
+            {/* Cabecera de la tabla: solo en pantalla ancha. En pantallas más
+                chicas cada campo trae su propia etiqueta (ver Celda). */}
+            <div
+              className={`hidden gap-2 px-0.5 pb-1.5 text-[0.78rem] font-semibold text-tinta-media xl:grid ${COLUMNAS_LINEA}`}
+            >
+              <span>Insumo</span>
+              <span>Cantidad</span>
+              <span>Almacén</span>
+              <span>Costo s/ IVA</span>
+              <span>Costo c/ IVA</span>
+              <span>Desc. %</span>
+              <span className="text-right">Importe s/ IVA</span>
+              <span />
+            </div>
+
             {lineas.map((l, i) => {
               const calculada = calculo.lineas[i];
               const unidadesQueEntran = Math.round(aNumero(l.cantidad) * l.rendimiento * 1000) / 1000;
+              // Lo escrito se muestra tal cual; la otra columna, calculada.
+              const hayCosto = l.costo !== "";
+              const costoSinIva = hayCosto ? (l.costoConIva ? String(calculada.costoUnitarioNeto) : l.costo) : "";
+              const costoConIva = hayCosto ? (l.costoConIva ? l.costo : String(calculada.costoUnitarioConImpuesto)) : "";
               return (
-                <div key={l.clave} className="flex flex-col gap-2 rounded-lg border border-linea p-3">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div>
-                      <p className="font-medium">{l.nombre}</p>
-                      <p className="text-xs text-tinta-suave">
-                        {l.unidadMedida} · {etiquetaIva(l.iva)}
-                        {l.rendimiento !== 1 && ` · cada compra trae ${l.rendimiento} ${l.unidadMedida}`}
-                      </p>
+                <div
+                  key={l.clave}
+                  className={`grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 border-t border-linea py-2 ${COLUMNAS_LINEA}`}
+                >
+                  <div className="order-1 min-w-0 xl:order-none">
+                    <p className="font-medium leading-tight">{l.nombre}</p>
+                    <p className="text-xs leading-snug text-tinta-suave">
+                      {l.unidadMedida} · {etiquetaIva(l.iva)}
+                      {l.rendimiento !== 1 && ` · cada compra trae ${l.rendimiento} ${l.unidadMedida}`}
                       {unidadesQueEntran > 0 && (
-                        <p className="cifra mt-0.5 text-[0.84rem] font-semibold text-exito">
-                          Ingresa al stock: {unidadesQueEntran} {l.unidadMedida}
-                        </p>
+                        <>
+                          {" · "}
+                          <span className="cifra font-semibold text-exito">
+                            Ingresa al stock: {unidadesQueEntran} {l.unidadMedida}
+                          </span>
+                        </>
                       )}
-                    </div>
-                    <button type="button" onClick={() => quitarLinea(l.clave)} className={clasesBoton("peligro", "sm")}>
-                      Quitar
-                    </button>
+                    </p>
                   </div>
-                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
-                    <Campo etiqueta="Cantidad">
+
+                  {/* En pantalla ancha este contenedor "desaparece" (contents) y
+                      sus campos caen directo en las columnas de la fila. */}
+                  <div className="order-3 col-span-2 grid grid-cols-2 items-end gap-2 sm:grid-cols-3 lg:grid-cols-6 xl:contents">
+                    <Celda etiqueta="Cantidad">
                       <Entrada
                         type="number"
                         step="0.001"
@@ -271,8 +337,8 @@ export function NuevaCompraForm({
                         value={l.cantidad}
                         onChange={(e) => actualizarLinea(l.clave, { cantidad: e.target.value })}
                       />
-                    </Campo>
-                    <Campo etiqueta="Almacén">
+                    </Celda>
+                    <Celda etiqueta="Almacén">
                       <Selector
                         value={l.almacenId}
                         onChange={(e) => actualizarLinea(l.clave, { almacenId: e.target.value })}
@@ -284,20 +350,26 @@ export function NuevaCompraForm({
                           </option>
                         ))}
                       </Selector>
-                    </Campo>
-                    <Campo etiqueta="Costo unitario">
+                    </Celda>
+                    <Celda etiqueta="Costo s/ IVA">
                       <Entrada
                         type="number"
-                        step="1"
+                        step="any"
                         min="0"
-                        value={l.costoUnitario}
-                        onChange={(e) => actualizarLinea(l.clave, { costoUnitario: e.target.value })}
+                        value={costoSinIva}
+                        onChange={(e) => actualizarLinea(l.clave, { costo: e.target.value, costoConIva: false })}
                       />
-                    </Campo>
-                    <Campo etiqueta="Costo c/ impuesto">
-                      <Entrada disabled value={formatearGuarani(calculada.costoUnitarioConImpuesto)} />
-                    </Campo>
-                    <Campo etiqueta="Desc. %">
+                    </Celda>
+                    <Celda etiqueta="Costo c/ IVA">
+                      <Entrada
+                        type="number"
+                        step="any"
+                        min="0"
+                        value={costoConIva}
+                        onChange={(e) => actualizarLinea(l.clave, { costo: e.target.value, costoConIva: true })}
+                      />
+                    </Celda>
+                    <Celda etiqueta="Desc. %">
                       <Entrada
                         type="number"
                         step="0.01"
@@ -307,10 +379,21 @@ export function NuevaCompraForm({
                         value={l.descuentoPorcentaje}
                         onChange={(e) => actualizarLinea(l.clave, { descuentoPorcentaje: e.target.value })}
                       />
-                    </Campo>
-                    <Campo etiqueta="Importe s/ impuesto">
-                      <Entrada disabled value={formatearGuarani(calculada.subtotal)} />
-                    </Campo>
+                    </Celda>
+                    <div>
+                      <span className="mb-1 block text-[0.78rem] font-semibold text-tinta-media xl:hidden">
+                        Importe s/ IVA
+                      </span>
+                      <p className="cifra py-2.5 text-[0.88rem] font-medium xl:py-0 xl:text-right">
+                        {formatearGuarani(calculada.subtotal)}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="order-2 justify-self-end xl:order-none">
+                    <button type="button" onClick={() => quitarLinea(l.clave)} className={clasesBoton("peligro", "sm")}>
+                      Quitar
+                    </button>
                   </div>
                 </div>
               );

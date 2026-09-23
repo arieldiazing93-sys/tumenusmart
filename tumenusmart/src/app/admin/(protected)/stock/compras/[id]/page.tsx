@@ -33,11 +33,14 @@ export default async function CompraDetallePage({ params }: { params: Promise<{ 
   });
   if (!compra) notFound();
 
+  // Se parte del importe ya guardado de cada línea (con su descuento), no de
+  // cantidad × costo unitario: el costo unitario está redondeado a centavos y
+  // en una compra grande el resultado podía desviarse un guaraní del total.
   const calculo = calcularCompra(
     compra.items.map((i) => ({
-      cantidad: Number(i.cantidad),
-      costoUnitario: Number(i.costoUnitario),
-      descuentoPorcentaje: i.descuentoPorcentaje != null ? Number(i.descuentoPorcentaje) : 0,
+      cantidad: 1,
+      costoUnitario: Number(i.subtotal),
+      descuentoPorcentaje: 0,
       iva: i.iva,
     })),
     compra.descuentoGeneralPorcentaje != null ? Number(compra.descuentoGeneralPorcentaje) : 0

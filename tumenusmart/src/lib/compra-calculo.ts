@@ -6,17 +6,24 @@
  * los que de verdad se guardan — el navegador nunca decide cuánto vale una
  * compra.
  *
- * Convención (la de una factura de compra en Paraguay): el costo unitario que
- * se carga es NETO, sin IVA. El descuento de línea baja el neto de esa línea;
- * el descuento general baja el neto de todas; el IVA se calcula sobre el neto
- * ya descontado y se suma al final. El total es lo que hay que pagar.
+ * Convención (la de una factura de compra en Paraguay): el costo unitario se
+ * trabaja NETO, sin IVA. El descuento de línea baja el neto de esa línea; el
+ * descuento general baja el neto de todas; el IVA se calcula sobre el neto ya
+ * descontado y se suma al final. El total es lo que hay que pagar.
+ *
+ * El operador puede cargar el costo tal cual lo dice la factura del proveedor,
+ * con el IVA adentro (`costoIncluyeIva`): acá se le saca el impuesto para
+ * llegar al neto, así nadie tiene que hacer esa cuenta a mano.
  */
 
 import { TASAS_IVA } from "./iva";
 
 export type LineaParaCalcular = {
   cantidad: number;
+  /** Costo de UNA unidad de compra. Sin IVA, salvo que `costoIncluyeIva` sea true. */
   costoUnitario: number;
+  /** true si `costoUnitario` ya trae el IVA del insumo adentro. */
+  costoIncluyeIva?: boolean;
   /** 0–100. Vacío o inválido cuenta como 0. */
   descuentoPorcentaje: number;
   /** "gravado10" | "gravado5" | "exento" — ver src/lib/iva.ts. */
@@ -26,6 +33,8 @@ export type LineaParaCalcular = {
 export type LineaCalculada = {
   /** cantidad × costo, con el descuento de LÍNEA aplicado; sin IVA. */
   subtotal: number;
+  /** Costo unitario sin IVA y sin descuentos — lo que se guarda en CompraItem.costoUnitario. */
+  costoUnitarioNeto: number;
   /** Costo unitario + IVA, sin descuentos — la columna informativa. */
   costoUnitarioConImpuesto: number;
   /** Lo que de verdad cuesta cada unidad: neto, con los dos descuentos. */
@@ -75,7 +84,11 @@ export function calcularCompra(
     const descL = porcentajeValido(l.descuentoPorcentaje);
     const pct = porcentajeIva(l.iva);
 
-    const subtotalLinea = redondear(cantidad * costo * (1 - descL / 100));
+    // Sin redondear: 10.000 con IVA son 9.090,909… de neto, y redondearlo
+    // antes de multiplicar por la cantidad arrastraría el error a cada compra.
+    const costoNeto = l.costoIncluyeIva ? costo / (1 + pct / 100) : costo;
+
+    const subtotalLinea = redondear(cantidad * costoNeto * (1 - descL / 100));
     const netoLinea = subtotalLinea * factorGeneral;
 
     subtotal += subtotalLinea;
@@ -84,8 +97,9 @@ export function calcularCompra(
 
     return {
       subtotal: subtotalLinea,
-      costoUnitarioConImpuesto: redondear(costo * (1 + pct / 100)),
-      costoUnitarioEfectivo: redondear(costo * (1 - descL / 100) * factorGeneral),
+      costoUnitarioNeto: redondear(costoNeto),
+      costoUnitarioConImpuesto: l.costoIncluyeIva ? redondear(costo) : redondear(costo * (1 + pct / 100)),
+      costoUnitarioEfectivo: redondear(costoNeto * (1 - descL / 100) * factorGeneral),
     };
   });
 
