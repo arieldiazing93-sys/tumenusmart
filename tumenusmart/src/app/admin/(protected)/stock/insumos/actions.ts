@@ -122,8 +122,18 @@ export async function actualizarInsumo(
   const rendimiento = leerRendimiento(formData.get("rendimiento"));
   if (rendimiento === "invalido") return { ok: false, error: "El rendimiento tiene que ser un número mayor a cero" };
   const stockMinimo = aDecimalOpcional(formData.get("stockMinimo"));
-  const costoUnitario = aDecimalOpcional(formData.get("costoUnitario"));
+  const costoEscrito = aDecimalOpcional(formData.get("costoUnitario"));
   const activo = formData.get("activo") === "on";
+
+  // El campo muestra el costo redondeado a guaraníes enteros. Si quedó tal como
+  // se mostró (no lo tocaron), se conserva el exacto de la última compra en vez
+  // de pisarlo con el redondeado, que cambiaría en silencio el costo de las recetas.
+  const actual = await prisma.insumo.findUnique({ where: { id }, select: { costoUnitario: true } });
+  const costoActual = actual?.costoUnitario != null ? Number(actual.costoUnitario) : null;
+  const costoUnitario =
+    costoEscrito !== null && costoActual !== null && Math.round(costoActual) === costoEscrito
+      ? costoActual
+      : costoEscrito;
 
   await prisma.$transaction(async (tx) => {
     let categoriaFinalId = categoriaId || null;

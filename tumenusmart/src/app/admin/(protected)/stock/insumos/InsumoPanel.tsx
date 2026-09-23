@@ -149,12 +149,15 @@ export function InsumoPanel({
             />
           </Campo>
           <Campo etiqueta="Costo unitario (opcional)">
+            {/* El costo que sale de una compra puede traer decimales (3787,88).
+                En guaraníes se muestra entero: con decimales el navegador
+                rechazaba el guardado por "valor inválido". */}
             <Entrada
               type="number"
               name="costoUnitario"
               step="1"
               min="0"
-              defaultValue={insumo.costoUnitario ?? ""}
+              defaultValue={insumo.costoUnitario != null ? Math.round(insumo.costoUnitario) : ""}
             />
           </Campo>
         </div>

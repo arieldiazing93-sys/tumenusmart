@@ -115,11 +115,18 @@ export async function actualizarProducto(
   const nombre = String(formData.get("nombre") ?? "").trim();
   const categoryId = String(formData.get("categoryId") ?? "");
   const areaImpresionId = String(formData.get("areaImpresionId") ?? "").trim() || null;
-  const precio = parseFloat(String(formData.get("precio") ?? "0"));
+  const precioEscrito = parseFloat(String(formData.get("precio") ?? "0"));
 
-  if (!nombre || !categoryId || isNaN(precio)) {
+  if (!nombre || !categoryId || isNaN(precioEscrito)) {
     return { ok: false, error: "Faltan datos obligatorios" };
   }
+
+  // El campo muestra el precio en guaraníes enteros. Si quedó como se mostró (no
+  // lo tocaron), se conserva el guardado tal cual en vez de pisarlo con el redondeado.
+  const guardado = await prisma.product.findUnique({ where: { id: productId }, select: { precio: true } });
+  const precioGuardado = guardado ? Number(guardado.precio) : null;
+  const precio =
+    precioGuardado !== null && Math.round(precioGuardado) === precioEscrito ? precioGuardado : precioEscrito;
 
   const mitadYMitadGrupo = String(formData.get("mitadYMitadGrupo") ?? "").trim() || null;
   const mitadYMitadModo =

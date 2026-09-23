@@ -122,13 +122,15 @@ export function EditarProductoForm({
         <p className="rotulo text-[0.8rem] font-bold">Precio</p>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Campo etiqueta="Precio de venta">
+            {/* Guaraníes enteros: si el precio guardado trae decimales, el campo
+                (que solo acepta enteros) rechazaría el guardado con "valor inválido". */}
             <Entrada
               type="number"
               name="precio"
               required
               step="1"
               min="0"
-              defaultValue={producto.precio}
+              defaultValue={Math.round(producto.precio)}
             />
           </Campo>
           <Campo etiqueta="IVA" ayuda="Para el desglose de la Factura Autoimpresor.">
