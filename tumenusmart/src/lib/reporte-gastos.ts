@@ -51,9 +51,11 @@ export async function calcularReporteGastos(
 ): Promise<ReporteGastos> {
   const db = prismaDelLocal(storeId);
 
-  // La categoría se acepta solo si es una de las conocidas: lo que venga
+  // La categoría se acepta solo si es una de las fijas o una propia del local: lo que venga
   // escrito en la URL a mano no se usa tal cual.
-  const categoria = CATEGORIAS_GASTO.find((c) => c.valor === filtros.categoria)?.valor ?? null;
+  const propias = (await db.categoriaGasto.findMany({ select: { nombre: true } })).map((c) => c.nombre);
+  const pedida = filtros.categoria ?? "";
+  const categoria = CATEGORIAS_GASTO.some((c) => c.valor === pedida) || propias.includes(pedida) ? pedida : null;
   const proveedorId = filtros.proveedorId || null;
 
   const [gastos, proveedor] = await Promise.all([

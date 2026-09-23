@@ -94,8 +94,8 @@ export function MaestroDetalle<T extends { id: string; activo: boolean }>({
                         {c.titulo}
                       </th>
                     ))}
-                    <th scope="col" className="px-2 py-2 lg:hidden">
-                      <span className="sr-only">Abrir</span>
+                    <th scope="col" className="px-2 py-2">
+                      <span className="sr-only">Ver</span>
                     </th>
                   </tr>
                 </thead>
@@ -118,9 +118,9 @@ export function MaestroDetalle<T extends { id: string; activo: boolean }>({
                           {c.celda(item)}
                         </td>
                       ))}
-                      <td className="px-2 py-1 text-right lg:hidden">
+                      <td className="px-2 py-1 text-right">
                         <button type="button" onClick={() => abrir(item.id)} className={clasesBoton("suave", "sm")}>
-                          Abrir
+                          Ver
                         </button>
                       </td>
                     </tr>
@@ -130,7 +130,7 @@ export function MaestroDetalle<T extends { id: string; activo: boolean }>({
             )}
           </div>
           <p className="border-t border-linea px-3 py-2 text-[0.74rem] text-tinta-suave">
-            Doble clic en una fila para ver sus datos.
+            Doble clic en una fila, o el botón Ver, para abrir sus datos.
           </p>
         </Tarjeta>
 

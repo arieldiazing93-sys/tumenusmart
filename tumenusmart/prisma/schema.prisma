@@ -173,6 +173,7 @@ model Store {
   movimientosStock MovimientoStock[]
   inventarios      Inventario[]
   inventarioItems  InventarioItem[]
+  categoriasGasto  CategoriaGasto[]
 }
 
 /// Las direcciones que este local tuvo antes.
@@ -1513,7 +1514,9 @@ model Gasto {
   storeId       String
   store         Store      @relation(fields: [storeId], references: [id], onDelete: Cascade)
   concepto      String
-  // "alquiler" | "servicios" | "sueldos" | "insumos" | "otros" — whitelist
+  // Una de las cinco fijas ("alquiler" | "servicios" | "sueldos" | "insumos" |
+  // "otros") o el NOMBRE de una categoría propia del local (ver CategoriaGasto) —
+  // whitelist
   // en la Server Action, mismo criterio que Product.iva.
   categoria     String     @default("otros")
   monto         Decimal    @db.Decimal(10, 2)
@@ -1627,4 +1630,18 @@ model InventarioItem {
 
   @@index([storeId])
   @@index([inventarioId])
+}
+
+/// Categorías de gasto que creó el local, además de las cinco fijas (ver
+/// src/lib/categoria-gasto.ts). Se crean ahí mismo, al cargar un gasto. Un
+/// gasto guarda el NOMBRE en Gasto.categoria, así que el nombre no se puede
+/// repetir dentro del local (ni llamarse como una de las fijas).
+model CategoriaGasto {
+  id        String   @id @default(cuid())
+  storeId   String
+  store     Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  nombre    String
+  createdAt DateTime @default(now())
+
+  @@unique([storeId, nombre])
 }

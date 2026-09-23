@@ -61,6 +61,9 @@ export function InsumosMaestroDetalle({
 
   const abierto = abiertoId ? (insumos.find((i) => i.id === abiertoId) ?? null) : null;
 
+  // El reporte respeta la categoría elegida arriba de la lista ("" = todas).
+  const consultaReporte = categoriaFiltro !== TODAS ? `?categoria=${encodeURIComponent(categoriaFiltro)}` : "";
+
   // En pantalla angosta el panel queda debajo de la lista: se lo trae a la
   // vista, si no el doble clic parecería no hacer nada.
   useEffect(() => {
@@ -89,6 +92,20 @@ export function InsumosMaestroDetalle({
         <span className="text-xs text-tinta-suave">
           {insumos.length} {insumos.length === 1 ? "insumo" : "insumos"} en total
         </span>
+        {/* Reporte de existencias: sale con la categoría que esté elegida en la lista. */}
+        <div className="flex flex-wrap items-center gap-2 sm:ml-auto">
+          <a href={`/admin/stock/insumos/exportar${consultaReporte}`} className={clasesBoton("suave", "sm")}>
+            Descargar Excel
+          </a>
+          <a
+            href={`/admin/stock/insumos/imprimir${consultaReporte}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={clasesBoton("navegar", "sm")}
+          >
+            Ver reporte / PDF
+          </a>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[26rem_minmax(0,1fr)]">
@@ -132,8 +149,8 @@ export function InsumosMaestroDetalle({
                     <th scope="col" className="px-3 py-2">
                       Unidad
                     </th>
-                    <th scope="col" className="px-2 py-2 lg:hidden">
-                      <span className="sr-only">Abrir</span>
+                    <th scope="col" className="px-2 py-2">
+                      <span className="sr-only">Ver</span>
                     </th>
                   </tr>
                 </thead>
@@ -173,9 +190,9 @@ export function InsumosMaestroDetalle({
                           {i.costoUnitario != null ? formatearGuarani(i.costoUnitario) : "—"}
                         </td>
                         <td className="px-3 py-2">{etiquetaUnidadMedida(i.unidadMedida)}</td>
-                        <td className="px-2 py-1 text-right lg:hidden">
+                        <td className="px-2 py-1 text-right">
                           <button type="button" onClick={() => abrir(i.id)} className={clasesBoton("suave", "sm")}>
-                            Abrir
+                            Ver
                           </button>
                         </td>
                       </tr>
@@ -186,7 +203,7 @@ export function InsumosMaestroDetalle({
             )}
           </div>
           <p className="border-t border-linea px-3 py-2 text-[0.74rem] text-tinta-suave">
-            Doble clic en un insumo para ver sus datos.
+            Doble clic en un insumo, o el botón Ver, para abrir sus datos.
           </p>
         </Tarjeta>
 

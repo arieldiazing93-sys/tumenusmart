@@ -4,7 +4,7 @@ import { idLocalActual } from "@/lib/local-actual";
 import { Cabecera, Tabla, Th, Td, Tr, Vacio, Pastilla, Tarjeta, Campo, Entrada, Selector, clasesBoton } from "@/components/ui";
 import { formatearGuarani } from "@/lib/format";
 import { CrearGastoForm } from "./CrearGastoForm";
-import { CATEGORIAS_GASTO, etiquetaCategoriaGasto } from "@/lib/categoria-gasto";
+import { opcionesCategoriaGasto, etiquetaCategoriaGasto } from "@/lib/categoria-gasto";
 
 export const dynamic = "force-dynamic";
 
@@ -12,7 +12,7 @@ export default async function GastosPage() {
   await pantallaConPermiso("stock.ver");
   const prisma = prismaDelLocal(await idLocalActual());
 
-  const [gastos, proveedores] = await Promise.all([
+  const [gastos, proveedores, categoriasPropias] = await Promise.all([
     prisma.gasto.findMany({
       orderBy: { fecha: "desc" },
       include: { proveedor: { select: { nombre: true } } },
@@ -23,7 +23,10 @@ export default async function GastosPage() {
       orderBy: { nombre: "asc" },
       select: { id: true, nombre: true },
     }),
+    // Las categorías que creó este local, además de las cinco fijas.
+    prisma.categoriaGasto.findMany({ select: { nombre: true } }),
   ]);
+  const categorias = opcionesCategoriaGasto(categoriasPropias.map((c) => c.nombre));
 
   return (
     <div>
@@ -32,7 +35,7 @@ export default async function GastosPage() {
         bajada="Gastos generales del negocio — alquiler, servicios, sueldos... No necesitan estar ligados a una compra ni a un proveedor."
       />
 
-      <CrearGastoForm proveedores={proveedores} />
+      <CrearGastoForm proveedores={proveedores} categorias={categorias} />
 
       {/* Reporte: cada botón manda este mismo formulario a su propia dirección
           (el Excel se descarga, el PDF se abre en otra pestaña), así que sale con
@@ -49,7 +52,7 @@ export default async function GastosPage() {
           <Campo etiqueta="Categoría">
             <Selector name="categoria" defaultValue="">
               <option value="">Todas</option>
-              {CATEGORIAS_GASTO.map((c) => (
+              {categorias.map((c) => (
                 <option key={c.valor} value={c.valor}>
                   {c.etiqueta}
                 </option>

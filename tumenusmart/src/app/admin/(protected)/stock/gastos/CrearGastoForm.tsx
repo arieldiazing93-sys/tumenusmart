@@ -2,16 +2,24 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import { Tarjeta, Campo, Entrada, Selector, clasesBoton } from "@/components/ui";
-import { CATEGORIAS_GASTO } from "@/lib/categoria-gasto";
+import { type OpcionCategoriaGasto } from "@/lib/categoria-gasto";
 import { crearGasto } from "./actions";
 
 type Proveedor = { id: string; nombre: string };
 
-export function CrearGastoForm({ proveedores }: { proveedores: Proveedor[] }) {
+export function CrearGastoForm({
+  proveedores,
+  categorias,
+}: {
+  proveedores: Proveedor[];
+  /** Las cinco fijas más las que creó el local. */
+  categorias: OpcionCategoriaGasto[];
+}) {
   const [pendiente, iniciar] = useTransition();
   const [agregado, setAgregado] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
   const [fecha, setFecha] = useState("");
+  const [nuevaCategoria, setNuevaCategoria] = useState(false);
 
   // Se completa recién en el navegador: en el servidor "hoy" sería el de UTC,
   // y de noche ya es "mañana" en Paraguay.
@@ -27,6 +35,7 @@ export function CrearGastoForm({ proveedores }: { proveedores: Proveedor[] }) {
         return;
       }
       formRef.current?.reset();
+      setNuevaCategoria(false);
       setAgregado(true);
       setTimeout(() => setAgregado(false), 2500);
     });
@@ -39,15 +48,29 @@ export function CrearGastoForm({ proveedores }: { proveedores: Proveedor[] }) {
         <Campo etiqueta="Concepto">
           <Entrada name="concepto" required placeholder="Ej: Alquiler de septiembre" />
         </Campo>
-        <Campo etiqueta="Categoría">
-          <Selector name="categoria" defaultValue="otros">
-            {CATEGORIAS_GASTO.map((c) => (
-              <option key={c.valor} value={c.valor}>
-                {c.etiqueta}
-              </option>
-            ))}
-          </Selector>
-        </Campo>
+        <div>
+          <Campo etiqueta="Categoría">
+            {!nuevaCategoria ? (
+              <Selector name="categoria" defaultValue="otros">
+                {categorias.map((c) => (
+                  <option key={c.valor} value={c.valor}>
+                    {c.etiqueta}
+                  </option>
+                ))}
+              </Selector>
+            ) : (
+              // Si se escribe una categoría nueva, se crea al guardar el gasto.
+              <Entrada name="categoriaNueva" placeholder="Nombre de la categoría nueva" maxLength={40} autoFocus required />
+            )}
+          </Campo>
+          <button
+            type="button"
+            onClick={() => setNuevaCategoria((v) => !v)}
+            className={`mt-1.5 ${clasesBoton("suave", "sm")}`}
+          >
+            {nuevaCategoria ? "Elegir una categoría existente" : "+ Nueva categoría"}
+          </button>
+        </div>
         <Campo etiqueta="Monto">
           <Entrada type="number" name="monto" required step="1" min="0" placeholder="Gs." />
         </Campo>
