@@ -99,7 +99,9 @@ export function estadoSuscripcion(
   }
 
   if (!local.vencimiento) {
-    return { clase: "sin_vencimiento", etiqueta: "Sin fecha de vencimiento" };
+    // Sin fecha = todavía no corre el plazo: el local atiende, pero la renta
+    // empieza recién cuando se lo activa desde la cartera.
+    return { clase: "sin_vencimiento", etiqueta: "Sin activar" };
   }
 
   const dias = diasHastaVencer(local.vencimiento, ahora, zona);

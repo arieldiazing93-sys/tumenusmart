@@ -8,6 +8,7 @@ import { formatearGuarani } from "@/lib/format";
 import { construirLinkWhatsapp } from "@/lib/whatsapp";
 import { type FiltroFecha } from "@/lib/rango-fecha";
 import {
+  calcularNuevoVencimiento,
   estadoSuscripcion,
   mensajeRecordatorio,
   type EstadoSuscripcion,
@@ -47,7 +48,7 @@ const TITULO_BLOQUE: Record<EstadoSuscripcion["clase"], string> = {
   vencido: "Vencidos",
   por_vencer: "Por vencer",
   suspendido: "Suspendidos a mano",
-  sin_vencimiento: "Sin fecha de vencimiento",
+  sin_vencimiento: "Sin activar",
   al_dia: "Al día",
 };
 
@@ -140,6 +141,10 @@ export default async function SuperPage({
 
   const pedidosPorLocal = contar(pedidosRecientes);
   const productosPorLocal = contar(productos);
+
+  // Hasta cuándo quedaría un local si se lo activa hoy — se lo muestra en la
+  // confirmación del botón "Activar", así se ve la fecha antes de dar el paso.
+  const venceSiSeActivaHoy = fechaCorta(calcularNuevoVencimiento(null, 1, ahora));
 
   const ultimoIngresoPorLocal = new Map<string, Date | null>();
   const correoPorLocal = new Map<string, string>();
@@ -368,7 +373,9 @@ export default async function SuperPage({
                       </div>
 
                       <p className="mt-1 text-xs text-tinta-media">
-                        Vence {fechaCorta(f.local.vencimiento)}
+                        {f.local.vencimiento
+                          ? `Vence ${fechaCorta(f.local.vencimiento)}`
+                          : "Todavía no corre el plazo"}
                         {" · "}
                         {f.pedidos} {f.pedidos === 1 ? "pedido" : "pedidos"} en {DIAS_DE_ACTIVIDAD}{" "}
                         días
@@ -398,6 +405,8 @@ export default async function SuperPage({
                       storeId={f.local.id}
                       nombre={f.local.nombre}
                       suspendidoAMano={f.local.estado === "suspendido"}
+                      sinActivar={f.estado.clase === "sin_vencimiento"}
+                      venceSiSeActivaHoy={venceSiSeActivaHoy}
                       linkRecordatorio={link}
                       titularNombre={f.local.titularNombre}
                       titularTelefono={f.local.titularTelefono}

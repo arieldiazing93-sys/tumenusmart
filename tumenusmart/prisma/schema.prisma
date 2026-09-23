@@ -100,6 +100,10 @@ model Store {
   // cartera pueda avisarte de uno y no del otro — antes compartían el mismo
   // valor y un cliente vencido se veía igual que uno que vos apagaste.
   estado         String    @default("activo")
+  // Hasta cuándo está pago (inclusive). Null = todavía no se activó: el local
+  // atiende con normalidad pero su plazo no corre. Un local nuevo nace así y
+  // la fecha se la pone "Activar" en Cartera (un mes desde ese día) o su
+  // primer pago registrado.
   vencimiento    DateTime?
   plan           String    @default("basico")
 

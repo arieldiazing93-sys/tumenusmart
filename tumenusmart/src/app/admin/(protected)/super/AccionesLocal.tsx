@@ -2,7 +2,7 @@
 
 import { clasesBoton } from "@/components/ui";
 import { useState, useTransition } from "react";
-import { actualizarDatosTitular, alternarSuspension, registrarPago } from "./actions";
+import { activarLocal, actualizarDatosTitular, alternarSuspension, registrarPago } from "./actions";
 
 const CAMPO =
   "rounded-lg border border-linea px-2 py-1 text-sm focus:border-brand focus:outline-none";
@@ -11,6 +11,8 @@ export function AccionesLocal({
   storeId,
   nombre,
   suspendidoAMano,
+  sinActivar,
+  venceSiSeActivaHoy,
   linkRecordatorio,
   titularNombre,
   titularTelefono,
@@ -20,6 +22,10 @@ export function AccionesLocal({
   storeId: string;
   nombre: string;
   suspendidoAMano: boolean;
+  /** Sin fecha de vencimiento todavía: no corre el plazo hasta que se lo active. */
+  sinActivar: boolean;
+  /** Fecha (ya formateada) hasta la que quedaría si se lo activa hoy. */
+  venceSiSeActivaHoy: string;
   /** Enlace de WhatsApp con el mensaje ya escrito, o null si no hay número. */
   linkRecordatorio: string | null;
   titularNombre: string | null;
@@ -52,6 +58,27 @@ export function AccionesLocal({
   return (
     <div className="flex flex-col items-start gap-2 sm:items-end">
       <div className="flex flex-wrap items-center gap-3 text-sm">
+        {/*
+          Mientras el local no tiene fecha de vencimiento, "Activar" es LA acción:
+          ahí empieza a correr su plazo. "Registrar pago" queda como secundaria
+          (registrar un pago también activa, contando desde hoy los meses pagados).
+        */}
+        {sinActivar && (
+          <button
+            type="button"
+            disabled={pendiente}
+            onClick={() => {
+              const texto =
+                `¿Activar ${nombre}? Desde hoy empieza a correr su plan y vence el ${venceSiSeActivaHoy}.`;
+              if (!confirm(texto)) return;
+              correr(() => activarLocal(storeId));
+            }}
+            className={clasesBoton("principal", "sm")}
+          >
+            Activar
+          </button>
+        )}
+
         <button
           type="button"
           disabled={pendiente}
@@ -59,7 +86,7 @@ export function AccionesLocal({
             setCobrando((v) => !v);
             setEditandoDatos(false);
           }}
-          className={clasesBoton("principal", "sm")}
+          className={clasesBoton(sinActivar ? "suave" : "principal", "sm")}
         >
           Registrar pago
         </button>

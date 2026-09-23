@@ -17,13 +17,11 @@ import { calcularNuevoVencimiento } from "@/lib/suscripcion";
 // acción de servidor se puede invocar sin pasar por la pantalla.
 
 /**
- * Todo local nuevo arranca con este período de prueba, sin excepción — no
- * se regalan meses. Pasados los 10 días, el dueño del local decide a mano
- * si le registra un pago (lo que le suma meses desde este mismo vencimiento)
- * o lo deja vencer.
+ * Un local nuevo nace SIN fecha de vencimiento: cargar la carta, capacitar al
+ * cliente y hacer las pruebas lleva su tiempo, y durante todo eso no corre la
+ * renta. El plazo empieza recién cuando se toca "Activar" (activarLocal) o se
+ * le registra el primer pago (registrarPago) — lo que pase primero.
  */
-const DIAS_PRUEBA_GRATIS = 10;
-
 export type ResultadoAlta = {
   ok: boolean;
   error?: string;
@@ -90,8 +88,6 @@ export async function crearLocal(formData: FormData): Promise<ResultadoAlta> {
   const password = generarPassword();
   const plantilla = plantillaPorClave(plantillaClave);
 
-  const vencimiento = new Date(Date.now() + DIAS_PRUEBA_GRATIS * 24 * 60 * 60 * 1000);
-
   // Todo junto: si algo falla, no queda un local a medio crear con un usuario
   // colgando o una carta a medias.
   await prisma.$transaction(async (tx) => {
@@ -105,7 +101,8 @@ export async function crearLocal(formData: FormData): Promise<ResultadoAlta> {
         envioModo: "coordinar",
         estado: "activo",
         plan,
-        vencimiento,
+        // Sin vencimiento hasta que se lo active: ver activarLocal.
+        vencimiento: null,
         asesorId,
         titularNombre,
         titularTelefono,
@@ -214,6 +211,42 @@ export async function registrarPago(storeId: string, formData: FormData): Promis
       data: { vencimiento: cubreHasta, estado: "activo" },
     }),
   ]);
+
+  revalidatePath("/admin/super");
+  revalidatePath("/[slug]", "layout");
+  return { ok: true };
+}
+
+export type ResultadoActivacion = { ok: true } | { ok: false; error: string };
+
+/**
+ * Activa un local que todavía no tenía fecha de vencimiento: desde hoy corre
+ * su primer mes (mismo cálculo que un pago de 1 mes, o sea 30 o 31 días según
+ * el calendario) y, al terminarlo, se apaga como cualquier otro.
+ *
+ * No registra ningún pago: si el cliente paga, se le carga aparte con
+ * "Registrar pago" y esos meses se suman a este vencimiento.
+ */
+export async function activarLocal(storeId: string): Promise<ResultadoActivacion> {
+  await exigirSuperadmin();
+
+  const local = await prisma.store.findUnique({
+    where: { id: storeId },
+    select: { estado: true, vencimiento: true },
+  });
+  if (!local) return { ok: false, error: "Ese local no existe" };
+  if (local.vencimiento) return { ok: false, error: "Este local ya está activado: su plazo ya corre." };
+  if (local.estado === "suspendido") {
+    return { ok: false, error: "Este local está suspendido a mano. Reactivalo primero." };
+  }
+
+  // La condición va también en el update: si se toca el botón dos veces seguidas,
+  // la segunda no le corre el plazo otra vez.
+  const { count } = await prisma.store.updateMany({
+    where: { id: storeId, vencimiento: null },
+    data: { vencimiento: calcularNuevoVencimiento(null, 1), estado: "activo" },
+  });
+  if (count === 0) return { ok: false, error: "Este local ya está activado: su plazo ya corre." };
 
   revalidatePath("/admin/super");
   revalidatePath("/[slug]", "layout");

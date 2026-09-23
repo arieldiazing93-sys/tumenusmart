@@ -182,8 +182,9 @@ export function AltaLocal({
         Plan
         <input name="plan" defaultValue="basico" className={CAMPO} />
         <span className="text-xs text-tinta-suave">
-          Arranca con 10 días de prueba gratis desde hoy. Al vencer, vos decidís si lo activás
-          registrándole un pago o lo dejás apagarse.
+          Arranca sin fecha de vencimiento: mientras cargás la carta y capacitás al cliente no
+          corre su plazo. Cuando esté listo, tocás Activar en la Cartera y ahí empiezan sus
+          30 días.
         </span>
       </label>
 
