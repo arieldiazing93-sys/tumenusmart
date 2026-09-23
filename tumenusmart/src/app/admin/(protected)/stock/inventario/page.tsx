@@ -1,14 +1,15 @@
 import { pantallaConPermiso } from "@/lib/auth";
+import { puede } from "@/lib/permisos";
 import { prismaDelLocal } from "@/lib/prisma-local";
 import { idLocalActual } from "@/lib/local-actual";
 import { stockPorAlmacen } from "@/lib/stock-almacen";
-import { Cabecera, Tabla, Th, Vacio } from "@/components/ui";
+import { BotonEnlace, Cabecera, Tabla, Th, Vacio } from "@/components/ui";
 import { InsumoInventarioFila } from "./InsumoInventarioFila";
 
 export const dynamic = "force-dynamic";
 
 export default async function InventarioPage() {
-  await pantallaConPermiso("stock.ver");
+  const sesion = await pantallaConPermiso("stock.ver");
   const idLocal = await idLocalActual();
   const prisma = prismaDelLocal(idLocal);
 
@@ -34,6 +35,11 @@ export default async function InventarioPage() {
       <Cabecera
         titulo="Registro de inventario"
         bajada="Contá lo que hay físicamente en cada almacén y corregí el stock del sistema — la diferencia queda en el historial de cada insumo."
+        acciones={
+          puede(sesion.rol, "stock.editar") && (
+            <BotonEnlace href="/admin/stock/inventario/nuevo">+ Nuevo inventario</BotonEnlace>
+          )
+        }
       />
 
       {insumos.length === 0 ? (
