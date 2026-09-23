@@ -1238,7 +1238,6 @@ model VentaPosItem {
   // Snapshot de los agregados elegidos, en texto legible — igual que
   // OrderItem.opcionesTexto. Null si no se eligió ninguno.
   opcionesTexto  String?
-  opcionesTexto  String?
   /// Snapshot del costo del PRODUCTO en sí (sin agregados), por unidad, al
   /// momento de la venta — sale de su receta. Null = no se conocía (sin receta
   /// o con algún insumo sin costo). Mismo criterio que OrderItem.costoProducto.
@@ -1252,6 +1251,7 @@ model VentaPosItem {
   /// OrderItem.precioAgregados, para que Rentabilidad separe producto y
   /// agregados también en el mostrador.
   precioAgregados Decimal @db.Decimal(10, 2) @default(0)
+
   @@index([storeId])
   @@index([ventaPosId])
 }
