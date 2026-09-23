@@ -31,14 +31,14 @@ export function MaestroDetalle<T extends { id: string; activo: boolean }>({
 }: {
   items: T[];
   columnas: ColumnaMaestro<T>[];
-  /** El del botón de arriba, ej: "+ Nuevo proveedor". */
-  textoNuevo: string;
+  /** El del botón de arriba, ej: "+ Nuevo proveedor". Sin él (y sin `renderNuevo`) no hay botón: la lista es solo para consultar. */
+  textoNuevo?: string;
   /** Cuando la lista está vacía. */
   textoVacio: string;
   /** Qué dice el panel derecho mientras no hay nada abierto. */
   textoPlaceholder: string;
   renderPanel: (item: T, alGuardar: () => void) => ReactNode;
-  renderNuevo: (alCrear: (id: string) => void) => ReactNode;
+  renderNuevo?: (alCrear: (id: string) => void) => ReactNode;
 }) {
   const router = useRouter();
   const [abiertoId, setAbiertoId] = useState<string | null>(null);
@@ -64,16 +64,18 @@ export function MaestroDetalle<T extends { id: string; activo: boolean }>({
   return (
     <div>
       <div className="mb-3 flex flex-wrap items-center gap-3">
-        <button
-          type="button"
-          onClick={() => {
-            setAbiertoId(null);
-            setCreando(true);
-          }}
-          className={clasesBoton("principal")}
-        >
-          {textoNuevo}
-        </button>
+        {textoNuevo && renderNuevo && (
+          <button
+            type="button"
+            onClick={() => {
+              setAbiertoId(null);
+              setCreando(true);
+            }}
+            className={clasesBoton("principal")}
+          >
+            {textoNuevo}
+          </button>
+        )}
         <span className="text-xs text-tinta-suave">{items.length} en total</span>
       </div>
 
@@ -134,7 +136,7 @@ export function MaestroDetalle<T extends { id: string; activo: boolean }>({
 
         {/* ---------------- derecha: los datos ---------------- */}
         <div ref={panelRef}>
-          {creando ? (
+          {creando && renderNuevo ? (
             renderNuevo((id) => {
               setCreando(false);
               setAbiertoId(id);

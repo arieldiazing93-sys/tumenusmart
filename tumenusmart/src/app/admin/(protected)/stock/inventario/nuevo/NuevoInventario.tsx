@@ -178,7 +178,8 @@ export function NuevoInventario({
     iniciar(async () => {
       const resultado = await guardarInventario(
         almacenId,
-        contadas.map((c) => ({ insumoId: c.insumo.id, contado: c.contado ?? 0 })),
+        // Toda la planilla, también lo que no se contó: queda en el registro.
+        calculadas.map((c) => ({ insumoId: c.insumo.id, contado: c.contado })),
         categoriasElegidas.join(", ")
       );
       if (!resultado.ok) {
@@ -208,7 +209,8 @@ export function NuevoInventario({
           Contaste {guardado.contados} {guardado.contados === 1 ? "insumo" : "insumos"} en {nombreAlmacen}.{" "}
           {guardado.ajustados === 0
             ? "Todos coincidían con el sistema, no hizo falta ajustar nada."
-            : `Se ajustó el stock de ${guardado.ajustados} — cada diferencia quedó en el historial del insumo.`}
+            : `Se ajustó el stock de ${guardado.ajustados} — cada diferencia quedó en el historial del insumo.`}{" "}
+          El inventario quedó registrado: lo abrís con doble clic desde Registro de inventario.
         </p>
         <div className="flex flex-wrap items-center gap-2">
           <Link href="/admin/stock/inventario" className={clasesBoton("principal")}>

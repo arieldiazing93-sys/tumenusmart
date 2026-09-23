@@ -171,6 +171,8 @@ model Store {
   compraItems      CompraItem[]
   gastos           Gasto[]
   movimientosStock MovimientoStock[]
+  inventarios      Inventario[]
+  inventarioItems  InventarioItem[]
 }
 
 /// Las direcciones que este local tuvo antes.
@@ -1337,6 +1339,7 @@ model Insumo {
   receta      RecetaItem[]
   compraItems CompraItem[]
   movimientos MovimientoStock[]
+  inventarioItems InventarioItem[]
 
   @@index([storeId])
   @@index([categoriaId])
@@ -1402,6 +1405,7 @@ model Almacen {
 
   compraItems CompraItem[]
   movimientos MovimientoStock[]
+  inventarios Inventario[]
   productos   Product[]
 
   @@index([storeId])
@@ -1544,4 +1548,62 @@ model MovimientoStock {
   @@index([orderId])
   @@index([ventaPosId])
   @@index([almacenId])
+}
+
+/// Una toma de inventario guardada: qué almacén y qué categorías se contaron,
+/// cuánto valía el stock según el sistema y cuánto vale con lo contado. Es el
+/// registro para poder consultarlo después; lo que cambió en el stock quedó
+/// además como movimientos "ajuste" de cada insumo (ver MovimientoStock).
+/// El nombre del almacén y las categorías son copias de ese momento: el
+/// registro se lee igual aunque después se renombren.
+model Inventario {
+  id        String   @id @default(cuid())
+  storeId   String
+  store     Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  almacenId String?
+  almacen   Almacen? @relation(fields: [almacenId], references: [id], onDelete: SetNull)
+  almacenNombre String
+  /// "Bebidas, Carnes" — las categorías que se contaron.
+  categorias    String
+  /// Cuántos insumos se escribieron como contados (los demás quedaron sin contar).
+  contados      Int
+  /// De esos, cuántos no coincidían con el sistema.
+  conDiferencia Int
+  /// Valor del stock según el sistema (a costo de cada insumo).
+  valorSistema  Decimal  @db.Decimal(14, 2)
+  /// Valor con lo contado; lo que no se contó se toma como estaba.
+  valorContado  Decimal  @db.Decimal(14, 2)
+  registradoPor String?
+  createdAt     DateTime @default(now())
+
+  items InventarioItem[]
+
+  @@index([storeId, createdAt])
+}
+
+/// Una fila de la planilla de un inventario, con los datos del insumo tal
+/// como estaban al guardar.
+model InventarioItem {
+  id           String     @id @default(cuid())
+  storeId      String
+  store        Store      @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  inventarioId String
+  inventario   Inventario @relation(fields: [inventarioId], references: [id], onDelete: Cascade)
+  insumoId     String?
+  insumo       Insumo?    @relation(fields: [insumoId], references: [id], onDelete: SetNull)
+  insumoNombre    String
+  categoriaNombre String?
+  unidad          String
+  /// Lo que decía el sistema en ese almacén al guardar.
+  stockSistema  Decimal  @db.Decimal(12, 3)
+  /// Lo que se contó. Null = no se contó este insumo.
+  contado       Decimal? @db.Decimal(12, 3)
+  /// contado - stockSistema. Null si no se contó.
+  diferencia    Decimal? @db.Decimal(12, 3)
+  costoUnitario Decimal? @db.Decimal(10, 2)
+  /// Posición en la planilla.
+  orden         Int      @default(0)
+
+  @@index([storeId])
+  @@index([inventarioId])
 }

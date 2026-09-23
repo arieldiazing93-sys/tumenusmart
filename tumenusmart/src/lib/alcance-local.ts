@@ -42,6 +42,8 @@ export const MODELOS_POR_LOCAL = new Set([
   "CompraItem",
   "Gasto",
   "MovimientoStock",
+  "Inventario",
+  "InventarioItem",
 ]);
 
 /** Operaciones que leen o modifican filas existentes: se filtran por `where`. */
