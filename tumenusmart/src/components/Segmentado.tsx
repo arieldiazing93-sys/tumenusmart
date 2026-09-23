@@ -19,7 +19,7 @@ export type ColorSegmentado = "brand" | "tinta" | "exito";
 // "violeta" (reservado para el estado "en despacho" de pedidos).
 const ESTILOS_ACTIVO: Record<ColorSegmentado, string> = {
   brand: "border-brand bg-brand-light text-brand-texto",
-  tinta: "border-tinta bg-tinta text-white",
+  tinta: "border-tinta bg-tinta text-papel",
   exito: "border-exito bg-exito-luz text-exito",
 };
 

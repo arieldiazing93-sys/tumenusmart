@@ -221,6 +221,11 @@ export async function actualizarStore(formData: FormData) {
   // puede mandar cualquier cosa.
   const estiloCarta =
     String(formData.get("estiloCarta") ?? "lista") === "tarjetas" ? "tarjetas" : "lista";
+  // Mismo criterio: nunca se guarda lo que mande el formulario tal cual.
+  const modoPlantillaRaw = String(formData.get("modoPlantilla") ?? "sistema");
+  const modoPlantilla = ["sistema", "claro", "oscuro"].includes(modoPlantillaRaw)
+    ? modoPlantillaRaw
+    : "sistema";
   // El <input type="color"> del navegador SIEMPRE manda un hex (nunca vacío,
   // arranca en #000000 si no se tocó) — por eso "personalizarColor" es lo
   // que de verdad decide si se guarda: destildado, el menú público vuelve al
@@ -257,6 +262,7 @@ export async function actualizarStore(formData: FormData) {
     mensajeSaludo: String(formData.get("mensajeSaludo") ?? "") || null,
     mensajeSaludoReserva: String(formData.get("mensajeSaludoReserva") ?? "") || null,
     estiloCarta,
+    modoPlantilla,
   };
 
   // Ojo con el orden: en el primer arranque todavía NO hay ningún local, y

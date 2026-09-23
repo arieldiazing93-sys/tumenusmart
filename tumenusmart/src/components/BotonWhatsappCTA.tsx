@@ -32,8 +32,8 @@ export function BotonWhatsappCTA({
       target="_blank"
       rel="noopener noreferrer"
       onClick={registrar}
-      className={`inline-flex items-center gap-2.5 rounded-full px-7 py-3.5 text-[0.95rem] font-semibold text-white shadow-media transition-[background-color,opacity] duration-150 hover:opacity-90 ${
-        enviado ? "bg-tinta-suave" : "bg-[#25D366]"
+      className={`inline-flex items-center gap-2.5 rounded-full px-7 py-3.5 text-[0.95rem] font-semibold shadow-media transition-[background-color,opacity] duration-150 hover:opacity-90 ${
+        enviado ? "bg-tinta-suave text-papel" : "bg-[#25D366] text-white"
       }`}
     >
       <IconoWhatsapp />

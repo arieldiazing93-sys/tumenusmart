@@ -96,7 +96,7 @@ function FilaCarrito({
             <span className="cifra text-[0.92rem] font-semibold">
               {formatearGuarani(precioUnitario(item) * item.cantidad)}
             </span>
-            <div className="flex items-center rounded-lg border border-linea bg-white">
+            <div className="flex items-center rounded-lg border border-linea bg-superficie">
               <button
                 type="button"
                 aria-label="Uno menos"

@@ -168,7 +168,7 @@ export function FichaProducto({
         type="button"
         aria-label="Cerrar"
         onClick={onCerrar}
-        className={`fixed inset-0 z-40 bg-tinta/45 ${
+        className={`fixed inset-0 z-40 bg-noche/45 ${
           saliendo
             ? "opacity-0 transition-opacity duration-[220ms]"
             : "animate-[subir_0.2s_ease]"
@@ -181,7 +181,7 @@ export function FichaProducto({
         role="dialog"
         aria-modal="true"
         aria-label={producto.nombre}
-        className={`fixed inset-x-0 bottom-0 z-50 mx-auto flex max-h-[88vh] max-w-2xl flex-col rounded-t-2xl bg-white shadow-alta outline-none ${
+        className={`fixed inset-x-0 bottom-0 z-50 mx-auto flex max-h-[88vh] max-w-2xl flex-col rounded-t-2xl bg-superficie shadow-alta outline-none ${
           saliendo
             ? "animate-[bajarHoja_0.22s_ease-in]"
             : "animate-[subirHoja_0.34s_cubic-bezier(0.22,0.7,0.3,1)]"
@@ -289,7 +289,7 @@ export function FichaProducto({
                       className={`rounded-full border px-3 py-1 text-[0.8rem] transition-colors ${
                         fuera
                           ? "border-linea bg-papel-hundido text-tinta-suave line-through"
-                          : "border-linea bg-white text-tinta"
+                          : "border-linea bg-superficie text-tinta"
                       }`}
                     >
                       {ing}

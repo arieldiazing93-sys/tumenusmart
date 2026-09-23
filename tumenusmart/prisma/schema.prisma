@@ -60,6 +60,12 @@ model Store {
   ///
   /// Forzar un solo diseño castiga a uno de los dos.
   estiloCarta    String   @default("lista")
+
+  /// "sistema" | "claro" | "oscuro" — cómo se ve el menú público.
+  /// "sistema" sigue el modo (claro/oscuro) del dispositivo de quien mira,
+  /// vía prefers-color-scheme; "claro"/"oscuro" lo fuerzan sin importar el
+  /// dispositivo. El panel admin nunca lee este campo — queda siempre claro.
+  modoPlantilla  String   @default("sistema")
   // Corte manual: el encargado apaga los pedidos aunque esté dentro del
   // horario (cocina saturada, falta de personal, etc.).
   pedidosPausados Boolean @default(false)

@@ -28,21 +28,32 @@ export default async function LocalLayout({
   const { slug } = await params;
   const local = await localPorSlug(slug);
 
+  // "sistema" (default) sigue el modo del dispositivo de quien mira,
+  // "claro"/"oscuro" lo fuerzan — ver el bloque [data-tema] en globals.css.
+  // Siempre uno de los tres, nunca undefined: el admin no entra por acá, así
+  // que nunca hace falta "no tocar nada".
+  const dataTema =
+    local.modoPlantilla === "oscuro" || local.modoPlantilla === "claro"
+      ? local.modoPlantilla
+      : "sistema";
+
   // Un local suspendido conserva todo pero deja de atender. El mensaje es
   // deliberadamente neutro: nunca menciona pagos, porque quien lo lee es un
   // cliente del negocio, no el dueño.
   if (estaSuspendido(local)) {
     return (
-      <main className="mx-auto flex min-h-[70vh] max-w-md flex-col items-center justify-center px-6 text-center">
-        <div className="mb-4 text-4xl">🕒</div>
-        <h1 className="mb-2 text-[1.2rem] font-semibold tracking-titular text-tinta">
-          Este menú no está disponible
-        </h1>
-        <p className="text-[0.9rem] text-tinta-media">
-          Por el momento no se pueden tomar pedidos desde acá. Si querés hacer un pedido,
-          comunicate directamente con el local.
-        </p>
-      </main>
+      <div data-tema={dataTema} className="min-h-screen bg-papel-suave">
+        <main className="mx-auto flex min-h-[70vh] max-w-md flex-col items-center justify-center px-6 text-center">
+          <div className="mb-4 text-4xl">🕒</div>
+          <h1 className="mb-2 text-[1.2rem] font-semibold tracking-titular text-tinta">
+            Este menú no está disponible
+          </h1>
+          <p className="text-[0.9rem] text-tinta-media">
+            Por el momento no se pueden tomar pedidos desde acá. Si querés hacer un pedido,
+            comunicate directamente con el local.
+          </p>
+        </main>
+      </div>
     );
   }
 
@@ -55,10 +66,18 @@ export default async function LocalLayout({
       ? derivarPaletaMarca(local.colorPrimario)
       : null;
 
+  // <body> (layout raíz, compartido con el admin) pinta bg-papel-suave y
+  // nunca se toca acá — por eso este div, que si no quedaría con el fondo
+  // de <body> sin reescribir, pinta el suyo propio con el token ya
+  // reescrito: si no, en modo oscuro las tarjetas de adentro se verían
+  // oscuras pero el espacio alrededor seguiría claro.
+  //
   // El carrito se guarda por local: si alguien abre dos menús distintos en el
   // mismo navegador, cada uno mantiene el suyo sin mezclarse.
   return (
     <div
+      data-tema={dataTema}
+      className="min-h-screen bg-papel-suave"
       style={
         paleta
           ? ({

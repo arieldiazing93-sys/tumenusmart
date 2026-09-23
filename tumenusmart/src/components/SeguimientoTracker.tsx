@@ -68,7 +68,7 @@ export function SeguimientoTracker({
   }, [finalizado]);
 
   return (
-    <div className="relative overflow-hidden rounded-xl border border-linea bg-white p-5">
+    <div className="relative overflow-hidden rounded-xl border border-linea bg-superficie p-5">
       {celebrando && (
         <div
           aria-hidden="true"

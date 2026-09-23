@@ -48,24 +48,34 @@ const config: Config = {
           texto: "rgb(var(--brand-texto) / <alpha-value>)",
         },
 
+        // Papel, tinta, línea y superficie: igual que "brand", variables CSS
+        // y no hex fijo. Los valores claros de siempre viven en :root de
+        // globals.css; el layout del menú público (src/app/[slug]/layout.tsx)
+        // los reescribe según Store.modoPlantilla ("sistema"/"claro"/"oscuro").
+        // El panel admin nunca entra por ese layout, así que nunca ve la
+        // reescritura y queda siempre en los valores claros de :root.
+
         /** Papel: los fondos. */
         papel: {
-          DEFAULT: "#FFFFFF",
-          suave: "#F7F7F6",
-          hundido: "#F1F1F0",
+          DEFAULT: "rgb(var(--papel) / <alpha-value>)",
+          suave: "rgb(var(--papel-suave) / <alpha-value>)",
+          hundido: "rgb(var(--papel-hundido) / <alpha-value>)",
         },
+
+        /** Superficie: fondo de tarjeta/panel — lo que antes era bg-white suelto. */
+        superficie: "rgb(var(--superficie) / <alpha-value>)",
 
         /** Tinta: los textos, de más fuerte a más apagado. */
         tinta: {
-          DEFAULT: "#131417",
-          media: "#4B4F58",
-          suave: "#83878F",
+          DEFAULT: "rgb(var(--tinta) / <alpha-value>)",
+          media: "rgb(var(--tinta-media) / <alpha-value>)",
+          suave: "rgb(var(--tinta-suave) / <alpha-value>)",
         },
 
         /** Líneas y separadores. */
         linea: {
-          DEFAULT: "#E4E4E6",
-          fina: "#EFEFF0",
+          DEFAULT: "rgb(var(--linea) / <alpha-value>)",
+          fina: "rgb(var(--linea-fina) / <alpha-value>)",
         },
 
         /** La banda oscura donde se muestra el producto. */

@@ -6,13 +6,75 @@
   /* El naranja de siempre, como variables — el panel admin siempre lee
      estos valores. El menú público de un local con color propio los
      reescribe en su layout (src/app/[slug]/layout.tsx), pero solo ADENTRO
-     de ese árbol; acá quedan los del panel y los del menú sin personalizar. */
+     de ese árbol; acá quedan los del panel y los del menú sin personalizar.
+
+     Lo mismo para papel/tinta/línea/superficie: son los valores CLAROS de
+     siempre. El modo oscuro/claro/sistema (Store.modoPlantilla) también se
+     resuelve reescribiendo estas variables en ese mismo layout — nunca acá,
+     para que el panel admin quede siempre en modo claro. Los valores
+     oscuros viven en "-oscuro" para no repetir cada hex dos veces: el
+     bloque [data-tema] de más abajo solo apunta a ellos, así que cambiar un
+     color de la paleta oscura es editar un solo lugar. */
   :root {
     --brand: 210 80 31;
     --brand-dark: 176 64 26;
     --brand-light: 252 237 230;
     --brand-tinte: 247 217 203;
     --brand-texto: 163 58 20;
+
+    --papel: 255 255 255;
+    --papel-suave: 247 247 246;
+    --papel-hundido: 241 241 240;
+    --superficie: 255 255 255;
+    --tinta: 19 20 23;
+    --tinta-media: 75 79 88;
+    --tinta-suave: 131 135 143;
+    --linea: 228 228 230;
+    --linea-fina: 239 239 240;
+
+    /* Paleta oscura — mismos valores que "noche" en tailwind.config.ts,
+       que ya es un negro cálido diseñado y probado en este sistema. */
+    --papel-oscuro: 19 20 23;
+    --papel-suave-oscuro: 23 24 28;
+    --papel-hundido-oscuro: 17 18 20;
+    --superficie-oscuro: 29 31 36;
+    --tinta-oscuro: 242 242 243;
+    --tinta-media-oscuro: 199 202 209;
+    --tinta-suave-oscuro: 160 164 172;
+    --linea-oscuro: 44 47 54;
+    --linea-fina-oscuro: 34 36 42;
+  }
+
+  /* Forzado desde Store.modoPlantilla = "oscuro" — sin importar el
+     dispositivo de quien mira. */
+  [data-tema="oscuro"] {
+    --papel: var(--papel-oscuro);
+    --papel-suave: var(--papel-suave-oscuro);
+    --papel-hundido: var(--papel-hundido-oscuro);
+    --superficie: var(--superficie-oscuro);
+    --tinta: var(--tinta-oscuro);
+    --tinta-media: var(--tinta-media-oscuro);
+    --tinta-suave: var(--tinta-suave-oscuro);
+    --linea: var(--linea-oscuro);
+    --linea-fina: var(--linea-fina-oscuro);
+  }
+
+  /* Store.modoPlantilla = "sistema" (default): sigue el modo del
+     dispositivo de quien mira. Con "claro" no matchea ninguna de las dos
+     reglas de acá arriba/abajo, así que se queda con los valores claros
+     de :root sin importar el dispositivo. */
+  @media (prefers-color-scheme: dark) {
+    [data-tema="sistema"] {
+      --papel: var(--papel-oscuro);
+      --papel-suave: var(--papel-suave-oscuro);
+      --papel-hundido: var(--papel-hundido-oscuro);
+      --superficie: var(--superficie-oscuro);
+      --tinta: var(--tinta-oscuro);
+      --tinta-media: var(--tinta-media-oscuro);
+      --tinta-suave: var(--tinta-suave-oscuro);
+      --linea: var(--linea-oscuro);
+      --linea-fina: var(--linea-fina-oscuro);
+    }
   }
 
   html {

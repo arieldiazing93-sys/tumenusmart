@@ -145,7 +145,7 @@ export function Carta({
             onChange={(e) => setBusqueda(e.target.value)}
             placeholder="Buscar en la carta"
             aria-label="Buscar en la carta"
-            className="w-full rounded-lg border border-linea bg-papel-suave py-2.5 pl-8 pr-3 text-[0.9rem] focus:border-brand focus:bg-white focus:outline-none"
+            className="w-full rounded-lg border border-linea bg-papel-suave py-2.5 pl-8 pr-3 text-[0.9rem] focus:border-brand focus:bg-superficie focus:outline-none"
           />
         </div>
         )}
@@ -160,8 +160,8 @@ export function Carta({
                 aria-current={categoriaActiva === c.id}
                 className={`flex-none whitespace-nowrap rounded-full border px-3 py-1.5 text-[0.82rem] font-medium transition-colors ${
                   categoriaActiva === c.id
-                    ? "border-tinta bg-tinta text-white"
-                    : "border-linea bg-white text-tinta-media"
+                    ? "border-tinta bg-tinta text-papel"
+                    : "border-linea bg-superficie text-tinta-media"
                 }`}
               >
                 {c.nombre}

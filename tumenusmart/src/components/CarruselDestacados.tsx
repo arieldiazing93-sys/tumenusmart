@@ -32,7 +32,7 @@ export function CarruselDestacados({ productos }: { productos: Producto[] }) {
           <a
             key={p.id}
             href={`#producto-${p.id}`}
-            className="w-[136px] flex-none overflow-hidden rounded-xl border border-linea bg-white transition-colors hover:border-brand"
+            className="w-[136px] flex-none overflow-hidden rounded-xl border border-linea bg-superficie transition-colors hover:border-brand"
           >
             {p.imagenUrl ? (
               // eslint-disable-next-line @next/next/no-img-element

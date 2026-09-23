@@ -127,7 +127,7 @@ export function MitadYMitadPicker({ grupoNombre, productos }: Props) {
             setIdA(e.target.value);
             setAgregadosIds([]);
           }}
-          className="min-w-0 flex-1 rounded-lg border border-linea bg-white px-3 py-2 text-[0.88rem] focus:border-brand focus:outline-none"
+          className="min-w-0 flex-1 rounded-lg border border-linea bg-superficie px-3 py-2 text-[0.88rem] focus:border-brand focus:outline-none"
         >
           <option value="">Mitad 1...</option>
           {productos.map((p) => (
@@ -142,7 +142,7 @@ export function MitadYMitadPicker({ grupoNombre, productos }: Props) {
             setIdB(e.target.value);
             setAgregadosIds([]);
           }}
-          className="min-w-0 flex-1 rounded-lg border border-linea bg-white px-3 py-2 text-[0.88rem] focus:border-brand focus:outline-none"
+          className="min-w-0 flex-1 rounded-lg border border-linea bg-superficie px-3 py-2 text-[0.88rem] focus:border-brand focus:outline-none"
         >
           <option value="">Mitad 2...</option>
           {productos.map((p) => (
@@ -162,7 +162,7 @@ export function MitadYMitadPicker({ grupoNombre, productos }: Props) {
           {agregadosDisponibles.map((a) => (
             <label
               key={a.id}
-              className={`cursor-pointer rounded-full border bg-white px-3 py-1.5 text-[0.82rem] ${
+              className={`cursor-pointer rounded-full border bg-superficie px-3 py-1.5 text-[0.82rem] ${
                 agregadosIds.includes(a.id)
                   ? "border-brand bg-brand-light text-brand-dark"
                   : "border-linea text-tinta-media"
@@ -188,7 +188,7 @@ export function MitadYMitadPicker({ grupoNombre, productos }: Props) {
         )}
 
         <div className="flex flex-none items-center gap-3">
-          <div className="flex items-center rounded-lg border border-linea bg-white">
+          <div className="flex items-center rounded-lg border border-linea bg-superficie">
             <button
               type="button"
               className="px-2.5 py-1 text-tinta-media"

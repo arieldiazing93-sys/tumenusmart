@@ -14,11 +14,12 @@ import { ZonaFila } from "./ZonaFila";
 import { CrearZonaForm } from "./CrearZonaForm";
 import { StoreLocationField } from "./StoreLocationField";
 import { LogoField } from "./LogoField";
+import { PaletaColorPicker } from "./PaletaColorPicker";
 import { UrlPublicaField } from "./UrlPublicaField";
 import { GuardadoToast } from "@/components/GuardadoToast";
 import { PausaPedidosToggle } from "../PausaPedidosToggle";
 import { NOMBRES_DIA, DIAS_ORDENADOS, resumenDia } from "@/lib/horario-atencion";
-import { clasesBoton, Tarjeta } from "@/components/ui";
+import { clasesBoton, Tarjeta, Selector } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
@@ -36,6 +37,10 @@ export default async function AdminConfiguracionPage() {
 
   const envioModo = store?.envioModo === "coordinar" ? "coordinar" : "zonas";
   const estiloCarta = store?.estiloCarta === "tarjetas" ? "tarjetas" : "lista";
+  const modoPlantilla =
+    store?.modoPlantilla === "oscuro" || store?.modoPlantilla === "claro"
+      ? store.modoPlantilla
+      : "sistema";
 
   return (
     <div className="flex flex-col gap-10">
@@ -96,12 +101,22 @@ export default async function AdminConfiguracionPage() {
               administrativo (esta pantalla, pedidos, POS...) no cambia nunca — esto es
               solo lo que ve tu cliente.
             </p>
-            <input
-              type="color"
-              name="colorPrimario"
-              defaultValue={store?.colorPrimario ?? "#D2501F"}
-              className="h-10 w-20 cursor-pointer rounded-lg border border-linea"
-            />
+            <PaletaColorPicker colorInicial={store?.colorPrimario ?? "#D2501F"} />
+          </div>
+
+          <div className="border-t border-linea pt-3">
+            <label className="mb-1 block text-sm font-medium text-tinta-media">
+              Modo plantilla
+            </label>
+            <p className="mb-2 text-xs text-tinta-media">
+              "Sistema" sigue el modo claro/oscuro del celular o navegador de quien mira tu
+              menú. "Claro" y "Oscuro" lo fuerzan siempre, sin importar su dispositivo.
+            </p>
+            <Selector name="modoPlantilla" defaultValue={modoPlantilla} className="w-full sm:w-64">
+              <option value="sistema">Sistema</option>
+              <option value="claro">Claro</option>
+              <option value="oscuro">Oscuro</option>
+            </Selector>
           </div>
 
           <div>

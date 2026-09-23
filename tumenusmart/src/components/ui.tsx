@@ -26,7 +26,7 @@ const TONOS: Record<Tono, string> = {
     "bg-brand text-white hover:bg-brand-dark focus-visible:outline-brand-dark",
   // Lo mismo pero sin gritar, para acciones secundarias frecuentes.
   suave:
-    "border border-linea bg-white text-tinta hover:border-brand hover:text-brand",
+    "border border-linea bg-superficie text-tinta hover:border-brand hover:text-brand",
   // Azul: volver, ir a otro lado. Nunca confirma nada.
   navegar:
     "border border-azul/35 bg-azul-luz text-azul-oscuro hover:border-azul hover:bg-azul hover:text-white",
@@ -129,7 +129,7 @@ export function Tarjeta({
 }) {
   return (
     <div
-      className={`rounded-xl border border-linea bg-white ${padding ? "p-4" : ""} ${className}`}
+      className={`rounded-xl border border-linea bg-superficie ${padding ? "p-4" : ""} ${className}`}
     >
       {children}
     </div>
@@ -147,7 +147,7 @@ export function Cifra({
   detalle?: string;
 }) {
   return (
-    <div className="rounded-xl border border-linea bg-white px-4 py-3.5">
+    <div className="rounded-xl border border-linea bg-superficie px-4 py-3.5">
       <p className="rotulo">{rotulo}</p>
       <p className="cifra mt-1.5 text-[1.5rem] font-semibold leading-none text-tinta">{valor}</p>
       {detalle && <p className="mt-1.5 text-[0.76rem] text-tinta-suave">{detalle}</p>}
@@ -257,7 +257,7 @@ export function Aviso({
 // ===========================================================================
 
 const BASE_CAMPO =
-  "w-full rounded-lg border border-linea bg-white px-3 py-2.5 text-[0.88rem] text-tinta " +
+  "w-full rounded-lg border border-linea bg-superficie px-3 py-2.5 text-[0.88rem] text-tinta " +
   "transition-colors duration-150 placeholder:text-tinta-suave " +
   "focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/15 " +
   "disabled:bg-papel-hundido disabled:text-tinta-suave";
@@ -356,7 +356,7 @@ export function MensajeError({ children }: { children: ReactNode }) {
  */
 export function Tabla({ children }: { children: ReactNode }) {
   return (
-    <div className="overflow-x-auto rounded-xl border border-linea bg-white">
+    <div className="overflow-x-auto rounded-xl border border-linea bg-superficie">
       <table className="w-full min-w-[34rem] border-collapse text-left">{children}</table>
     </div>
   );
