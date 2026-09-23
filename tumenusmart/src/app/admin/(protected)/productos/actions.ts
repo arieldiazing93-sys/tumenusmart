@@ -8,7 +8,7 @@ import { prismaDelLocal } from "@/lib/prisma-local";
 import { moverEnLista, cambiosDeOrden, type Direccion } from "@/lib/ordenar";
 import { subirImagenProducto } from "@/lib/supabase-storage";
 import { normalizarIva } from "@/lib/iva";
-import { normalizarUnidadMedida } from "@/lib/unidad-medida";
+import { normalizarUnidadMedida, etiquetaUnidadMedida } from "@/lib/unidad-medida";
 
 export type ResultadoFoto = { ok: true; url: string } | { ok: false; error: string };
 
@@ -333,6 +333,87 @@ export async function crearGrupoYAdjuntar(
   revalidatePath(`/admin/productos/${productId}`);
   revalidatePath("/admin/grupos-agregados");
   return { ok: true, groupId: grupo.id };
+}
+
+// ===========================================================================
+//  Receta (Control de stock) — qué insumos descuenta este producto al
+//  venderse, y cuánto de cada uno. Mismo espíritu que Grupos de agregados:
+//  todo el flujo (buscar, agregar, cambiar cantidad, quitar) vive en esta
+//  misma pantalla, sin pasar por /admin/stock/insumos.
+// ===========================================================================
+
+export type InsumoParaReceta = {
+  id: string;
+  nombre: string;
+  categoriaNombre: string;
+  unidadMedida: string;
+};
+
+/** Busca insumos del local para agregar a la receta — excluye los que ya están en ella. */
+export async function buscarInsumosParaReceta(
+  productId: string,
+  query: string
+): Promise<InsumoParaReceta[]> {
+  await exigirPermiso("stock.ver");
+  const prisma = prismaDelLocal(await idLocalActual());
+
+  const texto = query.trim();
+  if (!texto) return [];
+
+  const yaEnReceta = await prisma.recetaItem.findMany({
+    where: { productId },
+    select: { insumoId: true },
+  });
+
+  const insumos = await prisma.insumo.findMany({
+    where: {
+      activo: true,
+      nombre: { contains: texto, mode: "insensitive" },
+      id: { notIn: yaEnReceta.map((r) => r.insumoId) },
+    },
+    orderBy: { nombre: "asc" },
+    take: 10,
+    select: { id: true, nombre: true, unidadMedida: true, categoria: { select: { nombre: true } } },
+  });
+
+  return insumos.map((i) => ({
+    id: i.id,
+    nombre: i.nombre,
+    categoriaNombre: i.categoria?.nombre ?? "Sin categoría",
+    unidadMedida: etiquetaUnidadMedida(i.unidadMedida),
+  }));
+}
+
+/** Agrega (o, si ya estaba, corrige la cantidad de) un insumo en la receta de este producto. */
+export async function asignarInsumoAProducto(
+  productId: string,
+  insumoId: string,
+  cantidad: number
+): Promise<ResultadoProducto> {
+  await exigirPermiso("stock.editar");
+  const idLocal = await idLocalActual();
+  const prisma = prismaDelLocal(idLocal);
+
+  if (!Number.isFinite(cantidad) || cantidad <= 0) {
+    return { ok: false, error: "La cantidad tiene que ser mayor a cero" };
+  }
+
+  await prisma.recetaItem.upsert({
+    where: { productId_insumoId: { productId, insumoId } },
+    update: { cantidad },
+    create: { productId, insumoId, cantidad, storeId: idLocal },
+  });
+
+  revalidatePath(`/admin/productos/${productId}`);
+  return { ok: true };
+}
+
+export async function quitarInsumoDeProducto(productId: string, insumoId: string) {
+  await exigirPermiso("stock.editar");
+  const prisma = prismaDelLocal(await idLocalActual());
+
+  await prisma.recetaItem.deleteMany({ where: { productId, insumoId } });
+  revalidatePath(`/admin/productos/${productId}`);
 }
 
 /**

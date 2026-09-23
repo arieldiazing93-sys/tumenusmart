@@ -25,6 +25,9 @@ import { calcularPrecioMitadYMitad, type ModoPrecioMitad } from "./mitad-mitad";
  */
 export type Monto = number | string | { toString(): string };
 
+/** Un insumo y cuánto de él se consume — ver Control de stock. */
+export type RecetaInsumoBase = { insumoId: string; cantidad: Monto };
+
 export type OpcionBase = {
   id: string;
   nombre: string;
@@ -33,6 +36,13 @@ export type OpcionBase = {
   precioExtra: Monto;
   /** Null si el dueño nunca cargó un costo para esta opción. */
   costo: Monto | null;
+  /**
+   * Insumos que consume ESTA opción, por unidad elegida — [] si no tiene
+   * receta armada (la gran mayoría, mientras el negocio no controle stock).
+   * Un agregado de grupo (ver Grupos de agregados) es un Product real, así
+   * que trae la receta de SU PROPIA ficha, igual que cualquier producto.
+   */
+  receta: RecetaInsumoBase[];
 };
 
 export type ProductoBase = {
@@ -47,7 +57,12 @@ export type ProductoBase = {
   iva: string;
   /** Ya ordenadas como las ve el cliente. */
   opciones: OpcionBase[];
+  /** Insumos que consume este producto, por unidad vendida — ver OpcionBase.receta. */
+  receta: RecetaInsumoBase[];
 };
+
+/** Cuánto de un insumo hay que descontar — ver Control de stock. */
+export type ConsumoInsumo = { insumoId: string; cantidad: number };
 
 /**
  * Lo único que el navegador tiene derecho a mandar: qué eligió.
@@ -86,6 +101,13 @@ export type LineaArmada = {
   /** Precio (por unidad) de las opciones elegidas, sumadas. Nunca null: a
    * diferencia del costo, el precio de un agregado siempre está cargado. */
   precioAgregados: number;
+  /**
+   * Insumos que descuenta ESTA línea, POR UNIDAD — igual que precioUnitario,
+   * no viene multiplicado por `cantidad` (quien llama multiplica). [] si
+   * nada de lo elegido tiene receta armada — no descuenta nada, no bloquea
+   * nada.
+   */
+  consumo: ConsumoInsumo[];
 };
 
 export type ResultadoArmado =
@@ -132,6 +154,27 @@ function sumaCostoOpciones(opciones: OpcionBase[]): number | null {
  * costo, nunca es null: el precio de un agregado no es un dato opcional. */
 function sumaPrecioOpciones(opciones: OpcionBase[]): number {
   return opciones.reduce((s, o) => s + aNumero(o.precioExtra), 0);
+}
+
+/** Junta varias listas de consumo en una sola, sumando por insumoId repetido. */
+function combinarConsumo(...listas: ConsumoInsumo[][]): ConsumoInsumo[] {
+  const mapa = new Map<string, number>();
+  for (const lista of listas) {
+    for (const c of lista) {
+      mapa.set(c.insumoId, (mapa.get(c.insumoId) ?? 0) + c.cantidad);
+    }
+  }
+  return [...mapa.entries()].map(([insumoId, cantidad]) => ({ insumoId, cantidad }));
+}
+
+/** Multiplica cada cantidad de una receta por un factor (ej: 0.5 para media mitad y mitad). */
+function escalarConsumo(receta: RecetaInsumoBase[], factor: number): ConsumoInsumo[] {
+  return receta.map((r) => ({ insumoId: r.insumoId, cantidad: aNumero(r.cantidad) * factor }));
+}
+
+/** El consumo de un grupo de opciones elegidas — su propia receta, sin escalar. */
+function sumaConsumoOpciones(opciones: OpcionBase[]): ConsumoInsumo[] {
+  return combinarConsumo(...opciones.map((o) => escalarConsumo(o.receta, 1)));
 }
 
 /** Dos grupos de mitad y mitad son el mismo si difieren solo en mayúsculas o espacios. */
@@ -290,6 +333,7 @@ function armarProducto(
 
   const precioAgregados = sumaPrecioOpciones(elegidas.opciones);
   const precioUnitario = aNumero(producto.precio) + precioAgregados;
+  const consumo = combinarConsumo(escalarConsumo(producto.receta, 1), sumaConsumoOpciones(elegidas.opciones));
 
   return {
     ok: true,
@@ -304,6 +348,7 @@ function armarProducto(
         quitadosOrdenados.length > 0 ? `Sin: ${quitadosOrdenados.join(", ")}` : undefined,
       costoAgregados: sumaCostoOpciones(elegidas.opciones),
       precioAgregados,
+      consumo,
     },
   };
 }
@@ -346,6 +391,14 @@ function armarCombo(
   const precioAgregados = sumaPrecioOpciones(elegidas.opciones);
   const precioUnitario =
     calcularPrecioMitadYMitad(aNumero(a.precio), aNumero(b.precio), modo) + precioAgregados;
+  // Físicamente se prepara la MITAD de la receta de cada lado, sin importar
+  // el modo de precio ("mayor"/"proporcional" es solo para cobrar) — y los
+  // agregados elegidos se preparan enteros, no se parten.
+  const consumo = combinarConsumo(
+    escalarConsumo(a.receta, 0.5),
+    escalarConsumo(b.receta, 0.5),
+    sumaConsumoOpciones(elegidas.opciones)
+  );
 
   return {
     ok: true,
@@ -360,6 +413,7 @@ function armarCombo(
       opcionesTexto: textoOpciones(elegidas.opciones),
       costoAgregados: sumaCostoOpciones(elegidas.opciones),
       precioAgregados,
+      consumo,
     },
   };
 }

@@ -33,6 +33,14 @@ export const MODELOS_POR_LOCAL = new Set([
   "OptionGroup",
   "OptionGroupProduct",
   "ProductOptionGroup",
+  "CategoriaInsumo",
+  "Insumo",
+  "RecetaItem",
+  "Proveedor",
+  "Compra",
+  "CompraItem",
+  "Gasto",
+  "MovimientoStock",
 ]);
 
 /** Operaciones que leen o modifican filas existentes: se filtran por `where`. */

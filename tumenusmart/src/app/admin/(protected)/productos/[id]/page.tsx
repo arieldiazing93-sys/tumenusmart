@@ -7,6 +7,7 @@ import { idLocalActual } from "@/lib/local-actual";
 import { EliminarProductoBoton, EliminarOpcionBoton } from "./EliminarBotones";
 import { EditarProductoForm } from "./EditarProductoForm";
 import { GruposAgregadosProducto } from "./GruposAgregadosProducto";
+import { RecetaProducto } from "./RecetaProducto";
 import { etiquetaIva } from "@/lib/iva";
 import { etiquetaUnidadMedida } from "@/lib/unidad-medida";
 import { formatearGuarani } from "@/lib/format";
@@ -34,6 +35,12 @@ export default async function EditarProductoPage({
         opciones: {
           orderBy: { orden: "asc" },
           select: { id: true, nombre: true, precioExtra: true },
+        },
+        receta: {
+          select: {
+            cantidad: true,
+            insumo: { select: { id: true, nombre: true, unidadMedida: true } },
+          },
         },
         gruposAgregados: {
           orderBy: [{ orden: "asc" }, { id: "asc" }],
@@ -167,6 +174,27 @@ export default async function EditarProductoPage({
             })),
           }))}
           gruposDisponibles={gruposDisponibles}
+        />
+      </div>
+
+      <div className="flex flex-col gap-3 rounded-xl border border-linea bg-superficie p-4">
+        <div>
+          <p className="rotulo text-[0.8rem] font-bold">Receta (Control de stock)</p>
+          <p className="text-sm text-tinta-media">
+            Qué insumos descuenta cada unidad vendida de este producto, y cuánto de cada uno.
+            Sin receta, este producto no descuenta ningún insumo. Un "extra" de Grupos de
+            agregados es también un producto — armale la receta en su propia ficha para que
+            también descuente.
+          </p>
+        </div>
+        <RecetaProducto
+          productId={producto.id}
+          receta={producto.receta.map((r) => ({
+            insumoId: r.insumo.id,
+            nombre: r.insumo.nombre,
+            cantidad: Number(r.cantidad),
+            unidadMedida: etiquetaUnidadMedida(r.insumo.unidadMedida),
+          }))}
         />
       </div>
     </div>

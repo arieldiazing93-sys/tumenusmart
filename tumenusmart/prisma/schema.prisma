@@ -160,6 +160,16 @@ model Store {
   optionGroups         OptionGroup[]
   optionGroupProductos OptionGroupProduct[]
   productOptionGroups  ProductOptionGroup[]
+
+  // --- Control de stock ---
+  categoriasInsumo CategoriaInsumo[]
+  insumos          Insumo[]
+  recetaItems      RecetaItem[]
+  proveedores      Proveedor[]
+  compras          Compra[]
+  compraItems      CompraItem[]
+  gastos           Gasto[]
+  movimientosStock MovimientoStock[]
 }
 
 /// Las direcciones que este local tuvo antes.
@@ -456,6 +466,13 @@ model Product {
   // Grupos donde ESTE producto se usa como modificador de otro (ej: "Salsa
   // BBQ" referenciada dentro del grupo "Salsas") — ver OptionGroupProduct.
   usadoComoModificador OptionGroupProduct[]
+  // Qué insumos descuenta este producto al venderse, y cuánto de cada uno
+  // — ver RecetaItem (Control de stock). Vacío = no descuenta nada, ni
+  // bloquea nada: la receta es opcional, se arma solo si el negocio
+  // controla stock. Un "extra"/agregado de grupo (ver
+  // usadoComoModificador) también es un Product, así que su propia receta
+  // funciona igual, sin ningún caso especial.
+  receta      RecetaItem[]
   orderItems  OrderItem[]
   ventaPosItems VentaPosItem[]
   createdAt   DateTime        @default(now())
@@ -752,6 +769,10 @@ model Order {
   // después se emite una nueva para el mismo pedido (ver Fase 11), la vieja
   // queda congelada acá antes de pisarse.
   facturasReemplazadas FacturaReemplazada[]
+
+  // Cada descuento (y, si se cancela, su reversión) de stock que generó
+  // este pedido — ver MovimientoStock (Control de stock).
+  movimientosStock MovimientoStock[]
 
   // El pedido se guarda ANTES de que el cliente apriete "Enviar por
   // WhatsApp". Esta marca distingue los pedidos realmente enviados de los
@@ -1172,6 +1193,9 @@ model VentaPos {
   // Historial de remisiones — ver Order.facturasReemplazadas.
   facturasReemplazadas FacturaReemplazada[]
 
+  // Ver Order.movimientosStock.
+  movimientosStock MovimientoStock[]
+
   @@index([storeId])
   @@index([turnoPosId])
   @@index([storeId, creadoEn])
@@ -1236,4 +1260,199 @@ model FacturaReemplazada {
   @@index([storeId])
   @@index([orderId])
   @@index([ventaId])
+}
+
+// ===========================================================================
+//  Control de stock
+// ===========================================================================
+//
+// Insumos/artículos (materia prima) separados del catálogo de Productos que
+// se vende. Cada Product puede armar su propia "receta" (RecetaItem): qué
+// insumos consume y cuánto de cada uno. Un "extra"/agregado de grupo (ver
+// OptionGroupProduct) es también un Product, así que arma su receta en su
+// propia ficha, sin ningún mecanismo aparte.
+//
+// Todo movimiento de stock (venta, compra, ajuste de inventario, o la
+// reversión de una venta cancelada) queda como una fila en MovimientoStock
+// — es el ledger/auditoría, y la fuente de verdad si algún día hace falta
+// recalcular. Insumo.stockActual es un espejo rápido de ese ledger, que se
+// actualiza SIEMPRE junto con el movimiento, nunca solo.
+
+model CategoriaInsumo {
+  id        String   @id @default(cuid())
+  storeId   String
+  store     Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  nombre    String
+  orden     Int      @default(0)
+  createdAt DateTime @default(now())
+
+  insumos Insumo[]
+
+  @@index([storeId])
+}
+
+model Insumo {
+  id           String           @id @default(cuid())
+  storeId      String
+  store        Store            @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  categoriaId  String?
+  categoria    CategoriaInsumo? @relation(fields: [categoriaId], references: [id], onDelete: SetNull)
+  nombre       String
+  // "unidad" | "kilogramo" | "litro" — mismo whitelist que Product.unidadMedida,
+  // ver src/lib/unidad-medida.ts.
+  unidadMedida String           @default("unidad")
+  /// Espejo del ledger (MovimientoStock) para lectura rápida — se actualiza
+  /// siempre en la misma transacción que un movimiento, nunca por su cuenta.
+  /// Puede quedar negativo: una venta nunca se bloquea por falta de stock,
+  /// el negativo es el aviso para revisar después.
+  stockActual   Decimal  @default(0) @db.Decimal(12, 3)
+  /// Umbral opcional para avisos de "stock bajo" — todavía no dispara nada
+  /// automático, es un dato para la pantalla de inventario.
+  stockMinimo   Decimal? @db.Decimal(12, 3)
+  /// Costo de reposición: se actualiza solo con el costo unitario de la
+  /// última Compra registrada de este insumo.
+  costoUnitario Decimal? @db.Decimal(10, 2)
+  activo        Boolean  @default(true)
+  createdAt     DateTime @default(now())
+
+  receta      RecetaItem[]
+  compraItems CompraItem[]
+  movimientos MovimientoStock[]
+
+  @@index([storeId])
+  @@index([categoriaId])
+}
+
+/// Producto ↔ Insumo: qué consume UN Product por cada unidad vendida de él.
+/// Sirve igual para un plato de la carta que para un "extra" (que ya es un
+/// Product real, ver OptionGroupProduct) — no hay caso especial.
+model RecetaItem {
+  id        String  @id @default(cuid())
+  storeId   String
+  store     Store   @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  insumoId  String
+  insumo    Insumo  @relation(fields: [insumoId], references: [id], onDelete: Cascade)
+  cantidad  Decimal @db.Decimal(12, 3)
+
+  @@unique([productId, insumoId])
+  @@index([storeId])
+  @@index([productId])
+  @@index([insumoId])
+}
+
+model Proveedor {
+  id        String   @id @default(cuid())
+  storeId   String
+  store     Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  nombre    String
+  telefono  String?
+  email     String?
+  notas     String?
+  activo    Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  compras Compra[]
+  gastos  Gasto[]
+
+  @@index([storeId])
+}
+
+model Compra {
+  id                String     @id @default(cuid())
+  storeId           String
+  store             Store      @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  proveedorId       String?
+  proveedor         Proveedor? @relation(fields: [proveedorId], references: [id], onDelete: SetNull)
+  numeroComprobante String?
+  fecha             DateTime   @default(now())
+  total             Decimal    @db.Decimal(10, 2)
+  notas             String?
+  registradoPor     String?
+  createdAt         DateTime   @default(now())
+
+  items       CompraItem[]
+  movimientos MovimientoStock[]
+
+  @@index([storeId])
+  @@index([proveedorId])
+}
+
+model CompraItem {
+  id            String  @id @default(cuid())
+  storeId       String
+  store         Store   @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  compraId      String
+  compra        Compra  @relation(fields: [compraId], references: [id], onDelete: Cascade)
+  insumoId      String
+  // Restrict, no Cascade: borrar un insumo nunca debería borrar de yapa el
+  // historial de lo que se compró de él. En la práctica Insumo se
+  // desactiva (campo `activo`), no se borra — mismo patrón que Proveedor/
+  // AreaImpresion.
+  insumo        Insumo  @relation(fields: [insumoId], references: [id], onDelete: Restrict)
+  cantidad      Decimal @db.Decimal(12, 3)
+  costoUnitario Decimal @db.Decimal(10, 2)
+  subtotal      Decimal @db.Decimal(10, 2)
+
+  @@index([storeId])
+  @@index([compraId])
+  @@index([insumoId])
+}
+
+model Gasto {
+  id            String     @id @default(cuid())
+  storeId       String
+  store         Store      @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  concepto      String
+  // "alquiler" | "servicios" | "sueldos" | "insumos" | "otros" — whitelist
+  // en la Server Action, mismo criterio que Product.iva.
+  categoria     String     @default("otros")
+  monto         Decimal    @db.Decimal(10, 2)
+  fecha         DateTime   @default(now())
+  proveedorId   String?
+  proveedor     Proveedor? @relation(fields: [proveedorId], references: [id], onDelete: SetNull)
+  notas         String?
+  registradoPor String?
+  createdAt     DateTime   @default(now())
+
+  @@index([storeId])
+  @@index([proveedorId])
+}
+
+/// El ledger: cada movimiento de stock, venga de donde venga. Fuente de
+/// verdad para el historial de "Registro de inventario" y para poder
+/// revertir el descuento de una venta cancelada sin tener que re-derivar
+/// nada (no hace falta saber de nuevo qué recetas tenía cada ítem: alcanza
+/// con buscar los movimientos "venta" de ese orderId/ventaPosId e invertirlos).
+model MovimientoStock {
+  id       String @id @default(cuid())
+  storeId  String
+  store    Store  @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  insumoId String
+  // Restrict, mismo motivo que CompraItem.insumo: el ledger no se toca
+  // aunque el insumo se desactive.
+  insumo   Insumo @relation(fields: [insumoId], references: [id], onDelete: Restrict)
+  /// "venta" | "compra" | "ajuste" | "cancelacion"
+  tipo     String
+  /// Con signo: negativo en "venta", positivo en "compra"/"cancelacion";
+  /// en "ajuste" es la diferencia (contado - stockActual), puede ser
+  /// cualquier signo.
+  cantidad Decimal @db.Decimal(12, 3)
+
+  orderId    String?
+  order      Order?    @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  ventaPosId String?
+  ventaPos   VentaPos? @relation(fields: [ventaPosId], references: [id], onDelete: SetNull)
+  compraId   String?
+  compra     Compra?   @relation(fields: [compraId], references: [id], onDelete: SetNull)
+
+  motivo        String?
+  registradoPor String?
+  createdAt     DateTime @default(now())
+
+  @@index([storeId])
+  @@index([insumoId])
+  @@index([orderId])
+  @@index([ventaPosId])
 }

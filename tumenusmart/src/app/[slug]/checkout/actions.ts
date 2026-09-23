@@ -12,6 +12,7 @@ import {
   type LineaPedida,
   type ProductoBase,
 } from "@/lib/precio-pedido";
+import { registrarConsumoVenta } from "@/lib/movimientos-stock";
 
 export type DatosCheckout = {
   /** de qué local es el pedido, tomado de la URL que visitó el cliente */
@@ -176,13 +177,28 @@ export async function crearPedido(datos: DatosCheckout): Promise<ResultadoPedido
     orderBy: { orden: "asc" },
     include: {
       opciones: { orderBy: { orden: "asc" } },
+      // Insumos que consume este producto — ver Control de stock. Un
+      // producto sin receta armada simplemente trae [].
+      receta: { select: { insumoId: true, cantidad: true } },
       gruposAgregados: {
         select: {
           group: {
             select: {
               modificadores: {
                 where: { product: { disponible: true } },
-                select: { product: { select: { id: true, nombre: true, precio: true, costo: true } } },
+                select: {
+                  product: {
+                    select: {
+                      id: true,
+                      nombre: true,
+                      precio: true,
+                      costo: true,
+                      // Un modificador ES un Product (ver OptionGroupProduct):
+                      // trae su propia receta, igual que cualquier producto.
+                      receta: { select: { insumoId: true, cantidad: true } },
+                    },
+                  },
+                },
               },
             },
           },
@@ -200,13 +216,16 @@ export async function crearPedido(datos: DatosCheckout): Promise<ResultadoPedido
     mitadYMitadGrupo: p.mitadYMitadGrupo,
     mitadYMitadModo: p.mitadYMitadModo,
     iva: p.iva,
+    receta: p.receta,
     // Los agregados propios (ProductOption) más los de cualquier grupo
     // reutilizable adjuntado (ver src/app/admin/(protected)/grupos-agregados/)
     // — combinados acá para que armarPedido siga viendo un solo `opciones`
     // como siempre, sin saber de dónde salió cada ítem. Cada modificador de
     // un grupo ES un Product real (ver OptionGroupProduct): se usa su
-    // propio precio/costo, no datos duplicados. Siempre cuenta como
-    // "agregado" (los grupos no tienen variantes).
+    // propio precio/costo/receta, no datos duplicados. Siempre cuenta como
+    // "agregado" (los grupos no tienen variantes). Un ProductOption propio
+    // no es un Product, así que no tiene receta propia (ver Control de
+    // stock) — [] a propósito.
     opciones: [
       ...p.opciones.map((o) => ({
         id: o.id,
@@ -214,6 +233,7 @@ export async function crearPedido(datos: DatosCheckout): Promise<ResultadoPedido
         tipo: o.tipo,
         precioExtra: o.precioExtra,
         costo: o.costo,
+        receta: [],
       })),
       ...p.gruposAgregados.flatMap((g) =>
         g.group.modificadores.map((m) => ({
@@ -222,6 +242,7 @@ export async function crearPedido(datos: DatosCheckout): Promise<ResultadoPedido
           tipo: "agregado",
           precioExtra: m.product.precio,
           costo: m.product.costo,
+          receta: m.product.receta,
         }))
       ),
     ],
@@ -300,56 +321,64 @@ export async function crearPedido(datos: DatosCheckout): Promise<ResultadoPedido
   const facturaComoTicket = datos.comprobanteTipo === "ticket" && local.facturaObligatoria;
   const comprobanteTipoFinal = facturaComoTicket ? "factura" : datos.comprobanteTipo;
 
-  const order = await prisma.order.create({
-    data: {
-      storeId,
-      numero,
-      customerId: customer.id,
-      clienteNombre,
-      clienteTelefono,
-      tipoEntrega: datos.tipoEntrega,
-      deliveryZoneId: zonaId,
-      direccion: datos.tipoEntrega === "delivery" ? recortar(datos.direccion, LARGO.direccion) : undefined,
-      mesaNumero: datos.tipoEntrega === "mesa" ? recortar(datos.mesaNumero, LARGO.mesaNumero) : undefined,
-      clienteLat: datos.clienteLat,
-      clienteLng: datos.clienteLng,
-      metodoPagoReferencia: datos.metodoPagoReferencia,
-      comprobanteTipo: comprobanteTipoFinal,
-      // Con RUC real el checkout público no pide tipo — se guarda "ruc" fijo,
-      // solo para que el ticket sepa qué etiqueta imprimir después (ver
-      // src/lib/tipo-cliente.ts).
-      facturaTipoIdentificacion:
-        comprobanteTipoFinal === "factura" ? (facturaComoTicket ? SIN_REGISTRO_FISCAL.tipo : "ruc") : undefined,
-      facturaRazonSocial: facturaComoTicket
-        ? null
-        : datos.comprobanteTipo === "factura"
-          ? recortar(datos.facturaRazonSocial, LARGO.razonSocial)
-          : undefined,
-      facturaRuc: facturaComoTicket
-        ? SIN_REGISTRO_FISCAL.numero
-        : datos.comprobanteTipo === "factura"
-          ? recortar(datos.facturaRuc, LARGO.ruc)
-          : undefined,
-      facturaEmail: datos.comprobanteTipo === "factura" ? recortar(datos.facturaEmail, LARGO.email) : undefined,
-      notas: recortar(datos.notas, LARGO.notas),
-      subtotal,
-      costoEnvio,
-      total,
-      items: {
-        create: armado.lineas.map((l) => ({
-          storeId,
-          productId: l.productId,
-          nombreProducto: l.nombreProducto,
-          cantidad: l.cantidad,
-          precioUnitario: l.precioUnitario,
-          iva: l.iva,
-          opcionesTexto: l.opcionesTexto,
-          ingredientesQuitadosTexto: l.ingredientesQuitadosTexto,
-          costoAgregados: l.costoAgregados,
-          precioAgregados: l.precioAgregados,
-        })),
+  // En una transacción a partir de acá: si el pedido se crea, el descuento
+  // de stock de su receta tiene que quedar creado de yapa, nunca a medias.
+  const order = await prisma.$transaction(async (tx) => {
+    const nuevoPedido = await tx.order.create({
+      data: {
+        storeId,
+        numero,
+        customerId: customer.id,
+        clienteNombre,
+        clienteTelefono,
+        tipoEntrega: datos.tipoEntrega,
+        deliveryZoneId: zonaId,
+        direccion: datos.tipoEntrega === "delivery" ? recortar(datos.direccion, LARGO.direccion) : undefined,
+        mesaNumero: datos.tipoEntrega === "mesa" ? recortar(datos.mesaNumero, LARGO.mesaNumero) : undefined,
+        clienteLat: datos.clienteLat,
+        clienteLng: datos.clienteLng,
+        metodoPagoReferencia: datos.metodoPagoReferencia,
+        comprobanteTipo: comprobanteTipoFinal,
+        // Con RUC real el checkout público no pide tipo — se guarda "ruc" fijo,
+        // solo para que el ticket sepa qué etiqueta imprimir después (ver
+        // src/lib/tipo-cliente.ts).
+        facturaTipoIdentificacion:
+          comprobanteTipoFinal === "factura" ? (facturaComoTicket ? SIN_REGISTRO_FISCAL.tipo : "ruc") : undefined,
+        facturaRazonSocial: facturaComoTicket
+          ? null
+          : datos.comprobanteTipo === "factura"
+            ? recortar(datos.facturaRazonSocial, LARGO.razonSocial)
+            : undefined,
+        facturaRuc: facturaComoTicket
+          ? SIN_REGISTRO_FISCAL.numero
+          : datos.comprobanteTipo === "factura"
+            ? recortar(datos.facturaRuc, LARGO.ruc)
+            : undefined,
+        facturaEmail: datos.comprobanteTipo === "factura" ? recortar(datos.facturaEmail, LARGO.email) : undefined,
+        notas: recortar(datos.notas, LARGO.notas),
+        subtotal,
+        costoEnvio,
+        total,
+        items: {
+          create: armado.lineas.map((l) => ({
+            storeId,
+            productId: l.productId,
+            nombreProducto: l.nombreProducto,
+            cantidad: l.cantidad,
+            precioUnitario: l.precioUnitario,
+            iva: l.iva,
+            opcionesTexto: l.opcionesTexto,
+            ingredientesQuitadosTexto: l.ingredientesQuitadosTexto,
+            costoAgregados: l.costoAgregados,
+            precioAgregados: l.precioAgregados,
+          })),
+        },
       },
-    },
+    });
+
+    await registrarConsumoVenta(tx, storeId, armado.lineas, { orderId: nuevoPedido.id });
+
+    return nuevoPedido;
   });
 
   return { ok: true, orderId: order.id };

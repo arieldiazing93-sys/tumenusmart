@@ -8,6 +8,7 @@ import { idLocalActual } from "@/lib/local-actual";
 import { exigirPermiso } from "@/lib/auth";
 import { normalizarFormaPagoPos, resumirTurno, type DeclaradoPorForma } from "@/lib/turno-pos";
 import { armarPedido, type LineaPedida, type ProductoBase } from "@/lib/precio-pedido";
+import { registrarConsumoVenta, revertirMovimientosVenta } from "@/lib/movimientos-stock";
 import { desglosarIva, formatearNumeroFactura } from "@/lib/factura-pos";
 import { SIN_REGISTRO_FISCAL } from "@/lib/tipo-cliente";
 import { turnoAbierto, pedidosDelTurno, entregasSinRendir } from "./turno-actual";
@@ -200,13 +201,26 @@ export async function registrarVenta(turnoId: string, datos: DatosVenta): Promis
         orderBy: { orden: "asc" },
         select: { id: true, nombre: true, tipo: true, precioExtra: true, costo: true },
       },
+      // Insumos que consume este producto — ver Control de stock.
+      receta: { select: { insumoId: true, cantidad: true } },
       gruposAgregados: {
         select: {
           group: {
             select: {
               modificadores: {
                 where: { product: { disponible: true } },
-                select: { product: { select: { id: true, nombre: true, precio: true, costo: true } } },
+                select: {
+                  product: {
+                    select: {
+                      id: true,
+                      nombre: true,
+                      precio: true,
+                      costo: true,
+                      // Un modificador ES un Product: trae su propia receta.
+                      receta: { select: { insumoId: true, cantidad: true } },
+                    },
+                  },
+                },
               },
             },
           },
@@ -228,12 +242,14 @@ export async function registrarVenta(turnoId: string, datos: DatosVenta): Promis
     mitadYMitadGrupo: p.mitadYMitadGrupo,
     mitadYMitadModo: p.mitadYMitadModo,
     iva: p.iva,
+    receta: p.receta,
     // Los agregados propios más los de cualquier grupo reutilizable
     // adjuntado — mismo criterio que en checkout/actions.ts: cada
     // modificador de un grupo ES un Product real, se usa su propio
-    // precio/costo.
+    // precio/costo/receta. Un agregado propio (ProductOption) no es un
+    // Product, no tiene receta propia — [] a propósito.
     opciones: [
-      ...p.opciones,
+      ...p.opciones.map((o) => ({ ...o, receta: [] })),
       ...p.gruposAgregados.flatMap((g) =>
         g.group.modificadores.map((m) => ({
           id: m.product.id,
@@ -241,6 +257,7 @@ export async function registrarVenta(turnoId: string, datos: DatosVenta): Promis
           tipo: "agregado",
           precioExtra: m.product.precio,
           costo: m.product.costo,
+          receta: m.product.receta,
         }))
       ),
     ],
@@ -362,6 +379,9 @@ export async function registrarVenta(turnoId: string, datos: DatosVenta): Promis
       },
       select: { id: true },
     });
+
+    await registrarConsumoVenta(tx, storeId, filas, { ventaPosId: venta.id }, registradoPor);
+
     return venta.id;
   });
 
@@ -579,27 +599,34 @@ export async function cancelarVenta(ventaId: string, motivo: string): Promise<Re
   const identidad = sesion.nombre?.trim() || sesion.email;
   const ahora = new Date();
 
-  await db.ventaPos.update({
-    where: { id: ventaId },
-    data: {
-      cancelada: true,
-      canceladaPor: identidad,
-      canceladaEn: ahora,
-      motivoCancelacion: motivo.trim() || null,
-      // Cancelar la cuenta entera anula la factura de yapa: no puede quedar
-      // un número de timbrado vigente sobre una venta que ya no existe.
-      ...(venta.facturaNumero && !venta.facturaAnulada
-        ? {
-            facturaAnulada: true,
-            facturaAnuladaPor: identidad,
-            facturaAnuladaEn: ahora,
-            facturaMotivoAnulacion: motivo.trim() || null,
-          }
-        : {}),
-    },
+  // En transacción: cancelar la cuenta y devolverle el stock a sus insumos
+  // quedan como una sola cosa, nunca a medias.
+  await prisma.$transaction(async (tx) => {
+    await tx.ventaPos.update({
+      where: { id: ventaId, storeId },
+      data: {
+        cancelada: true,
+        canceladaPor: identidad,
+        canceladaEn: ahora,
+        motivoCancelacion: motivo.trim() || null,
+        // Cancelar la cuenta entera anula la factura de yapa: no puede quedar
+        // un número de timbrado vigente sobre una venta que ya no existe.
+        ...(venta.facturaNumero && !venta.facturaAnulada
+          ? {
+              facturaAnulada: true,
+              facturaAnuladaPor: identidad,
+              facturaAnuladaEn: ahora,
+              facturaMotivoAnulacion: motivo.trim() || null,
+            }
+          : {}),
+      },
+    });
+
+    await revertirMovimientosVenta(tx, storeId, { ventaPosId: ventaId }, identidad);
   });
 
   revalidatePath("/admin/pos/cuentas");
   revalidatePath(`/admin/pos/venta/${ventaId}`);
+  revalidatePath("/admin/stock/insumos");
   return { ok: true };
 }

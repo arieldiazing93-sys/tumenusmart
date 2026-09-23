@@ -3,11 +3,13 @@
 import { exigirPermiso } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 import { prismaDelLocal, type PrismaLocal } from "@/lib/prisma-local";
+import { prisma as prismaCliente } from "@/lib/prisma";
 import { idLocalActual } from "@/lib/local-actual";
 import { normalizarFormaPagoPos } from "@/lib/turno-pos";
 import { normalizarCobro } from "@/lib/rendicion";
 import { estacionActual } from "@/lib/estacion-actual";
 import { desglosarIva, formatearNumeroFactura } from "@/lib/factura-pos";
+import { revertirMovimientosVenta } from "@/lib/movimientos-stock";
 import { turnoAbierto } from "../pos/turno-actual";
 
 const ESTADOS_VALIDOS = [
@@ -112,8 +114,9 @@ export async function cambiarEstadoPedido(
   motivo?: string
 ): Promise<ResultadoPedidoAccion> {
   const sesion = await exigirPermiso("pedidos.cambiarEstado");
+  const storeId = await idLocalActual();
   // Todas las consultas de acá abajo quedan atadas a este local.
-  const prisma = prismaDelLocal(await idLocalActual());
+  const prisma = prismaDelLocal(storeId);
 
   if (!ESTADOS_VALIDOS.includes(estado)) {
     return { ok: false, error: "Estado inválido" };
@@ -283,10 +286,26 @@ export async function cambiarEstadoPedido(
     }
   }
 
-  await prisma.order.update({
-    where: { id: orderId },
-    data: { estado, ...datosExtra, ...datosFactura },
-  });
+  if (estado === "cancelado") {
+    // En transacción: cancelar el pedido y devolverle el stock a sus
+    // insumos quedan como una sola cosa, nunca a medias. Usa el cliente
+    // crudo (no el filtrado por local) porque $transaction necesita el
+    // mismo `tx` para las dos escrituras — por eso el `where` completa
+    // storeId a mano.
+    await prismaCliente.$transaction(async (tx) => {
+      await tx.order.update({
+        where: { id: orderId, storeId },
+        data: { estado, ...datosExtra, ...datosFactura },
+      });
+      await revertirMovimientosVenta(tx, storeId, { orderId }, sesion.nombre?.trim() || sesion.email);
+    });
+    revalidatePath("/admin/stock/insumos");
+  } else {
+    await prisma.order.update({
+      where: { id: orderId },
+      data: { estado, ...datosExtra, ...datosFactura },
+    });
+  }
   revalidatePath("/admin/pedidos");
   revalidatePath(`/admin/pedidos/${orderId}`);
   if ("turnoPosId" in datosExtra) {

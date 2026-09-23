@@ -45,6 +45,9 @@ export type Permiso =
   | "productos.editar"
   | "categorias.ver"
   | "categorias.editar"
+  // --- control de stock: insumos, recetas, proveedores, compras, gastos ---
+  | "stock.ver"
+  | "stock.editar"
   // --- el negocio ---
   | "estadisticas.ver"
   | "ideas.ver"
@@ -103,6 +106,10 @@ const PERMISOS_LOCAL: Permiso[] = [
   "pos.gestionarEstaciones",
   "productos.editar",
   "categorias.editar",
+  // Toca costos, proveedores y stock del negocio — nivel dueño, no
+  // empleado, mismo criterio que "pos.gestionarEstaciones".
+  "stock.ver",
+  "stock.editar",
   "estadisticas.ver",
   "ideas.ver",
   "analytics.ver",

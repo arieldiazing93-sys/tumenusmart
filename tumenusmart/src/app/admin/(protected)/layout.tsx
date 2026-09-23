@@ -73,6 +73,21 @@ function armarGrupos(hayIdeaSinVer: boolean, rol: string): GrupoSecciones[] {
       ],
     },
     {
+      titulo: "Control de stock",
+      secciones: [
+        { href: "/admin/stock/insumos", label: "Insumos", icono: "productos" as const,
+          ver: conPermiso("stock.ver") },
+        { href: "/admin/stock/proveedores", label: "Proveedores", icono: "usuarios" as const,
+          ver: conPermiso("stock.ver") },
+        { href: "/admin/stock/compras", label: "Compras", icono: "cierre" as const,
+          ver: conPermiso("stock.ver") },
+        { href: "/admin/stock/inventario", label: "Registro de inventario", icono: "estadisticas" as const,
+          ver: conPermiso("stock.ver") },
+        { href: "/admin/stock/gastos", label: "Gastos", icono: "cierre" as const,
+          ver: conPermiso("stock.ver") },
+      ],
+    },
+    {
       titulo: "Cómo va el negocio",
       secciones: [
         { href: "/admin/estadisticas", label: "Estadísticas", icono: "estadisticas" as const,
