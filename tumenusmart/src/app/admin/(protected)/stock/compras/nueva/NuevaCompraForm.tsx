@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState, useTransition, type ReactNode } f
 import Link from "next/link";
 import { Tarjeta, Campo, Entrada, Selector, clasesBoton } from "@/components/ui";
 import { formatearGuarani } from "@/lib/format";
-import { etiquetaIva } from "@/lib/iva";
+import { etiquetaIva, TASAS_IVA } from "@/lib/iva";
 import { calcularCompra } from "@/lib/compra-calculo";
 import { registrarCompra, type InsumoParaCompra } from "../actions";
 import { BuscarInsumoParaCompra } from "./BuscarInsumoParaCompra";
@@ -22,10 +22,8 @@ type Linea = {
   rendimiento: number;
   almacenId: string;
   cantidad: string;
-  /** Lo que se escribió como costo de una unidad de compra: sin IVA o con IVA, según `costoConIva`. */
+  /** Costo de una unidad de compra CON IVA, tal cual lo dice la factura del proveedor. El costo sin IVA se calcula solo. */
   costo: string;
-  /** true si `costo` se escribió en la columna "c/ IVA" — la otra columna se calcula sola. */
-  costoConIva: boolean;
   descuentoPorcentaje: string;
 };
 
@@ -46,6 +44,11 @@ function hoyLocal(): string {
 function aNumero(texto: string): number {
   const n = Number(texto);
   return Number.isFinite(n) ? n : 0;
+}
+
+/** El porcentaje de IVA de un insumo ("gravado10" → 10). */
+function porcentajeIva(iva: string): number {
+  return TASAS_IVA.find((t) => t.valor === iva)?.porcentaje ?? 10;
 }
 
 /**
@@ -105,7 +108,7 @@ export function NuevaCompraForm({
         lineas.map((l) => ({
           cantidad: aNumero(l.cantidad),
           costoUnitario: aNumero(l.costo),
-          costoIncluyeIva: l.costoConIva,
+          costoIncluyeIva: true,
           descuentoPorcentaje: aNumero(l.descuentoPorcentaje),
           iva: l.iva,
         })),
@@ -133,9 +136,12 @@ export function NuevaCompraForm({
           rendimiento: insumo.rendimiento,
           almacenId: almacenPorDefecto,
           cantidad: "",
-          // El último costo que se guardó es neto.
-          costo: insumo.ultimoCostoPorCompra != null ? String(insumo.ultimoCostoPorCompra) : "",
-          costoConIva: false,
+          // El último costo que se guardó es neto: se le suma el IVA para
+          // precargarlo como se carga siempre, con IVA.
+          costo:
+            insumo.ultimoCostoPorCompra != null
+              ? String(Math.round(insumo.ultimoCostoPorCompra * (1 + porcentajeIva(insumo.iva) / 100)))
+              : "",
           descuentoPorcentaje: "",
         },
       ];
@@ -192,7 +198,7 @@ export function NuevaCompraForm({
           almacenId: l.almacenId,
           cantidad: aNumero(l.cantidad),
           costoUnitario: aNumero(l.costo),
-          costoIncluyeIva: l.costoConIva,
+          costoIncluyeIva: true,
           descuentoPorcentaje: aNumero(l.descuentoPorcentaje),
         })),
       });
@@ -271,7 +277,7 @@ export function NuevaCompraForm({
 
         {lineas.length > 0 && (
           <p className="text-[0.78rem] text-tinta-suave">
-            Cargá el costo como dice la factura, sin IVA o con IVA: al escribir en una columna, la otra se calcula sola.
+            Cargá el costo con IVA, como dice la factura: el costo sin IVA se calcula solo.
           </p>
         )}
 
@@ -299,10 +305,6 @@ export function NuevaCompraForm({
             {lineas.map((l, i) => {
               const calculada = calculo.lineas[i];
               const unidadesQueEntran = Math.round(aNumero(l.cantidad) * l.rendimiento * 1000) / 1000;
-              // Lo escrito se muestra tal cual; la otra columna, calculada.
-              const hayCosto = l.costo !== "";
-              const costoSinIva = hayCosto ? (l.costoConIva ? String(calculada.costoUnitarioNeto) : l.costo) : "";
-              const costoConIva = hayCosto ? (l.costoConIva ? l.costo : String(calculada.costoUnitarioConImpuesto)) : "";
               return (
                 <div
                   key={l.clave}
@@ -348,13 +350,13 @@ export function NuevaCompraForm({
                         ))}
                       </Selector>
                     </Celda>
+                    {/* Solo se escribe el costo CON IVA (así viene en la factura);
+                        este otro se ve pero no se puede tipear, para que nadie
+                        cargue el costo en la columna equivocada. */}
                     <Celda etiqueta="Costo s/ IVA">
                       <Entrada
-                        type="number"
-                        step="any"
-                        min="0"
-                        value={costoSinIva}
-                        onChange={(e) => actualizarLinea(l.clave, { costo: e.target.value, costoConIva: false })}
+                        disabled
+                        value={l.costo !== "" ? formatearGuarani(calculada.costoUnitarioNeto) : ""}
                       />
                     </Celda>
                     <Celda etiqueta="Costo c/ IVA">
@@ -362,8 +364,8 @@ export function NuevaCompraForm({
                         type="number"
                         step="any"
                         min="0"
-                        value={costoConIva}
-                        onChange={(e) => actualizarLinea(l.clave, { costo: e.target.value, costoConIva: true })}
+                        value={l.costo}
+                        onChange={(e) => actualizarLinea(l.clave, { costo: e.target.value })}
                       />
                     </Celda>
                     <Celda etiqueta="Desc. %">

@@ -78,6 +78,27 @@ export default async function ComprasPage({ searchParams }: { searchParams: Prom
             </Link>
           )}
         </div>
+
+        {/* El reporte sale con lo que está escrito arriba (proveedor y fechas),
+            sin tener que apretar Buscar antes: cada botón manda este mismo
+            formulario a su propia dirección. Sin fechas, es el mes actual. */}
+        <div className="flex flex-wrap items-center gap-2 border-t border-linea pt-3 sm:col-span-2 lg:col-span-4">
+          <span className="text-sm font-medium text-tinta">Reporte de compras</span>
+          <button type="submit" formAction="/admin/stock/compras/exportar" className={clasesBoton("principal", "sm")}>
+            Descargar Excel
+          </button>
+          <button
+            type="submit"
+            formAction="/admin/stock/compras/imprimir"
+            formTarget="_blank"
+            className={clasesBoton("navegar", "sm")}
+          >
+            Ver reporte / PDF
+          </button>
+          <span className="text-xs text-tinta-suave">
+            Usa el proveedor y el rango Desde / Hasta de arriba. Sin fechas, toma el mes actual.
+          </span>
+        </div>
       </form>
 
       {compras.length === 0 ? (
