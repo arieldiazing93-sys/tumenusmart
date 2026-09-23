@@ -9,7 +9,17 @@ import { crearInsumo } from "./actions";
 
 type Categoria = { id: string; nombre: string };
 
-export function CrearInsumoForm({ categorias }: { categorias: Categoria[] }) {
+export function CrearInsumoForm({
+  categorias,
+  categoriaInicialId,
+  onCreado,
+}: {
+  categorias: Categoria[];
+  /** Categoría que ya está elegida en la lista — el insumo nuevo arranca en ella. */
+  categoriaInicialId?: string;
+  /** Se llama con el id del insumo recién creado, para abrirlo en el panel. */
+  onCreado?: (insumoId: string) => void;
+}) {
   const [pendiente, iniciar] = useTransition();
   const [agregado, setAgregado] = useState(false);
   const [nuevaCategoria, setNuevaCategoria] = useState(false);
@@ -27,12 +37,13 @@ export function CrearInsumoForm({ categorias }: { categorias: Categoria[] }) {
       setNuevaCategoria(false);
       setAgregado(true);
       router.refresh();
+      onCreado?.(resultado.insumoId);
       setTimeout(() => setAgregado(false), 2500);
     });
   }
 
   return (
-    <Tarjeta className="mb-6 flex flex-col gap-3">
+    <Tarjeta className="flex flex-col gap-3">
       <p className="rotulo text-[0.8rem] font-bold">Nuevo insumo</p>
       <form ref={formRef} action={alCrear} className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <Campo etiqueta="Nombre">
@@ -42,7 +53,7 @@ export function CrearInsumoForm({ categorias }: { categorias: Categoria[] }) {
         <div>
           <Campo etiqueta="Categoría (opcional)">
             {!nuevaCategoria ? (
-              <Selector name="categoriaId" defaultValue="">
+              <Selector name="categoriaId" defaultValue={categoriaInicialId ?? ""}>
                 <option value="">Sin categoría</option>
                 {categorias.map((c) => (
                   <option key={c.id} value={c.id}>

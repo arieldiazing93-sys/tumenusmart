@@ -2,7 +2,6 @@
 
 import { exigirPermiso } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
 import { idLocalActual } from "@/lib/local-actual";
 import { prismaDelLocal } from "@/lib/prisma-local";
 import { normalizarUnidadMedida } from "@/lib/unidad-medida";
@@ -116,7 +115,8 @@ export async function actualizarInsumo(
     });
   });
 
+  // No redirige: el panel de datos vive en la misma pantalla que la lista y
+  // sigue abierto después de guardar.
   revalidatePath("/admin/stock/insumos");
-  revalidatePath(`/admin/stock/insumos/${id}`);
-  redirect("/admin/stock/insumos");
+  return { ok: true };
 }

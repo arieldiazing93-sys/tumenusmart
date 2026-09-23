@@ -1,13 +1,12 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { Tarjeta, Campo, Entrada, Selector, clasesBoton } from "@/components/ui";
+import { useEffect, useState, useTransition } from "react";
+import { Tarjeta, Campo, Entrada, Selector, Pastilla, clasesBoton } from "@/components/ui";
 import { UNIDADES_MEDIDA, etiquetaUnidadMedida } from "@/lib/unidad-medida";
 import { TASAS_IVA } from "@/lib/iva";
-import { actualizarInsumo } from "../actions";
+import { actualizarInsumo } from "./actions";
 
-type Categoria = { id: string; nombre: string };
-type Insumo = {
+export type InsumoDatos = {
   id: string;
   nombre: string;
   categoriaId: string | null;
@@ -19,21 +18,66 @@ type Insumo = {
   activo: boolean;
 };
 
-export function EditarInsumoForm({ insumo, categorias }: { insumo: Insumo; categorias: Categoria[] }) {
+type Categoria = { id: string; nombre: string };
+
+/**
+ * Los datos de UN insumo, en el panel de la derecha. Se abre con doble clic
+ * sobre la lista y guarda sin salir de la pantalla.
+ *
+ * El stock no se edita acá: se corrige desde Registro de inventario, para que
+ * cada cambio quede como un movimiento en el historial.
+ */
+export function InsumoPanel({
+  insumo,
+  categorias,
+  onGuardado,
+}: {
+  insumo: InsumoDatos;
+  categorias: Categoria[];
+  onGuardado: () => void;
+}) {
   const [pendiente, iniciar] = useTransition();
   const [nuevaCategoria, setNuevaCategoria] = useState(false);
+  const [categoriaId, setCategoriaId] = useState(insumo.categoriaId ?? "");
+  const [error, setError] = useState<string | null>(null);
+  const [guardado, setGuardado] = useState(false);
+
+  // Si se creó una categoría nueva al guardar, el id recién llega con los
+  // datos refrescados: se sincroniza para que el desplegable la muestre.
+  useEffect(() => {
+    setCategoriaId(insumo.categoriaId ?? "");
+  }, [insumo.categoriaId]);
+
+  const negativo = insumo.stockActual < 0;
+  const bajoMinimo = insumo.stockMinimo != null && insumo.stockActual < insumo.stockMinimo;
 
   function alGuardar(formData: FormData) {
+    setError(null);
     iniciar(async () => {
-      // Si sale bien, actualizarInsumo redirige sola — este código no sigue.
       const resultado = await actualizarInsumo(insumo.id, formData);
-      if (resultado && !resultado.ok) alert(resultado.error);
+      if (!resultado.ok) {
+        setError(resultado.error);
+        return;
+      }
+      setNuevaCategoria(false);
+      setGuardado(true);
+      onGuardado();
+      setTimeout(() => setGuardado(false), 2500);
     });
   }
 
   return (
-    <form action={alGuardar} className="flex flex-col gap-4">
-      <Tarjeta className="flex flex-col gap-3">
+    <Tarjeta className="flex flex-col gap-4">
+      <div>
+        <h2 className="text-[1.1rem] font-semibold tracking-titular text-tinta">{insumo.nombre}</h2>
+        <div className="mt-1 flex flex-wrap items-center gap-2">
+          <Pastilla color={insumo.activo ? "exito" : "neutro"}>{insumo.activo ? "Activo" : "Desactivado"}</Pastilla>
+          {negativo && <Pastilla color="peligro">Stock negativo</Pastilla>}
+          {!negativo && bajoMinimo && <Pastilla color="aviso">Bajo el mínimo</Pastilla>}
+        </div>
+      </div>
+
+      <form action={alGuardar} className="flex flex-col gap-3">
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Campo etiqueta="Nombre">
             <Entrada name="nombre" required defaultValue={insumo.nombre} />
@@ -42,7 +86,7 @@ export function EditarInsumoForm({ insumo, categorias }: { insumo: Insumo; categ
           <div>
             <Campo etiqueta="Categoría (opcional)">
               {!nuevaCategoria ? (
-                <Selector name="categoriaId" defaultValue={insumo.categoriaId ?? ""}>
+                <Selector name="categoriaId" value={categoriaId} onChange={(e) => setCategoriaId(e.target.value)}>
                   <option value="">Sin categoría</option>
                   {categorias.map((c) => (
                     <option key={c.id} value={c.id}>
@@ -85,10 +129,7 @@ export function EditarInsumoForm({ insumo, categorias }: { insumo: Insumo; categ
             etiqueta="Stock actual"
             ayuda="No se edita acá — se corrige desde Registro de inventario, para que quede el movimiento en el historial."
           >
-            <Entrada
-              disabled
-              value={`${insumo.stockActual} ${etiquetaUnidadMedida(insumo.unidadMedida)}`}
-            />
+            <Entrada disabled value={`${insumo.stockActual} ${etiquetaUnidadMedida(insumo.unidadMedida)}`} />
           </Campo>
           <Campo etiqueta="Stock mínimo (opcional)">
             <Entrada
@@ -114,11 +155,15 @@ export function EditarInsumoForm({ insumo, categorias }: { insumo: Insumo; categ
           <input type="checkbox" name="activo" defaultChecked={insumo.activo} />
           Activo (disponible para armar recetas nuevas)
         </label>
-      </Tarjeta>
 
-      <button type="submit" disabled={pendiente} className={clasesBoton("principal")}>
-        {pendiente ? "Guardando…" : "Guardar cambios"}
-      </button>
-    </form>
+        {error && <p className="text-sm font-medium text-peligro">{error}</p>}
+        <div className="flex items-center gap-3">
+          <button type="submit" disabled={pendiente} className={clasesBoton("principal")}>
+            {pendiente ? "Guardando…" : "Guardar cambios"}
+          </button>
+          {guardado && <span className="text-xs font-medium text-exito">✓ Guardado</span>}
+        </div>
+      </form>
+    </Tarjeta>
   );
 }
