@@ -60,7 +60,7 @@ export function EditarProductoForm({
   }
 
   return (
-    <form action={alGuardar} className="flex flex-col gap-4">
+    <form action={alGuardar} className="campos-grises flex flex-col gap-4">
       <Tarjeta className="flex flex-col gap-3">
         <p className="rotulo text-[0.8rem] font-bold">Datos básicos</p>
         {/*

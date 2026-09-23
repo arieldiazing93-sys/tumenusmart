@@ -78,7 +78,7 @@ export function InsumoPanel({
         </div>
       </div>
 
-      <form action={alGuardar} className="flex flex-col gap-3">
+      <form action={alGuardar} className="campos-grises flex flex-col gap-3">
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Campo etiqueta="Nombre">
             <Entrada name="nombre" required defaultValue={insumo.nombre} />

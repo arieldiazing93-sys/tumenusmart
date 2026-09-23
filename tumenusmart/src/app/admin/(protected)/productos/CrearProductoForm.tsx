@@ -33,7 +33,7 @@ export function CrearProductoForm({
   }
 
   return (
-    <form action={alCrear} className="mt-4 flex flex-col gap-3">
+    <form action={alCrear} className="campos-grises mt-4 flex flex-col gap-3">
       {/* Dos columnas desde sm: menos scroll para llegar al botón de crear. */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <input

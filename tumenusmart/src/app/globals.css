@@ -131,6 +131,24 @@
   }
 }
 
+/* Formularios con los campos en gris claro.
+
+   Sobre una tarjeta blanca, un campo blanco con borde fino no se distingue de
+   la tarjeta: cuesta ver dónde va el dato. Con esta clase en el <form> (o en
+   cualquier contenedor), todos sus campos de texto, listas y áreas de texto
+   se pintan con el gris de "papel hundido", y la vista se va al valor que
+   tienen adentro. Es opt-in a propósito: hoy solo la usan los formularios de
+   Productos e Insumos.
+
+   Va como regla suelta (no como utilidad de Tailwind) y con el selector largo
+   para ganarle a `bg-superficie`, que ya traen Entrada/Selector/Area: dos
+   clases de la misma fuerza se pisan según el orden del CSS, y este orden no
+   se puede dar por seguro. Los deshabilitados quedan con su estilo propio, y
+   las casillas y los archivos no se tocan. */
+.campos-grises :is(input, select, textarea):not([type="checkbox"], [type="radio"], [type="hidden"], [type="file"], [type="color"], :disabled) {
+  background-color: rgb(var(--papel-hundido));
+}
+
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
   *, *::before, *::after {

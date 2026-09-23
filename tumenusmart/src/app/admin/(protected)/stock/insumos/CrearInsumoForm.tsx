@@ -49,7 +49,7 @@ export function CrearInsumoForm({
   return (
     <Tarjeta className="flex flex-col gap-3">
       <p className="rotulo text-[0.8rem] font-bold">Nuevo insumo</p>
-      <form ref={formRef} action={alCrear} className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+      <form ref={formRef} action={alCrear} className="campos-grises grid grid-cols-1 gap-3 sm:grid-cols-2">
         <Campo etiqueta="Nombre">
           <Entrada name="nombre" required placeholder="Ej: Carne molida" />
         </Campo>
