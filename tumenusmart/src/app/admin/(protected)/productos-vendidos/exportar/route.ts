@@ -74,6 +74,11 @@ export async function GET(request: NextRequest) {
   filaTitulo(hoja, ["Negocio", local.nombre], 2);
   filaTitulo(hoja, ["Reporte", "Rentabilidad"], 2);
   filaTitulo(hoja, ["Período", periodo], 2);
+  filaTitulo(
+    hoja,
+    ["Criterio", "Venta, costo, ganancia y margen sin IVA. El costo sale de la receta de cada producto (última compra de cada insumo): es el costo de hoy."],
+    2
+  );
   hoja.addRow([]);
 
   filaTitulo(
@@ -82,7 +87,7 @@ export async function GET(request: NextRequest) {
       "Categoría",
       "Producto",
       "Cantidad vendida",
-      "Precio de venta (Gs.)",
+      "Precio de venta sin IVA (Gs.)",
       "Costo (Gs.)",
       "Margen (%)",
       "Ganancia (Gs.)",
@@ -91,7 +96,7 @@ export async function GET(request: NextRequest) {
       // con él, no el producto en sí — sumarlas al precio de venta de
       // arriba daría el mismo número mezclado que este reporte dejó de
       // mostrar.
-      "Venta agregados (Gs.)",
+      "Venta agregados sin IVA (Gs.)",
       "Costo agregados (Gs.)",
       "Ganancia agregados (Gs.)",
       // Cuál fue cada agregado, no solo el total — el mismo texto que ve
@@ -125,7 +130,7 @@ export async function GET(request: NextRequest) {
     hoja,
     [
       "",
-      "TOTAL GENERAL",
+      "TOTAL GENERAL (sin IVA)",
       reporte.totalGeneral.cantidad,
       Math.round(reporte.totalGeneral.venta),
       reporte.totalGeneral.costo != null ? Math.round(reporte.totalGeneral.costo) : "",
@@ -139,10 +144,20 @@ export async function GET(request: NextRequest) {
     11
   );
 
+  // De la plata cobrada a la venta sin IVA: la primera cifra es la de
+  // Estadísticas, la segunda es la que usa este reporte para la ganancia.
+  hoja.addRow([]);
+  hoja.addRow(["", "Cobrado (con IVA — cifra de Estadísticas)", "", Math.round(reporte.totalGeneral.ventaConIva)]);
+  hoja.addRow(["", "IVA incluido en lo cobrado", "", Math.round(reporte.totalGeneral.iva)]);
+
   if (reporte.totalGeneral.costoIncompleto) {
+    const cobertura =
+      reporte.totalGeneral.venta > 0
+        ? Math.round((reporte.totalGeneral.ventaConCosto / reporte.totalGeneral.venta) * 100)
+        : 0;
     hoja.addRow([]);
     hoja.addRow([
-      "Hay productos vendidos sin costo cargado — los totales de costo y ganancia no incluyen esas filas.",
+      `Hay productos vendidos sin costo (sin receta, o con algún insumo sin compra registrada): el costo y la ganancia del total no incluyen esas filas y cubren solo el ${cobertura}% de la venta sin IVA.`,
     ]);
   }
 

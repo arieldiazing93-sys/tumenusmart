@@ -102,6 +102,7 @@ export async function GET(request: NextRequest) {
         categoriaNombre: pr.category.nombre,
         precio: Number(pr.precio),
         costo: costoDelProducto(pr.costo, pr.receta),
+        iva: pr.iva,
         disponible: pr.disponible,
         creado: pr.createdAt,
       }));

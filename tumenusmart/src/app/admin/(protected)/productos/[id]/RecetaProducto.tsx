@@ -94,8 +94,10 @@ export function RecetaProducto({ productId, receta }: { productId: string; recet
                     className={clasesBoton("suave", "sm")}
                     title="Cambiar la cantidad"
                   >
-                    {r.cantidad} {r.unidadMedida}
+                    {r.cantidad}
                   </button>
+                  {/* La unidad va afuera del botón: pegada al número se leía "1Unidad". */}
+                  <span className="text-xs text-tinta-suave">{r.unidadMedida}</span>
                   <QuitarInsumoDeRecetaBoton productId={productId} insumoId={r.insumoId} />
                 </div>
               )}

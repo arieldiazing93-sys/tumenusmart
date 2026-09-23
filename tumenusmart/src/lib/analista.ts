@@ -17,6 +17,7 @@
 // ---------------------------------------------------------------------------
 
 import { agruparPorCliente } from "./agrupar-clientes";
+import { TASAS_IVA } from "./iva";
 
 export type ItemAnalisis = {
   productId: string | null;
@@ -47,6 +48,8 @@ export type ProductoAnalisis = {
   precio: number;
   /** Nulo mientras el negocio no lo haya cargado. Sin esto no hay margen. */
   costo: number | null;
+  /** "gravado10" | "gravado5" | "exento". Sin esto se asume 10%. El margen se mide sin IVA. */
+  iva?: string;
   disponible: boolean;
   creado: Date;
 };
@@ -575,7 +578,10 @@ function ideaMargen(
   const filas = conCosto
     .map((pr) => {
       const u = unidades.get(pr.id) ?? 0;
-      const margenUnitario = pr.precio - (pr.costo as number);
+      // El precio de venta lleva IVA y el costo no: para que la resta sea justa
+      // se le saca el impuesto al precio (el IVA no es del negocio, es del fisco).
+      const porcentajeIva = TASAS_IVA.find((t) => t.valor === pr.iva)?.porcentaje ?? 10;
+      const margenUnitario = pr.precio / (1 + porcentajeIva / 100) - (pr.costo as number);
       return {
         pr,
         unidades: u,
@@ -607,7 +613,7 @@ function ideaMargen(
       clave: "margen",
       tipo: "dato",
       titulo: "Tu producto más fuerte también es el que más deja",
-      dato: `${reyMargen.pr.nombre}: ${reyMargen.unidades} unidades, ${guaranies(reyMargen.margenTotal)} de margen`,
+      dato: `${reyMargen.pr.nombre}: ${reyMargen.unidades} unidades, ${guaranies(reyMargen.margenTotal)} de margen (sin IVA)`,
       accion:
         "Es la situación cómoda. Cuidá que nunca falte y que la foto sea la mejor de la carta: es el producto que sostiene tu rentabilidad.",
       confianza: "media",
@@ -618,12 +624,12 @@ function ideaMargen(
     clave: "margen",
     tipo: "oportunidad",
     titulo: "El que más facturás no es el que más te deja",
-    dato: `${reyIngreso.pr.nombre} factura ${guaranies(reyIngreso.ingreso)} y deja ${guaranies(reyIngreso.margenTotal)}. ${reyMargen.pr.nombre} deja ${guaranies(reyMargen.margenTotal)}`,
+    dato: `${reyIngreso.pr.nombre} factura ${guaranies(reyIngreso.ingreso)} y deja ${guaranies(reyIngreso.margenTotal)} (sin IVA, ya descontado el costo). ${reyMargen.pr.nombre} deja ${guaranies(reyMargen.margenTotal)}`,
     accion: `Poné ${reyMargen.pr.nombre} arriba de la carta y como destacado. Mover clientes de uno al otro te sube la ganancia sin vender un pedido más.`,
     confianza: reales.length >= 100 ? "alta" : "media",
     detalle: porMargen.slice(0, 6).map((f) => ({
       etiqueta: f.pr.nombre,
-      valor: `${f.unidades} u · ${guaranies(f.margenTotal)} de margen`,
+      valor: `${f.unidades} u · ${guaranies(f.margenTotal)} de margen sin IVA`,
     })),
   };
 }

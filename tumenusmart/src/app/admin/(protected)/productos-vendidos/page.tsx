@@ -116,24 +116,51 @@ export default async function ProductosVendidosPage({
         <>
           <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
             <TarjetaTotal color="volumen" etiqueta="Unidades vendidas" valor={String(reporte.totalGeneral.cantidad)} />
-            <TarjetaTotal color="dinero" etiqueta="Venta total" valor={formatearGuarani(Math.round(reporte.totalGeneral.venta))} />
+            <TarjetaTotal color="dinero" etiqueta="Venta sin IVA" valor={formatearGuarani(Math.round(reporte.totalGeneral.venta))} />
             <TarjetaTotal
               color="costo"
-              etiqueta="Costo total"
+              etiqueta="Costo de insumos"
               valor={reporte.totalGeneral.costo != null ? formatearGuarani(Math.round(reporte.totalGeneral.costo)) : "—"}
             />
             <TarjetaTotal
               color="ganancia"
-              etiqueta="Ganancia total"
+              etiqueta="Ganancia"
               valor={reporte.totalGeneral.ganancia != null ? formatearGuarani(Math.round(reporte.totalGeneral.ganancia)) : "—"}
             />
           </div>
 
+          {/* Cómo se leen los números: de dónde sale cada uno, en el orden en que
+              se calculan. Sin esto, "Venta" y "Ganancia" no se pueden cotejar contra
+              Estadísticas ni contra una calculadora. */}
+          <div className="mb-4 flex flex-col gap-1 rounded-lg border border-linea bg-papel-suave px-3 py-2.5 text-xs text-tinta-media">
+            <p className="font-semibold text-tinta">Cómo leer este reporte</p>
+            <p>
+              Cobraste <span className="font-semibold text-tinta">{formatearGuarani(Math.round(reporte.totalGeneral.ventaConIva))}</span>{" "}
+              (es la cifra de Estadísticas). De eso,{" "}
+              <span className="font-semibold text-tinta">{formatearGuarani(Math.round(reporte.totalGeneral.iva))}</span> es IVA, que se
+              le paga al fisco: la venta sin IVA es{" "}
+              <span className="font-semibold text-tinta">{formatearGuarani(Math.round(reporte.totalGeneral.venta))}</span>.
+            </p>
+            <p>
+              <span className="font-semibold text-tinta">Ganancia = venta sin IVA − costo de los insumos.</span> El margen es la
+              ganancia sobre la venta sin IVA.
+            </p>
+            <p>
+              El costo de cada producto sale de su receta, con lo que pagaste por cada insumo en su última
+              compra (sin IVA). Es el costo de hoy, no el del día en que se vendió.
+            </p>
+          </div>
+
           {reporte.totalGeneral.costoIncompleto && (
             <p className="mb-6 rounded-lg border border-aviso/30 bg-aviso-luz px-3 py-2 text-xs text-aviso">
-              Hay productos vendidos sin costo cargado — el costo y la ganancia de esas filas (y de
-              los totales que las incluyen) no están, no son cero. Cargales el costo desde la
-              ficha del producto para que el número quede completo.
+              Hay productos vendidos sin costo: no tienen receta, o a algún insumo de su receta todavía
+              no se le registró una compra. Su costo y su ganancia no están (no son cero), así que el
+              costo y la ganancia de arriba cubren solo{" "}
+              {reporte.totalGeneral.venta > 0
+                ? Math.round((reporte.totalGeneral.ventaConCosto / reporte.totalGeneral.venta) * 100)
+                : 0}
+              % de la venta ({formatearGuarani(Math.round(reporte.totalGeneral.ventaConCosto))} sin IVA). Armá la
+              receta desde la ficha del producto para completarlo.
             </p>
           )}
 
@@ -149,10 +176,14 @@ export default async function ProductosVendidosPage({
                 <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2 rounded-lg bg-brand-tinte px-3 py-2">
                   <h2 className="font-semibold text-tinta">{cat.categoriaNombre}</h2>
                   <p className="text-xs text-brand-texto">
-                    {cat.totalCantidad} {cat.totalCantidad === 1 ? "unidad" : "unidades"} ·{" "}
+                    {cat.totalCantidad} {cat.totalCantidad === 1 ? "unidad" : "unidades"} · venta sin IVA{" "}
                     {formatearGuarani(Math.round(cat.totalVenta))}
                     {cat.totalGanancia != null && (
-                      <> · ganancia {formatearGuarani(Math.round(cat.totalGanancia))}</>
+                      <>
+                        {" "}
+                        · ganancia {formatearGuarani(Math.round(cat.totalGanancia))}
+                        {cat.costoIncompleto && " (solo de lo que tiene costo)"}
+                      </>
                     )}
                   </p>
                 </div>
@@ -163,7 +194,7 @@ export default async function ProductosVendidosPage({
                       <tr>
                         <th className="px-3 py-2">Producto</th>
                         <th className="px-3 py-2 text-right">Cantidad</th>
-                        <th className="px-3 py-2 text-right">Precio venta</th>
+                        <th className="px-3 py-2 text-right">Precio s/ IVA</th>
                         <th className="px-3 py-2 text-right">Costo</th>
                         <th className="px-3 py-2 text-right">Margen</th>
                         <th className="px-3 py-2 text-right">Ganancia</th>

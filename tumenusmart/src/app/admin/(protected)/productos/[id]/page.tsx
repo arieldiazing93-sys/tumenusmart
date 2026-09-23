@@ -214,6 +214,10 @@ export default async function EditarProductoPage({
               <>
                 Costo de preparar una unidad, según esta receta:{" "}
                 <span className="font-semibold text-tinta">{formatearGuarani(costoPorReceta)}</span>
+                <span className="mt-0.5 block text-xs text-tinta-suave">
+                  Es la suma, por cada insumo, de la cantidad de la receta × el costo de ese insumo (el de su
+                  última compra, por unidad y sin IVA).
+                </span>
               </>
             ) : (
               "Todavía no se puede calcular el costo: a algún insumo de la receta le falta el costo (se completa al registrar una compra)."
