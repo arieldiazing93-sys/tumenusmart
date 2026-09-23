@@ -92,6 +92,9 @@ export function CrearInsumoForm({
             ))}
           </Selector>
         </Campo>
+        <Campo etiqueta="Rendimiento" ayuda="Unidades que trae cada compra. Ej: un pack de 12 latas → 12.">
+          <Entrada type="number" name="rendimiento" step="0.001" min="0.001" defaultValue={1} />
+        </Campo>
         <Campo etiqueta="Stock inicial">
           <Entrada type="number" name="stockInicial" step="0.001" min="0" placeholder="0" />
         </Campo>

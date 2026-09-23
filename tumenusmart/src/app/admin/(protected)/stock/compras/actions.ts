@@ -39,8 +39,13 @@ export type InsumoParaCompra = {
   unidadMedida: string;
   /** "gravado10" | "gravado5" | "exento" */
   iva: string;
-  /** Último costo conocido, para precargar la línea. */
-  costoUnitario: number | null;
+  /** Unidades que trae cada unidad de compra (ver Insumo.rendimiento). */
+  rendimiento: number;
+  /**
+   * Lo que costó la última compra de UNA unidad de compra (ej: un pack),
+   * para precargar la línea. Null si nunca se compró.
+   */
+  ultimoCostoPorCompra: number | null;
 };
 
 function aFecha(texto: string | null | undefined): Date | null {
@@ -66,19 +71,26 @@ export async function buscarInsumosParaCompra(query: string): Promise<InsumoPara
       nombre: true,
       unidadMedida: true,
       iva: true,
+      rendimiento: true,
       costoUnitario: true,
       categoria: { select: { nombre: true } },
     },
   });
 
-  return insumos.map((i) => ({
-    id: i.id,
-    nombre: i.nombre,
-    categoriaNombre: i.categoria?.nombre ?? "Sin categoría",
-    unidadMedida: etiquetaUnidadMedida(i.unidadMedida),
-    iva: i.iva,
-    costoUnitario: i.costoUnitario != null ? Number(i.costoUnitario) : null,
-  }));
+  return insumos.map((i) => {
+    const rendimiento = Number(i.rendimiento);
+    return {
+      id: i.id,
+      nombre: i.nombre,
+      categoriaNombre: i.categoria?.nombre ?? "Sin categoría",
+      unidadMedida: etiquetaUnidadMedida(i.unidadMedida),
+      iva: i.iva,
+      rendimiento,
+      // Insumo.costoUnitario es por unidad de stock (ya dividido por el
+      // rendimiento al comprar) — acá se vuelve a llevar a "por compra".
+      ultimoCostoPorCompra: i.costoUnitario != null ? Math.round(Number(i.costoUnitario) * rendimiento) : null,
+    };
+  });
 }
 
 /**
@@ -113,7 +125,7 @@ export async function registrarCompra(datos: DatosCompra): Promise<ResultadoComp
   const idsAlmacenes = [...new Set(lineas.map((l) => l.almacenId).filter((a): a is string => !!a))];
 
   const [insumos, almacenes, proveedor] = await Promise.all([
-    prisma.insumo.findMany({ where: { id: { in: idsInsumos } }, select: { id: true, iva: true } }),
+    prisma.insumo.findMany({ where: { id: { in: idsInsumos } }, select: { id: true, iva: true, rendimiento: true } }),
     idsAlmacenes.length > 0
       ? prisma.almacen.findMany({ where: { id: { in: idsAlmacenes } }, select: { id: true } })
       : Promise.resolve([]),
@@ -133,6 +145,10 @@ export async function registrarCompra(datos: DatosCompra): Promise<ResultadoComp
   }
 
   const ivaPorInsumo = new Map(insumos.map((i) => [i.id, i.iva]));
+  // El rendimiento sale de la base, nunca del navegador: define cuántas
+  // unidades entran al stock por cada unidad de compra (ver Insumo.rendimiento).
+  const rendimientoPorInsumo = new Map(insumos.map((i) => [i.id, Number(i.rendimiento)]));
+  const rendimientoDe = (insumoId: string) => rendimientoPorInsumo.get(insumoId) ?? 1;
   const calculo = calcularCompra(
     lineas.map((l) => ({
       cantidad: l.cantidad,
@@ -170,6 +186,7 @@ export async function registrarCompra(datos: DatosCompra): Promise<ResultadoComp
             insumoId: l.insumoId,
             almacenId: l.almacenId || null,
             cantidad: l.cantidad,
+            rendimiento: rendimientoDe(l.insumoId),
             costoUnitario: l.costoUnitario,
             descuentoPorcentaje: l.descuentoPorcentaje > 0 ? Math.min(l.descuentoPorcentaje, 100) : null,
             subtotal: calculo.lineas[i].subtotal,
@@ -182,13 +199,17 @@ export async function registrarCompra(datos: DatosCompra): Promise<ResultadoComp
 
     for (let i = 0; i < lineas.length; i++) {
       const linea = lineas[i];
+      const rendimiento = rendimientoDe(linea.insumoId);
+      // Lo que entra al stock son UNIDADES: 10 packs de 12 → 120.
+      const unidades = Math.round(linea.cantidad * rendimiento * 1000) / 1000;
       await tx.insumo.update({
         where: { id: linea.insumoId },
         data: {
-          stockActual: { increment: linea.cantidad },
-          // Costo de reposición: lo que de verdad costó cada unidad en esta
-          // compra, neto y con los descuentos aplicados.
-          costoUnitario: calculo.lineas[i].costoUnitarioEfectivo,
+          stockActual: { increment: unidades },
+          // Costo de reposición POR UNIDAD de stock: lo que costó cada pack,
+          // neto y con los descuentos aplicados, repartido entre las
+          // unidades que trae.
+          costoUnitario: Math.round((calculo.lineas[i].costoUnitarioEfectivo / rendimiento) * 100) / 100,
         },
       });
       await tx.movimientoStock.create({
@@ -196,7 +217,7 @@ export async function registrarCompra(datos: DatosCompra): Promise<ResultadoComp
           storeId: idLocal,
           insumoId: linea.insumoId,
           tipo: "compra",
-          cantidad: linea.cantidad,
+          cantidad: unidades,
           compraId: nuevaCompra.id,
           registradoPor,
         },

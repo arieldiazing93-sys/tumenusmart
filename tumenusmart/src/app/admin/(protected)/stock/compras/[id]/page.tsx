@@ -116,7 +116,17 @@ export default async function CompraDetallePage({ params }: { params: Promise<{ 
               <Td className="font-medium text-tinta">{i.insumo.nombre}</Td>
               <Td>{i.almacen ? `${i.almacen.codigo} — ${i.almacen.nombre}` : "—"}</Td>
               <Td>
-                {Number(i.cantidad)} {etiquetaUnidadMedida(i.insumo.unidadMedida)}
+                {Number(i.rendimiento) === 1 ? (
+                  <>
+                    {Number(i.cantidad)} {etiquetaUnidadMedida(i.insumo.unidadMedida)}
+                  </>
+                ) : (
+                  <>
+                    {Number(i.cantidad)} × {Number(i.rendimiento)} ={" "}
+                    {Math.round(Number(i.cantidad) * Number(i.rendimiento) * 1000) / 1000}{" "}
+                    {etiquetaUnidadMedida(i.insumo.unidadMedida)}
+                  </>
+                )}
               </Td>
               <Td>{formatearGuarani(Number(i.costoUnitario))}</Td>
               <Td>{i.descuentoPorcentaje != null ? `${Number(i.descuentoPorcentaje)}%` : "—"}</Td>

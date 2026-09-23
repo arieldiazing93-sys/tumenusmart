@@ -19,6 +19,13 @@ function aDecimalOpcional(valor: FormDataEntryValue | null): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
+/** Vacío cuenta como 1 (se compra y se cuenta en la misma unidad); 0 o negativo es un error. */
+function leerRendimiento(valor: FormDataEntryValue | null): number | "invalido" {
+  const n = aDecimalOpcional(valor);
+  if (n === null) return valor && String(valor).trim() ? "invalido" : 1;
+  return n > 0 ? n : "invalido";
+}
+
 /**
  * Crea el insumo. Si `categoriaId` viene vacío pero `categoriaNueva` trae un
  * nombre, la categoría se crea y se adjunta en la misma transacción — así el
@@ -36,6 +43,8 @@ export async function crearInsumo(formData: FormData): Promise<ResultadoCrearIns
   const categoriaNueva = String(formData.get("categoriaNueva") ?? "").trim();
   const unidadMedida = normalizarUnidadMedida(formData.get("unidadMedida"));
   const iva = normalizarIva(formData.get("iva"));
+  const rendimiento = leerRendimiento(formData.get("rendimiento"));
+  if (rendimiento === "invalido") return { ok: false, error: "El rendimiento tiene que ser un número mayor a cero" };
   const stockInicial = aDecimalOpcional(formData.get("stockInicial")) ?? 0;
   const stockMinimo = aDecimalOpcional(formData.get("stockMinimo"));
   const costoUnitario = aDecimalOpcional(formData.get("costoUnitario"));
@@ -56,6 +65,7 @@ export async function crearInsumo(formData: FormData): Promise<ResultadoCrearIns
         categoriaId: categoriaFinalId,
         unidadMedida,
         iva,
+        rendimiento,
         stockActual: stockInicial,
         stockMinimo,
         costoUnitario,
@@ -97,6 +107,8 @@ export async function actualizarInsumo(
   const categoriaNueva = String(formData.get("categoriaNueva") ?? "").trim();
   const unidadMedida = normalizarUnidadMedida(formData.get("unidadMedida"));
   const iva = normalizarIva(formData.get("iva"));
+  const rendimiento = leerRendimiento(formData.get("rendimiento"));
+  if (rendimiento === "invalido") return { ok: false, error: "El rendimiento tiene que ser un número mayor a cero" };
   const stockMinimo = aDecimalOpcional(formData.get("stockMinimo"));
   const costoUnitario = aDecimalOpcional(formData.get("costoUnitario"));
   const activo = formData.get("activo") === "on";
@@ -111,7 +123,16 @@ export async function actualizarInsumo(
     }
     await tx.insumo.update({
       where: { id },
-      data: { nombre, categoriaId: categoriaFinalId, unidadMedida, iva, stockMinimo, costoUnitario, activo },
+      data: {
+        nombre,
+        categoriaId: categoriaFinalId,
+        unidadMedida,
+        iva,
+        rendimiento,
+        stockMinimo,
+        costoUnitario,
+        activo,
+      },
     });
   });
 

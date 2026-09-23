@@ -18,6 +18,8 @@ type Linea = {
   nombre: string;
   unidadMedida: string;
   iva: string;
+  /** Unidades que trae cada unidad de compra (ver Insumo.rendimiento). */
+  rendimiento: number;
   almacenId: string;
   cantidad: string;
   costoUnitario: string;
@@ -96,9 +98,10 @@ export function NuevaCompraForm({
           nombre: insumo.nombre,
           unidadMedida: insumo.unidadMedida,
           iva: insumo.iva,
+          rendimiento: insumo.rendimiento,
           almacenId: almacenPorDefecto,
           cantidad: "",
-          costoUnitario: insumo.costoUnitario != null ? String(insumo.costoUnitario) : "",
+          costoUnitario: insumo.ultimoCostoPorCompra != null ? String(insumo.ultimoCostoPorCompra) : "",
           descuentoPorcentaje: "",
         },
       ];
@@ -239,6 +242,7 @@ export function NuevaCompraForm({
           <div className="flex flex-col gap-2">
             {lineas.map((l, i) => {
               const calculada = calculo.lineas[i];
+              const unidadesQueEntran = Math.round(aNumero(l.cantidad) * l.rendimiento * 1000) / 1000;
               return (
                 <div key={l.clave} className="flex flex-col gap-2 rounded-lg border border-linea p-3">
                   <div className="flex flex-wrap items-center justify-between gap-2">
@@ -246,7 +250,13 @@ export function NuevaCompraForm({
                       <p className="font-medium">{l.nombre}</p>
                       <p className="text-xs text-tinta-suave">
                         {l.unidadMedida} · {etiquetaIva(l.iva)}
+                        {l.rendimiento !== 1 && ` · cada compra trae ${l.rendimiento} ${l.unidadMedida}`}
                       </p>
+                      {unidadesQueEntran > 0 && (
+                        <p className="cifra mt-0.5 text-[0.84rem] font-semibold text-exito">
+                          Ingresa al stock: {unidadesQueEntran} {l.unidadMedida}
+                        </p>
+                      )}
                     </div>
                     <button type="button" onClick={() => quitarLinea(l.clave)} className={clasesBoton("peligro", "sm")}>
                       Quitar

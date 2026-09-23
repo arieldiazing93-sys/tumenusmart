@@ -29,6 +29,7 @@ export default async function InsumosPage() {
           categoriaId: i.categoriaId,
           unidadMedida: i.unidadMedida,
           iva: i.iva,
+          rendimiento: Number(i.rendimiento),
           stockActual: Number(i.stockActual),
           stockMinimo: i.stockMinimo != null ? Number(i.stockMinimo) : null,
           costoUnitario: i.costoUnitario != null ? Number(i.costoUnitario) : null,

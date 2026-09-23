@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useTransition } from "react";
 import { Tarjeta, Campo, Entrada, Selector, Pastilla, clasesBoton } from "@/components/ui";
-import { UNIDADES_MEDIDA, etiquetaUnidadMedida } from "@/lib/unidad-medida";
+import { UNIDADES_MEDIDA } from "@/lib/unidad-medida";
 import { TASAS_IVA } from "@/lib/iva";
 import { actualizarInsumo } from "./actions";
 
@@ -12,6 +12,7 @@ export type InsumoDatos = {
   categoriaId: string | null;
   unidadMedida: string;
   iva: string;
+  rendimiento: number;
   stockActual: number;
   stockMinimo: number | null;
   costoUnitario: number | null;
@@ -126,10 +127,17 @@ export function InsumoPanel({
             </Selector>
           </Campo>
           <Campo
-            etiqueta="Stock actual"
-            ayuda="No se edita acá — se corrige desde Registro de inventario, para que quede el movimiento en el historial."
+            etiqueta="Rendimiento"
+            ayuda="Unidades que trae cada compra. Ej: un pack de 12 latas → 12."
           >
-            <Entrada disabled value={`${insumo.stockActual} ${etiquetaUnidadMedida(insumo.unidadMedida)}`} />
+            <Entrada
+              type="number"
+              name="rendimiento"
+              step="0.001"
+              min="0.001"
+              required
+              defaultValue={insumo.rendimiento}
+            />
           </Campo>
           <Campo etiqueta="Stock mínimo (opcional)">
             <Entrada

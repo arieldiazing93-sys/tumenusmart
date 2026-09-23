@@ -1307,6 +1307,11 @@ model Insumo {
   // negocio al comprarlo) — cada línea de Compra lo copia como snapshot al
   // momento de registrarse, para poder armar una factura de compra fiscal.
   iva          String           @default("gravado10")
+  /// Cuántas unidades del insumo (en su unidadMedida) trae UNA unidad de
+  /// compra. Ej: la lata de cerveza se compra en pack de 12 → rendimiento 12:
+  /// comprar 10 packs suma 120 latas al stock. Con 1 (el default) se compra
+  /// y se cuenta en la misma unidad, como antes.
+  rendimiento  Decimal          @default(1) @db.Decimal(12, 3)
   /// Espejo del ledger (MovimientoStock) para lectura rápida — se actualiza
   /// siempre en la misma transacción que un movimiento, nunca por su cuenta.
   /// Puede quedar negativo: una venta nunca se bloquea por falta de stock,
@@ -1446,7 +1451,13 @@ model CompraItem {
   // A qué almacén entró esta línea — opcional (ver comentario de Almacen).
   almacenId     String?
   almacen       Almacen? @relation(fields: [almacenId], references: [id], onDelete: SetNull)
+  /// Cuántas unidades de COMPRA se pidieron (ej: 10 packs) — no las que
+  /// entran al stock, que son cantidad × rendimiento.
   cantidad      Decimal  @db.Decimal(12, 3)
+  /// Snapshot de Insumo.rendimiento al comprar: si el insumo cambia de
+  /// presentación después, esta compra ya registrada no se mueve sola.
+  rendimiento   Decimal  @default(1) @db.Decimal(12, 3)
+  /// Costo de UNA unidad de compra (el precio del pack), neto sin IVA.
   costoUnitario Decimal  @db.Decimal(10, 2)
   /// Descuento propio de esta línea — ej: el proveedor bonifica solo un
   /// insumo puntual, no toda la factura.

@@ -60,7 +60,8 @@ export function BuscarInsumoParaCompra({
                 <p className="font-medium">{i.nombre}</p>
                 <p className="text-xs text-tinta-suave">
                   {i.categoriaNombre} · {i.unidadMedida} · {etiquetaIva(i.iva)}
-                  {i.costoUnitario != null && ` · último costo ${formatearGuarani(i.costoUnitario)}`}
+                  {i.rendimiento !== 1 && ` · rendimiento ${i.rendimiento}`}
+                  {i.ultimoCostoPorCompra != null && ` · último costo ${formatearGuarani(i.ultimoCostoPorCompra)}`}
                 </p>
               </div>
               <button
