@@ -92,7 +92,11 @@ export async function buscarInsumosParaCompra(query: string): Promise<InsumoPara
       rendimiento,
       // Insumo.costoUnitario es por unidad de stock (ya dividido por el
       // rendimiento al comprar) — acá se vuelve a llevar a "por compra".
-      ultimoCostoPorCompra: i.costoUnitario != null ? Math.round(Number(i.costoUnitario) * rendimiento) : null,
+      // Con centavos, sin redondear a entero: el formulario le suma el IVA y
+      // recién ahí redondea. Si se redondeara antes, el error se arrastraba:
+      // 50.000 con IVA volvía como 50.001.
+      ultimoCostoPorCompra:
+        i.costoUnitario != null ? Math.round(Number(i.costoUnitario) * rendimiento * 100) / 100 : null,
     };
   });
 }
