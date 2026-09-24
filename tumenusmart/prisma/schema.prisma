@@ -1557,11 +1557,12 @@ model MovimientoStock {
   // Restrict, mismo motivo que CompraItem.insumo: el ledger no se toca
   // aunque el insumo se desactive.
   insumo   Insumo @relation(fields: [insumoId], references: [id], onDelete: Restrict)
-  /// "venta" | "compra" | "ajuste" | "cancelacion"
+  /// "venta" | "compra" | "ajuste" | "cancelacion" | "correccion"
   tipo     String
   /// Con signo: negativo en "venta", positivo en "compra"/"cancelacion";
   /// en "ajuste" es la diferencia (contado - stockActual), puede ser
-  /// cualquier signo.
+  /// cualquier signo; en "correccion" (una compra editada después de
+  /// guardarse) es la diferencia entre lo que sumó y lo que debió sumar.
   cantidad Decimal @db.Decimal(12, 3)
 
   orderId    String?

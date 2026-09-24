@@ -6,11 +6,27 @@ import { Tarjeta, Campo, Entrada, Selector, clasesBoton } from "@/components/ui"
 import { formatearGuarani } from "@/lib/format";
 import { etiquetaIva, TASAS_IVA } from "@/lib/iva";
 import { calcularCompra } from "@/lib/compra-calculo";
-import { registrarCompra, type InsumoParaCompra } from "../actions";
+import { actualizarCompra, registrarCompra, type InsumoParaCompra } from "../actions";
 import { BuscarInsumoParaCompra } from "./BuscarInsumoParaCompra";
 
 type Proveedor = { id: string; nombre: string; ruc: string | null };
 type Almacen = { id: string; nombre: string };
+
+/**
+ * Los datos de una compra ya guardada, para abrirla en el mismo formulario y
+ * corregirla. Todo va como texto, tal cual lo escribiría quien la carga.
+ */
+export type CompraInicial = {
+  compraId: string;
+  proveedorId: string;
+  fecha: string;
+  folioFactura: string;
+  condicionPago: "contado" | "credito";
+  fechaVencimiento: string;
+  notas: string;
+  descuentoGeneral: string;
+  lineas: Omit<Linea, "clave">[];
+};
 
 type Linea = {
   clave: number;
@@ -81,26 +97,57 @@ function Celda({
 export function NuevaCompraForm({
   proveedores,
   almacenes,
+  inicial,
 }: {
   proveedores: Proveedor[];
   almacenes: Almacen[];
+  /** Si viene, el formulario corrige esa compra ya guardada en vez de cargar una nueva. */
+  inicial?: CompraInicial;
 }) {
+  const editando = inicial !== undefined;
+  const lineasIniciales = (): Linea[] => (inicial?.lineas ?? []).map((l, i) => ({ ...l, clave: i + 1 }));
+
   const [pendiente, iniciar] = useTransition();
-  const [proveedorId, setProveedorId] = useState("");
-  const [fecha, setFecha] = useState("");
-  const [folioFactura, setFolioFactura] = useState("");
-  const [condicionPago, setCondicionPago] = useState<"contado" | "credito">("contado");
-  const [fechaVencimiento, setFechaVencimiento] = useState("");
-  const [notas, setNotas] = useState("");
-  const [descuentoGeneral, setDescuentoGeneral] = useState("");
-  const [lineas, setLineas] = useState<Linea[]>([]);
+  const [proveedorId, setProveedorId] = useState(inicial?.proveedorId ?? "");
+  const [fecha, setFecha] = useState(inicial?.fecha ?? "");
+  const [folioFactura, setFolioFactura] = useState(inicial?.folioFactura ?? "");
+  const [condicionPago, setCondicionPago] = useState<"contado" | "credito">(inicial?.condicionPago ?? "contado");
+  const [fechaVencimiento, setFechaVencimiento] = useState(inicial?.fechaVencimiento ?? "");
+  const [notas, setNotas] = useState(inicial?.notas ?? "");
+  const [descuentoGeneral, setDescuentoGeneral] = useState(inicial?.descuentoGeneral ?? "");
+  const [lineas, setLineas] = useState<Linea[]>(lineasIniciales);
   const [error, setError] = useState<string | null>(null);
-  const contador = useRef(0);
+  const [confirmando, setConfirmando] = useState(false);
+  const contador = useRef(inicial?.lineas.length ?? 0);
+  /** La línea recién agregada: al dibujarse, el cursor va a su cantidad. */
+  const enfocarClave = useRef<number | null>(null);
 
   // Se completa recién en el navegador: en el servidor "hoy" sería el de UTC.
+  // Una compra que se está corrigiendo ya trae su propia fecha.
   useEffect(() => {
-    setFecha(hoyLocal());
-  }, []);
+    if (!editando) setFecha(hoyLocal());
+  }, [editando]);
+
+  // Escape en el modal de confirmación = "No" (salvo mientras ya está guardando).
+  useEffect(() => {
+    if (!confirmando) return;
+    function alTeclado(e: KeyboardEvent) {
+      if (e.key === "Escape" && !pendiente) setConfirmando(false);
+    }
+    window.addEventListener("keydown", alTeclado);
+    return () => window.removeEventListener("keydown", alTeclado);
+  }, [confirmando, pendiente]);
+
+  // Después de elegir un insumo el cursor sigue en su cantidad (la línea ya
+  // existe en pantalla), así se carga todo con el teclado: buscar, elegir,
+  // cantidad, costo… y con Tab se vuelve al buscador de abajo.
+  useEffect(() => {
+    const clave = enfocarClave.current;
+    if (clave == null) return;
+    enfocarClave.current = null;
+    const campo = document.querySelector<HTMLInputElement>(`input[data-cantidad-linea="${clave}"]`);
+    campo?.focus();
+  }, [lineas]);
 
   const calculo = useMemo(
     () =>
@@ -119,16 +166,18 @@ export function NuevaCompraForm({
 
   function agregarLinea(insumo: InsumoParaCompra) {
     setError(null);
+    contador.current += 1;
+    const clave = contador.current;
+    enfocarClave.current = clave;
     setLineas((actuales) => {
       // Todo insumo entra a un almacén: cada línea arranca en el de la línea
       // anterior, o en el primero de la lista si es la primera.
       const almacenPorDefecto =
         actuales.length > 0 ? actuales[actuales.length - 1].almacenId : (almacenes[0]?.id ?? "");
-      contador.current += 1;
       return [
         ...actuales,
         {
-          clave: contador.current,
+          clave,
           insumoId: insumo.id,
           nombre: insumo.nombre,
           unidadMedida: insumo.unidadMedida,
@@ -160,20 +209,26 @@ export function NuevaCompraForm({
     return lineas.length > 0 || !!folioFactura || !!notas || !!proveedorId || !!descuentoGeneral;
   }
 
+  /** Nueva compra: vacía todo. Compra en corrección: vuelve a lo que estaba guardado. */
   function deshacer() {
-    if (hayAlgoCargado() && !confirm("¿Descartar todo lo que cargaste en esta compra?")) return;
-    setProveedorId("");
-    setFecha(hoyLocal());
-    setFolioFactura("");
-    setCondicionPago("contado");
-    setFechaVencimiento("");
-    setNotas("");
-    setDescuentoGeneral("");
-    setLineas([]);
+    const pregunta = editando
+      ? "¿Volver a los datos guardados de la compra? Se pierden los cambios que hiciste."
+      : "¿Descartar todo lo que cargaste en esta compra?";
+    if ((editando || hayAlgoCargado()) && !confirm(pregunta)) return;
+    setProveedorId(inicial?.proveedorId ?? "");
+    setFecha(inicial?.fecha ?? hoyLocal());
+    setFolioFactura(inicial?.folioFactura ?? "");
+    setCondicionPago(inicial?.condicionPago ?? "contado");
+    setFechaVencimiento(inicial?.fechaVencimiento ?? "");
+    setNotas(inicial?.notas ?? "");
+    setDescuentoGeneral(inicial?.descuentoGeneral ?? "");
+    contador.current = inicial?.lineas.length ?? 0;
+    setLineas(lineasIniciales());
     setError(null);
   }
 
-  function guardar() {
+  /** Revisa que la compra esté completa y, si lo está, pregunta antes de guardar. */
+  function pedirConfirmacion() {
     setError(null);
     const validas = lineas.filter((l) => aNumero(l.cantidad) > 0 && l.costo !== "");
     if (validas.length === 0) {
@@ -184,26 +239,37 @@ export function NuevaCompraForm({
       setError("Hay líneas sin cantidad o sin costo unitario — completalas o quitalas.");
       return;
     }
+    setConfirmando(true);
+  }
+
+  /** Guarda de verdad. Solo se llega acá con el "Sí" del modal de confirmación. */
+  function guardar() {
+    setError(null);
+    const validas = lineas.filter((l) => aNumero(l.cantidad) > 0 && l.costo !== "");
+    const datos = {
+      proveedorId: proveedorId || null,
+      fecha,
+      folioFactura: folioFactura.trim() || null,
+      condicionPago,
+      fechaVencimiento: condicionPago === "credito" ? fechaVencimiento || null : null,
+      descuentoGeneralPorcentaje: aNumero(descuentoGeneral),
+      notas: notas.trim() || null,
+      lineas: validas.map((l) => ({
+        insumoId: l.insumoId,
+        almacenId: l.almacenId,
+        cantidad: aNumero(l.cantidad),
+        costoUnitario: aNumero(l.costo),
+        costoIncluyeIva: true,
+        descuentoPorcentaje: aNumero(l.descuentoPorcentaje),
+      })),
+    };
     iniciar(async () => {
-      const resultado = await registrarCompra({
-        proveedorId: proveedorId || null,
-        fecha,
-        folioFactura: folioFactura.trim() || null,
-        condicionPago,
-        fechaVencimiento: condicionPago === "credito" ? fechaVencimiento || null : null,
-        descuentoGeneralPorcentaje: aNumero(descuentoGeneral),
-        notas: notas.trim() || null,
-        lineas: validas.map((l) => ({
-          insumoId: l.insumoId,
-          almacenId: l.almacenId,
-          cantidad: aNumero(l.cantidad),
-          costoUnitario: aNumero(l.costo),
-          costoIncluyeIva: true,
-          descuentoPorcentaje: aNumero(l.descuentoPorcentaje),
-        })),
-      });
-      // Si sale bien, registrarCompra redirige sola — este código no sigue.
-      if (resultado && !resultado.ok) setError(resultado.error);
+      const resultado = inicial ? await actualizarCompra(inicial.compraId, datos) : await registrarCompra(datos);
+      // Si sale bien, la acción redirige sola — este código no sigue.
+      if (resultado && !resultado.ok) {
+        setConfirmando(false);
+        setError(resultado.error);
+      }
     });
   }
 
@@ -213,13 +279,16 @@ export function NuevaCompraForm({
           "Eliminar" de una línea es el Quitar de cada una, y anular una compra
           ya guardada se hace desde su detalle. */}
       <div className="flex flex-wrap items-center gap-2">
-        <button type="button" disabled={pendiente} onClick={guardar} className={clasesBoton("principal")}>
+        <button type="button" disabled={pendiente} onClick={pedirConfirmacion} className={clasesBoton("principal")}>
           {pendiente ? "Guardando…" : "Guardar"}
         </button>
         <button type="button" disabled={pendiente} onClick={deshacer} className={clasesBoton("suave")}>
           Deshacer
         </button>
-        <Link href="/admin/stock/compras" className={clasesBoton("navegar")}>
+        <Link
+          href={inicial ? `/admin/stock/compras/${inicial.compraId}` : "/admin/stock/compras"}
+          className={clasesBoton("navegar")}
+        >
           Cerrar
         </Link>
       </div>
@@ -273,8 +342,6 @@ export function NuevaCompraForm({
       <Tarjeta className="flex flex-col gap-3">
         <p className="rotulo text-[0.8rem] font-bold">Insumos comprados</p>
 
-        <BuscarInsumoParaCompra onElegir={agregarLinea} />
-
         {lineas.length > 0 && (
           <p className="text-[0.78rem] text-tinta-suave">
             Cargá el costo con IVA, como dice la factura: el costo sin IVA se calcula solo.
@@ -283,7 +350,7 @@ export function NuevaCompraForm({
 
         {lineas.length === 0 ? (
           <p className="rounded-lg border border-dashed border-linea px-3 py-6 text-center text-sm text-tinta-suave">
-            Todavía no agregaste ningún insumo — buscalo arriba por nombre.
+            Todavía no agregaste ningún insumo — buscalo abajo por nombre.
           </p>
         ) : (
           <div className="flex flex-col">
@@ -334,6 +401,7 @@ export function NuevaCompraForm({
                         type="number"
                         step="0.001"
                         min="0"
+                        data-cantidad-linea={l.clave}
                         value={l.cantidad}
                         onChange={(e) => actualizarLinea(l.clave, { cantidad: e.target.value })}
                       />
@@ -390,7 +458,14 @@ export function NuevaCompraForm({
                   </div>
 
                   <div className="order-2 justify-self-end xl:order-none">
-                    <button type="button" onClick={() => quitarLinea(l.clave)} className={clasesBoton("peligro", "sm")}>
+                    {/* Fuera del recorrido con Tab: al terminar la línea, el
+                        siguiente Tab tiene que ir al buscador de abajo. */}
+                    <button
+                      type="button"
+                      tabIndex={-1}
+                      onClick={() => quitarLinea(l.clave)}
+                      className={clasesBoton("peligro", "sm")}
+                    >
                       Quitar
                     </button>
                   </div>
@@ -399,6 +474,10 @@ export function NuevaCompraForm({
             })}
           </div>
         )}
+
+        {/* El buscador va DEBAJO de las líneas: después del último campo de la
+            última línea, Tab cae acá para seguir agregando insumos. */}
+        <BuscarInsumoParaCompra onElegir={agregarLinea} />
       </Tarjeta>
 
       <Tarjeta className="flex flex-col gap-3">
@@ -441,10 +520,58 @@ export function NuevaCompraForm({
 
       {error && <p className="text-sm font-medium text-peligro">{error}</p>}
       <div>
-        <button type="button" disabled={pendiente} onClick={guardar} className={clasesBoton("principal")}>
-          {pendiente ? "Guardando…" : "Guardar compra"}
+        <button type="button" disabled={pendiente} onClick={pedirConfirmacion} className={clasesBoton("principal")}>
+          {pendiente ? "Guardando…" : editando ? "Guardar cambios" : "Guardar compra"}
         </button>
       </div>
+
+      {confirmando && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-tinta/45 p-4"
+          onClick={() => {
+            if (!pendiente) setConfirmando(false);
+          }}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Confirmar compra"
+            className="w-full max-w-sm rounded-xl bg-superficie p-5 shadow-alta animate-[subir_0.22s_ease-out]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <p className="text-[1.05rem] font-semibold text-tinta">
+              ¿Están correctos los datos que cargaste?
+            </p>
+            <p className="mt-1.5 text-[0.85rem] text-tinta-media">
+              {editando
+                ? "Revisalos antes de guardar: el stock de los insumos se ajusta por la diferencia con lo que ya estaba registrado."
+                : "Revisalos antes de guardar: al guardar, el stock de los insumos sube y el costo queda registrado."}
+            </p>
+            <p className="cifra mt-3 rounded-lg bg-papel-suave px-3 py-2 text-[0.88rem] text-tinta">
+              {lineas.length} {lineas.length === 1 ? "insumo" : "insumos"} · Total {formatearGuarani(calculo.total)}
+            </p>
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                type="button"
+                disabled={pendiente}
+                onClick={() => setConfirmando(false)}
+                className={clasesBoton("suave")}
+              >
+                No
+              </button>
+              <button
+                type="button"
+                autoFocus
+                disabled={pendiente}
+                onClick={guardar}
+                className={clasesBoton("principal")}
+              >
+                {pendiente ? "Guardando…" : "Sí, guardar"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

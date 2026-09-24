@@ -67,6 +67,19 @@ function porcentajeIva(iva: string): number {
   return TASAS_IVA.find((t) => t.valor === iva)?.porcentaje ?? 10;
 }
 
+/**
+ * La cuenta al revés: el costo CON IVA que dio ese costo neto, para volver a
+ * mostrar lo que se cargó al abrir una compra ya guardada (se guarda solo el
+ * neto, con centavos). Si el resultado cae a menos de un centavo de un número
+ * entero, es ese entero: 10.000 con IVA se guardó como 9.090,91 de neto, y al
+ * volver a sumarle el IVA da 10.000,001 — lo que había escrito era 10.000.
+ */
+export function costoConIvaDesdeNeto(neto: number, iva: string): number {
+  const conIva = neto * (1 + porcentajeIva(iva) / 100);
+  const entero = Math.round(conIva);
+  return Math.abs(conIva - entero) < 0.008 ? entero : redondear(conIva);
+}
+
 export function calcularCompra(
   lineas: LineaParaCalcular[],
   descuentoGeneralPorcentaje: number

@@ -44,7 +44,7 @@ export default async function ComprasPage({ searchParams }: { searchParams: Prom
     <div>
       <Cabecera
         titulo="Compras"
-        bajada="Cada compra suma stock a los insumos que trae y actualiza su costo de reposición. Una compra cargada por error se anula desde su detalle."
+        bajada="Cada compra suma stock a los insumos que trae y actualiza su costo de reposición. Una compra cargada con algún dato mal se corrige o se anula desde su detalle."
         acciones={<BotonEnlace href="/admin/stock/compras/nueva">+ Nueva compra</BotonEnlace>}
       />
 

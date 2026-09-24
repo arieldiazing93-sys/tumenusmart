@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { idLocalActual } from "@/lib/local-actual";
 import { prismaDelLocal } from "@/lib/prisma-local";
-import { calcularCompra } from "@/lib/compra-calculo";
+import { calcularCompra, type ResultadoCalculoCompra } from "@/lib/compra-calculo";
 import { etiquetaUnidadMedida } from "@/lib/unidad-medida";
 
 export type LineaCompraInput = {
@@ -97,20 +97,38 @@ export async function buscarInsumosParaCompra(query: string): Promise<InsumoPara
   });
 }
 
-/**
- * Registra una compra: sube el stock de cada insumo, actualiza su costo de
- * reposición, y deja un MovimientoStock ("compra") por cada línea — todo en
- * una sola transacción. Si sale bien, redirige sola a la lista (no hay nada
- * más que devolver).
- *
- * Los totales se recalculan acá con calcularCompra: lo que muestra el
- * formulario es solo una vista previa.
- */
-export async function registrarCompra(datos: DatosCompra): Promise<ResultadoCompra | void> {
-  const sesion = await exigirPermiso("stock.editar");
-  const idLocal = await idLocalActual();
-  const prisma = prismaDelLocal(idLocal);
+function redondear3(n: number): number {
+  return Math.round(n * 1000) / 1000;
+}
 
+/** Lo que entra al stock son UNIDADES: 10 packs de 12 → 120. */
+function unidadesQueEntran(cantidad: number, rendimiento: number): number {
+  return redondear3(cantidad * rendimiento);
+}
+
+/** Costo de reposición POR UNIDAD de stock: lo que costó cada pack (neto y con los descuentos), repartido entre las unidades que trae. */
+function costoDeReposicion(costoEfectivoPorCompra: number, rendimiento: number): number {
+  return Math.round((costoEfectivoPorCompra / rendimiento) * 100) / 100;
+}
+
+type CompraPreparada = {
+  lineas: LineaCompraInput[];
+  calculo: ResultadoCalculoCompra;
+  ivaDe: (insumoId: string) => string;
+  rendimientoDe: (insumoId: string) => number;
+  condicionPago: "contado" | "credito";
+  descuentoGeneral: number | null;
+};
+
+/**
+ * Lo que comparten registrar y editar una compra: valida lo que llegó del
+ * navegador contra el local y recalcula los totales. Devuelve el error para
+ * mostrar, o todo lo necesario para guardar.
+ */
+async function prepararCompra(
+  prisma: ReturnType<typeof prismaDelLocal>,
+  datos: DatosCompra
+): Promise<{ error: string } | CompraPreparada> {
   const lineas = datos.lineas.filter(
     (l) =>
       l.insumoId &&
@@ -120,13 +138,13 @@ export async function registrarCompra(datos: DatosCompra): Promise<ResultadoComp
       l.costoUnitario >= 0
   );
   if (lineas.length === 0) {
-    return { ok: false, error: "Agregá al menos un insumo con cantidad y costo unitario válidos." };
+    return { error: "Agregá al menos un insumo con cantidad y costo unitario válidos." };
   }
 
   // Todo lo que se compra entra a un almacén: sin almacén no hay dónde
   // guardar el stock.
   if (lineas.some((l) => !l.almacenId)) {
-    return { ok: false, error: "Elegí el almacén de cada insumo." };
+    return { error: "Elegí el almacén de cada insumo." };
   }
 
   // Todo lo que viene del navegador se verifica contra el local: al ir por
@@ -143,20 +161,22 @@ export async function registrarCompra(datos: DatosCompra): Promise<ResultadoComp
   ]);
 
   if (insumos.length !== idsInsumos.length) {
-    return { ok: false, error: "Alguno de los insumos ya no existe. Recargá la pantalla e intentá de nuevo." };
+    return { error: "Alguno de los insumos ya no existe. Recargá la pantalla e intentá de nuevo." };
   }
   if (almacenes.length !== idsAlmacenes.length) {
-    return { ok: false, error: "Alguno de los almacenes elegidos ya no existe o está desactivado." };
+    return { error: "Alguno de los almacenes elegidos ya no existe o está desactivado." };
   }
   if (datos.proveedorId && !proveedor) {
-    return { ok: false, error: "Ese proveedor ya no existe." };
+    return { error: "Ese proveedor ya no existe." };
   }
 
   const ivaPorInsumo = new Map(insumos.map((i) => [i.id, i.iva]));
+  const ivaDe = (insumoId: string) => ivaPorInsumo.get(insumoId) ?? "gravado10";
   // El rendimiento sale de la base, nunca del navegador: define cuántas
   // unidades entran al stock por cada unidad de compra (ver Insumo.rendimiento).
   const rendimientoPorInsumo = new Map(insumos.map((i) => [i.id, Number(i.rendimiento)]));
   const rendimientoDe = (insumoId: string) => rendimientoPorInsumo.get(insumoId) ?? 1;
+
   const calculo = calcularCompra(
     lineas.map((l) => ({
       cantidad: l.cantidad,
@@ -164,7 +184,7 @@ export async function registrarCompra(datos: DatosCompra): Promise<ResultadoComp
       // El IVA que se le saca sale de la base (el del insumo), no del navegador.
       costoIncluyeIva: l.costoIncluyeIva === true,
       descuentoPorcentaje: l.descuentoPorcentaje,
-      iva: ivaPorInsumo.get(l.insumoId) ?? "gravado10",
+      iva: ivaDe(l.insumoId),
     })),
     datos.descuentoGeneralPorcentaje
   );
@@ -174,6 +194,44 @@ export async function registrarCompra(datos: DatosCompra): Promise<ResultadoComp
     Number.isFinite(datos.descuentoGeneralPorcentaje) && datos.descuentoGeneralPorcentaje > 0
       ? Math.min(datos.descuentoGeneralPorcentaje, 100)
       : null;
+
+  return { lineas, calculo, ivaDe, rendimientoDe, condicionPago, descuentoGeneral };
+}
+
+/** Las líneas de la compra tal cual se guardan en CompraItem. */
+function itemsParaGuardar(idLocal: string, p: CompraPreparada) {
+  return p.lineas.map((l, i) => ({
+    storeId: idLocal,
+    insumoId: l.insumoId,
+    almacenId: l.almacenId,
+    cantidad: l.cantidad,
+    rendimiento: p.rendimientoDe(l.insumoId),
+    // Siempre neto: si se cargó con IVA, ya viene sin el impuesto.
+    costoUnitario: p.calculo.lineas[i].costoUnitarioNeto,
+    descuentoPorcentaje: l.descuentoPorcentaje > 0 ? Math.min(l.descuentoPorcentaje, 100) : null,
+    subtotal: p.calculo.lineas[i].subtotal,
+    // Snapshot del IVA del insumo al comprar (ver CompraItem.iva).
+    iva: p.ivaDe(l.insumoId),
+  }));
+}
+
+/**
+ * Registra una compra: sube el stock de cada insumo, actualiza su costo de
+ * reposición, y deja un MovimientoStock ("compra") por cada línea — todo en
+ * una sola transacción. Si sale bien, redirige sola a la lista (no hay nada
+ * más que devolver).
+ *
+ * Los totales se recalculan acá con calcularCompra: lo que muestra el
+ * formulario es solo una vista previa.
+ */
+export async function registrarCompra(datos: DatosCompra): Promise<ResultadoCompra | void> {
+  const sesion = await exigirPermiso("stock.editar");
+  const idLocal = await idLocalActual();
+  const prisma = prismaDelLocal(idLocal);
+
+  const preparada = await prepararCompra(prisma, datos);
+  if ("error" in preparada) return { ok: false, error: preparada.error };
+  const { lineas, calculo, rendimientoDe, condicionPago, descuentoGeneral } = preparada;
 
   const registradoPor = sesion.nombre?.trim() || sesion.email;
 
@@ -190,37 +248,19 @@ export async function registrarCompra(datos: DatosCompra): Promise<ResultadoComp
         total: calculo.total,
         notas: datos.notas?.trim() || null,
         registradoPor,
-        items: {
-          create: lineas.map((l, i) => ({
-            storeId: idLocal,
-            insumoId: l.insumoId,
-            almacenId: l.almacenId,
-            cantidad: l.cantidad,
-            rendimiento: rendimientoDe(l.insumoId),
-            // Siempre neto: si se cargó con IVA, ya viene sin el impuesto.
-            costoUnitario: calculo.lineas[i].costoUnitarioNeto,
-            descuentoPorcentaje: l.descuentoPorcentaje > 0 ? Math.min(l.descuentoPorcentaje, 100) : null,
-            subtotal: calculo.lineas[i].subtotal,
-            // Snapshot del IVA del insumo al comprar (ver CompraItem.iva).
-            iva: ivaPorInsumo.get(l.insumoId) ?? "gravado10",
-          })),
-        },
+        items: { create: itemsParaGuardar(idLocal, preparada) },
       },
     });
 
     for (let i = 0; i < lineas.length; i++) {
       const linea = lineas[i];
       const rendimiento = rendimientoDe(linea.insumoId);
-      // Lo que entra al stock son UNIDADES: 10 packs de 12 → 120.
-      const unidades = Math.round(linea.cantidad * rendimiento * 1000) / 1000;
+      const unidades = unidadesQueEntran(linea.cantidad, rendimiento);
       await tx.insumo.update({
         where: { id: linea.insumoId },
         data: {
           stockActual: { increment: unidades },
-          // Costo de reposición POR UNIDAD de stock: lo que costó cada pack,
-          // neto y con los descuentos aplicados, repartido entre las
-          // unidades que trae.
-          costoUnitario: Math.round((calculo.lineas[i].costoUnitarioEfectivo / rendimiento) * 100) / 100,
+          costoUnitario: costoDeReposicion(calculo.lineas[i].costoUnitarioEfectivo, rendimiento),
         },
       });
       await tx.movimientoStock.create({
@@ -240,6 +280,132 @@ export async function registrarCompra(datos: DatosCompra): Promise<ResultadoComp
   revalidatePath("/admin/stock/compras");
   revalidatePath("/admin/stock/insumos");
   redirect("/admin/stock/compras");
+}
+
+/**
+ * Corrige una compra ya registrada (cantidad, precio, insumos, proveedor,
+ * fecha…). Reemplaza sus líneas por las nuevas y ajusta el stock por la
+ * DIFERENCIA, no lo rehace: el historial de movimientos no se reescribe, queda
+ * la compra original y, aparte, un movimiento "correccion" por cada insumo y
+ * almacén cuyo stock cambió. Si sale bien, redirige sola al detalle.
+ *
+ * El costo de reposición de un insumo se actualiza solo si esta compra es la
+ * última que lo trajo: corregir una compra vieja no pisa el precio de una más
+ * nueva. (Un insumo que se quita de la compra conserva el costo que tenía.)
+ */
+export async function actualizarCompra(
+  compraId: string,
+  datos: DatosCompra
+): Promise<ResultadoCompra | void> {
+  const sesion = await exigirPermiso("stock.editar");
+  const idLocal = await idLocalActual();
+  const prisma = prismaDelLocal(idLocal);
+
+  const compra = await prisma.compra.findUnique({
+    where: { id: compraId },
+    select: { id: true, cancelada: true, createdAt: true },
+  });
+  if (!compra) return { ok: false, error: "Esa compra no existe." };
+  if (compra.cancelada) return { ok: false, error: "Una compra cancelada no se puede editar." };
+
+  const preparada = await prepararCompra(prisma, datos);
+  if ("error" in preparada) return { ok: false, error: preparada.error };
+  const { lineas, calculo, rendimientoDe, condicionPago, descuentoGeneral } = preparada;
+
+  const registradoPor = sesion.nombre?.trim() || sesion.email;
+
+  await prisma.$transaction(async (tx) => {
+    // Lo que esta compra tiene hoy en el stock, por insumo y almacén: la suma
+    // de TODOS sus movimientos (la compra original y las correcciones previas).
+    const previos = await tx.movimientoStock.groupBy({
+      by: ["insumoId", "almacenId"],
+      where: { compraId },
+      _sum: { cantidad: true },
+    });
+    type Stock = { insumoId: string; almacenId: string | null; cantidad: number };
+    const clave = (insumoId: string, almacenId: string | null) => `${insumoId}|${almacenId ?? ""}`;
+
+    const antes = new Map<string, Stock>();
+    for (const f of previos) {
+      antes.set(clave(f.insumoId, f.almacenId), {
+        insumoId: f.insumoId,
+        almacenId: f.almacenId,
+        cantidad: Number(f._sum.cantidad ?? 0),
+      });
+    }
+
+    // Lo que tendría con las líneas nuevas.
+    const despues = new Map<string, Stock>();
+    for (const l of lineas) {
+      const k = clave(l.insumoId, l.almacenId);
+      const unidades = unidadesQueEntran(l.cantidad, rendimientoDe(l.insumoId));
+      const actual = despues.get(k);
+      if (actual) actual.cantidad = redondear3(actual.cantidad + unidades);
+      else despues.set(k, { insumoId: l.insumoId, almacenId: l.almacenId, cantidad: unidades });
+    }
+
+    for (const k of new Set([...antes.keys(), ...despues.keys()])) {
+      const base = despues.get(k) ?? antes.get(k)!;
+      const diferencia = redondear3((despues.get(k)?.cantidad ?? 0) - (antes.get(k)?.cantidad ?? 0));
+      if (diferencia === 0) continue;
+      await tx.insumo.update({
+        where: { id: base.insumoId },
+        data: { stockActual: { increment: diferencia } },
+      });
+      await tx.movimientoStock.create({
+        data: {
+          storeId: idLocal,
+          insumoId: base.insumoId,
+          almacenId: base.almacenId,
+          tipo: "correccion",
+          cantidad: diferencia,
+          compraId,
+          motivo: "Compra corregida",
+          registradoPor,
+        },
+      });
+    }
+
+    await tx.compra.update({
+      where: { id: compraId },
+      data: {
+        proveedorId: datos.proveedorId || null,
+        numeroComprobante: datos.folioFactura?.trim() || null,
+        fecha: aFecha(datos.fecha) ?? new Date(),
+        condicionPago,
+        fechaVencimiento: condicionPago === "credito" ? aFecha(datos.fechaVencimiento) : null,
+        descuentoGeneralPorcentaje: descuentoGeneral,
+        total: calculo.total,
+        notas: datos.notas?.trim() || null,
+        items: { deleteMany: {}, create: itemsParaGuardar(idLocal, preparada) },
+      },
+    });
+
+    // El costo de reposición sigue a la compra más reciente de cada insumo.
+    for (let i = 0; i < lineas.length; i++) {
+      const linea = lineas[i];
+      const conCompraMasNueva = await tx.compraItem.count({
+        where: {
+          insumoId: linea.insumoId,
+          compraId: { not: compraId },
+          compra: { cancelada: false, createdAt: { gt: compra.createdAt } },
+        },
+      });
+      if (conCompraMasNueva > 0) continue;
+      await tx.insumo.update({
+        where: { id: linea.insumoId },
+        data: {
+          costoUnitario: costoDeReposicion(calculo.lineas[i].costoUnitarioEfectivo, rendimientoDe(linea.insumoId)),
+        },
+      });
+    }
+  });
+
+  revalidatePath("/admin/stock/compras");
+  revalidatePath(`/admin/stock/compras/${compraId}`);
+  revalidatePath("/admin/stock/insumos");
+  revalidatePath("/admin/stock/inventario");
+  redirect(`/admin/stock/compras/${compraId}`);
 }
 
 /**
@@ -283,14 +449,19 @@ export async function cancelarCompra(
       },
     });
 
-    // El ledger es la fuente de verdad: se invierte cada movimiento "compra"
-    // de esta compra, sin re-derivar nada desde las líneas.
-    const movimientos = await tx.movimientoStock.findMany({
-      where: { compraId, tipo: "compra" },
-      select: { insumoId: true, almacenId: true, cantidad: true },
-    });
+    // El ledger es la fuente de verdad: se devuelve lo que esta compra tiene
+    // hoy en el stock de cada insumo y almacén, sin re-derivar nada desde las
+    // líneas. Es la suma de TODOS sus movimientos, no solo el de la compra
+    // original: si se corrigió antes, las correcciones también cuentan.
+    const movimientos = (
+      await tx.movimientoStock.groupBy({
+        by: ["insumoId", "almacenId"],
+        where: { compraId },
+        _sum: { cantidad: true },
+      })
+    ).map((f) => ({ insumoId: f.insumoId, almacenId: f.almacenId, cantidad: f._sum.cantidad }));
     for (const m of movimientos) {
-      const cantidad = Number(m.cantidad);
+      const cantidad = Number(m.cantidad ?? 0);
       if (cantidad === 0) continue;
       await tx.insumo.update({
         where: { id: m.insumoId },

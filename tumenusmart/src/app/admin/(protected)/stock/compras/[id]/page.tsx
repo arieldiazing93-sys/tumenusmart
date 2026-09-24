@@ -3,7 +3,7 @@ import { pantallaConPermiso } from "@/lib/auth";
 import { puede } from "@/lib/permisos";
 import { prismaDelLocal } from "@/lib/prisma-local";
 import { idLocalActual } from "@/lib/local-actual";
-import { Cabecera, Tarjeta, Tabla, Th, Td, Tr, Pastilla } from "@/components/ui";
+import { Cabecera, Tarjeta, Tabla, Th, Td, Tr, Pastilla, BotonEnlace } from "@/components/ui";
 import { Volver } from "@/components/Volver";
 import { formatearGuarani } from "@/lib/format";
 import { etiquetaIva } from "@/lib/iva";
@@ -56,7 +56,10 @@ export default async function CompraDetallePage({ params }: { params: Promise<{ 
           compra.cancelada ? (
             <Pastilla color="peligro">Cancelada</Pastilla>
           ) : puede(sesion.rol, "stock.editar") ? (
-            <CancelarCompraBoton compraId={compra.id} />
+            <>
+              <BotonEnlace href={`/admin/stock/compras/${compra.id}/editar`}>Editar</BotonEnlace>
+              <CancelarCompraBoton compraId={compra.id} />
+            </>
           ) : undefined
         }
       />
