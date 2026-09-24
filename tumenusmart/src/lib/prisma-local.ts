@@ -75,6 +75,16 @@ export async function siguienteNumeroVentaPos(storeId: string): Promise<number> 
   return local.contadorVentasPos;
 }
 
+/** Igual que las anteriores, para el N° de cada presupuesto/cotización. */
+export async function siguienteNumeroCotizacion(storeId: string): Promise<number> {
+  const local = await prisma.store.update({
+    where: { id: storeId },
+    data: { contadorCotizaciones: { increment: 1 } },
+    select: { contadorCotizaciones: true },
+  });
+  return local.contadorCotizaciones;
+}
+
 /**
  * Igual que las anteriores, para la Clave del cliente — con una diferencia:
  * tiene que poder recibir el `tx` de una transacción en curso, no solo el

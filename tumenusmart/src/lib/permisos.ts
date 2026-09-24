@@ -34,6 +34,8 @@ export type Permiso =
   | "rendiciones.gestionar"
   // Punto de venta: abrir/cerrar SU turno y vender por mostrador.
   | "pos.vender"
+  // Presupuestos / cotizaciones para clientes: armarlos, editarlos, borrarlos y sacarles el PDF.
+  | "cotizaciones.gestionar"
   // Ver el histórico completo de cuentas y cierres de TODOS los cajeros.
   | "pos.verHistorico"
   // Dar de alta estaciones (notebooks/cajas) y vincular una computadora a
@@ -81,6 +83,10 @@ const PERMISOS_EMPLEADO: Permiso[] = [
   "reservas.gestionar",
   "repartidores.ver",
   "pos.vender",
+  // Un presupuesto no mueve plata ni stock ni es un comprobante: quien atiende
+  // al cliente puede armarlo (los precios se editan solo en ESE presupuesto,
+  // nunca en el catálogo).
+  "cotizaciones.gestionar",
   "productos.ver",
   "productos.disponibilidad",
   "categorias.ver",

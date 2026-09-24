@@ -49,6 +49,10 @@ function armarGrupos(hayIdeaSinVer: boolean, rol: string): GrupoSecciones[] {
           ver: conPermiso("pedidos.ver") },
         { href: "/admin/reservas", label: "Reservas", icono: "reservas" as const,
           ver: conPermiso("reservas.ver") },
+        // Presupuestos para clientes: se arman en el momento en que el cliente
+        // los pide, por eso viven en "Día a día".
+        { href: "/admin/cotizaciones", label: "Cotizaciones", icono: "cierre" as const,
+          ver: conPermiso("cotizaciones.gestionar") },
         // Repartidores vive acá y no en Ajustes: se mira durante el servicio,
         // no una vez al mes.
         { href: "/admin/repartidores", label: "Repartidores", icono: "repartidores" as const,

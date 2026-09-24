@@ -132,6 +132,8 @@ model Store {
   contadorVentasPos Int @default(0)
   // Igual que los anteriores, para la Clave de Customer.numero.
   contadorClientes Int @default(0)
+  // Y para el N° de cada presupuesto/cotización (Cotizacion.numero).
+  contadorCotizaciones Int @default(0)
 
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
@@ -171,6 +173,8 @@ model Store {
   recetaItems      RecetaItem[]
   proveedores      Proveedor[]
   almacenes        Almacen[]
+  cotizaciones     Cotizacion[]
+  cotizacionItems  CotizacionItem[]
   compras          Compra[]
   pagosCompra      PagoCompra[]
   compraItems      CompraItem[]
@@ -1487,6 +1491,60 @@ model Compra {
 
   @@index([storeId])
   @@index([proveedorId])
+}
+
+/// Un presupuesto / cotización para enviarle a un cliente (PDF). Es solo el
+/// documento y su registro: no mueve stock ni caja y no es un comprobante
+/// fiscal. Cada línea copia el nombre y el precio del momento, así un
+/// presupuesto ya enviado no cambia si después se edita el producto.
+model Cotizacion {
+  id      String @id @default(cuid())
+  storeId String
+  store   Store  @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  /// Correlativo propio de cada local (Store.contadorCotizaciones).
+  numero  Int
+  fecha   DateTime @default(now())
+  /// Días de validez contados desde `fecha`: el PDF dice "válido hasta" ese día.
+  validezDias Int  @default(15)
+  clienteNombre         String
+  /// RUC o cédula tal como se escribió: texto libre, no se valida.
+  clienteIdentificacion String?
+  clienteTelefono       String?
+  clienteEmail          String?
+  /// Condiciones u observaciones que salen al pie del PDF.
+  notas   String?
+  /// Descuento general en guaraníes (ya calculado) y, si se pidió en %, el porcentaje.
+  descuento           Decimal  @default(0) @db.Decimal(14, 2)
+  descuentoPorcentaje Decimal? @db.Decimal(5, 2)
+  /// Lo que hay que pagar: con IVA y ya con el descuento.
+  total     Decimal  @db.Decimal(14, 2)
+  creadaPor String?
+  createdAt DateTime @default(now())
+
+  items CotizacionItem[]
+
+  @@unique([storeId, numero])
+  @@index([storeId])
+}
+
+model CotizacionItem {
+  id           String     @id @default(cuid())
+  storeId      String
+  store        Store      @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  cotizacionId String
+  cotizacion   Cotizacion @relation(fields: [cotizacionId], references: [id], onDelete: Cascade)
+  orden        Int        @default(0)
+  nombre       String
+  /// Detalle opcional que sale debajo del nombre (ej: "incluye mano de obra").
+  descripcion  String?
+  cantidad     Decimal    @db.Decimal(10, 2)
+  /// Precio de UNA unidad, con IVA incluido.
+  precioUnitario Decimal  @db.Decimal(14, 2)
+  /// "gravado10" | "gravado5" | "exento" — ver src/lib/iva.ts.
+  iva          String     @default("gravado10")
+
+  @@index([storeId])
+  @@index([cotizacionId])
 }
 
 /// Un pago al proveedor por una compra a crédito (cuentas por pagar). Lo que

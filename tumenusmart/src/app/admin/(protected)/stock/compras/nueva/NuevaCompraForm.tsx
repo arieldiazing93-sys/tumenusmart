@@ -336,8 +336,12 @@ export function NuevaCompraForm({
             </Selector>
           </Campo>
           <Campo
-            etiqueta="Fecha de vencimiento"
-            ayuda={condicionPago === "credito" ? undefined : "Solo si la compra es a crédito."}
+            etiqueta="Fecha de vencimiento de la factura (solo a crédito)"
+            ayuda={
+              condicionPago === "credito"
+                ? "La fecha límite para pagarle al proveedor."
+                : "Se completa solo si la compra es a crédito."
+            }
           >
             <Entrada
               type="date"
