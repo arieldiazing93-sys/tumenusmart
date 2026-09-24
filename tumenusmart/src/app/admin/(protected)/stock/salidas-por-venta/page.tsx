@@ -7,30 +7,39 @@ import { ZONA_NEGOCIO } from "@/lib/timezone";
 import {
   LIMITE_PANTALLA,
   calcularSalidasPorVenta,
+  unidadCorta,
+  ventaCorta,
   type TipoSalidaVenta,
 } from "@/lib/reporte-salidas-venta";
-import {
-  Cabecera,
-  Campo,
-  Entrada,
-  Pastilla,
-  Selector,
-  Tabla,
-  Tarjeta,
-  Td,
-  Th,
-  Tr,
-  Vacio,
-  clasesBoton,
-} from "@/components/ui";
+import { Cabecera, Campo, Entrada, Selector, Vacio, clasesBoton } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
+
+/** "29/09/26 20:14": corto, para que la fecha ocupe poco lugar en la tabla. */
+function fechaCorta(fecha: Date): string {
+  const dia = fecha.toLocaleDateString("es-PY", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "2-digit",
+    timeZone: ZONA_NEGOCIO,
+  });
+  const hora = fecha.toLocaleTimeString("es-PY", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+    timeZone: ZONA_NEGOCIO,
+  });
+  return `${dia} ${hora}`;
+}
 
 /**
  * Salidas por venta: qué insumos descontó cada venta, y por qué producto. Sirve
  * para comprobar cómo sale cada ingrediente cuando se vende algo — una receta
  * con preparaciones, un mitad y mitad, un agregado. Las cancelaciones aparecen
  * como entradas: es el stock que volvió.
+ *
+ * La tabla es a propósito muy compacta (letra chica, filas casi sin relleno)
+ * para ver muchas filas juntas en poco espacio.
  */
 export default async function SalidasPorVentaPage({
   searchParams,
@@ -78,27 +87,20 @@ export default async function SalidasPorVentaPage({
     return `?${params.toString()}`;
   })();
 
-  const fechaYHora = (fecha: Date) =>
-    fecha.toLocaleString("es-PY", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: false,
-      timeZone: ZONA_NEGOCIO,
-    });
+  // Con un solo almacén la columna no dice nada nuevo: se saca para ganar lugar.
+  const almacenesUsados = new Set(reporte.filas.map((f) => f.almacen));
+  const mostrarAlmacen = almacenesUsados.size > 1;
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-3">
       <Cabecera
         titulo="Salidas por venta"
-        bajada="Qué insumos descontó cada venta y por qué producto: fecha y hora, la venta, lo que se vendió, el insumo y la cantidad que salió del almacén. Sirve para comprobar cómo sale cada ingrediente."
+        bajada="Qué insumos descontó cada venta y por qué producto. Sirve para comprobar cómo sale cada ingrediente."
       />
 
       <form
         method="get"
-        className="grid grid-cols-1 gap-3 rounded-xl border border-linea bg-superficie p-4 sm:grid-cols-2 lg:grid-cols-3"
+        className="grid grid-cols-2 gap-2 rounded-xl border border-linea bg-superficie p-3 sm:grid-cols-3 lg:grid-cols-6"
       >
         <Campo etiqueta="Desde">
           <Entrada type="date" name="desde" defaultValue={rango.desde} />
@@ -108,9 +110,9 @@ export default async function SalidasPorVentaPage({
         </Campo>
         <Campo etiqueta="Tipo">
           <Selector name="tipo" defaultValue={tipoFiltro ?? ""}>
-            <option value="">Salidas por venta y cancelaciones</option>
+            <option value="">Ventas y cancelaciones</option>
             <option value="venta">Solo salidas por venta</option>
-            <option value="cancelacion">Solo cancelaciones (stock que volvió)</option>
+            <option value="cancelacion">Solo cancelaciones</option>
           </Selector>
         </Campo>
         <Campo etiqueta="Producto vendido">
@@ -130,8 +132,8 @@ export default async function SalidasPorVentaPage({
             ))}
           </Selector>
         </Campo>
-        <div className="flex flex-wrap items-center gap-2 sm:col-span-2 lg:col-span-3">
-          <button type="submit" className={clasesBoton("suave", "sm")}>
+        <div className="col-span-full flex flex-wrap items-center gap-2">
+          <button type="submit" className={clasesBoton("principal", "sm")}>
             Buscar
           </button>
           {hayFiltros && (
@@ -141,7 +143,7 @@ export default async function SalidasPorVentaPage({
           )}
           <span className="text-xs text-tinta-suave">Sin fechas, muestra el mes actual.</span>
           <div className="flex flex-wrap items-center gap-2 sm:ml-auto">
-            <a href={`/admin/stock/salidas-por-venta/exportar${consulta}`} className={clasesBoton("suave", "sm")}>
+            <a href={`/admin/stock/salidas-por-venta/exportar${consulta}`} className={clasesBoton("exito", "sm")}>
               Descargar Excel
             </a>
             <a
@@ -167,48 +169,80 @@ export default async function SalidasPorVentaPage({
         />
       ) : (
         <>
-          <Tarjeta>
-            <p className="rotulo">En este período</p>
-            <p className="cifra mt-1 text-[1.35rem] font-semibold text-tinta">
+          <p className="text-xs text-tinta-suave">
+            <span className="font-semibold text-tinta">
               {reporte.filas.length} {reporte.filas.length === 1 ? "movimiento" : "movimientos"} de {reporte.ventas}{" "}
               {reporte.ventas === 1 ? "venta" : "ventas"}
-            </p>
-          </Tarjeta>
+            </span>
+            {!mostrarAlmacen && ` · Almacén: ${[...almacenesUsados][0]}`}
+          </p>
 
-          <Tabla>
-            <thead>
-              <tr className="bg-exito-luz">
-                <Th>Fecha y hora</Th>
-                <Th>Venta</Th>
-                <Th>Qué se vendió</Th>
-                <Th>Insumo</Th>
-                <Th>Cantidad</Th>
-                <Th>Almacén</Th>
-              </tr>
-            </thead>
-            <tbody>
-              {reporte.filas.map((f) => (
-                <Tr key={f.id}>
-                  <Td className="cifra whitespace-nowrap">{f.inicioDeGrupo ? fechaYHora(f.fecha) : ""}</Td>
-                  <Td className="whitespace-nowrap">
-                    {f.inicioDeGrupo && (
-                      <span className="flex flex-wrap items-center gap-1.5">
-                        {f.venta}
-                        {f.tipo === "cancelacion" && <Pastilla color="marca">Cancelada</Pastilla>}
-                      </span>
-                    )}
-                  </Td>
-                  <Td className="font-medium text-tinta">{f.inicioDeGrupo ? f.producto : ""}</Td>
-                  <Td>{f.insumo}</Td>
-                  <Td className={`cifra whitespace-nowrap font-semibold ${f.cantidad < 0 ? "text-peligro" : "text-exito"}`}>
-                    {f.cantidad > 0 ? "+" : ""}
-                    {f.cantidad} {f.unidad}
-                  </Td>
-                  <Td>{f.almacen}</Td>
-                </Tr>
-              ))}
-            </tbody>
-          </Tabla>
+          <div className="overflow-x-auto rounded-lg border border-linea bg-superficie">
+            <table className="w-full min-w-[30rem] border-collapse text-left text-[0.74rem] leading-[1.2]">
+              <thead>
+                <tr className="bg-exito-luz text-[0.64rem] font-semibold uppercase tracking-rotulo text-tinta-suave">
+                  <th scope="col" className="px-2 py-1">
+                    Fecha y hora
+                  </th>
+                  <th scope="col" className="px-2 py-1">
+                    Venta
+                  </th>
+                  <th scope="col" className="px-2 py-1">
+                    Qué se vendió
+                  </th>
+                  <th scope="col" className="px-2 py-1">
+                    Insumo
+                  </th>
+                  <th scope="col" className="px-2 py-1 text-right">
+                    Cantidad
+                  </th>
+                  {mostrarAlmacen && (
+                    <th scope="col" className="px-2 py-1">
+                      Almacén
+                    </th>
+                  )}
+                </tr>
+              </thead>
+              <tbody>
+                {reporte.filas.map((f) => (
+                  <tr
+                    key={f.id}
+                    className={`hover:bg-papel-suave ${f.inicioDeGrupo ? "border-t border-linea" : ""}`}
+                  >
+                    <td className="cifra whitespace-nowrap px-2 py-[2px] align-top text-tinta-media">
+                      {f.inicioDeGrupo ? fechaCorta(f.fecha) : ""}
+                    </td>
+                    <td className="whitespace-nowrap px-2 py-[2px] align-top text-tinta-media">
+                      {f.inicioDeGrupo && (
+                        <>
+                          {ventaCorta(f.venta)}
+                          {f.tipo === "cancelacion" && (
+                            <span className="ml-1 rounded bg-brand-light px-1 text-[0.62rem] font-semibold text-brand-texto">
+                              Cancelada
+                            </span>
+                          )}
+                        </>
+                      )}
+                    </td>
+                    <td className="px-2 py-[2px] align-top font-medium text-tinta">
+                      {f.inicioDeGrupo ? f.producto : ""}
+                    </td>
+                    <td className="px-2 py-[2px] text-tinta">{f.insumo}</td>
+                    <td
+                      className={`cifra whitespace-nowrap px-2 py-[2px] text-right font-semibold ${
+                        f.cantidad < 0 ? "text-peligro" : "text-exito"
+                      }`}
+                    >
+                      {f.cantidad > 0 ? "+" : ""}
+                      {f.cantidad} {unidadCorta(f.unidad)}
+                    </td>
+                    {mostrarAlmacen && <td className="px-2 py-[2px] text-tinta-media">{f.almacen}</td>}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
           {reporte.recortado && (
             <p className="text-xs text-tinta-suave">
               Se muestran los {LIMITE_PANTALLA} movimientos más recientes de este filtro. Acotá las fechas para ver los
@@ -217,9 +251,9 @@ export default async function SalidasPorVentaPage({
           )}
           <p className="text-xs text-tinta-suave">
             Cada fila es lo que un producto vendido le sacó a un insumo. Si el producto lleva una preparación (salsa,
-            masa…), se ven los insumos con que se hace. En un mitad y mitad, cada sabor descuenta la mitad de su receta.
-            Las ventas de antes de que existiera este reporte no guardaron qué producto descontó cada insumo: figuran
-            como “Toda la venta”.
+            masa…), se ven los insumos con que se hace; en un mitad y mitad, cada sabor descuenta la mitad de su receta.
+            Las ventas de antes de este reporte figuran como “Toda la venta”: no se guardó qué producto descontó cada
+            insumo.
           </p>
         </>
       )}

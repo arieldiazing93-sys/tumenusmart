@@ -58,6 +58,19 @@ export type ReporteSalidasVenta = {
 export const LIMITE_PANTALLA = 300;
 export const LIMITE_REPORTE = 5000;
 
+/** La unidad abreviada para mostrar en poco espacio: "Kilogramo" → "kg". */
+export function unidadCorta(etiqueta: string): string {
+  if (etiqueta === "Kilogramo") return "kg";
+  if (etiqueta === "Litro") return "l";
+  if (etiqueta === "Unidad") return "un";
+  return etiqueta;
+}
+
+/** "Venta mostrador #0012" → "Mostrador #0012": lo mismo, más corto. */
+export function ventaCorta(venta: string): string {
+  return venta.replace("Venta mostrador", "Mostrador");
+}
+
 function aNumero(valor: unknown): number {
   if (typeof valor === "number") return Number.isFinite(valor) ? valor : 0;
   const n = parseFloat(String(valor));
