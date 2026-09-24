@@ -8,7 +8,7 @@ import { Segmentado } from "@/components/Segmentado";
 import { formatearGuarani } from "@/lib/format";
 import { calcularDescuento, textoPorcentaje } from "@/lib/descuento-venta";
 import { type FormaPagoPos } from "@/lib/turno-pos";
-import { SIN_REGISTRO_FISCAL, TIPOS_IDENTIFICACION_FISCAL, etiquetaTipoIdentificacion } from "@/lib/tipo-cliente";
+import { SIN_REGISTRO_FISCAL, TIPOS_IDENTIFICACION_FISCAL, etiquetaCortaTipoIdentificacion } from "@/lib/tipo-cliente";
 import { buscarClientePorIdentificacion, buscarClientePorTelefono, registrarVenta } from "./actions";
 import { CobrarModal } from "./CobrarModal";
 import { EntradaConLupa } from "./EntradaConLupa";
@@ -714,10 +714,11 @@ export function PantallaVenta({
                       </Campo>
                       {clienteFiscalEncontrado ? (
                         <div className="flex flex-col items-start gap-1 rounded-lg bg-white px-3 py-2">
-                          <p className="text-[0.85rem] font-medium text-tinta">{facturaRazonSocial}</p>
-                          <p className="text-[0.76rem] text-tinta-suave">
-                            {etiquetaTipoIdentificacion(facturaTipoIdentificacionElegido)}
-                          </p>
+                          <DatoDelCliente etiqueta="Razón social" valor={facturaRazonSocial} />
+                          <DatoDelCliente
+                            etiqueta={etiquetaCortaTipoIdentificacion(facturaTipoIdentificacionElegido)}
+                            valor={facturaNumeroIdentificacion.trim()}
+                          />
                           <button
                             type="button"
                             onClick={() => {
@@ -734,11 +735,12 @@ export function PantallaVenta({
                       ) : clienteFiscalEsNuevo ? (
                         facturaRazonSocial.trim() ? (
                           <div className="flex flex-col items-start gap-1 rounded-lg bg-white px-3 py-2">
-                            <p className="text-[0.85rem] font-medium text-tinta">{facturaRazonSocial}</p>
-                            <p className="text-[0.76rem] text-tinta-suave">
-                              {etiquetaTipoIdentificacion(facturaTipoIdentificacionElegido)}
-                              {facturaEmail && ` · ${facturaEmail}`}
-                            </p>
+                            <DatoDelCliente etiqueta="Razón social" valor={facturaRazonSocial} />
+                            <DatoDelCliente
+                              etiqueta={etiquetaCortaTipoIdentificacion(facturaTipoIdentificacionElegido)}
+                              valor={facturaNumeroIdentificacion.trim()}
+                            />
+                            {facturaEmail && <DatoDelCliente etiqueta="Correo" valor={facturaEmail} />}
                             <button
                               type="button"
                               onClick={() => setMostrarModalClienteFiscal(true)}
@@ -750,10 +752,10 @@ export function PantallaVenta({
                         ) : (
                           <>
                             <p className="text-[0.74rem] font-medium text-aviso">
-                              Cliente nuevo — cargá los datos.
+                              No existe ningún cliente con ese número.
                             </p>
                             <Boton tono="navegar" tam="sm" onClick={() => setMostrarModalClienteFiscal(true)}>
-                              Cargar datos del cliente
+                              Crear cliente
                             </Boton>
                           </>
                         )
@@ -889,5 +891,14 @@ export function PantallaVenta({
         />
       )}
     </div>
+  );
+}
+
+/** Una línea "Etiqueta: dato" del cliente fiscal, con la etiqueta apagada y el dato resaltado. */
+function DatoDelCliente({ etiqueta, valor }: { etiqueta: string; valor: string }) {
+  return (
+    <p className="text-[0.85rem] text-tinta">
+      <span className="text-tinta-suave">{etiqueta}:</span> <span className="font-medium">{valor}</span>
+    </p>
   );
 }

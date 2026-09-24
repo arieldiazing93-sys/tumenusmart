@@ -51,3 +51,20 @@ export function etiquetaTipoIdentificacion(valor: string): string {
   if (valor === SIN_REGISTRO_FISCAL.tipo) return "Sin nombre";
   return TIPOS_IDENTIFICACION_FISCAL.find((t) => t.valor === valor)?.etiqueta ?? "RUC";
 }
+
+const ETIQUETAS_CORTAS: Record<TipoIdentificacionFiscal, string> = {
+  ruc: "RUC",
+  cedula: "CI",
+  diplomatico: "Diplomático",
+  pasaporte: "Pasaporte",
+  cedula_extranjera: "Céd. extranjera",
+  identificacion_tributaria: "Id. tributaria",
+};
+
+/**
+ * La etiqueta corta para poner delante del número ("RUC: 80012345-6",
+ * "CI: 4987017"), en pantallas donde "Cédula de identidad" ocuparía de más.
+ */
+export function etiquetaCortaTipoIdentificacion(valor: string): string {
+  return ETIQUETAS_CORTAS[valor as TipoIdentificacionFiscal] ?? "RUC";
+}
