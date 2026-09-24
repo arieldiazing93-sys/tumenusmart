@@ -17,15 +17,24 @@ export async function GET(request: NextRequest) {
   const fecha = searchParams.get("fecha") ?? "7dias";
   const desde = searchParams.get("desde") ?? undefined;
   const hasta = searchParams.get("hasta") ?? undefined;
+  const estacionPedida = searchParams.get("estacion") ?? "";
 
   const rango = calcularRangoFecha(fecha, desde, hasta) ?? calcularRangoFecha("7dias", undefined, undefined)!;
 
   const storeId = await idLocalActual();
   const db = prismaDelLocal(storeId);
+  // Una estación puntual, o todas si no viene (o si el id no existe en este local).
+  const estacionElegida = estacionPedida
+    ? await db.estacion.findFirst({ where: { id: estacionPedida }, select: { id: true, nombre: true } })
+    : null;
   const [local, turnos] = await Promise.all([
     localActual(),
     db.turnoPos.findMany({
-      where: { estado: "cerrado", cerradoEn: { gte: rango.gte, lt: rango.lt } },
+      where: {
+        estado: "cerrado",
+        cerradoEn: { gte: rango.gte, lt: rango.lt },
+        ...(estacionElegida ? { estacionId: estacionElegida.id } : {}),
+      },
       orderBy: { cerradoEn: "asc" },
       select: {
         id: true,
@@ -104,6 +113,7 @@ export async function GET(request: NextRequest) {
   filaTitulo(hoja, ["Negocio", local.nombre], 2);
   filaTitulo(hoja, ["Reporte", "Cierres de turno — Punto de venta"], 2);
   filaTitulo(hoja, ["Período", periodo], 2);
+  filaTitulo(hoja, ["Estación", estacionElegida?.nombre ?? "Todas las estaciones"], 2);
   hoja.addRow([]);
 
   filaTitulo(
@@ -175,5 +185,9 @@ export async function GET(request: NextRequest) {
     hoja.addRow(["No se registraron cierres de turno en este período."]);
   }
 
-  return respuestaXlsx(libro, `cierres_pos_${fecha}.xlsx`);
+  // Con una estación puntual, su nombre va en el archivo (sin acentos ni espacios).
+  const sufijoEstacion = estacionElegida
+    ? `_${estacionElegida.nombre.normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^A-Za-z0-9]+/g, "_")}`
+    : "";
+  return respuestaXlsx(libro, `cierres_pos_${fecha}${sufijoEstacion}.xlsx`);
 }

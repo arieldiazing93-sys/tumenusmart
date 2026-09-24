@@ -17,6 +17,15 @@ const FILTROS_FECHA: { value: FiltroFecha; label: string }[] = [
   { value: "mes", label: "Este mes" },
 ];
 
+/** La pastilla de un filtro: llena si es la elegida, con borde si no. */
+function clasePastilla(activa: boolean): string {
+  return `rounded-full border px-3 py-1.5 text-sm font-medium ${
+    activa
+      ? "border-brand bg-brand text-white"
+      : "border-linea text-tinta-media hover:border-brand hover:text-brand"
+  }`;
+}
+
 function totalDeclarado(t: {
   declaradoEfectivo: unknown;
   declaradoTransferencia: unknown;
@@ -48,31 +57,47 @@ function totalCalculado(t: {
 export default async function TurnosPosPage({
   searchParams,
 }: {
-  searchParams: Promise<{ fecha?: string; desde?: string; hasta?: string }>;
+  searchParams: Promise<{ fecha?: string; desde?: string; hasta?: string; estacion?: string }>;
 }) {
   await pantallaConPermiso("pos.verHistorico");
 
-  const { fecha, desde, hasta } = await searchParams;
+  const { fecha, desde, hasta, estacion } = await searchParams;
   const fechaActiva: FiltroFecha = (fecha as FiltroFecha) ?? "7dias";
   const rango =
     calcularRangoFecha(fechaActiva, desde, hasta) ?? calcularRangoFecha("7dias", undefined, undefined)!;
 
-  function hrefFecha(nuevaFecha: FiltroFecha) {
-    return `/admin/pos/turnos?fecha=${nuevaFecha}`;
-  }
-  function querystringActual() {
-    const params = new URLSearchParams();
-    params.set("fecha", fechaActiva);
-    if (fechaActiva === "rango" && desde) params.set("desde", desde);
-    if (fechaActiva === "rango" && hasta) params.set("hasta", hasta);
-    return params.toString();
-  }
-
   const storeId = await idLocalActual();
   const db = prismaDelLocal(storeId);
 
+  // Todas las estaciones del local, incluso las desactivadas: un turno viejo
+  // puede ser de una que ya no se usa. Un id que no existe se ignora (= todas).
+  const estaciones = await db.estacion.findMany({
+    orderBy: { nombre: "asc" },
+    select: { id: true, nombre: true, activa: true },
+  });
+  const estacionElegida = estaciones.find((e) => e.id === estacion) ?? null;
+
+  // El filtro de fecha y el de estación se combinan: cambiar uno conserva el
+  // otro. Los reportes de Excel y PDF reciben el mismo querystring, así salen
+  // con exactamente lo que se está viendo.
+  function querystring(nueva: { fecha?: FiltroFecha; estacion?: string | null }) {
+    const f = nueva.fecha ?? fechaActiva;
+    const e = nueva.estacion === undefined ? (estacionElegida?.id ?? null) : nueva.estacion;
+    const params = new URLSearchParams();
+    params.set("fecha", f);
+    if (f === "rango" && desde) params.set("desde", desde);
+    if (f === "rango" && hasta) params.set("hasta", hasta);
+    if (e) params.set("estacion", e);
+    return params.toString();
+  }
+  const querystringActual = () => querystring({});
+
   const turnos = await db.turnoPos.findMany({
-    where: { estado: "cerrado", cerradoEn: { gte: rango.gte, lt: rango.lt } },
+    where: {
+      estado: "cerrado",
+      cerradoEn: { gte: rango.gte, lt: rango.lt },
+      ...(estacionElegida ? { estacionId: estacionElegida.id } : {}),
+    },
     orderBy: { cerradoEn: "desc" },
     select: {
       id: true,
@@ -177,25 +202,47 @@ export default async function TurnosPosPage({
         }
       />
 
-      <div className="mb-6 flex flex-wrap items-center gap-2">
-        {FILTROS_FECHA.map((f) => (
-          <Link
-            key={f.value}
-            href={hrefFecha(f.value)}
-            className={`rounded-full border px-3 py-1.5 text-sm font-medium ${
-              fechaActiva === f.value && fechaActiva !== "rango"
-                ? "border-brand bg-brand text-white"
-                : "border-linea text-tinta-media hover:border-brand hover:text-brand"
-            }`}
-          >
-            {f.label}
-          </Link>
-        ))}
+      <div className="mb-6 flex flex-col gap-3">
+        <div className="flex flex-wrap items-center gap-2">
+          {FILTROS_FECHA.map((f) => (
+            <Link
+              key={f.value}
+              href={`/admin/pos/turnos?${querystring({ fecha: f.value })}`}
+              className={clasePastilla(fechaActiva === f.value && fechaActiva !== "rango")}
+            >
+              {f.label}
+            </Link>
+          ))}
+        </div>
+
+        {/* Con una sola estación no hay nada que elegir. */}
+        {estaciones.length > 1 && (
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs text-tinta-suave">Estación:</span>
+            <Link href={`/admin/pos/turnos?${querystring({ estacion: null })}`} className={clasePastilla(!estacionElegida)}>
+              Todas las estaciones
+            </Link>
+            {estaciones.map((e) => (
+              <Link
+                key={e.id}
+                href={`/admin/pos/turnos?${querystring({ estacion: e.id })}`}
+                className={clasePastilla(estacionElegida?.id === e.id)}
+              >
+                {e.nombre}
+                {!e.activa && " (inactiva)"}
+              </Link>
+            ))}
+          </div>
+        )}
       </div>
 
       {turnos.length === 0 ? (
         <Vacio
-          titulo="No hay turnos cerrados en este período"
+          titulo={
+            estacionElegida
+              ? `No hay turnos cerrados de ${estacionElegida.nombre} en este período`
+              : "No hay turnos cerrados en este período"
+          }
           detalle="Los cierres de caja del Punto de Venta van a aparecer acá."
         />
       ) : (

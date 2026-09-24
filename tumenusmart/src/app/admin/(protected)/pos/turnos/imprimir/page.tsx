@@ -39,21 +39,29 @@ function totalCalculado(t: {
 export default async function ImprimirTurnosPosPage({
   searchParams,
 }: {
-  searchParams: Promise<{ fecha?: string; desde?: string; hasta?: string }>;
+  searchParams: Promise<{ fecha?: string; desde?: string; hasta?: string; estacion?: string }>;
 }) {
   await pantallaConPermiso("pos.verHistorico");
 
-  const { fecha, desde, hasta } = await searchParams;
+  const { fecha, desde, hasta, estacion } = await searchParams;
   const fechaActiva = fecha ?? "7dias";
   const rango =
     calcularRangoFecha(fechaActiva, desde, hasta) ?? calcularRangoFecha("7dias", undefined, undefined)!;
 
   const storeId = await idLocalActual();
   const db = prismaDelLocal(storeId);
+  // Una estación puntual, o todas si no viene (o si el id no existe en este local).
+  const estacionElegida = estacion
+    ? await db.estacion.findFirst({ where: { id: estacion }, select: { id: true, nombre: true } })
+    : null;
   const [local, turnos] = await Promise.all([
     localActual(),
     db.turnoPos.findMany({
-      where: { estado: "cerrado", cerradoEn: { gte: rango.gte, lt: rango.lt } },
+      where: {
+        estado: "cerrado",
+        cerradoEn: { gte: rango.gte, lt: rango.lt },
+        ...(estacionElegida ? { estacionId: estacionElegida.id } : {}),
+      },
       orderBy: { cerradoEn: "asc" },
       select: {
         id: true,
@@ -124,7 +132,8 @@ export default async function ImprimirTurnosPosPage({
         <h1 className="text-2xl font-bold text-tinta">Cierres de turno — {local.nombre}</h1>
         <p className="mt-1 text-sm text-tinta-media">
           Período: {rango.gte.toLocaleDateString("es-PY", opcionesFecha)} –{" "}
-          {finRangoInclusive.toLocaleDateString("es-PY", opcionesFecha)}
+          {finRangoInclusive.toLocaleDateString("es-PY", opcionesFecha)} ·{" "}
+          {estacionElegida ? `Estación: ${estacionElegida.nombre}` : "Todas las estaciones"}
         </p>
       </div>
 
