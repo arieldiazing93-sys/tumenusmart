@@ -1,20 +1,35 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { Campo, Entrada, Selector, Tarjeta, clasesBoton } from "@/components/ui";
-import { Segmentado } from "@/components/Segmentado";
+import { Entrada, Selector, Tarjeta, clasesBoton } from "@/components/ui";
 import { motivosDe, type TipoMovimientoAlmacen } from "@/lib/movimiento-almacen";
 import { buscarInsumosParaCompra, type InsumoParaCompra } from "../compras/actions";
 import { consultarStockEnAlmacen, registrarMovimientoAlmacen } from "./actions";
 
 type Almacen = { id: string; nombre: string };
 
+/** Campos bajos: el formulario ocupa poco lugar en pantalla (el padding base de los campos se pisa con !). */
+const CAMPO_BAJO = "!py-1.5 !text-[0.85rem]";
+
+/** Una etiqueta chica arriba de un campo. */
+function Etiqueta({ texto, children, className = "" }: { texto: string; children: ReactNode; className?: string }) {
+  return (
+    <label className={`block ${className}`}>
+      <span className="mb-0.5 block text-[0.74rem] font-semibold text-tinta-media">{texto}</span>
+      {children}
+    </label>
+  );
+}
+
 /**
  * El formulario "Nuevo movimiento" de almacén: entrada o salida, en qué
  * almacén, de qué insumo, cuánto y por qué. La salida es para lo que se
  * pierde sin venderse (se venció, se rompió, lo consumió el personal); la
  * entrada, para lo que llega sin una compra.
+ *
+ * Compacto a propósito: en pantalla ancha entra en tres renglones (tipo; almacén,
+ * insumo, cantidad y motivo; detalle y botón).
  */
 export function NuevoMovimientoAlmacenForm({ almacenes }: { almacenes: Almacen[] }) {
   const router = useRouter();
@@ -72,39 +87,55 @@ export function NuevoMovimientoAlmacenForm({ almacenes }: { almacenes: Almacen[]
   }
 
   return (
-    <Tarjeta className="flex flex-col gap-3">
-      <p className="rotulo text-[0.8rem] font-bold">Nuevo movimiento</p>
+    <Tarjeta padding={false} className="flex flex-col gap-2 p-3">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+        <p className="rotulo text-[0.78rem] font-bold">Nuevo movimiento</p>
+        <div className="inline-flex overflow-hidden rounded-lg border border-linea">
+          {(
+            [
+              { valor: "salida", etiqueta: "− Salida", ayuda: "Se pierde o se saca sin vender" },
+              { valor: "entrada", etiqueta: "+ Entrada", ayuda: "Llega sin una compra" },
+            ] as const
+          ).map((o) => (
+            <button
+              key={o.valor}
+              type="button"
+              title={o.ayuda}
+              aria-pressed={tipo === o.valor}
+              onClick={() => cambiarTipo(o.valor)}
+              className={`px-3.5 py-1 text-[0.82rem] font-medium transition-colors ${
+                tipo === o.valor ? "bg-tinta text-papel" : "text-tinta-media hover:bg-papel-suave"
+              }`}
+            >
+              {o.etiqueta}
+            </button>
+          ))}
+        </div>
+        <span className="text-xs text-tinta-suave">
+          {tipo === "salida" ? "Se pierde o se saca sin vender." : "Llega sin una compra."}
+        </span>
+      </div>
 
-      <Segmentado
-        opciones={[
-          { value: "salida", label: "− Salida", sublabel: "Se pierde o se saca sin vender" },
-          { value: "entrada", label: "+ Entrada", sublabel: "Llega sin una compra" },
-        ]}
-        valor={tipo}
-        onChange={cambiarTipo}
-        color="tinta"
-      />
-
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <Campo etiqueta="Almacén">
-          <Selector value={almacenId} onChange={(e) => setAlmacenId(e.target.value)}>
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-[1fr_1.5fr_7rem_1.2fr]">
+        <Etiqueta texto="Almacén">
+          <Selector className={CAMPO_BAJO} value={almacenId} onChange={(e) => setAlmacenId(e.target.value)}>
             {almacenes.map((a) => (
               <option key={a.id} value={a.id}>
                 {a.nombre}
               </option>
             ))}
           </Selector>
-        </Campo>
+        </Etiqueta>
 
         <div>
-          <span className="mb-1.5 block text-[0.82rem] font-semibold text-tinta">Insumo</span>
+          <span className="mb-0.5 block text-[0.74rem] font-semibold text-tinta-media">Insumo</span>
           {insumo ? (
-            <div className="flex items-center justify-between gap-2 rounded-lg border border-linea bg-papel-suave px-3 py-2.5">
+            <div className="flex items-center justify-between gap-2 rounded-lg border border-linea bg-papel-suave px-2.5 py-1">
               <div className="min-w-0">
-                <p className="truncate text-[0.88rem] font-medium text-tinta">{insumo.nombre}</p>
-                <p className="text-xs text-tinta-suave">
+                <p className="truncate text-[0.84rem] font-medium leading-tight text-tinta">{insumo.nombre}</p>
+                <p className="truncate text-[0.7rem] leading-tight text-tinta-suave">
                   {insumo.unidadMedida}
-                  {stock && ` · en este almacén hay ${stock.stock} ${stock.unidad}`}
+                  {stock && ` · hay ${stock.stock} ${stock.unidad}`}
                 </p>
               </div>
               <button type="button" onClick={() => setInsumo(null)} className={clasesBoton("suave", "sm")}>
@@ -116,8 +147,9 @@ export function NuevoMovimientoAlmacenForm({ almacenes }: { almacenes: Almacen[]
           )}
         </div>
 
-        <Campo etiqueta={`Cantidad${insumo ? ` (${insumo.unidadMedida.toLowerCase()})` : ""}`}>
+        <Etiqueta texto={`Cantidad${insumo ? ` (${insumo.unidadMedida.toLowerCase()})` : ""}`}>
           <Entrada
+            className={CAMPO_BAJO}
             type="number"
             step="any"
             min="0"
@@ -125,10 +157,10 @@ export function NuevoMovimientoAlmacenForm({ almacenes }: { almacenes: Almacen[]
             onChange={(e) => setCantidad(e.target.value)}
             placeholder="Ej: 3"
           />
-        </Campo>
+        </Etiqueta>
 
-        <Campo etiqueta="Motivo">
-          <Selector value={motivo} onChange={(e) => setMotivo(e.target.value)}>
+        <Etiqueta texto="Motivo">
+          <Selector className={CAMPO_BAJO} value={motivo} onChange={(e) => setMotivo(e.target.value)}>
             <option value="">Elegí el motivo…</option>
             {motivosDe(tipo).map((m) => (
               <option key={m.valor} value={m.valor}>
@@ -136,28 +168,28 @@ export function NuevoMovimientoAlmacenForm({ almacenes }: { almacenes: Almacen[]
               </option>
             ))}
           </Selector>
-        </Campo>
+        </Etiqueta>
+      </div>
 
-        <Campo
-          etiqueta={motivo === "otro" ? "Detalle del motivo" : "Detalle (opcional)"}
-          className="sm:col-span-2"
-        >
+      <div className="grid grid-cols-1 items-end gap-2 sm:grid-cols-[1fr_auto]">
+        <Etiqueta texto={motivo === "otro" ? "Detalle del motivo" : "Detalle (opcional)"}>
           <Entrada
+            className={CAMPO_BAJO}
             value={detalle}
             onChange={(e) => setDetalle(e.target.value)}
             maxLength={200}
             placeholder="Ej: se cayó una caja en el depósito"
           />
-        </Campo>
+        </Etiqueta>
+        <div className="flex items-center gap-3">
+          <button type="button" disabled={pendiente} onClick={registrar} className={clasesBoton("principal", "sm")}>
+            {pendiente ? "Guardando…" : tipo === "salida" ? "Registrar salida" : "Registrar entrada"}
+          </button>
+          {registrado && <span className="text-xs font-medium text-exito">✓ Registrado</span>}
+        </div>
       </div>
 
-      {error && <p className="text-sm font-medium text-peligro">{error}</p>}
-      <div className="flex flex-wrap items-center gap-3">
-        <button type="button" disabled={pendiente} onClick={registrar} className={clasesBoton("principal")}>
-          {pendiente ? "Guardando…" : tipo === "salida" ? "Registrar salida" : "Registrar entrada"}
-        </button>
-        {registrado && <span className="text-sm font-medium text-exito">✓ Movimiento registrado</span>}
-      </div>
+      {error && <p className="text-[0.82rem] font-medium text-peligro">{error}</p>}
     </Tarjeta>
   );
 }
@@ -186,27 +218,27 @@ function BuscadorInsumo({ onElegir }: { onElegir: (insumo: InsumoParaCompra) => 
   }
 
   return (
-    <div className="flex flex-col gap-2">
+    <div className="flex flex-col gap-1">
       <input
         value={query}
         onChange={(e) => buscar(e.target.value)}
         placeholder="Buscá un insumo por nombre"
-        className="w-full rounded-lg border border-linea bg-superficie px-3 py-2.5 text-[0.88rem] focus:border-brand focus:outline-none"
+        className="w-full rounded-lg border border-linea bg-superficie px-3 py-1.5 text-[0.85rem] focus:border-brand focus:outline-none"
       />
       {buscando && <p className="text-xs text-tinta-suave">Buscando…</p>}
       {!buscando && query.trim() && resultados.length === 0 && (
         <p className="text-xs text-tinta-suave">No encontré ningún insumo con ese nombre.</p>
       )}
       {resultados.length > 0 && (
-        <div className="flex flex-col gap-1.5">
+        <div className="flex flex-col gap-1">
           {resultados.map((i) => (
             <div
               key={i.id}
-              className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-linea bg-superficie px-3 py-2 text-sm"
+              className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-linea bg-superficie px-2.5 py-1 text-sm"
             >
-              <div>
-                <p className="font-medium">{i.nombre}</p>
-                <p className="text-xs text-tinta-suave">
+              <div className="min-w-0">
+                <p className="truncate text-[0.84rem] font-medium leading-tight">{i.nombre}</p>
+                <p className="truncate text-[0.7rem] leading-tight text-tinta-suave">
                   {i.categoriaNombre} · {i.unidadMedida}
                 </p>
               </div>
