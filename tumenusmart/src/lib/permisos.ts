@@ -53,6 +53,9 @@ export type Permiso =
   // --- reserva de turnos: la agenda de los negocios que atienden con cita
   // (peluquería, barbería, salón de belleza) ---
   | "agenda.ver"
+  // Armar la agenda: cargar y editar el personal (y más adelante horarios,
+  // servicios y la página de reservas). Del dueño, como el resto de la configuración.
+  | "agenda.configurar"
   // --- el negocio ---
   | "estadisticas.ver"
   | "ideas.ver"
@@ -124,6 +127,7 @@ const PERMISOS_LOCAL: Permiso[] = [
   // empleado, mismo criterio que "pos.gestionarEstaciones".
   "stock.ver",
   "stock.editar",
+  "agenda.configurar",
   "estadisticas.ver",
   "ideas.ver",
   "analytics.ver",

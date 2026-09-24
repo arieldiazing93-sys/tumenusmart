@@ -118,8 +118,15 @@ function armarGrupos(hayIdeaSinVer: boolean, rol: string, ventasACredito: boolea
       // profesional a una hora.
       titulo: "Reserva de turnos",
       secciones: [
-        { href: "/admin/agenda", label: "Agenda", icono: "reservas" as const,
+        { href: "/admin/agenda", label: "Calendario", icono: "reservas" as const,
           ver: conPermiso("agenda.ver") },
+        // Reutiliza la pantalla de Clientes que ya existe (la misma de "Cómo va
+        // el negocio"), con el mismo permiso.
+        { href: "/admin/pos/clientes", label: "Clientes", icono: "usuarios" as const,
+          ver: conPermiso("pos.verHistorico") },
+        // Quienes atienden. Lo arma el dueño, igual que el resto de la configuración.
+        { href: "/admin/agenda/personal", label: "Personal", icono: "cuenta" as const,
+          ver: conPermiso("agenda.configurar") },
       ],
     },
     {

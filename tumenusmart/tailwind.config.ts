@@ -174,6 +174,11 @@ const config: Config = {
           "0%": { transform: "translateX(-100%)" },
           "100%": { transform: "translateX(0)" },
         },
+        // El panel lateral de los formularios (alta de personal…) entrando desde la derecha.
+        entrarDerecha: {
+          "0%": { transform: "translateX(100%)" },
+          "100%": { transform: "translateX(0)" },
+        },
         /**
          * La entrada del contenido al cambiar de sección del panel.
          *

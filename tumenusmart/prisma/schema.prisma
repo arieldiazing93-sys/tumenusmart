@@ -2176,6 +2176,11 @@ model MiembroPersonal {
   storeId   String
   store     Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
   nombre    String
+  apellido  String?
+  /// En formato internacional, solo dígitos (ej: 595984123456).
+  telefono  String?
+  profesion String?
+  fotoUrl   String?
   orden     Int      @default(0)
   /// Se desactiva en vez de borrarse: sus turnos viejos siguen mostrándose.
   activo    Boolean  @default(true)

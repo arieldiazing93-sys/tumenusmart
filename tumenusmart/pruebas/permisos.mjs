@@ -32,6 +32,7 @@ SI("empleado", "categorias.ver");
 // Lo que NO puede es lo que importa: acá es donde un error cuesta plata.
 NO("empleado", "productos.editar");
 NO("empleado", "categorias.editar");
+NO("empleado", "agenda.configurar");
 NO("empleado", "repartidores.gestionar");
 NO("empleado", "estadisticas.ver");
 NO("empleado", "ideas.ver");
@@ -43,6 +44,7 @@ NO("empleado", "usuarios.gestionar");
 console.log("— el dueño del local —");
 SI("local", "productos.editar");
 SI("local", "categorias.editar");
+SI("local", "agenda.configurar");
 SI("local", "estadisticas.ver");
 SI("local", "configuracion.editar");
 SI("local", "empleados.gestionar");

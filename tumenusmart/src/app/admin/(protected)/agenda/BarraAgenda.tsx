@@ -4,15 +4,14 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
-  AVATARES,
   ESTADOS_CITA,
   VISTAS_AGENDA,
   fechaVecina,
-  iniciales,
   urlAgenda,
   type EstadoCita,
   type ParametrosAgenda,
 } from "@/lib/agenda";
+import { AvatarPersonal } from "./AvatarPersonal";
 
 /**
  * La barra de arriba de la Agenda: ir a hoy, moverse entre períodos, elegir la
@@ -211,7 +210,7 @@ function Desplegable({
 //  La barra
 // ---------------------------------------------------------------------------
 
-type Miembro = { id: string; nombre: string };
+type Miembro = { id: string; nombre: string; fotoUrl: string | null };
 
 export function BarraAgenda({
   parametros,
@@ -336,13 +335,7 @@ export function BarraAgenda({
                   aria-checked={esElegido}
                   className={`${ITEM_MENU} ${esElegido ? ITEM_MENU_ACTIVO : ""}`}
                 >
-                  <span
-                    className={`flex h-7 w-7 flex-none items-center justify-center rounded-full text-[0.68rem] font-semibold ${
-                      AVATARES[i % AVATARES.length]
-                    }`}
-                  >
-                    {iniciales(p.nombre)}
-                  </span>
+                  <AvatarPersonal nombre={p.nombre} fotoUrl={p.fotoUrl} indice={i} className="h-7 w-7 text-[0.68rem]" />
                   <span className="min-w-0 flex-1 truncate">{p.nombre}</span>
                   {esElegido && <IconoCheck />}
                 </Link>

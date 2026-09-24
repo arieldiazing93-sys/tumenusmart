@@ -27,6 +27,7 @@ export const MODULOS_BITACORA = [
   { valor: "cotizaciones", etiqueta: "Cotizaciones" },
   { valor: "clientes", etiqueta: "Clientes" },
   { valor: "empleados", etiqueta: "Empleados" },
+  { valor: "agenda", etiqueta: "Agenda y turnos" },
   { valor: "configuracion", etiqueta: "Configuración" },
 ] as const;
 

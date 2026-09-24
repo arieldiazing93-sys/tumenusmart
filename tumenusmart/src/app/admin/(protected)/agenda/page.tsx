@@ -13,6 +13,7 @@ import {
   type CitaAgenda,
   type ParametrosAgenda,
 } from "@/lib/agenda";
+import { nombreCompleto } from "@/lib/agenda-personal";
 import { Cabecera } from "@/components/ui";
 import { BandaPersonal } from "./BandaPersonal";
 import { BarraAgenda } from "./BarraAgenda";
@@ -48,11 +49,12 @@ export default async function AgendaPage({
   const fecha = parsearFecha(sp.fecha, hoy);
   const ocultar = parsearOcultar(sp.ocultar);
 
-  const personal = await db.miembroPersonal.findMany({
+  const personalDb = await db.miembroPersonal.findMany({
     where: { activo: true },
     orderBy: [{ orden: "asc" }, { createdAt: "asc" }, { id: "asc" }],
-    select: { id: true, nombre: true },
+    select: { id: true, nombre: true, apellido: true, fotoUrl: true },
   });
+  const personal = personalDb.map((p) => ({ id: p.id, nombre: nombreCompleto(p), fotoUrl: p.fotoUrl }));
   // Un id que no es del personal de este local (o que ya no está) se ignora: se ve a todos.
   const indiceElegido = personal.findIndex((p) => p.id === sp.personal);
   const elegido = indiceElegido >= 0 ? personal[indiceElegido] : null;
@@ -76,13 +78,13 @@ export default async function AgendaPage({
       fin: true,
       estado: true,
       precio: true,
-      personal: { select: { nombre: true } },
+      personal: { select: { nombre: true, apellido: true } },
     },
   });
   const citas: CitaAgenda[] = citasBase.map((c) => ({
     id: c.id,
     personalId: c.personalId,
-    personalNombre: c.personal.nombre,
+    personalNombre: nombreCompleto(c.personal),
     clienteNombre: c.clienteNombre,
     inicio: c.inicio,
     fin: c.fin,
@@ -93,7 +95,7 @@ export default async function AgendaPage({
   return (
     <div className="flex flex-col gap-3">
       <Cabecera
-        titulo="Agenda"
+        titulo="Calendario"
         bajada="Los turnos de tus clientes: quién viene, con quién y a qué hora."
       />
 
@@ -119,7 +121,12 @@ export default async function AgendaPage({
       </ul>
 
       <section className="overflow-hidden rounded-xl border border-linea bg-superficie shadow-sm">
-        <BandaPersonal nombre={elegido?.nombre ?? null} indice={indiceElegido} cantidad={personal.length} />
+        <BandaPersonal
+          nombre={elegido?.nombre ?? null}
+          fotoUrl={elegido?.fotoUrl ?? null}
+          indice={indiceElegido}
+          cantidad={personal.length}
+        />
         {vista === "mes" ? (
           <VistaMes fecha={fecha} citas={citas} hoy={hoy} parametros={parametros} />
         ) : (
