@@ -112,6 +112,17 @@ function armarGrupos(hayIdeaSinVer: boolean, rol: string, ventasACredito: boolea
       ],
     },
     {
+      // Para los negocios que atienden con cita (peluquería, barbería, salón
+      // de belleza). No es lo mismo que "Reservas" de Día a día: eso es
+      // reservar mesa en un restaurante, esto es agendar a alguien con un
+      // profesional a una hora.
+      titulo: "Reserva de turnos",
+      secciones: [
+        { href: "/admin/agenda", label: "Agenda", icono: "reservas" as const,
+          ver: conPermiso("agenda.ver") },
+      ],
+    },
+    {
       titulo: "Cómo va el negocio",
       secciones: [
         { href: "/admin/estadisticas", label: "Estadísticas", icono: "estadisticas" as const,

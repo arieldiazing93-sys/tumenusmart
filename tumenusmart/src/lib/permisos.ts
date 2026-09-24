@@ -50,6 +50,9 @@ export type Permiso =
   // --- control de stock: insumos, recetas, proveedores, compras, gastos ---
   | "stock.ver"
   | "stock.editar"
+  // --- reserva de turnos: la agenda de los negocios que atienden con cita
+  // (peluquería, barbería, salón de belleza) ---
+  | "agenda.ver"
   // --- el negocio ---
   | "estadisticas.ver"
   | "ideas.ver"
@@ -83,6 +86,9 @@ const PERMISOS_EMPLEADO: Permiso[] = [
   "pedidos.asignarRepartidor",
   "reservas.ver",
   "reservas.gestionar",
+  // Quien atiende el mostrador es quien anota y mueve los turnos, igual que
+  // con las reservas de mesa.
+  "agenda.ver",
   "repartidores.ver",
   "pos.vender",
   // Un presupuesto no mueve plata ni stock ni es un comprobante: quien atiende

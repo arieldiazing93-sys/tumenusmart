@@ -23,6 +23,7 @@ SI("empleado", "pedidos.cambiarEstado");
 SI("empleado", "pedidos.asignarRepartidor");
 SI("empleado", "reservas.ver");
 SI("empleado", "reservas.gestionar");
+SI("empleado", "agenda.ver");
 SI("empleado", "repartidores.ver");
 SI("empleado", "productos.ver");
 SI("empleado", "productos.disponibilidad");
