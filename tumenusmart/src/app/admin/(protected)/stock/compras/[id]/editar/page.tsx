@@ -80,6 +80,7 @@ export default async function EditarCompraPage({ params }: { params: Promise<{ i
     // La fecha se guardó como medianoche UTC del día elegido: así vuelve al mismo día.
     fecha: compra.fecha.toISOString().slice(0, 10),
     folioFactura: compra.numeroComprobante ?? "",
+    timbrado: compra.timbrado ?? "",
     condicionPago: compra.condicionPago === "credito" ? "credito" : "contado",
     fechaVencimiento: compra.fechaVencimiento ? compra.fechaVencimiento.toISOString().slice(0, 10) : "",
     notas: compra.notas ?? "",

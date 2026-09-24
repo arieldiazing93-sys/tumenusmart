@@ -13,9 +13,10 @@ function siNo(valor: string | null, porDefecto: SiNo): SiNo {
 }
 
 /**
- * Baja el registro de comprobantes de VENTAS de un mes en el formato de
- * importación de la DNIT (Resolución General N° 90/2021, Sistema Marangatú):
- * un .zip con el archivo .csv o .txt adentro, con el nombre que pide la DNIT.
+ * Baja el registro de comprobantes de VENTAS de un mes —y, si se pide con
+ * `compras=1`, también el de COMPRAS— en el formato de importación de la DNIT
+ * (Resolución General N° 90/2021, Sistema Marangatú): un .zip con el archivo
+ * .csv o .txt adentro, con el nombre que pide la DNIT.
  * Ver src/lib/registro-rg90.ts para el detalle del formato.
  *
  * Si no se puede armar un archivo completo, no baja nada: vuelve a Facturas con
@@ -53,6 +54,8 @@ export async function GET(request: NextRequest) {
     imputaIrpRsp,
     formato: searchParams.get("formato") === "txt" ? "txt" : "csv",
     primerArchivo,
+    // Las compras son de Control de stock: hace falta también ese permiso.
+    incluirCompras: searchParams.get("compras") === "1" && puede(sesion.rol, "stock.ver"),
   });
 
   if (!resultado.ok) {

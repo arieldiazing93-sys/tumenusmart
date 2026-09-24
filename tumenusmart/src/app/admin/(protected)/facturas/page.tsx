@@ -63,9 +63,9 @@ export default async function FacturasPage({
     : claveDiaAsuncion(ultimoDiaMesAnterior).slice(0, 7);
   const avisoRg90: string | null =
     rg90 === "sin_facturas"
-      ? `No hay facturas vigentes en ${mesAviso ?? "ese mes"} para exportar.`
+      ? `No hay facturas vigentes ni compras con factura de proveedor en ${mesAviso ?? "ese mes"} para exportar.`
       : rg90 === "incompletas"
-        ? `No se generó el archivo: estas facturas tienen datos incompletos (timbrado, número o datos del cliente) y no se pueden informar: ${detalle ?? ""}. Corregilas y volvé a exportar.`
+        ? `No se generó el archivo: estos comprobantes tienen datos incompletos y no se pueden informar: ${detalle ?? ""}. Corregilos (las compras se editan desde su detalle en Compras) y volvé a exportar.`
         : rg90 === "sin_ruc"
           ? "No se pudo saber el RUC del contribuyente para el nombre del archivo. Cargalo en Puntos de expedición y volvé a exportar."
           : rg90 === "sin_imputacion"
@@ -137,7 +137,7 @@ export default async function FacturasPage({
           action="/admin/facturas/rg90"
           className="grid grid-cols-1 gap-3 border-t border-brand/30 p-4 sm:grid-cols-2 lg:grid-cols-3"
         >
-          <Campo etiqueta="Mes" ayuda="El mes fiscal del registro. Entran las facturas emitidas en ese mes.">
+          <Campo etiqueta="Mes" ayuda="El mes fiscal del registro. Entran las facturas y compras con fecha de ese mes.">
             <Entrada type="month" name="mes" defaultValue={mesPorDefecto} required />
           </Campo>
           <Campo etiqueta="Formato del archivo" ayuda="Los dos los acepta Marangatú.">
@@ -146,7 +146,7 @@ export default async function FacturasPage({
               <option value="txt">TXT (delimitado por tabulaciones)</option>
             </Selector>
           </Campo>
-          <Campo etiqueta="Número de archivo" ayuda="V0001, V0002… Cada archivo que subas al mismo mes lleva uno distinto.">
+          <Campo etiqueta="Número de archivo" ayuda="V0001 (ventas), C0001 (compras)… Cada archivo que subas al mismo mes lleva uno distinto.">
             {/* De texto con teclado numérico, no type="number": ese agrega un manejador
                 de la rueda del mouse que no puede ir en una pantalla de servidor. */}
             <Entrada type="text" inputMode="numeric" pattern="[0-9]{1,4}" name="archivo" defaultValue="1" required />
@@ -170,14 +170,24 @@ export default async function FacturasPage({
             </Selector>
           </Campo>
           <div className="flex flex-col gap-2 sm:col-span-2 lg:col-span-3">
+            <label className="flex items-start gap-2 text-[0.86rem] text-tinta">
+              <input type="checkbox" name="compras" value="1" defaultChecked className="mt-1" />
+              <span>
+                Incluir también las <strong>compras</strong> del mes (facturas de tus proveedores).
+                <span className="block text-xs text-tinta-suave">
+                  Salen en su propio archivo (C0001). Entran las compras que tienen folio y/o timbrado de la factura del
+                  proveedor, y el proveedor con su RUC; las compras sin factura no se informan.
+                </span>
+              </span>
+            </label>
             <div>
               <button type="submit" className={clasesBoton("principal", "sm")}>
                 Descargar archivo RG 90 (.zip)
               </button>
             </div>
             <p className="text-xs text-tinta-suave">
-              Solo entran las facturas vigentes: el formato pide un total mayor a cero y no tiene dónde marcar una factura
-              anulada, así que las anuladas no se informan. El archivo sale comprimido y con el nombre que pide la DNIT
+              De las ventas solo entran las facturas vigentes: el formato pide un total mayor a cero y no tiene dónde marcar
+              una factura anulada, así que las anuladas no se informan. El archivo sale comprimido y con el nombre que pide la DNIT
               (RUC sin dígito verificador, mes y número de archivo): subilo tal cual en Marangatú → Declaraciones
               informativas → Gestión de comprobantes informativos → Importar. A qué obligaciones se imputan las
               facturas depende del contribuyente: si tenés dudas, confirmalo con tu contador (por defecto, solo IVA).

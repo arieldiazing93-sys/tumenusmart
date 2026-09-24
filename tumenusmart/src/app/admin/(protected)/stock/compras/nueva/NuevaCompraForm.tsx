@@ -21,6 +21,7 @@ export type CompraInicial = {
   proveedorId: string;
   fecha: string;
   folioFactura: string;
+  timbrado: string;
   condicionPago: "contado" | "credito";
   fechaVencimiento: string;
   notas: string;
@@ -111,6 +112,7 @@ export function NuevaCompraForm({
   const [proveedorId, setProveedorId] = useState(inicial?.proveedorId ?? "");
   const [fecha, setFecha] = useState(inicial?.fecha ?? "");
   const [folioFactura, setFolioFactura] = useState(inicial?.folioFactura ?? "");
+  const [timbrado, setTimbrado] = useState(inicial?.timbrado ?? "");
   const [condicionPago, setCondicionPago] = useState<"contado" | "credito">(inicial?.condicionPago ?? "contado");
   const [fechaVencimiento, setFechaVencimiento] = useState(inicial?.fechaVencimiento ?? "");
   const [notas, setNotas] = useState(inicial?.notas ?? "");
@@ -206,7 +208,7 @@ export function NuevaCompraForm({
   }
 
   function hayAlgoCargado() {
-    return lineas.length > 0 || !!folioFactura || !!notas || !!proveedorId || !!descuentoGeneral;
+    return lineas.length > 0 || !!folioFactura || !!timbrado || !!notas || !!proveedorId || !!descuentoGeneral;
   }
 
   /** Nueva compra: vacía todo. Compra en corrección: vuelve a lo que estaba guardado. */
@@ -218,6 +220,7 @@ export function NuevaCompraForm({
     setProveedorId(inicial?.proveedorId ?? "");
     setFecha(inicial?.fecha ?? hoyLocal());
     setFolioFactura(inicial?.folioFactura ?? "");
+    setTimbrado(inicial?.timbrado ?? "");
     setCondicionPago(inicial?.condicionPago ?? "contado");
     setFechaVencimiento(inicial?.fechaVencimiento ?? "");
     setNotas(inicial?.notas ?? "");
@@ -250,6 +253,7 @@ export function NuevaCompraForm({
       proveedorId: proveedorId || null,
       fecha,
       folioFactura: folioFactura.trim() || null,
+      timbrado: timbrado.trim() || null,
       condicionPago,
       fechaVencimiento: condicionPago === "credito" ? fechaVencimiento || null : null,
       descuentoGeneralPorcentaje: aNumero(descuentoGeneral),
@@ -309,6 +313,15 @@ export function NuevaCompraForm({
           </Campo>
           <Campo etiqueta="Folio de factura">
             <Entrada value={folioFactura} onChange={(e) => setFolioFactura(e.target.value)} placeholder="Ej: 001-001-0001234" />
+          </Campo>
+          <Campo etiqueta="Timbrado de la factura" ayuda="Hasta 8 números. Se necesita para el registro de compras de la DNIT (RG 90).">
+            <Entrada
+              inputMode="numeric"
+              maxLength={8}
+              value={timbrado}
+              onChange={(e) => setTimbrado(e.target.value.replace(/\D/g, ""))}
+              placeholder="Ej: 12345678"
+            />
           </Campo>
           <Campo etiqueta="Fecha de la factura">
             <Entrada type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} />

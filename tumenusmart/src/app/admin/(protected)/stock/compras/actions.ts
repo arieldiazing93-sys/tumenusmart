@@ -26,6 +26,8 @@ export type DatosCompra = {
   fecha: string; // yyyy-mm-dd, del <input type="date">
   /** Folio de la factura del proveedor. */
   folioFactura: string | null;
+  /** Timbrado de esa factura (hasta 8 números). Lo pide el registro de compras de la DNIT (RG 90). */
+  timbrado?: string | null;
   condicionPago: "contado" | "credito";
   /** yyyy-mm-dd. Solo se guarda si la compra es a crédito. */
   fechaVencimiento: string | null;
@@ -123,6 +125,8 @@ type CompraPreparada = {
   rendimientoDe: (insumoId: string) => number;
   condicionPago: "contado" | "credito";
   descuentoGeneral: number | null;
+  /** Solo dígitos, o null si no se cargó. */
+  timbrado: string | null;
 };
 
 /**
@@ -144,6 +148,12 @@ async function prepararCompra(
   );
   if (lineas.length === 0) {
     return { error: "Agregá al menos un insumo con cantidad y costo unitario válidos." };
+  }
+
+  // El timbrado son hasta 8 números; se guarda sin espacios ni guiones.
+  const timbrado = (datos.timbrado ?? "").replace(/\D/g, "");
+  if (timbrado && timbrado.length > 8) {
+    return { error: "El timbrado tiene como máximo 8 números." };
   }
 
   // Todo lo que se compra entra a un almacén: sin almacén no hay dónde
@@ -200,7 +210,7 @@ async function prepararCompra(
       ? Math.min(datos.descuentoGeneralPorcentaje, 100)
       : null;
 
-  return { lineas, calculo, ivaDe, rendimientoDe, condicionPago, descuentoGeneral };
+  return { lineas, calculo, ivaDe, rendimientoDe, condicionPago, descuentoGeneral, timbrado: timbrado || null };
 }
 
 /** Las líneas de la compra tal cual se guardan en CompraItem. */
@@ -236,7 +246,7 @@ export async function registrarCompra(datos: DatosCompra): Promise<ResultadoComp
 
   const preparada = await prepararCompra(prisma, datos);
   if ("error" in preparada) return { ok: false, error: preparada.error };
-  const { lineas, calculo, rendimientoDe, condicionPago, descuentoGeneral } = preparada;
+  const { lineas, calculo, rendimientoDe, condicionPago, descuentoGeneral, timbrado } = preparada;
 
   const registradoPor = sesion.nombre?.trim() || sesion.email;
 
@@ -246,6 +256,7 @@ export async function registrarCompra(datos: DatosCompra): Promise<ResultadoComp
         storeId: idLocal,
         proveedorId: datos.proveedorId || null,
         numeroComprobante: datos.folioFactura?.trim() || null,
+        timbrado,
         fecha: aFecha(datos.fecha) ?? new Date(),
         condicionPago,
         fechaVencimiento: condicionPago === "credito" ? aFecha(datos.fechaVencimiento) : null,
@@ -315,7 +326,7 @@ export async function actualizarCompra(
 
   const preparada = await prepararCompra(prisma, datos);
   if ("error" in preparada) return { ok: false, error: preparada.error };
-  const { lineas, calculo, rendimientoDe, condicionPago, descuentoGeneral } = preparada;
+  const { lineas, calculo, rendimientoDe, condicionPago, descuentoGeneral, timbrado } = preparada;
 
   // Una compra con pagos registrados tiene que seguir siendo a crédito y no
   // puede quedar debiendo menos de lo que ya se pagó.
@@ -394,6 +405,7 @@ export async function actualizarCompra(
       data: {
         proveedorId: datos.proveedorId || null,
         numeroComprobante: datos.folioFactura?.trim() || null,
+        timbrado,
         fecha: aFecha(datos.fecha) ?? new Date(),
         condicionPago,
         fechaVencimiento: condicionPago === "credito" ? aFecha(datos.fechaVencimiento) : null,

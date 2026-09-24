@@ -113,6 +113,10 @@ export default async function CompraDetallePage({ params }: { params: Promise<{ 
           <p className="font-medium">{compra.fecha.toLocaleDateString("es-PY")}</p>
         </div>
         <div>
+          <p className="rotulo">Timbrado</p>
+          <p className="font-medium">{compra.timbrado ?? "—"}</p>
+        </div>
+        <div>
           <p className="rotulo">Condición de pago</p>
           <p className="font-medium">
             {compra.condicionPago === "credito" ? "A crédito" : "Al contado"}

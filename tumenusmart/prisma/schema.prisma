@@ -1455,6 +1455,10 @@ model Compra {
   proveedor         Proveedor? @relation(fields: [proveedorId], references: [id], onDelete: SetNull)
   /// Folio de la factura del proveedor (no un número propio del sistema).
   numeroComprobante String?
+  /// Timbrado de esa factura (hasta 8 dígitos). Lo pide el registro de
+  /// comprobantes de COMPRAS de la DNIT (RG 90). Opcional: una compra sin
+  /// factura no lo tiene y simplemente no entra a ese registro.
+  timbrado          String?
   fecha             DateTime   @default(now())
   /// "contado" | "credito".
   condicionPago     String     @default("contado")
