@@ -154,6 +154,32 @@ export default async function CuentasPorPagarPage({
             </Link>
           )}
         </div>
+
+        {/* El reporte sale con el proveedor y el estado elegidos arriba, sin
+            tener que apretar Buscar antes: cada botón manda este mismo
+            formulario a su propia dirección (el Excel se descarga, el PDF se
+            abre en otra pestaña). */}
+        <div className="flex flex-wrap items-center gap-2 border-t border-linea pt-3 sm:col-span-3">
+          <span className="text-sm font-medium text-tinta">Reporte de cuentas por pagar</span>
+          <button
+            type="submit"
+            formAction="/admin/stock/cuentas-por-pagar/exportar"
+            className={clasesBoton("principal", "sm")}
+          >
+            Descargar Excel
+          </button>
+          <button
+            type="submit"
+            formAction="/admin/stock/cuentas-por-pagar/imprimir"
+            formTarget="_blank"
+            className={clasesBoton("navegar", "sm")}
+          >
+            Ver reporte / PDF
+          </button>
+          <span className="text-xs text-tinta-suave">
+            Usa el proveedor y el filtro de arriba. Incluye cada compra, lo que se debe a cada proveedor y los pagos hechos.
+          </span>
+        </div>
       </form>
 
       {cuentas.filas.length === 0 ? (
