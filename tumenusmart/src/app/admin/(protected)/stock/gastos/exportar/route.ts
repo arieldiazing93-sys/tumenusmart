@@ -4,6 +4,7 @@ import { puede } from "@/lib/permisos";
 import { idLocalActual, localActual } from "@/lib/local-actual";
 import { rangoDeDias, fechaDeDia, diaEnTexto } from "@/lib/rango-dias";
 import { calcularReporteGastos } from "@/lib/reporte-gastos";
+import { etiquetaIva } from "@/lib/iva";
 import { nuevoLibro, filaTitulo, respuestaXlsx } from "@/lib/excel-reporte";
 
 export const dynamic = "force-dynamic";
@@ -48,9 +49,43 @@ export async function GET(request: NextRequest) {
 
   // ------------------------------------------------------------ una fila por gasto
   const { libro, hoja } = nuevoLibro("Gastos");
-  hoja.columns = [{ width: 12 }, { width: 34 }, { width: 16 }, { width: 26 }, { width: 16 }, { width: 36 }, { width: 22 }];
+  hoja.columns = [
+    { width: 12 },
+    { width: 34 },
+    { width: 16 },
+    { width: 26 },
+    { width: 16 },
+    { width: 36 },
+    { width: 22 },
+    { width: 22 },
+    { width: 12 },
+    { width: 18 },
+    { width: 28 },
+    { width: 14 },
+    { width: 14 },
+    { width: 16 },
+  ];
   cabeceraComun(hoja, "Gastos");
-  filaTitulo(hoja, ["Fecha", "Concepto", "Categoría", "Proveedor", "Monto (Gs.)", "Notas", "Registrado por"], 7);
+  filaTitulo(
+    hoja,
+    [
+      "Fecha",
+      "Concepto",
+      "Categoría",
+      "Proveedor",
+      "Monto (Gs.)",
+      "Notas",
+      "Registrado por",
+      "Folio de la factura",
+      "Timbrado",
+      "RUC del proveedor",
+      "Razón social",
+      "Tasa de IVA",
+      "Condición",
+      "Vencimiento",
+    ],
+    14
+  );
   for (const g of reporte.gastos) {
     hoja.addRow([
       fechaDeDia(g.fecha),
@@ -60,6 +95,14 @@ export async function GET(request: NextRequest) {
       Math.round(g.monto),
       g.notas ?? "",
       g.registradoPor ?? "",
+      g.numeroComprobante ?? "",
+      g.timbrado ?? "",
+      g.proveedorRuc ?? "",
+      g.proveedorRazonSocial ?? "",
+      // Solo tiene sentido con factura: sin folio ni timbrado no se muestra la tasa.
+      g.numeroComprobante || g.timbrado ? etiquetaIva(g.iva) : "",
+      g.condicionPago === "credito" ? "A crédito" : "Al contado",
+      g.fechaVencimiento ? fechaDeDia(g.fechaVencimiento) : "",
     ]);
   }
   filaTitulo(
@@ -72,8 +115,15 @@ export async function GET(request: NextRequest) {
       Math.round(reporte.total),
       "",
       "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
     ],
-    7
+    14
   );
 
   // ------------------------------------------------------------ resumen por categoría

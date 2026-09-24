@@ -93,6 +93,8 @@ type FacturaBase = {
   gravado5: unknown;
   exento: unknown;
   rucEmisor: string | null;
+  /** true si la venta fue a crédito (condición 2 en el registro); si no, contado. */
+  aCredito: boolean;
 };
 
 /** Partes de un monto repartidas en enteros que suman justo el total redondeado. */
@@ -201,7 +203,7 @@ function armarFila(f: FacturaBase, o: OpcionesRg90): string[] | null {
     String(g5), //                         10  monto gravado al 5% (IVA incluido)
     String(exento), //                     11  monto no gravado o exento
     String(total), //                      12  monto total del comprobante
-    CONDICION_CONTADO, //                  13  condición de venta
+    f.aCredito ? CONDICION_CREDITO : CONDICION_CONTADO, // 13 condición de venta
     "N", //                                14  operación en moneda extranjera
     o.imputaIva, //                        15  imputa al IVA
     o.imputaIre, //                        16  imputa al IRE
@@ -321,7 +323,7 @@ export async function armarRegistroRg90(storeId: string, o: OpcionesRg90): Promi
         cancelada: false,
         creadoEn: { gte, lt },
       },
-      select: { creadoEn: true, ...campos },
+      select: { creadoEn: true, formaPago: true, ...campos },
     }),
   ]);
 
@@ -337,6 +339,7 @@ export async function armarRegistroRg90(storeId: string, o: OpcionesRg90): Promi
       gravado5: p.facturaGravado5,
       exento: p.facturaExento,
       rucEmisor: p.facturaRucEmisor,
+      aCredito: false,
     })),
     ...ventas.map((v) => ({
       fecha: v.creadoEn,
@@ -349,6 +352,7 @@ export async function armarRegistroRg90(storeId: string, o: OpcionesRg90): Promi
       gravado5: v.facturaGravado5,
       exento: v.facturaExento,
       rucEmisor: v.facturaRucEmisor,
+      aCredito: v.formaPago === "a_credito",
     })),
   ].sort((a, b) => a.fecha.getTime() - b.fecha.getTime() || (a.numero ?? "").localeCompare(b.numero ?? ""));
 

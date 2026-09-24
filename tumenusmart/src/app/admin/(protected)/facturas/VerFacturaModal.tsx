@@ -295,7 +295,7 @@ export function VerFacturaModal({
 
         {!anulada && (
           <div className="mt-4 border-t border-linea pt-4">
-            <CancelarFacturaBoton origen={origen} id={id} facturaNumero={facturaNumero} />
+            <CancelarFacturaBoton origen={origen} id={id} facturaNumero={facturaNumero} fecha={fecha} />
           </div>
         )}
       </div>

@@ -3,7 +3,10 @@
 import { useEffect, useState } from "react";
 import { Boton } from "@/components/ui";
 import { formatearGuarani } from "@/lib/format";
-import { FORMAS_PAGO_POS, type FormaPagoPos } from "@/lib/turno-pos";
+import { FORMAS_PAGO_POS, FORMA_PAGO_A_CREDITO, type FormaPagoPos } from "@/lib/turno-pos";
+
+/** Los días de plazo que se proponen al vender a crédito. */
+const DIAS_CREDITO_POR_DEFECTO = 30;
 
 const ICONOS_FORMA: Record<FormaPagoPos, string> = {
   efectivo: "💵",
@@ -31,6 +34,7 @@ export function CobrarModal({
   total,
   cobrando,
   error,
+  permiteCredito,
   onCerrar,
   onCobrar,
 }: {
@@ -39,11 +43,16 @@ export function CobrarModal({
   total: number;
   cobrando: boolean;
   error: string | null;
+  /** Si el local vende a crédito (Configuración): se ofrece "A crédito" como forma de pago. */
+  permiteCredito: boolean;
   onCerrar: () => void;
-  onCobrar: (formaPago: FormaPagoPos) => void;
+  /** `creditoDias` solo viene cuando la forma de pago es "a_credito". */
+  onCobrar: (formaPago: FormaPagoPos | typeof FORMA_PAGO_A_CREDITO, creditoDias?: number) => void;
 }) {
-  const [formaPago, setFormaPago] = useState<FormaPagoPos>("efectivo");
+  const [formaPago, setFormaPago] = useState<FormaPagoPos | typeof FORMA_PAGO_A_CREDITO>("efectivo");
   const [montoRecibido, setMontoRecibido] = useState(String(Math.round(total)));
+  const [creditoDias, setCreditoDias] = useState(String(DIAS_CREDITO_POR_DEFECTO));
+  const esCredito = formaPago === FORMA_PAGO_A_CREDITO;
 
   const vuelto = formaPago === "efectivo" ? (parseFloat(montoRecibido) || 0) - total : 0;
 
@@ -116,7 +125,48 @@ export function CobrarModal({
               {f.etiqueta}
             </button>
           ))}
+          {permiteCredito && (
+            <button
+              type="button"
+              onClick={() => setFormaPago(FORMA_PAGO_A_CREDITO)}
+              aria-pressed={esCredito}
+              className={`col-span-2 flex items-center gap-2 rounded-lg border px-3 py-3 text-left text-[0.85rem] font-medium transition-all active:scale-[0.97] ${
+                esCredito
+                  ? "border-brand bg-brand-light text-brand-texto shadow-sm"
+                  : "border-linea text-tinta-media hover:border-brand/40 hover:bg-papel-suave"
+              }`}
+            >
+              <span aria-hidden="true" className="text-base leading-none">
+                🧾
+              </span>
+              A crédito (paga después)
+            </button>
+          )}
         </div>
+
+        {esCredito && (
+          <div className="mt-4 rounded-lg border border-aviso/30 bg-aviso-luz p-3.5 animate-[subir_0.25s_ease-out]">
+            <p className="text-[0.85rem] font-medium text-tinta">
+              Esta venta no entra en la caja: el cliente la paga después.
+            </p>
+            <p className="mt-1 text-[0.78rem] text-tinta-media">
+              Hace falta el nombre del cliente y su teléfono o su RUC/cédula. Se cobra desde Cuentas por cobrar.
+            </p>
+            <label className="mt-2.5 block text-[0.75rem] font-semibold uppercase tracking-rotulo text-tinta-suave">
+              Vence en (días)
+              <input
+                type="number"
+                min={0}
+                max={365}
+                step={1}
+                value={creditoDias}
+                onChange={(e) => setCreditoDias(e.target.value)}
+                onWheel={(e) => e.currentTarget.blur()}
+                className="mt-1 w-full rounded-lg border border-linea bg-white px-3 py-2 text-center text-[1rem] font-semibold normal-case tracking-normal text-tinta focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/15"
+              />
+            </label>
+          </div>
+        )}
 
         {formaPago === "efectivo" && (
           <div className="mt-4 rounded-lg border border-linea bg-papel-suave p-3.5 animate-[subir_0.25s_ease-out]">
@@ -162,8 +212,15 @@ export function CobrarModal({
             </Boton>
           </div>
           <div className="flex-[2]">
-            <Boton tam="lg" onClick={() => onCobrar(formaPago)} disabled={cobrando} className="w-full">
-              {cobrando ? "Cobrando…" : `Cobrar ${formatearGuarani(total)}`}
+            <Boton
+              tam="lg"
+              onClick={() =>
+                esCredito ? onCobrar(FORMA_PAGO_A_CREDITO, Math.max(0, Math.round(Number(creditoDias) || 0))) : onCobrar(formaPago)
+              }
+              disabled={cobrando}
+              className="w-full"
+            >
+              {cobrando ? "Guardando…" : esCredito ? "Registrar venta a crédito" : `Cobrar ${formatearGuarani(total)}`}
             </Boton>
           </div>
         </div>

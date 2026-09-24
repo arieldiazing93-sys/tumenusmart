@@ -35,7 +35,30 @@ export function normalizarFormaPagoPos(valor: unknown): FormaPagoPos {
   return (VALIDAS.has(texto as FormaPagoPos) ? texto : "efectivo") as FormaPagoPos;
 }
 
+/**
+ * "A crédito" (fiado): la venta se hace pero el cliente todavía no pagó. NO es
+ * una forma de cobro: no entra en ninguna de las 4 de arriba, ni en la caja ni
+ * en el corte. Se cobra después (Cuentas por cobrar). Solo existe en las
+ * ventas del mostrador, y solo si el local la activó en Configuración.
+ */
+export const FORMA_PAGO_A_CREDITO = "a_credito";
+
+export function esVentaACredito(formaPago: string | null | undefined): boolean {
+  return formaPago === FORMA_PAGO_A_CREDITO;
+}
+
+/**
+ * Como normalizarFormaPagoPos, pero para una VENTA del mostrador: además de las
+ * 4 formas de cobro reconoce "a_credito". Cualquier otra cosa cae en efectivo.
+ */
+export function normalizarFormaPagoVenta(valor: unknown): FormaPagoPos | typeof FORMA_PAGO_A_CREDITO {
+  return String(valor ?? "").trim().toLowerCase() === FORMA_PAGO_A_CREDITO
+    ? FORMA_PAGO_A_CREDITO
+    : normalizarFormaPagoPos(valor);
+}
+
 export function etiquetaFormaPagoPos(valor: string): string {
+  if (esVentaACredito(valor)) return "A crédito";
   return FORMAS_PAGO_POS.find((f) => f.valor === valor)?.etiqueta ?? "Efectivo";
 }
 
@@ -48,9 +71,13 @@ function aNumero(valor: Monto): number {
 export type VentaDeTurno = { total: Monto; formaPago: string };
 
 export type ResumenTurno = {
+  /** Todas las ventas del turno, también las a crédito. */
   cantidad: number;
+  /** Lo COBRADO en el turno (las 4 formas de cobro): las ventas a crédito no suman acá. */
   totalGeneral: number;
   porForma: Record<FormaPagoPos, number>;
+  /** Ventas a crédito del turno: se vendieron pero todavía no se cobraron, no entran en la caja. */
+  aCredito: { cantidad: number; total: number };
 };
 
 /** Suma las ventas de un turno, agrupadas por forma de pago. */
@@ -62,15 +89,24 @@ export function resumirTurno(ventas: VentaDeTurno[]): ResumenTurno {
     tarjeta_credito: 0,
   };
   let totalGeneral = 0;
+  const aCredito = { cantidad: 0, total: 0 };
 
   for (const v of ventas) {
-    const forma = normalizarFormaPagoPos(v.formaPago);
     const monto = aNumero(v.total);
+    // Una venta a crédito no es plata que entró: se cuenta aparte. Sin esto,
+    // caería en "efectivo" (lo que no se reconoce se cuenta como efectivo) y
+    // el corte de caja diría que falta plata que nunca entró.
+    if (esVentaACredito(v.formaPago)) {
+      aCredito.cantidad += 1;
+      aCredito.total += monto;
+      continue;
+    }
+    const forma = normalizarFormaPagoPos(v.formaPago);
     porForma[forma] += monto;
     totalGeneral += monto;
   }
 
-  return { cantidad: ventas.length, totalGeneral, porForma };
+  return { cantidad: ventas.length, totalGeneral, porForma, aCredito };
 }
 
 // ===========================================================================
@@ -95,7 +131,10 @@ export type CierreTurno = {
 };
 
 /** Arma la comparación fila por fila que se muestra en la pantalla de cierre. */
-export function compararCierre(resumen: ResumenTurno, declarado: DeclaradoPorForma): CierreTurno {
+export function compararCierre(
+  resumen: Pick<ResumenTurno, "cantidad" | "totalGeneral" | "porForma">,
+  declarado: DeclaradoPorForma
+): CierreTurno {
   const porForma: FilaCierre[] = FORMAS_PAGO_POS.map((f) => {
     const calculado = resumen.porForma[f.valor];
     const decl = declarado[f.valor] ?? 0;

@@ -6,7 +6,13 @@ import { idLocalActual } from "@/lib/local-actual";
 import { Volver } from "@/components/Volver";
 import { ImprimirBoton } from "../../../estadisticas/imprimir/ImprimirBoton";
 import { formatearGuarani, formatearNumero } from "@/lib/format";
-import { compararCierre, contrastarTurno, etiquetaFormaPagoPos, type FormaPagoPos } from "@/lib/turno-pos";
+import {
+  compararCierre,
+  contrastarTurno,
+  esVentaACredito,
+  etiquetaFormaPagoPos,
+  type FormaPagoPos,
+} from "@/lib/turno-pos";
 import { ZONA_NEGOCIO } from "@/lib/timezone";
 
 export const dynamic = "force-dynamic";
@@ -75,6 +81,12 @@ export default async function ComprobanteTurnoPosPage({
         notas: true,
         estacion: { select: { nombre: true } },
         montoInicial: true,
+        movimientosEfectivoNeto: true,
+        // Ingresos y retiros de caja del turno (ver MovimientoCaja).
+        movimientosCaja: {
+          orderBy: { createdAt: "asc" },
+          select: { id: true, tipo: true, monto: true, concepto: true, registradoPor: true, createdAt: true },
+        },
         cantidadVentas: true,
         calculadoEfectivo: true,
         calculadoTransferencia: true,
@@ -189,8 +201,17 @@ export default async function ComprobanteTurnoPosPage({
   // esperar. Solo afecta Efectivo: se abre caja con billetes, no con una
   // transferencia o una tarjeta.
   const montoInicial = Number(turno.montoInicial ?? 0);
+  // Lo que entró y salió de la caja en efectivo aparte de las ventas (ingresos
+  // menos retiros), congelado al cerrar: el cajón lo refleja, así que el
+  // efectivo esperado también.
+  const movimientosNeto = Number(turno.movimientosEfectivoNeto ?? 0);
+  const totalIngresosCaja = turno.movimientosCaja.filter((m) => m.tipo === "ingreso").reduce((s, m) => s + Number(m.monto), 0);
+  const totalRetirosCaja = turno.movimientosCaja.filter((m) => m.tipo === "retiro").reduce((s, m) => s + Number(m.monto), 0);
+  // Ventas a crédito del turno: se vendieron pero no entraron plata (no cuentan en el corte).
+  const ventasACredito = turno.ventas.filter((v) => !v.cancelada && esVentaACredito(v.formaPago));
+  const totalVentasACredito = ventasACredito.reduce((s, v) => s + Number(v.total), 0);
   const calculado: Record<FormaPagoPos, number> = {
-    efectivo: calculadoBase.efectivo + totalRendicionesEfectivo + montoInicial,
+    efectivo: calculadoBase.efectivo + totalRendicionesEfectivo + montoInicial + movimientosNeto,
     transferencia: calculadoBase.transferencia + totalRendicionesTransferencia,
     tarjeta_debito: calculadoBase.tarjeta_debito + totalRendicionesTarjetaDebito,
     tarjeta_credito: calculadoBase.tarjeta_credito + totalRendicionesTarjetaCredito,
@@ -359,7 +380,58 @@ export default async function ComprobanteTurnoPosPage({
               se abrió el turno.
             </p>
           )}
+          {turno.movimientosCaja.length > 0 && (
+            <p className="mt-1 text-[0.78rem] text-tinta-suave">
+              El Efectivo también suma los ingresos de caja ({formatearGuarani(totalIngresosCaja)}) y resta los
+              retiros ({formatearGuarani(totalRetirosCaja)}) de este turno — el detalle está más abajo.
+            </p>
+          )}
+          {ventasACredito.length > 0 && (
+            <p className="mt-1 text-[0.78rem] text-tinta-suave">
+              Este turno tuvo {ventasACredito.length} {ventasACredito.length === 1 ? "venta" : "ventas"} a crédito por{" "}
+              {formatearGuarani(totalVentasACredito)}: no entró plata, por eso no suman a ninguna forma de pago de acá
+              arriba. Se cobran desde Cuentas por cobrar.
+            </p>
+          )}
         </section>
+
+        {turno.movimientosCaja.length > 0 && (
+          <section className="mb-4 break-inside-avoid">
+            <h2 className="mb-1.5 text-[0.95rem] font-semibold tracking-titular text-tinta">
+              Movimientos de caja (efectivo)
+            </h2>
+            <table className="w-full border-collapse text-left">
+              <thead>
+                <tr className="text-[0.7rem] uppercase tracking-rotulo text-tinta-suave">
+                  <th className="w-24 border-b border-linea pb-1.5 font-semibold">Hora</th>
+                  <th className="border-b border-linea pb-1.5 font-semibold">Motivo</th>
+                  <th className="w-40 border-b border-linea pb-1.5 font-semibold">Registró</th>
+                  <th className="w-32 border-b border-linea pb-1.5 text-right font-semibold">Monto</th>
+                </tr>
+              </thead>
+              <tbody>
+                {turno.movimientosCaja.map((m) => (
+                  <tr key={m.id} className="break-inside-avoid align-top">
+                    <td className="cifra border-b border-linea-fina py-1 text-[0.82rem] text-tinta-media">
+                      {horaCorta(m.createdAt)}
+                    </td>
+                    <td className="border-b border-linea-fina py-1 text-[0.85rem] text-tinta">{m.concepto}</td>
+                    <td className="border-b border-linea-fina py-1 text-[0.82rem] text-tinta-media">
+                      {m.registradoPor}
+                    </td>
+                    <td
+                      className={`cifra border-b border-linea-fina py-1 text-right text-[0.85rem] font-medium ${
+                        m.tipo === "retiro" ? "text-peligro" : "text-exito"
+                      }`}
+                    >
+                      {m.tipo === "retiro" ? "−" : "+"} {formatearGuarani(Number(m.monto))}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </section>
+        )}
 
         <section className="break-inside-avoid">
           <h2 className="mb-1.5 text-[0.95rem] font-semibold tracking-titular text-tinta">

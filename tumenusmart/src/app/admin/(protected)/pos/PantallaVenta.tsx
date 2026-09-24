@@ -7,10 +7,11 @@ import { Boton, Cabecera, Campo, Entrada, Tarjeta, clasesBoton } from "@/compone
 import { Segmentado } from "@/components/Segmentado";
 import { formatearGuarani } from "@/lib/format";
 import { calcularDescuento, textoPorcentaje } from "@/lib/descuento-venta";
-import { type FormaPagoPos } from "@/lib/turno-pos";
+import { FORMA_PAGO_A_CREDITO, type FormaPagoPos } from "@/lib/turno-pos";
 import { SIN_REGISTRO_FISCAL, TIPOS_IDENTIFICACION_FISCAL, etiquetaCortaTipoIdentificacion } from "@/lib/tipo-cliente";
 import { buscarClientePorIdentificacion, buscarClientePorTelefono, registrarVenta } from "./actions";
 import { CobrarModal } from "./CobrarModal";
+import { MovimientosCajaBoton } from "./caja/MovimientosCajaBoton";
 import { EntradaConLupa } from "./EntradaConLupa";
 import { ClienteFiscalModal, type DatosClienteFiscal } from "./ClienteFiscalModal";
 import { MitadYMitadPickerPos } from "./MitadYMitadPickerPos";
@@ -66,6 +67,7 @@ export function PantallaVenta({
   puedeFacturar,
   diasParaVencerTimbrado,
   facturaObligatoria,
+  ventasACredito,
   nombreImpresoraTicket,
   impresorasPorArea,
 }: {
@@ -78,6 +80,8 @@ export function PantallaVenta({
   diasParaVencerTimbrado: number | null;
   /** Si el local exige facturar TODA venta (timbrado Autoimpresor). */
   facturaObligatoria: boolean;
+  /** Si el local vende a crédito (Configuración): el cobro ofrece "A crédito". */
+  ventasACredito: boolean;
   /** Impresora QZ Tray para el ticket/factura, en esta estación — null = sin configurar, cae al manual. */
   nombreImpresoraTicket: string | null;
   /** Mapa Área de Impresión → impresora QZ Tray, en esta estación. */
@@ -289,7 +293,7 @@ export function PantallaVenta({
     }
   }
 
-  async function confirmarCobro(formaPago: FormaPagoPos) {
+  async function confirmarCobro(formaPago: FormaPagoPos | typeof FORMA_PAGO_A_CREDITO, creditoDias?: number) {
     if (
       comprobanteTipo === "factura" &&
       registroFiscal === "con" &&
@@ -297,6 +301,19 @@ export function PantallaVenta({
     ) {
       setError("Para factura con registro fiscal hacen falta el número y la razón social.");
       return;
+    }
+    // A crédito hay que saber a quién cobrarle después: el nombre y una forma
+    // de ubicarlo (teléfono o RUC/cédula). El servidor lo vuelve a exigir.
+    if (formaPago === FORMA_PAGO_A_CREDITO) {
+      const conRegistro = comprobanteTipo === "factura" && registroFiscal === "con";
+      const tieneNombre = !!clienteNombre.trim() || (conRegistro && !!facturaRazonSocial.trim());
+      const tieneContacto = !!clienteTelefono.trim() || (conRegistro && !!facturaNumeroIdentificacion.trim());
+      if (!tieneNombre || !tieneContacto) {
+        setError(
+          "Una venta a crédito necesita el nombre del cliente y su teléfono o su RUC/cédula. Cargalos arriba, en los datos del cliente."
+        );
+        return;
+      }
     }
     if (!descuento.ok) {
       setError(descuento.error);
@@ -327,6 +344,7 @@ export function PantallaVenta({
       facturaRazonSocial: esFactura && !esSinRegistroFiscal ? facturaRazonSocial : undefined,
       facturaEmail: esFactura && !esSinRegistroFiscal ? facturaEmail.trim() || undefined : undefined,
       descuento: descuentoPedido,
+      creditoDias: formaPago === FORMA_PAGO_A_CREDITO ? creditoDias : undefined,
       items: carrito.map((i) =>
         i.tipo === "combo"
           ? {
@@ -410,9 +428,12 @@ export function PantallaVenta({
         titulo="Punto de venta"
         bajada="Venta rápida de mostrador."
         acciones={
-          <Link href="/admin/pos/cerrar" className={clasesBoton("navegar", "sm")}>
-            🔒 Cerrar turno
-          </Link>
+          <>
+            <MovimientosCajaBoton turnoId={turnoId} />
+            <Link href="/admin/pos/cerrar" className={clasesBoton("navegar", "sm")}>
+              🔒 Cerrar turno
+            </Link>
+          </>
         }
       />
 
@@ -873,6 +894,7 @@ export function PantallaVenta({
           total={total}
           cobrando={cobrando}
           error={error}
+          permiteCredito={ventasACredito}
           onCerrar={() => setMostrarCobro(false)}
           onCobrar={confirmarCobro}
         />

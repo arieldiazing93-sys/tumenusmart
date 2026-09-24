@@ -19,7 +19,7 @@
  * físicamente). No son la misma pregunta.
  */
 import { prismaDelLocal } from "./prisma-local";
-import { normalizarFormaPagoPos, FORMAS_PAGO_POS, type FormaPagoPos } from "./turno-pos";
+import { normalizarFormaPagoPos, FORMAS_PAGO_POS, FORMA_PAGO_A_CREDITO, type FormaPagoPos } from "./turno-pos";
 
 export type FilaReporteGeneral = {
   n: number;
@@ -46,10 +46,22 @@ export async function calcularReporteGeneralPos(
 ): Promise<ReporteGeneralPos> {
   const db = prismaDelLocal(storeId);
 
-  const [ventas, pedidos, deliveries] = await Promise.all([
+  const [ventas, cobros, pedidos, deliveries] = await Promise.all([
+    // Las ventas a crédito no entran: este reporte es lo que se COBRÓ. Cuando
+    // el cliente paga, aparece el cobro (más abajo).
     db.ventaPos.findMany({
-      where: { creadoEn: { gte: rango.gte, lt: rango.lt }, cancelada: false },
+      where: {
+        creadoEn: { gte: rango.gte, lt: rango.lt },
+        cancelada: false,
+        formaPago: { not: FORMA_PAGO_A_CREDITO },
+      },
       select: { id: true, numero: true, total: true, formaPago: true, creadoEn: true },
+    }),
+    // Los cobros de ventas a crédito, por el instante en que se cargaron (la
+    // fecha del cobro es solo un día y no sirve para cortar por rango horario).
+    db.cobroVenta.findMany({
+      where: { createdAt: { gte: rango.gte, lt: rango.lt }, ventaPos: { cancelada: false } },
+      select: { monto: true, formaPago: true, createdAt: true, ventaPos: { select: { id: true, numero: true } } },
     }),
     db.order.findMany({
       where: {
@@ -81,6 +93,15 @@ export async function calcularReporteGeneralPos(
       fecha: v.creadoEn,
       importe: Number(v.total),
       formaPago: normalizarFormaPagoPos(v.formaPago),
+    })),
+    ...cobros.map((c) => ({
+      idPedido: null as number | null,
+      idVenta: c.ventaPos.numero as number | null,
+      idPedidoDb: null as string | null,
+      idVentaDb: c.ventaPos.id as string | null,
+      fecha: c.createdAt,
+      importe: Number(c.monto),
+      formaPago: normalizarFormaPagoPos(c.formaPago),
     })),
     ...pedidos.map((p) => ({
       idPedido: p.numero as number | null,

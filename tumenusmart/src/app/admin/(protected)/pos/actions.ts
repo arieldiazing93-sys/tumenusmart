@@ -6,14 +6,20 @@ import { prisma } from "@/lib/prisma";
 import { prismaDelLocal, siguienteNumeroVentaPos, upsertClienteFiscal } from "@/lib/prisma-local";
 import { idLocalActual } from "@/lib/local-actual";
 import { exigirPermiso } from "@/lib/auth";
-import { normalizarFormaPagoPos, resumirTurno, type DeclaradoPorForma } from "@/lib/turno-pos";
+import {
+  FORMA_PAGO_A_CREDITO,
+  normalizarFormaPagoVenta,
+  resumirTurno,
+  type DeclaradoPorForma,
+} from "@/lib/turno-pos";
+import { claveDiaAsuncion } from "@/lib/timezone";
 import { armarPedido, type LineaPedida, type ProductoBase } from "@/lib/precio-pedido";
 import { registrarConsumoVenta, revertirMovimientosVenta } from "@/lib/movimientos-stock";
 import { costoDelProducto } from "@/lib/costo-receta";
 import { desglosarIva, formatearNumeroFactura } from "@/lib/factura-pos";
 import { calcularDescuento, type DescuentoPedido } from "@/lib/descuento-venta";
 import { SIN_REGISTRO_FISCAL } from "@/lib/tipo-cliente";
-import { turnoAbierto, pedidosDelTurno, entregasSinRendir } from "./turno-actual";
+import { turnoAbierto, pedidosDelTurno, entregasSinRendir, netoMovimientosCaja } from "./turno-actual";
 
 export type ResultadoAbrirTurno =
   | { ok: true; turnoId: string; yaAbierto: boolean }
@@ -100,6 +106,8 @@ export type DatosVenta = {
   /** Descuento general de la cuenta (porcentaje o monto). Sin esto, o con valor 0, no hay descuento.
    *  El monto real lo calcula el servidor sobre el subtotal — ver calcularDescuento. */
   descuento?: DescuentoPedido;
+  /** Solo si formaPago es "a_credito": en cuántos días vence lo que debe el cliente (0 a 365; por defecto 30). */
+  creditoDias?: number;
 };
 
 /**
@@ -122,7 +130,7 @@ export async function registrarVenta(turnoId: string, datos: DatosVenta): Promis
       where: { id: turnoId },
       select: { id: true, estado: true, estacion: { select: { puntoExpedicion: true } } },
     }),
-    prisma.store.findUnique({ where: { id: storeId }, select: { facturaObligatoria: true } }),
+    prisma.store.findUnique({ where: { id: storeId }, select: { facturaObligatoria: true, ventasACredito: true } }),
   ]);
   if (!turno) return { ok: false, error: "Ese turno no existe." };
   if (turno.estado !== "abierto") {
@@ -180,6 +188,31 @@ export async function registrarVenta(turnoId: string, datos: DatosVenta): Promis
     if (!puntoExpedicion.activo || puntoExpedicion.timbradoHasta < new Date()) {
       return { ok: false, error: "El timbrado de este punto de expedición está vencido. No se puede emitir factura." };
     }
+  }
+
+  // Venta a crédito: solo si el local la activó, y solo a un cliente al que se
+  // le pueda cobrar después. El navegador ya lo pide, pero esto es lo que vale.
+  const formaPagoNormalizada = normalizarFormaPagoVenta(datos.formaPago);
+  const esCredito = formaPagoNormalizada === FORMA_PAGO_A_CREDITO;
+  let fechaVencimientoCredito: Date | null = null;
+  if (esCredito) {
+    if (!store?.ventasACredito) {
+      return { ok: false, error: "Este local no vende a crédito. Se activa en Configuración." };
+    }
+    const conRegistro = esFactura && !esSinRegistroFiscal;
+    const nombreDeudor = datos.clienteNombre.trim() || (conRegistro ? (datos.facturaRazonSocial ?? "").trim() : "");
+    const contactoDeudor =
+      datos.clienteTelefono.trim() || (conRegistro ? (datos.facturaNumeroIdentificacion ?? "").trim() : "");
+    if (!nombreDeudor || !contactoDeudor) {
+      return {
+        ok: false,
+        error: "Una venta a crédito necesita el nombre del cliente y su teléfono o su RUC/cédula.",
+      };
+    }
+    const diasPedidos = Math.round(Number(datos.creditoDias ?? 30));
+    const dias = Number.isFinite(diasPedidos) ? Math.min(Math.max(diasPedidos, 0), 365) : 30;
+    // El vencimiento es un día (no una hora): se guarda a medianoche UTC, como las demás fechas de día.
+    fechaVencimientoCredito = new Date(Date.parse(claveDiaAsuncion(new Date())) + dias * 24 * 60 * 60 * 1000);
   }
 
   // El POS no ofrece variantes ni ingredientes-a-sacar (esos siguen siendo
@@ -320,7 +353,6 @@ export async function registrarVenta(turnoId: string, datos: DatosVenta): Promis
 
   const numero = await siguienteNumeroVentaPos(storeId);
   const registradoPor = sesion.nombre?.trim() || sesion.email;
-  const formaPagoNormalizada = normalizarFormaPagoPos(datos.formaPago);
   const tipoEntrega = datos.tipoEntrega === "llevar" ? "llevar" : "local";
   const clienteNombre = datos.clienteNombre.trim() || null;
   const clienteTelefono = datos.clienteTelefono.trim() || null;
@@ -394,6 +426,7 @@ export async function registrarVenta(turnoId: string, datos: DatosVenta): Promis
         turnoPosId: turnoId,
         numero,
         formaPago: formaPagoNormalizada,
+        fechaVencimientoCredito,
         total,
         descuento: descuento.monto,
         descuentoPorcentaje: descuento.porcentaje,
@@ -523,10 +556,16 @@ export async function cerrarTurno(
     tarjeta_credito: declarado.tarjetaCredito,
   };
 
+  // Lo que entró y salió de la caja en efectivo aparte de las ventas (ingresos
+  // y retiros del turno): se congela acá, igual que lo calculado, y suma al
+  // efectivo que tendría que haber.
+  const movimientos = await netoMovimientosCaja(db, turnoId);
+
   await db.turnoPos.update({
     where: { id: turnoId },
     data: {
       estado: "cerrado",
+      movimientosEfectivoNeto: movimientos.neto,
       cantidadVentas: resumen.cantidad,
       calculadoEfectivo: resumen.porForma.efectivo,
       calculadoTransferencia: resumen.porForma.transferencia,
@@ -628,10 +667,17 @@ export async function cancelarVenta(ventaId: string, motivo: string): Promise<Re
       turnoPos: { select: { estado: true } },
       facturaNumero: true,
       facturaAnulada: true,
+      _count: { select: { cobros: true } },
     },
   });
   if (!venta) return { ok: false, error: "Esa cuenta no existe." };
   if (venta.cancelada) return { ok: false, error: "Esa cuenta ya estaba cancelada." };
+  if (venta._count.cobros > 0) {
+    return {
+      ok: false,
+      error: "Esta venta a crédito ya tiene cobros registrados. Eliminá primero sus cobros (en Cuentas por cobrar) y después cancelala.",
+    };
+  }
   if (venta.turnoPos.estado !== "abierto") {
     return {
       ok: false,

@@ -7,6 +7,7 @@ import { prismaDelLocal, upsertClienteFiscal } from "@/lib/prisma-local";
 import { idLocalActual } from "@/lib/local-actual";
 import { estacionActual } from "@/lib/estacion-actual";
 import { desglosarIva, formatearNumeroFactura } from "@/lib/factura-pos";
+import { esDeMesAnterior, nombreDelMes } from "@/lib/mes-fiscal";
 import { cancelarVenta } from "../pos/actions";
 import { cambiarEstadoPedido } from "../pedidos/actions";
 
@@ -160,7 +161,9 @@ export async function cancelarFactura(
   origen: "pedido" | "venta",
   id: string,
   motivo: string,
-  tambienCuenta: boolean
+  tambienCuenta: boolean,
+  /** El dueño vio la alerta de "factura de un mes ya cerrado" y aceptó anularla igual. */
+  confirmoMesAnterior = false
 ): Promise<ResultadoCancelarFactura> {
   // Mismo permiso que la pantalla de Facturas — es información y una acción
   // del dueño, no del día a día de un cajero.
@@ -168,6 +171,23 @@ export async function cancelarFactura(
 
   if (!motivo.trim()) {
     return { ok: false, error: "Decí por qué se anula — queda en el historial." };
+  }
+
+  // Una factura de un mes que ya terminó probablemente ya se presentó en
+  // Marangatú (RG 90): anularla ahora no cambia lo que se le informó a la DNIT.
+  // La pantalla muestra una alerta grande y pide confirmar; acá se exige de
+  // nuevo, porque lo que viene del navegador no es de fiar. La fecha sale de
+  // la base, nunca del navegador (es la misma que usa el registro RG 90).
+  const dbFecha = prismaDelLocal(await idLocalActual());
+  const fechaFactura =
+    origen === "venta"
+      ? (await dbFecha.ventaPos.findUnique({ where: { id }, select: { creadoEn: true } }))?.creadoEn
+      : (await dbFecha.order.findUnique({ where: { id }, select: { createdAt: true } }))?.createdAt;
+  if (fechaFactura && esDeMesAnterior(fechaFactura) && !confirmoMesAnterior) {
+    return {
+      ok: false,
+      error: `Esta factura es de ${nombreDelMes(fechaFactura)}, un mes que ya terminó. Confirmá que entendés el aviso antes de anularla.`,
+    };
   }
 
   if (tambienCuenta) {

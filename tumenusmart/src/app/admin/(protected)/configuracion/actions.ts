@@ -173,6 +173,26 @@ export async function guardarAceptaReservas(formData: FormData): Promise<void> {
   redirect("/admin/configuracion?guardado=1");
 }
 
+/**
+ * Activa o desactiva las ventas a crédito (fiado) del Punto de Venta. Apagado,
+ * "A crédito" no se ofrece al cobrar y Cuentas por cobrar no aparece en el
+ * menú. Apagarlo NO borra nada: lo que los clientes ya deben sigue ahí y se
+ * puede seguir cobrando.
+ */
+export async function guardarVentasACredito(formData: FormData): Promise<void> {
+  await exigirPermiso("configuracion.editar");
+
+  await prisma.store.update({
+    where: { id: await idLocalActual() },
+    data: { ventasACredito: formData.get("ventasACredito") === "on" },
+  });
+
+  refrescarPantallas();
+  revalidatePath("/admin/pos");
+  revalidatePath("/admin/pos/cuentas-por-cobrar");
+  redirect("/admin/configuracion?guardado=1");
+}
+
 export type ResultadoTramo = { ok: true } | { ok: false; error: string };
 
 /**

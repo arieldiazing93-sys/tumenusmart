@@ -23,6 +23,16 @@ export type GastoReporte = {
   monto: number;
   notas: string | null;
   registradoPor: string | null;
+  // Datos de la factura, si se cargaron (todos opcionales).
+  numeroComprobante: string | null;
+  timbrado: string | null;
+  proveedorRuc: string | null;
+  proveedorRazonSocial: string | null;
+  /** "gravado10" | "gravado5" | "exento" */
+  iva: string;
+  /** "contado" | "credito" */
+  condicionPago: string;
+  fechaVencimiento: Date | null;
 };
 
 export type CategoriaGastoReporte = {
@@ -82,6 +92,13 @@ export async function calcularReporteGastos(
     monto: Number(g.monto),
     notas: g.notas,
     registradoPor: g.registradoPor,
+    numeroComprobante: g.numeroComprobante,
+    timbrado: g.timbrado,
+    proveedorRuc: g.proveedorRuc,
+    proveedorRazonSocial: g.proveedorRazonSocial,
+    iva: g.iva,
+    condicionPago: g.condicionPago,
+    fechaVencimiento: g.fechaVencimiento,
   }));
 
   const total = filas.reduce((s, f) => s + f.monto, 0);

@@ -51,6 +51,11 @@ model Store {
   // que solo hacen delivery/retiro y no tienen mesas físicas que reservar.
   aceptaReservas Boolean @default(true)
 
+  /// Si este local vende a crédito (fiado / cuenta corriente): prendido, el
+  /// Punto de Venta ofrece "A crédito" como forma de pago y aparece Cuentas
+  /// por cobrar. Apagado (default), todo sigue como siempre.
+  ventasACredito Boolean @default(false)
+
   /// Cómo se ve la carta pública de este local.
   ///
   /// "lista"    — filas compactas con miniatura. Es lo mejor para el local que
@@ -157,6 +162,8 @@ model Store {
   rendiciones      Rendicion[]
   turnosPos        TurnoPos[]
   ventasPos        VentaPos[]
+  movimientosCaja  MovimientoCaja[]
+  cobrosVenta      CobroVenta[]
   ventaPosItems    VentaPosItem[]
   estaciones       Estacion[]
   puntosExpedicion PuntoExpedicion[]
@@ -1011,6 +1018,13 @@ model TurnoPos {
   cerradoPor String?
   cerradoEn  DateTime?
 
+  /// Lo que entró menos lo que salió de la caja en efectivo durante el turno
+  /// (ingresos − retiros, ver MovimientoCaja), congelado al cerrar. Suma al
+  /// efectivo que tendría que haber en la caja. Null en los turnos anteriores
+  /// a esta función y en los que siguen abiertos (se calcula en vivo).
+  movimientosEfectivoNeto Decimal? @db.Decimal(12, 2)
+  movimientosCaja         MovimientoCaja[]
+
   ventas  VentaPos[]
   // Pedidos de retiro/mesa cobrados en este turno (ver Order.turnoPosId) —
   // el mismo cierre que las ventas de mostrador, no uno aparte.
@@ -1182,6 +1196,12 @@ model VentaPos {
   canceladaPor      String?
   canceladaEn       DateTime?
   motivoCancelacion String?
+
+  /// Solo si la venta fue "a_credito": hasta cuándo tiene el cliente para
+  /// pagar (el día, guardado a medianoche UTC). Lo que se debe es `total`
+  /// menos la suma de sus cobros (CobroVenta): el saldo no se guarda.
+  fechaVencimientoCredito DateTime?
+  cobros                  CobroVenta[]
 
   // Mismos campos informales que Order ya tiene: lo que pide el cliente
   // para que le facturen. "ticket" | "factura".
@@ -1547,6 +1567,58 @@ model CotizacionItem {
   @@index([cotizacionId])
 }
 
+/// Plata que entra a la caja (ingreso) o sale de ella (retiro) en efectivo
+/// durante un turno, aparte de las ventas: cambio que se repone, un gasto
+/// pagado del cajón, el retiro del dueño, un cobro de cuenta a crédito en
+/// efectivo... Suma o resta al efectivo que tendría que haber al cerrar. El
+/// signo lo da el tipo: `monto` siempre es positivo.
+model MovimientoCaja {
+  id            String   @id @default(cuid())
+  storeId       String
+  store         Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  turnoPosId    String
+  turnoPos      TurnoPos @relation(fields: [turnoPosId], references: [id])
+  /// "ingreso" | "retiro"
+  tipo          String
+  monto         Decimal  @db.Decimal(12, 2)
+  /// Para qué fue — obligatorio: dentro de un mes nadie se acuerda.
+  concepto      String
+  registradoPor String
+  createdAt     DateTime @default(now())
+
+  /// Si este ingreso es el cobro en efectivo de una venta a crédito.
+  cobroVentaId  String?      @unique
+  cobroVenta    CobroVenta?  @relation(fields: [cobroVentaId], references: [id], onDelete: Cascade)
+
+  @@index([storeId])
+  @@index([turnoPosId])
+}
+
+/// Un cobro de una venta hecha a crédito (cuentas por cobrar): el cliente
+/// paga total o parcialmente lo que debe. Lo que falta cobrar de una venta es
+/// su total menos la suma de sus cobros. Un cobro en efectivo con turno
+/// abierto genera además un ingreso de caja (MovimientoCaja).
+model CobroVenta {
+  id            String   @id @default(cuid())
+  storeId       String
+  store         Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  ventaPosId    String
+  ventaPos      VentaPos @relation(fields: [ventaPosId], references: [id], onDelete: Cascade)
+  monto         Decimal  @db.Decimal(12, 2)
+  /// El día en que se cobró (a medianoche UTC), no cuándo se cargó al sistema.
+  fecha         DateTime
+  /// "efectivo" | "transferencia" | "tarjeta_debito" | "tarjeta_credito"
+  formaPago     String
+  notas         String?
+  registradoPor String
+  createdAt     DateTime @default(now())
+
+  movimientoCaja MovimientoCaja?
+
+  @@index([storeId])
+  @@index([ventaPosId])
+}
+
 /// Un pago al proveedor por una compra a crédito (cuentas por pagar). Lo que
 /// se debe de una compra es su total menos la suma de sus pagos: no se guarda
 /// el saldo, se calcula. Si un pago se cargó mal se elimina y se vuelve a cargar.
@@ -1627,6 +1699,25 @@ model Gasto {
   notas         String?
   registradoPor String?
   createdAt     DateTime   @default(now())
+
+  // --- Datos de la factura del gasto (todos opcionales) ---
+  // Muchos gastos no tienen factura, ni RUC, ni razón social de nadie: por eso
+  // ninguno se exige. Son los mismos datos que una compra, para poder informar
+  // este gasto en el registro de compras de la DNIT (RG 90) más adelante.
+  /// Folio de la factura (ej: 001-001-0001234).
+  numeroComprobante    String?
+  /// Timbrado de esa factura (hasta 8 dígitos).
+  timbrado             String?
+  /// RUC o cédula de quien emitió la factura, tal como se escribió — sirve
+  /// cuando no está cargado como Proveedor.
+  proveedorRuc         String?
+  proveedorRazonSocial String?
+  /// "gravado10" | "gravado5" | "exento": la tasa de IVA del monto.
+  iva                  String    @default("gravado10")
+  /// "contado" | "credito".
+  condicionPago        String    @default("contado")
+  /// Solo tiene sentido si es a crédito.
+  fechaVencimiento     DateTime?
 
   @@index([storeId])
   @@index([proveedorId])

@@ -24,7 +24,7 @@ import { ZONA_NEGOCIO } from "@/lib/timezone";
  * — quien tenga la dirección puede escribirla igual. Lo que de verdad protege
  * son las guardias de cada pantalla y de cada acción del servidor.
  */
-function armarGrupos(hayIdeaSinVer: boolean, rol: string): GrupoSecciones[] {
+function armarGrupos(hayIdeaSinVer: boolean, rol: string, ventasACredito: boolean): GrupoSecciones[] {
   const conPermiso = (p: Permiso) => puede(rol, p);
 
   const grupos: GrupoSecciones[] = [
@@ -40,6 +40,10 @@ function armarGrupos(hayIdeaSinVer: boolean, rol: string): GrupoSecciones[] {
         // repasando el día después.
         { href: "/admin/pos/cuentas", label: "Cuentas del mostrador", icono: "pedidos" as const,
           ver: conPermiso("pos.vender") },
+        // Solo si el local vende a crédito (se activa en Configuración): lo que
+        // los clientes le deben y los cobros.
+        { href: "/admin/pos/cuentas-por-cobrar", label: "Cuentas por cobrar", icono: "cierre" as const,
+          ver: ventasACredito && conPermiso("pos.vender") },
         { href: "/admin/pedidos", label: "Pedidos", icono: "pedidos" as const,
           ver: conPermiso("pedidos.ver") },
         // Mismo permiso y misma pantalla que "Pedidos" — solo entra con el
@@ -205,16 +209,19 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   // mientras administra ese local en particular.
   let avisoSuscripcion: EstadoSuscripcion | null = null;
   let vencimientoLocal: Date | null = null;
+  // Si el local vende a crédito (Configuración): decide si el menú muestra Cuentas por cobrar.
+  let ventasACredito = false;
   if (localActualId) {
     const datosLocal = await prisma.store
       .findUnique({
         where: { id: localActualId },
-        select: { estado: true, vencimiento: true },
+        select: { estado: true, vencimiento: true, ventasACredito: true },
       })
       .catch(() => null);
     if (datosLocal) {
       avisoSuscripcion = estadoSuscripcion(datosLocal, new Date(), ZONA_NEGOCIO);
       vencimientoLocal = datosLocal.vencimiento;
+      ventasACredito = datosLocal.ventasACredito;
     }
   }
 
@@ -245,7 +252,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         <div className="mx-auto flex h-14 max-w-[92rem] items-center gap-3 overflow-hidden px-4">
           <NavPanel
             variante="boton"
-            grupos={armarGrupos(hayIdeaSinVer, sesion.rol)}
+            grupos={armarGrupos(hayIdeaSinVer, sesion.rol, ventasACredito)}
             extra={
               esSuper ? <SelectorLocal locales={locales} actual={localActualId} /> : null
             }
@@ -322,7 +329,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           <NavPanel
             variante="columna"
             plegadaInicial={menuPlegado}
-            grupos={armarGrupos(hayIdeaSinVer, sesion.rol)}
+            grupos={armarGrupos(hayIdeaSinVer, sesion.rol, ventasACredito)}
           />
         </aside>
 

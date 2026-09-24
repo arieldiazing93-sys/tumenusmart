@@ -5,7 +5,7 @@ import { idLocalActual } from "@/lib/local-actual";
 import { formatearGuarani, formatearMiles, formatearNumero, formatearTelefonoLocal, sinAcentos } from "@/lib/format";
 import { numeroALetras } from "@/lib/numero-a-letras";
 import { textoPorcentaje } from "@/lib/descuento-venta";
-import { etiquetaFormaPagoPos } from "@/lib/turno-pos";
+import { esVentaACredito, etiquetaFormaPagoPos } from "@/lib/turno-pos";
 import { SIN_REGISTRO_FISCAL, etiquetaTipoIdentificacion } from "@/lib/tipo-cliente";
 import { ZONA_NEGOCIO } from "@/lib/timezone";
 import { ImprimirAuto } from "@/components/ImprimirAuto";
@@ -224,9 +224,15 @@ export default async function TicketVentaPosPage({
               </>
             )}
             <p className="mt-1">Factura: {venta.facturaNumero}</p>
-            <p>Condicion de venta: CONTADO</p>
+            <p>Condicion de venta: {esVentaACredito(venta.formaPago) ? "CREDITO" : "CONTADO"}</p>
             <p>Fecha: {fechaFactura}</p>
-            <p>Metodo de pago: {sinAcentos(etiquetaFormaPagoPos(venta.formaPago))}</p>
+            {esVentaACredito(venta.formaPago) ? (
+              venta.fechaVencimientoCredito && (
+                <p>Vence: {venta.fechaVencimientoCredito.toLocaleDateString("es-PY", { timeZone: "UTC" })}</p>
+              )
+            ) : (
+              <p>Metodo de pago: {sinAcentos(etiquetaFormaPagoPos(venta.formaPago))}</p>
+            )}
           </div>
         ) : (
           <div>

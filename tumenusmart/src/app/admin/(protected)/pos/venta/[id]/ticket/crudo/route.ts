@@ -5,7 +5,7 @@ import { idLocalActual } from "@/lib/local-actual";
 import { formatearGuarani, formatearMiles, formatearNumero, formatearTelefonoLocal, sinAcentos } from "@/lib/format";
 import { numeroALetras } from "@/lib/numero-a-letras";
 import { textoPorcentaje } from "@/lib/descuento-venta";
-import { etiquetaFormaPagoPos } from "@/lib/turno-pos";
+import { esVentaACredito, etiquetaFormaPagoPos } from "@/lib/turno-pos";
 import { SIN_REGISTRO_FISCAL, etiquetaTipoIdentificacion } from "@/lib/tipo-cliente";
 import { ZONA_NEGOCIO } from "@/lib/timezone";
 import { armarDocumento, centrado, filaEtiqueta, filaTabla, negrita, separador } from "@/lib/escpos";
@@ -69,9 +69,15 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
       l.push(`Timbrado: ${venta.facturaTimbrado}${vto}`);
     }
     l.push(`Factura: ${venta.facturaNumero}`);
-    l.push("Condicion de venta: CONTADO");
+    l.push(`Condicion de venta: ${esVentaACredito(venta.formaPago) ? "CREDITO" : "CONTADO"}`);
     l.push(`Fecha: ${fechaFactura}`);
-    l.push(`Metodo de pago: ${sinAcentos(etiquetaFormaPagoPos(venta.formaPago))}`);
+    if (esVentaACredito(venta.formaPago)) {
+      if (venta.fechaVencimientoCredito) {
+        l.push(`Vence: ${venta.fechaVencimientoCredito.toLocaleDateString("es-PY", { timeZone: "UTC" })}`);
+      }
+    } else {
+      l.push(`Metodo de pago: ${sinAcentos(etiquetaFormaPagoPos(venta.formaPago))}`);
+    }
   } else {
     l.push("Servicio rapido");
     l.push(fecha);

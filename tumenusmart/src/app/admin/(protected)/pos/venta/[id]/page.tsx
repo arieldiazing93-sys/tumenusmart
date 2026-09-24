@@ -2,13 +2,16 @@ import { notFound } from "next/navigation";
 import { pantallaConPermiso } from "@/lib/auth";
 import { prismaDelLocal } from "@/lib/prisma-local";
 import { idLocalActual } from "@/lib/local-actual";
-import { Cabecera, Pastilla, Tarjeta, clasesBoton } from "@/components/ui";
+import { Cabecera, Pastilla, Tabla, Tarjeta, Td, Th, Tr, clasesBoton } from "@/components/ui";
 import { Volver } from "@/components/Volver";
 import { formatearGuarani, formatearNumero } from "@/lib/format";
 import { textoPorcentaje } from "@/lib/descuento-venta";
-import { etiquetaFormaPagoPos } from "@/lib/turno-pos";
+import { esVentaACredito, etiquetaFormaPagoPos } from "@/lib/turno-pos";
+import { estadoDeCuenta, redondear2, saldoDeCompra } from "@/lib/pagos-compra";
 import { ZONA_NEGOCIO } from "@/lib/timezone";
 import { CancelarVentaBoton } from "./CancelarVentaBoton";
+import { RegistrarCobroBoton } from "../../cuentas-por-cobrar/RegistrarCobroBoton";
+import { EliminarCobroBoton } from "../../cuentas-por-cobrar/EliminarCobroBoton";
 
 export const dynamic = "force-dynamic";
 
@@ -31,11 +34,21 @@ export default async function DetalleVentaPosPage({
 
   const venta = await db.ventaPos.findUnique({
     where: { id },
-    include: { items: { orderBy: { id: "asc" } }, turnoPos: { select: { estado: true } } },
+    include: {
+      items: { orderBy: { id: "asc" } },
+      turnoPos: { select: { estado: true } },
+      cobros: { orderBy: [{ fecha: "asc" }, { createdAt: "asc" }] },
+    },
   });
   if (!venta) notFound();
 
   const turnoCerrado = venta.turnoPos.estado !== "abierto";
+
+  // Venta a crédito: lo que el cliente todavía debe (total menos lo cobrado).
+  const aCredito = esVentaACredito(venta.formaPago);
+  const cobrado = redondear2(venta.cobros.reduce((s, c) => s + Number(c.monto), 0));
+  const saldo = saldoDeCompra(Number(venta.total), cobrado);
+  const estadoCobro = estadoDeCuenta(Number(venta.total), cobrado);
 
   const fecha = venta.creadoEn.toLocaleString("es-PY", {
     day: "2-digit",
@@ -199,6 +212,91 @@ export default async function DetalleVentaPosPage({
             </span>
           </div>
         </Tarjeta>
+
+        {aCredito && (
+          <div id="cobros">
+            <Tarjeta className="flex flex-col gap-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="rotulo text-[0.8rem] font-bold">Venta a crédito · cobros</p>
+                  {!venta.cancelada && (
+                    <Pastilla color={estadoCobro === "pagada" ? "exito" : estadoCobro === "parcial" ? "azul" : "aviso"}>
+                      {estadoCobro === "pagada" ? "Cobrada" : estadoCobro === "parcial" ? "Cobro parcial" : "Pendiente"}
+                    </Pastilla>
+                  )}
+                </div>
+                {!venta.cancelada && saldo > 0 && (
+                  <RegistrarCobroBoton
+                    ventaId={venta.id}
+                    saldo={saldo}
+                    descripcion={`Venta ${formatearNumero(venta.numero)} — ${
+                      (venta.facturaRazonSocial ?? venta.clienteNombre ?? "").trim() || "cliente"
+                    }`}
+                    tam="md"
+                  />
+                )}
+              </div>
+
+              <dl className="cifra grid grid-cols-1 gap-2 text-[0.88rem] sm:grid-cols-4">
+                <div className="flex justify-between gap-4 sm:block">
+                  <dt className="text-tinta-media">Total</dt>
+                  <dd className="font-medium">{formatearGuarani(Number(venta.total))}</dd>
+                </div>
+                <div className="flex justify-between gap-4 sm:block">
+                  <dt className="text-tinta-media">Cobrado</dt>
+                  <dd className="font-medium">{formatearGuarani(cobrado)}</dd>
+                </div>
+                <div className="flex justify-between gap-4 sm:block">
+                  <dt className="text-tinta-media">Falta cobrar</dt>
+                  <dd className="font-semibold text-tinta">{formatearGuarani(saldo)}</dd>
+                </div>
+                <div className="flex justify-between gap-4 sm:block">
+                  <dt className="text-tinta-media">Vence</dt>
+                  <dd className="font-medium">
+                    {venta.fechaVencimientoCredito
+                      ? venta.fechaVencimientoCredito.toLocaleDateString("es-PY", { timeZone: "UTC" })
+                      : "—"}
+                  </dd>
+                </div>
+              </dl>
+
+              {venta.cobros.length === 0 ? (
+                <p className="rounded-lg border border-dashed border-linea px-3 py-4 text-center text-sm text-tinta-suave">
+                  Todavía no se registró ningún cobro de esta venta.
+                </p>
+              ) : (
+                <Tabla>
+                  <thead>
+                    <tr className="bg-exito-luz">
+                      <Th>Fecha</Th>
+                      <Th>Monto</Th>
+                      <Th>Forma de pago</Th>
+                      <Th>Nota</Th>
+                      <Th>Registró</Th>
+                      <Th>
+                        <span className="sr-only">Acciones</span>
+                      </Th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {venta.cobros.map((c) => (
+                      <Tr key={c.id}>
+                        <Td>{c.fecha.toLocaleDateString("es-PY", { timeZone: "UTC" })}</Td>
+                        <Td className="cifra font-medium text-tinta">{formatearGuarani(Number(c.monto))}</Td>
+                        <Td>{etiquetaFormaPagoPos(c.formaPago)}</Td>
+                        <Td>{c.notas ?? "—"}</Td>
+                        <Td>{c.registradoPor}</Td>
+                        <Td>
+                          <EliminarCobroBoton cobroId={c.id} />
+                        </Td>
+                      </Tr>
+                    ))}
+                  </tbody>
+                </Tabla>
+              )}
+            </Tarjeta>
+          </div>
+        )}
 
         {!venta.cancelada &&
           (turnoCerrado ? (

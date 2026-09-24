@@ -65,3 +65,24 @@ export async function entregasSinRendir(db: PrismaLocal) {
     },
   });
 }
+
+/**
+ * Lo que entró (ingresos) y salió (retiros) de la caja en efectivo durante el
+ * turno, aparte de las ventas — ver MovimientoCaja. El `neto` (ingresos menos
+ * retiros) es lo que se le suma al efectivo que tendría que haber al cerrar.
+ */
+export async function netoMovimientosCaja(db: PrismaLocal, turnoId: string) {
+  const filas = await db.movimientoCaja.groupBy({
+    by: ["tipo"],
+    where: { turnoPosId: turnoId },
+    _sum: { monto: true },
+  });
+  let ingresos = 0;
+  let retiros = 0;
+  for (const f of filas) {
+    const monto = Number(f._sum.monto ?? 0);
+    if (f.tipo === "ingreso") ingresos += monto;
+    else if (f.tipo === "retiro") retiros += monto;
+  }
+  return { ingresos, retiros, neto: ingresos - retiros };
+}

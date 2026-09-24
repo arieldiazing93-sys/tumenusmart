@@ -50,7 +50,7 @@ export default async function PosPage() {
   // eso se lee con el cliente global, no con `db`.
   const store = await prisma.store.findUnique({
     where: { id: storeId },
-    select: { facturaObligatoria: true },
+    select: { facturaObligatoria: true, ventasACredito: true },
   });
 
   const categorias = await db.category.findMany({
@@ -161,6 +161,7 @@ export default async function PosPage() {
       puedeFacturar={puedeFacturar}
       diasParaVencerTimbrado={diasParaVencerTimbrado}
       facturaObligatoria={store?.facturaObligatoria ?? false}
+      ventasACredito={store?.ventasACredito ?? false}
       nombreImpresoraTicket={nombreImpresoraTicket}
       impresorasPorArea={impresorasPorArea}
     />

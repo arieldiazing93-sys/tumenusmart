@@ -21,7 +21,7 @@ export default async function GastosPage() {
     prisma.proveedor.findMany({
       where: { activo: true },
       orderBy: { nombre: "asc" },
-      select: { id: true, nombre: true },
+      select: { id: true, nombre: true, ruc: true, razonSocial: true },
     }),
     // Las categorías que creó este local, además de las cinco fijas.
     prisma.categoriaGasto.findMany({ select: { nombre: true } }),
@@ -98,6 +98,7 @@ export default async function GastosPage() {
               <Th>Concepto</Th>
               <Th>Categoría</Th>
               <Th>Proveedor</Th>
+              <Th>Factura</Th>
               <Th>Monto</Th>
             </tr>
           </thead>
@@ -109,7 +110,17 @@ export default async function GastosPage() {
                 <Td>
                   <Pastilla>{etiquetaCategoriaGasto(g.categoria)}</Pastilla>
                 </Td>
-                <Td>{g.proveedor?.nombre ?? "—"}</Td>
+                <Td>{g.proveedor?.nombre ?? g.proveedorRazonSocial ?? g.proveedorRuc ?? "—"}</Td>
+                <Td>
+                  <div className="flex flex-col items-start gap-1">
+                    <span>{g.numeroComprobante ?? "—"}</span>
+                    {g.condicionPago === "credito" && (
+                      <Pastilla color="aviso">
+                        A crédito{g.fechaVencimiento ? ` · vence ${g.fechaVencimiento.toLocaleDateString("es-PY")}` : ""}
+                      </Pastilla>
+                    )}
+                  </div>
+                </Td>
                 <Td className="font-medium text-tinta">{formatearGuarani(Number(g.monto))}</Td>
               </Tr>
             ))}

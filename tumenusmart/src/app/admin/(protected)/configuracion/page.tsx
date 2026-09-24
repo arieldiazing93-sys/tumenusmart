@@ -9,6 +9,7 @@ import {
   guardarEnvioUbicacion,
   guardarFormasPagoEntrega,
   guardarAceptaReservas,
+  guardarVentasACredito,
 } from "./actions";
 import { ZonaFila } from "./ZonaFila";
 import { CrearZonaForm } from "./CrearZonaForm";
@@ -362,6 +363,26 @@ export default async function AdminConfiguracionPage() {
               defaultChecked={store?.aceptaReservas ?? true}
             />
             Este local reserva mesas con anticipación
+          </label>
+          <button type="submit" className={`self-start ${clasesBoton("principal")}`}>
+            Guardar
+          </button>
+        </form>
+      </Tarjeta>
+
+      <Tarjeta>
+        <h2 className="mb-1 text-[1.15rem] font-semibold tracking-titular text-tinta">
+          Ventas a crédito
+        </h2>
+        <p className="mb-4 text-sm text-tinta-media">
+          Para negocios que le venden fiado a clientes que pagan después (empresas, clientes de confianza).
+          Activado, en el Punto de Venta aparece "A crédito" como forma de pago y en el menú se suma "Cuentas por
+          cobrar", donde se registran los cobros. Esas ventas no entran en la caja hasta que se cobran.
+        </p>
+        <form action={guardarVentasACredito} className="flex flex-col gap-3">
+          <label className="flex items-center gap-2 text-sm font-medium text-tinta-media">
+            <input type="checkbox" name="ventasACredito" defaultChecked={store?.ventasACredito ?? false} />
+            Este local vende a crédito
           </label>
           <button type="submit" className={`self-start ${clasesBoton("principal")}`}>
             Guardar

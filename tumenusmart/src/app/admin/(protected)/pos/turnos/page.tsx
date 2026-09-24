@@ -6,6 +6,7 @@ import { Cabecera, Campo, Entrada, clasesBoton, Tabla, Th, Td, Tr, Vacio, BotonE
 import { calcularRangoFecha, claveDia, type FiltroFecha } from "@/lib/rango-fecha";
 import { formatearGuarani } from "@/lib/format";
 import { ZONA_NEGOCIO } from "@/lib/timezone";
+import { FORMA_PAGO_A_CREDITO } from "@/lib/turno-pos";
 
 export const dynamic = "force-dynamic";
 
@@ -107,6 +108,7 @@ export default async function TurnosPosPage({
       cerradoEn: true,
       cantidadVentas: true,
       montoInicial: true,
+      movimientosEfectivoNeto: true,
       declaradoEfectivo: true,
       declaradoTransferencia: true,
       declaradoTarjetaDebito: true,
@@ -125,7 +127,7 @@ export default async function TurnosPosPage({
   // cancelada o un pedido pasado a "cancelado" DESPUÉS de cerrar el turno es
   // justo lo que esto saca a la luz.
   const turnoIds = turnos.map((t) => t.id);
-  const [ventasHoy, pedidosHoy, rendicionesPorTurno] = turnoIds.length
+  const [ventasHoy, pedidosHoy, rendicionesPorTurno, creditoHoy] = turnoIds.length
     ? await Promise.all([
         db.ventaPos.groupBy({
           by: ["turnoPosId"],
@@ -144,8 +146,15 @@ export default async function TurnosPosPage({
           where: { turnoPosId: { in: turnoIds } },
           _sum: { totalEfectivo: true, totalTransferencia: true, totalTarjetaDebito: true, totalTarjetaCredito: true },
         }),
+        // Las ventas a crédito cuentan como venta pero no como plata cobrada:
+        // el total "de hoy" las descuenta, igual que lo congelado al cerrar.
+        db.ventaPos.groupBy({
+          by: ["turnoPosId"],
+          where: { turnoPosId: { in: turnoIds }, cancelada: false, formaPago: FORMA_PAGO_A_CREDITO },
+          _sum: { total: true },
+        }),
       ])
-    : [[], [], []];
+    : [[], [], [], []];
   // Corte general: lo que el repartidor rindió (en cualquiera de las 4
   // formas) se cuenta junto con el resto de la caja del cajero — sin
   // sumarlo acá, "Sistema" quedaría por debajo de lo declarado y se vería
@@ -168,6 +177,10 @@ export default async function TurnosPosPage({
     actual.cantidad += v._count._all;
     actual.total += Number(v._sum.total ?? 0);
     hoyPorTurno.set(v.turnoPosId!, actual);
+  }
+  for (const c of creditoHoy) {
+    const actual = hoyPorTurno.get(c.turnoPosId!);
+    if (actual) actual.total -= Number(c._sum.total ?? 0);
   }
   for (const p of pedidosHoy) {
     const actual = hoyPorTurno.get(p.turnoPosId!) ?? { cantidad: 0, total: 0 };
@@ -273,7 +286,10 @@ export default async function TurnosPosPage({
             {turnos.map((t) => {
               const calculadoBase = totalCalculado(t);
               const calculado =
-                calculadoBase + (rendidoPorTurno.get(t.id) ?? 0) + Number(t.montoInicial ?? 0);
+                calculadoBase +
+                (rendidoPorTurno.get(t.id) ?? 0) +
+                Number(t.montoInicial ?? 0) +
+                Number(t.movimientosEfectivoNeto ?? 0);
               const declarado = totalDeclarado(t);
               const diferencia = declarado - calculado;
               const hoy = hoyPorTurno.get(t.id) ?? { cantidad: 0, total: 0 };
