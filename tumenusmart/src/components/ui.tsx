@@ -18,7 +18,7 @@ import type { ReactNode } from "react";
 //  Botón
 // ===========================================================================
 
-type Tono = "principal" | "suave" | "navegar" | "peligro" | "fantasma";
+type Tono = "principal" | "suave" | "navegar" | "violeta" | "peligro" | "fantasma";
 
 const TONOS: Record<Tono, string> = {
   // Naranja: avanzar, guardar, confirmar. Uno por pantalla, no más.
@@ -30,6 +30,10 @@ const TONOS: Record<Tono, string> = {
   // Azul: volver, ir a otro lado. Nunca confirma nada.
   navegar:
     "border border-azul/35 bg-azul-luz text-azul-oscuro hover:border-azul hover:bg-azul hover:text-white",
+  // Violeta: una acción destacada que no es "el" botón naranja de la pantalla
+  // (ej. "Activar" un local en Cartera, al lado de "Registrar pago").
+  violeta:
+    "bg-violeta text-white hover:bg-violeta-oscuro focus-visible:outline-violeta-oscuro",
   peligro:
     "border border-peligro/30 bg-peligro-luz text-peligro hover:bg-peligro hover:text-white",
   fantasma: "text-tinta-media hover:bg-papel-hundido hover:text-tinta",

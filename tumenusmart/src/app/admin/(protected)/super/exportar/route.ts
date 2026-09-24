@@ -5,6 +5,7 @@ import { calcularRangoFecha } from "@/lib/rango-fecha";
 import { estadoSuscripcion, type EstadoSuscripcion } from "@/lib/suscripcion";
 import { ZONA_NEGOCIO } from "@/lib/timezone";
 import { nuevoLibro, filaTitulo, respuestaXlsx } from "@/lib/excel-reporte";
+import { etiquetaTipoNegocio } from "@/lib/tipo-negocio";
 
 export const dynamic = "force-dynamic";
 
@@ -40,6 +41,7 @@ export async function GET(request: NextRequest) {
         titularTelefono: true,
         razonSocial: true,
         ruc: true,
+        tipoNegocio: true,
         asesor: { select: { nombre: true } },
       },
     }),
@@ -93,6 +95,7 @@ export async function GET(request: NextRequest) {
     { width: 24 },
     { width: 26 },
     { width: 14 },
+    { width: 24 },
   ];
 
   filaTitulo(hoja, ["Reporte", "Cartera de locales"], 2);
@@ -114,8 +117,19 @@ export async function GET(request: NextRequest) {
   // de Cartera, que solo se podían consultar local por local, uno por uno.
   filaTitulo(
     hoja,
-    ["Local", "Slug", "Estado", "Vence", "Asesor", "Titular", "Teléfono titular", "Razón social", "RUC"],
-    9
+    [
+      "Local",
+      "Slug",
+      "Estado",
+      "Vence",
+      "Asesor",
+      "Titular",
+      "Teléfono titular",
+      "Razón social",
+      "RUC",
+      "Tipo de negocio",
+    ],
+    10
   );
   for (const l of locales) {
     hoja.addRow([
@@ -128,6 +142,7 @@ export async function GET(request: NextRequest) {
       l.titularTelefono ?? "",
       l.razonSocial ?? "",
       l.ruc ?? "",
+      etiquetaTipoNegocio(l.tipoNegocio) ?? "",
     ]);
   }
   hoja.addRow([]);

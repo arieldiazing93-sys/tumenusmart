@@ -6,6 +6,7 @@ import { sesionActual } from "@/lib/auth";
 import { ZONA_NEGOCIO } from "@/lib/timezone";
 import { formatearGuarani } from "@/lib/format";
 import { construirLinkWhatsapp } from "@/lib/whatsapp";
+import { etiquetaTipoNegocio } from "@/lib/tipo-negocio";
 import { type FiltroFecha } from "@/lib/rango-fecha";
 import {
   calcularNuevoVencimiento,
@@ -384,6 +385,11 @@ export default async function SuperPage({
                         <span className="rounded-full bg-papel-hundido px-2 py-0.5 text-xs text-tinta-media">
                           {f.local.plan}
                         </span>
+                        {etiquetaTipoNegocio(f.local.tipoNegocio) && (
+                          <span className="rounded-full bg-brand-light px-2 py-0.5 text-xs text-brand-texto">
+                            {etiquetaTipoNegocio(f.local.tipoNegocio)}
+                          </span>
+                        )}
                         {f.local.asesor && (
                           <span className="rounded-full bg-azul-luz px-2 py-0.5 text-xs text-azul-oscuro">
                             {f.local.asesor.nombre}
@@ -436,6 +442,7 @@ export default async function SuperPage({
                         whatsapp: f.local.whatsappNumero,
                         direccion: f.local.direccion,
                         plan: f.local.plan,
+                        tipoNegocio: f.local.tipoNegocio,
                         estadoEtiqueta: f.estado.etiqueta,
                         estadoClase: f.estado.clase,
                         vencimiento: f.local.vencimiento

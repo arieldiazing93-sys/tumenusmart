@@ -64,7 +64,7 @@ export function AccionesLocal({
         <button
           type="button"
           onClick={() => setViendo(true)}
-          className="rounded-lg border border-linea bg-white px-3 py-1.5 text-sm font-medium text-tinta-media transition-colors hover:border-brand hover:text-brand"
+          className={clasesBoton("navegar", "sm")}
         >
           Ver
         </button>
@@ -84,7 +84,7 @@ export function AccionesLocal({
               if (!confirm(texto)) return;
               correr(() => activarLocal(storeId));
             }}
-            className={clasesBoton("principal", "sm")}
+            className={clasesBoton("violeta", "sm")}
           >
             Activar
           </button>

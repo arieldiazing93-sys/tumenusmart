@@ -112,6 +112,13 @@ model Store {
   vencimiento    DateTime?
   plan           String    @default("basico")
 
+  /// Rubro del negocio, para la cartera de TuMenuSmart (clave de
+  /// src/lib/tipo-negocio.ts: "comidas_rapidas", "barberia_peluqueria",
+  /// "salon_belleza", "taller", "heladeria", "bodega", "veterinaria"). Nulo en
+  /// los locales creados antes de que existiera el campo: se completa desde
+  /// Cartera ("Ver" → "Editar"). No lo ve el propio local.
+  tipoNegocio    String?
+
   // Quién de tu equipo comercial trajo o atiende este cliente. Se asigna al
   // dar de alta el local (o después, a mano) — nunca lo elige ni lo ve el
   // dueño del local, es solo para tu propia cartera.

@@ -11,6 +11,7 @@ import {
 import { normalizarSlug, SLUGS_RESERVADOS } from "@/lib/alcance-local";
 import { plantillaPorClave } from "@/lib/plantillas-menu";
 import { calcularNuevoVencimiento } from "@/lib/suscripcion";
+import { esTipoNegocio } from "@/lib/tipo-negocio";
 
 // Todo lo de este archivo es exclusivo del superadmin, y cada acción lo exige
 // por su cuenta: que la pantalla no muestre el botón no alcanza, porque una
@@ -46,6 +47,7 @@ export async function crearLocal(formData: FormData): Promise<ResultadoAlta> {
   const email = normalizarEmail(String(formData.get("email") ?? ""));
   const plantillaClave = String(formData.get("plantilla") ?? "vacio");
   const plan = String(formData.get("plan") ?? "basico").trim() || "basico";
+  const tipoNegocio = String(formData.get("tipoNegocio") ?? "").trim();
   const asesorId = String(formData.get("asesorId") ?? "").trim() || null;
   // Los cuatro datos del titular son opcionales: se completan si se tienen a
   // mano al dar de alta, o después desde Cartera.
@@ -55,6 +57,10 @@ export async function crearLocal(formData: FormData): Promise<ResultadoAlta> {
   const ruc = String(formData.get("ruc") ?? "").trim() || null;
 
   if (!nombre) return { ok: false, error: "Falta el nombre del negocio" };
+  // Obligatorio al dar de alta (después, en un local viejo, puede quedar sin
+  // definir). La clave viene del navegador: se comprueba que exista.
+  if (!tipoNegocio) return { ok: false, error: "Elegí el tipo de negocio" };
+  if (!esTipoNegocio(tipoNegocio)) return { ok: false, error: "Ese tipo de negocio no existe" };
 
   const slug = normalizarSlug(slugPedido || nombre);
   if (!slug) return { ok: false, error: "No pude armar una URL con ese nombre" };
@@ -101,6 +107,7 @@ export async function crearLocal(formData: FormData): Promise<ResultadoAlta> {
         envioModo: "coordinar",
         estado: "activo",
         plan,
+        tipoNegocio,
         // Sin vencimiento hasta que se lo active: ver activarLocal.
         vencimiento: null,
         asesorId,
@@ -274,7 +281,7 @@ export type ResultadoDatosLocal = { ok: true } | { ok: false; error: string };
 
 /**
  * Corrige los datos de un local ya creado, desde el modal "Ver" de Cartera:
- * los del negocio (nombre, WhatsApp, dirección, plan, asesor) y los del
+ * los del negocio (nombre, tipo de negocio, WhatsApp, dirección, plan, asesor) y los del
  * titular (nombre, teléfono, razón social, RUC — estos cuatro opcionales,
  * para completarlos cuando no se tenían a mano al dar de alta).
  *
@@ -301,6 +308,13 @@ export async function actualizarDatosLocal(
 
   const plan = String(formData.get("plan") ?? "").trim().slice(0, 40) || "basico";
 
+  // Vacío = "sin definir", que es lo que tienen los locales creados antes de
+  // que existiera este dato; si viene algo, tiene que ser una clave válida.
+  const tipoNegocio = String(formData.get("tipoNegocio") ?? "").trim();
+  if (tipoNegocio && !esTipoNegocio(tipoNegocio)) {
+    return { ok: false, error: "Ese tipo de negocio no existe" };
+  }
+
   // El id del asesor viene del navegador: se comprueba que exista en vez de
   // dejar que la base falle con un error de clave foránea que Next oculta.
   const asesorId = String(formData.get("asesorId") ?? "").trim() || null;
@@ -319,6 +333,7 @@ export async function actualizarDatosLocal(
       whatsappNumero: whatsapp,
       direccion: String(formData.get("direccion") ?? "").trim() || null,
       plan,
+      tipoNegocio: tipoNegocio || null,
       asesorId,
       titularNombre: String(formData.get("titularNombre") ?? "").trim() || null,
       titularTelefono: String(formData.get("titularTelefono") ?? "").trim() || null,

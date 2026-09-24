@@ -4,6 +4,7 @@ import { clasesBoton } from "@/components/ui";
 import { useState, useTransition } from "react";
 import { crearLocal, type ResultadoAlta } from "./actions";
 import { PLANTILLAS, contarProductos } from "@/lib/plantillas-menu";
+import { TIPOS_DE_NEGOCIO } from "@/lib/tipo-negocio";
 
 const CAMPO =
   "w-full rounded-lg border border-linea px-3 py-2 text-sm focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand";
@@ -111,6 +112,23 @@ export function AltaLocal({
         <input name="slug" placeholder="maspizza" className={CAMPO} />
         <span className="text-xs text-tinta-suave">
           Si lo dejás vacío se arma con el nombre. Queda como {dominio}/maspizza
+        </span>
+      </label>
+
+      <label className="flex flex-col gap-1 text-sm text-tinta-media">
+        Tipo de negocio
+        <select name="tipoNegocio" required defaultValue="" className={CAMPO}>
+          <option value="" disabled>
+            Elegí el tipo de negocio…
+          </option>
+          {TIPOS_DE_NEGOCIO.map((t) => (
+            <option key={t.clave} value={t.clave}>
+              {t.etiqueta}
+            </option>
+          ))}
+        </select>
+        <span className="text-xs text-tinta-suave">
+          El rubro del cliente, para tu cartera. Después se puede corregir desde Ver → Editar.
         </span>
       </label>
 

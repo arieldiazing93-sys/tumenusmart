@@ -2,6 +2,7 @@
 
 import { useEffect, useId, useState, useTransition, type ReactNode } from "react";
 import { Campo, Entrada, Pastilla, Selector, clasesBoton } from "@/components/ui";
+import { TIPOS_DE_NEGOCIO, etiquetaTipoNegocio } from "@/lib/tipo-negocio";
 import { actualizarDatosLocal } from "./actions";
 
 /**
@@ -20,6 +21,8 @@ export type FichaLocal = {
   whatsapp: string;
   direccion: string | null;
   plan: string;
+  /** Clave de TIPOS_DE_NEGOCIO; nulo en los locales anteriores a este dato. */
+  tipoNegocio: string | null;
   estadoEtiqueta: string;
   estadoClase: "vencido" | "suspendido" | "por_vencer" | "al_dia" | "sin_vencimiento";
   vencimiento: string;
@@ -162,6 +165,9 @@ export function FichaLocalModal({
               <span className="font-mono text-xs text-tinta-suave">/{ficha.slug}</span>
               <Pastilla color={COLOR_ESTADO[ficha.estadoClase]}>{ficha.estadoEtiqueta}</Pastilla>
               <Pastilla>{ficha.plan}</Pastilla>
+              {etiquetaTipoNegocio(ficha.tipoNegocio) && (
+                <Pastilla color="marca">{etiquetaTipoNegocio(ficha.tipoNegocio)}</Pastilla>
+              )}
             </div>
           </div>
           <button
@@ -210,10 +216,20 @@ export function FichaLocalModal({
                       placeholder="Av. Mariscal López 1234, Asunción"
                     />
                   </Campo>
+                  <Campo etiqueta="Tipo de negocio">
+                    <Selector name="tipoNegocio" defaultValue={ficha.tipoNegocio ?? ""}>
+                      <option value="">Sin definir</option>
+                      {TIPOS_DE_NEGOCIO.map((t) => (
+                        <option key={t.clave} value={t.clave}>
+                          {t.etiqueta}
+                        </option>
+                      ))}
+                    </Selector>
+                  </Campo>
                   <Campo etiqueta="Plan">
                     <Entrada name="plan" defaultValue={ficha.plan} placeholder="basico" />
                   </Campo>
-                  <Campo etiqueta="Asesor comercial" className="sm:col-span-2">
+                  <Campo etiqueta="Asesor comercial">
                     <Selector name="asesorId" defaultValue={ficha.asesorId ?? ""}>
                       <option value="">Sin asignar</option>
                       {asesorInactivo && (
@@ -294,6 +310,7 @@ export function FichaLocalModal({
                       +{ficha.whatsapp}
                     </a>
                   </Dato>
+                  <Dato etiqueta="Tipo de negocio">{etiquetaTipoNegocio(ficha.tipoNegocio)}</Dato>
                   <Dato etiqueta="Dirección">{ficha.direccion}</Dato>
                   <Dato etiqueta="Asesor comercial">{ficha.asesorNombre}</Dato>
                   <Dato etiqueta="Correo de acceso del dueño">{ficha.correo}</Dato>

@@ -5,6 +5,7 @@ import { calcularRangoFecha } from "@/lib/rango-fecha";
 import { estadoSuscripcion, type EstadoSuscripcion } from "@/lib/suscripcion";
 import { formatearGuarani } from "@/lib/format";
 import { ZONA_NEGOCIO } from "@/lib/timezone";
+import { etiquetaTipoNegocio } from "@/lib/tipo-negocio";
 import { ImprimirBoton } from "../../estadisticas/imprimir/ImprimirBoton";
 
 export const dynamic = "force-dynamic";
@@ -38,6 +39,7 @@ export default async function ImprimirCarteraPage({
         titularTelefono: true,
         razonSocial: true,
         ruc: true,
+        tipoNegocio: true,
         asesor: { select: { nombre: true } },
       },
     }),
@@ -121,6 +123,7 @@ export default async function ImprimirCarteraPage({
         <thead>
           <tr className="border-b border-linea text-left text-xs uppercase tracking-wide text-tinta-media">
             <th className="py-1.5">Local</th>
+            <th className="py-1.5">Tipo</th>
             <th className="py-1.5">Estado</th>
             <th className="py-1.5">Vence</th>
             <th className="py-1.5">Asesor</th>
@@ -134,6 +137,7 @@ export default async function ImprimirCarteraPage({
           {locales.map((l) => (
             <tr key={l.slug} className="border-b border-linea-fina">
               <td className="py-1.5">{l.nombre}</td>
+              <td className="py-1.5 text-tinta-media">{etiquetaTipoNegocio(l.tipoNegocio) ?? "—"}</td>
               <td className="py-1.5 text-tinta-media">
                 {estadoSuscripcion(l, ahora, ZONA_NEGOCIO).etiqueta}
               </td>
