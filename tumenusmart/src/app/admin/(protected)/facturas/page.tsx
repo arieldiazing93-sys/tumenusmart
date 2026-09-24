@@ -291,7 +291,9 @@ export default async function FacturasPage({
             </Selector>
           </Campo>
           <Campo etiqueta="Número de archivo" ayuda="V0001, V0002… Cada archivo que subas al mismo mes lleva uno distinto.">
-            <Entrada type="number" name="archivo" min="1" max="9999" defaultValue="1" required />
+            {/* De texto con teclado numérico, no type="number": ese agrega un manejador
+                de la rueda del mouse que no puede ir en una pantalla de servidor. */}
+            <Entrada type="text" inputMode="numeric" pattern="[0-9]{1,4}" name="archivo" defaultValue="1" required />
           </Campo>
           <Campo etiqueta="Imputa al IVA">
             <Selector name="iva" defaultValue="S">
