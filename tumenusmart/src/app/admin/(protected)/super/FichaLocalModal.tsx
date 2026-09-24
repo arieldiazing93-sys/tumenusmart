@@ -359,9 +359,18 @@ export function FichaLocalModal({
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-linea bg-papel-suave px-5 py-3">
           <p className="min-w-0 flex-1 text-sm font-medium text-peligro">{editando && error}</p>
           <div className="flex items-center gap-2">
+            {/*
+              Cada botón lleva su propia key A PROPÓSITO. Sin ella, React
+              reutiliza el botón "Editar" como el botón "Guardar" (misma
+              posición, mismo tag) y le cambia el type a "submit" en medio del
+              mismo clic: el navegador termina ese clic ya como un envío del
+              formulario recién montado y lo guarda vacío de cambios, con lo
+              que el modo edición se cerraba solo apenas se abría.
+            */}
             {editando ? (
               <>
                 <button
+                  key="cancelar"
                   type="button"
                   onClick={cancelarEdicion}
                   disabled={pendiente}
@@ -370,6 +379,7 @@ export function FichaLocalModal({
                   Cancelar
                 </button>
                 <button
+                  key="guardar"
                   type="submit"
                   form={idFormulario}
                   disabled={pendiente}
@@ -380,10 +390,20 @@ export function FichaLocalModal({
               </>
             ) : (
               <>
-                <button type="button" onClick={onCerrar} className={clasesBoton("suave")}>
+                <button
+                  key="cerrar"
+                  type="button"
+                  onClick={onCerrar}
+                  className={clasesBoton("suave")}
+                >
                   Cerrar
                 </button>
-                <button type="button" onClick={empezarAEditar} className={clasesBoton("principal")}>
+                <button
+                  key="editar"
+                  type="button"
+                  onClick={empezarAEditar}
+                  className={clasesBoton("principal")}
+                >
                   Editar
                 </button>
               </>
