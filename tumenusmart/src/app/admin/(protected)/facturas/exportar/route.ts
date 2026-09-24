@@ -111,7 +111,7 @@ export async function GET(request: NextRequest) {
       Math.round(f.total),
       etiquetaEstadoFactura(f),
       f.reemplazadaPor
-        ? `Reemplazada por la ${f.reemplazadaPor}${f.motivoAnulacion ? ` — ${f.motivoAnulacion}` : ""}`
+        ? `Se emitió la ${f.reemplazadaPor} en su lugar${f.motivoAnulacion ? ` — ${f.motivoAnulacion}` : ""}`
         : "",
     ]);
     for (const col of [7, 8, 9, 10, 11, 12]) fila.getCell(col).numFmt = "#,##0";
@@ -156,7 +156,7 @@ export async function GET(request: NextRequest) {
   }
   hoja.addRow([]);
   hoja.addRow([
-    "Los totales suman solo las facturas vigentes (no las anuladas ni las reemplazadas). Los montos van con IVA incluido; el IVA se saca dividiendo el gravado por 11 (10%) o por 21 (5%).",
+    "Los totales suman solo las facturas vigentes (no las anuladas). Los montos van con IVA incluido; el IVA se saca dividiendo el gravado por 11 (10%) o por 21 (5%).",
   ]);
 
   const dia = (f: Date) => claveDia(f);

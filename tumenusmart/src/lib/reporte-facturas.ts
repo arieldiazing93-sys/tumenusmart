@@ -26,7 +26,7 @@ export type FilaFactura = {
   etiquetaIdentificacion: string;
   identificacion: string;
   total: number;
-  /** El desglose fiscal de la factura (con IVA incluido). Null en las reemplazadas: no se guardó. */
+  /** El desglose fiscal de la factura (con IVA incluido). Null en las anuladas que se volvieron a emitir: no se guardó. */
   gravado10: number | null;
   gravado5: number | null;
   exento: number | null;
@@ -54,11 +54,12 @@ export function esVigente(f: Pick<FilaFactura, "cuentaAnulada" | "facturaAnulada
   return !f.cuentaAnulada && !f.facturaAnulada;
 }
 
-/** El estado de una factura, como se muestra en la lista. */
-export function etiquetaEstadoFactura(
-  f: Pick<FilaFactura, "cuentaAnulada" | "facturaAnulada" | "reemplazadaPor">
-): string {
-  if (f.reemplazadaPor) return "Reemplazada";
+/**
+ * El estado de una factura, como se muestra en la lista y en los reportes. Una
+ * factura que se anuló y se volvió a emitir con otro número (remisión) es una
+ * "Factura anulada" más: no hay un estado aparte para las reemplazadas.
+ */
+export function etiquetaEstadoFactura(f: Pick<FilaFactura, "cuentaAnulada" | "facturaAnulada">): string {
   if (f.cuentaAnulada) return "Cuenta anulada";
   if (f.facturaAnulada) return "Factura anulada";
   return "Vigente";

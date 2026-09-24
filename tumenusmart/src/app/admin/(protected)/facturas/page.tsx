@@ -254,9 +254,7 @@ export default async function FacturasPage({
                     <span className="cifra font-medium">{formatearGuarani(f.total)}</span>
                   </Td>
                   <Td className="text-right">
-                    {f.reemplazadaPor ? (
-                      <Pastilla color="neutro">Reemplazada</Pastilla>
-                    ) : f.cuentaAnulada ? (
+                    {f.cuentaAnulada ? (
                       <Pastilla color="peligro">Cuenta anulada</Pastilla>
                     ) : f.facturaAnulada ? (
                       <Pastilla color="aviso">Factura anulada</Pastilla>

@@ -122,9 +122,7 @@ export function VerFacturaModal({
         <div className="mt-4 flex flex-col gap-4 sm:grid sm:grid-cols-2 sm:items-start sm:gap-x-6">
         <div className="flex flex-col gap-3 text-[0.85rem]">
           <div>
-            {reemplazadaPor ? (
-              <Pastilla color="neutro">Reemplazada</Pastilla>
-            ) : cuentaAnulada ? (
+            {cuentaAnulada ? (
               <Pastilla color="peligro">Cuenta anulada</Pastilla>
             ) : facturaAnulada ? (
               <Pastilla color="aviso">Factura anulada</Pastilla>

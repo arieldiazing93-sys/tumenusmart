@@ -78,7 +78,7 @@ export default async function ImprimirFacturasPage({
               </tr>
               {anuladas > 0 && (
                 <tr className="border-b border-linea">
-                  <td className="py-2 text-tinta-media">Anuladas o reemplazadas (no suman)</td>
+                  <td className="py-2 text-tinta-media">Anuladas (no suman)</td>
                   <td className="py-2 text-right text-tinta-media">{anuladas}</td>
                 </tr>
               )}
@@ -130,7 +130,7 @@ export default async function ImprimirFacturasPage({
       )}
 
       <p className="mt-6 text-xs text-tinta-suave">
-        Los totales suman solo las facturas vigentes: las anuladas y las reemplazadas figuran tachadas. Los montos van con
+        Los totales suman solo las facturas vigentes: las anuladas figuran tachadas. Los montos van con
         IVA incluido. Para el desglose por tasa (gravado 10%, 5% y exento) usá el reporte en Excel.
       </p>
       <p className="mt-2 text-[0.72rem] text-tinta-suave">Generado desde TuMenuSmart.</p>
