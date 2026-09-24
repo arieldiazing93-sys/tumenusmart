@@ -1,5 +1,6 @@
 import { prisma } from "./prisma";
 import { listarDias, claveDia } from "./rango-fecha";
+import { factorDeDescuento } from "./descuento-venta";
 
 export type RangoFecha = { gte: Date; lt: Date };
 
@@ -187,7 +188,13 @@ export async function calcularRankingProductos(
     // como "sin ventas" solo porque nadie lo pidió online.
     prisma.ventaPosItem.findMany({
       where: { storeId, ventaPos: { creadoEn: rango, cancelada: false } },
-      select: { nombreProducto: true, cantidad: true, precioUnitario: true },
+      select: {
+        nombreProducto: true,
+        cantidad: true,
+        precioUnitario: true,
+        // Para repartir entre los ítems el descuento general de la cuenta.
+        ventaPos: { select: { total: true, descuento: true } },
+      },
     }),
     prisma.product.findMany({
       where: { storeId, disponible: true },
@@ -196,11 +203,20 @@ export async function calcularRankingProductos(
   ]);
 
   const acumulado = new Map<string, { unidades: number; facturacion: number }>();
-  for (const item of [...items, ...itemsPos]) {
+  // Los ítems del mostrador guardan el precio sin el descuento general de la
+  // cuenta: se lo reparte en proporción para que la facturación sea la real.
+  const todosLosItems = [
+    ...items.map((i) => ({ ...i, factorDescuento: 1 })),
+    ...itemsPos.map(({ ventaPos, ...i }) => ({
+      ...i,
+      factorDescuento: factorDeDescuento(Number(ventaPos.total), Number(ventaPos.descuento)),
+    })),
+  ];
+  for (const item of todosLosItems) {
     const clave = item.nombreProducto;
     const actual = acumulado.get(clave) ?? { unidades: 0, facturacion: 0 };
     actual.unidades += item.cantidad;
-    actual.facturacion += item.cantidad * Number(item.precioUnitario);
+    actual.facturacion += item.cantidad * Number(item.precioUnitario) * item.factorDescuento;
     acumulado.set(clave, actual);
   }
 

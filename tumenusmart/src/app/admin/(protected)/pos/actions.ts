@@ -11,6 +11,7 @@ import { armarPedido, type LineaPedida, type ProductoBase } from "@/lib/precio-p
 import { registrarConsumoVenta, revertirMovimientosVenta } from "@/lib/movimientos-stock";
 import { costoDelProducto } from "@/lib/costo-receta";
 import { desglosarIva, formatearNumeroFactura } from "@/lib/factura-pos";
+import { calcularDescuento, type DescuentoPedido } from "@/lib/descuento-venta";
 import { SIN_REGISTRO_FISCAL } from "@/lib/tipo-cliente";
 import { turnoAbierto, pedidosDelTurno, entregasSinRendir } from "./turno-actual";
 
@@ -96,6 +97,9 @@ export type DatosVenta = {
   /** Opcional — pensado para el día que se implemente la factura
    *  electrónica. No aplica si facturaTipoIdentificacion es "sin_nombre". */
   facturaEmail?: string;
+  /** Descuento general de la cuenta (porcentaje o monto). Sin esto, o con valor 0, no hay descuento.
+   *  El monto real lo calcula el servidor sobre el subtotal — ver calcularDescuento. */
+  descuento?: DescuentoPedido;
 };
 
 /**
@@ -296,8 +300,15 @@ export async function registrarVenta(turnoId: string, datos: DatosVenta): Promis
   if (!armado.ok) return { ok: false, error: armado.motivo };
 
   const filas = armado.lineas;
-  const total = armado.subtotal;
-  if (total <= 0) return { ok: false, error: "El total tiene que ser mayor a cero." };
+  const subtotal = armado.subtotal;
+  if (subtotal <= 0) return { ok: false, error: "El total tiene que ser mayor a cero." };
+
+  // Descuento general: se calcula acá sobre el subtotal recalculado, nunca con
+  // un monto que venga del navegador. `total` es lo que se cobra, ya con el
+  // descuento restado — de ahí salen el cierre de turno y todos los reportes.
+  const descuento = calcularDescuento(subtotal, datos.descuento);
+  if (!descuento.ok) return { ok: false, error: descuento.error };
+  const total = subtotal - descuento.monto;
 
   const areasImpresion = [
     ...new Set(
@@ -349,7 +360,9 @@ export async function registrarVenta(turnoId: string, datos: DatosVenta): Promis
         data: { ultimoNumeroFactura: { increment: 1 } },
         select: { ultimoNumeroFactura: true },
       });
-      const desglose = desglosarIva(filas);
+      // El IVA va sobre lo que se cobró de verdad: el descuento se reparte
+      // entre las tasas (ver desglosarIva).
+      const desglose = desglosarIva(filas, descuento.monto);
       datosFactura = {
         comprobanteTipo: "factura",
         facturaTipoIdentificacion: datos.facturaTipoIdentificacion,
@@ -382,6 +395,8 @@ export async function registrarVenta(turnoId: string, datos: DatosVenta): Promis
         numero,
         formaPago: formaPagoNormalizada,
         total,
+        descuento: descuento.monto,
+        descuentoPorcentaje: descuento.porcentaje,
         registradoPor,
         clienteNombre,
         clienteTelefono,

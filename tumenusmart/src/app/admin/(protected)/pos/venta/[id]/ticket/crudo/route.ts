@@ -4,6 +4,7 @@ import { prismaDelLocal } from "@/lib/prisma-local";
 import { idLocalActual } from "@/lib/local-actual";
 import { formatearGuarani, formatearMiles, formatearNumero, formatearTelefonoLocal, sinAcentos } from "@/lib/format";
 import { numeroALetras } from "@/lib/numero-a-letras";
+import { textoPorcentaje } from "@/lib/descuento-venta";
 import { etiquetaFormaPagoPos } from "@/lib/turno-pos";
 import { SIN_REGISTRO_FISCAL, etiquetaTipoIdentificacion } from "@/lib/tipo-cliente";
 import { ZONA_NEGOCIO } from "@/lib/timezone";
@@ -99,6 +100,17 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   }
   l.push(sep());
 
+  // Descuento general de la cuenta: los ítems de arriba están a precio de
+  // lista, y el TOTAL ya viene con el descuento restado.
+  const descuento = Number(venta.descuento);
+  if (descuento > 0) {
+    const etiquetaDescuento =
+      venta.descuentoPorcentaje != null
+        ? `DESCUENTO ${textoPorcentaje(Number(venta.descuentoPorcentaje))}%`
+        : "DESCUENTO";
+    l.push(`SUBTOTAL: ${formatearGuarani(Number(venta.total) + descuento)}`);
+    l.push(`${etiquetaDescuento}: -${formatearGuarani(descuento)}`);
+  }
   l.push(`TOTAL: ${formatearGuarani(Number(venta.total))}`);
   if (esFactura) l.push(`SON: ${numeroALetras(Number(venta.total))} GUARANIES`);
   l.push(sep());

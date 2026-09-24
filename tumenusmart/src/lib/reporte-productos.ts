@@ -1,6 +1,7 @@
 import { prismaDelLocal } from "./prisma-local";
 import { PEDIDO_REAL, type RangoFecha } from "./estadisticas";
 import { costoDelProducto } from "./costo-receta";
+import { factorDeDescuento } from "./descuento-venta";
 import { TASAS_IVA } from "./iva";
 
 /**
@@ -198,6 +199,8 @@ export async function calcularReporteProductosVendidos(
         costoAgregados: true,
         costoProducto: true,
         opcionesTexto: true,
+        // Para repartir entre los ítems el descuento general de la cuenta.
+        ventaPos: { select: { total: true, descuento: true } },
         product: {
           select: {
             costo: true,
@@ -260,7 +263,19 @@ export async function calcularReporteProductosVendidos(
   const acumulado = new Map<string, Acumulado>();
   const SIN_CATEGORIA = "__combos__";
 
-  for (const item of [...items, ...itemsPos]) {
+  // Los ítems del mostrador guardan su precio SIN el descuento general de la
+  // cuenta (así el ticket muestra lo que se pidió). Acá se lo reparte entre
+  // todos en proporción, para que la venta del reporte sea la plata que de
+  // verdad entró — la misma que suman Estadísticas y Analytics con `total`.
+  const todosLosItems = [
+    ...items.map((i) => ({ ...i, factorDescuento: 1 })),
+    ...itemsPos.map(({ ventaPos, ...i }) => ({
+      ...i,
+      factorDescuento: factorDeDescuento(Number(ventaPos.total), Number(ventaPos.descuento)),
+    })),
+  ];
+
+  for (const item of todosLosItems) {
     const clave = item.productId ?? `combo:${item.nombreProducto}`;
     const esCombo = !item.productId;
     const actual: Acumulado = acumulado.get(clave) ?? {
@@ -285,8 +300,8 @@ export async function calcularReporteProductosVendidos(
     // ítem). Los agregados comparten la del producto: no se separan en su
     // propia línea fiscal.
     const sinIva = factorSinIva(item.iva);
-    const precioUnitario = Number(item.precioUnitario);
-    const precioAgregadosItem = Number(item.precioAgregados);
+    const precioUnitario = Number(item.precioUnitario) * item.factorDescuento;
+    const precioAgregadosItem = Number(item.precioAgregados) * item.factorDescuento;
 
     actual.cantidad += item.cantidad;
     actual.ventaConIva += item.cantidad * precioUnitario;

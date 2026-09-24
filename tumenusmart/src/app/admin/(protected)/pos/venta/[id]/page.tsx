@@ -5,6 +5,7 @@ import { idLocalActual } from "@/lib/local-actual";
 import { Cabecera, Pastilla, Tarjeta, clasesBoton } from "@/components/ui";
 import { Volver } from "@/components/Volver";
 import { formatearGuarani, formatearNumero } from "@/lib/format";
+import { textoPorcentaje } from "@/lib/descuento-venta";
 import { etiquetaFormaPagoPos } from "@/lib/turno-pos";
 import { ZONA_NEGOCIO } from "@/lib/timezone";
 import { CancelarVentaBoton } from "./CancelarVentaBoton";
@@ -171,7 +172,27 @@ export default async function DetalleVentaPosPage({
             ))}
           </div>
 
-          <div className="mt-3 flex items-center justify-between border-t border-linea pt-3">
+          {Number(venta.descuento) > 0 && (
+            <div className="mt-3 flex flex-col gap-1 border-t border-linea pt-3 text-[0.85rem]">
+              <div className="flex items-center justify-between text-tinta-media">
+                <span>Subtotal</span>
+                <span className="cifra">{formatearGuarani(Number(venta.total) + Number(venta.descuento))}</span>
+              </div>
+              <div className="flex items-center justify-between text-exito">
+                <span>
+                  Descuento
+                  {venta.descuentoPorcentaje != null && ` (${textoPorcentaje(Number(venta.descuentoPorcentaje))} %)`}
+                </span>
+                <span className="cifra">-{formatearGuarani(Number(venta.descuento))}</span>
+              </div>
+            </div>
+          )}
+
+          <div
+            className={`flex items-center justify-between pt-3 ${
+              Number(venta.descuento) > 0 ? "mt-2" : "mt-3 border-t border-linea"
+            }`}
+          >
             <span className="text-[0.9rem] font-semibold text-tinta">Total</span>
             <span className="cifra text-[1.2rem] font-semibold text-tinta">
               {formatearGuarani(Number(venta.total))}

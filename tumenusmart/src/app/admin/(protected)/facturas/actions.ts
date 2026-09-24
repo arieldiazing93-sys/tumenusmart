@@ -30,6 +30,8 @@ export type DetalleFactura = {
   facturaExento: number;
   facturaIva10: number;
   facturaIva5: number;
+  /** Descuento general de la cuenta, en guaraníes (solo ventas del mostrador; 0 si no hubo). */
+  descuento: number;
 };
 
 /**
@@ -60,6 +62,7 @@ export async function obtenerDetalleFactura(
             facturaExento: true,
             facturaIva10: true,
             facturaIva5: true,
+            descuento: true,
             items: { select: { nombreProducto: true, cantidad: true, precioUnitario: true, opcionesTexto: true } },
           },
         })
@@ -91,6 +94,8 @@ export async function obtenerDetalleFactura(
     facturaExento: Number(registro.facturaExento ?? 0),
     facturaIva10: Number(registro.facturaIva10 ?? 0),
     facturaIva5: Number(registro.facturaIva5 ?? 0),
+    // Solo la venta del mostrador tiene descuento general (el pedido online, no).
+    descuento: "descuento" in registro ? Number(registro.descuento) : 0,
   };
 }
 
@@ -418,6 +423,7 @@ export async function remitirFactura(
         facturaAnuladaPor: true,
         facturaAnuladaEn: true,
         facturaMotivoAnulacion: true,
+        descuento: true,
         items: { select: { precioUnitario: true, cantidad: true, iva: true } },
       },
     });
@@ -428,9 +434,12 @@ export async function remitirFactura(
     }
 
     // Se recalcula desde los ítems reales en vez de copiar los montos
-    // viejos — la venta en sí no cambió, pero es la fuente de verdad.
+    // viejos — la venta en sí no cambió, pero es la fuente de verdad. Con el
+    // descuento general de la cuenta, si tuvo: los ítems guardan el precio sin
+    // descuento, y el IVA tiene que salir sobre lo que se cobró.
     const desglose = desglosarIva(
-      venta.items.map((i) => ({ precioUnitario: Number(i.precioUnitario), cantidad: i.cantidad, iva: i.iva }))
+      venta.items.map((i) => ({ precioUnitario: Number(i.precioUnitario), cantidad: i.cantidad, iva: i.iva })),
+      Number(venta.descuento)
     );
 
     try {

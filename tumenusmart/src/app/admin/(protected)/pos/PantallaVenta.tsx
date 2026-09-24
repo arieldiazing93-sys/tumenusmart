@@ -6,10 +6,12 @@ import Link from "next/link";
 import { Boton, Cabecera, Campo, Entrada, Tarjeta, clasesBoton } from "@/components/ui";
 import { Segmentado } from "@/components/Segmentado";
 import { formatearGuarani } from "@/lib/format";
+import { calcularDescuento, textoPorcentaje } from "@/lib/descuento-venta";
 import { type FormaPagoPos } from "@/lib/turno-pos";
 import { SIN_REGISTRO_FISCAL, TIPOS_IDENTIFICACION_FISCAL, etiquetaTipoIdentificacion } from "@/lib/tipo-cliente";
 import { buscarClientePorIdentificacion, buscarClientePorTelefono, registrarVenta } from "./actions";
 import { CobrarModal } from "./CobrarModal";
+import { EntradaConLupa } from "./EntradaConLupa";
 import { ClienteFiscalModal, type DatosClienteFiscal } from "./ClienteFiscalModal";
 import { MitadYMitadPickerPos } from "./MitadYMitadPickerPos";
 import { AgregadosPickerPos } from "./AgregadosPickerPos";
@@ -113,6 +115,11 @@ export function PantallaVenta({
   const [productoEligiendo, setProductoEligiendo] = useState<Producto | null>(null);
   const [buscandoCliente, setBuscandoCliente] = useState(false);
   const [clienteEsNuevo, setClienteEsNuevo] = useState(false);
+  // Descuento general de la cuenta: se tilda "Con descuento" y se escribe un
+  // porcentaje o un monto. El valor va como texto para poder tipear "12,5".
+  const [conDescuento, setConDescuento] = useState<"no" | "si">("no");
+  const [tipoDescuento, setTipoDescuento] = useState<"porcentaje" | "monto">("porcentaje");
+  const [valorDescuento, setValorDescuento] = useState("");
 
   // Suma, no pisa: un mismo producto puede estar en el carrito varias veces
   // con distintos agregados (líneas distintas), y el número sobre la
@@ -134,7 +141,18 @@ export function PantallaVenta({
     categoriaId === TODOS ? gruposMitad : gruposMitad.filter((g) => g.categoriaId === categoriaId);
 
   const totalProductos = categorias.reduce((s, c) => s + c.productos.length, 0);
-  const total = useMemo(() => carrito.reduce((s, i) => s + i.precio * i.cantidad, 0), [carrito]);
+  const subtotal = useMemo(() => carrito.reduce((s, i) => s + i.precio * i.cantidad, 0), [carrito]);
+  // Sin descuento tildado, o con el campo vacío, no se descuenta nada. Es la
+  // misma función que usa el servidor (registrarVenta), así que el total que se
+  // ve acá es el que se cobra.
+  const descuentoPedido =
+    conDescuento === "si" && valorDescuento.trim() !== ""
+      ? { tipo: tipoDescuento, valor: Number(valorDescuento.replace(",", ".")) }
+      : undefined;
+  const descuento = calcularDescuento(subtotal, descuentoPedido);
+  const descuentoInvalido = !descuento.ok;
+  const descuentoMonto = descuento.ok ? descuento.monto : 0;
+  const total = subtotal - descuentoMonto;
   const cantidadTotal = useMemo(() => carrito.reduce((s, i) => s + i.cantidad, 0), [carrito]);
 
   function agregarProducto(p: Producto) {
@@ -227,6 +245,8 @@ export function PantallaVenta({
 
   function limpiarCarrito() {
     setCarrito([]);
+    setConDescuento("no");
+    setValorDescuento("");
     setError(null);
   }
 
@@ -278,6 +298,10 @@ export function PantallaVenta({
       setError("Para factura con registro fiscal hacen falta el número y la razón social.");
       return;
     }
+    if (!descuento.ok) {
+      setError(descuento.error);
+      return;
+    }
     setCobrando(true);
     setError(null);
     const esFactura = comprobanteTipo === "factura";
@@ -297,6 +321,7 @@ export function PantallaVenta({
       facturaNumeroIdentificacion: esFactura && !esSinRegistroFiscal ? facturaNumeroIdentificacion.trim() : undefined,
       facturaRazonSocial: esFactura && !esSinRegistroFiscal ? facturaRazonSocial : undefined,
       facturaEmail: esFactura && !esSinRegistroFiscal ? facturaEmail.trim() || undefined : undefined,
+      descuento: descuentoPedido,
       items: carrito.map((i) =>
         i.tipo === "combo"
           ? {
@@ -532,6 +557,66 @@ export function PantallaVenta({
             </div>
           )}
 
+          {/* Descuento general: sobre toda la cuenta, no por producto. Solo tiene
+              sentido con algo cargado. */}
+          {carrito.length > 0 && (
+            <div className="flex flex-col gap-2 border-t border-linea pt-3.5">
+              <p className="text-[0.72rem] font-semibold uppercase tracking-rotulo text-tinta-suave">
+                Descuento
+              </p>
+              <Segmentado
+                opciones={[
+                  { value: "no", label: "Sin descuento" },
+                  { value: "si", label: "Con descuento" },
+                ]}
+                valor={conDescuento}
+                onChange={setConDescuento}
+                color="tinta"
+              />
+              {conDescuento === "si" && (
+                <>
+                  <div className="flex items-stretch gap-2">
+                    <Segmentado
+                      opciones={[
+                        { value: "porcentaje", label: "%" },
+                        { value: "monto", label: "Gs." },
+                      ]}
+                      valor={tipoDescuento}
+                      onChange={(v) => {
+                        setTipoDescuento(v);
+                        setValorDescuento("");
+                      }}
+                      className="w-32 flex-none"
+                    />
+                    <Entrada
+                      type="number"
+                      inputMode="decimal"
+                      min="0"
+                      step={tipoDescuento === "porcentaje" ? "0.01" : "1"}
+                      placeholder={tipoDescuento === "porcentaje" ? "Ej: 10" : "Ej: 5000"}
+                      aria-label={tipoDescuento === "porcentaje" ? "Porcentaje de descuento" : "Monto del descuento en guaraníes"}
+                      value={valorDescuento}
+                      onChange={(e) => setValorDescuento(e.target.value)}
+                      invalido={descuentoInvalido}
+                    />
+                  </div>
+                  {!descuento.ok ? (
+                    <p className="text-[0.76rem] font-medium text-peligro">{descuento.error}</p>
+                  ) : descuentoMonto > 0 ? (
+                    <p className="text-[0.76rem] font-medium text-exito">
+                      Se descuenta {formatearGuarani(descuentoMonto)}
+                      {descuento.porcentaje != null && ` (${textoPorcentaje(descuento.porcentaje)} %)`} de toda la cuenta.
+                    </p>
+                  ) : (
+                    <p className="text-[0.74rem] text-tinta-suave">
+                      Escribí el porcentaje o el monto a descontar de toda la cuenta.
+                    </p>
+                  )}
+                </>
+              )}
+            </div>
+          )}
+
           <div className="flex flex-col gap-2 border-t border-linea pt-3.5">
             <p className="text-[0.72rem] font-semibold uppercase tracking-rotulo text-tinta-suave">
               Cliente (opcional)
@@ -542,18 +627,18 @@ export function PantallaVenta({
                 value={clienteNombre}
                 onChange={(e) => setClienteNombre(e.target.value)}
               />
-              <Entrada
+              {/* La lupa hace lo mismo que Enter: en el celular el teclado
+                  numérico no tiene esa tecla. */}
+              <EntradaConLupa
                 placeholder="0981 234 567"
                 value={clienteTelefono}
                 onChange={(e) => {
                   setClienteTelefono(e.target.value);
                   setClienteEsNuevo(false);
                 }}
-                onKeyDown={(e) => {
-                  if (e.key !== "Enter") return;
-                  e.preventDefault();
-                  buscarCliente();
-                }}
+                onBuscar={buscarCliente}
+                buscando={buscandoCliente}
+                etiquetaBoton="Buscar cliente por teléfono"
               />
             </div>
             {clienteEsNuevo ? (
@@ -564,7 +649,7 @@ export function PantallaVenta({
               <p className="text-[0.74rem] text-tinta-suave">
                 {buscandoCliente
                   ? "Buscando…"
-                  : "Enter en el teléfono completa el nombre si ya es cliente. Se guarda con +595 automático."}
+                  : "Tocá la lupa (o Enter) para completar el nombre si ya es cliente. Se guarda con +595 automático."}
               </p>
             )}
           </div>
@@ -613,7 +698,7 @@ export function PantallaVenta({
                   ) : (
                     <>
                       <Campo etiqueta="N° de RUC / Cédula / etc.">
-                        <Entrada
+                        <EntradaConLupa
                           value={facturaNumeroIdentificacion}
                           onChange={(e) => {
                             setFacturaNumeroIdentificacion(e.target.value);
@@ -621,11 +706,9 @@ export function PantallaVenta({
                             setClienteFiscalEncontrado(false);
                             setFacturaEmail("");
                           }}
-                          onKeyDown={(e) => {
-                            if (e.key !== "Enter") return;
-                            e.preventDefault();
-                            buscarClienteFiscal();
-                          }}
+                          onBuscar={buscarClienteFiscal}
+                          buscando={buscandoClienteFiscal}
+                          etiquetaBoton="Buscar cliente por RUC o cédula"
                           placeholder="80012345-6"
                         />
                       </Campo>
@@ -676,7 +759,7 @@ export function PantallaVenta({
                         )
                       ) : (
                         <p className="text-[0.74rem] text-tinta-suave">
-                          Enter completa los datos si ya es cliente.
+                          Tocá la lupa (o Enter) para completar los datos si ya es cliente.
                         </p>
                       )}
                     </>
@@ -709,9 +792,23 @@ export function PantallaVenta({
             />
           </div>
 
-          <div className="flex items-center justify-between border-t border-linea pt-3">
-            <span className="text-[0.85rem] text-tinta-media">Total ({cantidadTotal})</span>
-            <span className="cifra text-[1.4rem] font-bold text-tinta">{formatearGuarani(total)}</span>
+          <div className="flex flex-col gap-1.5 border-t border-linea pt-3">
+            {descuentoMonto > 0 && (
+              <>
+                <div className="flex items-center justify-between text-[0.85rem] text-tinta-media">
+                  <span>Subtotal</span>
+                  <span className="cifra">{formatearGuarani(subtotal)}</span>
+                </div>
+                <div className="flex items-center justify-between text-[0.85rem] font-medium text-exito">
+                  <span>Descuento</span>
+                  <span className="cifra">-{formatearGuarani(descuentoMonto)}</span>
+                </div>
+              </>
+            )}
+            <div className="flex items-center justify-between">
+              <span className="text-[0.85rem] text-tinta-media">Total ({cantidadTotal})</span>
+              <span className="cifra text-[1.4rem] font-bold text-tinta">{formatearGuarani(total)}</span>
+            </div>
           </div>
 
           {error && (
@@ -723,7 +820,7 @@ export function PantallaVenta({
           <div className="hidden lg:block">
             <Boton
               onClick={() => setMostrarCobro(true)}
-              disabled={carrito.length === 0 || bloqueadoSinFacturar}
+              disabled={carrito.length === 0 || bloqueadoSinFacturar || descuentoInvalido}
               tam="lg"
               className="w-full"
             >
@@ -744,7 +841,8 @@ export function PantallaVenta({
           <button
             type="button"
             onClick={() => setMostrarCobro(true)}
-            className="flex w-full items-center justify-between rounded-lg bg-brand px-4 py-3 text-white shadow-sm transition-transform active:scale-[0.98]"
+            disabled={descuentoInvalido}
+            className="flex w-full items-center justify-between rounded-lg bg-brand px-4 py-3 text-white shadow-sm transition-transform active:scale-[0.98] disabled:opacity-50"
           >
             <span className="text-[0.85rem] font-semibold">
               {cantidadTotal} {cantidadTotal === 1 ? "item" : "items"} · Confirmar pedido

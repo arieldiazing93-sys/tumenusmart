@@ -29,7 +29,13 @@ export type DesgloseIva = {
   totalGeneral: number;
 };
 
-export function desglosarIva(lineas: LineaConIva[]): DesgloseIva {
+/**
+ * `descuento` es el descuento general de la venta, en guaraníes. Se reparte en
+ * proporción entre las tres tasas (cada monto gravado se achica por igual), que
+ * es como queda el IVA cuando el descuento es sobre toda la cuenta: el IVA se
+ * calcula sobre lo que de verdad se cobró, no sobre el precio de lista.
+ */
+export function desglosarIva(lineas: LineaConIva[], descuento = 0): DesgloseIva {
   let gravado10 = 0;
   let gravado5 = 0;
   let exento = 0;
@@ -38,6 +44,13 @@ export function desglosarIva(lineas: LineaConIva[]): DesgloseIva {
     if (l.iva === "gravado10") gravado10 += monto;
     else if (l.iva === "gravado5") gravado5 += monto;
     else exento += monto;
+  }
+  const subtotal = gravado10 + gravado5 + exento;
+  if (descuento > 0 && subtotal > 0) {
+    const factor = Math.max(0, (subtotal - descuento) / subtotal);
+    gravado10 *= factor;
+    gravado5 *= factor;
+    exento *= factor;
   }
   return {
     gravado10,

@@ -1141,7 +1141,16 @@ model VentaPos {
   // deliberadamente no tiene valor por defecto.
   numero        Int
   formaPago     String   // "efectivo" | "transferencia" | "tarjeta_debito" | "tarjeta_credito"
+  /// Lo que se cobró, YA con el descuento general restado.
   total         Decimal  @db.Decimal(10, 2)
+  /// Descuento general de la cuenta, en guaraníes (0 = sin descuento). Lo que
+  /// sumaban los ítems es total + descuento; los ítems guardan su precio sin
+  /// descuento, así el ticket muestra lo que se pidió. El IVA de la factura ya
+  /// se calculó sobre lo cobrado (ver desglosarIva).
+  descuento     Decimal  @default(0) @db.Decimal(10, 2)
+  /// Solo si el descuento se cargó como porcentaje (ej. 10): para imprimir
+  /// "DESCUENTO 10%". Null si fue un monto fijo o no hubo descuento.
+  descuentoPorcentaje Decimal? @db.Decimal(5, 2)
   registradoPor String
   creadoEn      DateTime @default(now())
   items         VentaPosItem[]

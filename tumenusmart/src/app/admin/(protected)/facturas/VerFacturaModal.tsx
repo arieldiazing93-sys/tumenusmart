@@ -243,6 +243,12 @@ export function VerFacturaModal({
                     </span>
                   </div>
                 ))}
+                {detalle.descuento > 0 && (
+                  <div className="flex items-start justify-between gap-2 text-exito">
+                    <span>Descuento</span>
+                    <span className="cifra flex-none font-medium">-{formatearGuarani(detalle.descuento)}</span>
+                  </div>
+                )}
               </div>
 
               {(detalle.facturaGravado10 > 0 ||
