@@ -15,6 +15,7 @@ import { armarPedido, type LineaPedida, type ProductoBase } from "@/lib/precio-p
 import { registrarConsumoVenta, revertirMovimientosVenta } from "@/lib/movimientos-stock";
 import { costoDelProducto } from "@/lib/costo-receta";
 import { desglosarIva, formatearNumeroFactura } from "@/lib/factura-pos";
+import { anularComprobantes, crearComprobante, descripcionDeItem } from "@/lib/comprobante";
 import { calcularDescuento, type DescuentoPedido } from "@/lib/descuento-venta";
 import { SIN_REGISTRO_FISCAL } from "@/lib/tipo-cliente";
 import { turnoAbierto, pedidosDelTurno, entregasSinRendir, netoMovimientosCaja } from "./turno-actual";
@@ -253,6 +254,8 @@ export async function registrarVenta(turnoId: string, datos: DatosVenta): Promis
       areaImpresionId: true,
       almacenId: true,
       costo: true,
+      // Para el comprobante: cada línea de la factura lleva su unidad de medida.
+      unidadMedida: true,
       opciones: {
         where: { tipo: "agregado" },
         orderBy: { orden: "asc" },
@@ -306,6 +309,7 @@ export async function registrarVenta(turnoId: string, datos: DatosVenta): Promis
   // un único producto (f.productId queda null) y, junto con los productos
   // sin área asignada, simplemente no aparecen en ninguna comanda impresa.
   const areaDelProducto = new Map(productosDelLocal.map((p) => [p.id, p.areaImpresionId]));
+  const unidadDelProducto = new Map(productosDelLocal.map((p) => [p.id, p.unidadMedida]));
   const catalogo: ProductoBase[] = productosDelLocal.map((p) => ({
     id: p.id,
     nombre: p.nombre,
@@ -390,6 +394,8 @@ export async function registrarVenta(turnoId: string, datos: DatosVenta): Promis
 
   const ventaId = await prisma.$transaction(async (tx) => {
     let datosFactura: Record<string, unknown> = { comprobanteTipo: "ticket" };
+    // El número que consumió esta factura, para armar su Comprobante más abajo.
+    let correlativoFactura: number | null = null;
 
     if (esFactura && puntoExpedicion) {
       // Con registro fiscal: la ficha del cliente queda guardada por su
@@ -414,6 +420,7 @@ export async function registrarVenta(turnoId: string, datos: DatosVenta): Promis
         data: { ultimoNumeroFactura: { increment: 1 } },
         select: { ultimoNumeroFactura: true },
       });
+      correlativoFactura = peActualizado.ultimoNumeroFactura;
       // El IVA va sobre lo que se cobró de verdad: el descuento se reparte
       // entre las tasas (ver desglosarIva).
       const desglose = desglosarIva(filas, descuento.monto);
@@ -488,6 +495,39 @@ export async function registrarVenta(turnoId: string, datos: DatosVenta): Promis
     });
 
     await registrarConsumoVenta(tx, storeId, filas, { ventaPosId: venta.id }, registradoPor);
+
+    // La foto fiscal de la factura: todo lo que un proveedor de factura
+    // electrónica (o un reporte) necesita, en una sola tabla. Va en la misma
+    // transacción que el número consumido, así nunca quedan una sin la otra.
+    if (esFactura && puntoExpedicion && correlativoFactura !== null) {
+      await crearComprobante(tx, {
+        storeId,
+        origen: { ventaPosId: venta.id },
+        punto: puntoExpedicion,
+        correlativo: correlativoFactura,
+        receptor: {
+          tipoIdentificacion: datos.facturaTipoIdentificacion!,
+          numeroIdentificacion: esSinRegistroFiscal
+            ? SIN_REGISTRO_FISCAL.numero
+            : datos.facturaNumeroIdentificacion!.trim(),
+          razonSocial: esSinRegistroFiscal ? null : datos.facturaRazonSocial!.trim(),
+          email: esSinRegistroFiscal ? null : datos.facturaEmail?.trim() || null,
+        },
+        presencia: "presencial",
+        condicion: esCredito ? "credito" : "contado",
+        fechaVencimientoCredito,
+        items: filas.map((f) => ({
+          productId: f.productId ?? null,
+          descripcion: descripcionDeItem(f.nombreProducto, f.opcionesTexto),
+          unidadMedida: f.productId ? (unidadDelProducto.get(f.productId) ?? null) : null,
+          cantidad: f.cantidad,
+          precioUnitario: f.precioUnitario,
+          iva: f.iva,
+        })),
+        descuento: descuento.monto,
+        emitidoPor: registradoPor,
+      });
+    }
 
     return venta.id;
   });
@@ -791,6 +831,17 @@ export async function cancelarVenta(ventaId: string, motivo: string): Promise<Re
           : {}),
       },
     });
+
+    // El comprobante de la factura también queda anulado (el número no se reutiliza).
+    if (venta.facturaNumero && !venta.facturaAnulada) {
+      await anularComprobantes(tx, {
+        storeId,
+        origen: { ventaPosId: ventaId },
+        por: identidad,
+        en: ahora,
+        motivo: motivo.trim() || null,
+      });
+    }
 
     await revertirMovimientosVenta(tx, storeId, { ventaPosId: ventaId }, identidad);
   });

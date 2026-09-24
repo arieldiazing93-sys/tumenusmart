@@ -9,6 +9,7 @@ import { esVentaACredito, etiquetaFormaPagoPos } from "@/lib/turno-pos";
 import { SIN_REGISTRO_FISCAL, etiquetaTipoIdentificacion } from "@/lib/tipo-cliente";
 import { ZONA_NEGOCIO } from "@/lib/timezone";
 import { ImprimirAuto } from "@/components/ImprimirAuto";
+import { VolverAutomatico } from "@/components/VolverAutomatico";
 
 export const dynamic = "force-dynamic";
 
@@ -90,7 +91,7 @@ export default async function TicketVentaPosPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ silencioso?: string; comandasFallidas?: string }>;
+  searchParams: Promise<{ silencioso?: string; comandasFallidas?: string; volver?: string }>;
 }) {
   await pantallaConPermiso("pos.vender");
   const storeId = await idLocalActual();
@@ -100,7 +101,7 @@ export default async function TicketVentaPosPage({
   // src/lib/impresion-comprobantes.ts. Oculta los controles manuales
   // (ImprimirAuto, el link a la comanda), que no tienen sentido en un
   // documento que ya se manda directo a la impresora.
-  const { silencioso, comandasFallidas } = await searchParams;
+  const { silencioso, comandasFallidas, volver } = await searchParams;
   const esSilencioso = silencioso === "1";
   // Áreas cuya comanda NO se pudo imprimir sola al cobrar (ver
   // PantallaVenta.tsx confirmarCobro) — se avisa acá, con un link manual
@@ -111,6 +112,11 @@ export default async function TicketVentaPosPage({
     idsComandasFallidas.length > 0
       ? await db.areaImpresion.findMany({ where: { id: { in: idsComandasFallidas } }, select: { id: true, nombre: true } })
       : [];
+  // Solo viene de cobrar en el Punto de Venta (PantallaVenta): ahí, ya impreso
+  // el ticket, se vuelve solo al mostrador. Si alguna comanda no salió sola se
+  // queda: hay que tocar su link, y volver de golpe taparía ese aviso. Al abrir
+  // el ticket de una venta vieja desde Cuentas no viene, y no se mueve.
+  const volverAlPos = volver === "1" && areasFallidas.length === 0;
 
   const [venta, store] = await Promise.all([
     db.ventaPos.findUnique({ where: { id }, include: { items: true, pagos: { orderBy: { orden: "asc" } } } }),
@@ -156,7 +162,11 @@ export default async function TicketVentaPosPage({
       <style dangerouslySetInnerHTML={{ __html: ESTILOS_IMPRESION }} />
 
       <div id="comprobante-imprimible" className="mx-auto max-w-[75mm] font-mono text-[9px] leading-tight text-black">
-        {!esSilencioso && <ImprimirAuto />}
+        {!esSilencioso ? (
+          <ImprimirAuto volverA={volverAlPos ? "/admin/pos" : undefined} />
+        ) : (
+          volverAlPos && <VolverAutomatico a="/admin/pos" segundos={2} />
+        )}
 
         {venta.cancelada && (
           <div className="mb-2 text-center">

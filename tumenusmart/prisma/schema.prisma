@@ -179,6 +179,8 @@ model Store {
   areasImpresion   AreaImpresion[]
   estacionesImpresoras EstacionImpresora[]
   facturasReemplazadas FacturaReemplazada[]
+  comprobantes         Comprobante[]
+  comprobanteItems     ComprobanteItem[]
   optionGroups         OptionGroup[]
   optionGroupProductos OptionGroupProduct[]
   productOptionGroups  ProductOptionGroup[]
@@ -807,6 +809,10 @@ model Order {
   // queda congelada acá antes de pisarse.
   facturasReemplazadas FacturaReemplazada[]
 
+  /// Los documentos fiscales emitidos para este pedido (ver Comprobante): la
+  /// factura vigente y, si hubo remisión, las anuladas que reemplazó.
+  comprobantes Comprobante[]
+
   // Cada descuento (y, si se cancela, su reversión) de stock que generó
   // este pedido — ver MovimientoStock (Control de stock).
   movimientosStock MovimientoStock[]
@@ -1151,9 +1157,10 @@ model PuntoExpedicion {
   // dos ventas en simultáneo podrían agarrar el mismo número).
   ultimoNumeroFactura Int @default(0)
 
-  activo     Boolean    @default(true)
-  createdAt  DateTime   @default(now())
-  estaciones Estacion[]
+  activo       Boolean       @default(true)
+  createdAt    DateTime      @default(now())
+  estaciones   Estacion[]
+  comprobantes Comprobante[]
 
   @@index([storeId])
 }
@@ -1270,6 +1277,9 @@ model VentaPos {
   // Historial de remisiones — ver Order.facturasReemplazadas.
   facturasReemplazadas FacturaReemplazada[]
 
+  /// Los documentos fiscales emitidos para esta venta (ver Comprobante).
+  comprobantes Comprobante[]
+
   // Ver Order.movimientosStock.
   movimientosStock MovimientoStock[]
 
@@ -1312,6 +1322,159 @@ model VentaPosItem {
 
   @@index([storeId])
   @@index([ventaPosId])
+}
+
+/// Un documento fiscal emitido: hoy la Factura Autoimpresor; mañana la factura
+/// electrónica (SIFEN, a través de un proveedor), notas de crédito, etc.
+///
+/// Es una FOTO del documento tal como salió — emisor, comprador, numeración,
+/// montos y líneas — que nunca se recalcula. Todo lo que un proveedor de
+/// factura electrónica (o un reporte fiscal como el RG 90) necesita está acá,
+/// sin tener que juntar datos de ventas, pedidos, clientes y productos.
+///
+/// Sigue la estructura del Documento Electrónico de SIFEN (esquema oficial
+/// DE_v150.xsd de la DNIT): cada campo dice, en su comentario, a qué campo del
+/// DE corresponde. Se guardan valores SEMÁNTICOS ("factura", "contado",
+/// "efectivo"…), no los códigos numéricos de la DNIT — la traducción a esos
+/// códigos vive en src/lib/sifen-codigos.ts, mismo criterio que
+/// tipo-cliente.ts.
+///
+/// Una venta o un pedido puede tener varios a lo largo del tiempo (una factura
+/// anulada y su remisión): el que rige es el de `estado = "vigente"`. Debe
+/// tener origen: exactamente una de ventaPosId / orderId (lo exige un CHECK en
+/// la migración).
+model Comprobante {
+  id      String @id @default(cuid())
+  storeId String
+  store   Store  @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  /// De qué cuenta salió: la venta del mostrador…
+  ventaPosId String?
+  ventaPos   VentaPos? @relation(fields: [ventaPosId], references: [id], onDelete: Cascade)
+  /// …o el pedido online.
+  orderId    String?
+  order      Order?    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  // --- gTimb: tipo, timbrado y numeración ---
+  /// "factura" | "autofactura" | "nota_credito" | "nota_debito" | "nota_remision" (iTiDE).
+  tipo         String  @default("factura")
+  /// "autoimpresor" (talonario autorizado por la DNIT, como hoy) | "electronico" (SIFEN).
+  modalidad    String  @default("autoimpresor")
+  /// "normal" | "contingencia" (iTipEmi).
+  tipoEmision  String  @default("normal")
+  /// El punto de expedición del que salió el número.
+  puntoExpedicionId String?
+  puntoDeExpedicion PuntoExpedicion? @relation(fields: [puntoExpedicionId], references: [id], onDelete: SetNull)
+  /// Número de timbrado (dNumTim, 8 dígitos) y desde cuándo rige (dFeIniT).
+  timbrado         String
+  timbradoDesde    DateTime?
+  timbradoHasta    DateTime
+  /// dEst y dPunExp: 3 dígitos cada uno.
+  establecimiento  String
+  punto            String
+  /// dNumDoc: el correlativo (1, 2, 3…), 7 dígitos con ceros. `numero` es el
+  /// documento completo con formato: "001-001-0000001".
+  correlativo      Int
+  numero           String
+  /// Cuándo se emitió (dFeEmiDE).
+  fechaEmision     DateTime @default(now())
+
+  // --- gOpeCom: la operación ---
+  /// "venta_mercaderia" | "prestacion_servicios" | "mixto" (iTipTra).
+  tipoTransaccion  String  @default("venta_mercaderia")
+  /// Moneda de la operación (cMoneOpe): siempre guaraníes hoy.
+  moneda           String  @default("PYG")
+
+  // --- gEmis: el emisor (foto) ---
+  emisorRuc         String
+  emisorRazonSocial String
+
+  // --- gDatRec: el comprador (foto) ---
+  /// Clasificación del comprador (ver src/lib/tipo-cliente.ts): "ruc" |
+  /// "cedula" | "pasaporte" | "cedula_extranjera" | "diplomatico" |
+  /// "identificacion_tributaria" | "sin_nombre" (innominado).
+  receptorTipoIdentificacion   String
+  receptorNumeroIdentificacion String
+  /// dNomRec. Nulo si es "sin_nombre".
+  receptorRazonSocial          String?
+  /// dEmailRec.
+  receptorEmail                String?
+
+  // --- gCamFE / gCamCond: presencia y condición ---
+  /// "presencial" | "electronica" | "telemarketing" | "domicilio" | "bancaria" | "ciclica" | "otro" (iIndPres).
+  presencia   String  @default("presencial")
+  /// "contado" | "credito" (iCondOpe).
+  condicion   String  @default("contado")
+  /// Solo si es a crédito: hasta cuándo tiene el cliente para pagar.
+  fechaVencimientoCredito DateTime?
+
+  // --- gTotSub: totales, en guaraníes, IVA incluido ---
+  /// Subtotales por tasa, ya con el descuento restado (dSub10, dSub5, dSubExe).
+  gravado10 Decimal @db.Decimal(18, 2)
+  gravado5  Decimal @db.Decimal(18, 2)
+  exento    Decimal @db.Decimal(18, 2)
+  /// IVA contenido en cada base (dLiqTotIVA10, dLiqTotIVA5).
+  iva10     Decimal @db.Decimal(18, 2)
+  iva5      Decimal @db.Decimal(18, 2)
+  /// Descuento total aplicado (suma de los `descuento` de los ítems).
+  descuento Decimal @default(0) @db.Decimal(18, 2)
+  /// Lo que se facturó (dTotGralOpe).
+  total     Decimal @db.Decimal(18, 2)
+
+  // --- Estado ---
+  /// "vigente" | "anulado".
+  estado          String    @default("vigente")
+  anuladoPor      String?
+  anuladoEn       DateTime?
+  motivoAnulacion String?
+
+  /// Si se emitió EN LUGAR de otro comprobante anulado (remisión): cuál.
+  reemplazaAId   String?      @unique
+  reemplazaA     Comprobante? @relation("Remision", fields: [reemplazaAId], references: [id])
+  reemplazadoPor Comprobante? @relation("Remision")
+
+  emitidoPor String
+  createdAt  DateTime @default(now())
+
+  items ComprobanteItem[]
+
+  @@index([storeId, fechaEmision])
+  @@index([storeId, numero])
+  @@index([ventaPosId])
+  @@index([orderId])
+}
+
+/// Una línea de un Comprobante (gCamItem del DE): la foto de lo facturado,
+/// con su unidad de medida y su tasa de IVA congeladas.
+model ComprobanteItem {
+  id            String      @id @default(cuid())
+  storeId       String
+  store         Store       @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  comprobanteId String
+  comprobante   Comprobante @relation(fields: [comprobanteId], references: [id], onDelete: Cascade)
+  orden         Int         @default(0)
+
+  /// dCodInt: código interno (el id del producto de la carta). Nulo en un
+  /// combo mitad y mitad y en el costo de envío, que no son un producto único.
+  codigo         String?
+  /// dDesProSer: el nombre, con los agregados entre paréntesis.
+  descripcion    String
+  /// "unidad" | "kilogramo" | "litro" (cUniMed; código en src/lib/unidad-medida.ts).
+  unidadMedida   String      @default("unidad")
+  /// dCantProSer.
+  cantidad       Decimal     @db.Decimal(18, 8)
+  /// dPUniProSer: precio de UNA unidad de lista, IVA incluido.
+  precioUnitario Decimal     @db.Decimal(18, 2)
+  /// dDescItem: descuento de la línea (el descuento general de la cuenta,
+  /// repartido en proporción entre todas las líneas).
+  descuento      Decimal     @default(0) @db.Decimal(18, 2)
+  /// dTotOpeItem: cantidad × precio − descuento, IVA incluido.
+  total          Decimal     @db.Decimal(18, 2)
+  /// "gravado10" | "gravado5" | "exento" (iAfecIVA + dTasaIVA).
+  iva            String
+
+  @@index([storeId])
+  @@index([comprobanteId])
 }
 
 /// Snapshot de una factura anulada justo antes de reemplazarla por una

@@ -423,11 +423,12 @@ export function PantallaVenta({
     // disparar además el diálogo de impresión del navegador encima de algo
     // que ya salió — si no se pudo, se navega igual que siempre y el propio
     // ImprimirAuto de esa pantalla ofrece la impresión manual.
-    router.push(
-      resultadoTicket.ok
-        ? `${urlTicket}?silencioso=1${parametroFallidas}`
-        : `${urlTicket}${parametroFallidas ? `?${parametroFallidas.slice(1)}` : ""}`
-    );
+    const destino = resultadoTicket.ok
+      ? `${urlTicket}?silencioso=1${parametroFallidas}`
+      : `${urlTicket}${parametroFallidas ? `?${parametroFallidas.slice(1)}` : ""}`;
+    // "volver=1": el ticket, una vez impreso (o guardado como PDF), vuelve solo
+    // al mostrador — así el cajero no tiene que hacer clic para seguir vendiendo.
+    router.push(`${destino}${destino.includes("?") ? "&" : "?"}volver=1`);
   }
 
   // Lo que se muestra dentro del cuadro de cobro al elegir "A crédito": el

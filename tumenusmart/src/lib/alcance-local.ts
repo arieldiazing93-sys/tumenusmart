@@ -48,6 +48,8 @@ export const MODELOS_POR_LOCAL = new Set([
   "MovimientoCaja",
   "CobroVenta",
   "PagoVenta",
+  "Comprobante",
+  "ComprobanteItem",
   "Bitacora",
   "Gasto",
   "MovimientoStock",

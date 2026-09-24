@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, type ReactNode } from "react";
-import { Boton } from "@/components/ui";
+import { Boton, clasesBoton } from "@/components/ui";
 import { formatearGuarani } from "@/lib/format";
 import { FORMAS_PAGO_POS, FORMA_PAGO_A_CREDITO, type FormaPagoPos } from "@/lib/turno-pos";
 import { MAX_PAGOS_POR_VENTA, type PagoCobro } from "@/lib/pago-venta";
@@ -36,8 +36,9 @@ const CLASE_CAMPO =
  *
  * En el celular sube como una hoja desde abajo (mismo patrón que
  * FichaProducto.tsx en el menú público); en pantallas más anchas es un
- * cuadro centrado — el pulgar del cajero queda cerca de los botones en
- * los dos casos.
+ * cuadro centrado, ancho y bajo (el total al lado del cliente, las formas
+ * de pago en dos renglones) — el pulgar del cajero queda cerca de los
+ * botones en los dos casos.
  */
 export function CobrarModal({
   clienteNombre,
@@ -151,6 +152,10 @@ export function CobrarModal({
     onCobrar([{ forma: formaPago, monto: total }]);
   }
 
+  const totalGrande = (
+    <p className="cifra text-[1.9rem] font-bold leading-none text-tinta">{formatearGuarani(total)}</p>
+  );
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-end justify-center bg-tinta/45 sm:items-center sm:p-4"
@@ -160,14 +165,15 @@ export function CobrarModal({
         role="dialog"
         aria-modal="true"
         aria-label="Cobrar"
-        className="max-h-[90vh] w-full overflow-y-auto rounded-t-xl bg-white p-5 shadow-alta animate-[subirHoja_0.28s_cubic-bezier(0.22,0.7,0.3,1)] sm:max-w-sm sm:animate-[subir_0.22s_ease-out] sm:rounded-xl"
-        style={{ paddingBottom: "max(1.25rem, env(safe-area-inset-bottom, 0px))" }}
+        className="max-h-[92vh] w-full overflow-y-auto rounded-t-xl bg-white p-4 shadow-alta animate-[subirHoja_0.28s_cubic-bezier(0.22,0.7,0.3,1)] sm:max-w-xl sm:animate-[subir_0.22s_ease-out] sm:rounded-xl sm:p-5"
+        style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom, 0px))" }}
         onClick={(e) => e.stopPropagation()}
       >
         <span className="mx-auto mb-3 block h-1 w-10 flex-none rounded-full bg-linea sm:hidden" />
 
+        {/* En pantallas anchas el total va al lado del cliente (ahorra una fila); en el celular queda debajo, más grande. */}
         <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <p className="text-[0.7rem] font-semibold uppercase tracking-rotulo text-tinta-suave">
               Cobrar
             </p>
@@ -176,6 +182,7 @@ export function CobrarModal({
               {cantidadItems === 1 ? "producto" : "productos"}
             </p>
           </div>
+          <div className="hidden flex-none sm:block">{totalGrande}</div>
           <button
             type="button"
             onClick={onCerrar}
@@ -185,14 +192,24 @@ export function CobrarModal({
             ✕
           </button>
         </div>
+        <div className="mt-2 sm:hidden">{totalGrande}</div>
 
-        <p className="cifra mt-3 text-[2.1rem] font-bold leading-none text-tinta">
-          {formatearGuarani(total)}
-        </p>
-
-        <p className="mb-2 mt-6 text-[0.75rem] font-semibold uppercase tracking-rotulo text-tinta-suave">
-          {dividiendo ? "Dividir el pago" : "¿Cómo paga?"}
-        </p>
+        <div className="mb-2 mt-4 flex items-center justify-between gap-2">
+          <p className="text-[0.75rem] font-semibold uppercase tracking-rotulo text-tinta-suave">
+            {dividiendo ? "Dividir el pago" : "¿Cómo paga?"}
+          </p>
+          {dividiendo ? (
+            <button type="button" onClick={volverAUnaForma} className={clasesBoton("suave", "sm")}>
+              Una sola forma de pago
+            </button>
+          ) : (
+            !esCredito && (
+              <button type="button" onClick={empezarADividir} className={clasesBoton("suave", "sm")}>
+                Dividir el pago
+              </button>
+            )
+          )}
+        </div>
 
         {dividiendo ? (
           <div className="animate-[subir_0.25s_ease-out]">
@@ -221,13 +238,13 @@ export function CobrarModal({
                     onWheel={(e) => e.currentTarget.blur()}
                     placeholder="Monto"
                     aria-label={`Monto de la forma de pago ${i + 1}`}
-                    className={`${CLASE_CAMPO} w-28 text-right`}
+                    className={`${CLASE_CAMPO} w-36 text-right`}
                   />
                   <button
                     type="button"
                     onClick={() => completarConElResto(i)}
                     title="Poner lo que falta para llegar al total"
-                    className="flex-none rounded-full border border-linea bg-white px-2.5 py-1 text-[0.74rem] font-medium text-tinta-media transition-colors hover:border-brand hover:text-brand"
+                    className={clasesBoton("suave", "sm")}
                   >
                     Resto
                   </button>
@@ -236,7 +253,7 @@ export function CobrarModal({
                       type="button"
                       onClick={() => quitarLinea(i)}
                       aria-label="Quitar esta forma de pago"
-                      className="flex h-7 w-7 flex-none items-center justify-center rounded-full text-tinta-suave transition-colors hover:bg-papel-suave hover:text-peligro"
+                      className="flex h-8 w-8 flex-none items-center justify-center rounded-full text-tinta-suave transition-colors hover:bg-papel-suave hover:text-peligro"
                     >
                       ✕
                     </button>
@@ -245,73 +262,66 @@ export function CobrarModal({
               ))}
             </div>
 
-            {lineas.length < MAX_PAGOS_POR_VENTA && (
-              <button
-                type="button"
-                onClick={agregarLinea}
-                className="mt-2 text-[0.8rem] font-medium text-brand-texto underline underline-offset-2"
+            <div className="mt-2.5 flex flex-wrap items-center gap-2">
+              {lineas.length < MAX_PAGOS_POR_VENTA && (
+                <button type="button" onClick={agregarLinea} className={clasesBoton("suave", "sm")}>
+                  + Agregar otra forma de pago
+                </button>
+              )}
+              <p
+                className={`flex-1 rounded-lg px-3 py-1.5 text-[0.85rem] font-medium ${
+                  cubreElTotal
+                    ? "bg-exito-luz text-exito"
+                    : restante > 0
+                      ? "bg-aviso-luz text-aviso"
+                      : "bg-peligro-luz text-peligro"
+                }`}
               >
-                + Agregar otra forma de pago
-              </button>
-            )}
-
-            <p
-              className={`mt-3 rounded-lg px-3 py-2 text-[0.85rem] font-medium ${
-                cubreElTotal
-                  ? "bg-exito-luz text-exito"
+                {cubreElTotal
+                  ? "✓ Los montos cubren el total."
                   : restante > 0
-                    ? "bg-aviso-luz text-aviso"
-                    : "bg-peligro-luz text-peligro"
-              }`}
-            >
-              {cubreElTotal
-                ? "✓ Los montos cubren el total."
-                : restante > 0
-                  ? `Falta cobrar ${formatearGuarani(restante)}`
-                  : `Se pasa por ${formatearGuarani(-restante)}`}
-            </p>
+                    ? `Falta cobrar ${formatearGuarani(restante)}`
+                    : `Se pasa por ${formatearGuarani(-restante)}`}
+              </p>
+            </div>
 
             {montoEnEfectivo > 0 && (
-              <div className="mt-3 rounded-lg border border-linea bg-papel-suave p-3">
-                <label className="block text-[0.75rem] font-semibold uppercase tracking-rotulo text-tinta-suave">
+              <div className="mt-2.5 flex flex-wrap items-center gap-3 rounded-lg border border-linea bg-papel-suave px-3 py-2">
+                <label
+                  htmlFor="efectivo-recibido"
+                  className="text-[0.75rem] font-semibold uppercase tracking-rotulo text-tinta-suave"
+                >
                   Efectivo recibido (opcional)
-                  <input
-                    type="number"
-                    min={0}
-                    step={1000}
-                    value={efectivoRecibido}
-                    onChange={(e) => setEfectivoRecibido(e.target.value)}
-                    onWheel={(e) => e.currentTarget.blur()}
-                    placeholder={String(Math.round(montoEnEfectivo))}
-                    className={`${CLASE_CAMPO} mt-1 w-full text-center normal-case tracking-normal`}
-                  />
                 </label>
+                <input
+                  id="efectivo-recibido"
+                  type="number"
+                  min={0}
+                  step={1000}
+                  value={efectivoRecibido}
+                  onChange={(e) => setEfectivoRecibido(e.target.value)}
+                  onWheel={(e) => e.currentTarget.blur()}
+                  placeholder={String(Math.round(montoEnEfectivo))}
+                  className={`${CLASE_CAMPO} w-36 text-center`}
+                />
                 {vueltoDividido > 0 && (
-                  <p className="mt-2 text-[0.85rem] text-tinta">
+                  <p className="text-[0.85rem] text-tinta">
                     Vuelto: <strong className="cifra text-exito">{formatearGuarani(vueltoDividido)}</strong>
                   </p>
                 )}
               </div>
             )}
-
-            <button
-              type="button"
-              onClick={volverAUnaForma}
-              className="mt-3 text-[0.8rem] font-medium text-tinta-media underline underline-offset-2"
-            >
-              Volver a una sola forma de pago
-            </button>
           </div>
         ) : (
           <>
-            <div className="grid grid-cols-2 gap-2">
+            <div className={`grid grid-cols-2 gap-2 ${permiteCredito ? "sm:grid-cols-3" : "sm:grid-cols-4"}`}>
               {FORMAS_PAGO_POS.map((f) => (
                 <button
                   key={f.valor}
                   type="button"
                   onClick={() => setFormaPago(f.valor)}
                   aria-pressed={formaPago === f.valor}
-                  className={`flex items-center gap-2 rounded-lg border px-3 py-3 text-left text-[0.85rem] font-medium transition-all active:scale-[0.97] ${
+                  className={`flex min-w-0 items-center gap-2 rounded-lg border px-3 py-2.5 text-left text-[0.85rem] font-medium leading-tight transition-all active:scale-[0.97] ${
                     formaPago === f.valor
                       ? "border-brand bg-brand-light text-brand-texto shadow-sm"
                       : "border-linea text-tinta-media hover:border-brand/40 hover:bg-papel-suave"
@@ -328,7 +338,7 @@ export function CobrarModal({
                   type="button"
                   onClick={() => setFormaPago(FORMA_PAGO_A_CREDITO)}
                   aria-pressed={esCredito}
-                  className={`col-span-2 flex items-center gap-2 rounded-lg border px-3 py-3 text-left text-[0.85rem] font-medium transition-all active:scale-[0.97] ${
+                  className={`col-span-2 flex min-w-0 items-center gap-2 rounded-lg border px-3 py-2.5 text-left text-[0.85rem] font-medium leading-tight transition-all active:scale-[0.97] sm:col-span-2 ${
                     esCredito
                       ? "border-brand bg-brand-light text-brand-texto shadow-sm"
                       : "border-linea text-tinta-media hover:border-brand/40 hover:bg-papel-suave"
@@ -343,7 +353,7 @@ export function CobrarModal({
             </div>
 
             {esCredito && (
-              <div className="mt-4 rounded-lg border border-aviso/30 bg-aviso-luz p-3.5 animate-[subir_0.25s_ease-out]">
+              <div className="mt-3 rounded-lg border border-aviso/30 bg-aviso-luz p-3.5 animate-[subir_0.25s_ease-out]">
                 <p className="text-[0.85rem] font-medium text-tinta">
                   Esta venta no entra en la caja: el cliente la paga después.
                 </p>
@@ -369,44 +379,36 @@ export function CobrarModal({
             )}
 
             {formaPago === "efectivo" && (
-              <div className="mt-4 rounded-lg border border-linea bg-papel-suave p-3.5 animate-[subir_0.25s_ease-out]">
-                <p className="mb-1.5 text-[0.75rem] font-semibold uppercase tracking-rotulo text-tinta-suave">
+              <div className="mt-3 flex flex-wrap items-center gap-3 rounded-lg border border-linea bg-papel-suave px-3 py-2.5 animate-[subir_0.25s_ease-out]">
+                <label
+                  htmlFor="paga-con"
+                  className="text-[0.75rem] font-semibold uppercase tracking-rotulo text-tinta-suave"
+                >
                   Paga con
-                </p>
+                </label>
                 <input
+                  id="paga-con"
                   type="number"
                   min={0}
                   step={1000}
                   value={montoRecibido}
                   onChange={(e) => setMontoRecibido(e.target.value)}
                   onWheel={(e) => e.currentTarget.blur()}
-                  className="w-full rounded-lg border border-linea bg-white px-3 py-2.5 text-center text-[1.15rem] font-semibold text-tinta transition-colors focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/15"
+                  className="w-40 rounded-lg border border-linea bg-white px-3 py-2 text-center text-[1.05rem] font-semibold text-tinta transition-colors focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/15"
                 />
-                <div className="mt-2 flex items-center justify-between gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setMontoRecibido(String(Math.round(total)))}
-                    className="rounded-full border border-linea bg-white px-3 py-1 text-[0.78rem] font-medium text-tinta-media transition-colors hover:border-brand hover:text-brand"
-                  >
-                    Justo
-                  </button>
-                  {vuelto > 0 && (
-                    <p className="text-[0.85rem] text-tinta">
-                      Vuelto: <strong className="cifra text-exito">{formatearGuarani(vuelto)}</strong>
-                    </p>
-                  )}
-                </div>
+                <button
+                  type="button"
+                  onClick={() => setMontoRecibido(String(Math.round(total)))}
+                  className={clasesBoton("suave", "sm")}
+                >
+                  Justo
+                </button>
+                {vuelto > 0 && (
+                  <p className="ml-auto text-[0.9rem] text-tinta">
+                    Vuelto: <strong className="cifra text-exito">{formatearGuarani(vuelto)}</strong>
+                  </p>
+                )}
               </div>
-            )}
-
-            {!esCredito && (
-              <button
-                type="button"
-                onClick={empezarADividir}
-                className="mt-3 text-[0.8rem] font-medium text-brand-texto underline underline-offset-2"
-              >
-                Dividir el pago entre varias formas
-              </button>
             )}
           </>
         )}
@@ -417,7 +419,7 @@ export function CobrarModal({
           </p>
         )}
 
-        <div className="mt-5 flex gap-2">
+        <div className="mt-4 flex gap-2">
           <div className="flex-1">
             <Boton tono="fantasma" tam="lg" onClick={onCerrar} className="w-full">
               Volver

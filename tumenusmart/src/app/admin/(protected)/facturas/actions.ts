@@ -7,6 +7,13 @@ import { prismaDelLocal, upsertClienteFiscal } from "@/lib/prisma-local";
 import { idLocalActual } from "@/lib/local-actual";
 import { estacionActual } from "@/lib/estacion-actual";
 import { desglosarIva, formatearNumeroFactura } from "@/lib/factura-pos";
+import {
+  anularComprobantes,
+  crearComprobante,
+  descripcionDeItem,
+  ultimoComprobanteAnulado,
+  type ItemFuente,
+} from "@/lib/comprobante";
 import { esDeMesAnterior, nombreDelMes } from "@/lib/mes-fiscal";
 import { registrarBitacora } from "@/lib/bitacora";
 import { cancelarVenta } from "../pos/actions";
@@ -248,7 +255,17 @@ export async function cancelarFactura(
       return { ok: false, error: "Esa cuenta ya está cancelada — la factura ya quedó anulada con ella." };
     }
     if (venta.facturaAnulada) return { ok: false, error: "Esa factura ya estaba anulada." };
-    await db.ventaPos.update({ where: { id }, data: datosAnulacion });
+    // La venta y el comprobante de su factura se anulan juntos.
+    await prisma.$transaction(async (tx) => {
+      await tx.ventaPos.update({ where: { id, storeId }, data: datosAnulacion });
+      await anularComprobantes(tx, {
+        storeId,
+        origen: { ventaPosId: id },
+        por: identidad,
+        en: datosAnulacion.facturaAnuladaEn,
+        motivo: motivo.trim(),
+      });
+    });
     revalidatePath(`/admin/pos/venta/${id}`);
   } else {
     const pedido = await db.order.findUnique({
@@ -260,7 +277,17 @@ export async function cancelarFactura(
       return { ok: false, error: "Ese pedido ya está cancelado — la factura ya quedó anulada con él." };
     }
     if (pedido.facturaAnulada) return { ok: false, error: "Esa factura ya estaba anulada." };
-    await db.order.update({ where: { id }, data: datosAnulacion });
+    // El pedido y el comprobante de su factura se anulan juntos.
+    await prisma.$transaction(async (tx) => {
+      await tx.order.update({ where: { id, storeId }, data: datosAnulacion });
+      await anularComprobantes(tx, {
+        storeId,
+        origen: { orderId: id },
+        por: identidad,
+        en: datosAnulacion.facturaAnuladaEn,
+        motivo: motivo.trim(),
+      });
+    });
     revalidatePath(`/admin/pedidos/${id}`);
   }
 
@@ -473,7 +500,19 @@ export async function remitirFactura(
         facturaAnuladaEn: true,
         facturaMotivoAnulacion: true,
         descuento: true,
-        items: { select: { precioUnitario: true, cantidad: true, iva: true } },
+        formaPago: true,
+        fechaVencimientoCredito: true,
+        items: {
+          select: {
+            productId: true,
+            nombreProducto: true,
+            opcionesTexto: true,
+            precioUnitario: true,
+            cantidad: true,
+            iva: true,
+            product: { select: { unidadMedida: true } },
+          },
+        },
       },
     });
     if (!venta) return { ok: false, error: "Esa venta no existe." };
@@ -556,6 +595,36 @@ export async function remitirFactura(
         if (actualizada.count === 0) {
           throw new Error("Esa cuenta cambió mientras se armaba la remisión. Volvé a intentar.");
         }
+
+        // La foto fiscal de la factura nueva, ligada a la anulada que reemplaza.
+        const anterior = await ultimoComprobanteAnulado(tx, storeId, { ventaPosId: id });
+        const itemsComprobante: ItemFuente[] = venta.items.map((i) => ({
+          productId: i.productId,
+          descripcion: descripcionDeItem(i.nombreProducto, i.opcionesTexto),
+          unidadMedida: i.product?.unidadMedida ?? null,
+          cantidad: i.cantidad,
+          precioUnitario: Number(i.precioUnitario),
+          iva: i.iva,
+        }));
+        await crearComprobante(tx, {
+          storeId,
+          origen: { ventaPosId: id },
+          punto: pe,
+          correlativo: peActualizado.ultimoNumeroFactura,
+          receptor: {
+            tipoIdentificacion,
+            numeroIdentificacion,
+            razonSocial,
+            email: email || null,
+          },
+          presencia: "presencial",
+          condicion: venta.formaPago === "a_credito" ? "credito" : "contado",
+          fechaVencimientoCredito: venta.fechaVencimientoCredito,
+          items: itemsComprobante,
+          descuento: Number(venta.descuento),
+          reemplazaAId: anterior?.id ?? null,
+          emitidoPor: identidad,
+        });
       });
     } catch (err) {
       return { ok: false, error: err instanceof Error ? err.message : "No se pudo generar la factura." };
@@ -590,7 +659,18 @@ export async function remitirFactura(
       facturaAnuladaEn: true,
       facturaMotivoAnulacion: true,
       costoEnvio: true,
-      items: { select: { precioUnitario: true, cantidad: true, iva: true } },
+      tipoEntrega: true,
+      items: {
+        select: {
+          productId: true,
+          nombreProducto: true,
+          opcionesTexto: true,
+          precioUnitario: true,
+          cantidad: true,
+          iva: true,
+          product: { select: { unidadMedida: true } },
+        },
+      },
     },
   });
   if (!pedido) return { ok: false, error: "Ese pedido no existe." };
@@ -670,6 +750,47 @@ export async function remitirFactura(
       if (actualizado.count === 0) {
         throw new Error("Ese pedido cambió mientras se armaba la remisión. Volvé a intentar.");
       }
+
+      // La foto fiscal de la factura nueva, ligada a la anulada que reemplaza.
+      // El envío entra como una línea más, igual que en el desglose de arriba.
+      const anterior = await ultimoComprobanteAnulado(tx, storeId, { orderId: id });
+      const itemsComprobante: ItemFuente[] = pedido.items.map((i) => ({
+        productId: i.productId,
+        descripcion: descripcionDeItem(i.nombreProducto, i.opcionesTexto),
+        unidadMedida: i.product?.unidadMedida ?? null,
+        cantidad: i.cantidad,
+        precioUnitario: Number(i.precioUnitario),
+        iva: i.iva,
+      }));
+      if (costoEnvio > 0) {
+        itemsComprobante.push({
+          productId: null,
+          descripcion: "Costo de envío",
+          unidadMedida: "unidad",
+          cantidad: 1,
+          precioUnitario: costoEnvio,
+          iva: "gravado10",
+        });
+      }
+      await crearComprobante(tx, {
+        storeId,
+        origen: { orderId: id },
+        punto: pe,
+        correlativo: peActualizado.ultimoNumeroFactura,
+        receptor: {
+          tipoIdentificacion,
+          numeroIdentificacion,
+          razonSocial,
+          email: email || null,
+        },
+        presencia: pedido.tipoEntrega === "delivery" ? "domicilio" : "presencial",
+        condicion: "contado",
+        fechaVencimientoCredito: null,
+        items: itemsComprobante,
+        descuento: 0,
+        reemplazaAId: anterior?.id ?? null,
+        emitidoPor: identidad,
+      });
     });
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : "No se pudo generar la factura." };

@@ -9,6 +9,14 @@ import { normalizarFormaPagoPos } from "@/lib/turno-pos";
 import { normalizarCobro } from "@/lib/rendicion";
 import { estacionActual } from "@/lib/estacion-actual";
 import { desglosarIva, formatearNumeroFactura } from "@/lib/factura-pos";
+import {
+  anularComprobantes,
+  crearComprobante,
+  descripcionDeItem,
+  type DatosNuevoComprobante,
+  type ItemFuente,
+} from "@/lib/comprobante";
+import { SIN_REGISTRO_FISCAL } from "@/lib/tipo-cliente";
 import { revertirMovimientosVenta } from "@/lib/movimientos-stock";
 import { registrarBitacora } from "@/lib/bitacora";
 import { formatearGuarani } from "@/lib/format";
@@ -28,6 +36,36 @@ export type ResultadoPedidoAccion =
   | { ok: false; error: string };
 
 /**
+ * Lo que hace falta leer de un pedido para emitirle factura (intentarEmitirFactura)
+ * y armar su Comprobante: los datos del comprador que pidió en el checkout y
+ * las líneas, con la unidad de medida de cada producto.
+ */
+const SELECT_PEDIDO_PARA_FACTURA = {
+  tipoEntrega: true,
+  comprobanteTipo: true,
+  facturaNumero: true,
+  facturaTipoIdentificacion: true,
+  facturaRuc: true,
+  facturaRazonSocial: true,
+  facturaEmail: true,
+  costoEnvio: true,
+  items: {
+    select: {
+      productId: true,
+      nombreProducto: true,
+      opcionesTexto: true,
+      precioUnitario: true,
+      cantidad: true,
+      iva: true,
+      product: { select: { unidadMedida: true } },
+    },
+  },
+} as const;
+
+/** El comprobante listo para guardar; solo falta decir de qué pedido es y quién lo emitió. */
+type ComprobanteAEmitir = Omit<DatosNuevoComprobante, "storeId" | "origen" | "emitidoPor">;
+
+/**
  * Si este pedido pidió factura y todavía no se le emitió número, intenta
  * emitirlo con el punto de expedición de la estación vinculada a ESTA
  * computadora (mismo mecanismo de cookie que usa el Punto de Venta — sin
@@ -44,13 +82,26 @@ async function intentarEmitirFactura(
   pedido: {
     comprobanteTipo: string;
     facturaNumero: string | null;
-    items: { precioUnitario: unknown; cantidad: number; iva: string }[];
+    tipoEntrega: string;
+    facturaTipoIdentificacion: string | null;
+    facturaRuc: string | null;
+    facturaRazonSocial: string | null;
+    facturaEmail: string | null;
+    items: {
+      productId: string | null;
+      nombreProducto: string;
+      opcionesTexto: string | null;
+      precioUnitario: unknown;
+      cantidad: number;
+      iva: string;
+      product: { unidadMedida: string } | null;
+    }[];
     /** Costo de envío (delivery), gravado al 10% igual que cualquier
      *  servicio — si no se suma acá, Gravadas+Exentas queda por debajo del
      *  total real del pedido en la factura impresa. */
     costoEnvio?: unknown;
   }
-): Promise<{ datos: Record<string, unknown>; aviso?: string }> {
+): Promise<{ datos: Record<string, unknown>; aviso?: string; comprobante?: ComprobanteAEmitir }> {
   if (pedido.comprobanteTipo !== "factura" || pedido.facturaNumero) {
     // No pidió factura, o ya se emitió antes (idempotencia: nunca quema un
     // segundo número para el mismo pedido).
@@ -88,7 +139,45 @@ async function intentarEmitirFactura(
   }
   const desglose = desglosarIva(lineas);
 
+  // La foto fiscal de esta factura (ver Comprobante): el que llama la guarda en
+  // la misma transacción que marca el pedido con su número. El envío entra
+  // como una línea más, igual que en el desglose de IVA de arriba.
+  const itemsComprobante: ItemFuente[] = pedido.items.map((i) => ({
+    productId: i.productId,
+    descripcion: descripcionDeItem(i.nombreProducto, i.opcionesTexto),
+    unidadMedida: i.product?.unidadMedida ?? null,
+    cantidad: i.cantidad,
+    precioUnitario: Number(i.precioUnitario),
+    iva: i.iva,
+  }));
+  if (costoEnvio > 0) {
+    itemsComprobante.push({
+      productId: null,
+      descripcion: "Costo de envío",
+      unidadMedida: "unidad",
+      cantidad: 1,
+      precioUnitario: costoEnvio,
+      iva: "gravado10",
+    });
+  }
+  const sinNombre = pedido.facturaTipoIdentificacion === SIN_REGISTRO_FISCAL.tipo;
+
   return {
+    comprobante: {
+      punto: pe,
+      correlativo: peActualizado.ultimoNumeroFactura,
+      receptor: {
+        tipoIdentificacion: pedido.facturaTipoIdentificacion ?? "ruc",
+        numeroIdentificacion: pedido.facturaRuc ?? SIN_REGISTRO_FISCAL.numero,
+        razonSocial: sinNombre ? null : pedido.facturaRazonSocial,
+        email: sinNombre ? null : pedido.facturaEmail || null,
+      },
+      presencia: pedido.tipoEntrega === "delivery" ? "domicilio" : "presencial",
+      condicion: "contado",
+      fechaVencimientoCredito: null,
+      items: itemsComprobante,
+      descuento: 0,
+    },
     datos: {
       facturaNumero: formatearNumeroFactura(pe.establecimiento, pe.puntoExpedicion, peActualizado.ultimoNumeroFactura),
       facturaTimbrado: pe.numeroTimbrado,
@@ -126,6 +215,11 @@ export async function cambiarEstadoPedido(
 
   let datosFactura: Record<string, unknown> = {};
   let aviso: string | undefined;
+  // Si este cambio de estado emite la factura del pedido: su Comprobante, para
+  // guardarlo junto con el pedido (ver más abajo).
+  let comprobanteAEmitir: ComprobanteAEmitir | undefined;
+  // Si cancelar el pedido anula además una factura vigente: quién, cuándo y por qué.
+  let anulacionDeFactura: { por: string; en: Date; motivo: string } | null = null;
   // Áreas de Impresión presentes en este pedido — para la impresión
   // automática de comanda por área al pasar a "en preparación" (ver
   // src/lib/impresion-comprobantes.ts). Ítems sin producto (combo mitad y
@@ -171,6 +265,9 @@ export async function cambiarEstadoPedido(
     }
     const identidad = sesion.nombre?.trim() || sesion.email;
     const ahora = new Date();
+    if (pedidoActual?.facturaNumero && !pedidoActual.facturaAnulada) {
+      anulacionDeFactura = { por: identidad, en: ahora, motivo: motivo.trim() };
+    }
     datosFactura = {
       canceladaPor: identidad,
       canceladaEn: ahora,
@@ -204,12 +301,8 @@ export async function cambiarEstadoPedido(
     const pedido = await prisma.order.findUnique({
       where: { id: orderId },
       select: {
-        tipoEntrega: true,
         repartidorId: true,
-        comprobanteTipo: true,
-        facturaNumero: true,
-        costoEnvio: true,
-        items: { select: { precioUnitario: true, cantidad: true, iva: true } },
+        ...SELECT_PEDIDO_PARA_FACTURA,
       },
     });
     if (pedido?.tipoEntrega === "delivery" && !pedido.repartidorId) {
@@ -225,6 +318,7 @@ export async function cambiarEstadoPedido(
       const resultado = await intentarEmitirFactura(prisma, pedido);
       datosFactura = resultado.datos;
       aviso = resultado.aviso;
+      comprobanteAEmitir = resultado.comprobante;
     }
   }
 
@@ -241,12 +335,8 @@ export async function cambiarEstadoPedido(
     const pedido = await prisma.order.findUnique({
       where: { id: orderId },
       select: {
-        tipoEntrega: true,
         estado: true,
-        comprobanteTipo: true,
-        facturaNumero: true,
-        costoEnvio: true,
-        items: { select: { precioUnitario: true, cantidad: true, iva: true } },
+        ...SELECT_PEDIDO_PARA_FACTURA,
       },
     });
     if (pedido && pedido.estado !== "entregado") {
@@ -285,6 +375,7 @@ export async function cambiarEstadoPedido(
       const resultado = await intentarEmitirFactura(prisma, pedido);
       datosFactura = resultado.datos;
       aviso = resultado.aviso;
+      comprobanteAEmitir = resultado.comprobante;
     }
   }
 
@@ -294,14 +385,35 @@ export async function cambiarEstadoPedido(
     // crudo (no el filtrado por local) porque $transaction necesita el
     // mismo `tx` para las dos escrituras — por eso el `where` completa
     // storeId a mano.
+    const anulacion = anulacionDeFactura;
     await prismaCliente.$transaction(async (tx) => {
       await tx.order.update({
         where: { id: orderId, storeId },
         data: { estado, ...datosExtra, ...datosFactura },
       });
+      // Si tenía una factura vigente, su comprobante también queda anulado.
+      if (anulacion) {
+        await anularComprobantes(tx, { storeId, origen: { orderId }, ...anulacion });
+      }
       await revertirMovimientosVenta(tx, storeId, { orderId }, sesion.nombre?.trim() || sesion.email);
     });
     revalidatePath("/admin/stock/insumos");
+  } else if (comprobanteAEmitir) {
+    // Se emitió la factura: el pedido queda con su número Y el comprobante (la
+    // foto fiscal de esa factura) se guarda en la misma transacción.
+    const emision = comprobanteAEmitir;
+    await prismaCliente.$transaction(async (tx) => {
+      await tx.order.update({
+        where: { id: orderId, storeId },
+        data: { estado, ...datosExtra, ...datosFactura },
+      });
+      await crearComprobante(tx, {
+        ...emision,
+        storeId,
+        origen: { orderId },
+        emitidoPor: sesion.nombre?.trim() || sesion.email,
+      });
+    });
   } else {
     await prisma.order.update({
       where: { id: orderId },
