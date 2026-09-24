@@ -14,6 +14,7 @@ import {
   esVentaACredito,
   etiquetaFormaPagoPos,
   type FormaPagoPos,
+  type PagoDeVenta,
 } from "./turno-pos";
 import { formatearGuarani } from "./format";
 
@@ -112,9 +113,7 @@ export function filtroPorFormaPago(formaPago: string | null | undefined) {
 }
 
 /** Cuánto de una venta se cobró con una forma concreta (0 si no se usó). */
-export function montoCobradoConForma(
-  pagos: { forma: string; monto: number | string }[],
-  forma: string
-): number {
+export function montoCobradoConForma(pagos: PagoDeVenta[], forma: string): number {
+  // `monto` puede venir como Decimal de Prisma: Number() lo convierte igual que en el resto del código.
   return pagos.filter((p) => p.forma === forma).reduce((s, p) => s + Number(p.monto), 0);
 }
