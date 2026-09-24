@@ -5,7 +5,8 @@ import { idLocalActual } from "@/lib/local-actual";
 import { Cabecera, clasesBoton, Pastilla, Tabla, Th, Td, Tr, Vacio, BotonEnlace } from "@/components/ui";
 import { calcularRangoFecha, type FiltroFecha } from "@/lib/rango-fecha";
 import { formatearGuarani, formatearNumero } from "@/lib/format";
-import { etiquetaFormaPagoPos, FORMAS_PAGO_POS } from "@/lib/turno-pos";
+import { etiquetaFormaPagoPos, FORMAS_PAGO_POS, FORMA_PAGO_MIXTO } from "@/lib/turno-pos";
+import { detallePagos, filtroPorFormaPago, montoCobradoConForma } from "@/lib/pago-venta";
 import { ZONA_NEGOCIO } from "@/lib/timezone";
 
 export const dynamic = "force-dynamic";
@@ -61,13 +62,14 @@ export default async function CuentasPosPage({
   const db = prismaDelLocal(storeId);
 
   const ventas = await db.ventaPos.findMany({
-    where: { creadoEn: { gte: rango.gte, lt: rango.lt }, formaPago: formaPago || undefined },
+    where: { creadoEn: { gte: rango.gte, lt: rango.lt }, ...filtroPorFormaPago(formaPago) },
     orderBy: { creadoEn: "desc" },
     select: {
       id: true,
       numero: true,
       total: true,
       formaPago: true,
+      pagos: { orderBy: { orden: "asc" }, select: { forma: true, monto: true } },
       registradoPor: true,
       creadoEn: true,
       cancelada: true,
@@ -77,8 +79,18 @@ export default async function CuentasPosPage({
     },
   });
 
-  // Las canceladas no suman: no son plata que haya entrado a la caja.
-  const totalGeneral = ventas.filter((v) => !v.cancelada).reduce((s, v) => s + Number(v.total), 0);
+  // Las canceladas no suman: no son plata que haya entrado a la caja. Filtrando
+  // por una forma concreta se suma solo lo que se cobró CON esa forma (de una
+  // venta dividida cuenta la parte, no la cuenta entera).
+  const filtraPorUnaForma = !!formaPago && formaPago !== FORMA_PAGO_MIXTO;
+  const totalGeneral = ventas
+    .filter((v) => !v.cancelada)
+    .reduce(
+      (s, v) =>
+        s +
+        (filtraPorUnaForma ? montoCobradoConForma(v.pagos, formaPago ?? "") : Number(v.total)),
+      0
+    );
 
   return (
     <div>
@@ -164,7 +176,7 @@ export default async function CuentasPosPage({
         >
           Todas las formas
         </Link>
-        {FORMAS_PAGO_POS.map((f) => (
+        {[...FORMAS_PAGO_POS, { valor: FORMA_PAGO_MIXTO, etiqueta: "Mixto (dividido)" }].map((f) => (
           <Link
             key={f.valor}
             href={hrefFormaPago(f.valor)}
@@ -227,7 +239,14 @@ export default async function CuentasPosPage({
                   })}
                 </Td>
                 <Td>{v.clienteNombre ?? "—"}</Td>
-                <Td>{etiquetaFormaPagoPos(v.formaPago)}</Td>
+                <Td>
+                  {etiquetaFormaPagoPos(v.formaPago)}
+                  {v.pagos.length > 1 && (
+                    <span className="mt-0.5 block text-[10px] text-tinta-suave">
+                      {detallePagos(v.pagos.map((p) => ({ forma: p.forma, monto: Number(p.monto) })))}
+                    </span>
+                  )}
+                </Td>
                 <Td>{v.registradoPor}</Td>
                 <Td>
                   <Pastilla color={v.cancelada ? "peligro" : "exito"}>
@@ -252,7 +271,9 @@ export default async function CuentasPosPage({
           <tfoot>
             <tr>
               <Td colSpan={6} className="text-right font-medium">
-                Total (sin canceladas)
+                {filtraPorUnaForma
+                  ? `Cobrado en ${etiquetaFormaPagoPos(formaPago ?? "").toLowerCase()} (sin canceladas)`
+                  : "Total (sin canceladas)"}
               </Td>
               <Td className="cifra text-right font-semibold text-tinta">
                 {formatearGuarani(totalGeneral)}

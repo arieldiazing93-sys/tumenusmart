@@ -3,7 +3,8 @@ import { haySesionAdminValida } from "@/lib/auth";
 import { prismaDelLocal } from "@/lib/prisma-local";
 import { idLocalActual, localActual } from "@/lib/local-actual";
 import { calcularRangoFecha } from "@/lib/rango-fecha";
-import { etiquetaFormaPagoPos } from "@/lib/turno-pos";
+import { etiquetaFormaPagoPos, FORMA_PAGO_MIXTO } from "@/lib/turno-pos";
+import { detallePagos, filtroPorFormaPago, montoCobradoConForma } from "@/lib/pago-venta";
 import { ZONA_NEGOCIO } from "@/lib/timezone";
 import { nuevoLibro, filaTitulo, respuestaXlsx } from "@/lib/excel-reporte";
 
@@ -29,12 +30,13 @@ export async function GET(request: NextRequest) {
   const [local, ventas] = await Promise.all([
     localActual(),
     db.ventaPos.findMany({
-      where: { creadoEn: { gte: rango.gte, lt: rango.lt }, formaPago: formaPago || undefined },
+      where: { creadoEn: { gte: rango.gte, lt: rango.lt }, ...filtroPorFormaPago(formaPago) },
       orderBy: { creadoEn: "asc" },
       select: {
         numero: true,
         total: true,
         formaPago: true,
+        pagos: { orderBy: { orden: "asc" }, select: { forma: true, monto: true } },
         registradoPor: true,
         creadoEn: true,
         cancelada: true,
@@ -62,7 +64,7 @@ export async function GET(request: NextRequest) {
     { width: 12 },
     { width: 14 },
     { width: 12 },
-    { width: 20 },
+    { width: 40 },
     { width: 20 },
     { width: 14 },
     { width: 16 },
@@ -76,9 +78,14 @@ export async function GET(request: NextRequest) {
   filaTitulo(hoja, ["Cuenta", "Fecha", "Hora", "Forma de pago", "Cajero", "Estado", "Total (Gs.)"], 7);
   // Las canceladas quedan en la planilla para que no desaparezcan del
   // registro, pero no suman al total: no es plata que haya entrado a la caja.
+  // Filtrando por una forma concreta se suma solo lo cobrado CON esa forma (de
+  // una venta dividida, la parte y no la cuenta entera).
+  const filtraPorUnaForma = !!formaPago && formaPago !== FORMA_PAGO_MIXTO;
   let total = 0;
   for (const v of ventas) {
-    if (!v.cancelada) total += Number(v.total);
+    if (!v.cancelada) {
+      total += filtraPorUnaForma ? montoCobradoConForma(v.pagos, formaPago ?? "") : Number(v.total);
+    }
     const fila = hoja.addRow([
       v.numero,
       v.creadoEn.toLocaleDateString("es-PY", opcionesFecha),
@@ -88,7 +95,9 @@ export async function GET(request: NextRequest) {
         hour12: false,
         timeZone: ZONA_NEGOCIO,
       }),
-      etiquetaFormaPagoPos(v.formaPago),
+      v.pagos.length > 1
+        ? detallePagos(v.pagos.map((p) => ({ forma: p.forma, monto: Number(p.monto) })))
+        : etiquetaFormaPagoPos(v.formaPago),
       v.registradoPor,
       v.cancelada ? "Cancelada" : "Activa",
       Math.round(Number(v.total)),
@@ -99,7 +108,17 @@ export async function GET(request: NextRequest) {
   hoja.addRow([]);
   const filaTotal = filaTitulo(
     hoja,
-    ["", "", "", "", "", "TOTAL GENERAL, sin canceladas (Gs.)", Math.round(total)],
+    [
+      "",
+      "",
+      "",
+      "",
+      "",
+      filtraPorUnaForma
+        ? `TOTAL cobrado en ${etiquetaFormaPagoPos(formaPago ?? "").toLowerCase()}, sin canceladas (Gs.)`
+        : "TOTAL GENERAL, sin canceladas (Gs.)",
+      Math.round(total),
+    ],
     7
   );
   filaTotal.getCell(7).numFmt = "#,##0";

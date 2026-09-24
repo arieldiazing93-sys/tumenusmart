@@ -57,8 +57,17 @@ export function normalizarFormaPagoVenta(valor: unknown): FormaPagoPos | typeof 
     : normalizarFormaPagoPos(valor);
 }
 
+/**
+ * Pago dividido: la venta se pagó con más de una forma (50.000 en efectivo +
+ * 50.000 con débito). Es solo el RESUMEN que se guarda en VentaPos.formaPago
+ * para listar; el detalle y los montos están en sus PagoVenta, que es lo que
+ * cuenta la caja.
+ */
+export const FORMA_PAGO_MIXTO = "mixto";
+
 export function etiquetaFormaPagoPos(valor: string): string {
   if (esVentaACredito(valor)) return "A crédito";
+  if (valor === FORMA_PAGO_MIXTO) return "Mixto";
   return FORMAS_PAGO_POS.find((f) => f.valor === valor)?.etiqueta ?? "Efectivo";
 }
 
@@ -68,7 +77,16 @@ function aNumero(valor: Monto): number {
   return Number.isFinite(n) ? n : 0;
 }
 
-export type VentaDeTurno = { total: Monto; formaPago: string };
+/** Una parte del pago de una venta (ver PagoVenta). */
+export type PagoDeVenta = { forma: string; monto: Monto };
+
+/**
+ * Lo que el cierre necesita de cada venta. `pagos` es lo que de verdad se
+ * suma: una venta con pago dividido cae en varias formas a la vez. Los
+ * pedidos online cobrados en el mostrador tienen una sola forma y no traen
+ * `pagos`; ahí se usa `formaPago` con el `total` completo.
+ */
+export type VentaDeTurno = { total: Monto; formaPago: string; pagos?: PagoDeVenta[] };
 
 export type ResumenTurno = {
   /** Todas las ventas del turno, también las a crédito. */
@@ -92,6 +110,32 @@ export function resumirTurno(ventas: VentaDeTurno[]): ResumenTurno {
   const aCredito = { cantidad: 0, total: 0 };
 
   for (const v of ventas) {
+    // Con el detalle de pagos, cada parte suma en SU forma (una venta dividida
+    // cae en dos o más columnas a la vez).
+    if (v.pagos && v.pagos.length > 0) {
+      let contadaACredito = false;
+      for (const p of v.pagos) {
+        const montoPago = aNumero(p.monto);
+        if (esVentaACredito(p.forma)) {
+          aCredito.total += montoPago;
+          if (!contadaACredito) {
+            aCredito.cantidad += 1;
+            contadaACredito = true;
+          }
+          continue;
+        }
+        porForma[normalizarFormaPagoPos(p.forma)] += montoPago;
+        totalGeneral += montoPago;
+      }
+      continue;
+    }
+
+    // Sin detalle no hay forma de repartir una venta dividida: mejor cortar con
+    // un error claro que contarla toda como efectivo y descuadrar la caja sin avisar.
+    if (v.formaPago === FORMA_PAGO_MIXTO) {
+      throw new Error("Una venta con pago dividido llegó sin el detalle de sus pagos.");
+    }
+
     const monto = aNumero(v.total);
     // Una venta a crédito no es plata que entró: se cuenta aparte. Sin esto,
     // caería en "efectivo" (lo que no se reconoce se cuenta como efectivo) y

@@ -3,7 +3,8 @@ import { prismaDelLocal } from "@/lib/prisma-local";
 import { idLocalActual, localActual } from "@/lib/local-actual";
 import { calcularRangoFecha } from "@/lib/rango-fecha";
 import { formatearGuarani, formatearNumero } from "@/lib/format";
-import { etiquetaFormaPagoPos } from "@/lib/turno-pos";
+import { etiquetaFormaPagoPos, FORMA_PAGO_MIXTO } from "@/lib/turno-pos";
+import { detallePagos, filtroPorFormaPago, montoCobradoConForma } from "@/lib/pago-venta";
 import { ZONA_NEGOCIO } from "@/lib/timezone";
 import { ImprimirBoton } from "../../../estadisticas/imprimir/ImprimirBoton";
 
@@ -26,13 +27,14 @@ export default async function ImprimirCuentasPosPage({
   const [local, ventas] = await Promise.all([
     localActual(),
     db.ventaPos.findMany({
-      where: { creadoEn: { gte: rango.gte, lt: rango.lt }, formaPago: formaPago || undefined },
+      where: { creadoEn: { gte: rango.gte, lt: rango.lt }, ...filtroPorFormaPago(formaPago) },
       orderBy: { creadoEn: "asc" },
       select: {
         id: true,
         numero: true,
         total: true,
         formaPago: true,
+        pagos: { orderBy: { orden: "asc" }, select: { forma: true, monto: true } },
         registradoPor: true,
         creadoEn: true,
         cancelada: true,
@@ -53,7 +55,15 @@ export default async function ImprimirCuentasPosPage({
   const periodoTexto = esRangoConHora
     ? `${rango.gte.toLocaleString("es-PY", { ...opcionesFecha, hour: "2-digit", minute: "2-digit", hour12: false })} – ${rango.lt.toLocaleString("es-PY", { ...opcionesFecha, hour: "2-digit", minute: "2-digit", hour12: false })}`
     : `${rango.gte.toLocaleDateString("es-PY", opcionesFecha)} – ${new Date(rango.lt.getTime() - 24 * 60 * 60 * 1000).toLocaleDateString("es-PY", opcionesFecha)}`;
-  const total = ventas.filter((v) => !v.cancelada).reduce((s, v) => s + Number(v.total), 0);
+  // Filtrando por una forma concreta se suma solo lo cobrado CON esa forma (de
+  // una venta dividida, la parte y no la cuenta entera).
+  const filtraPorUnaForma = !!formaPago && formaPago !== FORMA_PAGO_MIXTO;
+  const total = ventas
+    .filter((v) => !v.cancelada)
+    .reduce(
+      (s, v) => s + (filtraPorUnaForma ? montoCobradoConForma(v.pagos, formaPago ?? "") : Number(v.total)),
+      0
+    );
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-8 print:max-w-none print:px-0 print:py-0">
@@ -94,7 +104,11 @@ export default async function ImprimirCuentasPosPage({
                     timeZone: ZONA_NEGOCIO,
                   })}
                 </td>
-                <td className="py-1.5 text-tinta-media">{etiquetaFormaPagoPos(v.formaPago)}</td>
+                <td className="py-1.5 text-tinta-media">
+                  {v.pagos.length > 1
+                    ? detallePagos(v.pagos.map((p) => ({ forma: p.forma, monto: Number(p.monto) })))
+                    : etiquetaFormaPagoPos(v.formaPago)}
+                </td>
                 <td className="py-1.5 text-tinta-media">{v.registradoPor}</td>
                 <td className="py-1.5 text-tinta-media">{v.cancelada ? "Cancelada" : "Activa"}</td>
                 <td
@@ -108,7 +122,9 @@ export default async function ImprimirCuentasPosPage({
           <tfoot>
             <tr className="border-t-2 border-linea font-semibold text-tinta">
               <td className="py-2" colSpan={5}>
-                Total recaudado (sin canceladas)
+                {filtraPorUnaForma
+                  ? `Cobrado en ${etiquetaFormaPagoPos(formaPago ?? "").toLowerCase()} (sin canceladas)`
+                  : "Total recaudado (sin canceladas)"}
               </td>
               <td className="cifra py-2 text-right">{formatearGuarani(total)}</td>
             </tr>

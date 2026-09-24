@@ -7,6 +7,7 @@ import { Volver } from "@/components/Volver";
 import { formatearGuarani, formatearNumero } from "@/lib/format";
 import { textoPorcentaje } from "@/lib/descuento-venta";
 import { esVentaACredito, etiquetaFormaPagoPos } from "@/lib/turno-pos";
+import { detallePagos } from "@/lib/pago-venta";
 import { estadoDeCuenta, redondear2, saldoDeCompra } from "@/lib/pagos-compra";
 import { ZONA_NEGOCIO } from "@/lib/timezone";
 import { CancelarVentaBoton } from "./CancelarVentaBoton";
@@ -37,6 +38,7 @@ export default async function DetalleVentaPosPage({
     include: {
       items: { orderBy: { id: "asc" } },
       turnoPos: { select: { estado: true } },
+      pagos: { orderBy: { orden: "asc" } },
       cobros: { orderBy: [{ fecha: "asc" }, { createdAt: "asc" }] },
     },
   });
@@ -135,7 +137,11 @@ export default async function DetalleVentaPosPage({
             </div>
             <div>
               <dt className="text-tinta-suave">Forma de pago</dt>
-              <dd className="font-semibold text-tinta">{etiquetaFormaPagoPos(venta.formaPago)}</dd>
+              <dd className="font-semibold text-tinta">
+                {venta.pagos.length > 1
+                  ? detallePagos(venta.pagos.map((p) => ({ forma: p.forma, monto: Number(p.monto) })))
+                  : etiquetaFormaPagoPos(venta.formaPago)}
+              </dd>
             </div>
             {venta.comprobanteTipo === "factura" && (
               <div>

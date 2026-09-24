@@ -6,12 +6,8 @@ import { prisma } from "@/lib/prisma";
 import { prismaDelLocal, siguienteNumeroVentaPos, upsertClienteFiscal } from "@/lib/prisma-local";
 import { idLocalActual } from "@/lib/local-actual";
 import { exigirPermiso } from "@/lib/auth";
-import {
-  FORMA_PAGO_A_CREDITO,
-  normalizarFormaPagoVenta,
-  resumirTurno,
-  type DeclaradoPorForma,
-} from "@/lib/turno-pos";
+import { FORMA_PAGO_A_CREDITO, resumirTurno, type DeclaradoPorForma } from "@/lib/turno-pos";
+import { validarPagosDeVenta } from "@/lib/pago-venta";
 import { claveDiaAsuncion } from "@/lib/timezone";
 import { formatearGuarani, formatearNumero } from "@/lib/format";
 import { registrarBitacora } from "@/lib/bitacora";
@@ -90,7 +86,13 @@ export type ItemVentaInput =
   | { mitadYMitad: { productIdA: string; productIdB: string }; opcionIds?: string[]; cantidad: number };
 
 export type DatosVenta = {
-  formaPago: string;
+  /**
+   * Cómo paga el cliente: una forma, o varias si divide el pago (50.000 en
+   * efectivo + 50.000 con débito). Con una sola, el monto se ignora y cobra
+   * todo; con varias, la suma tiene que dar el total (lo calcula el servidor).
+   * "a_credito" va sola. Ver validarPagosDeVenta.
+   */
+  pagos: { forma: string; monto: number }[];
   /** "local" (se consume ahí) | "llevar" (para llevar). Cualquier otro valor cae en "local". */
   tipoEntrega: string;
   /** Opcionales: se guardan tal cual se tipean, sin normalizar — igual que
@@ -116,7 +118,7 @@ export type DatosVenta = {
   /** Descuento general de la cuenta (porcentaje o monto). Sin esto, o con valor 0, no hay descuento.
    *  El monto real lo calcula el servidor sobre el subtotal — ver calcularDescuento. */
   descuento?: DescuentoPedido;
-  /** Solo si formaPago es "a_credito": en cuántos días vence lo que debe el cliente (0 a 365; por defecto 30). */
+  /** Solo si se paga "a_credito": en cuántos días vence lo que debe el cliente (0 a 365; por defecto 30). */
   creditoDias?: number;
 };
 
@@ -202,8 +204,13 @@ export async function registrarVenta(turnoId: string, datos: DatosVenta): Promis
 
   // Venta a crédito: solo si el local la activó, y solo a un cliente al que se
   // le pueda cobrar después. El navegador ya lo pide, pero esto es lo que vale.
-  const formaPagoNormalizada = normalizarFormaPagoVenta(datos.formaPago);
-  const esCredito = formaPagoNormalizada === FORMA_PAGO_A_CREDITO;
+  // (Acá solo se mira si ES a crédito, porque eso cambia qué hay que pedirle al
+  // cliente; que los pagos cierren contra el total se valida más abajo, cuando
+  // el servidor ya calculó cuánto es.)
+  const esCredito =
+    Array.isArray(datos.pagos) &&
+    datos.pagos.length === 1 &&
+    String(datos.pagos[0]?.forma ?? "").trim().toLowerCase() === FORMA_PAGO_A_CREDITO;
   let fechaVencimientoCredito: Date | null = null;
   if (esCredito) {
     if (!store?.ventasACredito) {
@@ -353,6 +360,11 @@ export async function registrarVenta(turnoId: string, datos: DatosVenta): Promis
   if (!descuento.ok) return { ok: false, error: descuento.error };
   const total = subtotal - descuento.monto;
 
+  // Cómo se paga, contra el total que acaba de calcular el servidor: una forma
+  // cobra todo; varias tienen que sumar exactamente el total.
+  const pagosValidados = validarPagosDeVenta(datos.pagos, total);
+  if (!pagosValidados.ok) return { ok: false, error: pagosValidados.error };
+
   const areasImpresion = [
     ...new Set(
       filas
@@ -435,7 +447,16 @@ export async function registrarVenta(turnoId: string, datos: DatosVenta): Promis
         storeId,
         turnoPosId: turnoId,
         numero,
-        formaPago: formaPagoNormalizada,
+        // El resumen ("efectivo", "mixto"…); el detalle con los montos va en `pagos`.
+        formaPago: pagosValidados.formaPago,
+        pagos: {
+          create: pagosValidados.pagos.map((p, i) => ({
+            storeId,
+            forma: p.forma,
+            monto: p.monto,
+            orden: i,
+          })),
+        },
         fechaVencimientoCredito,
         total,
         descuento: descuento.monto,
@@ -567,7 +588,8 @@ export async function cerrarTurno(
   const [ventas, pedidos] = await Promise.all([
     db.ventaPos.findMany({
       where: { turnoPosId: turnoId, cancelada: false },
-      select: { total: true, formaPago: true },
+      // Con el detalle de pagos: una venta con pago dividido suma en cada forma.
+      select: { total: true, formaPago: true, pagos: { select: { forma: true, monto: true } } },
     }),
     pedidosDelTurno(db, turnoId),
   ]);

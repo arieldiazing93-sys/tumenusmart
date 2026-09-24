@@ -171,6 +171,7 @@ model Store {
   ventasPos        VentaPos[]
   movimientosCaja  MovimientoCaja[]
   cobrosVenta      CobroVenta[]
+  pagosVenta       PagoVenta[]
   bitacoras        Bitacora[]
   ventaPosItems    VentaPosItem[]
   estaciones       Estacion[]
@@ -1167,7 +1168,10 @@ model VentaPos {
   // Mismo criterio que Order.numero: sale de contadorVentasPos del local y
   // deliberadamente no tiene valor por defecto.
   numero        Int
-  formaPago     String   // "efectivo" | "transferencia" | "tarjeta_debito" | "tarjeta_credito"
+  /// RESUMEN de cómo se pagó: la forma única ("efectivo" | "transferencia" |
+  /// "tarjeta_debito" | "tarjeta_credito" | "a_credito"), o "mixto" si se
+  /// dividió entre varias. El detalle y los montos están en `pagos`.
+  formaPago     String
   /// Lo que se cobró, YA con el descuento general restado.
   total         Decimal  @db.Decimal(10, 2)
   /// Descuento general de la cuenta, en guaraníes (0 = sin descuento). Lo que
@@ -1210,6 +1214,13 @@ model VentaPos {
   /// menos la suma de sus cobros (CobroVenta): el saldo no se guarda.
   fechaVencimientoCredito DateTime?
   cobros                  CobroVenta[]
+
+  /// Cómo se pagó ESTA venta: una fila por cada forma de pago usada (pago
+  /// dividido: 50.000 en efectivo + 50.000 con débito = dos filas). Siempre
+  /// hay al menos una, y la suma de sus montos es exactamente `total`. Es la
+  /// FUENTE DE VERDAD de la caja, el cierre de turno y los reportes por forma
+  /// de pago; `formaPago` (arriba) queda solo como resumen para listar.
+  pagos                   PagoVenta[]
 
   // Mismos campos informales que Order ya tiene: lo que pide el cliente
   // para que le facturen. "ticket" | "factura".
@@ -1637,6 +1648,27 @@ model MovimientoCaja {
 /// paga total o parcialmente lo que debe. Lo que falta cobrar de una venta es
 /// su total menos la suma de sus cobros. Un cobro en efectivo con turno
 /// abierto genera además un ingreso de caja (MovimientoCaja).
+/// Una parte del pago de una venta del mostrador — ver VentaPos.pagos. Es lo
+/// mismo que después pide la factura electrónica (condición de la operación y
+/// cada forma de pago con su monto), así que ya queda con esa forma.
+model PagoVenta {
+  id         String   @id @default(cuid())
+  storeId    String
+  store      Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  ventaPosId String
+  ventaPos   VentaPos @relation(fields: [ventaPosId], references: [id], onDelete: Cascade)
+  /// "efectivo" | "transferencia" | "tarjeta_debito" | "tarjeta_credito" | "a_credito"
+  /// ("a_credito" solo puede ser la única fila de la venta).
+  forma      String
+  /// Lo que se cobró con esta forma, en guaraníes (no el "paga con": el vuelto no se guarda).
+  monto      Decimal  @db.Decimal(12, 2)
+  /// Para mostrarlas en el mismo orden en que se cargaron.
+  orden      Int      @default(0)
+
+  @@index([storeId])
+  @@index([ventaPosId])
+}
+
 model CobroVenta {
   id            String   @id @default(cuid())
   storeId       String

@@ -113,7 +113,7 @@ export default async function TicketVentaPosPage({
       : [];
 
   const [venta, store] = await Promise.all([
-    db.ventaPos.findUnique({ where: { id }, include: { items: true } }),
+    db.ventaPos.findUnique({ where: { id }, include: { items: true, pagos: { orderBy: { orden: "asc" } } } }),
     db.store.findUnique({ where: { id: storeId } }),
   ]);
 
@@ -230,6 +230,16 @@ export default async function TicketVentaPosPage({
               venta.fechaVencimientoCredito && (
                 <p>Vence: {venta.fechaVencimientoCredito.toLocaleDateString("es-PY", { timeZone: "UTC" })}</p>
               )
+            ) : venta.pagos.length > 1 ? (
+              // Pago dividido: cada forma con lo que se cobró con ella.
+              <>
+                <p>Metodo de pago: Mixto</p>
+                {venta.pagos.map((p) => (
+                  <p key={p.id}>
+                    - {sinAcentos(etiquetaFormaPagoPos(p.forma))}: {formatearGuarani(Number(p.monto))}
+                  </p>
+                ))}
+              </>
             ) : (
               <p>Metodo de pago: {sinAcentos(etiquetaFormaPagoPos(venta.formaPago))}</p>
             )}
@@ -356,7 +366,18 @@ export default async function TicketVentaPosPage({
         {!esFactura && (
           <>
             <div>
-              <p>Pago: {sinAcentos(etiquetaFormaPagoPos(venta.formaPago))}</p>
+              {venta.pagos.length > 1 ? (
+                <>
+                  <p>Pago: Mixto</p>
+                  {venta.pagos.map((p) => (
+                    <p key={p.id}>
+                      - {sinAcentos(etiquetaFormaPagoPos(p.forma))}: {formatearGuarani(Number(p.monto))}
+                    </p>
+                  ))}
+                </>
+              ) : (
+                <p>Pago: {sinAcentos(etiquetaFormaPagoPos(venta.formaPago))}</p>
+              )}
             </div>
 
             <Separador factura={esFactura} />

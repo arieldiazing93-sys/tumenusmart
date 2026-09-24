@@ -6,6 +6,7 @@ import { idLocalActual } from "@/lib/local-actual";
 import { Volver } from "@/components/Volver";
 import { ImprimirBoton } from "../../../estadisticas/imprimir/ImprimirBoton";
 import { formatearGuarani, formatearNumero } from "@/lib/format";
+import { detallePagos } from "@/lib/pago-venta";
 import {
   compararCierre,
   contrastarTurno,
@@ -103,6 +104,8 @@ export default async function ComprobanteTurnoPosPage({
             numero: true,
             total: true,
             formaPago: true,
+            // Cómo se pagó cada una (pago dividido): el contraste con "hoy" suma por forma.
+            pagos: { orderBy: { orden: "asc" }, select: { forma: true, monto: true } },
             creadoEn: true,
             cancelada: true,
           },
@@ -233,7 +236,11 @@ export default async function ComprobanteTurnoPosPage({
     [
       ...turno.ventas
         .filter((v) => !v.cancelada)
-        .map((v) => ({ total: Number(v.total), formaPago: v.formaPago })),
+        .map((v) => ({
+          total: Number(v.total),
+          formaPago: v.formaPago,
+          pagos: v.pagos.map((p) => ({ forma: p.forma, monto: Number(p.monto) })),
+        })),
       ...turno.pedidos
         .filter((p) => p.estado !== "cancelado")
         .map((p) => ({ total: Number(p.total), formaPago: p.formaPagoPos ?? "efectivo" })),
@@ -459,7 +466,9 @@ export default async function ComprobanteTurnoPosPage({
                       {horaCorta(v.creadoEn)}
                     </td>
                     <td className="border-b border-linea-fina py-1 text-[0.82rem] text-tinta-media">
-                      {etiquetaFormaPagoPos(v.formaPago)}
+                      {v.pagos.length > 1
+                        ? detallePagos(v.pagos.map((p) => ({ forma: p.forma, monto: Number(p.monto) })))
+                        : etiquetaFormaPagoPos(v.formaPago)}
                       {v.cancelada && <span className="text-peligro"> (cancelada)</span>}
                     </td>
                     <td

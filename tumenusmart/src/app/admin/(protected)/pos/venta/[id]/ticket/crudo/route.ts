@@ -26,7 +26,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   const { id } = await params;
 
   const [venta, store] = await Promise.all([
-    db.ventaPos.findUnique({ where: { id }, include: { items: true } }),
+    db.ventaPos.findUnique({ where: { id }, include: { items: true, pagos: { orderBy: { orden: "asc" } } } }),
     db.store.findUnique({ where: { id: storeId } }),
   ]);
 
@@ -74,6 +74,12 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     if (esVentaACredito(venta.formaPago)) {
       if (venta.fechaVencimientoCredito) {
         l.push(`Vence: ${venta.fechaVencimientoCredito.toLocaleDateString("es-PY", { timeZone: "UTC" })}`);
+      }
+    } else if (venta.pagos.length > 1) {
+      // Pago dividido: cada forma con lo que se cobró con ella.
+      l.push("Metodo de pago: Mixto");
+      for (const p of venta.pagos) {
+        l.push(`- ${sinAcentos(etiquetaFormaPagoPos(p.forma))}: ${formatearGuarani(Number(p.monto))}`);
       }
     } else {
       l.push(`Metodo de pago: ${sinAcentos(etiquetaFormaPagoPos(venta.formaPago))}`);
@@ -135,7 +141,14 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     l.push("ORIGINAL: CLIENTE");
     l.push("DUPLICADO: ARCHIVO TRIBUTARIO");
   } else {
-    l.push(`Pago: ${sinAcentos(etiquetaFormaPagoPos(venta.formaPago))}`);
+    if (venta.pagos.length > 1) {
+      l.push("Pago: Mixto");
+      for (const p of venta.pagos) {
+        l.push(`- ${sinAcentos(etiquetaFormaPagoPos(p.forma))}: ${formatearGuarani(Number(p.monto))}`);
+      }
+    } else {
+      l.push(`Pago: ${sinAcentos(etiquetaFormaPagoPos(venta.formaPago))}`);
+    }
     l.push(sep());
   }
 

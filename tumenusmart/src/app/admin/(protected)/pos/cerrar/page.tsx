@@ -54,12 +54,17 @@ export default async function CerrarTurnoPage() {
   const [ventas, pedidos] = await Promise.all([
     db.ventaPos.findMany({
       where: { turnoPosId: turno.id, cancelada: false },
-      select: { total: true, formaPago: true },
+      // Con el detalle de pagos: una venta con pago dividido suma en cada forma.
+      select: { total: true, formaPago: true, pagos: { select: { forma: true, monto: true } } },
     }),
     pedidosDelTurno(db, turno.id),
   ]);
   const resumen = resumirTurno([
-    ...ventas.map((v) => ({ total: Number(v.total), formaPago: v.formaPago })),
+    ...ventas.map((v) => ({
+      total: Number(v.total),
+      formaPago: v.formaPago,
+      pagos: v.pagos.map((p) => ({ forma: p.forma, monto: Number(p.monto) })),
+    })),
     ...pedidos
       .filter((p) => p.estado !== "cancelado")
       .map((p) => ({ total: Number(p.total), formaPago: p.formaPagoPos ?? "efectivo" })),

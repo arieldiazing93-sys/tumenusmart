@@ -55,7 +55,15 @@ export async function calcularReporteGeneralPos(
         cancelada: false,
         formaPago: { not: FORMA_PAGO_A_CREDITO },
       },
-      select: { id: true, numero: true, total: true, formaPago: true, creadoEn: true },
+      select: {
+        id: true,
+        numero: true,
+        total: true,
+        formaPago: true,
+        creadoEn: true,
+        // Una venta con pago dividido aporta una fila por cada forma usada.
+        pagos: { orderBy: { orden: "asc" }, select: { forma: true, monto: true } },
+      },
     }),
     // Los cobros de ventas a crédito, por el instante en que se cargaron (la
     // fecha del cobro es solo un día y no sirve para cortar por rango horario).
@@ -85,15 +93,25 @@ export async function calcularReporteGeneralPos(
   ]);
 
   const combinadas = [
-    ...ventas.map((v) => ({
-      idPedido: null as number | null,
-      idVenta: v.numero as number | null,
-      idPedidoDb: null as string | null,
-      idVentaDb: v.id as string | null,
-      fecha: v.creadoEn,
-      importe: Number(v.total),
-      formaPago: normalizarFormaPagoPos(v.formaPago),
-    })),
+    // Una fila por cada forma de pago de la venta: una cuenta dividida (50.000
+    // en efectivo + 50.000 con débito) aparece dos veces, cada una en su
+    // columna. Sin detalle de pagos (una venta anterior a esto) cae en una sola
+    // fila con su forma de siempre.
+    ...ventas.flatMap((v) => {
+      const partes =
+        v.pagos.length > 0
+          ? v.pagos.map((p) => ({ forma: p.forma, importe: Number(p.monto) }))
+          : [{ forma: v.formaPago, importe: Number(v.total) }];
+      return partes.map((p) => ({
+        idPedido: null as number | null,
+        idVenta: v.numero as number | null,
+        idPedidoDb: null as string | null,
+        idVentaDb: v.id as string | null,
+        fecha: v.creadoEn,
+        importe: p.importe,
+        formaPago: normalizarFormaPagoPos(p.forma),
+      }));
+    }),
     ...cobros.map((c) => ({
       idPedido: null as number | null,
       idVenta: c.ventaPos.numero as number | null,

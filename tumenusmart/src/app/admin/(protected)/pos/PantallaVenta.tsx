@@ -7,7 +7,8 @@ import { Boton, Cabecera, Campo, Entrada, Tarjeta, clasesBoton } from "@/compone
 import { Segmentado } from "@/components/Segmentado";
 import { formatearGuarani } from "@/lib/format";
 import { calcularDescuento, textoPorcentaje } from "@/lib/descuento-venta";
-import { FORMA_PAGO_A_CREDITO, type FormaPagoPos } from "@/lib/turno-pos";
+import { FORMA_PAGO_A_CREDITO } from "@/lib/turno-pos";
+import type { PagoCobro } from "@/lib/pago-venta";
 import { SIN_REGISTRO_FISCAL, TIPOS_IDENTIFICACION_FISCAL, etiquetaCortaTipoIdentificacion } from "@/lib/tipo-cliente";
 import { buscarClientePorIdentificacion, buscarClientePorTelefono, registrarVenta } from "./actions";
 import { CobrarModal } from "./CobrarModal";
@@ -318,7 +319,9 @@ export function PantallaVenta({
     }
   }
 
-  async function confirmarCobro(formaPago: FormaPagoPos | typeof FORMA_PAGO_A_CREDITO, creditoDias?: number) {
+  async function confirmarCobro(pagos: PagoCobro[], creditoDias?: number) {
+    // A crédito va sola (no se combina con otras formas): una única fila "a_credito".
+    const esCredito = pagos.length === 1 && pagos[0].forma === FORMA_PAGO_A_CREDITO;
     if (
       comprobanteTipo === "factura" &&
       registroFiscal === "con" &&
@@ -329,7 +332,7 @@ export function PantallaVenta({
     }
     // A crédito hay que saber a quién cobrarle después: el nombre y una forma
     // de ubicarlo (teléfono o RUC/cédula). El servidor lo vuelve a exigir.
-    if (formaPago === FORMA_PAGO_A_CREDITO && !creditoListo) {
+    if (esCredito && !creditoListo) {
       setError("Una venta a crédito necesita un cliente: buscalo o creálo en el cuadro de cobro.");
       return;
     }
@@ -347,7 +350,7 @@ export function PantallaVenta({
     let r: Awaited<ReturnType<typeof registrarVenta>>;
     try {
       r = await registrarVenta(turnoId, {
-      formaPago,
+      pagos,
       tipoEntrega,
       clienteNombre,
       clienteTelefono,
@@ -362,7 +365,7 @@ export function PantallaVenta({
       facturaRazonSocial: esFactura && !esSinRegistroFiscal ? facturaRazonSocial : undefined,
       facturaEmail: esFactura && !esSinRegistroFiscal ? facturaEmail.trim() || undefined : undefined,
       descuento: descuentoPedido,
-      creditoDias: formaPago === FORMA_PAGO_A_CREDITO ? creditoDias : undefined,
+      creditoDias: esCredito ? creditoDias : undefined,
       items: carrito.map((i) =>
         i.tipo === "combo"
           ? {
