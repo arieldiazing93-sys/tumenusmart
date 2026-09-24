@@ -199,12 +199,13 @@ export function CobrarModal({
             {dividiendo ? "Dividir el pago" : "¿Cómo paga?"}
           </p>
           {dividiendo ? (
-            <button type="button" onClick={volverAUnaForma} className={clasesBoton("suave", "sm")}>
+            <button type="button" onClick={volverAUnaForma} className={clasesBoton("navegar", "sm")}>
               Una sola forma de pago
             </button>
           ) : (
             !esCredito && (
-              <button type="button" onClick={empezarADividir} className={clasesBoton("suave", "sm")}>
+              // Azul (el tono de "ir a otro modo") para que se note que existe: en blanco casi no se veía.
+              <button type="button" onClick={empezarADividir} className={clasesBoton("navegar", "sm")}>
                 Dividir el pago
               </button>
             )
@@ -264,7 +265,7 @@ export function CobrarModal({
 
             <div className="mt-2.5 flex flex-wrap items-center gap-2">
               {lineas.length < MAX_PAGOS_POR_VENTA && (
-                <button type="button" onClick={agregarLinea} className={clasesBoton("suave", "sm")}>
+                <button type="button" onClick={agregarLinea} className={clasesBoton("navegar", "sm")}>
                   + Agregar otra forma de pago
                 </button>
               )}

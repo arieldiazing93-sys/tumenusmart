@@ -6,6 +6,8 @@ import { idLocalActual } from "@/lib/local-actual";
 import { prismaDelLocal } from "@/lib/prisma-local";
 import { prisma } from "@/lib/prisma";
 import { registrarBitacora } from "@/lib/bitacora";
+import { faltantesEmisor, normalizarEmisor } from "@/lib/emisor-fiscal";
+import type { Prisma } from "@prisma/client";
 
 export type ResultadoPuntoExpedicion = { ok: true } | { ok: false; error: string };
 
@@ -135,4 +137,62 @@ export async function alternarFacturaObligatoria(obligatoria: boolean): Promise<
   });
   revalidatePath("/admin/pos/puntos-expedicion");
   revalidatePath("/admin/pos");
+}
+
+export type ResultadoEmisorFiscal = { ok: true } | { ok: false; error: string };
+
+/**
+ * Guarda los datos del contribuyente que pide la factura ELECTRÓNICA (SIFEN):
+ * dirección, ciudad, teléfono, correo, actividades económicas… Son todos
+ * opcionales — la factura autoimpresor no los usa —, así que se puede guardar
+ * a medias y completar después. Ver src/lib/emisor-fiscal.ts.
+ *
+ * Los datos van como objeto (no como FormData) porque incluyen la lista de
+ * actividades. Devuelve un resultado en vez de lanzar los errores de
+ * validación: Next.js oculta en producción el mensaje de cualquier `throw`.
+ */
+export async function guardarEmisorFiscal(entrada: Record<string, unknown>): Promise<ResultadoEmisorFiscal> {
+  const sesion = await exigirPermiso("pos.gestionarEstaciones");
+  const storeId = await idLocalActual();
+
+  const validado = normalizarEmisor(entrada);
+  if (!validado.ok) return { ok: false, error: validado.error };
+  const d = validado.datos;
+
+  const datos = {
+    tipoContribuyente: d.tipoContribuyente,
+    tipoRegimen: d.tipoRegimen,
+    nombreFantasia: d.nombreFantasia,
+    denominacionSucursal: d.denominacionSucursal,
+    telefono: d.telefono,
+    email: d.email,
+    direccion: d.direccion,
+    numeroCasa: d.numeroCasa,
+    complemento: d.complemento,
+    departamento: d.departamento,
+    distritoCodigo: d.distritoCodigo,
+    distrito: d.distrito,
+    ciudadCodigo: d.ciudadCodigo,
+    ciudad: d.ciudad,
+    actividades: d.actividades as Prisma.InputJsonValue,
+  };
+
+  // Cliente global con el local explícito: EmisorFiscal es uno por local.
+  await prisma.emisorFiscal.upsert({
+    where: { storeId },
+    create: { storeId, ...datos },
+    update: datos,
+  });
+
+  await registrarBitacora(storeId, sesion, {
+    modulo: "configuracion",
+    accion: "datos_emisor_actualizados",
+    descripcion: "Actualizó los datos del emisor para factura electrónica.",
+    entidad: "EmisorFiscal",
+    entidadId: storeId,
+    detalle: { faltan: faltantesEmisor(d).length },
+  });
+
+  revalidatePath("/admin/pos/puntos-expedicion");
+  return { ok: true };
 }

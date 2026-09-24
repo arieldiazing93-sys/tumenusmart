@@ -254,8 +254,10 @@ export async function registrarVenta(turnoId: string, datos: DatosVenta): Promis
       areaImpresionId: true,
       almacenId: true,
       costo: true,
-      // Para el comprobante: cada línea de la factura lleva su unidad de medida.
+      // Para el comprobante: cada línea de la factura lleva su unidad de medida
+      // y si es un servicio (eso decide el tipo de transacción de la factura electrónica).
       unidadMedida: true,
+      esServicio: true,
       opciones: {
         where: { tipo: "agregado" },
         orderBy: { orden: "asc" },
@@ -310,6 +312,7 @@ export async function registrarVenta(turnoId: string, datos: DatosVenta): Promis
   // sin área asignada, simplemente no aparecen en ninguna comanda impresa.
   const areaDelProducto = new Map(productosDelLocal.map((p) => [p.id, p.areaImpresionId]));
   const unidadDelProducto = new Map(productosDelLocal.map((p) => [p.id, p.unidadMedida]));
+  const esServicioElProducto = new Map(productosDelLocal.map((p) => [p.id, p.esServicio]));
   const catalogo: ProductoBase[] = productosDelLocal.map((p) => ({
     id: p.id,
     nombre: p.nombre,
@@ -520,6 +523,8 @@ export async function registrarVenta(turnoId: string, datos: DatosVenta): Promis
           productId: f.productId ?? null,
           descripcion: descripcionDeItem(f.nombreProducto, f.opcionesTexto),
           unidadMedida: f.productId ? (unidadDelProducto.get(f.productId) ?? null) : null,
+          // Un combo mitad y mitad (sin producto único) es comida: mercadería.
+          esServicio: f.productId ? (esServicioElProducto.get(f.productId) ?? false) : false,
           cantidad: f.cantidad,
           precioUnitario: f.precioUnitario,
           iva: f.iva,

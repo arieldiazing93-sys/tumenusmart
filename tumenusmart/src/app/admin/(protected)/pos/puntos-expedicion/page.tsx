@@ -7,6 +7,8 @@ import { claveDiaAsuncion } from "@/lib/timezone";
 import { CrearPuntoExpedicionForm } from "./CrearPuntoExpedicionForm";
 import { PuntoExpedicionFila } from "./PuntoExpedicionFila";
 import { FacturaObligatoriaToggle } from "./FacturaObligatoriaToggle";
+import { EmisorFiscalForm } from "./EmisorFiscalForm";
+import { emisorDesdeFila } from "@/lib/emisor-fiscal";
 
 export const dynamic = "force-dynamic";
 
@@ -15,10 +17,12 @@ export default async function PuntosExpedicionPage() {
   const idLocal = await idLocalActual();
   const prisma = prismaDelLocal(idLocal);
 
-  const [puntos, store] = await Promise.all([
+  const [puntos, store, emisorFila] = await Promise.all([
     prisma.puntoExpedicion.findMany({ orderBy: { createdAt: "asc" } }),
     // Store no pertenece a ningún local, se lee con el cliente global.
     prismaGlobal.store.findUnique({ where: { id: idLocal }, select: { facturaObligatoria: true } }),
+    // Los datos del emisor para factura electrónica: uno por local, se busca por su local explícito.
+    prismaGlobal.emisorFiscal.findUnique({ where: { storeId: idLocal } }),
   ]);
 
   return (
@@ -31,6 +35,8 @@ export default async function PuntosExpedicionPage() {
       <FacturaObligatoriaToggle obligatoria={store?.facturaObligatoria ?? false} />
 
       <CrearPuntoExpedicionForm />
+
+      <EmisorFiscalForm inicial={emisorDesdeFila(emisorFila)} />
 
       <div className="flex flex-col gap-2">
         {puntos.map((p) => (

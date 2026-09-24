@@ -202,6 +202,8 @@ export async function actualizarProducto(
       mitadYMitadModo,
       iva,
       unidadMedida,
+      // Un servicio (corte de pelo, revisión…) se factura distinto de una mercadería en la factura electrónica.
+      esServicio: formData.get("esServicio") === "on",
     },
   });
 

@@ -14,6 +14,7 @@
 
 import type { Prisma, PrismaClient } from "@prisma/client";
 import { formatearNumeroFactura } from "./factura-pos";
+import { emisorDesdeFila } from "./emisor-fiscal";
 
 type Db = PrismaClient | Prisma.TransactionClient;
 
@@ -40,6 +41,12 @@ export type ItemFuente = {
   descripcion: string;
   /** "unidad" | "kilogramo" | "litro" (la del producto); sin dato cae en "unidad". */
   unidadMedida: string | null;
+  /**
+   * true si es un servicio, false si es una mercadería. Sin dato (null o sin
+   * poner — como el costo de envío, que acompaña a la venta) no cuenta para
+   * decidir el tipo de transacción del comprobante.
+   */
+  esServicio?: boolean | null;
   cantidad: number;
   /** Precio de UNA unidad de lista, IVA incluido. */
   precioUnitario: number;
@@ -120,6 +127,19 @@ export function totalesDeItems(items: ItemCalculado[]): TotalesComprobante {
   };
 }
 
+/**
+ * El tipo de transacción del comprobante (iTipTra): solo servicios →
+ * "prestacion_servicios"; mezcla de servicios y mercadería → "mixto"; el resto,
+ * "venta_mercaderia".
+ */
+export function tipoTransaccionDe(items: Pick<ItemFuente, "esServicio">[]): "venta_mercaderia" | "prestacion_servicios" | "mixto" {
+  const conDato = items.filter((i) => typeof i.esServicio === "boolean");
+  const servicios = conDato.filter((i) => i.esServicio === true).length;
+  if (conDato.length === 0 || servicios === 0) return "venta_mercaderia";
+  if (servicios === conDato.length) return "prestacion_servicios";
+  return "mixto";
+}
+
 export type DatosNuevoComprobante = {
   storeId: string;
   /** De qué cuenta sale: exactamente una de las dos. */
@@ -153,6 +173,13 @@ export async function crearComprobante(db: Db, datos: DatosNuevoComprobante): Pr
   const totales = totalesDeItems(items);
   const numero = formatearNumeroFactura(punto.establecimiento, punto.puntoExpedicion, datos.correlativo);
 
+  // Los datos del emisor que pide la factura electrónica (dirección,
+  // actividades…), si el local los cargó: se copian al comprobante para que
+  // quede completo aunque después cambien. Sin cargar, queda en null — la
+  // autoimpresor no los usa.
+  const emisor = await db.emisorFiscal.findUnique({ where: { storeId: datos.storeId } });
+  const emisorDatos = emisor ? (emisorDesdeFila(emisor) as unknown as Prisma.InputJsonValue) : null;
+
   return db.comprobante.create({
     data: {
       storeId: datos.storeId,
@@ -169,8 +196,10 @@ export async function crearComprobante(db: Db, datos: DatosNuevoComprobante): Pr
       correlativo: datos.correlativo,
       numero,
       fechaEmision: datos.fechaEmision ?? new Date(),
+      tipoTransaccion: tipoTransaccionDe(datos.items),
       emisorRuc: punto.rucEmisor,
       emisorRazonSocial: punto.razonSocialEmisor,
+      ...(emisorDatos ? { emisorDatos } : {}),
       receptorTipoIdentificacion: receptor.tipoIdentificacion,
       receptorNumeroIdentificacion: receptor.numeroIdentificacion,
       receptorRazonSocial: receptor.razonSocial,

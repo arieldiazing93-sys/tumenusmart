@@ -14,6 +14,7 @@ import {
   ultimoComprobanteAnulado,
   type ItemFuente,
 } from "@/lib/comprobante";
+import { armarDocumentoElectronico } from "@/lib/documento-electronico";
 import { esDeMesAnterior, nombreDelMes } from "@/lib/mes-fiscal";
 import { registrarBitacora } from "@/lib/bitacora";
 import { cancelarVenta } from "../pos/actions";
@@ -510,7 +511,7 @@ export async function remitirFactura(
             precioUnitario: true,
             cantidad: true,
             iva: true,
-            product: { select: { unidadMedida: true } },
+            product: { select: { unidadMedida: true, esServicio: true } },
           },
         },
       },
@@ -602,6 +603,7 @@ export async function remitirFactura(
           productId: i.productId,
           descripcion: descripcionDeItem(i.nombreProducto, i.opcionesTexto),
           unidadMedida: i.product?.unidadMedida ?? null,
+          esServicio: i.product?.esServicio ?? false,
           cantidad: i.cantidad,
           precioUnitario: Number(i.precioUnitario),
           iva: i.iva,
@@ -668,7 +670,7 @@ export async function remitirFactura(
           precioUnitario: true,
           cantidad: true,
           iva: true,
-          product: { select: { unidadMedida: true } },
+          product: { select: { unidadMedida: true, esServicio: true } },
         },
       },
     },
@@ -758,6 +760,7 @@ export async function remitirFactura(
         productId: i.productId,
         descripcion: descripcionDeItem(i.nombreProducto, i.opcionesTexto),
         unidadMedida: i.product?.unidadMedida ?? null,
+        esServicio: i.product?.esServicio ?? false,
         cantidad: i.cantidad,
         precioUnitario: Number(i.precioUnitario),
         iva: i.iva,
@@ -808,4 +811,117 @@ export async function remitirFactura(
   revalidatePath("/admin/facturas");
   revalidatePath(`/admin/pedidos/${id}`);
   return { ok: true, url: `/admin/pedidos/${id}/ticket` };
+}
+
+// ===========================================================================
+//  Datos para la factura electrónica: el comprobante armado como lo pide SIFEN
+// ===========================================================================
+
+export type ResultadoDocumentoElectronico =
+  | {
+      ok: true;
+      numero: string;
+      modalidad: string;
+      estado: string;
+      documento: Record<string, unknown>;
+      /** Lo que hay que completar antes de poder emitir. */
+      faltantes: string[];
+      /** Cosas a tener en cuenta que no frenan. */
+      avisos: string[];
+    }
+  | { ok: false; error: string };
+
+/**
+ * Arma el Documento Electrónico de SIFEN de una factura, a partir de su
+ * Comprobante (la foto fiscal que se guarda al emitirla), y dice qué le falta
+ * para poder emitirse electrónico. No envía nada a nadie: es la vista previa
+ * de los datos que recibiría un proveedor de factura electrónica.
+ */
+export async function obtenerDocumentoElectronico(
+  origen: "pedido" | "venta",
+  id: string
+): Promise<ResultadoDocumentoElectronico> {
+  await exigirPermiso("pos.verHistorico");
+  const storeId = await idLocalActual();
+  const db = prismaDelLocal(storeId);
+
+  // El más nuevo: si hubo remisión, el vigente; si no, el último que tuvo.
+  const comprobante = await db.comprobante.findFirst({
+    where: origen === "venta" ? { ventaPosId: id } : { orderId: id },
+    orderBy: { createdAt: "desc" },
+    include: { items: { orderBy: { orden: "asc" } } },
+  });
+  if (!comprobante) {
+    return {
+      ok: false,
+      error:
+        "Esta factura es anterior a los comprobantes y no tiene su registro completo. Con las facturas nuevas sí aparece.",
+    };
+  }
+
+  let pagos: { forma: string; monto: number }[] = [];
+  if (origen === "venta") {
+    const filas = await db.pagoVenta.findMany({
+      where: { ventaPosId: id },
+      orderBy: { orden: "asc" },
+      select: { forma: true, monto: true },
+    });
+    pagos = filas.map((p) => ({ forma: p.forma, monto: Number(p.monto) }));
+  } else {
+    const pedido = await db.order.findUnique({
+      where: { id },
+      select: { cobroMetodo: true, formaPagoPos: true },
+    });
+    const forma = pedido?.cobroMetodo ?? pedido?.formaPagoPos ?? null;
+    pagos = forma ? [{ forma, monto: Number(comprobante.total) }] : [];
+  }
+
+  const resultado = armarDocumentoElectronico(
+    {
+      tipo: comprobante.tipo,
+      modalidad: comprobante.modalidad,
+      tipoEmision: comprobante.tipoEmision,
+      timbrado: comprobante.timbrado,
+      timbradoDesde: comprobante.timbradoDesde,
+      establecimiento: comprobante.establecimiento,
+      punto: comprobante.punto,
+      correlativo: comprobante.correlativo,
+      numero: comprobante.numero,
+      fechaEmision: comprobante.fechaEmision,
+      tipoTransaccion: comprobante.tipoTransaccion,
+      moneda: comprobante.moneda,
+      emisorRuc: comprobante.emisorRuc,
+      emisorRazonSocial: comprobante.emisorRazonSocial,
+      emisorDatos: comprobante.emisorDatos,
+      receptorTipoIdentificacion: comprobante.receptorTipoIdentificacion,
+      receptorNumeroIdentificacion: comprobante.receptorNumeroIdentificacion,
+      receptorRazonSocial: comprobante.receptorRazonSocial,
+      receptorEmail: comprobante.receptorEmail,
+      presencia: comprobante.presencia,
+      condicion: comprobante.condicion,
+      fechaVencimientoCredito: comprobante.fechaVencimientoCredito,
+      total: Number(comprobante.total),
+      items: comprobante.items.map((i) => ({
+        codigo: i.codigo,
+        descripcion: i.descripcion,
+        unidadMedida: i.unidadMedida,
+        cantidad: Number(i.cantidad),
+        precioUnitario: Number(i.precioUnitario),
+        descuento: Number(i.descuento),
+        total: Number(i.total),
+        iva: i.iva,
+      })),
+    },
+    pagos
+  );
+
+  return {
+    ok: true,
+    numero: comprobante.numero,
+    modalidad: comprobante.modalidad,
+    estado: comprobante.estado,
+    documento: resultado.documento,
+    faltantes: resultado.faltantes,
+    avisos: resultado.avisos,
+  };
 }

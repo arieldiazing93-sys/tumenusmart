@@ -21,6 +21,7 @@ type Producto = {
   precio: number;
   iva: string;
   unidadMedida: string;
+  esServicio: boolean;
   imagenUrl: string | null;
   disponible: boolean;
   destacado: boolean;
@@ -154,6 +155,21 @@ export function EditarProductoForm({
               ))}
             </Selector>
           </Campo>
+          <label className="flex items-start gap-2 text-[0.85rem] text-tinta sm:col-span-2">
+            <input
+              type="checkbox"
+              name="esServicio"
+              defaultChecked={producto.esServicio}
+              className="mt-0.5 h-4 w-4 accent-brand"
+            />
+            <span>
+              <span className="font-medium">Es un servicio</span>
+              <span className="block text-[0.78rem] text-tinta-suave">
+                Marcalo si no es una mercadería (un corte de pelo, una revisión, una consulta). En la factura
+                electrónica se declara como prestación de servicios; en la autoimpresor no cambia nada.
+              </span>
+            </span>
+          </label>
         </div>
       </Tarjeta>
 

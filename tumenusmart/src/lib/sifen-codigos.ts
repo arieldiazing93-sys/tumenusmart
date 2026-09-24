@@ -135,3 +135,34 @@ export const MOTIVO_NOTA_SIFEN = {
   recupero_de_gasto: 7,
   ajuste_de_precio: 8,
 } as const;
+
+/**
+ * Dígito verificador de un RUC paraguayo (dDVEmi / dDVRec), por el algoritmo
+ * módulo 11 que exige SIFEN: se multiplican los dígitos de derecha a izquierda
+ * por 2, 3, 4… (hasta 11 y vuelve a 2), se suman, y el dígito es
+ * `11 - (suma % 11)` si el resto es mayor que 1, o 0 en otro caso.
+ * Ejemplo: el RUC 80069563 da el dígito 1. Si un RUC real no coincidiera, el
+ * panel de factura electrónica lo marca como AVISO (nunca frena nada).
+ */
+export function calcularDvRuc(numeroRuc: string): number {
+  const digitos = numeroRuc.replace(/\D/g, "");
+  let k = 2;
+  let total = 0;
+  for (let i = digitos.length - 1; i >= 0; i--) {
+    total += Number(digitos[i]) * k;
+    k = k === 11 ? 2 : k + 1;
+  }
+  const resto = total % 11;
+  return resto > 1 ? 11 - resto : 0;
+}
+
+/**
+ * iTiContRec — si el comprador con RUC es persona física (1) o jurídica (2).
+ * SIFEN lo exige cuando el comprador es contribuyente y no lo tenemos
+ * guardado: se estima por el número de RUC (las personas jurídicas tienen RUC
+ * de 8 dígitos que empiezan en 80 o más; las personas físicas usan su número
+ * de cédula, mucho más bajo). Es una estimación: el panel la marca como aviso.
+ */
+export function tipoContribuyenteDeRuc(numeroRuc: string): 1 | 2 {
+  return Number(numeroRuc.replace(/\D/g, "")) >= 50_000_000 ? 2 : 1;
+}

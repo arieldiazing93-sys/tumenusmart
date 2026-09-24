@@ -6,6 +6,7 @@ import { Pastilla, clasesBoton } from "@/components/ui";
 import { formatearGuarani } from "@/lib/format";
 import { ZONA_NEGOCIO } from "@/lib/timezone";
 import { CancelarFacturaBoton } from "./CancelarFacturaBoton";
+import { DatosFacturaElectronica } from "./DatosFacturaElectronica";
 import { obtenerDetalleFactura, type DetalleFactura } from "./actions";
 
 /**
@@ -291,6 +292,11 @@ export function VerFacturaModal({
             Abrir para imprimir
           </a>
         </div>
+        </div>
+
+        {/* La factura tal como la pediría un proveedor de factura electrónica (SIFEN), y lo que todavía le falta. */}
+        <div className="mt-4 border-t border-linea pt-4">
+          <DatosFacturaElectronica origen={origen} id={id} />
         </div>
 
         {!anulada && (

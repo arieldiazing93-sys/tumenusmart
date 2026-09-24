@@ -57,7 +57,7 @@ const SELECT_PEDIDO_PARA_FACTURA = {
       precioUnitario: true,
       cantidad: true,
       iva: true,
-      product: { select: { unidadMedida: true } },
+      product: { select: { unidadMedida: true, esServicio: true } },
     },
   },
 } as const;
@@ -94,7 +94,7 @@ async function intentarEmitirFactura(
       precioUnitario: unknown;
       cantidad: number;
       iva: string;
-      product: { unidadMedida: string } | null;
+      product: { unidadMedida: string; esServicio: boolean } | null;
     }[];
     /** Costo de envío (delivery), gravado al 10% igual que cualquier
      *  servicio — si no se suma acá, Gravadas+Exentas queda por debajo del
@@ -146,6 +146,7 @@ async function intentarEmitirFactura(
     productId: i.productId,
     descripcion: descripcionDeItem(i.nombreProducto, i.opcionesTexto),
     unidadMedida: i.product?.unidadMedida ?? null,
+    esServicio: i.product?.esServicio ?? false,
     cantidad: i.cantidad,
     precioUnitario: Number(i.precioUnitario),
     iva: i.iva,

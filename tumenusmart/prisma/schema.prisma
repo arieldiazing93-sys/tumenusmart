@@ -181,6 +181,7 @@ model Store {
   facturasReemplazadas FacturaReemplazada[]
   comprobantes         Comprobante[]
   comprobanteItems     ComprobanteItem[]
+  emisorFiscal         EmisorFiscal?
   optionGroups         OptionGroup[]
   optionGroupProductos OptionGroupProduct[]
   productOptionGroups  ProductOptionGroup[]
@@ -482,6 +483,12 @@ model Product {
   // que iva: todavía no lo consume ningún cálculo acá, pero es un dato que
   // va a pedir la futura API de factura electrónica por cada ítem.
   unidadMedida String         @default("unidad")
+  /// true = es un servicio (un corte de pelo, una revisión, una consulta), no
+  /// una mercadería. La factura electrónica distingue "venta de mercadería" de
+  /// "prestación de servicios" (iTipTra de SIFEN); con esto el comprobante
+  /// arma solo el tipo de transacción correcto. En la factura autoimpresor no
+  /// cambia nada.
+  esServicio   Boolean        @default(false)
   imagenUrl   String?
   disponible  Boolean         @default(true)
   orden       Int             @default(0)
@@ -1388,6 +1395,10 @@ model Comprobante {
   // --- gEmis: el emisor (foto) ---
   emisorRuc         String
   emisorRazonSocial String
+  /// Los demás datos del emisor que pide SIFEN (dirección, actividades…), tal
+  /// como estaban cargados al emitir (copia de EmisorFiscal). Nulo si el local
+  /// no los tiene cargados: en la factura autoimpresor no hacen falta.
+  emisorDatos       Json?
 
   // --- gDatRec: el comprador (foto) ---
   /// Clasificación del comprador (ver src/lib/tipo-cliente.ts): "ruc" |
@@ -1442,6 +1453,52 @@ model Comprobante {
   @@index([storeId, numero])
   @@index([ventaPosId])
   @@index([orderId])
+}
+
+/// Los datos del contribuyente que la factura ELECTRÓNICA (SIFEN) exige del
+/// emisor y que la autoimpresor no usa: por eso son todos opcionales y solo se
+/// piden a los locales que van a emitir electrónico. Uno por local. Se copian
+/// dentro de cada Comprobante (emisorDatos) al emitirlo.
+///
+/// Los campos siguen el grupo gEmis del Documento Electrónico (DE_v150.xsd).
+model EmisorFiscal {
+  id      String @id @default(cuid())
+  storeId String @unique
+  store   Store  @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  /// "persona_fisica" | "persona_juridica" (iTipCont).
+  tipoContribuyente  String?
+  /// Tipo de régimen (cTipReg), del 1 al 8. Opcional.
+  tipoRegimen        Int?
+  /// dNomFanEmi.
+  nombreFantasia     String?
+  /// dDenSuc: nombre comercial de la sucursal (hasta 30 caracteres).
+  denominacionSucursal String?
+  /// dTelEmi (6 a 15 caracteres) y dEmailE.
+  telefono           String?
+  email              String?
+
+  // --- Dirección del establecimiento emisor ---
+  /// dDirEmi y dNumCas (0 si no tiene número).
+  direccion          String?
+  numeroCasa         String?
+  /// dCompDir1: entre calles, piso, etc.
+  complemento        String?
+  /// Nombre del departamento tal cual la lista oficial ("Central", "Alto Paraná"…);
+  /// el código de SIFEN se calcula al armar el documento (ver src/lib/emisor-fiscal.ts).
+  departamento       String?
+  /// Distrito y ciudad: código y nombre según la Tabla 2.1 de la DNIT
+  /// (Departamentos, Distritos y Ciudades). La ciudad es obligatoria en el DE.
+  distritoCodigo     Int?
+  distrito           String?
+  ciudadCodigo       Int?
+  ciudad             String?
+
+  /// Actividades económicas (gActEco, de 1 a 9): [{ codigo: "56101", descripcion: "Restaurantes" }].
+  actividades        Json?
+
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
 }
 
 /// Una línea de un Comprobante (gCamItem del DE): la foto de lo facturado,

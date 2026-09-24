@@ -129,6 +129,7 @@ export default async function EditarProductoPage({
             precio: Number(producto.precio),
             iva: producto.iva,
             unidadMedida: producto.unidadMedida,
+            esServicio: producto.esServicio,
             imagenUrl: producto.imagenUrl,
             disponible: producto.disponible,
             destacado: producto.destacado,
