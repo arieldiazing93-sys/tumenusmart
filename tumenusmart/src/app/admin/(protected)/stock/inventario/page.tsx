@@ -4,7 +4,7 @@ import { prismaDelLocal } from "@/lib/prisma-local";
 import { idLocalActual } from "@/lib/local-actual";
 import { stockPorAlmacen } from "@/lib/stock-almacen";
 import { ZONA_NEGOCIO } from "@/lib/timezone";
-import { BotonEnlace, Cabecera, Tabla, Th, Vacio } from "@/components/ui";
+import { BotonEnlace, Cabecera, Campo, Entrada, Selector, Tabla, Tarjeta, Th, Vacio, clasesBoton } from "@/components/ui";
 import { InsumoInventarioFila } from "./InsumoInventarioFila";
 import { InventariosRegistrados } from "./InventariosRegistrados";
 
@@ -55,38 +55,96 @@ export default async function InventarioPage({
 async function vistaHistorial(idLocal: string) {
   const prisma = prismaDelLocal(idLocal);
 
-  const inventarios = await prisma.inventario.findMany({
-    orderBy: { createdAt: "desc" },
-    take: 200,
-    select: {
-      id: true,
-      createdAt: true,
-      almacenNombre: true,
-      categorias: true,
-      contados: true,
-      conDiferencia: true,
-    },
-  });
+  const [inventarios, almacenes] = await Promise.all([
+    prisma.inventario.findMany({
+      orderBy: { createdAt: "desc" },
+      take: 200,
+      select: {
+        id: true,
+        createdAt: true,
+        almacenNombre: true,
+        categorias: true,
+        contados: true,
+        conDiferencia: true,
+      },
+    }),
+    // Todos, también los desactivados: un inventario viejo pudo ser de uno.
+    prisma.almacen.findMany({
+      orderBy: [{ activo: "desc" }, { nombre: "asc" }],
+      select: { id: true, nombre: true, activo: true },
+    }),
+  ]);
 
   return (
-    <InventariosRegistrados
-      inventarios={inventarios.map((i) => ({
-        id: i.id,
-        activo: true,
-        fecha: i.createdAt.toLocaleString("es-PY", {
-          day: "2-digit",
-          month: "2-digit",
-          year: "numeric",
-          hour: "2-digit",
-          minute: "2-digit",
-          timeZone: ZONA_NEGOCIO,
-        }),
-        almacen: i.almacenNombre,
-        categorias: i.categorias,
-        contados: i.contados,
-        conDiferencia: i.conDiferencia,
-      }))}
-    />
+    <>
+      <InventariosRegistrados
+        inventarios={inventarios.map((i) => ({
+          id: i.id,
+          activo: true,
+          fecha: i.createdAt.toLocaleString("es-PY", {
+            day: "2-digit",
+            month: "2-digit",
+            year: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+            timeZone: ZONA_NEGOCIO,
+          }),
+          almacen: i.almacenNombre,
+          categorias: i.categorias,
+          contados: i.contados,
+          conDiferencia: i.conDiferencia,
+        }))}
+      />
+
+      {/* Reporte: cada botón manda este mismo formulario a su propia dirección
+          (el Excel se descarga, el PDF se abre en otra pestaña), así que sale con
+          lo que está escrito acá. Sin fechas, es el mes actual. */}
+      {inventarios.length > 0 && (
+        <Tarjeta className="mt-6 flex flex-col gap-3">
+          <p className="rotulo text-[0.8rem] font-bold">Reporte de inventarios</p>
+          <form method="get" className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <Campo etiqueta="Almacén">
+              <Selector name="almacen" defaultValue="">
+                <option value="">Todos los almacenes</option>
+                {almacenes.map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.nombre}
+                    {a.activo ? "" : " (desactivado)"}
+                  </option>
+                ))}
+              </Selector>
+            </Campo>
+            <Campo etiqueta="Desde">
+              <Entrada type="date" name="desde" />
+            </Campo>
+            <Campo etiqueta="Hasta">
+              <Entrada type="date" name="hasta" />
+            </Campo>
+            <div className="flex flex-wrap items-center gap-2 sm:col-span-2 lg:col-span-3">
+              <button
+                type="submit"
+                formAction="/admin/stock/inventario/exportar"
+                className={clasesBoton("principal", "sm")}
+              >
+                Descargar Excel
+              </button>
+              <button
+                type="submit"
+                formAction="/admin/stock/inventario/imprimir"
+                formTarget="_blank"
+                className={clasesBoton("navegar", "sm")}
+              >
+                Ver reporte / PDF
+              </button>
+              <span className="text-xs text-tinta-suave">
+                Los inventarios que registraste en ese período, con lo que dijo el sistema, lo que contaste y la
+                diferencia. Sin fechas, toma el mes actual.
+              </span>
+            </div>
+          </form>
+        </Tarjeta>
+      )}
+    </>
   );
 }
 

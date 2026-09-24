@@ -8,7 +8,7 @@
  * entran.
  */
 
-import { claveDiaAsuncion, inicioDeMesEnAsuncion } from "./timezone";
+import { claveDiaAsuncion, fechaAsuncionDesdeTexto, inicioDeMesEnAsuncion } from "./timezone";
 
 export type RangoDias = { desde: string; hasta: string };
 
@@ -34,6 +34,17 @@ export function rangoDeDias(desde?: string | null, hasta?: string | null): Rango
 /** Los límites para consultar la base: desde el inicio del primer día hasta el fin del último (excluido el siguiente). */
 export function limitesDelRango(rango: RangoDias): { gte: Date; lt: Date } {
   return { gte: new Date(rango.desde), lt: new Date(Date.parse(rango.hasta) + DIA_MS) };
+}
+
+/**
+ * Igual que `limitesDelRango`, pero con los días en hora de Asunción: para lo
+ * que se guarda con la hora real en que pasó (un inventario, un movimiento de
+ * stock), no como un día suelto. Ambos extremos entran.
+ */
+export function limitesEnAsuncion(rango: RangoDias): { gte: Date; lt: Date } {
+  const inicio = fechaAsuncionDesdeTexto(rango.desde) ?? new Date(rango.desde);
+  const ultimoDia = fechaAsuncionDesdeTexto(rango.hasta) ?? new Date(rango.hasta);
+  return { gte: inicio, lt: new Date(ultimoDia.getTime() + DIA_MS) };
 }
 
 /** "23/09/2026" — sin correr el día por la zona horaria (las fechas son días, no instantes). */
