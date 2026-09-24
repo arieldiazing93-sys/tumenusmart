@@ -172,6 +172,7 @@ model Store {
   proveedores      Proveedor[]
   almacenes        Almacen[]
   compras          Compra[]
+  pagosCompra      PagoCompra[]
   compraItems      CompraItem[]
   gastos           Gasto[]
   movimientosStock MovimientoStock[]
@@ -1477,9 +1478,34 @@ model Compra {
 
   items       CompraItem[]
   movimientos MovimientoStock[]
+  /// Lo que se le fue pagando al proveedor de una compra a crédito (ver PagoCompra).
+  pagos       PagoCompra[]
 
   @@index([storeId])
   @@index([proveedorId])
+}
+
+/// Un pago al proveedor por una compra a crédito (cuentas por pagar). Lo que
+/// se debe de una compra es su total menos la suma de sus pagos: no se guarda
+/// el saldo, se calcula. Si un pago se cargó mal se elimina y se vuelve a cargar.
+model PagoCompra {
+  id            String   @id @default(cuid())
+  storeId       String
+  store         Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  compraId      String
+  compra        Compra   @relation(fields: [compraId], references: [id], onDelete: Cascade)
+  /// Con IVA, igual que Compra.total.
+  monto         Decimal  @db.Decimal(10, 2)
+  /// El día en que se pagó (no cuándo se cargó al sistema).
+  fecha         DateTime
+  /// "efectivo" | "transferencia" | "cheque" | "otro".
+  formaPago     String   @default("efectivo")
+  notas         String?
+  registradoPor String?
+  createdAt     DateTime @default(now())
+
+  @@index([storeId])
+  @@index([compraId])
 }
 
 model CompraItem {

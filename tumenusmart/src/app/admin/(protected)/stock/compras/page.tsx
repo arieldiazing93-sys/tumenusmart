@@ -4,6 +4,7 @@ import { prismaDelLocal } from "@/lib/prisma-local";
 import { idLocalActual } from "@/lib/local-actual";
 import { Cabecera, Tabla, Th, Td, Tr, Vacio, Pastilla, Campo, Entrada, Selector, BotonEnlace, clasesBoton } from "@/components/ui";
 import { formatearGuarani } from "@/lib/format";
+import { saldoDeCompra } from "@/lib/pagos-compra";
 
 export const dynamic = "force-dynamic";
 
@@ -34,7 +35,11 @@ export default async function ComprasPage({ searchParams }: { searchParams: Prom
         ...(folio?.trim() ? { numeroComprobante: { contains: folio.trim(), mode: "insensitive" as const } } : {}),
       },
       orderBy: [{ fecha: "desc" }, { createdAt: "desc" }],
-      include: { proveedor: { select: { nombre: true } }, _count: { select: { items: true } } },
+      include: {
+        proveedor: { select: { nombre: true } },
+        pagos: { select: { monto: true } },
+        _count: { select: { items: true } },
+      },
       take: 200,
     }),
     prisma.proveedor.findMany({ orderBy: { nombre: "asc" }, select: { id: true, nombre: true } }),
@@ -122,7 +127,11 @@ export default async function ComprasPage({ searchParams }: { searchParams: Prom
             </tr>
           </thead>
           <tbody>
-            {compras.map((c) => (
+            {compras.map((c) => {
+              // A crédito: lo que todavía se le debe al proveedor de esta compra.
+              const pagado = c.pagos.reduce((s, p) => s + Number(p.monto), 0);
+              const saldo = saldoDeCompra(Number(c.total), pagado);
+              return (
               <Tr key={c.id}>
                 <Td className={c.cancelada ? "opacity-60" : ""}>{c.fecha.toLocaleDateString("es-PY")}</Td>
                 <Td className={c.cancelada ? "opacity-60" : ""}>{c.proveedor?.nombre ?? "—"}</Td>
@@ -131,9 +140,14 @@ export default async function ComprasPage({ searchParams }: { searchParams: Prom
                   {c.cancelada ? (
                     <Pastilla color="peligro">Cancelada</Pastilla>
                   ) : c.condicionPago === "credito" ? (
-                    <Pastilla color="aviso">
-                      A crédito{c.fechaVencimiento ? ` · vence ${c.fechaVencimiento.toLocaleDateString("es-PY")}` : ""}
-                    </Pastilla>
+                    saldo <= 0 ? (
+                      <Pastilla color="exito">Crédito pagado</Pastilla>
+                    ) : (
+                      <Pastilla color="aviso">
+                        A crédito{c.fechaVencimiento ? ` · vence ${c.fechaVencimiento.toLocaleDateString("es-PY")}` : ""}
+                        {pagado > 0 ? ` · debe ${formatearGuarani(saldo)}` : ""}
+                      </Pastilla>
+                    )
                   ) : (
                     <Pastilla color="exito">Al contado</Pastilla>
                   )}
@@ -148,7 +162,8 @@ export default async function ComprasPage({ searchParams }: { searchParams: Prom
                   </BotonEnlace>
                 </Td>
               </Tr>
-            ))}
+              );
+            })}
           </tbody>
         </Tabla>
       )}

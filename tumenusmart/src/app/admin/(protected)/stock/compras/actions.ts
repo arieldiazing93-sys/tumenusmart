@@ -7,6 +7,7 @@ import { idLocalActual } from "@/lib/local-actual";
 import { prismaDelLocal } from "@/lib/prisma-local";
 import { calcularCompra, type ResultadoCalculoCompra } from "@/lib/compra-calculo";
 import { etiquetaUnidadMedida } from "@/lib/unidad-medida";
+import { formatearGuarani } from "@/lib/format";
 
 export type LineaCompraInput = {
   insumoId: string;
@@ -307,7 +308,7 @@ export async function actualizarCompra(
 
   const compra = await prisma.compra.findUnique({
     where: { id: compraId },
-    select: { id: true, cancelada: true, createdAt: true },
+    select: { id: true, cancelada: true, createdAt: true, pagos: { select: { monto: true } } },
   });
   if (!compra) return { ok: false, error: "Esa compra no existe." };
   if (compra.cancelada) return { ok: false, error: "Una compra cancelada no se puede editar." };
@@ -315,6 +316,24 @@ export async function actualizarCompra(
   const preparada = await prepararCompra(prisma, datos);
   if ("error" in preparada) return { ok: false, error: preparada.error };
   const { lineas, calculo, rendimientoDe, condicionPago, descuentoGeneral } = preparada;
+
+  // Una compra con pagos registrados tiene que seguir siendo a crédito y no
+  // puede quedar debiendo menos de lo que ya se pagó.
+  const pagado = compra.pagos.reduce((s, p) => s + Number(p.monto), 0);
+  if (pagado > 0) {
+    if (condicionPago !== "credito") {
+      return {
+        ok: false,
+        error: "Esta compra ya tiene pagos registrados, así que tiene que seguir a crédito. Eliminá sus pagos si querés pasarla a contado.",
+      };
+    }
+    if (calculo.total + 0.004 < pagado) {
+      return {
+        ok: false,
+        error: `Ya se pagaron ${formatearGuarani(pagado)} de esta compra: el total no puede quedar por debajo de eso. Corregí primero los pagos.`,
+      };
+    }
+  }
 
   const registradoPor = sesion.nombre?.trim() || sesion.email;
 
@@ -435,10 +454,16 @@ export async function cancelarCompra(
 
   const compra = await prisma.compra.findUnique({
     where: { id: compraId },
-    select: { id: true, cancelada: true },
+    select: { id: true, cancelada: true, _count: { select: { pagos: true } } },
   });
   if (!compra) return { ok: false, error: "Esa compra no existe." };
   if (compra.cancelada) return { ok: false, error: "Esa compra ya estaba cancelada." };
+  if (compra._count.pagos > 0) {
+    return {
+      ok: false,
+      error: "Esta compra ya tiene pagos registrados. Eliminá primero sus pagos (en el detalle de la compra) y después cancelala.",
+    };
+  }
 
   const identidad = sesion.nombre?.trim() || sesion.email;
 

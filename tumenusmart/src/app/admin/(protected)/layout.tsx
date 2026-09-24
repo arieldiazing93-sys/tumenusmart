@@ -83,6 +83,8 @@ function armarGrupos(hayIdeaSinVer: boolean, rol: string): GrupoSecciones[] {
           ver: conPermiso("stock.ver") },
         { href: "/admin/stock/compras", label: "Compras", icono: "cierre" as const,
           ver: conPermiso("stock.ver") },
+        { href: "/admin/stock/cuentas-por-pagar", label: "Cuentas por pagar", icono: "cierre" as const,
+          ver: conPermiso("stock.ver") },
         { href: "/admin/stock/inventario", label: "Registro de inventario", icono: "estadisticas" as const,
           ver: conPermiso("stock.ver") },
         { href: "/admin/stock/gastos", label: "Gastos", icono: "cierre" as const,

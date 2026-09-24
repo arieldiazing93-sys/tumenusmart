@@ -40,6 +40,7 @@ export const MODELOS_POR_LOCAL = new Set([
   "Almacen",
   "Compra",
   "CompraItem",
+  "PagoCompra",
   "Gasto",
   "MovimientoStock",
   "Inventario",
