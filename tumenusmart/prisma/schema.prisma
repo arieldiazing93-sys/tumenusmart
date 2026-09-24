@@ -203,6 +203,10 @@ model Store {
   inventarios      Inventario[]
   inventarioItems  InventarioItem[]
   categoriasGasto  CategoriaGasto[]
+
+  // --- Reserva de turnos ---
+  miembrosPersonal MiembroPersonal[]
+  citas            Cita[]
 }
 
 /// Las direcciones que este local tuvo antes.
@@ -2162,4 +2166,44 @@ model CategoriaGasto {
   createdAt DateTime @default(now())
 
   @@unique([storeId, nombre])
+}
+
+/// Quien atiende a los clientes en un negocio que trabaja con turnos: el
+/// barbero, la peluquera, la manicurista. No es un usuario del panel (no entra
+/// al sistema): solo es a quien se le agenda el turno.
+model MiembroPersonal {
+  id        String   @id @default(cuid())
+  storeId   String
+  store     Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  nombre    String
+  orden     Int      @default(0)
+  /// Se desactiva en vez de borrarse: sus turnos viejos siguen mostrándose.
+  activo    Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  citas Cita[]
+
+  @@index([storeId])
+}
+
+/// Un turno agendado: un cliente con un miembro del personal, de `inicio` a
+/// `fin`. Es lo que se ve en el calendario de la Agenda.
+model Cita {
+  id            String          @id @default(cuid())
+  storeId       String
+  store         Store           @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  personalId    String
+  personal      MiembroPersonal @relation(fields: [personalId], references: [id])
+  clienteNombre String
+  /// Instantes reales (UTC): en pantalla se muestran en hora de Asunción.
+  inicio        DateTime
+  fin           DateTime
+  /// pendiente | proxima | finalizada | cancelada | no_asistio (ver src/lib/agenda.ts)
+  estado        String          @default("pendiente")
+  /// Lo que cuesta el turno. NULL = todavía sin precio.
+  precio        Decimal?        @db.Decimal(10, 2)
+  createdAt     DateTime        @default(now())
+
+  @@index([storeId, inicio])
+  @@index([personalId])
 }
