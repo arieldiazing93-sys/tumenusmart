@@ -284,10 +284,10 @@ export function NuevoInventario({
       <Tabla>
         <thead>
           <tr>
-            <Th>Insumo</Th>
-            <Th className="text-right">Stock del sistema</Th>
-            <Th className="w-40">Ajuste (lo que contaste)</Th>
-            <Th className="text-right">Diferencia</Th>
+            <Th className="!py-2">Insumo</Th>
+            <Th className="!py-2 text-right">Stock del sistema</Th>
+            <Th className="!py-2 whitespace-nowrap">Ajuste (lo que contaste)</Th>
+            <Th className="!py-2 text-right">Diferencia</Th>
           </tr>
         </thead>
         <tbody>
@@ -298,18 +298,22 @@ export function NuevoInventario({
             const invalida = c.escrito.trim() !== "" && c.contado == null;
             return (
               <FilaConGrupo key={c.insumo.id} grupo={nuevoGrupo ? (nombreDeCategoria.get(clave) ?? "") : null}>
-                <td className="border-b border-linea-fina px-3.5 py-1.5 text-[0.86rem] font-medium text-tinta">
+                <td className="border-b border-linea-fina px-3.5 py-0.5 text-[0.86rem] font-medium text-tinta">
                   {c.insumo.nombre}
                 </td>
-                <td className="border-b border-linea-fina px-3.5 py-1.5 text-right text-[0.86rem] text-tinta-media">
+                <td className="border-b border-linea-fina px-3.5 py-0.5 text-right text-[0.86rem] text-tinta-media">
                   {c.sistema} <span className="text-xs text-tinta-suave">{c.insumo.unidad}</span>
                 </td>
-                <td className="border-b border-linea-fina px-3.5 py-1.5">
+                <td className="border-b border-linea-fina px-3.5 py-0.5">
+                  {/* Campo bajo (el de siempre tiene mucho relleno vertical y estiraba
+                      cada fila): así entran muchos más insumos en pantalla. El "!" es
+                      para ganarle al relleno que ya trae Entrada. */}
                   <Entrada
                     type="number"
                     step="0.001"
                     min="0"
                     placeholder="—"
+                    className="max-w-[10rem] !py-1 !text-[0.84rem]"
                     data-conteo={idx}
                     invalido={invalida}
                     value={c.escrito}
@@ -323,7 +327,7 @@ export function NuevoInventario({
                     }}
                   />
                 </td>
-                <td className="border-b border-linea-fina px-3.5 py-1.5 text-right text-[0.86rem]">
+                <td className="border-b border-linea-fina px-3.5 py-0.5 text-right text-[0.86rem]">
                   {c.diferencia == null ? (
                     <span className="text-tinta-suave">—</span>
                   ) : c.diferencia === 0 ? (
