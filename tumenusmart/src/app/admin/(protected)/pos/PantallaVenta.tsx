@@ -306,7 +306,12 @@ export function PantallaVenta({
     setError(null);
     const esFactura = comprobanteTipo === "factura";
     const esSinRegistroFiscal = esFactura && registroFiscal === "sin";
-    const r = await registrarVenta(turnoId, {
+    // Si el servidor falla por algo inesperado (la base, la red), la llamada
+    // lanza en vez de devolver {ok:false}: sin este try, la pantalla se quedaba
+    // para siempre en "Cobrando…" sin decir nada.
+    let r: Awaited<ReturnType<typeof registrarVenta>>;
+    try {
+      r = await registrarVenta(turnoId, {
       formaPago,
       tipoEntrega,
       clienteNombre,
@@ -331,7 +336,14 @@ export function PantallaVenta({
             }
           : { productId: i.productId, opcionIds: i.agregadoIds, cantidad: i.cantidad }
       ),
-    });
+      });
+    } catch {
+      setCobrando(false);
+      setError(
+        "No se pudo confirmar el cobro. Antes de volver a intentar, fijate en Cuentas del mostrador si la venta quedó registrada."
+      );
+      return;
+    }
     setCobrando(false);
     if (!r.ok) {
       setError(r.error);
