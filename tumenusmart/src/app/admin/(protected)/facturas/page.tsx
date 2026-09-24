@@ -1,69 +1,19 @@
 import Link from "next/link";
 import { pantallaConPermiso } from "@/lib/auth";
-import { prismaDelLocal } from "@/lib/prisma-local";
 import { idLocalActual } from "@/lib/local-actual";
 import { Cabecera, Campo, Entrada, Selector, Tabla, Th, Td, Tr, Vacio, Pastilla, clasesBoton } from "@/components/ui";
-import { calcularRangoFecha, type FiltroFecha } from "@/lib/rango-fecha";
-import { formatearGuarani, formatearNumero } from "@/lib/format";
+import { calcularRangoFecha, claveDia, type FiltroFecha } from "@/lib/rango-fecha";
+import { formatearGuarani } from "@/lib/format";
 import { ZONA_NEGOCIO, claveDiaAsuncion, inicioDeMesEnAsuncion } from "@/lib/timezone";
-import { SIN_REGISTRO_FISCAL, etiquetaTipoIdentificacion } from "@/lib/tipo-cliente";
+import { esVigente, listarFacturas } from "@/lib/reporte-facturas";
 import { VerFacturaBoton } from "./VerFacturaBoton";
 
 export const dynamic = "force-dynamic";
 
-const FILTROS_FECHA: { value: FiltroFecha; label: string }[] = [
-  { value: "hoy", label: "Hoy" },
-  { value: "ayer", label: "Ayer" },
-  { value: "7dias", label: "Últimos 7 días" },
-  { value: "30dias", label: "Últimos 30 días" },
-  { value: "mes", label: "Este mes" },
-];
-
-type FilaFactura = {
-  key: string;
-  origen: "pedido" | "venta";
-  id: string;
-  facturaNumero: string;
-  fecha: Date;
-  razonSocial: string;
-  etiquetaIdentificacion: string;
-  identificacion: string;
-  total: number;
-  // Se cancela la cuenta entera (arrastra la factura de yapa) o se anula
-  // SOLO la factura, cuenta viva — dos cosas distintas, ver
-  // src/app/admin/(protected)/facturas/actions.ts.
-  cuentaAnulada: boolean;
-  facturaAnulada: boolean;
-  // Solo en filas de FacturaReemplazada: este número YA NO es el vigente de
-  // la cuenta (se remitió a uno nuevo) — sin esto, el número viejo
-  // desaparecía de la lista por completo apenas se remitía, como si nunca
-  // hubiera existido. El documento sigue siendo auditable: motivo, quién y
-  // a qué número se reemplazó.
-  reemplazadaPor: string | null;
-  motivoAnulacion: string | null;
-  anuladaPor: string | null;
-  origenLabel: string;
-  href: string;
-};
-
-function nombreCliente(
-  tipoIdentificacion: string | null,
-  razonSocial: string | null
-): string {
-  if (tipoIdentificacion === SIN_REGISTRO_FISCAL.tipo) return SIN_REGISTRO_FISCAL.etiquetaDisplay;
-  return razonSocial ?? "—";
-}
-
 /**
- * Todas las facturas emitidas (pedidos + mostrador) en un rango de fecha,
- * en un solo lugar — hoy una factura solo se ve como un dato suelto dentro
- * de un pedido o de una cuenta del POS, sin forma de repasar el período
- * completo de un vistazo.
- *
- * Solo entran acá las que de verdad tienen número (facturaNumero no nulo):
- * un pedido que pidió factura pero se imprimió informal porque la estación
- * no tenía punto de expedición no es una factura real, y no corresponde
- * mezclarla en este listado.
+ * Todas las facturas emitidas (pedidos + mostrador) en un rango de fechas, en un
+ * solo lugar — ver src/lib/reporte-facturas.ts. El rango se elige con un
+ * calendario Desde / Hasta; los reportes de Excel y PDF salen con el mismo.
  */
 export default async function FacturasPage({
   searchParams,
@@ -82,138 +32,27 @@ export default async function FacturasPage({
 
   const { fecha, desde, hasta, rg90, mes: mesAviso, detalle } = await searchParams;
   const fechaActiva: FiltroFecha = (fecha as FiltroFecha) ?? "30dias";
-  const rango =
+  let rango =
     calcularRangoFecha(fechaActiva, desde, hasta) ?? calcularRangoFecha("30dias", undefined, undefined)!;
 
-  function hrefFecha(nuevaFecha: FiltroFecha) {
-    return `/admin/facturas?fecha=${nuevaFecha}`;
+  // El filtro es un calendario Desde / Hasta. Sin fechas en la dirección arranca
+  // en los últimos 30 días, y el calendario muestra siempre el rango que se está
+  // viendo, venga como venga en la dirección.
+  let diaDesde = claveDia(rango.gte);
+  let diaHasta = claveDia(new Date(rango.lt.getTime() - 24 * 60 * 60 * 1000));
+  if (diaDesde > diaHasta) {
+    // Las escribieron al revés: se dan vuelta en vez de mostrar una lista vacía.
+    [diaDesde, diaHasta] = [diaHasta, diaDesde];
+    rango = calcularRangoFecha("rango", diaDesde, diaHasta)!;
   }
+  // Los reportes de Excel y PDF reciben el mismo rango, así salen con lo que se ve.
+  const consultaReporte = new URLSearchParams({ fecha: "rango", desde: diaDesde, hasta: diaHasta }).toString();
 
   const storeId = await idLocalActual();
-  const db = prismaDelLocal(storeId);
+  const filas = await listarFacturas(storeId, rango);
 
-  const [pedidos, ventas, reemplazadas] = await Promise.all([
-    db.order.findMany({
-      where: { facturaNumero: { not: null }, createdAt: rango },
-      orderBy: { createdAt: "desc" },
-      select: {
-        id: true,
-        numero: true,
-        createdAt: true,
-        total: true,
-        estado: true,
-        facturaAnulada: true,
-        facturaNumero: true,
-        facturaRazonSocial: true,
-        facturaRuc: true,
-        facturaTipoIdentificacion: true,
-      },
-    }),
-    db.ventaPos.findMany({
-      where: { facturaNumero: { not: null }, creadoEn: rango },
-      orderBy: { creadoEn: "desc" },
-      select: {
-        id: true,
-        numero: true,
-        creadoEn: true,
-        total: true,
-        cancelada: true,
-        facturaAnulada: true,
-        facturaNumero: true,
-        facturaRazonSocial: true,
-        facturaRuc: true,
-        facturaTipoIdentificacion: true,
-      },
-    }),
-    // Números viejos que se anularon y después se remitieron a uno nuevo —
-    // ver Fase 11 (remisión). Sin esto, un número que ya no es el vigente de
-    // su cuenta no aparecía en ningún lado de esta pantalla.
-    db.facturaReemplazada.findMany({
-      where: { anuladaEn: rango },
-      orderBy: { anuladaEn: "desc" },
-      select: {
-        id: true,
-        origen: true,
-        facturaNumero: true,
-        anuladaEn: true,
-        anuladaPor: true,
-        motivoAnulacion: true,
-        facturaNuevaNumero: true,
-        facturaRazonSocial: true,
-        facturaRuc: true,
-        facturaTipoIdentificacion: true,
-        order: { select: { id: true, numero: true, total: true } },
-        venta: { select: { id: true, numero: true, total: true } },
-      },
-    }),
-  ]);
-
-  const filas: FilaFactura[] = [
-    ...pedidos.map((p) => ({
-      key: `pedido-${p.id}`,
-      origen: "pedido" as const,
-      id: p.id,
-      facturaNumero: p.facturaNumero!,
-      fecha: p.createdAt,
-      razonSocial: nombreCliente(p.facturaTipoIdentificacion, p.facturaRazonSocial),
-      etiquetaIdentificacion: etiquetaTipoIdentificacion(p.facturaTipoIdentificacion ?? "ruc"),
-      identificacion: p.facturaRuc ?? "—",
-      total: Number(p.total),
-      cuentaAnulada: p.estado === "cancelado",
-      facturaAnulada: p.facturaAnulada,
-      reemplazadaPor: null,
-      motivoAnulacion: null,
-      anuladaPor: null,
-      origenLabel: `Pedido ${formatearNumero(p.numero)}`,
-      href: `/admin/pedidos/${p.id}`,
-    })),
-    ...ventas.map((v) => ({
-      key: `venta-${v.id}`,
-      origen: "venta" as const,
-      id: v.id,
-      facturaNumero: v.facturaNumero!,
-      fecha: v.creadoEn,
-      razonSocial: nombreCliente(v.facturaTipoIdentificacion, v.facturaRazonSocial),
-      etiquetaIdentificacion: etiquetaTipoIdentificacion(v.facturaTipoIdentificacion ?? "ruc"),
-      identificacion: v.facturaRuc ?? "—",
-      total: Number(v.total),
-      cuentaAnulada: v.cancelada,
-      facturaAnulada: v.facturaAnulada,
-      reemplazadaPor: null,
-      motivoAnulacion: null,
-      anuladaPor: null,
-      origenLabel: `Venta ${formatearNumero(v.numero)}`,
-      href: `/admin/pos/venta/${v.id}`,
-    })),
-    ...reemplazadas.map((r) => {
-      const cuenta = r.origen === "venta" ? r.venta : r.order;
-      const origen = r.origen === "venta" ? ("venta" as const) : ("pedido" as const);
-      return {
-        key: `reemplazada-${r.id}`,
-        origen,
-        id: cuenta?.id ?? "",
-        facturaNumero: r.facturaNumero,
-        fecha: r.anuladaEn,
-        razonSocial: nombreCliente(r.facturaTipoIdentificacion, r.facturaRazonSocial),
-        etiquetaIdentificacion: etiquetaTipoIdentificacion(r.facturaTipoIdentificacion ?? "ruc"),
-        identificacion: r.facturaRuc ?? "—",
-        total: cuenta ? Number(cuenta.total) : 0,
-        cuentaAnulada: false,
-        facturaAnulada: true,
-        reemplazadaPor: r.facturaNuevaNumero,
-        motivoAnulacion: r.motivoAnulacion,
-        anuladaPor: r.anuladaPor,
-        origenLabel: cuenta
-          ? `${origen === "pedido" ? "Pedido" : "Venta"} ${formatearNumero(cuenta.numero)}`
-          : "—",
-        href: cuenta ? (origen === "pedido" ? `/admin/pedidos/${cuenta.id}` : `/admin/pos/venta/${cuenta.id}`) : "#",
-      };
-    }),
-  ].sort((a, b) => b.fecha.getTime() - a.fecha.getTime());
-
-  // "Vigente" = ni la cuenta ni la factura están anuladas. Solo esas suman
-  // al total facturado del período.
-  const vigentes = filas.filter((f) => !f.cuentaAnulada && !f.facturaAnulada);
+  // Solo las vigentes suman al total facturado del período.
+  const vigentes = filas.filter(esVigente);
   const totalFacturado = vigentes.reduce((s, f) => s + f.total, 0);
 
   // Exportación RG 90: el mes que se propone es el anterior (el que se presenta
@@ -241,45 +80,62 @@ export default async function FacturasPage({
         titulo="Facturas"
         bajada="Todas las facturas emitidas, de pedidos y de mostrador, juntas en un solo lugar."
         acciones={
-          <Link href="/admin/facturas/nueva" className={clasesBoton("principal", "sm")}>
-            + Nueva factura
-          </Link>
+          <>
+            <a href={`/admin/facturas/exportar?${consultaReporte}`} className={clasesBoton("suave", "sm")}>
+              Descargar Excel
+            </a>
+            <a
+              href={`/admin/facturas/imprimir?${consultaReporte}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={clasesBoton("navegar", "sm")}
+            >
+              Ver reporte / PDF
+            </a>
+            <Link href="/admin/facturas/nueva" className={clasesBoton("principal", "sm")}>
+              + Nueva factura
+            </Link>
+          </>
         }
       />
 
-      <div className="mb-6 flex flex-wrap items-center gap-2">
-        {FILTROS_FECHA.map((f) => (
-          <Link
-            key={f.value}
-            href={hrefFecha(f.value)}
-            className={`rounded-full border px-3 py-1.5 text-sm font-medium ${
-              fechaActiva === f.value
-                ? "border-brand bg-brand text-white"
-                : "border-linea text-tinta-media hover:border-brand hover:text-brand"
-            }`}
-          >
-            {f.label}
-          </Link>
-        ))}
-      </div>
+      {/* Solo calendario: el rango de fechas que se ve en la lista y sale en los reportes. */}
+      <form
+        key={`${diaDesde}_${diaHasta}`}
+        method="get"
+        action="/admin/facturas"
+        className="mb-6 flex flex-wrap items-end gap-3"
+      >
+        <input type="hidden" name="fecha" value="rango" />
+        <Campo etiqueta="Desde" className="w-44">
+          <Entrada type="date" name="desde" defaultValue={diaDesde} required />
+        </Campo>
+        <Campo etiqueta="Hasta" className="w-44">
+          <Entrada type="date" name="hasta" defaultValue={diaHasta} required />
+        </Campo>
+        <button type="submit" className={clasesBoton("principal", "md")}>
+          Filtrar
+        </button>
+      </form>
 
       {avisoRg90 && (
         <p className="mb-4 rounded-lg bg-aviso-luz px-4 py-3 text-[0.85rem] font-medium text-aviso">{avisoRg90}</p>
       )}
 
       {/* Registro de comprobantes de ventas en el formato de importación de la
-          DNIT (RG 90/2021, Marangatú). El formulario baja un .zip listo para subir. */}
-      <details open={!!rg90} className="group mb-6 rounded-xl border border-linea bg-white">
-        <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-4 py-3 text-[0.9rem] font-semibold text-tinta">
+          DNIT (RG 90/2021, Marangatú). El formulario baja un .zip listo para subir.
+          La cabecera va con fondo naranja claro para distinguirla del resto. */}
+      <details open={!!rg90} className="group mb-6 overflow-hidden rounded-xl border border-brand/30 bg-white">
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-2 bg-brand-light px-4 py-3 text-[0.9rem] font-semibold text-brand-texto">
           <span>Exportar para Marangatú (RG 90)</span>
-          <span aria-hidden="true" className="text-xs text-tinta-suave transition-transform group-open:rotate-180">
+          <span aria-hidden="true" className="text-xs transition-transform group-open:rotate-180">
             ▼
           </span>
         </summary>
         <form
           method="get"
           action="/admin/facturas/rg90"
-          className="grid grid-cols-1 gap-3 border-t border-linea p-4 sm:grid-cols-2 lg:grid-cols-3"
+          className="grid grid-cols-1 gap-3 border-t border-brand/30 p-4 sm:grid-cols-2 lg:grid-cols-3"
         >
           <Campo etiqueta="Mes" ayuda="El mes fiscal del registro. Entran las facturas emitidas en ese mes.">
             <Entrada type="month" name="mes" defaultValue={mesPorDefecto} required />
