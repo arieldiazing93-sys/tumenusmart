@@ -98,6 +98,9 @@ function armarGrupos(hayIdeaSinVer: boolean, rol: string, ventasACredito: boolea
         // Entradas y salidas que no son compras ni ventas: mermas, roturas, consumo del personal.
         { href: "/admin/stock/movimientos", label: "Movimientos de almacén", icono: "estadisticas" as const,
           ver: conPermiso("stock.ver") },
+        // Qué insumos descontó cada venta y por qué producto — para comprobar cómo sale cada ingrediente.
+        { href: "/admin/stock/salidas-por-venta", label: "Salidas por venta", icono: "estadisticas" as const,
+          ver: conPermiso("stock.ver") },
         { href: "/admin/stock/compras", label: "Compras", icono: "cierre" as const,
           ver: conPermiso("stock.ver") },
         { href: "/admin/stock/cuentas-por-pagar", label: "Cuentas por pagar", icono: "cierre" as const,

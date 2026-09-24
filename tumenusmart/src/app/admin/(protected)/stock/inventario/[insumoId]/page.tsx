@@ -75,10 +75,12 @@ export default async function HistorialInsumoPage({
           <tbody>
             {movimientos.map((m) => {
               const cantidad = Number(m.cantidad);
+              // En una venta, el motivo dice qué se vendió ("2 × Pizza Muzzarella").
+              const queSeVendio = m.motivo ? ` — ${m.motivo}` : "";
               const referencia = m.order
-                ? `Pedido #${m.order.numero}`
+                ? `Pedido #${m.order.numero}${queSeVendio}`
                 : m.ventaPos
-                  ? `Venta mostrador #${m.ventaPos.numero}`
+                  ? `Venta mostrador #${m.ventaPos.numero}${queSeVendio}`
                   : m.compra
                     ? `Compra${m.compra.proveedor ? ` — ${m.compra.proveedor.nombre}` : ""}${
                         m.compra.numeroComprobante ? ` (${m.compra.numeroComprobante})` : ""
