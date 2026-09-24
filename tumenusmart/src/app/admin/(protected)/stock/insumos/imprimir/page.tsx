@@ -1,34 +1,33 @@
-import { Fragment } from "react";
 import { pantallaConPermiso } from "@/lib/auth";
 import { idLocalActual, localActual } from "@/lib/local-actual";
 import { formatearGuarani } from "@/lib/format";
-import { ZONA_NEGOCIO } from "@/lib/timezone";
+import { rangoDeDias, diaEnTexto } from "@/lib/rango-dias";
 import { calcularReporteInsumos } from "@/lib/reporte-insumos";
 import { ImprimirBoton } from "../../../estadisticas/imprimir/ImprimirBoton";
 
 export const dynamic = "force-dynamic";
 
+/** Un movimiento con su signo: "+12", "-3" y, si no hubo, un guion. */
+function conSigno(n: number): string {
+  if (n === 0) return "—";
+  return `${n > 0 ? "+" : ""}${n}`;
+}
+
 /** Versión imprimible del reporte de insumos — "Imprimir / Guardar como PDF" desde el navegador. */
 export default async function ImprimirInsumosPage({
   searchParams,
 }: {
-  searchParams: Promise<{ categoria?: string }>;
+  searchParams: Promise<{ categoria?: string; desde?: string; hasta?: string }>;
 }) {
   await pantallaConPermiso("stock.ver");
 
-  const { categoria } = await searchParams;
+  const { categoria, desde, hasta } = await searchParams;
+  const rango = rangoDeDias(desde, hasta);
   const storeId = await idLocalActual();
   const [local, reporte] = await Promise.all([
     localActual(),
-    calcularReporteInsumos(storeId, categoria || null),
+    calcularReporteInsumos(storeId, rango, categoria || null),
   ]);
-
-  const fecha = new Date().toLocaleDateString("es-PY", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    timeZone: ZONA_NEGOCIO,
-  });
 
   // Una sección por categoría.
   const grupos = new Map<string, typeof reporte.filas>();
@@ -39,7 +38,7 @@ export default async function ImprimirInsumosPage({
   }
 
   return (
-    <div className="mx-auto max-w-3xl px-4 py-8 print:max-w-none print:px-0 print:py-0">
+    <div className="mx-auto max-w-4xl px-4 py-8 print:max-w-none print:px-0 print:py-0">
       <div className="mb-6 flex justify-end print:hidden">
         <ImprimirBoton />
       </div>
@@ -52,7 +51,7 @@ export default async function ImprimirInsumosPage({
         <div>
           <h1 className="text-2xl font-bold text-tinta">{local.nombre} — Insumos</h1>
           <p className="mt-1 text-sm text-tinta-media">
-            Existencias al {fecha} · {reporte.categoriaFiltrada ?? "Todas las categorías"}
+            Período: {diaEnTexto(rango.desde)} – {diaEnTexto(rango.hasta)} · {reporte.categoriaFiltrada ?? "Todas las categorías"}
           </p>
         </div>
       </div>
@@ -68,7 +67,7 @@ export default async function ImprimirInsumosPage({
                 <td className="py-2 text-right font-semibold text-tinta">{reporte.filas.length}</td>
               </tr>
               <tr className="border-b border-linea">
-                <td className="py-2 text-tinta-media">Valor del stock (a costo de cada insumo, sin IVA)</td>
+                <td className="py-2 text-tinta-media">Valor del stock final (a costo de cada insumo, sin IVA)</td>
                 <td className="py-2 text-right text-base font-bold text-tinta">
                   {formatearGuarani(Math.round(reporte.totalValor))}
                 </td>
@@ -90,36 +89,42 @@ export default async function ImprimirInsumosPage({
                 <thead>
                   <tr className="border-b border-linea text-left text-xs uppercase tracking-wide text-tinta-media">
                     <th className="py-1.5">Insumo</th>
-                    <th className="py-1.5 text-right">Stock</th>
-                    <th className="py-1.5 text-right">Mínimo</th>
+                    <th className="py-1.5 text-right">Inicial</th>
+                    <th className="py-1.5 text-right">Compras</th>
+                    <th className="py-1.5 text-right">Ventas</th>
+                    <th className="py-1.5 text-right">Ajustes</th>
+                    <th className="py-1.5 text-right">Anul.</th>
+                    <th className="py-1.5 text-right">Final</th>
                     <th className="py-1.5 text-right">Costo</th>
                     <th className="py-1.5 text-right">Valor</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filas.map((f, i) => (
-                    <Fragment key={i}>
-                      <tr className="border-b border-linea-fina break-inside-avoid">
-                        <td className="py-1.5 text-tinta">
-                          {f.insumo}
-                          {!f.activo && <span className="ml-1 text-xs text-tinta-suave">(inactivo)</span>}
-                        </td>
-                        <td
-                          className={`py-1.5 text-right font-semibold ${
-                            f.estado === "negativo" ? "text-peligro" : f.estado === "bajo" ? "text-aviso" : "text-tinta"
-                          }`}
-                        >
-                          {f.stock} <span className="text-xs font-normal text-tinta-suave">{f.unidad}</span>
-                        </td>
-                        <td className="py-1.5 text-right text-tinta-media">{f.stockMinimo ?? "—"}</td>
-                        <td className="py-1.5 text-right text-tinta-media">
-                          {f.costoUnitario != null ? formatearGuarani(Math.round(f.costoUnitario)) : "—"}
-                        </td>
-                        <td className="py-1.5 text-right text-tinta-media">
-                          {f.valor != null ? formatearGuarani(Math.round(f.valor)) : "—"}
-                        </td>
-                      </tr>
-                    </Fragment>
+                    <tr key={i} className="border-b border-linea-fina break-inside-avoid">
+                      <td className="py-1.5 text-tinta">
+                        {f.insumo} <span className="text-xs text-tinta-suave">{f.unidad}</span>
+                        {!f.activo && <span className="ml-1 text-xs text-tinta-suave">(inactivo)</span>}
+                      </td>
+                      <td className="py-1.5 text-right text-tinta-media">{f.inicial}</td>
+                      <td className="py-1.5 text-right text-tinta-media">{conSigno(f.compras)}</td>
+                      <td className="py-1.5 text-right text-tinta-media">{conSigno(f.ventas)}</td>
+                      <td className="py-1.5 text-right text-tinta-media">{conSigno(f.ajustes)}</td>
+                      <td className="py-1.5 text-right text-tinta-media">{conSigno(f.anulaciones)}</td>
+                      <td
+                        className={`py-1.5 text-right font-semibold ${
+                          f.estado === "negativo" ? "text-peligro" : f.estado === "bajo" ? "text-aviso" : "text-tinta"
+                        }`}
+                      >
+                        {f.stock}
+                      </td>
+                      <td className="py-1.5 text-right text-tinta-media">
+                        {f.costoUnitario != null ? formatearGuarani(Math.round(f.costoUnitario)) : "—"}
+                      </td>
+                      <td className="py-1.5 text-right text-tinta-media">
+                        {f.valor != null ? formatearGuarani(Math.round(f.valor)) : "—"}
+                      </td>
+                    </tr>
                   ))}
                 </tbody>
               </table>
@@ -129,8 +134,10 @@ export default async function ImprimirInsumosPage({
       )}
 
       <p className="mt-6 text-xs text-tinta-suave">
-        Stock en rojo: negativo (se vendió más de lo que había registrado). En naranja: bajo el mínimo. Para ver qué se
-        movió entre dos fechas, usá el reporte de Almacén.
+        Inicial: lo que había al empezar el primer día. Compras, ventas y ajustes (inventarios) son lo que se movió en el
+        período; Anul. es lo que se devolvió o se sacó por ventas y compras canceladas. Final en rojo: negativo (se
+        vendió más de lo que había registrado); en naranja: bajo el mínimo. El valor va a costo de hoy de cada insumo
+        (última compra, sin IVA).
       </p>
       <p className="mt-2 text-[0.72rem] text-tinta-suave">Generado desde TuMenuSmart.</p>
     </div>

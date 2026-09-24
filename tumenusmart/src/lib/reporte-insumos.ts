@@ -1,13 +1,18 @@
 import { prismaDelLocal } from "./prisma-local";
-import { stockPorAlmacen } from "./stock-almacen";
+import { type RangoDias } from "./rango-dias";
+import { acumularMovimientos, redondear3 } from "./reporte-almacen";
 import { etiquetaUnidadMedida } from "./unidad-medida";
 
 /**
- * Reporte de insumos: la foto de hoy de lo que hay de cada uno, con su costo y
- * el valor del stock. El stock es el total de todos los almacenes
- * (`Insumo.stockActual`) y, aparte, cómo está repartido por almacén.
+ * Reporte de insumos en un rango de fechas: por cada insumo, con cuánto stock
+ * arrancó, cuánto entró por compras, cuánto salió por ventas, cuánto se
+ * corrigió con inventarios y con cuánto terminó (sumando todos los almacenes),
+ * más su costo y el valor del stock final. Aparte, cómo quedó repartido el
+ * stock final por almacén.
  *
- * Para ver qué se movió entre dos fechas está el reporte de Almacén.
+ * Sale del mismo cálculo que el reporte de Almacén (el ledger de movimientos,
+ * `acumularMovimientos`), así los dos siempre coinciden. Con un rango que
+ * termina hoy, "stock final" es lo que hay ahora.
  *
  * Lo usan el Excel (insumos/exportar) y la versión imprimible/PDF
  * (insumos/imprimir), para que los dos digan siempre lo mismo.
@@ -18,14 +23,24 @@ export type FilaInsumoReporte = {
   insumo: string;
   unidad: string;
   activo: boolean;
-  /** El total de todos los almacenes. */
+  /** Lo que había al empezar el primer día (todos los almacenes). */
+  inicial: number;
+  /** Entradas por compras (positivo). */
+  compras: number;
+  /** Salidas por ventas (negativo). */
+  ventas: number;
+  /** Correcciones por inventario (positivo o negativo). */
+  ajustes: number;
+  /** Ventas o compras canceladas: lo que se devolvió o se sacó de nuevo. */
+  anulaciones: number;
+  /** El stock al terminar el último día del rango (todos los almacenes). */
   stock: number;
   stockMinimo: number | null;
-  /** Costo de una unidad de stock. Null si todavía no tiene. */
+  /** Costo de HOY de una unidad de stock. Null si todavía no tiene. */
   costoUnitario: number | null;
   /** stock × costoUnitario. Null si no hay costo. */
   valor: number | null;
-  /** "negativo" | "bajo" (bajo el mínimo) | "ok". */
+  /** Sobre el stock final: "negativo" | "bajo" (bajo el mínimo) | "ok". */
   estado: "negativo" | "bajo" | "ok";
 };
 
@@ -34,11 +49,13 @@ export type FilaInsumoPorAlmacen = {
   categoria: string;
   insumo: string;
   unidad: string;
+  /** Cuánto había en ese almacén al terminar el último día del rango. */
   cantidad: number;
   valor: number | null;
 };
 
 export type ReporteInsumos = {
+  rango: RangoDias;
   /** Nombre de la categoría por la que se filtró ("Sin categoría" incluida), si se filtró. */
   categoriaFiltrada: string | null;
   filas: FilaInsumoReporte[];
@@ -53,6 +70,7 @@ export const SIN_CATEGORIA_INSUMO = "sin";
 
 export async function calcularReporteInsumos(
   storeId: string,
+  rango: RangoDias,
   categoria?: string | null
 ): Promise<ReporteInsumos> {
   const db = prismaDelLocal(storeId);
@@ -69,13 +87,31 @@ export async function calcularReporteInsumos(
   ]);
 
   const nombreDeAlmacen = new Map(almacenes.map((a) => [a.id, a.nombre]));
-  const stockDeCadaAlmacen = await stockPorAlmacen(
-    storeId,
-    insumos.map((i) => i.id)
-  );
+  const datosDeInsumo = new Map(insumos.map((i) => [i.id, i]));
+
+  const acumulados = await acumularMovimientos(storeId, rango, { insumoIds: insumos.map((i) => i.id) });
+
+  // Lo de todos los almacenes, sumado por insumo.
+  type Totales = { inicial: number; compras: number; ventas: number; ajustes: number; anulaciones: number };
+  const totalesPorInsumo = new Map<string, Totales>();
+  for (const a of acumulados) {
+    const t = totalesPorInsumo.get(a.insumoId) ?? { inicial: 0, compras: 0, ventas: 0, ajustes: 0, anulaciones: 0 };
+    t.inicial += a.inicial;
+    t.compras += a.compras;
+    t.ventas += a.ventas;
+    t.ajustes += a.ajustes;
+    t.anulaciones += a.anulaciones;
+    totalesPorInsumo.set(a.insumoId, t);
+  }
 
   const filas: FilaInsumoReporte[] = insumos.map((i) => {
-    const stock = Number(i.stockActual);
+    const t = totalesPorInsumo.get(i.id) ?? { inicial: 0, compras: 0, ventas: 0, ajustes: 0, anulaciones: 0 };
+    const inicial = redondear3(t.inicial);
+    const compras = redondear3(t.compras);
+    const ventas = redondear3(t.ventas);
+    const ajustes = redondear3(t.ajustes);
+    const anulaciones = redondear3(t.anulaciones);
+    const stock = redondear3(inicial + compras + ventas + ajustes + anulaciones);
     const stockMinimo = i.stockMinimo != null ? Number(i.stockMinimo) : null;
     const costoUnitario = i.costoUnitario != null ? Number(i.costoUnitario) : null;
     return {
@@ -83,6 +119,11 @@ export async function calcularReporteInsumos(
       insumo: i.nombre,
       unidad: etiquetaUnidadMedida(i.unidadMedida),
       activo: i.activo,
+      inicial,
+      compras,
+      ventas,
+      ajustes,
+      anulaciones,
       stock,
       stockMinimo,
       costoUnitario,
@@ -94,19 +135,22 @@ export async function calcularReporteInsumos(
     (a, b) => a.categoria.localeCompare(b.categoria, "es") || a.insumo.localeCompare(b.insumo, "es")
   );
 
+  // Cómo quedó el stock final repartido por almacén (solo lo que tiene algo).
   const porAlmacen: FilaInsumoPorAlmacen[] = [];
-  for (const i of insumos) {
+  for (const a of acumulados) {
+    const cantidad = redondear3(a.inicial + a.compras + a.ventas + a.ajustes + a.anulaciones);
+    if (cantidad === 0) continue;
+    const i = datosDeInsumo.get(a.insumoId);
+    if (!i) continue;
     const costo = i.costoUnitario != null ? Number(i.costoUnitario) : null;
-    for (const s of stockDeCadaAlmacen.get(i.id) ?? []) {
-      porAlmacen.push({
-        almacen: s.almacenId ? (nombreDeAlmacen.get(s.almacenId) ?? "Almacén eliminado") : "Sin almacén",
-        categoria: i.categoria?.nombre ?? "Sin categoría",
-        insumo: i.nombre,
-        unidad: etiquetaUnidadMedida(i.unidadMedida),
-        cantidad: s.cantidad,
-        valor: costo != null ? s.cantidad * costo : null,
-      });
-    }
+    porAlmacen.push({
+      almacen: a.almacenId ? (nombreDeAlmacen.get(a.almacenId) ?? "Almacén eliminado") : "Sin almacén",
+      categoria: i.categoria?.nombre ?? "Sin categoría",
+      insumo: i.nombre,
+      unidad: etiquetaUnidadMedida(i.unidadMedida),
+      cantidad,
+      valor: costo != null ? cantidad * costo : null,
+    });
   }
   porAlmacen.sort(
     (a, b) =>
@@ -116,6 +160,7 @@ export async function calcularReporteInsumos(
   );
 
   return {
+    rango,
     categoriaFiltrada: !categoria
       ? null
       : categoria === SIN_CATEGORIA_INSUMO

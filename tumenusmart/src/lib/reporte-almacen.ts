@@ -16,7 +16,8 @@ import { etiquetaUnidadMedida } from "./unidad-medida";
  * compra, sin IVA): no se guardó el costo de cada día.
  *
  * Lo usan el Excel (almacenes/exportar) y la versión imprimible/PDF
- * (almacenes/imprimir), para que los dos digan siempre lo mismo.
+ * (almacenes/imprimir), para que los dos digan siempre lo mismo. El reporte de
+ * Insumos usa el mismo cálculo de movimientos (`acumularMovimientos`).
  */
 
 export type FilaAlmacenReporte = {
@@ -65,15 +66,36 @@ export type ReporteAlmacen = {
 
 const DIA_MS = 24 * 60 * 60 * 1000;
 
-function redondear3(n: number): number {
+export function redondear3(n: number): number {
   return Math.round(n * 1000) / 1000;
 }
 
-export async function calcularReporteAlmacen(
+/** Lo que pasó con un insumo en un almacén durante el rango, tal cual sale del ledger. */
+export type MovimientoAcumulado = {
+  almacenId: string | null;
+  insumoId: string;
+  /** Lo que había al empezar el primer día. */
+  inicial: number;
+  compras: number;
+  ventas: number;
+  ajustes: number;
+  anulaciones: number;
+};
+
+/**
+ * Suma el ledger por almacén e insumo: el stock con el que arrancó el rango
+ * (todo lo anterior al primer día) y lo que entró y salió durante el rango,
+ * separado por tipo. Los días son de Asunción y ambos extremos entran.
+ *
+ * `filtro.almacenId` deja solo un almacén; `filtro.insumoIds`, solo esos
+ * insumos. Devuelve también las combinaciones sin ningún movimiento ni stock
+ * (en cero): quien la usa decide si las muestra.
+ */
+export async function acumularMovimientos(
   storeId: string,
   rango: RangoDias,
-  almacenId?: string | null
-): Promise<ReporteAlmacen> {
+  filtro: { almacenId?: string | null; insumoIds?: string[] } = {}
+): Promise<MovimientoAcumulado[]> {
   const db = prismaDelLocal(storeId);
 
   // Los días en hora de Asunción: desde el inicio del primero hasta el fin del último.
@@ -81,33 +103,24 @@ export async function calcularReporteAlmacen(
   const ultimoDia = fechaAsuncionDesdeTexto(rango.hasta) ?? new Date(rango.hasta);
   const fin = new Date(ultimoDia.getTime() + DIA_MS);
 
-  const filtroAlmacen = almacenId ? { almacenId } : {};
+  const filtroAlmacen = filtro.almacenId ? { almacenId: filtro.almacenId } : {};
+  const filtroInsumos = filtro.insumoIds ? { insumoId: { in: filtro.insumoIds } } : {};
 
-  const [antes, enElRango, almacenes] = await Promise.all([
+  const [antes, enElRango] = await Promise.all([
     db.movimientoStock.groupBy({
       by: ["insumoId", "almacenId"],
-      where: { createdAt: { lt: inicio }, ...filtroAlmacen },
+      where: { createdAt: { lt: inicio }, ...filtroAlmacen, ...filtroInsumos },
       _sum: { cantidad: true },
     }),
     db.movimientoStock.groupBy({
       by: ["insumoId", "almacenId", "tipo"],
-      where: { createdAt: { gte: inicio, lt: fin }, ...filtroAlmacen },
+      where: { createdAt: { gte: inicio, lt: fin }, ...filtroAlmacen, ...filtroInsumos },
       _sum: { cantidad: true },
     }),
-    db.almacen.findMany({ select: { id: true, nombre: true } }),
   ]);
 
-  type Acumulado = {
-    almacenId: string | null;
-    insumoId: string;
-    inicial: number;
-    compras: number;
-    ventas: number;
-    ajustes: number;
-    anulaciones: number;
-  };
-  const acumulados = new Map<string, Acumulado>();
-  const acumuladoDe = (idAlmacen: string | null, insumoId: string): Acumulado => {
+  const acumulados = new Map<string, MovimientoAcumulado>();
+  const acumuladoDe = (idAlmacen: string | null, insumoId: string): MovimientoAcumulado => {
     const clave = `${idAlmacen ?? ""}|${insumoId}`;
     let actual = acumulados.get(clave);
     if (!actual) {
@@ -129,8 +142,23 @@ export async function calcularReporteAlmacen(
     else a.ajustes += cantidad;
   }
 
+  return [...acumulados.values()];
+}
+
+export async function calcularReporteAlmacen(
+  storeId: string,
+  rango: RangoDias,
+  almacenId?: string | null
+): Promise<ReporteAlmacen> {
+  const db = prismaDelLocal(storeId);
+
+  const [acumulados, almacenes] = await Promise.all([
+    acumularMovimientos(storeId, rango, { almacenId }),
+    db.almacen.findMany({ select: { id: true, nombre: true } }),
+  ]);
+
   // Los datos de cada insumo, en una sola consulta.
-  const idsInsumos = [...new Set([...acumulados.values()].map((a) => a.insumoId))];
+  const idsInsumos = [...new Set(acumulados.map((a) => a.insumoId))];
   const insumos =
     idsInsumos.length > 0
       ? await db.insumo.findMany({
@@ -148,7 +176,7 @@ export async function calcularReporteAlmacen(
   const nombreDeAlmacen = new Map(almacenes.map((a) => [a.id, a.nombre]));
 
   const filas: FilaAlmacenReporte[] = [];
-  for (const a of acumulados.values()) {
+  for (const a of acumulados) {
     const inicial = redondear3(a.inicial);
     const compras = redondear3(a.compras);
     const ventas = redondear3(a.ventas);

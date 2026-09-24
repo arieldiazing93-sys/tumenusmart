@@ -15,6 +15,11 @@ type Almacen = { id: string; nombre: string };
 const TODAS = "";
 const SIN_CATEGORIA = "sin";
 
+/** Un campo de fecha de la misma altura que los botones chicos de al lado. */
+const CAMPO_FECHA =
+  "h-8 rounded-lg border border-linea bg-superficie px-2 text-[0.82rem] text-tinta " +
+  "focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/15";
+
 /**
  * La pantalla de Insumos en dos paneles: a la izquierda se elige una
  * categoría y abajo aparecen sus insumos; con doble clic en uno, a la derecha
@@ -35,6 +40,9 @@ export function InsumosMaestroDetalle({
   const [categoriaFiltro, setCategoriaFiltro] = useState(TODAS);
   const [abiertoId, setAbiertoId] = useState<string | null>(null);
   const [creando, setCreando] = useState(false);
+  // Rango del reporte, por calendario. Vacío = el mes actual.
+  const [desde, setDesde] = useState("");
+  const [hasta, setHasta] = useState("");
   const panelRef = useRef<HTMLDivElement>(null);
 
   const conteoPorCategoria = useMemo(() => {
@@ -61,8 +69,16 @@ export function InsumosMaestroDetalle({
 
   const abierto = abiertoId ? (insumos.find((i) => i.id === abiertoId) ?? null) : null;
 
-  // El reporte respeta la categoría elegida arriba de la lista ("" = todas).
-  const consultaReporte = categoriaFiltro !== TODAS ? `?categoria=${encodeURIComponent(categoriaFiltro)}` : "";
+  // El reporte respeta la categoría elegida arriba de la lista ("" = todas) y el
+  // rango de fechas del calendario (sin fechas, el servidor toma el mes actual).
+  const consultaReporte = (() => {
+    const params = new URLSearchParams();
+    if (categoriaFiltro !== TODAS) params.set("categoria", categoriaFiltro);
+    if (desde) params.set("desde", desde);
+    if (hasta) params.set("hasta", hasta);
+    const texto = params.toString();
+    return texto ? `?${texto}` : "";
+  })();
 
   // En pantalla angosta el panel queda debajo de la lista: se lo trae a la
   // vista, si no el doble clic parecería no hacer nada.
@@ -92,8 +108,28 @@ export function InsumosMaestroDetalle({
         <span className="text-xs text-tinta-suave">
           {insumos.length} {insumos.length === 1 ? "insumo" : "insumos"} en total
         </span>
-        {/* Reporte de existencias: sale con la categoría que esté elegida en la lista. */}
+        {/* Reporte de insumos: sale con la categoría que esté elegida en la lista y
+            el rango de fechas de acá. Sin fechas, toma el mes actual. */}
         <div className="flex flex-wrap items-center gap-2 sm:ml-auto">
+          <label className="flex items-center gap-1.5 text-[0.78rem] text-tinta-suave">
+            Desde
+            <input
+              type="date"
+              value={desde}
+              onChange={(e) => setDesde(e.target.value)}
+              className={CAMPO_FECHA}
+            />
+          </label>
+          <label className="flex items-center gap-1.5 text-[0.78rem] text-tinta-suave">
+            Hasta
+            <input
+              type="date"
+              value={hasta}
+              min={desde || undefined}
+              onChange={(e) => setHasta(e.target.value)}
+              className={CAMPO_FECHA}
+            />
+          </label>
           <a href={`/admin/stock/insumos/exportar${consultaReporte}`} className={clasesBoton("suave", "sm")}>
             Descargar Excel
           </a>
