@@ -14,6 +14,7 @@ import { CobrarModal } from "./CobrarModal";
 import { MovimientosCajaBoton } from "./caja/MovimientosCajaBoton";
 import { EntradaConLupa } from "./EntradaConLupa";
 import { ClienteFiscalModal, type DatosClienteFiscal } from "./ClienteFiscalModal";
+import { ClienteRapidoModal } from "./ClienteRapidoModal";
 import { MitadYMitadPickerPos } from "./MitadYMitadPickerPos";
 import { AgregadosPickerPos } from "./AgregadosPickerPos";
 import { imprimirComprobante, type ResultadoImpresion } from "@/lib/impresion-comprobantes";
@@ -113,6 +114,8 @@ export function PantallaVenta({
   const [clienteFiscalEncontrado, setClienteFiscalEncontrado] = useState(false);
   const [buscandoClienteFiscal, setBuscandoClienteFiscal] = useState(false);
   const [mostrarModalClienteFiscal, setMostrarModalClienteFiscal] = useState(false);
+  // Crear un cliente por teléfono (venta a crédito con ticket): nombre + teléfono.
+  const [mostrarModalClienteRapido, setMostrarModalClienteRapido] = useState(false);
   const [mostrarCobro, setMostrarCobro] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [cobrando, setCobrando] = useState(false);
@@ -293,6 +296,28 @@ export function PantallaVenta({
     }
   }
 
+  // Venta a crédito: ¿ya hay un cliente al que cobrarle después? Con factura con
+  // registro fiscal el cliente es el del RUC/cédula; si no, el del nombre y
+  // teléfono. Es lo mismo que exige el servidor (registrarVenta).
+  const conRegistroFiscal = comprobanteTipo === "factura" && registroFiscal === "con";
+  const creditoTieneNombre = !!clienteNombre.trim() || (conRegistroFiscal && !!facturaRazonSocial.trim());
+  const creditoTieneContacto = !!clienteTelefono.trim() || (conRegistroFiscal && !!facturaNumeroIdentificacion.trim());
+  const creditoListo = creditoTieneNombre && creditoTieneContacto;
+
+  /** Vuelve a buscar/crear el cliente de una venta a crédito, sin tocar el resto de la cuenta. */
+  function cambiarClienteCredito() {
+    setClienteNombre("");
+    setClienteTelefono("");
+    setClienteEsNuevo(false);
+    if (conRegistroFiscal) {
+      setFacturaRazonSocial("");
+      setFacturaNumeroIdentificacion("");
+      setFacturaEmail("");
+      setClienteFiscalEncontrado(false);
+      setClienteFiscalEsNuevo(false);
+    }
+  }
+
   async function confirmarCobro(formaPago: FormaPagoPos | typeof FORMA_PAGO_A_CREDITO, creditoDias?: number) {
     if (
       comprobanteTipo === "factura" &&
@@ -304,16 +329,9 @@ export function PantallaVenta({
     }
     // A crédito hay que saber a quién cobrarle después: el nombre y una forma
     // de ubicarlo (teléfono o RUC/cédula). El servidor lo vuelve a exigir.
-    if (formaPago === FORMA_PAGO_A_CREDITO) {
-      const conRegistro = comprobanteTipo === "factura" && registroFiscal === "con";
-      const tieneNombre = !!clienteNombre.trim() || (conRegistro && !!facturaRazonSocial.trim());
-      const tieneContacto = !!clienteTelefono.trim() || (conRegistro && !!facturaNumeroIdentificacion.trim());
-      if (!tieneNombre || !tieneContacto) {
-        setError(
-          "Una venta a crédito necesita el nombre del cliente y su teléfono o su RUC/cédula. Cargalos arriba, en los datos del cliente."
-        );
-        return;
-      }
+    if (formaPago === FORMA_PAGO_A_CREDITO && !creditoListo) {
+      setError("Una venta a crédito necesita un cliente: buscalo o creálo en el cuadro de cobro.");
+      return;
     }
     if (!descuento.ok) {
       setError(descuento.error);
@@ -408,6 +426,138 @@ export function PantallaVenta({
         : `${urlTicket}${parametroFallidas ? `?${parametroFallidas.slice(1)}` : ""}`
     );
   }
+
+  // Lo que se muestra dentro del cuadro de cobro al elegir "A crédito": el
+  // cliente al que se le va a cobrar después. Si ya hay uno cargado, sus datos;
+  // si no, un botón para buscarlo (por teléfono, o por RUC/cédula si la venta
+  // va con factura con registro fiscal) y, si no existe, otro para crearlo.
+  // Es el mismo estado que los datos del cliente de la pantalla: buscar o crear
+  // acá completa esos mismos campos.
+  const bloqueClienteCredito = (
+    <div className="mt-3 rounded-lg border border-linea bg-white p-3">
+      <p className="mb-2 text-[0.72rem] font-semibold uppercase tracking-rotulo text-tinta-suave">
+        Cliente de esta venta a crédito
+      </p>
+      {/* Se ve qué comprobante va a salir: una venta a crédito puede ser con
+          factura (condición crédito) o solo ticket, según lo elegido al armar la cuenta. */}
+      <p className="mb-2 rounded-md bg-papel-suave px-2.5 py-1.5 text-[0.76rem] text-tinta-media">
+        Comprobante:{" "}
+        <strong className="text-tinta">
+          {comprobanteTipo === "factura"
+            ? registroFiscal === "con"
+              ? "Factura a crédito (con registro fiscal)"
+              : "Factura a crédito (Consumidor Final)"
+            : "Ticket (sin factura)"}
+        </strong>
+        {comprobanteTipo !== "factura" && puedeFacturar && !facturaObligatoria && (
+          <span className="block text-tinta-suave">
+            Si querés facturarla, cerrá este cuadro y elegí Factura en "Comprobante" antes de cobrar.
+          </span>
+        )}
+      </p>
+
+      {creditoListo ? (
+        <div className="flex flex-col items-start gap-1">
+          <DatoDelCliente
+            etiqueta={conRegistroFiscal ? "Razón social" : "Cliente"}
+            valor={(conRegistroFiscal && facturaRazonSocial.trim()) || clienteNombre.trim() || "—"}
+          />
+          {clienteTelefono.trim() && <DatoDelCliente etiqueta="Teléfono" valor={clienteTelefono.trim()} />}
+          {conRegistroFiscal && facturaNumeroIdentificacion.trim() && (
+            <DatoDelCliente
+              etiqueta={etiquetaCortaTipoIdentificacion(facturaTipoIdentificacionElegido)}
+              valor={facturaNumeroIdentificacion.trim()}
+            />
+          )}
+          <button
+            type="button"
+            onClick={cambiarClienteCredito}
+            className="text-[0.76rem] font-medium text-brand-texto underline"
+          >
+            Cambiar cliente
+          </button>
+        </div>
+      ) : conRegistroFiscal ? (
+        <div className="flex flex-col gap-2">
+          <div className="grid grid-cols-[1fr_auto] gap-2">
+            <Entrada
+              placeholder="RUC o cédula del cliente"
+              value={facturaNumeroIdentificacion}
+              onChange={(e) => {
+                setFacturaNumeroIdentificacion(e.target.value);
+                setClienteFiscalEsNuevo(false);
+                setClienteFiscalEncontrado(false);
+                setFacturaEmail("");
+              }}
+              onKeyDown={(e) => {
+                if (e.key !== "Enter") return;
+                e.preventDefault();
+                if (facturaNumeroIdentificacion.trim() && !buscandoClienteFiscal) void buscarClienteFiscal();
+              }}
+            />
+            <Boton
+              tono="navegar"
+              tam="md"
+              onClick={buscarClienteFiscal}
+              disabled={buscandoClienteFiscal || !facturaNumeroIdentificacion.trim()}
+            >
+              {buscandoClienteFiscal ? "Buscando…" : "Buscar cliente"}
+            </Boton>
+          </div>
+          {clienteFiscalEsNuevo ? (
+            <>
+              <p className="text-[0.78rem] font-medium text-aviso">No existe ningún cliente con ese número.</p>
+              <div>
+                <Boton tono="principal" tam="sm" onClick={() => setMostrarModalClienteFiscal(true)}>
+                  Crear cliente
+                </Boton>
+              </div>
+            </>
+          ) : (
+            <p className="text-[0.76rem] text-tinta-suave">
+              Buscalo por su RUC o cédula. Si no existe, lo creás acá mismo.
+            </p>
+          )}
+        </div>
+      ) : (
+        <div className="flex flex-col gap-2">
+          <div className="grid grid-cols-[1fr_auto] gap-2">
+            <Entrada
+              inputMode="tel"
+              placeholder="Teléfono del cliente"
+              value={clienteTelefono}
+              onChange={(e) => {
+                setClienteTelefono(e.target.value);
+                setClienteEsNuevo(false);
+              }}
+              onKeyDown={(e) => {
+                if (e.key !== "Enter") return;
+                e.preventDefault();
+                if (clienteTelefono.trim() && !buscandoCliente) void buscarCliente();
+              }}
+            />
+            <Boton tono="navegar" tam="md" onClick={buscarCliente} disabled={buscandoCliente || !clienteTelefono.trim()}>
+              {buscandoCliente ? "Buscando…" : "Buscar cliente"}
+            </Boton>
+          </div>
+          {clienteEsNuevo ? (
+            <>
+              <p className="text-[0.78rem] font-medium text-aviso">No existe ningún cliente con ese teléfono.</p>
+              <div>
+                <Boton tono="principal" tam="sm" onClick={() => setMostrarModalClienteRapido(true)}>
+                  Crear cliente
+                </Boton>
+              </div>
+            </>
+          ) : (
+            <p className="text-[0.76rem] text-tinta-suave">
+              Buscalo por su teléfono. Si no existe, lo creás acá mismo.
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+  );
 
   if (categorias.length === 0) {
     return (
@@ -895,8 +1045,25 @@ export function PantallaVenta({
           cobrando={cobrando}
           error={error}
           permiteCredito={ventasACredito}
+          bloqueClienteCredito={bloqueClienteCredito}
+          creditoListo={creditoListo}
+          hayModalEncima={mostrarModalClienteFiscal || mostrarModalClienteRapido}
           onCerrar={() => setMostrarCobro(false)}
           onCobrar={confirmarCobro}
+        />
+      )}
+
+      {mostrarModalClienteRapido && (
+        <ClienteRapidoModal
+          nombreInicial={clienteNombre}
+          telefonoInicial={clienteTelefono}
+          onCerrar={() => setMostrarModalClienteRapido(false)}
+          onGuardar={(datos) => {
+            setClienteNombre(datos.nombre);
+            setClienteTelefono(datos.telefono);
+            setClienteEsNuevo(false);
+            setMostrarModalClienteRapido(false);
+          }}
         />
       )}
 

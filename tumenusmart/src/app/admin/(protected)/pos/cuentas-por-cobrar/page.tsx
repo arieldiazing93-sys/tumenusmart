@@ -165,6 +165,31 @@ export default async function CuentasPorCobrarPage({
             </Link>
           )}
         </div>
+
+        {/* El reporte sale con el cliente y el estado elegidos arriba, sin tener
+            que apretar Buscar antes: cada botón manda este mismo formulario a su
+            propia dirección (el Excel se descarga, el PDF se abre en otra pestaña). */}
+        <div className="flex flex-wrap items-center gap-2 border-t border-linea pt-3 sm:col-span-3">
+          <span className="text-sm font-medium text-tinta">Reporte de cuentas por cobrar</span>
+          <button
+            type="submit"
+            formAction="/admin/pos/cuentas-por-cobrar/exportar"
+            className={clasesBoton("principal", "sm")}
+          >
+            Descargar Excel
+          </button>
+          <button
+            type="submit"
+            formAction="/admin/pos/cuentas-por-cobrar/imprimir"
+            formTarget="_blank"
+            className={clasesBoton("navegar", "sm")}
+          >
+            Ver reporte / PDF
+          </button>
+          <span className="text-xs text-tinta-suave">
+            Usa el cliente y el filtro de arriba. Incluye cada venta, lo que debe cada cliente y los cobros hechos.
+          </span>
+        </div>
       </form>
 
       {cuentas.filas.length === 0 ? (

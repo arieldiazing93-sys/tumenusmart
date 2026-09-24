@@ -58,6 +58,9 @@ export type ResumenClienteCobros = {
 export type FiltroEstadoCobros = "con_saldo" | "cobradas" | "todas";
 
 export type CuentasPorCobrar = {
+  /** Lo que se buscó (nombre, teléfono o RUC), si se buscó algo. */
+  textoFiltrado: string | null;
+  estadoFiltrado: FiltroEstadoCobros;
   filas: FilaCuentaPorCobrar[];
   /** Lo que debe cada cliente (solo los que tienen saldo). */
   porCliente: ResumenClienteCobros[];
@@ -184,6 +187,8 @@ export async function listarCuentasPorCobrar(
   }
 
   return {
+    textoFiltrado: texto || null,
+    estadoFiltrado: estado,
     filas,
     porCliente: [...porCliente.values()].sort((a, b) => b.saldo - a.saldo),
     totalSaldo: redondear2(totalSaldo),

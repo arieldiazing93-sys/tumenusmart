@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Boton } from "@/components/ui";
 import { formatearGuarani } from "@/lib/format";
 import { FORMAS_PAGO_POS, FORMA_PAGO_A_CREDITO, type FormaPagoPos } from "@/lib/turno-pos";
@@ -35,6 +35,9 @@ export function CobrarModal({
   cobrando,
   error,
   permiteCredito,
+  bloqueClienteCredito,
+  creditoListo,
+  hayModalEncima,
   onCerrar,
   onCobrar,
 }: {
@@ -45,6 +48,12 @@ export function CobrarModal({
   error: string | null;
   /** Si el local vende a crédito (Configuración): se ofrece "A crédito" como forma de pago. */
   permiteCredito: boolean;
+  /** Lo que se muestra al elegir "A crédito": buscar el cliente o crearlo (lo arma la pantalla de venta, que tiene sus datos). */
+  bloqueClienteCredito: ReactNode;
+  /** Si ya hay un cliente cargado al que cobrarle después. Sin eso no se puede registrar la venta a crédito. */
+  creditoListo: boolean;
+  /** Si hay otro cuadro abierto encima (crear cliente): Escape cierra ese, no este. */
+  hayModalEncima: boolean;
   onCerrar: () => void;
   /** `creditoDias` solo viene cuando la forma de pago es "a_credito". */
   onCobrar: (formaPago: FormaPagoPos | typeof FORMA_PAGO_A_CREDITO, creditoDias?: number) => void;
@@ -58,11 +67,11 @@ export function CobrarModal({
 
   useEffect(() => {
     function alTeclado(e: KeyboardEvent) {
-      if (e.key === "Escape") onCerrar();
+      if (e.key === "Escape" && !hayModalEncima) onCerrar();
     }
     window.addEventListener("keydown", alTeclado);
     return () => window.removeEventListener("keydown", alTeclado);
-  }, [onCerrar]);
+  }, [onCerrar, hayModalEncima]);
 
   return (
     <div
@@ -150,7 +159,8 @@ export function CobrarModal({
               Esta venta no entra en la caja: el cliente la paga después.
             </p>
             <p className="mt-1 text-[0.78rem] text-tinta-media">
-              Hace falta el nombre del cliente y su teléfono o su RUC/cédula. Se cobra desde Cuentas por cobrar.
+              Hace falta saber a quién cobrarle después: buscá al cliente o creá uno nuevo acá abajo. Se cobra desde
+              Cuentas por cobrar.
             </p>
             <label className="mt-2.5 block text-[0.75rem] font-semibold uppercase tracking-rotulo text-tinta-suave">
               Vence en (días)
@@ -165,6 +175,7 @@ export function CobrarModal({
                 className="mt-1 w-full rounded-lg border border-linea bg-white px-3 py-2 text-center text-[1rem] font-semibold normal-case tracking-normal text-tinta focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/15"
               />
             </label>
+            {bloqueClienteCredito}
           </div>
         )}
 
@@ -217,7 +228,7 @@ export function CobrarModal({
               onClick={() =>
                 esCredito ? onCobrar(FORMA_PAGO_A_CREDITO, Math.max(0, Math.round(Number(creditoDias) || 0))) : onCobrar(formaPago)
               }
-              disabled={cobrando}
+              disabled={cobrando || (esCredito && !creditoListo)}
               className="w-full"
             >
               {cobrando ? "Guardando…" : esCredito ? "Registrar venta a crédito" : `Cobrar ${formatearGuarani(total)}`}
