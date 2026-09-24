@@ -94,7 +94,7 @@ export default async function CuentasPorPagarPage({
           <p className="rotulo text-[0.8rem] font-bold">Lo que le debés a cada proveedor</p>
           <Tabla>
             <thead>
-              <tr>
+              <tr className="bg-exito-luz">
                 <Th>Proveedor</Th>
                 <Th>Compras con saldo</Th>
                 <Th>Debés</Th>
@@ -192,7 +192,7 @@ export default async function CuentasPorPagarPage({
       ) : (
         <Tabla>
           <thead>
-            <tr>
+            <tr className="bg-exito-luz">
               <Th>Proveedor</Th>
               <Th>Folio</Th>
               <Th>Fecha</Th>

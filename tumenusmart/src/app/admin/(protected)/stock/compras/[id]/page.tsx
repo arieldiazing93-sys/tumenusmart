@@ -236,7 +236,7 @@ export default async function CompraDetallePage({ params }: { params: Promise<{ 
           ) : (
             <Tabla>
               <thead>
-                <tr>
+                <tr className="bg-exito-luz">
                   <Th>Fecha</Th>
                   <Th>Monto</Th>
                   <Th>Forma de pago</Th>
