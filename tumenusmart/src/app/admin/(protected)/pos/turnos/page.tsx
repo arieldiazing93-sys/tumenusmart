@@ -2,20 +2,12 @@ import Link from "next/link";
 import { pantallaConPermiso } from "@/lib/auth";
 import { prismaDelLocal } from "@/lib/prisma-local";
 import { idLocalActual } from "@/lib/local-actual";
-import { Cabecera, clasesBoton, Tabla, Th, Td, Tr, Vacio, BotonEnlace } from "@/components/ui";
-import { calcularRangoFecha, type FiltroFecha } from "@/lib/rango-fecha";
+import { Cabecera, Campo, Entrada, clasesBoton, Tabla, Th, Td, Tr, Vacio, BotonEnlace } from "@/components/ui";
+import { calcularRangoFecha, claveDia, type FiltroFecha } from "@/lib/rango-fecha";
 import { formatearGuarani } from "@/lib/format";
 import { ZONA_NEGOCIO } from "@/lib/timezone";
 
 export const dynamic = "force-dynamic";
-
-const FILTROS_FECHA: { value: FiltroFecha; label: string }[] = [
-  { value: "hoy", label: "Hoy" },
-  { value: "ayer", label: "Ayer" },
-  { value: "7dias", label: "Últimos 7 días" },
-  { value: "30dias", label: "Últimos 30 días" },
-  { value: "mes", label: "Este mes" },
-];
 
 /** La pastilla de un filtro: llena si es la elegida, con borde si no. */
 function clasePastilla(activa: boolean): string {
@@ -63,8 +55,19 @@ export default async function TurnosPosPage({
 
   const { fecha, desde, hasta, estacion } = await searchParams;
   const fechaActiva: FiltroFecha = (fecha as FiltroFecha) ?? "7dias";
-  const rango =
+  let rango =
     calcularRangoFecha(fechaActiva, desde, hasta) ?? calcularRangoFecha("7dias", undefined, undefined)!;
+
+  // El filtro es un calendario Desde / Hasta. Sin fechas en la dirección arranca
+  // en los últimos 7 días, y el calendario muestra siempre el rango que se está
+  // viendo, venga como venga en la dirección.
+  let diaDesde = claveDia(rango.gte);
+  let diaHasta = claveDia(new Date(rango.lt.getTime() - 24 * 60 * 60 * 1000));
+  if (diaDesde > diaHasta) {
+    // Las escribieron al revés: se dan vuelta en vez de mostrar una lista vacía.
+    [diaDesde, diaHasta] = [diaHasta, diaDesde];
+    rango = calcularRangoFecha("rango", diaDesde, diaHasta)!;
+  }
 
   const storeId = await idLocalActual();
   const db = prismaDelLocal(storeId);
@@ -77,16 +80,12 @@ export default async function TurnosPosPage({
   });
   const estacionElegida = estaciones.find((e) => e.id === estacion) ?? null;
 
-  // El filtro de fecha y el de estación se combinan: cambiar uno conserva el
-  // otro. Los reportes de Excel y PDF reciben el mismo querystring, así salen
-  // con exactamente lo que se está viendo.
-  function querystring(nueva: { fecha?: FiltroFecha; estacion?: string | null }) {
-    const f = nueva.fecha ?? fechaActiva;
+  // El rango de fechas y la estación se combinan: cambiar la estación conserva
+  // las fechas. Los reportes de Excel y PDF reciben el mismo querystring, así
+  // salen con exactamente lo que se está viendo.
+  function querystring(nueva: { estacion?: string | null }) {
     const e = nueva.estacion === undefined ? (estacionElegida?.id ?? null) : nueva.estacion;
-    const params = new URLSearchParams();
-    params.set("fecha", f);
-    if (f === "rango" && desde) params.set("desde", desde);
-    if (f === "rango" && hasta) params.set("hasta", hasta);
+    const params = new URLSearchParams({ fecha: "rango", desde: diaDesde, hasta: diaHasta });
     if (e) params.set("estacion", e);
     return params.toString();
   }
@@ -203,17 +202,25 @@ export default async function TurnosPosPage({
       />
 
       <div className="mb-6 flex flex-col gap-3">
-        <div className="flex flex-wrap items-center gap-2">
-          {FILTROS_FECHA.map((f) => (
-            <Link
-              key={f.value}
-              href={`/admin/pos/turnos?${querystring({ fecha: f.value })}`}
-              className={clasePastilla(fechaActiva === f.value && fechaActiva !== "rango")}
-            >
-              {f.label}
-            </Link>
-          ))}
-        </div>
+        {/* Solo calendario: rango de fechas, con la estación elegida (si hay) conservada. */}
+        <form
+          key={`${diaDesde}_${diaHasta}`}
+          method="get"
+          action="/admin/pos/turnos"
+          className="flex flex-wrap items-end gap-3"
+        >
+          <input type="hidden" name="fecha" value="rango" />
+          {estacionElegida && <input type="hidden" name="estacion" value={estacionElegida.id} />}
+          <Campo etiqueta="Desde" className="w-44">
+            <Entrada type="date" name="desde" defaultValue={diaDesde} required />
+          </Campo>
+          <Campo etiqueta="Hasta" className="w-44">
+            <Entrada type="date" name="hasta" defaultValue={diaHasta} required />
+          </Campo>
+          <button type="submit" className={clasesBoton("principal", "md")}>
+            Filtrar
+          </button>
+        </form>
 
         {/* Con una sola estación no hay nada que elegir. */}
         {estaciones.length > 1 && (

@@ -189,5 +189,8 @@ export async function GET(request: NextRequest) {
   const sufijoEstacion = estacionElegida
     ? `_${estacionElegida.nombre.normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^A-Za-z0-9]+/g, "_")}`
     : "";
-  return respuestaXlsx(libro, `cierres_pos_${fecha}${sufijoEstacion}.xlsx`);
+  // Con calendario (el caso normal) el archivo lleva las fechas; el resto de
+  // los valores de `fecha` (hoy, 7dias...) quedan por si alguien tiene un enlace viejo.
+  const nombreFechas = fecha === "rango" && desde && hasta ? `${desde}_a_${hasta}` : fecha;
+  return respuestaXlsx(libro, `cierres_pos_${nombreFechas.replace(/[^0-9A-Za-z_-]/g, "")}${sufijoEstacion}.xlsx`);
 }
