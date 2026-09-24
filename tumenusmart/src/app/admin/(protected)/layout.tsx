@@ -89,6 +89,9 @@ function armarGrupos(hayIdeaSinVer: boolean, rol: string, ventasACredito: boolea
           ver: conPermiso("stock.ver") },
         { href: "/admin/stock/almacenes", label: "Almacenes", icono: "configuracion" as const,
           ver: conPermiso("stock.ver") },
+        // Entradas y salidas que no son compras ni ventas: mermas, roturas, consumo del personal.
+        { href: "/admin/stock/movimientos", label: "Movimientos de almacén", icono: "estadisticas" as const,
+          ver: conPermiso("stock.ver") },
         { href: "/admin/stock/compras", label: "Compras", icono: "cierre" as const,
           ver: conPermiso("stock.ver") },
         { href: "/admin/stock/cuentas-por-pagar", label: "Cuentas por pagar", icono: "cierre" as const,
@@ -155,6 +158,9 @@ function armarGrupos(hayIdeaSinVer: boolean, rol: string, ventasACredito: boolea
           ver: conPermiso("configuracion.editar") },
         { href: "/admin/empleados", label: "Empleados", icono: "usuarios" as const,
           ver: conPermiso("empleados.gestionar") },
+        // Quién hizo qué en el sistema: solo el dueño.
+        { href: "/admin/bitacora", label: "Bitácora", icono: "cuenta" as const,
+          ver: conPermiso("bitacora.ver") },
         // Mi cuenta la ve todo el mundo: es donde se cambia la contraseña.
         { href: "/admin/mi-cuenta", label: "Mi cuenta", icono: "cuenta" as const, ver: true },
       ],

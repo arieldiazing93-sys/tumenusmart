@@ -10,6 +10,7 @@ import { idLocalActual } from "@/lib/local-actual";
 import { normalizarSlug } from "@/lib/alcance-local";
 import { decidirCambioDeUrl } from "@/lib/url-publica";
 import { esHexValido } from "@/lib/color-marca";
+import { registrarBitacora } from "@/lib/bitacora";
 
 // Dos accesos a la base conviven acá a propósito:
 //
@@ -65,10 +66,18 @@ export async function quitarLogoStore(): Promise<void> {
 }
 
 export async function alternarPausaPedidos(pausado: boolean): Promise<void> {
-  await exigirPermiso("configuracion.editar");
+  const sesion = await exigirPermiso("configuracion.editar");
+  const storeId = await idLocalActual();
   await prisma.store.update({
-    where: { id: await idLocalActual() },
+    where: { id: storeId },
     data: { pedidosPausados: pausado },
+  });
+  await registrarBitacora(storeId, sesion, {
+    modulo: "configuracion",
+    accion: pausado ? "pedidos_pausados" : "pedidos_reanudados",
+    descripcion: pausado ? "Pausó los pedidos online." : "Reanudó los pedidos online.",
+    entidad: "Store",
+    entidadId: storeId,
   });
   refrescarPantallas();
 }
@@ -180,12 +189,24 @@ export async function guardarAceptaReservas(formData: FormData): Promise<void> {
  * puede seguir cobrando.
  */
 export async function guardarVentasACredito(formData: FormData): Promise<void> {
-  await exigirPermiso("configuracion.editar");
+  const sesion = await exigirPermiso("configuracion.editar");
+  const storeId = await idLocalActual();
+  const activo = formData.get("ventasACredito") === "on";
 
+  const antes = await prisma.store.findUnique({ where: { id: storeId }, select: { ventasACredito: true } });
   await prisma.store.update({
-    where: { id: await idLocalActual() },
-    data: { ventasACredito: formData.get("ventasACredito") === "on" },
+    where: { id: storeId },
+    data: { ventasACredito: activo },
   });
+  if (antes && antes.ventasACredito !== activo) {
+    await registrarBitacora(storeId, sesion, {
+      modulo: "configuracion",
+      accion: activo ? "ventas_a_credito_activadas" : "ventas_a_credito_desactivadas",
+      descripcion: `${activo ? "Activó" : "Desactivó"} las ventas a crédito.`,
+      entidad: "Store",
+      entidadId: storeId,
+    });
+  }
 
   refrescarPantallas();
   revalidatePath("/admin/pos");

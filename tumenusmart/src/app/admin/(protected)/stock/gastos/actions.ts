@@ -6,6 +6,8 @@ import { idLocalActual } from "@/lib/local-actual";
 import { prismaDelLocal } from "@/lib/prisma-local";
 import { normalizarCategoriaGasto, resolverCategoriaNueva } from "@/lib/categoria-gasto";
 import { normalizarIva } from "@/lib/iva";
+import { formatearGuarani } from "@/lib/format";
+import { registrarBitacora } from "@/lib/bitacora";
 
 export type ResultadoGasto = { ok: true } | { ok: false; error: string };
 
@@ -88,7 +90,8 @@ export async function crearGasto(formData: FormData): Promise<ResultadoGasto> {
     categoria = normalizarCategoriaGasto(formData.get("categoria"), propias);
   }
 
-  await prisma.gasto.create({
+  const gasto = await prisma.gasto.create({
+    select: { id: true },
     data: {
       storeId: idLocal,
       concepto,
@@ -106,6 +109,15 @@ export async function crearGasto(formData: FormData): Promise<ResultadoGasto> {
       fechaVencimiento,
       registradoPor: sesion.nombre?.trim() || sesion.email,
     },
+  });
+
+  await registrarBitacora(idLocal, sesion, {
+    modulo: "gastos",
+    accion: "gasto_registrado",
+    descripcion: `Registró un gasto: ${concepto} por ${formatearGuarani(monto)} (${categoria}).`,
+    entidad: "Gasto",
+    entidadId: gasto.id,
+    detalle: { concepto, monto, categoria, factura: numeroComprobante, a_credito: condicionPago === "credito" },
   });
 
   revalidatePath("/admin/stock/gastos");

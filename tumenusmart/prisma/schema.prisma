@@ -164,6 +164,7 @@ model Store {
   ventasPos        VentaPos[]
   movimientosCaja  MovimientoCaja[]
   cobrosVenta      CobroVenta[]
+  bitacoras        Bitacora[]
   ventaPosItems    VentaPosItem[]
   estaciones       Estacion[]
   puntosExpedicion PuntoExpedicion[]
@@ -1567,6 +1568,37 @@ model CotizacionItem {
   @@index([cotizacionId])
 }
 
+/// Bitácora del sistema: quién hizo qué y cuándo. Cada fila es una acción
+/// importante de un usuario (cancelar una venta, anular una factura, cargar una
+/// compra, cambiar un precio…). Solo se agrega: nunca se edita ni se borra, para
+/// que sirva de rastro. `descripcion` es la frase que se lee en pantalla;
+/// `detalle` guarda los datos de apoyo (montos, antes y después) como JSON en texto.
+model Bitacora {
+  id           String   @id @default(cuid())
+  storeId      String
+  store        Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  /// Cómo se llamaba quien lo hizo (nombre, o su correo si no tiene) y su correo,
+  /// copiados en ese momento: el rastro no cambia si después se renombra.
+  usuario      String
+  usuarioEmail String
+  /// Su rol en ese momento ("local", "empleado", "superadmin").
+  usuarioRol   String?
+  /// El área del sistema: "ventas", "caja", "facturas", "stock", "compras"…
+  modulo       String
+  /// Qué hizo, en código corto ("venta_cancelada", "factura_anulada"…).
+  accion       String
+  descripcion  String
+  /// Sobre qué registro fue (por ejemplo "VentaPos" y su id), si aplica.
+  entidad      String?
+  entidadId    String?
+  detalle      String?
+  createdAt    DateTime @default(now())
+
+  @@index([storeId, createdAt])
+  @@index([storeId, modulo])
+  @@index([storeId, usuarioEmail])
+}
+
 /// Plata que entra a la caja (ingreso) o sale de ella (retiro) en efectivo
 /// durante un turno, aparte de las ventas: cambio que se repone, un gasto
 /// pagado del cajón, el retiro del dueño, un cobro de cuenta a crédito en
@@ -1736,7 +1768,8 @@ model MovimientoStock {
   // Restrict, mismo motivo que CompraItem.insumo: el ledger no se toca
   // aunque el insumo se desactive.
   insumo   Insumo @relation(fields: [insumoId], references: [id], onDelete: Restrict)
-  /// "venta" | "compra" | "ajuste" | "cancelacion" | "correccion"
+  /// "venta" | "compra" | "ajuste" | "cancelacion" | "correccion" | "movimiento"
+  /// ("movimiento": una entrada o salida manual de almacén, con su motivo).
   tipo     String
   /// Con signo: negativo en "venta", positivo en "compra"/"cancelacion";
   /// en "ajuste" es la diferencia (contado - stockActual), puede ser

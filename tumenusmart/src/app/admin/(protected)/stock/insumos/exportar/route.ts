@@ -55,6 +55,8 @@ export async function GET(request: NextRequest) {
     { width: 12 },
     { width: 14 },
     { width: 14 },
+    { width: 18 },
+    { width: 14 },
     { width: 14 },
     { width: 20 },
     { width: 18 },
@@ -73,6 +75,7 @@ export async function GET(request: NextRequest) {
       "Ventas",
       "Ajustes",
       "Anulaciones",
+      "Mov. de almacén",
       "Stock final",
       "Stock mínimo",
       "Costo unit. hoy (Gs.)",
@@ -80,7 +83,7 @@ export async function GET(request: NextRequest) {
       "Estado",
       "Activo",
     ],
-    14
+    15
   );
   for (const f of reporte.filas) {
     hoja.addRow([
@@ -92,6 +95,7 @@ export async function GET(request: NextRequest) {
       f.ventas,
       f.ajustes,
       f.anulaciones,
+      f.movimientos,
       f.stock,
       f.stockMinimo ?? "",
       f.costoUnitario != null ? Math.round(f.costoUnitario * 100) / 100 : "",
@@ -100,10 +104,10 @@ export async function GET(request: NextRequest) {
       f.activo ? "Sí" : "No",
     ]);
   }
-  filaTitulo(hoja, ["TOTAL", "", "", "", "", "", "", "", "", "", "", Math.round(reporte.totalValor), "", ""], 14);
+  filaTitulo(hoja, ["TOTAL", "", "", "", "", "", "", "", "", "", "", "", Math.round(reporte.totalValor), "", ""], 15);
   hoja.addRow([]);
   hoja.addRow([
-    "Ventas y compras canceladas figuran en Anulaciones. " +
+    "Ventas y compras canceladas figuran en Anulaciones. Mov. de almacén son las entradas (+) y salidas (−) manuales: mermas, roturas, consumo del personal. " +
       (reporte.sinCosto > 0
         ? `${reporte.sinCosto} insumo(s) con stock no tienen costo (todavía no se les registró una compra) y no suman al valor.`
         : "El valor va a costo de hoy de cada insumo (última compra, sin IVA)."),

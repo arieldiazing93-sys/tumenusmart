@@ -37,7 +37,9 @@ export type FilaAlmacenReporte = {
   ajustes: number;
   /** Ventas o compras canceladas: lo que se devolvió o se sacó de nuevo. */
   anulaciones: number;
-  /** inicial + compras + ventas + ajustes + anulaciones. */
+  /** Movimientos de almacén: entradas (+) y salidas (−) manuales — mermas, roturas, consumo del personal. */
+  movimientos: number;
+  /** inicial + compras + ventas + ajustes + anulaciones + movimientos. */
   final: number;
   /** Costo de HOY de una unidad de stock. Null si el insumo no tiene costo. */
   costoUnitario: number | null;
@@ -88,6 +90,8 @@ export type MovimientoAcumulado = {
   ventas: number;
   ajustes: number;
   anulaciones: number;
+  /** Entradas y salidas manuales de almacén (MovimientoStock tipo "movimiento"). */
+  movimientos: number;
 };
 
 /**
@@ -132,7 +136,16 @@ export async function acumularMovimientos(
     const clave = `${idAlmacen ?? ""}|${insumoId}`;
     let actual = acumulados.get(clave);
     if (!actual) {
-      actual = { almacenId: idAlmacen, insumoId, inicial: 0, compras: 0, ventas: 0, ajustes: 0, anulaciones: 0 };
+      actual = {
+        almacenId: idAlmacen,
+        insumoId,
+        inicial: 0,
+        compras: 0,
+        ventas: 0,
+        ajustes: 0,
+        anulaciones: 0,
+        movimientos: 0,
+      };
       acumulados.set(clave, actual);
     }
     return actual;
@@ -147,6 +160,7 @@ export async function acumularMovimientos(
     if (f.tipo === "compra") a.compras += cantidad;
     else if (f.tipo === "venta") a.ventas += cantidad;
     else if (f.tipo === "cancelacion") a.anulaciones += cantidad;
+    else if (f.tipo === "movimiento") a.movimientos += cantidad;
     else a.ajustes += cantidad;
   }
 
@@ -207,9 +221,10 @@ export async function calcularReporteAlmacen(
     const ventas = redondear3(a.ventas);
     const ajustes = redondear3(a.ajustes);
     const anulaciones = redondear3(a.anulaciones);
-    const final = redondear3(inicial + compras + ventas + ajustes + anulaciones);
+    const movimientos = redondear3(a.movimientos);
+    const final = redondear3(inicial + compras + ventas + ajustes + anulaciones + movimientos);
     // Un insumo que no tuvo nada en el período y no tenía stock no aporta una fila.
-    if (inicial === 0 && compras === 0 && ventas === 0 && ajustes === 0 && anulaciones === 0) continue;
+    if (inicial === 0 && compras === 0 && ventas === 0 && ajustes === 0 && anulaciones === 0 && movimientos === 0) continue;
 
     const insumo = datosDeInsumo.get(a.insumoId);
     if (!insumo) continue;
@@ -226,6 +241,7 @@ export async function calcularReporteAlmacen(
       ventas,
       ajustes,
       anulaciones,
+      movimientos,
       final,
       costoUnitario,
       valorFinal: costoUnitario != null ? final * costoUnitario : null,

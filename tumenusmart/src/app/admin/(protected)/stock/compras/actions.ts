@@ -8,6 +8,7 @@ import { prismaDelLocal } from "@/lib/prisma-local";
 import { calcularCompra, type ResultadoCalculoCompra } from "@/lib/compra-calculo";
 import { etiquetaUnidadMedida } from "@/lib/unidad-medida";
 import { formatearGuarani } from "@/lib/format";
+import { registrarBitacora } from "@/lib/bitacora";
 
 export type LineaCompraInput = {
   insumoId: string;
@@ -250,7 +251,7 @@ export async function registrarCompra(datos: DatosCompra): Promise<ResultadoComp
 
   const registradoPor = sesion.nombre?.trim() || sesion.email;
 
-  await prisma.$transaction(async (tx) => {
+  const compraCreadaId = await prisma.$transaction(async (tx) => {
     const nuevaCompra = await tx.compra.create({
       data: {
         storeId: idLocal,
@@ -291,6 +292,25 @@ export async function registrarCompra(datos: DatosCompra): Promise<ResultadoComp
         },
       });
     }
+    return nuevaCompra.id;
+  });
+
+  await registrarBitacora(idLocal, sesion, {
+    modulo: "compras",
+    accion: "compra_registrada",
+    descripcion: `Registró una compra${datos.folioFactura?.trim() ? ` (folio ${datos.folioFactura.trim()})` : ""} de ${
+      lineas.length
+    } ${lineas.length === 1 ? "insumo" : "insumos"} por ${formatearGuarani(calculo.total)}, ${
+      condicionPago === "credito" ? "a crédito" : "al contado"
+    }.`,
+    entidad: "Compra",
+    entidadId: compraCreadaId,
+    detalle: {
+      folio: datos.folioFactura?.trim() || null,
+      total: calculo.total,
+      insumos: lineas.length,
+      condicion: condicionPago,
+    },
   });
 
   revalidatePath("/admin/stock/compras");
@@ -436,6 +456,22 @@ export async function actualizarCompra(
     }
   });
 
+  await registrarBitacora(idLocal, sesion, {
+    modulo: "compras",
+    accion: "compra_editada",
+    descripcion: `Editó una compra${datos.folioFactura?.trim() ? ` (folio ${datos.folioFactura.trim()})` : ""}: ahora tiene ${
+      lineas.length
+    } ${lineas.length === 1 ? "insumo" : "insumos"} y un total de ${formatearGuarani(calculo.total)}.`,
+    entidad: "Compra",
+    entidadId: compraId,
+    detalle: {
+      folio: datos.folioFactura?.trim() || null,
+      total_nuevo: calculo.total,
+      insumos: lineas.length,
+      condicion: condicionPago,
+    },
+  });
+
   revalidatePath("/admin/stock/compras");
   revalidatePath(`/admin/stock/compras/${compraId}`);
   revalidatePath("/admin/stock/insumos");
@@ -466,7 +502,13 @@ export async function cancelarCompra(
 
   const compra = await prisma.compra.findUnique({
     where: { id: compraId },
-    select: { id: true, cancelada: true, _count: { select: { pagos: true } } },
+    select: {
+      id: true,
+      cancelada: true,
+      total: true,
+      numeroComprobante: true,
+      _count: { select: { pagos: true } },
+    },
   });
   if (!compra) return { ok: false, error: "Esa compra no existe." };
   if (compra.cancelada) return { ok: false, error: "Esa compra ya estaba cancelada." };
@@ -522,6 +564,17 @@ export async function cancelarCompra(
         },
       });
     }
+  });
+
+  await registrarBitacora(idLocal, sesion, {
+    modulo: "compras",
+    accion: "compra_cancelada",
+    descripcion: `Canceló una compra${compra.numeroComprobante ? ` (folio ${compra.numeroComprobante})` : ""} de ${formatearGuarani(
+      Number(compra.total)
+    )}. Motivo: ${motivo.trim()}.`,
+    entidad: "Compra",
+    entidadId: compraId,
+    detalle: { folio: compra.numeroComprobante, total: Number(compra.total), motivo: motivo.trim() },
   });
 
   revalidatePath("/admin/stock/compras");

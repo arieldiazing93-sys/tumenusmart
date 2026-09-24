@@ -9,6 +9,8 @@ import { moverEnLista, cambiosDeOrden, type Direccion } from "@/lib/ordenar";
 import { subirImagenProducto } from "@/lib/supabase-storage";
 import { normalizarIva } from "@/lib/iva";
 import { normalizarUnidadMedida, etiquetaUnidadMedida } from "@/lib/unidad-medida";
+import { formatearGuarani } from "@/lib/format";
+import { registrarBitacora } from "@/lib/bitacora";
 
 export type ResultadoFoto = { ok: true; url: string } | { ok: false; error: string };
 
@@ -54,6 +56,27 @@ async function leerAlmacen(prisma: PrismaLocal, formData: FormData): Promise<str
   return almacen?.id ?? null;
 }
 
+/**
+ * La categoría y el área de impresión de un producto vienen del navegador: se
+ * buscan por el cliente del local, así que una de otro negocio no aparece y se
+ * rechaza. Devuelve el mensaje de error, o null si están bien.
+ */
+async function verificarCategoriaYArea(
+  prisma: PrismaLocal,
+  categoryId: string,
+  areaImpresionId: string | null
+): Promise<string | null> {
+  const [categoria, area] = await Promise.all([
+    prisma.category.findUnique({ where: { id: categoryId }, select: { id: true } }),
+    areaImpresionId
+      ? prisma.areaImpresion.findUnique({ where: { id: areaImpresionId }, select: { id: true } })
+      : Promise.resolve({ id: "" }),
+  ]);
+  if (!categoria) return "Esa categoría ya no existe.";
+  if (!area) return "Esa área de impresión ya no existe.";
+  return null;
+}
+
 export type ResultadoProducto = { ok: true } | { ok: false; error: string };
 
 /**
@@ -65,7 +88,7 @@ export type ResultadoProducto = { ok: true } | { ok: false; error: string };
  * que es el riesgo más grave de los dos.
  */
 export async function crearProducto(formData: FormData): Promise<ResultadoProducto | void> {
-  await exigirPermiso("productos.editar");
+  const sesion = await exigirPermiso("productos.editar");
   // Todas las consultas de acá abajo quedan atadas a este local.
   const idLocal = await idLocalActual();
   const prisma = prismaDelLocal(idLocal);
@@ -78,6 +101,11 @@ export async function crearProducto(formData: FormData): Promise<ResultadoProduc
   if (!nombre || !categoryId || isNaN(precio)) {
     return { ok: false, error: "Faltan datos obligatorios" };
   }
+
+  // La categoría y el área de impresión vienen del navegador: se verifican por
+  // el cliente del local (los de otro negocio simplemente no aparecen).
+  const errorDeReferencias = await verificarCategoriaYArea(prisma, categoryId, areaImpresionId);
+  if (errorDeReferencias) return { ok: false, error: errorDeReferencias };
 
   const almacenId = await leerAlmacen(prisma, formData);
 
@@ -97,6 +125,15 @@ export async function crearProducto(formData: FormData): Promise<ResultadoProduc
     },
   });
 
+  await registrarBitacora(idLocal, sesion, {
+    modulo: "productos",
+    accion: "producto_creado",
+    descripcion: `Creó el producto ${nombre} a ${formatearGuarani(precio)}.`,
+    entidad: "Product",
+    entidadId: producto.id,
+    detalle: { producto: nombre, precio },
+  });
+
   revalidatePath("/admin/productos");
   revalidatePath("/[slug]", "layout");
   // Vuelve a la lista de la misma categoría (no al detalle del producto)
@@ -108,9 +145,10 @@ export async function actualizarProducto(
   productId: string,
   formData: FormData
 ): Promise<ResultadoProducto | void> {
-  await exigirPermiso("productos.editar");
+  const sesion = await exigirPermiso("productos.editar");
   // Todas las consultas de acá abajo quedan atadas a este local.
-  const prisma = prismaDelLocal(await idLocalActual());
+  const idLocal = await idLocalActual();
+  const prisma = prismaDelLocal(idLocal);
 
   const nombre = String(formData.get("nombre") ?? "").trim();
   const categoryId = String(formData.get("categoryId") ?? "");
@@ -121,9 +159,17 @@ export async function actualizarProducto(
     return { ok: false, error: "Faltan datos obligatorios" };
   }
 
+  // La categoría y el área de impresión vienen del navegador: se verifican por
+  // el cliente del local (los de otro negocio simplemente no aparecen).
+  const errorDeReferencias = await verificarCategoriaYArea(prisma, categoryId, areaImpresionId);
+  if (errorDeReferencias) return { ok: false, error: errorDeReferencias };
+
   // El campo muestra el precio en guaraníes enteros. Si quedó como se mostró (no
   // lo tocaron), se conserva el guardado tal cual en vez de pisarlo con el redondeado.
-  const guardado = await prisma.product.findUnique({ where: { id: productId }, select: { precio: true } });
+  const guardado = await prisma.product.findUnique({
+    where: { id: productId },
+    select: { precio: true, nombre: true, disponible: true, iva: true },
+  });
   const precioGuardado = guardado ? Number(guardado.precio) : null;
   const precio =
     precioGuardado !== null && Math.round(precioGuardado) === precioEscrito ? precioGuardado : precioEscrito;
@@ -159,6 +205,28 @@ export async function actualizarProducto(
     },
   });
 
+  // Se anota lo que cambió — sobre todo el precio, que es lo que más importa poder rastrear.
+  if (guardado) {
+    const cambios: string[] = [];
+    if (precioGuardado !== null && Math.round(precioGuardado * 100) !== Math.round(precio * 100)) {
+      cambios.push(`precio ${formatearGuarani(precioGuardado)} → ${formatearGuarani(precio)}`);
+    }
+    if (guardado.nombre !== nombre) cambios.push(`nombre "${guardado.nombre}" → "${nombre}"`);
+    const disponibleAhora = formData.get("disponible") === "on";
+    if (guardado.disponible !== disponibleAhora) cambios.push(disponibleAhora ? "lo marcó disponible" : "lo marcó no disponible");
+    if (guardado.iva !== iva) cambios.push(`IVA ${guardado.iva} → ${iva}`);
+    if (cambios.length > 0) {
+      await registrarBitacora(idLocal, sesion, {
+        modulo: "productos",
+        accion: precioGuardado !== null && Math.round(precioGuardado * 100) !== Math.round(precio * 100) ? "precio_cambiado" : "producto_editado",
+        descripcion: `Editó el producto ${nombre}: ${cambios.join("; ")}.`,
+        entidad: "Product",
+        entidadId: productId,
+        detalle: { producto: nombre, cambios },
+      });
+    }
+  }
+
   revalidatePath("/admin/productos");
   revalidatePath(`/admin/productos/${productId}`);
   revalidatePath("/[slug]", "layout");
@@ -175,9 +243,10 @@ export async function actualizarProducto(
  * venderse en la carta pública sin tocar ni un dato de lo ya vendido.
  */
 export async function eliminarProducto(productId: string): Promise<ResultadoProducto> {
-  await exigirPermiso("productos.editar");
+  const sesion = await exigirPermiso("productos.editar");
   // Todas las consultas de acá abajo quedan atadas a este local.
-  const prisma = prismaDelLocal(await idLocalActual());
+  const idLocal = await idLocalActual();
+  const prisma = prismaDelLocal(idLocal);
 
   const pedidosConEsteProducto = await prisma.orderItem.count({ where: { productId } });
   if (pedidosConEsteProducto > 0) {
@@ -187,7 +256,18 @@ export async function eliminarProducto(productId: string): Promise<ResultadoProd
     };
   }
 
+  const aBorrar = await prisma.product.findUnique({ where: { id: productId }, select: { nombre: true, precio: true } });
   await prisma.product.delete({ where: { id: productId } });
+  await registrarBitacora(idLocal, sesion, {
+    modulo: "productos",
+    accion: "producto_eliminado",
+    descripcion: `Eliminó el producto ${aBorrar?.nombre ?? "(sin nombre)"}${
+      aBorrar ? ` (${formatearGuarani(Number(aBorrar.precio))})` : ""
+    }.`,
+    entidad: "Product",
+    entidadId: productId,
+    detalle: { producto: aBorrar?.nombre ?? null, precio: aBorrar ? Number(aBorrar.precio) : null },
+  });
   revalidatePath("/admin/productos");
   redirect("/admin/productos");
 }
@@ -485,10 +565,23 @@ export async function moverProducto(id: string, direccion: Direccion) {
  * alguien llame a esta acción desde afuera del panel.
  */
 export async function alternarDisponibleProducto(id: string, disponible: boolean) {
-  await exigirPermiso("productos.disponibilidad");
-  const prisma = prismaDelLocal(await idLocalActual());
+  const sesion = await exigirPermiso("productos.disponibilidad");
+  const idLocal = await idLocalActual();
+  const prisma = prismaDelLocal(idLocal);
 
+  const producto = await prisma.product.findUnique({ where: { id }, select: { nombre: true, disponible: true } });
   await prisma.product.update({ where: { id }, data: { disponible } });
+
+  if (producto && producto.disponible !== disponible) {
+    await registrarBitacora(idLocal, sesion, {
+      modulo: "productos",
+      accion: disponible ? "producto_disponible" : "producto_agotado",
+      descripcion: `Marcó ${producto.nombre} como ${disponible ? "disponible" : "no disponible (agotado)"}.`,
+      entidad: "Product",
+      entidadId: id,
+      detalle: { producto: producto.nombre, disponible },
+    });
+  }
 
   revalidatePath("/admin/productos");
   revalidatePath("/[slug]", "layout");

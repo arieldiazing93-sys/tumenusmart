@@ -94,6 +94,7 @@ export default async function ImprimirInsumosPage({
                     <th className="py-1.5 text-right">Ventas</th>
                     <th className="py-1.5 text-right">Ajustes</th>
                     <th className="py-1.5 text-right">Anul.</th>
+                    <th className="py-1.5 text-right">Mov.</th>
                     <th className="py-1.5 text-right">Final</th>
                     <th className="py-1.5 text-right">Costo</th>
                     <th className="py-1.5 text-right">Valor</th>
@@ -111,6 +112,7 @@ export default async function ImprimirInsumosPage({
                       <td className="py-1.5 text-right text-tinta-media">{conSigno(f.ventas)}</td>
                       <td className="py-1.5 text-right text-tinta-media">{conSigno(f.ajustes)}</td>
                       <td className="py-1.5 text-right text-tinta-media">{conSigno(f.anulaciones)}</td>
+                      <td className="py-1.5 text-right text-tinta-media">{conSigno(f.movimientos)}</td>
                       <td
                         className={`py-1.5 text-right font-semibold ${
                           f.estado === "negativo" ? "text-peligro" : f.estado === "bajo" ? "text-aviso" : "text-tinta"
@@ -135,7 +137,7 @@ export default async function ImprimirInsumosPage({
 
       <p className="mt-6 text-xs text-tinta-suave">
         Inicial: lo que había al empezar el primer día. Compras, ventas y ajustes (inventarios) son lo que se movió en el
-        período; Anul. es lo que se devolvió o se sacó por ventas y compras canceladas. Final en rojo: negativo (se
+        período; Anul. es lo que se devolvió o se sacó por ventas y compras canceladas; Mov. son las entradas (+) y salidas (−) manuales de almacén (mermas, roturas, consumo del personal). Final en rojo: negativo (se
         vendió más de lo que había registrado); en naranja: bajo el mínimo. El valor va a costo de hoy de cada insumo
         (última compra, sin IVA).
       </p>

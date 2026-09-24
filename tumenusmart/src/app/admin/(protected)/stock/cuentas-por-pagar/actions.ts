@@ -5,6 +5,7 @@ import { exigirPermiso } from "@/lib/auth";
 import { idLocalActual } from "@/lib/local-actual";
 import { prismaDelLocal } from "@/lib/prisma-local";
 import { formatearGuarani } from "@/lib/format";
+import { registrarBitacora } from "@/lib/bitacora";
 import { FORMAS_PAGO_PROVEEDOR, redondear2, saldoDeCompra } from "@/lib/pagos-compra";
 
 export type DatosPago = {
@@ -62,7 +63,7 @@ export async function registrarPagoCompra(compraId: string, datos: DatosPago): P
     return { ok: false, error: `El pago supera lo que falta pagar de esta compra (${formatearGuarani(saldo)}).` };
   }
 
-  await prisma.pagoCompra.create({
+  const pago = await prisma.pagoCompra.create({
     data: {
       storeId: idLocal,
       compraId,
@@ -72,6 +73,18 @@ export async function registrarPagoCompra(compraId: string, datos: DatosPago): P
       notas: datos.notas?.trim() || null,
       registradoPor: sesion.nombre?.trim() || sesion.email,
     },
+    select: { id: true },
+  });
+
+  await registrarBitacora(idLocal, sesion, {
+    modulo: "compras",
+    accion: "pago_a_proveedor",
+    descripcion: `Registró un pago de ${formatearGuarani(monto)} (${datos.formaPago}) a un proveedor por una compra a crédito. Queda por pagar ${formatearGuarani(
+      Math.max(0, saldo - monto)
+    )}.`,
+    entidad: "PagoCompra",
+    entidadId: pago.id,
+    detalle: { compra: compraId, monto, forma_de_pago: datos.formaPago, saldo_anterior: saldo },
   });
 
   refrescar(compraId);
@@ -80,13 +93,26 @@ export async function registrarPagoCompra(compraId: string, datos: DatosPago): P
 
 /** Elimina un pago cargado por error: la compra vuelve a deber ese monto. */
 export async function eliminarPagoCompra(pagoId: string): Promise<ResultadoPago> {
-  await exigirPermiso("stock.editar");
-  const prisma = prismaDelLocal(await idLocalActual());
+  const sesion = await exigirPermiso("stock.editar");
+  const idLocal = await idLocalActual();
+  const prisma = prismaDelLocal(idLocal);
 
-  const pago = await prisma.pagoCompra.findUnique({ where: { id: pagoId }, select: { id: true, compraId: true } });
+  const pago = await prisma.pagoCompra.findUnique({
+    where: { id: pagoId },
+    select: { id: true, compraId: true, monto: true, formaPago: true },
+  });
   if (!pago) return { ok: false, error: "Ese pago ya no existe." };
 
   await prisma.pagoCompra.delete({ where: { id: pagoId } });
+
+  await registrarBitacora(idLocal, sesion, {
+    modulo: "compras",
+    accion: "pago_a_proveedor_eliminado",
+    descripcion: `Eliminó un pago de ${formatearGuarani(Number(pago.monto))} (${pago.formaPago}) a un proveedor: la compra vuelve a deber ese monto.`,
+    entidad: "PagoCompra",
+    entidadId: pagoId,
+    detalle: { compra: pago.compraId, monto: Number(pago.monto), forma_de_pago: pago.formaPago },
+  });
 
   refrescar(pago.compraId);
   return { ok: true };

@@ -33,6 +33,8 @@ export type FilaInsumoReporte = {
   ajustes: number;
   /** Ventas o compras canceladas: lo que se devolvió o se sacó de nuevo. */
   anulaciones: number;
+  /** Movimientos de almacén: entradas (+) y salidas (−) manuales — mermas, roturas, consumo del personal. */
+  movimientos: number;
   /** El stock al terminar el último día del rango (todos los almacenes). */
   stock: number;
   stockMinimo: number | null;
@@ -89,26 +91,43 @@ export async function calcularReporteInsumos(
   const acumulados = await acumularMovimientos(storeId, rango, { insumoIds: insumos.map((i) => i.id) });
 
   // Lo de todos los almacenes, sumado por insumo.
-  type Totales = { inicial: number; compras: number; ventas: number; ajustes: number; anulaciones: number };
+  type Totales = {
+    inicial: number;
+    compras: number;
+    ventas: number;
+    ajustes: number;
+    anulaciones: number;
+    movimientos: number;
+  };
+  const sinMovimientos = (): Totales => ({
+    inicial: 0,
+    compras: 0,
+    ventas: 0,
+    ajustes: 0,
+    anulaciones: 0,
+    movimientos: 0,
+  });
   const totalesPorInsumo = new Map<string, Totales>();
   for (const a of acumulados) {
-    const t = totalesPorInsumo.get(a.insumoId) ?? { inicial: 0, compras: 0, ventas: 0, ajustes: 0, anulaciones: 0 };
+    const t = totalesPorInsumo.get(a.insumoId) ?? sinMovimientos();
     t.inicial += a.inicial;
     t.compras += a.compras;
     t.ventas += a.ventas;
     t.ajustes += a.ajustes;
     t.anulaciones += a.anulaciones;
+    t.movimientos += a.movimientos;
     totalesPorInsumo.set(a.insumoId, t);
   }
 
   const filas: FilaInsumoReporte[] = insumos.map((i) => {
-    const t = totalesPorInsumo.get(i.id) ?? { inicial: 0, compras: 0, ventas: 0, ajustes: 0, anulaciones: 0 };
+    const t = totalesPorInsumo.get(i.id) ?? sinMovimientos();
     const inicial = redondear3(t.inicial);
     const compras = redondear3(t.compras);
     const ventas = redondear3(t.ventas);
     const ajustes = redondear3(t.ajustes);
     const anulaciones = redondear3(t.anulaciones);
-    const stock = redondear3(inicial + compras + ventas + ajustes + anulaciones);
+    const movimientos = redondear3(t.movimientos);
+    const stock = redondear3(inicial + compras + ventas + ajustes + anulaciones + movimientos);
     const stockMinimo = i.stockMinimo != null ? Number(i.stockMinimo) : null;
     const costoUnitario = i.costoUnitario != null ? Number(i.costoUnitario) : null;
     return {
@@ -121,6 +140,7 @@ export async function calcularReporteInsumos(
       ventas,
       ajustes,
       anulaciones,
+      movimientos,
       stock,
       stockMinimo,
       costoUnitario,
@@ -135,7 +155,7 @@ export async function calcularReporteInsumos(
   // Cómo quedó el stock final repartido por almacén (solo lo que tiene algo).
   const porAlmacen: FilaInsumoPorAlmacen[] = [];
   for (const a of acumulados) {
-    const cantidad = redondear3(a.inicial + a.compras + a.ventas + a.ajustes + a.anulaciones);
+    const cantidad = redondear3(a.inicial + a.compras + a.ventas + a.ajustes + a.anulaciones + a.movimientos);
     if (cantidad === 0) continue;
     const i = datosDeInsumo.get(a.insumoId);
     if (!i) continue;

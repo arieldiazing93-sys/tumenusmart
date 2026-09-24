@@ -6,6 +6,7 @@ import { idLocalActual } from "@/lib/local-actual";
 import { prismaDelLocal } from "@/lib/prisma-local";
 import { prisma as prismaCliente } from "@/lib/prisma";
 import { stockEnAlmacen } from "@/lib/stock-almacen";
+import { registrarBitacora } from "@/lib/bitacora";
 import { claveDiaAsuncion, ZONA_NEGOCIO } from "@/lib/timezone";
 import { etiquetaUnidadMedida } from "@/lib/unidad-medida";
 
@@ -35,8 +36,8 @@ export async function ajustarInventario(
   // Insumo y almacén se verifican por el cliente del local: uno de otro
   // negocio simplemente no aparece.
   const [insumo, almacen] = await Promise.all([
-    prisma.insumo.findUnique({ where: { id: insumoId }, select: { id: true } }),
-    prisma.almacen.findUnique({ where: { id: almacenId }, select: { id: true, activo: true } }),
+    prisma.insumo.findUnique({ where: { id: insumoId }, select: { id: true, nombre: true } }),
+    prisma.almacen.findUnique({ where: { id: almacenId }, select: { id: true, nombre: true, activo: true } }),
   ]);
   if (!insumo) return { ok: false, error: "No encontré ese insumo." };
   if (!almacen || !almacen.activo) return { ok: false, error: "Ese almacén ya no existe o está desactivado." };
@@ -45,10 +46,10 @@ export async function ajustarInventario(
 
   // El cliente crudo, con storeId explícito: el helper del stock por almacén
   // tiene que poder correr adentro de esta transacción.
-  await prismaCliente.$transaction(async (tx) => {
+  const cambio = await prismaCliente.$transaction(async (tx) => {
     const enElAlmacen = await stockEnAlmacen(tx, idLocal, insumoId, almacenId);
     const diferencia = Math.round((cantidadContada - enElAlmacen) * 1000) / 1000;
-    if (diferencia === 0) return;
+    if (diferencia === 0) return null;
 
     await tx.insumo.update({ where: { id: insumoId }, data: { stockActual: { increment: diferencia } } });
     await tx.movimientoStock.create({
@@ -62,7 +63,22 @@ export async function ajustarInventario(
         registradoPor,
       },
     });
+    return { antes: enElAlmacen, diferencia };
   });
+
+  // Solo si de verdad cambió el stock (si lo contado coincidía, no hay nada que anotar).
+  if (cambio) {
+    await registrarBitacora(idLocal, sesion, {
+      modulo: "stock",
+      accion: "ajuste_de_inventario",
+      descripcion: `Ajustó el stock de ${insumo.nombre} en ${almacen.nombre}: había ${cambio.antes}, contó ${cantidadContada} (${
+        cambio.diferencia > 0 ? "+" : ""
+      }${cambio.diferencia}).${motivo?.trim() ? ` Motivo: ${motivo.trim()}.` : ""}`,
+      entidad: "Insumo",
+      entidadId: insumoId,
+      detalle: { insumo: insumo.nombre, almacen: almacen.nombre, antes: cambio.antes, contado: cantidadContada, diferencia: cambio.diferencia },
+    });
+  }
 
   revalidatePath("/admin/stock/inventario");
   revalidatePath(`/admin/stock/inventario/${insumoId}`);
@@ -250,6 +266,17 @@ export async function guardarInventario(
     // defecto (5 segundos) no alcanza siempre.
     { timeout: 30000 }
   );
+
+  await registrarBitacora(idLocal, sesion, {
+    modulo: "stock",
+    accion: "inventario_guardado",
+    descripcion: `Guardó un inventario físico de ${almacen.nombre}: contó ${resultado.contados} ${
+      resultado.contados === 1 ? "insumo" : "insumos"
+    } y ajustó el stock de ${resultado.ajustados}.`,
+    entidad: "Inventario",
+    entidadId: resultado.inventarioId,
+    detalle: { almacen: almacen.nombre, contados: resultado.contados, ajustados: resultado.ajustados },
+  });
 
   revalidatePath("/admin/stock/inventario");
   revalidatePath("/admin/stock/insumos");

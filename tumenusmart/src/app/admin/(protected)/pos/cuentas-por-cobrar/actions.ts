@@ -7,6 +7,7 @@ import { idLocalActual } from "@/lib/local-actual";
 import { prismaDelLocal } from "@/lib/prisma-local";
 import { estacionActual } from "@/lib/estacion-actual";
 import { formatearGuarani, formatearNumero } from "@/lib/format";
+import { registrarBitacora } from "@/lib/bitacora";
 import { redondear2, saldoDeCompra } from "@/lib/pagos-compra";
 import { FORMAS_PAGO_POS, esVentaACredito } from "@/lib/turno-pos";
 import { turnoAbierto } from "../turno-actual";
@@ -123,6 +124,17 @@ export async function registrarCobroVenta(ventaId: string, datos: DatosCobro): P
     }
   });
 
+  await registrarBitacora(storeId, sesion, {
+    modulo: "ventas",
+    accion: "cobro_de_venta_a_credito",
+    descripcion: `Registró un cobro de ${formatearGuarani(monto)} (${datos.formaPago.replace("_", " ")}) de la venta ${formatearNumero(
+      venta.numero
+    )} a crédito — ${cliente}.`,
+    entidad: "VentaPos",
+    entidadId: ventaId,
+    detalle: { venta: formatearNumero(venta.numero), monto, forma_de_pago: datos.formaPago, cliente },
+  });
+
   refrescar(ventaId);
   return { ok: true };
 }
@@ -136,12 +148,16 @@ export async function registrarCobroVenta(ventaId: string, datos: DatosCobro): P
  */
 export async function eliminarCobroVenta(cobroId: string): Promise<ResultadoCobro> {
   const sesion = await exigirPermiso("pos.vender");
-  const db = prismaDelLocal(await idLocalActual());
+  const storeId = await idLocalActual();
+  const db = prismaDelLocal(storeId);
 
   const cobro = await db.cobroVenta.findUnique({
     where: { id: cobroId },
     select: {
       id: true,
+      monto: true,
+      formaPago: true,
+      ventaPos: { select: { numero: true } },
       ventaPosId: true,
       movimientoCaja: { select: { turnoPos: { select: { estado: true } } } },
     },
@@ -161,6 +177,17 @@ export async function eliminarCobroVenta(cobroId: string): Promise<ResultadoCobr
 
   // El ingreso de caja que generó se va con él (borrado en cascada).
   await db.cobroVenta.delete({ where: { id: cobroId } });
+
+  await registrarBitacora(storeId, sesion, {
+    modulo: "ventas",
+    accion: "cobro_eliminado",
+    descripcion: `Eliminó un cobro de ${formatearGuarani(Number(cobro.monto))} (${cobro.formaPago.replace("_", " ")}) de la venta ${formatearNumero(
+      cobro.ventaPos.numero
+    )} a crédito.`,
+    entidad: "VentaPos",
+    entidadId: cobro.ventaPosId,
+    detalle: { venta: formatearNumero(cobro.ventaPos.numero), monto: Number(cobro.monto), forma_de_pago: cobro.formaPago },
+  });
 
   refrescar(cobro.ventaPosId);
   return { ok: true };

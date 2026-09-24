@@ -6,6 +6,7 @@ import { idLocalActual } from "@/lib/local-actual";
 import { prismaDelLocal } from "@/lib/prisma-local";
 import { normalizarUnidadMedida } from "@/lib/unidad-medida";
 import { normalizarIva } from "@/lib/iva";
+import { registrarBitacora } from "@/lib/bitacora";
 
 export type ResultadoInsumo = { ok: true } | { ok: false; error: string };
 export type ResultadoCrearInsumo =
@@ -100,6 +101,15 @@ export async function crearInsumo(formData: FormData): Promise<ResultadoCrearIns
     return nuevo;
   });
 
+  await registrarBitacora(idLocal, sesion, {
+    modulo: "stock",
+    accion: "insumo_creado",
+    descripcion: `Creó el insumo ${nombre}${stockInicial !== 0 ? ` con un stock inicial de ${stockInicial}` : ""}.`,
+    entidad: "Insumo",
+    entidadId: insumo.id,
+    detalle: { insumo: nombre, stock_inicial: stockInicial, costo: costoUnitario },
+  });
+
   revalidatePath("/admin/stock/insumos");
   return { ok: true, insumoId: insumo.id };
 }
@@ -108,7 +118,7 @@ export async function actualizarInsumo(
   id: string,
   formData: FormData
 ): Promise<ResultadoInsumo> {
-  await exigirPermiso("stock.editar");
+  const sesion = await exigirPermiso("stock.editar");
   const idLocal = await idLocalActual();
   const prisma = prismaDelLocal(idLocal);
 
@@ -128,7 +138,10 @@ export async function actualizarInsumo(
   // El campo muestra el costo redondeado a guaraníes enteros. Si quedó tal como
   // se mostró (no lo tocaron), se conserva el exacto de la última compra en vez
   // de pisarlo con el redondeado, que cambiaría en silencio el costo de las recetas.
-  const actual = await prisma.insumo.findUnique({ where: { id }, select: { costoUnitario: true } });
+  const actual = await prisma.insumo.findUnique({
+    where: { id },
+    select: { nombre: true, costoUnitario: true, activo: true },
+  });
   const costoActual = actual?.costoUnitario != null ? Number(actual.costoUnitario) : null;
   const costoUnitario =
     costoEscrito !== null && costoActual !== null && Math.round(costoActual) === costoEscrito
@@ -157,6 +170,28 @@ export async function actualizarInsumo(
       },
     });
   });
+
+  // Se anota lo que cambió (sobre todo el costo, que mueve el costo de las recetas).
+  if (actual) {
+    const cambios: string[] = [];
+    if (actual.nombre !== nombre) cambios.push(`nombre "${actual.nombre}" → "${nombre}"`);
+    const costoAntes = costoActual != null ? Math.round(costoActual * 100) / 100 : null;
+    const costoAhora = costoUnitario != null ? Math.round(costoUnitario * 100) / 100 : null;
+    if (costoAntes !== costoAhora) {
+      cambios.push(`costo ${costoAntes ?? "sin costo"} → ${costoAhora ?? "sin costo"}`);
+    }
+    if (actual.activo !== activo) cambios.push(activo ? "lo activó" : "lo desactivó");
+    if (cambios.length > 0) {
+      await registrarBitacora(idLocal, sesion, {
+        modulo: "stock",
+        accion: "insumo_editado",
+        descripcion: `Editó el insumo ${nombre}: ${cambios.join("; ")}.`,
+        entidad: "Insumo",
+        entidadId: id,
+        detalle: { insumo: nombre, cambios },
+      });
+    }
+  }
 
   // No redirige: el panel de datos vive en la misma pantalla que la lista y
   // sigue abierto después de guardar.

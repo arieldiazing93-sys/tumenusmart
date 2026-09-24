@@ -4,6 +4,8 @@ import { revalidatePath } from "next/cache";
 import { exigirPermiso } from "@/lib/auth";
 import { idLocalActual } from "@/lib/local-actual";
 import { prismaDelLocal } from "@/lib/prisma-local";
+import { formatearGuarani } from "@/lib/format";
+import { registrarBitacora } from "@/lib/bitacora";
 import { netoMovimientosCaja } from "../turno-actual";
 
 export type TipoMovimientoCaja = "ingreso" | "retiro";
@@ -91,7 +93,7 @@ export async function registrarMovimientoCaja(
     return { ok: false, error: "Ese turno ya está cerrado: no se le pueden cargar movimientos." };
   }
 
-  await db.movimientoCaja.create({
+  const creado = await db.movimientoCaja.create({
     data: {
       storeId,
       turnoPosId: turnoId,
@@ -100,6 +102,18 @@ export async function registrarMovimientoCaja(
       concepto,
       registradoPor: sesion.nombre?.trim() || sesion.email,
     },
+    select: { id: true },
+  });
+
+  await registrarBitacora(storeId, sesion, {
+    modulo: "caja",
+    accion: tipo === "retiro" ? "retiro_de_caja" : "ingreso_a_caja",
+    descripcion: `${tipo === "retiro" ? "Retiró" : "Ingresó"} ${formatearGuarani(monto)} ${
+      tipo === "retiro" ? "de" : "a"
+    } la caja. Motivo: ${concepto}.`,
+    entidad: "MovimientoCaja",
+    entidadId: creado.id,
+    detalle: { tipo, monto, motivo: concepto },
   });
 
   revalidatePath("/admin/pos");
@@ -108,12 +122,20 @@ export async function registrarMovimientoCaja(
 
 /** Borra un movimiento cargado por error — solo mientras el turno sigue abierto. */
 export async function eliminarMovimientoCaja(movimientoId: string): Promise<ResultadoCaja> {
-  await exigirPermiso("pos.vender");
-  const db = prismaDelLocal(await idLocalActual());
+  const sesion = await exigirPermiso("pos.vender");
+  const storeId = await idLocalActual();
+  const db = prismaDelLocal(storeId);
 
   const movimiento = await db.movimientoCaja.findUnique({
     where: { id: movimientoId },
-    select: { id: true, cobroVentaId: true, turnoPos: { select: { estado: true } } },
+    select: {
+      id: true,
+      tipo: true,
+      monto: true,
+      concepto: true,
+      cobroVentaId: true,
+      turnoPos: { select: { estado: true } },
+    },
   });
   if (!movimiento) return { ok: false, error: "Ese movimiento ya no existe." };
   if (movimiento.turnoPos.estado !== "abierto") {
@@ -127,6 +149,17 @@ export async function eliminarMovimientoCaja(movimientoId: string): Promise<Resu
   }
 
   await db.movimientoCaja.delete({ where: { id: movimientoId } });
+
+  await registrarBitacora(storeId, sesion, {
+    modulo: "caja",
+    accion: "movimiento_de_caja_eliminado",
+    descripcion: `Eliminó ${movimiento.tipo === "retiro" ? "un retiro" : "un ingreso"} de caja de ${formatearGuarani(
+      Number(movimiento.monto)
+    )} (motivo que tenía: ${movimiento.concepto}).`,
+    entidad: "MovimientoCaja",
+    entidadId: movimientoId,
+    detalle: { tipo: movimiento.tipo, monto: Number(movimiento.monto), motivo: movimiento.concepto },
+  });
 
   revalidatePath("/admin/pos");
   return { ok: true };

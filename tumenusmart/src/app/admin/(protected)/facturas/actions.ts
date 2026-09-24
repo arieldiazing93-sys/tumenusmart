@@ -8,6 +8,7 @@ import { idLocalActual } from "@/lib/local-actual";
 import { estacionActual } from "@/lib/estacion-actual";
 import { desglosarIva, formatearNumeroFactura } from "@/lib/factura-pos";
 import { esDeMesAnterior, nombreDelMes } from "@/lib/mes-fiscal";
+import { registrarBitacora } from "@/lib/bitacora";
 import { cancelarVenta } from "../pos/actions";
 import { cambiarEstadoPedido } from "../pedidos/actions";
 
@@ -178,17 +179,45 @@ export async function cancelarFactura(
   // La pantalla muestra una alerta grande y pide confirmar; acá se exige de
   // nuevo, porque lo que viene del navegador no es de fiar. La fecha sale de
   // la base, nunca del navegador (es la misma que usa el registro RG 90).
-  const dbFecha = prismaDelLocal(await idLocalActual());
-  const fechaFactura =
+  const storeId = await idLocalActual();
+  const db = prismaDelLocal(storeId);
+  const datosDeLaFactura =
     origen === "venta"
-      ? (await dbFecha.ventaPos.findUnique({ where: { id }, select: { creadoEn: true } }))?.creadoEn
-      : (await dbFecha.order.findUnique({ where: { id }, select: { createdAt: true } }))?.createdAt;
-  if (fechaFactura && esDeMesAnterior(fechaFactura) && !confirmoMesAnterior) {
+      ? await db.ventaPos
+          .findUnique({ where: { id }, select: { creadoEn: true, facturaNumero: true } })
+          .then((v) => (v ? { fecha: v.creadoEn, factura: v.facturaNumero } : null))
+      : await db.order
+          .findUnique({ where: { id }, select: { createdAt: true, facturaNumero: true } })
+          .then((p) => (p ? { fecha: p.createdAt, factura: p.facturaNumero } : null));
+  const fechaFactura = datosDeLaFactura?.fecha;
+  const mesAnterior = !!fechaFactura && esDeMesAnterior(fechaFactura);
+  if (fechaFactura && mesAnterior && !confirmoMesAnterior) {
     return {
       ok: false,
       error: `Esta factura es de ${nombreDelMes(fechaFactura)}, un mes que ya terminó. Confirmá que entendés el aviso antes de anularla.`,
     };
   }
+
+  // Lo que queda en la bitácora: sobre todo si era de un mes ya terminado.
+  const anotarEnBitacora = () =>
+    registrarBitacora(storeId, sesion, {
+      modulo: "facturas",
+      accion: "factura_anulada",
+      descripcion: `Anuló la factura ${datosDeLaFactura?.factura ?? "(sin número)"}${
+        tambienCuenta ? " y canceló la cuenta" : " (la cuenta sigue vigente)"
+      }. Motivo: ${motivo.trim()}.${
+        mesAnterior && fechaFactura ? ` ATENCIÓN: era de ${nombreDelMes(fechaFactura)}, un mes ya terminado.` : ""
+      }`,
+      entidad: origen === "venta" ? "VentaPos" : "Order",
+      entidadId: id,
+      detalle: {
+        factura: datosDeLaFactura?.factura ?? null,
+        origen,
+        tambien_cancela_la_cuenta: tambienCuenta,
+        de_un_mes_anterior: mesAnterior,
+        motivo: motivo.trim(),
+      },
+    });
 
   if (tambienCuenta) {
     const resultado =
@@ -196,12 +225,11 @@ export async function cancelarFactura(
         ? await cancelarVenta(id, motivo)
         : await cambiarEstadoPedido(id, "cancelado", undefined, motivo);
     if (!resultado.ok) return resultado;
+    await anotarEnBitacora();
     revalidatePath("/admin/facturas");
     return { ok: true };
   }
 
-  const storeId = await idLocalActual();
-  const db = prismaDelLocal(storeId);
   const identidad = sesion.nombre?.trim() || sesion.email;
   const datosAnulacion = {
     facturaAnulada: true,
@@ -236,6 +264,7 @@ export async function cancelarFactura(
     revalidatePath(`/admin/pedidos/${id}`);
   }
 
+  await anotarEnBitacora();
   revalidatePath("/admin/facturas");
   return { ok: true };
 }
@@ -532,6 +561,15 @@ export async function remitirFactura(
       return { ok: false, error: err instanceof Error ? err.message : "No se pudo generar la factura." };
     }
 
+    await registrarBitacora(storeId, sesion, {
+      modulo: "facturas",
+      accion: "factura_remitida",
+      descripcion: `Emitió una factura nueva (remisión) de una venta del mostrador, en lugar de la anulada. Cliente: ${razonSocial} (${numeroIdentificacion}). Motivo: ${motivo.trim()}.`,
+      entidad: "VentaPos",
+      entidadId: id,
+      detalle: { origen, cliente: razonSocial, identificacion: numeroIdentificacion, motivo: motivo.trim() },
+    });
+
     revalidatePath("/admin/facturas");
     revalidatePath(`/admin/pos/venta/${id}`);
     return { ok: true, url: `/admin/pos/venta/${id}/ticket` };
@@ -636,6 +674,15 @@ export async function remitirFactura(
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : "No se pudo generar la factura." };
   }
+
+  await registrarBitacora(storeId, sesion, {
+    modulo: "facturas",
+    accion: "factura_remitida",
+    descripcion: `Emitió una factura nueva (remisión) de un pedido, en lugar de la anulada. Cliente: ${razonSocial} (${numeroIdentificacion}). Motivo: ${motivo.trim()}.`,
+    entidad: "Order",
+    entidadId: id,
+    detalle: { origen, cliente: razonSocial, identificacion: numeroIdentificacion, motivo: motivo.trim() },
+  });
 
   revalidatePath("/admin/facturas");
   revalidatePath(`/admin/pedidos/${id}`);

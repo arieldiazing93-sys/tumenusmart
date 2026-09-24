@@ -54,6 +54,7 @@ export async function GET(request: NextRequest) {
     { width: 12 },
     { width: 12 },
     { width: 14 },
+    { width: 18 },
     { width: 14 },
     { width: 18 },
     { width: 18 },
@@ -71,11 +72,12 @@ export async function GET(request: NextRequest) {
       "Ventas",
       "Ajustes",
       "Anulaciones",
+      "Mov. de almacén",
       "Stock final",
       "Costo unit. hoy (Gs.)",
       "Valor final (Gs.)",
     ],
-    12
+    13
   );
   for (const f of reporte.filas) {
     hoja.addRow([
@@ -88,15 +90,16 @@ export async function GET(request: NextRequest) {
       f.ventas,
       f.ajustes,
       f.anulaciones,
+      f.movimientos,
       f.final,
       f.costoUnitario != null ? Math.round(f.costoUnitario) : "",
       f.valorFinal != null ? Math.round(f.valorFinal) : "",
     ]);
   }
-  filaTitulo(hoja, ["TOTAL", "", "", "", "", "", "", "", "", "", "", Math.round(reporte.totalValorFinal)], 12);
+  filaTitulo(hoja, ["TOTAL", "", "", "", "", "", "", "", "", "", "", "", Math.round(reporte.totalValorFinal)], 13);
   hoja.addRow([]);
   hoja.addRow([
-    "Ventas y compras canceladas figuran en Anulaciones. El valor va a costo de hoy de cada insumo (última compra, sin IVA); los insumos sin costo no suman.",
+    "Ventas y compras canceladas figuran en Anulaciones. Mov. de almacén son las entradas (+) y salidas (−) manuales: mermas, roturas, consumo del personal. El valor va a costo de hoy de cada insumo (última compra, sin IVA); los insumos sin costo no suman.",
   ]);
 
   // ------------------------------------------------------------ resumen por almacén

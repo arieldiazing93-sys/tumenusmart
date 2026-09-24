@@ -55,6 +55,8 @@ export type Permiso =
   | "ideas.ver"
   | "analytics.ver"
   | "configuracion.editar"
+  // La bitácora del sistema: quién hizo qué. Solo el dueño la ve.
+  | "bitacora.ver"
   | "empleados.gestionar"
   | "fidelizacion.gestionar"
   // --- administración de la cartera ---
@@ -120,6 +122,7 @@ const PERMISOS_LOCAL: Permiso[] = [
   "ideas.ver",
   "analytics.ver",
   "configuracion.editar",
+  "bitacora.ver",
   "empleados.gestionar",
   "fidelizacion.gestionar",
 ];

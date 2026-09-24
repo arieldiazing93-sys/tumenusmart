@@ -10,6 +10,8 @@ import { normalizarCobro } from "@/lib/rendicion";
 import { estacionActual } from "@/lib/estacion-actual";
 import { desglosarIva, formatearNumeroFactura } from "@/lib/factura-pos";
 import { revertirMovimientosVenta } from "@/lib/movimientos-stock";
+import { registrarBitacora } from "@/lib/bitacora";
+import { formatearGuarani } from "@/lib/format";
 import { turnoAbierto } from "../pos/turno-actual";
 
 const ESTADOS_VALIDOS = [
@@ -304,6 +306,23 @@ export async function cambiarEstadoPedido(
     await prisma.order.update({
       where: { id: orderId },
       data: { estado, ...datosExtra, ...datosFactura },
+    });
+  }
+  // Cancelar un pedido queda en la bitácora (quién, cuándo y por qué).
+  if (estado === "cancelado") {
+    const cancelado = await prisma.order.findUnique({
+      where: { id: orderId },
+      select: { numero: true, total: true, facturaNumero: true },
+    });
+    await registrarBitacora(storeId, sesion, {
+      modulo: "pedidos",
+      accion: "pedido_cancelado",
+      descripcion: `Canceló el pedido #${String(cancelado?.numero ?? "").padStart(4, "0")}${
+        cancelado ? ` (${formatearGuarani(Number(cancelado.total))})` : ""
+      }. Motivo: ${motivo?.trim() || "sin motivo"}.`,
+      entidad: "Order",
+      entidadId: orderId,
+      detalle: { pedido: cancelado?.numero ?? null, total: cancelado ? Number(cancelado.total) : null, factura: cancelado?.facturaNumero ?? null, motivo: motivo?.trim() ?? null },
     });
   }
   revalidatePath("/admin/pedidos");

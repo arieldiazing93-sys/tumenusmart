@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { idLocalActual } from "@/lib/local-actual";
 import { prismaDelLocal } from "@/lib/prisma-local";
 import { prisma } from "@/lib/prisma";
+import { registrarBitacora } from "@/lib/bitacora";
 
 export type ResultadoPuntoExpedicion = { ok: true } | { ok: false; error: string };
 
@@ -117,10 +118,20 @@ export async function alternarActivoPuntoExpedicion(id: string, activo: boolean)
  * alternarPausaPedidos (src/app/admin/(protected)/configuracion/actions.ts).
  */
 export async function alternarFacturaObligatoria(obligatoria: boolean): Promise<void> {
-  await exigirPermiso("pos.gestionarEstaciones");
+  const sesion = await exigirPermiso("pos.gestionarEstaciones");
+  const storeId = await idLocalActual();
   await prisma.store.update({
-    where: { id: await idLocalActual() },
+    where: { id: storeId },
     data: { facturaObligatoria: obligatoria },
+  });
+  await registrarBitacora(storeId, sesion, {
+    modulo: "configuracion",
+    accion: obligatoria ? "factura_obligatoria_activada" : "factura_obligatoria_desactivada",
+    descripcion: obligatoria
+      ? 'Activó "Facturar todas las ventas": el punto de venta ya no permite vender solo con ticket.'
+      : 'Desactivó "Facturar todas las ventas".',
+    entidad: "Store",
+    entidadId: storeId,
   });
   revalidatePath("/admin/pos/puntos-expedicion");
   revalidatePath("/admin/pos");

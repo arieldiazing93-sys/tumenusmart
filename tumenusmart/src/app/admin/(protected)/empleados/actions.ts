@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { idLocalActual } from "@/lib/local-actual";
 import { cifrarPassword, exigirPermiso, generarPassword } from "@/lib/auth";
+import { registrarBitacora } from "@/lib/bitacora";
 
 function normalizarEmail(valor: string): string {
   return valor.trim().toLowerCase();
@@ -71,6 +72,14 @@ export async function crearEmpleado(formData: FormData): Promise<ResultadoCrearE
   // cuando alguien pregunta "¿y este usuario de dónde salió?".
   console.log(`[empleados] ${sesion.email} creó a ${email} en el local ${storeId}`);
 
+  await registrarBitacora(storeId, sesion, {
+    modulo: "empleados",
+    accion: "empleado_creado",
+    descripcion: `Dio de alta al empleado ${nombre} (${email}).`,
+    entidad: "Usuario",
+    detalle: { empleado: nombre, correo: email },
+  });
+
   revalidatePath("/admin/empleados");
   return { ok: true, password };
 }
@@ -85,7 +94,7 @@ export async function alternarActivoEmpleado(
   id: string,
   activo: boolean
 ): Promise<ResultadoAccionEmpleado> {
-  await exigirPermiso("empleados.gestionar");
+  const sesion = await exigirPermiso("empleados.gestionar");
   const storeId = await idLocalActual();
 
   // El `storeId` en el where NO es decorativo: sin él, alguien podría mandar
@@ -98,18 +107,28 @@ export async function alternarActivoEmpleado(
     return { ok: false, error: "Ese empleado no es de tu local" };
   }
 
+  const empleado = await prisma.usuario.findFirst({ where: { id, storeId }, select: { nombre: true, email: true } });
+  await registrarBitacora(storeId, sesion, {
+    modulo: "empleados",
+    accion: activo ? "empleado_activado" : "empleado_desactivado",
+    descripcion: `${activo ? "Volvió a activar" : "Desactivó"} al empleado ${empleado?.nombre ?? empleado?.email ?? ""}.`,
+    entidad: "Usuario",
+    entidadId: id,
+    detalle: { empleado: empleado?.nombre ?? null, correo: empleado?.email ?? null, activo },
+  });
+
   revalidatePath("/admin/empleados");
   return { ok: true };
 }
 
 /** Genera una contraseña nueva cuando el empleado se la olvidó. */
 export async function restablecerPasswordEmpleado(id: string): Promise<ResultadoNuevaPassword> {
-  await exigirPermiso("empleados.gestionar");
+  const sesion = await exigirPermiso("empleados.gestionar");
   const storeId = await idLocalActual();
 
   const empleado = await prisma.usuario.findFirst({
     where: { id, storeId, rol: "empleado" },
-    select: { id: true },
+    select: { id: true, nombre: true, email: true },
   });
   if (!empleado) return { ok: false, error: "Ese empleado no es de tu local" };
 
@@ -117,6 +136,15 @@ export async function restablecerPasswordEmpleado(id: string): Promise<Resultado
   await prisma.usuario.update({
     where: { id: empleado.id },
     data: { passwordHash: await cifrarPassword(password), debeCambiarPassword: true },
+  });
+
+  await registrarBitacora(storeId, sesion, {
+    modulo: "empleados",
+    accion: "contrasena_restablecida",
+    descripcion: `Le restableció la contraseña al empleado ${empleado.nombre ?? empleado.email}.`,
+    entidad: "Usuario",
+    entidadId: empleado.id,
+    detalle: { empleado: empleado.nombre, correo: empleado.email },
   });
 
   revalidatePath("/admin/empleados");

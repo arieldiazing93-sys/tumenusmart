@@ -13,6 +13,8 @@ import {
   type DeclaradoPorForma,
 } from "@/lib/turno-pos";
 import { claveDiaAsuncion } from "@/lib/timezone";
+import { formatearGuarani, formatearNumero } from "@/lib/format";
+import { registrarBitacora } from "@/lib/bitacora";
 import { armarPedido, type LineaPedida, type ProductoBase } from "@/lib/precio-pedido";
 import { registrarConsumoVenta, revertirMovimientosVenta } from "@/lib/movimientos-stock";
 import { costoDelProducto } from "@/lib/costo-receta";
@@ -61,6 +63,14 @@ export async function abrirTurno(
         abiertoPor: sesion.nombre?.trim() || sesion.email,
       },
       select: { id: true },
+    });
+    await registrarBitacora(storeId, sesion, {
+      modulo: "caja",
+      accion: "turno_abierto",
+      descripcion: `Abrió el turno de caja en ${estacion.nombre}${monto > 0 ? ` con ${formatearGuarani(monto)} de fondo` : ""}.`,
+      entidad: "TurnoPos",
+      entidadId: turno.id,
+      detalle: { estacion: estacion.nombre, fondo_inicial: monto },
     });
     revalidatePath("/admin/pos");
     return { ok: true, turnoId: turno.id, yaAbierto: false };
@@ -461,6 +471,34 @@ export async function registrarVenta(turnoId: string, datos: DatosVenta): Promis
     return venta.id;
   });
 
+  // Solo lo que conviene poder revisar después: las ventas con descuento y las
+  // ventas a crédito. Cada venta común ya tiene su propio registro.
+  if (descuento.monto > 0 || esCredito) {
+    const partes = [
+      descuento.monto > 0
+        ? `con un descuento de ${formatearGuarani(descuento.monto)}${
+            descuento.porcentaje != null ? ` (${descuento.porcentaje}%)` : ""
+          }`
+        : null,
+      esCredito ? "a crédito" : null,
+    ].filter(Boolean);
+    await registrarBitacora(storeId, sesion, {
+      modulo: "ventas",
+      accion: esCredito ? "venta_a_credito" : "venta_con_descuento",
+      descripcion: `Registró la venta ${formatearNumero(numero)} por ${formatearGuarani(total)}, ${partes.join(" y ")}.`,
+      entidad: "VentaPos",
+      entidadId: ventaId,
+      detalle: {
+        venta: formatearNumero(numero),
+        subtotal,
+        descuento: descuento.monto,
+        total,
+        a_credito: esCredito,
+        cliente: clienteNombre ?? datos.facturaRazonSocial ?? null,
+      },
+    });
+  }
+
   revalidatePath("/admin/pos");
   revalidatePath("/admin/pos/cuentas");
   return { ok: true, ventaId, total, areasImpresion };
@@ -581,6 +619,25 @@ export async function cerrarTurno(
     },
   });
 
+  const totalDeclarado =
+    declarado.efectivo + declarado.transferencia + declarado.tarjetaDebito + declarado.tarjetaCredito;
+  await registrarBitacora(storeId, sesion, {
+    modulo: "caja",
+    accion: "turno_cerrado",
+    descripcion: `Cerró el turno de caja: ${resumen.cantidad} ${resumen.cantidad === 1 ? "venta" : "ventas"}, ${formatearGuarani(resumen.totalGeneral)} cobrados, ${formatearGuarani(totalDeclarado)} declarados.`,
+    entidad: "TurnoPos",
+    entidadId: turnoId,
+    detalle: {
+      ventas: resumen.cantidad,
+      cobrado_calculado: resumen.totalGeneral,
+      declarado_efectivo: declarado.efectivo,
+      declarado_transferencia: declarado.transferencia,
+      declarado_tarjeta_debito: declarado.tarjetaDebito,
+      declarado_tarjeta_credito: declarado.tarjetaCredito,
+      ingresos_menos_retiros_de_caja: movimientos.neto,
+    },
+  });
+
   revalidatePath("/admin/pos");
   revalidatePath("/admin/pos/turnos");
   return { ok: true, turnoId };
@@ -663,6 +720,8 @@ export async function cancelarVenta(ventaId: string, motivo: string): Promise<Re
     where: { id: ventaId },
     select: {
       id: true,
+      numero: true,
+      total: true,
       cancelada: true,
       turnoPos: { select: { estado: true } },
       facturaNumero: true,
@@ -712,6 +771,17 @@ export async function cancelarVenta(ventaId: string, motivo: string): Promise<Re
     });
 
     await revertirMovimientosVenta(tx, storeId, { ventaPosId: ventaId }, identidad);
+  });
+
+  await registrarBitacora(storeId, sesion, {
+    modulo: "ventas",
+    accion: "venta_cancelada",
+    descripcion: `Canceló la venta ${formatearNumero(venta.numero)} (${formatearGuarani(Number(venta.total))}). Motivo: ${motivo.trim() || "sin motivo"}.${
+      venta.facturaNumero && !venta.facturaAnulada ? ` También quedó anulada la factura ${venta.facturaNumero}.` : ""
+    }`,
+    entidad: "VentaPos",
+    entidadId: ventaId,
+    detalle: { venta: formatearNumero(venta.numero), total: Number(venta.total), factura: venta.facturaNumero, motivo: motivo.trim() },
   });
 
   revalidatePath("/admin/pos/cuentas");

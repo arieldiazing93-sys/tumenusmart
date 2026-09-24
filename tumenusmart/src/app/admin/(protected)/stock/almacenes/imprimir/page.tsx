@@ -108,6 +108,7 @@ export default async function ImprimirAlmacenPage({
                     <th className="py-1.5 text-right">Ventas</th>
                     <th className="py-1.5 text-right">Ajustes</th>
                     <th className="py-1.5 text-right">Anul.</th>
+                    <th className="py-1.5 text-right">Mov.</th>
                     <th className="py-1.5 text-right">Final</th>
                     <th className="py-1.5 text-right">Valor</th>
                   </tr>
@@ -126,6 +127,7 @@ export default async function ImprimirAlmacenPage({
                       <td className="py-1.5 text-right text-tinta-media">{conSigno(f.ventas)}</td>
                       <td className="py-1.5 text-right text-tinta-media">{conSigno(f.ajustes)}</td>
                       <td className="py-1.5 text-right text-tinta-media">{conSigno(f.anulaciones)}</td>
+                      <td className="py-1.5 text-right text-tinta-media">{conSigno(f.movimientos)}</td>
                       <td className={`py-1.5 text-right font-semibold ${f.final < 0 ? "text-peligro" : "text-tinta"}`}>
                         {f.final}
                       </td>
@@ -143,7 +145,7 @@ export default async function ImprimirAlmacenPage({
 
       <p className="mt-6 text-xs text-tinta-suave">
         Inicial: lo que había al empezar el primer día. Compras, ventas y ajustes (inventarios) son lo que se movió en el
-        período; Anul. es lo que se devolvió o se sacó por ventas y compras canceladas. El valor va a costo de hoy de
+        período; Anul. es lo que se devolvió o se sacó por ventas y compras canceladas; Mov. son las entradas (+) y salidas (−) manuales de almacén (mermas, roturas, consumo del personal). El valor va a costo de hoy de
         cada insumo (última compra, sin IVA); los que no tienen costo no suman.
       </p>
       <p className="mt-2 text-[0.72rem] text-tinta-suave">Generado desde TuMenuSmart.</p>

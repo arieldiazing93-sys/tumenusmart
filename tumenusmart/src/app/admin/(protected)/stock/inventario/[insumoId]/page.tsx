@@ -13,6 +13,7 @@ const ETIQUETA_TIPO: Record<string, string> = {
   compra: "Compra",
   ajuste: "Ajuste de inventario",
   correccion: "Corrección de compra",
+  movimiento: "Movimiento de almacén",
   cancelacion: "Cancelación (restitución)",
 };
 
@@ -21,6 +22,7 @@ const COLOR_TIPO: Record<string, ColorEstado> = {
   compra: "exito",
   ajuste: "azul",
   correccion: "aviso",
+  movimiento: "aviso",
   cancelacion: "marca",
 };
 

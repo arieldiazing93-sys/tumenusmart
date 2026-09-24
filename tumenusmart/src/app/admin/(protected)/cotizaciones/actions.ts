@@ -5,7 +5,14 @@ import { redirect } from "next/navigation";
 import { exigirPermiso } from "@/lib/auth";
 import { idLocalActual } from "@/lib/local-actual";
 import { prismaDelLocal, siguienteNumeroCotizacion } from "@/lib/prisma-local";
-import { calcularCotizacion, VALIDEZ_DIAS_POR_DEFECTO, type ResultadoCotizacion as CalculoOk } from "@/lib/cotizacion";
+import {
+  calcularCotizacion,
+  numeroDeCotizacion,
+  VALIDEZ_DIAS_POR_DEFECTO,
+  type ResultadoCotizacion as CalculoOk,
+} from "@/lib/cotizacion";
+import { formatearGuarani } from "@/lib/format";
+import { registrarBitacora } from "@/lib/bitacora";
 import { normalizarIva } from "@/lib/iva";
 import type { DescuentoPedido } from "@/lib/descuento-venta";
 
@@ -225,6 +232,15 @@ export async function crearCotizacion(datos: DatosCotizacion): Promise<Resultado
     select: { id: true },
   });
 
+  await registrarBitacora(idLocal, sesion, {
+    modulo: "cotizaciones",
+    accion: "cotizacion_creada",
+    descripcion: `Creó la cotización N° ${numeroDeCotizacion(numero)} para ${p.clienteNombre} por ${formatearGuarani(p.calculo.total)}.`,
+    entidad: "Cotizacion",
+    entidadId: creada.id,
+    detalle: { numero, cliente: p.clienteNombre, total: p.calculo.total, lineas: p.lineas.length },
+  });
+
   revalidatePath("/admin/cotizaciones");
   redirect(`/admin/cotizaciones/${creada.id}`);
 }
@@ -237,11 +253,14 @@ export async function actualizarCotizacion(
   cotizacionId: string,
   datos: DatosCotizacion
 ): Promise<ResultadoGuardarCotizacion | void> {
-  await exigirPermiso("cotizaciones.gestionar");
+  const sesion = await exigirPermiso("cotizaciones.gestionar");
   const idLocal = await idLocalActual();
   const prisma = prismaDelLocal(idLocal);
 
-  const existente = await prisma.cotizacion.findUnique({ where: { id: cotizacionId }, select: { id: true } });
+  const existente = await prisma.cotizacion.findUnique({
+    where: { id: cotizacionId },
+    select: { id: true, numero: true, total: true },
+  });
   if (!existente) return { ok: false, error: "Ese presupuesto ya no existe." };
 
   const p = prepararCotizacion(datos);
@@ -263,6 +282,17 @@ export async function actualizarCotizacion(
     },
   });
 
+  await registrarBitacora(idLocal, sesion, {
+    modulo: "cotizaciones",
+    accion: "cotizacion_editada",
+    descripcion: `Editó la cotización N° ${numeroDeCotizacion(existente.numero)} para ${p.clienteNombre}: el total pasó de ${formatearGuarani(
+      Number(existente.total)
+    )} a ${formatearGuarani(p.calculo.total)}.`,
+    entidad: "Cotizacion",
+    entidadId: cotizacionId,
+    detalle: { numero: existente.numero, total_anterior: Number(existente.total), total_nuevo: p.calculo.total },
+  });
+
   revalidatePath("/admin/cotizaciones");
   revalidatePath(`/admin/cotizaciones/${cotizacionId}`);
   redirect(`/admin/cotizaciones/${cotizacionId}`);
@@ -270,13 +300,28 @@ export async function actualizarCotizacion(
 
 /** Borra un presupuesto. No afecta nada más: no mueve stock, caja ni facturas. */
 export async function eliminarCotizacion(cotizacionId: string): Promise<ResultadoEliminarCotizacion> {
-  await exigirPermiso("cotizaciones.gestionar");
-  const prisma = prismaDelLocal(await idLocalActual());
+  const sesion = await exigirPermiso("cotizaciones.gestionar");
+  const idLocal = await idLocalActual();
+  const prisma = prismaDelLocal(idLocal);
 
-  const existente = await prisma.cotizacion.findUnique({ where: { id: cotizacionId }, select: { id: true } });
+  const existente = await prisma.cotizacion.findUnique({
+    where: { id: cotizacionId },
+    select: { id: true, numero: true, clienteNombre: true, total: true },
+  });
   if (!existente) return { ok: false, error: "Ese presupuesto ya no existe." };
 
   await prisma.cotizacion.delete({ where: { id: cotizacionId } });
+
+  await registrarBitacora(idLocal, sesion, {
+    modulo: "cotizaciones",
+    accion: "cotizacion_eliminada",
+    descripcion: `Eliminó la cotización N° ${numeroDeCotizacion(existente.numero)} de ${existente.clienteNombre} (${formatearGuarani(
+      Number(existente.total)
+    )}).`,
+    entidad: "Cotizacion",
+    entidadId: cotizacionId,
+    detalle: { numero: existente.numero, cliente: existente.clienteNombre, total: Number(existente.total) },
+  });
 
   revalidatePath("/admin/cotizaciones");
   return { ok: true };
