@@ -155,6 +155,11 @@ export async function agregarTramoCategoria(
   }
   if (!abre || !cierra) return { ok: false, error: "Faltan las horas del bloqueo" };
 
+  // La categoría viene del navegador: se verifica que sea de ESTE local (al ir
+  // por prismaDelLocal, la de otro negocio simplemente no aparece).
+  const categoria = await prisma.category.findUnique({ where: { id: categoryId }, select: { id: true } });
+  if (!categoria) return { ok: false, error: "Esa categoría no existe" };
+
   await prisma.categoriaHorario.create({
     data: { categoryId, diaSemana, abre, cierra, storeId: idLocal },
   });

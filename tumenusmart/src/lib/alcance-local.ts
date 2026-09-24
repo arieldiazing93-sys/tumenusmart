@@ -20,6 +20,8 @@ export const MODELOS_POR_LOCAL = new Set([
   "Reservation",
   "HorarioReserva",
   "HorarioAtencion",
+  "CategoriaHorario",
+  "FacturaReemplazada",
   "IdeaSemanal",
   "Pago",
   "Rendicion",
