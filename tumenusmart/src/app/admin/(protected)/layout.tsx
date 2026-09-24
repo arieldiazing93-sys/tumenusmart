@@ -40,6 +40,12 @@ function armarGrupos(hayIdeaSinVer: boolean, rol: string, ventasACredito: boolea
         // repasando el día después.
         { href: "/admin/pos/cuentas", label: "Cuentas del mostrador", icono: "pedidos" as const,
           ver: conPermiso("pos.vender") },
+        // Facturas de pedidos y de mostrador, juntas. Vive en "Día a día" para
+        // encontrarla rápido: ahí se ve una factura recién emitida, se anula, se
+        // remite y se ven sus datos para la factura electrónica. El permiso sigue
+        // siendo el del dueño (pos.verHistorico).
+        { href: "/admin/facturas", label: "Facturas", icono: "cierre" as const,
+          ver: conPermiso("pos.verHistorico") },
         // Solo si el local vende a crédito (se activa en Configuración): lo que
         // los clientes le deben y los cobros.
         { href: "/admin/pos/cuentas-por-cobrar", label: "Cuentas por cobrar", icono: "cierre" as const,
@@ -121,11 +127,6 @@ function armarGrupos(hayIdeaSinVer: boolean, rol: string, ventasACredito: boolea
         { href: "/admin/pos/turnos", label: "Cierres de turno", icono: "cierre" as const,
           ver: conPermiso("pos.verHistorico") },
         { href: "/admin/pos/reporte-general", label: "Reporte general", icono: "estadisticas" as const,
-          ver: conPermiso("pos.verHistorico") },
-        // Facturas de pedidos y de mostrador, juntas — repaso del dueño, no
-        // algo que se toca en el momento. Mismo permiso que "Cierres de
-        // turno"/"Reporte general".
-        { href: "/admin/facturas", label: "Facturas", icono: "cierre" as const,
           ver: conPermiso("pos.verHistorico") },
         // Histórico de clientes (fidelización por teléfono + identificación
         // fiscal de la Factura Autoimpresor): repaso del dueño, no algo

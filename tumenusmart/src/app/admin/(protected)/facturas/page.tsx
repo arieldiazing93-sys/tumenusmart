@@ -92,6 +92,10 @@ export default async function FacturasPage({
             >
               Ver reporte / PDF
             </a>
+            {/* Acceso directo a los datos del emisor para factura electrónica (viven en Puntos de expedición). */}
+            <Link href="/admin/pos/puntos-expedicion" className={clasesBoton("navegar", "sm")}>
+              Datos del emisor
+            </Link>
             <Link href="/admin/facturas/nueva" className={clasesBoton("principal", "sm")}>
               + Nueva factura
             </Link>

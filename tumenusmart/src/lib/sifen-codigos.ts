@@ -141,11 +141,19 @@ export const MOTIVO_NOTA_SIFEN = {
  * módulo 11 que exige SIFEN: se multiplican los dígitos de derecha a izquierda
  * por 2, 3, 4… (hasta 11 y vuelve a 2), se suman, y el dígito es
  * `11 - (suma % 11)` si el resto es mayor que 1, o 0 en otro caso.
- * Ejemplo: el RUC 80069563 da el dígito 1. Si un RUC real no coincidiera, el
- * panel de factura electrónica lo marca como AVISO (nunca frena nada).
+ *
+ * Es la misma cuenta que la función oficial de la DNIT (`Pa_Calcular_Dv_11_A`,
+ * "Dígito Verificador.pdf" en dnit.gov.py), incluido el caso de una cédula que
+ * termina en letra: la letra se reemplaza por su código ASCII. Ejemplos: el RUC
+ * 80069563 da 1 y el 4987017 da 3. Si un RUC real no coincidiera, el panel de
+ * factura electrónica lo marca como AVISO (nunca frena nada).
  */
 export function calcularDvRuc(numeroRuc: string): number {
-  const digitos = numeroRuc.replace(/\D/g, "");
+  let digitos = "";
+  for (const caracter of numeroRuc.trim().toUpperCase()) {
+    const codigo = caracter.charCodeAt(0);
+    digitos += codigo >= 48 && codigo <= 57 ? caracter : String(codigo);
+  }
   let k = 2;
   let total = 0;
   for (let i = digitos.length - 1; i >= 0; i--) {
