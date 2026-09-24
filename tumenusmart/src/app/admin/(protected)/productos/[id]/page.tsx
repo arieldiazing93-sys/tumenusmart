@@ -12,6 +12,8 @@ import { etiquetaIva, TASAS_IVA } from "@/lib/iva";
 import { etiquetaUnidadMedida } from "@/lib/unidad-medida";
 import { formatearGuarani } from "@/lib/format";
 import { costoDeReceta, costoDelProducto } from "@/lib/costo-receta";
+import { aplanarReceta } from "@/lib/insumo-elaborado";
+import { cargarElaborados } from "@/lib/cargar-elaborados";
 import { GuardadoToast } from "@/components/GuardadoToast";
 import { Tarjeta } from "@/components/ui";
 
@@ -25,7 +27,8 @@ export default async function EditarProductoPage({
   await pantallaConPermiso("productos.editar");
 
   // Todas las consultas de acá abajo quedan atadas a este local.
-  const prisma = prismaDelLocal(await idLocalActual());
+  const idLocal = await idLocalActual();
+  const prisma = prismaDelLocal(idLocal);
 
   const { id } = await params;
 
@@ -40,7 +43,9 @@ export default async function EditarProductoPage({
         receta: {
           select: {
             cantidad: true,
-            insumo: { select: { id: true, nombre: true, unidadMedida: true, costoUnitario: true } },
+            insumo: {
+              select: { id: true, nombre: true, unidadMedida: true, costoUnitario: true, esElaborado: true },
+            },
           },
         },
         gruposAgregados: {
@@ -83,12 +88,24 @@ export default async function EditarProductoPage({
   if (!producto) notFound();
 
   const almacenes = todosLosAlmacenes.filter((a) => a.activo || a.id === producto.almacenId);
-  const costoPorReceta = costoDeReceta(producto.receta);
+
+  // Si la receta lleva una preparación (salsa, masa…), el costo sale de los
+  // insumos con que se hace: se la abre igual que al vender.
+  const elaborados = await cargarElaborados(idLocal);
+  const recetaAbierta = aplanarReceta(
+    producto.receta.map((r) => ({
+      insumoId: r.insumo.id,
+      cantidad: r.cantidad,
+      insumo: { costoUnitario: r.insumo.costoUnitario },
+    })),
+    elaborados
+  );
+  const costoPorReceta = costoDeReceta(recetaAbierta);
 
   // Costo y utilidad por unidad. Van sobre el precio SIN IVA: el precio de
   // venta lleva el IVA adentro y ese impuesto no es del negocio, mientras que
   // el costo de los insumos se guarda sin IVA — igual que en Rentabilidad.
-  const costoProducto = costoDelProducto(producto.costo, producto.receta);
+  const costoProducto = costoDelProducto(producto.costo, recetaAbierta);
   const porcentajeIva = TASAS_IVA.find((t) => t.valor === producto.iva)?.porcentaje ?? 10;
   const precioSinIva = Number(producto.precio) / (1 + porcentajeIva / 100);
   const utilidad = costoProducto != null ? precioSinIva - costoProducto : null;
@@ -203,9 +220,10 @@ export default async function EditarProductoPage({
           <p className="rotulo text-[0.8rem] font-bold">Receta (Control de stock)</p>
           <p className="text-sm text-tinta-media">
             Qué insumos descuenta cada unidad vendida de este producto, y cuánto de cada uno.
-            Sin receta, este producto no descuenta ningún insumo. Un "extra" de Grupos de
-            agregados es también un producto — armale la receta en su propia ficha para que
-            también descuente.
+            Si usa una preparación (salsa, masa…), poné la preparación con la cantidad que lleva:
+            al vender, se descuentan solos los insumos con que se hace. Sin receta, este producto
+            no descuenta ningún insumo. Un "extra" de Grupos de agregados es también un producto —
+            armale la receta en su propia ficha para que también descuente.
           </p>
         </div>
         <RecetaProducto
@@ -215,6 +233,7 @@ export default async function EditarProductoPage({
             nombre: r.insumo.nombre,
             cantidad: Number(r.cantidad),
             unidadMedida: etiquetaUnidadMedida(r.insumo.unidadMedida),
+            esElaborado: r.insumo.esElaborado,
           }))}
         />
         {/* El costo del producto ya no se carga a mano: sale de esta receta. */}

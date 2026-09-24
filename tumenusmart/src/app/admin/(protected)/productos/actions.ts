@@ -465,13 +465,21 @@ export async function buscarInsumosParaReceta(
     },
     orderBy: { nombre: "asc" },
     take: 10,
-    select: { id: true, nombre: true, unidadMedida: true, categoria: { select: { nombre: true } } },
+    select: {
+      id: true,
+      nombre: true,
+      unidadMedida: true,
+      esElaborado: true,
+      categoria: { select: { nombre: true } },
+    },
   });
 
   return insumos.map((i) => ({
     id: i.id,
     nombre: i.nombre,
-    categoriaNombre: i.categoria?.nombre ?? "Sin categoría",
+    // Una preparación (salsa, masa…) también se puede poner en la receta: al
+    // vender, descuenta los insumos con que se hace.
+    categoriaNombre: i.esElaborado ? "Preparación" : (i.categoria?.nombre ?? "Sin categoría"),
     unidadMedida: etiquetaUnidadMedida(i.unidadMedida),
   }));
 }
@@ -489,6 +497,14 @@ export async function asignarInsumoAProducto(
   if (!Number.isFinite(cantidad) || cantidad <= 0) {
     return { ok: false, error: "La cantidad tiene que ser mayor a cero" };
   }
+
+  // Los dos ids vienen del navegador: se vuelven a leer atados a este local,
+  // para que una receta nunca apunte a un producto o insumo de otro negocio.
+  const [producto, insumo] = await Promise.all([
+    prisma.product.findUnique({ where: { id: productId }, select: { id: true } }),
+    prisma.insumo.findUnique({ where: { id: insumoId }, select: { id: true } }),
+  ]);
+  if (!producto || !insumo) return { ok: false, error: "Ese producto o insumo ya no existe." };
 
   await prisma.recetaItem.upsert({
     where: { productId_insumoId: { productId, insumoId } },

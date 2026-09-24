@@ -31,6 +31,10 @@ function aNumero(valor: unknown): number {
   return Number.isFinite(n) ? n : 0;
 }
 
+function redondear3(n: number): number {
+  return Math.round(n * 1000) / 1000;
+}
+
 type ConsumoAgregado = { insumoId: string; almacenId: string | null; cantidad: number };
 
 /**
@@ -50,7 +54,10 @@ function agregarConsumo(lineas: LineaArmada[], almacenPorDefecto: string | null)
       else mapa.set(clave, { insumoId: c.insumoId, almacenId, cantidad });
     }
   }
-  return [...mapa.values()];
+  // A 3 decimales, que es lo que guardan el stock y el movimiento: al abrir una
+  // preparación (0,1 kg de salsa → 0,0375 kg de cebolla) salen cantidades más
+  // finas, y así el stock y el historial siempre coinciden exactos.
+  return [...mapa.values()].map((c) => ({ ...c, cantidad: redondear3(c.cantidad) }));
 }
 
 /** Descuenta stock por una venta recién creada y deja el movimiento ("venta") de cada insumo. */

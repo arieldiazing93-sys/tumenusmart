@@ -76,7 +76,11 @@ export async function calcularReporteInsumos(
 
   const [insumos, almacenes, categoriaElegida] = await Promise.all([
     db.insumo.findMany({
-      where: !categoria ? {} : categoria === SIN_CATEGORIA_INSUMO ? { categoriaId: null } : { categoriaId: categoria },
+      // Las preparaciones (salsa, masa…) no llevan stock propio: no entran al reporte.
+      where: {
+        esElaborado: false,
+        ...(!categoria ? {} : categoria === SIN_CATEGORIA_INSUMO ? { categoriaId: null } : { categoriaId: categoria }),
+      },
       include: { categoria: { select: { nombre: true } } },
     }),
     db.almacen.findMany({ select: { id: true, nombre: true } }),

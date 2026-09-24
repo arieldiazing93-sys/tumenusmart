@@ -1,6 +1,8 @@
 import { prismaDelLocal } from "./prisma-local";
 import { PEDIDO_REAL, type RangoFecha } from "./estadisticas";
 import { costoDelProducto } from "./costo-receta";
+import { aplanarReceta } from "./insumo-elaborado";
+import { cargarElaborados } from "./cargar-elaborados";
 import { factorDeDescuento } from "./descuento-venta";
 import { TASAS_IVA } from "./iva";
 
@@ -181,7 +183,7 @@ export async function calcularReporteProductosVendidos(
           select: {
             costo: true,
             // El costo de hoy, para lo vendido antes de que se guardara el costo en el ítem.
-            receta: { select: { cantidad: true, insumo: { select: { costoUnitario: true } } } },
+            receta: { select: { insumoId: true, cantidad: true, insumo: { select: { costoUnitario: true } } } },
             category: { select: { id: true, nombre: true, orden: true } },
           },
         },
@@ -204,13 +206,15 @@ export async function calcularReporteProductosVendidos(
         product: {
           select: {
             costo: true,
-            receta: { select: { cantidad: true, insumo: { select: { costoUnitario: true } } } },
+            receta: { select: { insumoId: true, cantidad: true, insumo: { select: { costoUnitario: true } } } },
             category: { select: { id: true, nombre: true, orden: true } },
           },
         },
       },
     }),
   ]);
+  // Una receta que lleva una preparación (salsa, masa…) se costea con los insumos con que se hace.
+  const elaborados = await cargarElaborados(storeId);
 
   type Acumulado = {
     nombre: string;
@@ -321,7 +325,10 @@ export async function calcularReporteProductosVendidos(
     // (ventas anteriores, o un producto que todavía no tenía receta), el de
     // hoy. Un combo no tiene "costo de hoy": sin el guardado, queda sin costo.
     const costoGuardado = item.costoProducto != null ? Number(item.costoProducto) : null;
-    const costoDeHoy = !esCombo && item.product ? costoDelProducto(item.product.costo, item.product.receta) : null;
+    const costoDeHoy =
+      !esCombo && item.product
+        ? costoDelProducto(item.product.costo, aplanarReceta(item.product.receta, elaborados))
+        : null;
     const costoPorUnidad = costoGuardado ?? costoDeHoy;
     if (costoPorUnidad != null) {
       actual.totalCostoProducto += costoPorUnidad * item.cantidad;

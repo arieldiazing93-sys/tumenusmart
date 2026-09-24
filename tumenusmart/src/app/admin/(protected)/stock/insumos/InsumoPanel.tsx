@@ -2,9 +2,10 @@
 
 import { useEffect, useState, useTransition } from "react";
 import { Tarjeta, Campo, Entrada, Selector, Pastilla, clasesBoton } from "@/components/ui";
-import { UNIDADES_MEDIDA } from "@/lib/unidad-medida";
+import { UNIDADES_MEDIDA, etiquetaUnidadMedida } from "@/lib/unidad-medida";
 import { TASAS_IVA } from "@/lib/iva";
 import { actualizarInsumo } from "./actions";
+import { RecetaElaborado, type IngredienteDatos } from "./RecetaElaborado";
 
 export type InsumoDatos = {
   id: string;
@@ -15,8 +16,13 @@ export type InsumoDatos = {
   rendimiento: number;
   stockActual: number;
   stockMinimo: number | null;
+  /** En una preparación es el costo calculado con sus ingredientes, no uno guardado. */
   costoUnitario: number | null;
   activo: boolean;
+  /** Preparación propia (salsa, masa…): se arma con otros insumos y no lleva stock propio. */
+  esElaborado: boolean;
+  rindeTanda: number | null;
+  ingredientes: IngredienteDatos[];
 };
 
 type Categoria = { id: string; nombre: string };
@@ -49,8 +55,10 @@ export function InsumoPanel({
     setCategoriaId(insumo.categoriaId ?? "");
   }, [insumo.categoriaId]);
 
-  const negativo = insumo.stockActual < 0;
-  const bajoMinimo = insumo.stockMinimo != null && insumo.stockActual < insumo.stockMinimo;
+  // Una preparación no lleva stock propio: no hay nada que avisar.
+  const negativo = !insumo.esElaborado && insumo.stockActual < 0;
+  const bajoMinimo =
+    !insumo.esElaborado && insumo.stockMinimo != null && insumo.stockActual < insumo.stockMinimo;
 
   function alGuardar(formData: FormData) {
     setError(null);
@@ -72,6 +80,7 @@ export function InsumoPanel({
       <div>
         <h2 className="text-[1.1rem] font-semibold tracking-titular text-tinta">{insumo.nombre}</h2>
         <div className="mt-1 flex flex-wrap items-center gap-2">
+          {insumo.esElaborado && <Pastilla color="azul">Preparación</Pastilla>}
           <Pastilla color={insumo.activo ? "exito" : "neutro"}>{insumo.activo ? "Activo" : "Desactivado"}</Pastilla>
           {negativo && <Pastilla color="peligro">Stock negativo</Pastilla>}
           {!negativo && bajoMinimo && <Pastilla color="aviso">Bajo el mínimo</Pastilla>}
@@ -117,49 +126,67 @@ export function InsumoPanel({
               ))}
             </Selector>
           </Campo>
-          <Campo etiqueta="IVA" ayuda="Para armar la factura cuando se compra este insumo.">
-            <Selector name="iva" defaultValue={insumo.iva}>
-              {TASAS_IVA.map((t) => (
-                <option key={t.valor} value={t.valor}>
-                  {t.etiqueta}
-                </option>
-              ))}
-            </Selector>
-          </Campo>
-          <Campo
-            etiqueta="Rendimiento"
-            ayuda="Unidades que trae cada compra. Ej: un pack de 12 latas → 12."
-          >
-            <Entrada
-              type="number"
-              name="rendimiento"
-              step="0.001"
-              min="0.001"
-              required
-              defaultValue={insumo.rendimiento}
-            />
-          </Campo>
-          <Campo etiqueta="Stock mínimo (opcional)">
-            <Entrada
-              type="number"
-              name="stockMinimo"
-              step="0.001"
-              min="0"
-              defaultValue={insumo.stockMinimo ?? ""}
-            />
-          </Campo>
-          <Campo etiqueta="Costo unitario (opcional)">
-            {/* El costo que sale de una compra puede traer decimales (3787,88).
-                En guaraníes se muestra entero: con decimales el navegador
-                rechazaba el guardado por "valor inválido". */}
-            <Entrada
-              type="number"
-              name="costoUnitario"
-              step="1"
-              min="0"
-              defaultValue={insumo.costoUnitario != null ? Math.round(insumo.costoUnitario) : ""}
-            />
-          </Campo>
+          {insumo.esElaborado ? (
+            <Campo
+              etiqueta="Rinde por tanda"
+              ayuda="Cuánto sale de una tanda, en la unidad de medida elegida. Ej: si una tanda de salsa rinde 4 litros, poné 4."
+            >
+              <Entrada
+                type="number"
+                name="rindeTanda"
+                step="0.001"
+                min="0.001"
+                required
+                defaultValue={insumo.rindeTanda ?? ""}
+              />
+            </Campo>
+          ) : (
+            <>
+              <Campo etiqueta="IVA" ayuda="Para armar la factura cuando se compra este insumo.">
+                <Selector name="iva" defaultValue={insumo.iva}>
+                  {TASAS_IVA.map((t) => (
+                    <option key={t.valor} value={t.valor}>
+                      {t.etiqueta}
+                    </option>
+                  ))}
+                </Selector>
+              </Campo>
+              <Campo
+                etiqueta="Rendimiento"
+                ayuda="Unidades que trae cada compra. Ej: un pack de 12 latas → 12."
+              >
+                <Entrada
+                  type="number"
+                  name="rendimiento"
+                  step="0.001"
+                  min="0.001"
+                  required
+                  defaultValue={insumo.rendimiento}
+                />
+              </Campo>
+              <Campo etiqueta="Stock mínimo (opcional)">
+                <Entrada
+                  type="number"
+                  name="stockMinimo"
+                  step="0.001"
+                  min="0"
+                  defaultValue={insumo.stockMinimo ?? ""}
+                />
+              </Campo>
+              <Campo etiqueta="Costo unitario (opcional)">
+                {/* El costo que sale de una compra puede traer decimales (3787,88).
+                    En guaraníes se muestra entero: con decimales el navegador
+                    rechazaba el guardado por "valor inválido". */}
+                <Entrada
+                  type="number"
+                  name="costoUnitario"
+                  step="1"
+                  min="0"
+                  defaultValue={insumo.costoUnitario != null ? Math.round(insumo.costoUnitario) : ""}
+                />
+              </Campo>
+            </>
+          )}
         </div>
 
         <label className="flex items-center gap-2 text-sm">
@@ -175,6 +202,19 @@ export function InsumoPanel({
           {guardado && <span className="text-xs font-medium text-exito">✓ Guardado</span>}
         </div>
       </form>
+
+      {insumo.esElaborado && (
+        <div className="border-t border-linea pt-4">
+          <RecetaElaborado
+            elaboradoId={insumo.id}
+            nombre={insumo.nombre}
+            unidadMedida={etiquetaUnidadMedida(insumo.unidadMedida).toLowerCase()}
+            rindeTanda={insumo.rindeTanda}
+            ingredientes={insumo.ingredientes}
+            costoPorUnidad={insumo.costoUnitario}
+          />
+        </div>
+      )}
     </Tarjeta>
   );
 }

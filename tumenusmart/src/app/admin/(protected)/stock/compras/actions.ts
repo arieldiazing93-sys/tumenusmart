@@ -62,7 +62,11 @@ function aFecha(texto: string | null | undefined): Date | null {
   return Number.isNaN(fecha.getTime()) ? null : fecha;
 }
 
-/** Busca insumos activos por nombre para agregarlos como línea de la compra. */
+/**
+ * Busca insumos activos por nombre para agregarlos como línea de la compra (o de
+ * un movimiento de almacén). Las preparaciones (salsa, masa…) quedan afuera:
+ * no se compran ni llevan stock propio.
+ */
 export async function buscarInsumosParaCompra(query: string): Promise<InsumoParaCompra[]> {
   await exigirPermiso("stock.ver");
   const prisma = prismaDelLocal(await idLocalActual());
@@ -71,7 +75,7 @@ export async function buscarInsumosParaCompra(query: string): Promise<InsumoPara
   if (!texto) return [];
 
   const insumos = await prisma.insumo.findMany({
-    where: { activo: true, nombre: { contains: texto, mode: "insensitive" } },
+    where: { activo: true, esElaborado: false, nombre: { contains: texto, mode: "insensitive" } },
     orderBy: { nombre: "asc" },
     take: 10,
     select: {

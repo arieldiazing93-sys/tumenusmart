@@ -3,6 +3,8 @@ import { prisma } from "@/lib/prisma";
 import { prismaDelLocal } from "@/lib/prisma-local";
 import { ZONA_NEGOCIO } from "@/lib/timezone";
 import { costoDelProducto } from "@/lib/costo-receta";
+import { aplanarReceta } from "@/lib/insumo-elaborado";
+import { cargarElaborados } from "@/lib/cargar-elaborados";
 import {
   analizar,
   elegirIdeaDeLaSemana,
@@ -67,7 +69,7 @@ export async function GET(request: NextRequest) {
         db.product.findMany({
           include: {
             category: true,
-            receta: { select: { cantidad: true, insumo: { select: { costoUnitario: true } } } },
+            receta: { select: { insumoId: true, cantidad: true, insumo: { select: { costoUnitario: true } } } },
           },
         }),
         db.ideaSemanal.findMany({
@@ -95,13 +97,15 @@ export async function GET(request: NextRequest) {
         })),
       }));
 
+      // Una receta que lleva una preparación (salsa, masa…) se costea con los insumos con que se hace.
+      const elaborados = await cargarElaborados(local.id);
       const productos: ProductoAnalisis[] = productosCrudos.map((pr) => ({
         id: pr.id,
         nombre: pr.nombre,
         categoriaId: pr.categoryId,
         categoriaNombre: pr.category.nombre,
         precio: Number(pr.precio),
-        costo: costoDelProducto(pr.costo, pr.receta),
+        costo: costoDelProducto(pr.costo, aplanarReceta(pr.receta, elaborados)),
         iva: pr.iva,
         disponible: pr.disponible,
         creado: pr.createdAt,

@@ -2,12 +2,19 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { clasesBoton } from "@/components/ui";
+import { Pastilla, clasesBoton } from "@/components/ui";
 import { asignarInsumoAProducto } from "../actions";
 import { BuscarInsumoParaReceta } from "./BuscarInsumoParaReceta";
 import { QuitarInsumoDeRecetaBoton } from "./QuitarInsumoDeRecetaBoton";
 
-type ItemReceta = { insumoId: string; nombre: string; cantidad: number; unidadMedida: string };
+type ItemReceta = {
+  insumoId: string;
+  nombre: string;
+  cantidad: number;
+  unidadMedida: string;
+  /** Una preparación (salsa, masa…): descuenta los insumos con que se hace. */
+  esElaborado?: boolean;
+};
 
 /**
  * Todo el flujo de la receta vive acá, en la ficha del producto — mismo
@@ -50,7 +57,10 @@ export function RecetaProducto({ productId, receta }: { productId: string; recet
               key={r.insumoId}
               className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-linea bg-white px-3 py-2 text-sm"
             >
-              <p className="font-medium">{r.nombre}</p>
+              <p className="flex flex-wrap items-center gap-2 font-medium">
+                {r.nombre}
+                {r.esElaborado && <Pastilla color="azul">Preparación</Pastilla>}
+              </p>
               {editando === r.insumoId ? (
                 <div className="flex items-center gap-1.5">
                   <input

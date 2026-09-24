@@ -39,7 +39,9 @@ export function InsumosMaestroDetalle({
   const router = useRouter();
   const [categoriaFiltro, setCategoriaFiltro] = useState(TODAS);
   const [abiertoId, setAbiertoId] = useState<string | null>(null);
-  const [creando, setCreando] = useState(false);
+  // Qué se está creando en el panel de la derecha: un insumo comprado o una
+  // preparación (salsa, masa…) que se arma con otros insumos.
+  const [creando, setCreando] = useState<"insumo" | "preparacion" | null>(null);
   // Rango del reporte, por calendario. Vacío = el mes actual.
   const [desde, setDesde] = useState("");
   const [hasta, setHasta] = useState("");
@@ -90,20 +92,23 @@ export function InsumosMaestroDetalle({
   }, [abiertoId, creando]);
 
   function abrir(id: string) {
-    setCreando(false);
+    setCreando(null);
     setAbiertoId(id);
   }
 
-  function nuevo() {
+  function nuevo(tipo: "insumo" | "preparacion") {
     setAbiertoId(null);
-    setCreando(true);
+    setCreando(tipo);
   }
 
   return (
     <div>
       <div className="mb-3 flex flex-wrap items-center gap-3">
-        <button type="button" onClick={nuevo} className={clasesBoton("principal")}>
+        <button type="button" onClick={() => nuevo("insumo")} className={clasesBoton("principal")}>
           + Nuevo insumo
+        </button>
+        <button type="button" onClick={() => nuevo("preparacion")} className={clasesBoton("suave")}>
+          + Nueva preparación
         </button>
         <span className="text-xs text-tinta-suave">
           {insumos.length} {insumos.length === 1 ? "insumo" : "insumos"} en total
@@ -192,8 +197,10 @@ export function InsumosMaestroDetalle({
                 </thead>
                 <tbody>
                   {visibles.map((i) => {
-                    const alerta =
-                      i.stockActual < 0
+                    // Una preparación no lleva stock propio: no hay nada que avisar.
+                    const alerta = i.esElaborado
+                      ? null
+                      : i.stockActual < 0
                         ? "Stock negativo"
                         : i.stockMinimo != null && i.stockActual < i.stockMinimo
                           ? "Stock bajo el mínimo"
@@ -213,6 +220,11 @@ export function InsumosMaestroDetalle({
                       >
                         <td className="px-3 py-2 font-medium">
                           {i.nombre}
+                          {i.esElaborado && (
+                            <span className="ml-1.5 rounded-full bg-azul-luz px-1.5 py-0.5 align-middle text-[0.66rem] font-semibold text-azul-oscuro">
+                              Preparación
+                            </span>
+                          )}
                           {alerta && (
                             <span
                               role="img"
@@ -247,13 +259,15 @@ export function InsumosMaestroDetalle({
         <div ref={panelRef}>
           {creando ? (
             <CrearInsumoForm
+              key={creando}
+              esPreparacion={creando === "preparacion"}
               categorias={categorias}
               almacenes={almacenes}
               categoriaInicialId={
                 categoriaFiltro !== TODAS && categoriaFiltro !== SIN_CATEGORIA ? categoriaFiltro : undefined
               }
               onCreado={(id) => {
-                setCreando(false);
+                setCreando(null);
                 setAbiertoId(id);
                 setCategoriaFiltro(TODAS);
               }}

@@ -16,7 +16,8 @@ export default async function NuevoInventarioPage() {
   const prisma = prismaDelLocal(idLocal);
 
   const [insumos, categorias, almacenes, stockDeCadaAlmacen] = await Promise.all([
-    prisma.insumo.findMany({ where: { activo: true }, orderBy: { nombre: "asc" } }),
+    // Las preparaciones (salsa, masa…) no llevan stock propio: no se cuentan.
+    prisma.insumo.findMany({ where: { activo: true, esElaborado: false }, orderBy: { nombre: "asc" } }),
     prisma.categoriaInsumo.findMany({ orderBy: { nombre: "asc" } }),
     prisma.almacen.findMany({
       where: { activo: true },

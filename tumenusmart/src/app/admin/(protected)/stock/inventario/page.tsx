@@ -153,7 +153,8 @@ async function vistaPorInsumo(idLocal: string) {
 
   const [insumos, almacenes, stockDeCadaAlmacen] = await Promise.all([
     prisma.insumo.findMany({
-      where: { activo: true },
+      // Las preparaciones (salsa, masa…) no llevan stock propio: no se cuentan.
+      where: { activo: true, esElaborado: false },
       orderBy: { nombre: "asc" },
       include: { categoria: { select: { nombre: true } } },
     }),

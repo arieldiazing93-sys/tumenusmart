@@ -14,6 +14,8 @@ import {
 } from "@/lib/precio-pedido";
 import { registrarConsumoVenta } from "@/lib/movimientos-stock";
 import { costoDelProducto } from "@/lib/costo-receta";
+import { aplanarReceta } from "@/lib/insumo-elaborado";
+import { cargarElaborados } from "@/lib/cargar-elaborados";
 
 export type DatosCheckout = {
   /** de qué local es el pedido, tomado de la URL que visitó el cliente */
@@ -224,51 +226,60 @@ export async function crearPedido(datos: DatosCheckout): Promise<ResultadoPedido
     },
   });
 
-  const catalogo: ProductoBase[] = productos.map((p) => ({
-    id: p.id,
-    nombre: p.nombre,
-    precio: p.precio,
-    disponible: p.disponible,
-    ingredientes: p.ingredientes,
-    mitadYMitadGrupo: p.mitadYMitadGrupo,
-    mitadYMitadModo: p.mitadYMitadModo,
-    iva: p.iva,
-    receta: p.receta,
-    // Lo que cuesta preparar una unidad, según su receta: se guarda en la línea vendida.
-    costo: costoDelProducto(p.costo, p.receta),
-    almacenId: p.almacenId,
-    // Los agregados propios (ProductOption) más los de cualquier grupo
-    // reutilizable adjuntado (ver src/app/admin/(protected)/grupos-agregados/)
-    // — combinados acá para que armarPedido siga viendo un solo `opciones`
-    // como siempre, sin saber de dónde salió cada ítem. Cada modificador de
-    // un grupo ES un Product real (ver OptionGroupProduct): se usa su
-    // propio precio/costo/receta, no datos duplicados. Siempre cuenta como
-    // "agregado" (los grupos no tienen variantes). Un ProductOption propio
-    // no es un Product, así que no tiene receta propia (ver Control de
-    // stock) — [] a propósito.
-    opciones: [
-      ...p.opciones.map((o) => ({
-        id: o.id,
-        nombre: o.nombre,
-        tipo: o.tipo,
-        precioExtra: o.precioExtra,
-        costo: o.costo,
-        receta: [],
-        almacenId: null,
-      })),
-      ...p.gruposAgregados.flatMap((g) =>
-        g.group.modificadores.map((m) => ({
-          id: m.product.id,
-          nombre: m.product.nombre,
-          tipo: "agregado",
-          precioExtra: m.product.precio,
-          costo: costoDelProducto(m.product.costo, m.product.receta),
-          receta: m.product.receta,
-          almacenId: m.product.almacenId,
-        }))
-      ),
-    ],
-  }));
+  // Las preparaciones (salsa, masa…) que lleve alguna receta se abren acá en
+  // los insumos con que se hacen: el stock y el costo salen de esos insumos.
+  const elaborados = await cargarElaborados(storeId);
+  const catalogo: ProductoBase[] = productos.map((p) => {
+    const receta = aplanarReceta(p.receta, elaborados);
+    return {
+      id: p.id,
+      nombre: p.nombre,
+      precio: p.precio,
+      disponible: p.disponible,
+      ingredientes: p.ingredientes,
+      mitadYMitadGrupo: p.mitadYMitadGrupo,
+      mitadYMitadModo: p.mitadYMitadModo,
+      iva: p.iva,
+      receta,
+      // Lo que cuesta preparar una unidad, según su receta: se guarda en la línea vendida.
+      costo: costoDelProducto(p.costo, receta),
+      almacenId: p.almacenId,
+      // Los agregados propios (ProductOption) más los de cualquier grupo
+      // reutilizable adjuntado (ver src/app/admin/(protected)/grupos-agregados/)
+      // — combinados acá para que armarPedido siga viendo un solo `opciones`
+      // como siempre, sin saber de dónde salió cada ítem. Cada modificador de
+      // un grupo ES un Product real (ver OptionGroupProduct): se usa su
+      // propio precio/costo/receta, no datos duplicados. Siempre cuenta como
+      // "agregado" (los grupos no tienen variantes). Un ProductOption propio
+      // no es un Product, así que no tiene receta propia (ver Control de
+      // stock) — [] a propósito.
+      opciones: [
+        ...p.opciones.map((o) => ({
+          id: o.id,
+          nombre: o.nombre,
+          tipo: o.tipo,
+          precioExtra: o.precioExtra,
+          costo: o.costo,
+          receta: [],
+          almacenId: null,
+        })),
+        ...p.gruposAgregados.flatMap((g) =>
+          g.group.modificadores.map((m) => {
+            const recetaAgregado = aplanarReceta(m.product.receta, elaborados);
+            return {
+              id: m.product.id,
+              nombre: m.product.nombre,
+              tipo: "agregado",
+              precioExtra: m.product.precio,
+              costo: costoDelProducto(m.product.costo, recetaAgregado),
+              receta: recetaAgregado,
+              almacenId: m.product.almacenId,
+            };
+          })
+        ),
+      ],
+    };
+  });
 
   const armado = armarPedido(catalogo, datos.items);
   if (!armado.ok) return { ok: false, error: armado.motivo };

@@ -38,6 +38,7 @@ export const MODELOS_POR_LOCAL = new Set([
   "CategoriaInsumo",
   "Insumo",
   "RecetaItem",
+  "IngredienteElaborado",
   "Proveedor",
   "Almacen",
   "Compra",

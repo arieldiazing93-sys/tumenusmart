@@ -190,6 +190,7 @@ model Store {
   categoriasInsumo CategoriaInsumo[]
   insumos          Insumo[]
   recetaItems      RecetaItem[]
+  ingredientesElaborados IngredienteElaborado[]
   proveedores      Proveedor[]
   almacenes        Almacen[]
   cotizaciones     Cotizacion[]
@@ -1634,14 +1635,46 @@ model Insumo {
   costoUnitario Decimal? @db.Decimal(10, 2)
   activo        Boolean  @default(true)
   createdAt     DateTime @default(now())
+  /// Preparación propia (salsa de tomate, masa, aderezo…): no se compra, se
+  /// arma con otros insumos (IngredienteElaborado). No lleva stock propio: al
+  /// vender, su consumo se "abre" en los insumos con que se prepara (ver
+  /// src/lib/insumo-elaborado.ts) y son ESOS los que bajan. Su costo tampoco
+  /// se guarda: sale de sus ingredientes. No cambia después de creado.
+  esElaborado   Boolean  @default(false)
+  /// Cuánto rinde UNA tanda de la receta, en la unidad de medida del propio
+  /// insumo (ej: la tanda de salsa rinde 4 litros). Solo para preparaciones.
+  rindeTanda    Decimal? @db.Decimal(12, 3)
 
   receta      RecetaItem[]
   compraItems CompraItem[]
   movimientos MovimientoStock[]
   inventarioItems InventarioItem[]
+  /// Con qué se prepara (solo si esElaborado).
+  ingredientes      IngredienteElaborado[] @relation("PreparacionIngredientes")
+  /// En qué preparaciones se usa este insumo como ingrediente.
+  usadoEnElaborados IngredienteElaborado[] @relation("IngredienteDePreparacion")
 
   @@index([storeId])
   @@index([categoriaId])
+}
+
+/// Un ingrediente de una preparación (Insumo con esElaborado): cuánto lleva UNA
+/// tanda, en la unidad del ingrediente. El ingrediente puede ser un insumo
+/// común o, a su vez, otra preparación (nunca en círculo: se valida al guardar).
+model IngredienteElaborado {
+  id            String @id @default(cuid())
+  storeId       String
+  store         Store  @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  elaboradoId   String
+  elaborado     Insumo @relation("PreparacionIngredientes", fields: [elaboradoId], references: [id], onDelete: Cascade)
+  ingredienteId String
+  ingrediente   Insumo @relation("IngredienteDePreparacion", fields: [ingredienteId], references: [id], onDelete: Cascade)
+  cantidad      Decimal @db.Decimal(12, 3)
+
+  @@unique([elaboradoId, ingredienteId])
+  @@index([storeId])
+  @@index([elaboradoId])
+  @@index([ingredienteId])
 }
 
 /// Producto ↔ Insumo: qué consume UN Product por cada unidad vendida de él.
