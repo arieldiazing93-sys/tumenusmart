@@ -110,8 +110,8 @@ export async function GET(request: NextRequest) {
   hoja.addRow([]);
 
   // Foto de HOY de cada local con sus datos de contacto/facturación — los
-  // mismos cuatro campos que "Editar datos" en Cartera, que hasta ahora solo
-  // se podían ver abriendo ese formulario local por local, uno por uno.
+  // mismos cuatro campos del titular que se ven y se editan en el modal "Ver"
+  // de Cartera, que solo se podían consultar local por local, uno por uno.
   filaTitulo(
     hoja,
     ["Local", "Slug", "Estado", "Vence", "Asesor", "Titular", "Teléfono titular", "Razón social", "RUC"],

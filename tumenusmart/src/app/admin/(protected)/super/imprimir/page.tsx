@@ -113,8 +113,8 @@ export default async function ImprimirCarteraPage({
 
       {/*
         Foto de HOY de cada local con sus datos de contacto/facturación —
-        los mismos cuatro campos que "Editar datos" en Cartera, que hasta
-        ahora solo se podían ver abriendo ese formulario local por local.
+        los mismos cuatro campos del titular que se ven y se editan en el modal
+        "Ver" de Cartera, que solo se podían consultar local por local.
       */}
       <h2 className="mb-3 font-semibold text-tinta">Locales</h2>
       <table className="mb-10 w-full border-collapse text-sm">

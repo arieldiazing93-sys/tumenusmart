@@ -118,10 +118,12 @@ export default async function SuperPage({
       select: { storeId: true },
     }),
     prisma.product.findMany({ select: { storeId: true } }),
-    prisma.usuario.findMany({ select: { storeId: true, ultimoIngreso: true, email: true } }),
+    prisma.usuario.findMany({
+      select: { storeId: true, ultimoIngreso: true, email: true, rol: true },
+    }),
     prisma.pago.findMany({
       orderBy: { fecha: "desc" },
-      select: { storeId: true, monto: true, fecha: true },
+      select: { storeId: true, monto: true, fecha: true, meses: true, cubreHasta: true, nota: true },
     }),
     prisma.asesor.findMany({
       where: { activo: true },
@@ -147,7 +149,10 @@ export default async function SuperPage({
   const venceSiSeActivaHoy = fechaCorta(calcularNuevoVencimiento(null, 1, ahora));
 
   const ultimoIngresoPorLocal = new Map<string, Date | null>();
+  // El correo que se muestra en la ficha es el del dueño (rol "local"); si por
+  // algún motivo no hubiera, el de cualquier otro usuario del local.
   const correoPorLocal = new Map<string, string>();
+  const localesConCorreoDelDueno = new Set<string>();
   for (const u of usuarios) {
     if (!u.storeId) continue;
     const previo = ultimoIngresoPorLocal.get(u.storeId) ?? null;
@@ -156,13 +161,27 @@ export default async function SuperPage({
     } else if (!ultimoIngresoPorLocal.has(u.storeId)) {
       ultimoIngresoPorLocal.set(u.storeId, previo);
     }
-    if (!correoPorLocal.has(u.storeId)) correoPorLocal.set(u.storeId, u.email);
+    if (u.rol === "local" && !localesConCorreoDelDueno.has(u.storeId)) {
+      correoPorLocal.set(u.storeId, u.email);
+      localesConCorreoDelDueno.add(u.storeId);
+    } else if (!correoPorLocal.has(u.storeId)) {
+      correoPorLocal.set(u.storeId, u.email);
+    }
   }
 
   const ultimoPagoPorLocal = new Map<string, { monto: number; fecha: Date }>();
+  // Los pagos ya vienen del más nuevo al más viejo: en la ficha se muestran los
+  // últimos, no todo el historial de años.
+  const PAGOS_EN_FICHA = 12;
+  const pagosPorLocal = new Map<string, typeof pagos>();
   for (const p of pagos) {
     if (!ultimoPagoPorLocal.has(p.storeId)) {
       ultimoPagoPorLocal.set(p.storeId, { monto: Number(p.monto), fecha: p.fecha });
+    }
+    const delLocal = pagosPorLocal.get(p.storeId) ?? [];
+    if (delLocal.length < PAGOS_EN_FICHA) {
+      delLocal.push(p);
+      pagosPorLocal.set(p.storeId, delLocal);
     }
   }
 
@@ -408,10 +427,40 @@ export default async function SuperPage({
                       sinActivar={f.estado.clase === "sin_vencimiento"}
                       venceSiSeActivaHoy={venceSiSeActivaHoy}
                       linkRecordatorio={link}
-                      titularNombre={f.local.titularNombre}
-                      titularTelefono={f.local.titularTelefono}
-                      razonSocial={f.local.razonSocial}
-                      ruc={f.local.ruc}
+                      asesores={asesoresActivos}
+                      ficha={{
+                        id: f.local.id,
+                        nombre: f.local.nombre,
+                        slug: f.local.slug,
+                        urlCarta: `${dominio}/${f.local.slug}`,
+                        whatsapp: f.local.whatsappNumero,
+                        direccion: f.local.direccion,
+                        plan: f.local.plan,
+                        estadoEtiqueta: f.estado.etiqueta,
+                        estadoClase: f.estado.clase,
+                        vencimiento: f.local.vencimiento
+                          ? `Vence el ${fechaCorta(f.local.vencimiento)}`
+                          : "Todavía no corre el plazo",
+                        alta: fechaCorta(f.local.createdAt),
+                        asesorId: f.local.asesorId,
+                        asesorNombre: f.local.asesor?.nombre ?? null,
+                        titularNombre: f.local.titularNombre,
+                        titularTelefono: f.local.titularTelefono,
+                        razonSocial: f.local.razonSocial,
+                        ruc: f.local.ruc,
+                        correo: f.correo,
+                        pedidosRecientes: f.pedidos,
+                        diasDeActividad: DIAS_DE_ACTIVIDAD,
+                        productos: f.cantidadProductos,
+                        ultimoIngreso: hace(f.ultimoIngreso, ahora),
+                        pagos: (pagosPorLocal.get(f.local.id) ?? []).map((p) => ({
+                          fecha: fechaCorta(p.fecha),
+                          monto: formatearGuarani(Number(p.monto)),
+                          meses: p.meses,
+                          cubreHasta: fechaCorta(p.cubreHasta),
+                          nota: p.nota,
+                        })),
+                      }}
                     />
                   </div>
                 );

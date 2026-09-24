@@ -2,7 +2,8 @@
 
 import { clasesBoton } from "@/components/ui";
 import { useState, useTransition } from "react";
-import { activarLocal, actualizarDatosTitular, alternarSuspension, registrarPago } from "./actions";
+import { activarLocal, alternarSuspension, registrarPago } from "./actions";
+import { FichaLocalModal, type FichaLocal } from "./FichaLocalModal";
 
 const CAMPO =
   "rounded-lg border border-linea px-2 py-1 text-sm focus:border-brand focus:outline-none";
@@ -14,10 +15,8 @@ export function AccionesLocal({
   sinActivar,
   venceSiSeActivaHoy,
   linkRecordatorio,
-  titularNombre,
-  titularTelefono,
-  razonSocial,
-  ruc,
+  ficha,
+  asesores,
 }: {
   storeId: string;
   nombre: string;
@@ -28,14 +27,14 @@ export function AccionesLocal({
   venceSiSeActivaHoy: string;
   /** Enlace de WhatsApp con el mensaje ya escrito, o null si no hay número. */
   linkRecordatorio: string | null;
-  titularNombre: string | null;
-  titularTelefono: string | null;
-  razonSocial: string | null;
-  ruc: string | null;
+  /** Todo lo que se muestra (y se puede editar) en el modal "Ver". */
+  ficha: FichaLocal;
+  /** Asesores activos, para reasignar desde el modal. */
+  asesores: { id: string; nombre: string }[];
 }) {
   const [pendiente, iniciar] = useTransition();
   const [cobrando, setCobrando] = useState(false);
-  const [editandoDatos, setEditandoDatos] = useState(false);
+  const [viendo, setViendo] = useState(false);
   const [aviso, setAviso] = useState<string | null>(null);
 
   function correr(
@@ -51,13 +50,25 @@ export function AccionesLocal({
       }
       if (exito) setAviso(exito);
       setCobrando(false);
-      setEditandoDatos(false);
     });
   }
 
   return (
     <div className="flex flex-col items-start gap-2 sm:items-end">
       <div className="flex flex-wrap items-center gap-3 text-sm">
+        {/*
+          "Ver" abre la ficha completa del local en un modal, y desde ahí se
+          editan sus datos (reemplaza al viejo "Editar datos" en línea, que
+          solo llegaba a los cuatro campos del titular).
+        */}
+        <button
+          type="button"
+          onClick={() => setViendo(true)}
+          className="rounded-lg border border-linea bg-white px-3 py-1.5 text-sm font-medium text-tinta-media transition-colors hover:border-brand hover:text-brand"
+        >
+          Ver
+        </button>
+
         {/*
           Mientras el local no tiene fecha de vencimiento, "Activar" es LA acción:
           ahí empieza a correr su plazo. "Registrar pago" queda como secundaria
@@ -82,10 +93,7 @@ export function AccionesLocal({
         <button
           type="button"
           disabled={pendiente}
-          onClick={() => {
-            setCobrando((v) => !v);
-            setEditandoDatos(false);
-          }}
+          onClick={() => setCobrando((v) => !v)}
           className={clasesBoton(sinActivar ? "suave" : "principal", "sm")}
         >
           Registrar pago
@@ -125,18 +133,6 @@ export function AccionesLocal({
           }
         >
           {suspendidoAMano ? "Reactivar" : "Suspender"}
-        </button>
-
-        <button
-          type="button"
-          disabled={pendiente}
-          onClick={() => {
-            setEditandoDatos((v) => !v);
-            setCobrando(false);
-          }}
-          className="rounded-lg border border-linea bg-white px-3 py-1.5 text-sm font-medium text-tinta-media transition-colors hover:border-brand hover:text-brand disabled:opacity-50"
-        >
-          Editar datos
         </button>
       </div>
 
@@ -199,75 +195,11 @@ export function AccionesLocal({
         </form>
       )}
 
-      {editandoDatos && (
-        <form
-          action={(datos) =>
-            correr(() => actualizarDatosTitular(storeId, datos), "Datos actualizados.")
-          }
-          className="flex flex-wrap items-end justify-end gap-2 rounded-lg border border-linea bg-papel-suave p-2"
-        >
-          <label className="flex flex-col gap-0.5 text-xs text-tinta-media">
-            Nombre y apellido del titular
-            <input
-              type="text"
-              name="titularNombre"
-              defaultValue={titularNombre ?? ""}
-              placeholder="Juan Pérez"
-              className={`${CAMPO} w-40`}
-            />
-          </label>
-          <label className="flex flex-col gap-0.5 text-xs text-tinta-media">
-            Teléfono del titular
-            <input
-              type="text"
-              name="titularTelefono"
-              defaultValue={titularTelefono ?? ""}
-              placeholder="0981 234 567"
-              className={`${CAMPO} w-36`}
-            />
-          </label>
-          <label className="flex flex-col gap-0.5 text-xs text-tinta-media">
-            Razón social
-            <input
-              type="text"
-              name="razonSocial"
-              defaultValue={razonSocial ?? ""}
-              placeholder="Juan Pérez S.A."
-              className={`${CAMPO} w-40`}
-            />
-          </label>
-          <label className="flex flex-col gap-0.5 text-xs text-tinta-media">
-            RUC
-            <input
-              type="text"
-              name="ruc"
-              defaultValue={ruc ?? ""}
-              placeholder="80012345-6"
-              className={`${CAMPO} w-28`}
-            />
-          </label>
-          <button
-            type="submit"
-            disabled={pendiente}
-            className="rounded-lg bg-noche px-3 py-1.5 text-sm font-medium text-white hover:bg-noche-panel disabled:opacity-50"
-          >
-            Guardar
-          </button>
-          <button
-            type="button"
-            disabled={pendiente}
-            onClick={() => {
-              setEditandoDatos(false);
-              setAviso(null);
-            }}
-            className="rounded-lg border border-linea bg-white px-3 py-1.5 text-sm font-medium text-tinta-media transition-colors hover:border-brand hover:text-brand disabled:opacity-50"
-          >
-            Cancelar
-          </button>
-        </form>
-      )}
-
       {aviso && <p className="text-xs text-tinta-media">{aviso}</p>}
+
+      {viendo && (
+        <FichaLocalModal ficha={ficha} asesores={asesores} onCerrar={() => setViendo(false)} />
+      )}
     </div>
   );
 }

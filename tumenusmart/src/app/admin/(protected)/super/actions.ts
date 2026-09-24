@@ -270,22 +270,56 @@ export async function alternarSuspension(
   return { ok: true };
 }
 
-export type ResultadoDatosTitular = { ok: true } | { ok: false; error: string };
+export type ResultadoDatosLocal = { ok: true } | { ok: false; error: string };
 
 /**
- * Corrige los datos del titular de un local ya creado — mismos cuatro campos
- * que el alta, todos opcionales, para completarlos o corregirlos cuando no
- * se tenían a mano al crear el local.
+ * Corrige los datos de un local ya creado, desde el modal "Ver" de Cartera:
+ * los del negocio (nombre, WhatsApp, dirección, plan, asesor) y los del
+ * titular (nombre, teléfono, razón social, RUC — estos cuatro opcionales,
+ * para completarlos cuando no se tenían a mano al dar de alta).
+ *
+ * Quedan afuera a propósito: la URL de la carta (`slug`, es lo que el cliente
+ * ya compartió; cambiarla se hace con su redirección desde la Configuración
+ * del propio local), el vencimiento y el estado (se mueven con Activar,
+ * Registrar pago y Suspender, que dejan su rastro) y el correo de acceso.
+ *
+ * Devuelve un resultado en vez de lanzar los errores de validación: Next.js
+ * oculta en producción el mensaje de cualquier `throw` que salga de una
+ * Server Action, así que el motivo real solo llega si viaja en el retorno.
  */
-export async function actualizarDatosTitular(
+export async function actualizarDatosLocal(
   storeId: string,
   formData: FormData
-): Promise<ResultadoDatosTitular> {
+): Promise<ResultadoDatosLocal> {
   await exigirSuperadmin();
+
+  const nombre = String(formData.get("nombre") ?? "").trim();
+  if (!nombre) return { ok: false, error: "El nombre del negocio no puede quedar vacío" };
+
+  const whatsapp = normalizarWhatsapp(String(formData.get("whatsapp") ?? ""));
+  if (!whatsapp) return { ok: false, error: "El número de WhatsApp no parece válido" };
+
+  const plan = String(formData.get("plan") ?? "").trim().slice(0, 40) || "basico";
+
+  // El id del asesor viene del navegador: se comprueba que exista en vez de
+  // dejar que la base falle con un error de clave foránea que Next oculta.
+  const asesorId = String(formData.get("asesorId") ?? "").trim() || null;
+  if (asesorId) {
+    const asesor = await prisma.asesor.findUnique({ where: { id: asesorId }, select: { id: true } });
+    if (!asesor) return { ok: false, error: "Ese asesor ya no existe" };
+  }
+
+  const existe = await prisma.store.findUnique({ where: { id: storeId }, select: { id: true } });
+  if (!existe) return { ok: false, error: "Ese local no existe" };
 
   await prisma.store.update({
     where: { id: storeId },
     data: {
+      nombre,
+      whatsappNumero: whatsapp,
+      direccion: String(formData.get("direccion") ?? "").trim() || null,
+      plan,
+      asesorId,
       titularNombre: String(formData.get("titularNombre") ?? "").trim() || null,
       titularTelefono: String(formData.get("titularTelefono") ?? "").trim() || null,
       razonSocial: String(formData.get("razonSocial") ?? "").trim() || null,
@@ -294,6 +328,8 @@ export async function actualizarDatosTitular(
   });
 
   revalidatePath("/admin/super");
+  // El nombre, el WhatsApp y la dirección también se ven en la carta pública.
+  revalidatePath("/[slug]", "layout");
   return { ok: true };
 }
 
