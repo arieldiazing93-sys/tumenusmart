@@ -1,6 +1,6 @@
 import { prismaDelLocal } from "./prisma-local";
 import { type RangoDias } from "./rango-dias";
-import { acumularMovimientos, redondear3 } from "./reporte-almacen";
+import { acumularMovimientos, redondear3, SIN_CATEGORIA_INSUMO } from "./reporte-almacen";
 import { etiquetaUnidadMedida } from "./unidad-medida";
 
 /**
@@ -64,9 +64,6 @@ export type ReporteInsumos = {
   /** Cuántos insumos con stock no tienen costo y no suman al valor. */
   sinCosto: number;
 };
-
-/** "" o ausente = todas, "sin" = las que no tienen categoría, o el id de una. */
-export const SIN_CATEGORIA_INSUMO = "sin";
 
 export async function calcularReporteInsumos(
   storeId: string,

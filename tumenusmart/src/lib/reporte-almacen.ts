@@ -55,10 +55,18 @@ export type ResumenAlmacenReporte = {
   sinCosto: number;
 };
 
+/**
+ * Filtro por categoría de insumo: "" o ausente = todas, "sin" = los que no
+ * tienen categoría, o el id de una. Lo comparten los reportes de Almacén e Insumos.
+ */
+export const SIN_CATEGORIA_INSUMO = "sin";
+
 export type ReporteAlmacen = {
   rango: RangoDias;
   /** Nombre del almacén por el que se filtró, si se filtró. */
   almacenFiltrado: string | null;
+  /** Nombre de la categoría por la que se filtró, si se filtró. */
+  categoriaFiltrada: string | null;
   filas: FilaAlmacenReporte[];
   porAlmacen: ResumenAlmacenReporte[];
   totalValorFinal: number;
@@ -148,12 +156,29 @@ export async function acumularMovimientos(
 export async function calcularReporteAlmacen(
   storeId: string,
   rango: RangoDias,
-  almacenId?: string | null
+  almacenId?: string | null,
+  categoria?: string | null
 ): Promise<ReporteAlmacen> {
   const db = prismaDelLocal(storeId);
 
+  // Con una categoría elegida, el reporte se arma solo con los insumos de esa categoría.
+  const [insumosDeLaCategoria, categoriaElegida] = await Promise.all([
+    categoria
+      ? db.insumo.findMany({
+          where: categoria === SIN_CATEGORIA_INSUMO ? { categoriaId: null } : { categoriaId: categoria },
+          select: { id: true },
+        })
+      : Promise.resolve(null),
+    categoria && categoria !== SIN_CATEGORIA_INSUMO
+      ? db.categoriaInsumo.findUnique({ where: { id: categoria }, select: { nombre: true } })
+      : Promise.resolve(null),
+  ]);
+
   const [acumulados, almacenes] = await Promise.all([
-    acumularMovimientos(storeId, rango, { almacenId }),
+    acumularMovimientos(storeId, rango, {
+      almacenId,
+      insumoIds: insumosDeLaCategoria?.map((i) => i.id),
+    }),
     db.almacen.findMany({ select: { id: true, nombre: true } }),
   ]);
 
@@ -233,6 +258,11 @@ export async function calcularReporteAlmacen(
   return {
     rango,
     almacenFiltrado: almacenId ? (nombreDeAlmacen.get(almacenId) ?? null) : null,
+    categoriaFiltrada: !categoria
+      ? null
+      : categoria === SIN_CATEGORIA_INSUMO
+        ? "Sin categoría"
+        : (categoriaElegida?.nombre ?? null),
     filas,
     porAlmacen,
     totalValorFinal: porAlmacen.reduce((s, r) => s + r.valorFinal, 0),

@@ -2,6 +2,7 @@ import { pantallaConPermiso } from "@/lib/auth";
 import { prismaDelLocal } from "@/lib/prisma-local";
 import { idLocalActual } from "@/lib/local-actual";
 import { Cabecera, Tarjeta, Campo, Entrada, Selector, clasesBoton } from "@/components/ui";
+import { SIN_CATEGORIA_INSUMO } from "@/lib/reporte-almacen";
 import { AlmacenesMaestroDetalle } from "./AlmacenesMaestroDetalle";
 
 export const dynamic = "force-dynamic";
@@ -10,9 +11,17 @@ export default async function AlmacenesPage() {
   await pantallaConPermiso("stock.ver");
   const prisma = prismaDelLocal(await idLocalActual());
 
-  const almacenes = await prisma.almacen.findMany({
-    orderBy: [{ activo: "desc" }, { nombre: "asc" }],
-  });
+  const [almacenes, categorias, insumosSinCategoria] = await Promise.all([
+    prisma.almacen.findMany({
+      orderBy: [{ activo: "desc" }, { nombre: "asc" }],
+    }),
+    prisma.categoriaInsumo.findMany({
+      orderBy: [{ orden: "asc" }, { nombre: "asc" }],
+      select: { id: true, nombre: true },
+    }),
+    // "Sin categoría" solo se ofrece si hay insumos así.
+    prisma.insumo.count({ where: { categoriaId: null } }),
+  ]);
 
   return (
     <div>
@@ -31,7 +40,7 @@ export default async function AlmacenesPage() {
       {almacenes.length > 0 && (
         <Tarjeta className="mt-6 flex flex-col gap-3">
           <p className="rotulo text-[0.8rem] font-bold">Reporte de almacén</p>
-          <form method="get" className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <form method="get" className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <Campo etiqueta="Almacén">
               <Selector name="almacen" defaultValue="">
                 <option value="">Todos los almacenes</option>
@@ -43,13 +52,24 @@ export default async function AlmacenesPage() {
                 ))}
               </Selector>
             </Campo>
+            <Campo etiqueta="Categoría">
+              <Selector name="categoria" defaultValue="">
+                <option value="">Todas las categorías</option>
+                {categorias.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.nombre}
+                  </option>
+                ))}
+                {insumosSinCategoria > 0 && <option value={SIN_CATEGORIA_INSUMO}>Sin categoría</option>}
+              </Selector>
+            </Campo>
             <Campo etiqueta="Desde">
               <Entrada type="date" name="desde" />
             </Campo>
             <Campo etiqueta="Hasta">
               <Entrada type="date" name="hasta" />
             </Campo>
-            <div className="flex flex-wrap items-center gap-2 sm:col-span-2 lg:col-span-3">
+            <div className="flex flex-wrap items-center gap-2 sm:col-span-2 lg:col-span-4">
               <button
                 type="submit"
                 formAction="/admin/stock/almacenes/exportar"

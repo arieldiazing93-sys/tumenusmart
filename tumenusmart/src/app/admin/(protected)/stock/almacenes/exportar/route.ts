@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
   const storeId = await idLocalActual();
   const [local, reporte] = await Promise.all([
     localActual(),
-    calcularReporteAlmacen(storeId, rango, searchParams.get("almacen") || null),
+    calcularReporteAlmacen(storeId, rango, searchParams.get("almacen") || null, searchParams.get("categoria") || null),
   ]);
 
   const periodo = `${diaEnTexto(rango.desde)} - ${diaEnTexto(rango.hasta)}`;
@@ -38,6 +38,7 @@ export async function GET(request: NextRequest) {
     filaTitulo(hoja, ["Reporte", titulo], 2);
     filaTitulo(hoja, ["Período", periodo], 2);
     filaTitulo(hoja, ["Almacén", reporte.almacenFiltrado ?? "Todos"], 2);
+    filaTitulo(hoja, ["Categoría", reporte.categoriaFiltrada ?? "Todas"], 2);
     hoja.addRow([]);
   };
 

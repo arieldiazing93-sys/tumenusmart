@@ -17,17 +17,17 @@ function conSigno(n: number): string {
 export default async function ImprimirAlmacenPage({
   searchParams,
 }: {
-  searchParams: Promise<{ desde?: string; hasta?: string; almacen?: string }>;
+  searchParams: Promise<{ desde?: string; hasta?: string; almacen?: string; categoria?: string }>;
 }) {
   await pantallaConPermiso("stock.ver");
 
-  const { desde, hasta, almacen } = await searchParams;
+  const { desde, hasta, almacen, categoria } = await searchParams;
   const rango = rangoDeDias(desde, hasta);
 
   const storeId = await idLocalActual();
   const [local, reporte] = await Promise.all([
     localActual(),
-    calcularReporteAlmacen(storeId, rango, almacen || null),
+    calcularReporteAlmacen(storeId, rango, almacen || null, categoria || null),
   ]);
 
   // Una tabla por almacén.
@@ -52,7 +52,8 @@ export default async function ImprimirAlmacenPage({
         <div>
           <h1 className="text-2xl font-bold text-tinta">{local.nombre} — Almacén</h1>
           <p className="mt-1 text-sm text-tinta-media">
-            Período: {diaEnTexto(rango.desde)} – {diaEnTexto(rango.hasta)} · {reporte.almacenFiltrado ?? "Todos los almacenes"}
+            Período: {diaEnTexto(rango.desde)} – {diaEnTexto(rango.hasta)} · {reporte.almacenFiltrado ?? "Todos los almacenes"} ·{" "}
+            {reporte.categoriaFiltrada ?? "Todas las categorías"}
           </p>
         </div>
       </div>
