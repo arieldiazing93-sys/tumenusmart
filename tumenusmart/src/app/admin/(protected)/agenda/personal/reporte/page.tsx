@@ -1,47 +1,33 @@
-import type { Prisma } from "@prisma/client";
 import { pantallaConPermiso } from "@/lib/auth";
 import { idLocalActual } from "@/lib/local-actual";
 import { prismaDelLocal } from "@/lib/prisma-local";
-import { Aviso, BotonEnlace, Cabecera, Tabla, Td, Th, Tr, Vacio } from "@/components/ui";
-import { diaLargo, horaDeMinutos, partesLocales } from "@/lib/agenda";
-import { calcularComision, montoDelTrabajo, nombreCompleto } from "@/lib/agenda-personal";
+import { Aviso, BotonEnlace, Cabecera, Tabla, Td, Th, Tr, Vacio, clasesBoton } from "@/components/ui";
+import { diaLargo } from "@/lib/agenda";
 import { claveSumarDias } from "@/lib/calendario";
 import { formatearGuarani } from "@/lib/format";
-import { detallePagos } from "@/lib/pago-venta";
-import { diaEnTexto, limitesEnAsuncion } from "@/lib/rango-dias";
+import { diaEnTexto } from "@/lib/rango-dias";
+import { MAXIMO_DIAS_REPORTE, cargarReportePersonal } from "@/lib/reporte-personal";
 import { claveDiaAsuncion } from "@/lib/timezone";
 import { AvatarPersonal } from "../../AvatarPersonal";
 import { FiltroReporte, type AtajoReporte } from "./FiltroReporte";
 
 export const dynamic = "force-dynamic";
 
-/** Tope de filas del detalle: más que eso no se lee igual (los totales de arriba cuentan todo el período). */
+/** Tope de filas del detalle en pantalla: más que eso no se lee igual (los totales de arriba cuentan todo el período). */
 const MAXIMO_FILAS = 500;
-/** El período más largo que se puede pedir de una vez. */
-const MAXIMO_DIAS = 366;
-const DIA_MS = 24 * 60 * 60 * 1000;
-
-/** Un día "YYYY-MM-DD" que existe de verdad ("2026-02-30" no), o null. */
-function diaValido(valor: string | undefined): string | null {
-  if (!valor || !/^\d{4}-\d{2}-\d{2}$/.test(valor)) return null;
-  return claveSumarDias(valor, 0) === valor ? valor : null;
-}
 
 function textoPorcentaje(valor: number): string {
   return String(valor).replace(".", ",");
 }
 
-type Acumulado = { cantidad: number; cobrado: number; comision: number };
-
 /**
  * El reporte de movimiento del personal: los trabajos que terminó cada persona (citas cobradas,
  * tanto las que tenían reserva como las cobradas en el mostrador a alguien sin reserva) y lo que le
  * toca de comisión, en el período que se elija. Se elige a quién —una persona o todo el personal—
- * y las fechas, y recién al tocar "Ver reporte" se arma. Es del dueño (ve comisiones).
+ * y las fechas, y recién al tocar "Ver reporte" se arma. Se puede bajar en Excel. Es del dueño (ve comisiones).
  *
- * Cuenta por el día del trabajo, igual que Citas y la vista de cada persona. Cada trabajo usa el
- * porcentaje que tenía quien lo hizo AL COBRARLO; los cobrados antes de existir la comisión usan el
- * que tiene ahora.
+ * Cuenta por el día del trabajo, igual que Citas y la vista de cada persona (ver `lib/reporte-personal.ts`, que
+ * también arma el Excel).
  */
 export default async function ReportePersonalPage({
   searchParams,
@@ -62,114 +48,9 @@ export default async function ReportePersonalPage({
     { etiqueta: "Mes anterior", desde: `${ultimoDiaMesAnterior.slice(0, 7)}-01`, hasta: ultimoDiaMesAnterior },
   ];
 
-  const equipo = await db.miembroPersonal.findMany({
-    orderBy: [{ activo: "desc" }, { orden: "asc" }, { createdAt: "asc" }, { id: "asc" }],
-    select: { id: true, nombre: true, apellido: true, fotoUrl: true, activo: true, comisionPorcentaje: true },
-  });
-  const personas = equipo.map((p, indice) => ({
-    id: p.id,
-    nombre: nombreCompleto(p),
-    fotoUrl: p.fotoUrl,
-    activo: p.activo,
-    indice,
-    comision: p.comisionPorcentaje == null ? null : Number(p.comisionPorcentaje),
-  }));
-  const personaPorId = new Map(personas.map((p) => [p.id, p] as const));
-
-  // Un id que no es de este local simplemente no filtra a nadie: se ve a todo el personal.
-  const personalElegido = personaPorId.get(sp.personal ?? "") ?? null;
-
-  // El reporte solo se arma cuando llegan las dos fechas (o sea, después de tocar "Ver reporte").
-  let desde = diaValido(sp.desde);
-  let hasta = diaValido(sp.hasta);
-  if (desde !== null && hasta !== null && desde > hasta) [desde, hasta] = [hasta, desde];
-  const periodo = desde !== null && hasta !== null ? { desde, hasta } : null;
-  const dias = periodo ? Math.round((Date.parse(periodo.hasta) - Date.parse(periodo.desde)) / DIA_MS) + 1 : 0;
-  const demasiadoLargo = dias > MAXIMO_DIAS;
-
-  // Un trabajo terminado = una cita cobrada cuyo cobro no se anuló (con reserva o de mostrador).
-  const donde: Prisma.CitaWhereInput | null =
-    periodo && !demasiadoLargo
-      ? {
-          ...(personalElegido ? { personalId: personalElegido.id } : {}),
-          inicio: limitesEnAsuncion(periodo),
-          ventaPos: { is: { cancelada: false } },
-        }
-      : null;
-
-  const [todos, detalle] = donde
-    ? await Promise.all([
-        // Todo el período, con lo mínimo: de acá salen los totales.
-        db.cita.findMany({
-          where: donde,
-          select: { personalId: true, comisionPorcentaje: true, precio: true, ventaPos: { select: { total: true } } },
-        }),
-        // Lo más reciente, con el detalle de cada trabajo.
-        db.cita.findMany({
-          where: donde,
-          orderBy: [{ inicio: "desc" }, { id: "asc" }],
-          take: MAXIMO_FILAS,
-          select: {
-            id: true,
-            personalId: true,
-            clienteNombre: true,
-            inicio: true,
-            serviciosTexto: true,
-            origen: true,
-            comisionPorcentaje: true,
-            precio: true,
-            ventaPos: { select: { total: true, pagos: { orderBy: { orden: "asc" }, select: { forma: true, monto: true } } } },
-          },
-        }),
-      ])
-    : [[], []];
-
-  /** El porcentaje de un trabajo: el que tenía al cobrarlo o, si no tenía, el que tiene la persona ahora. */
-  function porcentajeDe(personalId: string, guardado: unknown): number | null {
-    if (guardado != null) return Number(guardado);
-    return personaPorId.get(personalId)?.comision ?? null;
-  }
-
-  const porPersona = new Map<string, Acumulado>();
-  const general: Acumulado = { cantidad: 0, cobrado: 0, comision: 0 };
-  const sinComision = new Set<string>();
-  for (const c of todos) {
-    const total = montoDelTrabajo(c.precio, c.ventaPos?.total);
-    const porcentaje = porcentajeDe(c.personalId, c.comisionPorcentaje);
-    if (porcentaje === null) sinComision.add(c.personalId);
-    const comision = calcularComision(total, porcentaje);
-    const previo = porPersona.get(c.personalId) ?? { cantidad: 0, cobrado: 0, comision: 0 };
-    porPersona.set(c.personalId, {
-      cantidad: previo.cantidad + 1,
-      cobrado: previo.cobrado + total,
-      comision: previo.comision + comision,
-    });
-    general.cantidad += 1;
-    general.cobrado += total;
-    general.comision += comision;
-  }
+  const { personas, personalElegido, periodo, demasiadoLargo, porPersona, general, nombresSinComision, filas, hayMas } =
+    await cargarReportePersonal(db, sp, MAXIMO_FILAS);
   const promedio = general.cantidad > 0 ? general.cobrado / general.cantidad : 0;
-  const hayMas = general.cantidad > detalle.length;
-  const nombresSinComision = personas.filter((p) => sinComision.has(p.id)).map((p) => p.nombre);
-
-  const filas = detalle.map((c) => {
-    const { dia, minutos } = partesLocales(c.inicio);
-    const total = montoDelTrabajo(c.precio, c.ventaPos?.total);
-    const porcentaje = porcentajeDe(c.personalId, c.comisionPorcentaje);
-    return {
-      id: c.id,
-      personal: personaPorId.get(c.personalId)?.nombre ?? "—",
-      dia,
-      hora: horaDeMinutos(minutos),
-      cliente: c.clienteNombre,
-      servicios: c.serviciosTexto,
-      sinReserva: c.origen === "mostrador",
-      pago: c.ventaPos ? detallePagos(c.ventaPos.pagos.map((p) => ({ forma: p.forma, monto: Number(p.monto) }))) : "—",
-      total,
-      porcentaje,
-      comision: calcularComision(total, porcentaje),
-    };
-  });
   const columnas = personalElegido ? 7 : 8;
 
   const resumen = [
@@ -183,6 +64,10 @@ export default async function ReportePersonalPage({
     periodo
       ? `/admin/agenda/personal/reporte?personal=${personalId}&desde=${periodo.desde}&hasta=${periodo.hasta}`
       : "/admin/agenda/personal/reporte";
+  // La descarga en Excel: lo mismo que se está viendo (la misma persona y el mismo período).
+  const urlExcel = periodo
+    ? `/admin/agenda/personal/reporte/exportar?personal=${personalElegido?.id ?? "todos"}&desde=${periodo.desde}&hasta=${periodo.hasta}`
+    : null;
 
   return (
     <div>
@@ -213,17 +98,25 @@ export default async function ReportePersonalPage({
         />
       ) : demasiadoLargo ? (
         <Aviso titulo="El período es muy largo">
-          Elegí hasta {MAXIMO_DIAS} días por vez (un año) para armar el reporte.
+          Elegí hasta {MAXIMO_DIAS_REPORTE} días por vez (un año) para armar el reporte.
         </Aviso>
       ) : (
         <>
-          <h2 className="mb-2.5 text-[1rem] font-semibold tracking-titular text-tinta">
-            {personalElegido ? personalElegido.nombre : "Todo el personal"}
-            <span className="font-normal text-tinta-media">
-              {" "}
-              · {periodo.desde === periodo.hasta ? diaEnTexto(periodo.desde) : `${diaEnTexto(periodo.desde)} – ${diaEnTexto(periodo.hasta)}`}
-            </span>
-          </h2>
+          <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-[1rem] font-semibold tracking-titular text-tinta">
+              {personalElegido ? personalElegido.nombre : "Todo el personal"}
+              <span className="font-normal text-tinta-media">
+                {" "}
+                · {periodo.desde === periodo.hasta ? diaEnTexto(periodo.desde) : `${diaEnTexto(periodo.desde)} – ${diaEnTexto(periodo.hasta)}`}
+              </span>
+            </h2>
+            {/* Verde: sacar el reporte a un archivo. Baja lo mismo que se está viendo, con todos los trabajos. */}
+            {urlExcel && general.cantidad > 0 && (
+              <a href={urlExcel} className={clasesBoton("exito", "sm")}>
+                Descargar Excel
+              </a>
+            )}
+          </div>
 
           <dl className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
             {resumen.map((r) => (
