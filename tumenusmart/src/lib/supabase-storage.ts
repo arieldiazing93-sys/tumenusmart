@@ -75,3 +75,8 @@ export async function subirLogoNegocio(archivo: File): Promise<string> {
 export async function subirFotoPersonal(archivo: File): Promise<string> {
   return subirImagen(archivo, "personal/");
 }
+
+/** Foto de perfil, banner y galería de la página pública de reservas. */
+export async function subirImagenPaginaReservas(archivo: File): Promise<string> {
+  return subirImagen(archivo, "reservas/");
+}

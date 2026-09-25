@@ -133,6 +133,9 @@ function armarGrupos(hayIdeaSinVer: boolean, rol: string, ventasACredito: boolea
         // Lo que se ofrece a los clientes (cortes, barba, color…): también se vende en el punto de venta.
         { href: "/admin/agenda/servicios", label: "Servicios", icono: "productos" as const,
           ver: conPermiso("agenda.configurar") },
+        // La página pública donde el cliente reserva: foto, redes, galería, colores y el WhatsApp de las reservas.
+        { href: "/admin/agenda/pagina", label: "Página de reservas", icono: "categorias" as const,
+          ver: conPermiso("agenda.configurar") },
       ],
     },
     {

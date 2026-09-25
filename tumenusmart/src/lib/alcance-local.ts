@@ -63,6 +63,7 @@ export const MODELOS_POR_LOCAL = new Set([
   "HorarioTrabajo",
   "ServicioAgenda",
   "ServicioPersonal",
+  "PaginaReservas",
 ]);
 
 /** Operaciones que leen o modifican filas existentes: se filtran por `where`. */
@@ -173,6 +174,8 @@ export const SLUGS_RESERVADOS = new Set([
   "pedidos",
   "reserva",
   "reservas",
+  // /turnos/<dirección> es la página pública de reservas de los salones.
+  "turnos",
   "repartidor",
   "_next",
   "favicon.ico",

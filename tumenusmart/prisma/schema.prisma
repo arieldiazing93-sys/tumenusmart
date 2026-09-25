@@ -210,6 +210,7 @@ model Store {
   horariosTrabajo  HorarioTrabajo[]
   serviciosAgenda  ServicioAgenda[]
   serviciosPersonal ServicioPersonal[]
+  paginaReservas   PaginaReservas?
 }
 
 /// Las direcciones que este local tuvo antes.
@@ -2285,4 +2286,47 @@ model ServicioPersonal {
   @@unique([servicioId, personalId])
   @@index([storeId])
   @@index([personalId])
+}
+
+/// La página pública de reservas de un negocio de turnos (salón, barbería…).
+/// Es aparte de la configuración base del negocio (Store): tiene su propio
+/// nombre, dirección web, contacto, redes, galería y apariencia. Una por local.
+model PaginaReservas {
+  id      String  @id @default(cuid())
+  storeId String  @unique
+  store   Store   @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  /// La dirección pública: /turnos/<slug>. Única entre todos los negocios.
+  slug    String  @unique
+  /// Interruptor "Habilitar la reserva en línea": apagada, la página no se ve.
+  habilitada Boolean @default(false)
+  nombre  String
+  /// El rubro que se muestra debajo del nombre ("Barbershop", "Salón de belleza").
+  industria   String?
+  descripcion String?
+  email       String?
+  /// Internacional, solo dígitos (ej: 595984123456).
+  telefono    String?
+  fotoUrl     String?
+  bannerUrl   String?
+  /// Enlaces completos (https://…).
+  instagram String?
+  tiktok    String?
+  facebook  String?
+  /// El número donde llegan las reservas, internacional y solo dígitos.
+  whatsapp      String?
+  /// Si el cliente, al reservar, manda el aviso por WhatsApp a ese número.
+  avisoWhatsapp Boolean @default(true)
+  /// Cuándo entra la reserva al calendario: al_reservar | al_enviar_whatsapp.
+  entradaCalendario String @default("al_reservar")
+  /// Hasta 5 fotos: [{ "url": "https://…", "descripcion": "…" }].
+  galeria Json @default("[]")
+  /// El color de la página, "#RRGGBB".
+  colorPrimario String @default("#3B82F6")
+  /// claro | oscuro | sistema.
+  tema    String @default("claro")
+  /// Los campos del formulario de reserva y cuáles son obligatorios
+  /// (ver src/lib/pagina-reservas.ts).
+  campos  Json   @default("[]")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
