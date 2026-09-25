@@ -123,7 +123,6 @@ export default async function AgendaPage({
   });
   // Un turno cobrado por adelantado se ve Finalizada recién cuando pasa su hora (ver estadoVisible), así que
   // lo que se oculta por estado se decide con ese estado y no con el guardado.
-  const ahora = new Date();
   const citas: CitaAgenda[] = citasBase
     .map((c) => ({
       id: c.id,

@@ -252,6 +252,17 @@ const config: Config = {
           "0%": { opacity: "0", transform: "translateY(12px)" },
           "100%": { opacity: "1", transform: "translateY(0)" },
         },
+        // Llamar la atención sobre lo que el cliente todavía tiene que hacer (el botón de "Enviar por
+        // WhatsApp" al terminar su reserva): tres saltitos, cada uno más bajo, y una pausa. Sin fill-mode:
+        // al pararla no queda ningún transform pegado (ver el aviso de `entrarPanel` más arriba).
+        llamarAccion: {
+          "0%, 36%, 100%": { transform: "translateY(0)" },
+          "6%": { transform: "translateY(-12px)" },
+          "12%": { transform: "translateY(0)" },
+          "18%": { transform: "translateY(-8px)" },
+          "24%": { transform: "translateY(0)" },
+          "30%": { transform: "translateY(-4px)" },
+        },
       },
       animation: {
         "destacado-entrada": "destacado-entrada 0.5s ease-out",
@@ -259,6 +270,8 @@ const config: Config = {
         panel: "entrarPanel 0.18s ease-out both",
         bloque: "aparecerBloque 0.42s cubic-bezier(0.22,0.7,0.3,1) backwards",
         deslizar: "deslizarArriba 0.45s cubic-bezier(0.22,0.7,0.3,1) backwards",
+        // Empieza a saltar un momento después de cargar la pantalla y repite cada 3,6 s hasta que se toque.
+        llamar: "llamarAccion 3.6s ease-in-out 0.8s infinite",
       },
     },
   },

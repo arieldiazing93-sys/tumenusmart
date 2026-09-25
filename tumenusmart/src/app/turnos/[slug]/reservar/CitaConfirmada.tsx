@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { formatearGuarani } from "@/lib/format";
 import type { CitaCreada } from "@/lib/reserva-cliente";
@@ -10,6 +11,9 @@ import { marcarCitaEnviada } from "../actions";
  * La pantalla final: la cita ya se creó. Si el negocio pide el aviso por WhatsApp,
  * el botón abre WhatsApp con el resumen ya escrito; al tocarlo, si la cita
  * estaba esperando ese aviso, pasa a verse en el calendario del negocio.
+ *
+ * Mientras el cliente no toque el botón, se lo llama a la acción: el botón salta tres veces cada tanto
+ * y, si el aviso es necesario para que la cita se vea, arriba hay una advertencia en color de aviso.
  */
 export function CitaConfirmada({
   slug,
@@ -20,6 +24,10 @@ export function CitaConfirmada({
   negocio: string;
   cita: CitaCreada;
 }) {
+  const [enviado, setEnviado] = useState(false);
+  // Falta el aviso y sin él el negocio no ve la cita: la advertencia y el botón que salta llaman a hacerlo.
+  const pendienteDeEnvio = !!cita.enlaceWhatsapp && cita.esperaEnvio && !enviado;
+
   return (
     <div className="flex flex-col items-center px-1 pt-4 text-center">
       <span
@@ -32,13 +40,40 @@ export function CitaConfirmada({
       </span>
 
       <h2 className="mt-4 text-[1.3rem] font-semibold tracking-titular text-tinta">¡Cita creada!</h2>
-      <p className="mt-1.5 max-w-sm text-[0.92rem] leading-snug text-tinta-media">
-        {cita.enlaceWhatsapp
-          ? cita.esperaEnvio
-            ? `Falta un paso: mandale el aviso por WhatsApp a ${negocio} para que vea tu cita y te la confirme.`
-            : `Avisale a ${negocio} por WhatsApp para que te confirme la cita.`
-          : `${negocio} ya tiene tu cita y te la va a confirmar.`}
-      </p>
+      {pendienteDeEnvio ? (
+        // Todo el texto va en el color de aviso (que no cambia con el tema claro u oscuro de la página) para
+        // que se lea igual sobre el fondo ámbar.
+        <div className="mt-3 flex w-full max-w-sm items-start gap-2.5 rounded-xl border border-aviso/40 bg-aviso-luz px-3.5 py-3 text-left">
+          <svg
+            viewBox="0 0 24 24"
+            width={20}
+            height={20}
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={2.2}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+            className="mt-0.5 flex-none text-aviso"
+          >
+            <path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" />
+            <path d="M12 9v4" />
+            <path d="M12 17h.01" />
+          </svg>
+          <p className="text-[0.9rem] leading-snug text-aviso">
+            <span className="font-bold">Falta un paso.</span> Es necesario que le envíes el aviso por WhatsApp a{" "}
+            {negocio} para que vea tu cita y te la confirme.
+          </p>
+        </div>
+      ) : (
+        <p className="mt-1.5 max-w-sm text-[0.92rem] leading-snug text-tinta-media">
+          {cita.enlaceWhatsapp
+            ? enviado
+              ? `${negocio} ya tiene tu cita y te la va a confirmar. Si no se abrió WhatsApp, tocá el botón de nuevo.`
+              : `Avisale a ${negocio} por WhatsApp para que te confirme la cita.`
+            : `${negocio} ya tiene tu cita y te la va a confirmar.`}
+        </p>
+      )}
 
       <div className="mt-6 w-full rounded-xl border border-linea bg-superficie p-4 text-left">
         <p className="text-[0.78rem] text-tinta-suave">Cita {cita.codigo}</p>
@@ -54,17 +89,24 @@ export function CitaConfirmada({
       </div>
 
       {cita.enlaceWhatsapp && (
-        <a
-          href={cita.enlaceWhatsapp}
-          target="_blank"
-          rel="noopener noreferrer"
-          // La cita pasa a verse en el calendario del negocio en cuanto se toca el botón.
-          onClick={() => void marcarCitaEnviada(slug, cita.citaId)}
-          className="mt-6 flex h-12 w-full items-center justify-center gap-2.5 rounded-xl bg-brand text-[0.95rem] font-semibold text-white transition-colors hover:bg-brand-dark active:scale-[0.99]"
-        >
-          <IconoWhatsapp tam={20} />
-          Enviar por WhatsApp
-        </a>
+        // El que salta es este contenedor y no el botón: así el botón conserva su propio efecto al apretarlo.
+        // Deja de saltar apenas se lo toca.
+        <div className={`mt-6 w-full ${enviado ? "" : "animate-llamar"}`}>
+          <a
+            href={cita.enlaceWhatsapp}
+            target="_blank"
+            rel="noopener noreferrer"
+            // La cita pasa a verse en el calendario del negocio en cuanto se toca el botón.
+            onClick={() => {
+              setEnviado(true);
+              void marcarCitaEnviada(slug, cita.citaId);
+            }}
+            className="flex h-12 w-full items-center justify-center gap-2.5 rounded-xl bg-brand text-[0.95rem] font-semibold text-white shadow-media transition-colors hover:bg-brand-dark active:scale-[0.99]"
+          >
+            <IconoWhatsapp tam={20} />
+            {enviado ? "Volver a abrir WhatsApp" : "Enviar por WhatsApp"}
+          </a>
+        </div>
       )}
 
       <Link
