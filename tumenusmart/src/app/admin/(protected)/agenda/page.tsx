@@ -7,6 +7,7 @@ import { claveDiaAsuncion } from "@/lib/timezone";
 import {
   ESTADOS_CITA,
   diasDeVista,
+  estadoVisible,
   parsearFecha,
   parsearOcultar,
   parsearVista,
@@ -101,7 +102,6 @@ export default async function AgendaPage({
       // Un turno pedido por la web que espera el aviso por WhatsApp todavía no se ve.
       visible: true,
       ...(elegido ? { personalId: elegido.id } : {}),
-      ...(ocultar.length > 0 ? { estado: { notIn: ocultar } } : {}),
     },
     orderBy: [{ inicio: "asc" }, { id: "asc" }],
     take: MAXIMO_TURNOS,
@@ -118,18 +118,23 @@ export default async function AgendaPage({
       personal: { select: { nombre: true, apellido: true } },
     },
   });
-  const citas: CitaAgenda[] = citasBase.map((c) => ({
-    id: c.id,
-    personalId: c.personalId,
-    personalNombre: nombreCompleto(c.personal),
-    clienteNombre: c.clienteNombre,
-    inicio: c.inicio,
-    fin: c.fin,
-    estado: c.estado,
-    precio: c.precio == null ? null : Number(c.precio),
-    serviciosTexto: c.serviciosTexto,
-    cobrada: c.ventaPosId !== null,
-  }));
+  // Un turno cobrado por adelantado se ve Finalizada recién cuando pasa su hora (ver estadoVisible), así que
+  // lo que se oculta por estado se decide con ese estado y no con el guardado.
+  const ahora = new Date();
+  const citas: CitaAgenda[] = citasBase
+    .map((c) => ({
+      id: c.id,
+      personalId: c.personalId,
+      personalNombre: nombreCompleto(c.personal),
+      clienteNombre: c.clienteNombre,
+      inicio: c.inicio,
+      fin: c.fin,
+      estado: estadoVisible(c.estado, c.ventaPosId !== null, c.fin, ahora),
+      precio: c.precio == null ? null : Number(c.precio),
+      serviciosTexto: c.serviciosTexto,
+      cobrada: c.ventaPosId !== null,
+    }))
+    .filter((c) => !(ocultar as string[]).includes(c.estado));
 
   // El panel de la derecha: el detalle de la cita tocada, o una cita nueva.
   let panel: React.ReactNode = null;

@@ -426,8 +426,9 @@ export async function eliminarCita(citaId: string): Promise<ResultadoSimple> {
  * Primero guarda lo que se cambió en el panel (servicios, precios, descuento), y
  * después registra la venta en el turno de caja abierto de ESTA computadora con el
  * mismo motor que el punto de venta (IVA, factura, stock, cierre de caja). La cita
- * queda Finalizada y enlazada a esa venta en la misma transacción, y desde ese
- * momento aparece en Citas.
+ * queda enlazada a esa venta en la misma transacción (Finalizada, o Próxima si el
+ * cliente paga por adelantado un turno que todavía no llegó), y desde ese momento
+ * aparece en Citas, en el día de su turno.
  */
 export async function cobrarCita(citaId: string, datos: DatosCita, cobro: DatosCobro): Promise<ResultadoCobroCita> {
   const sesion = await exigirPermiso("pos.vender");

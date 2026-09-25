@@ -88,6 +88,15 @@ export function estadoDeCita(valor: string): (typeof ESTADOS_CITA)[number] {
   return ESTADOS_CITA.find((e) => e.valor === valor) ?? ESTADOS_CITA[0];
 }
 
+/**
+ * El estado con que se ve una cita. Una cita cobrada por adelantado (el cliente pagó hoy su turno del viernes)
+ * queda "Próxima" mientras el turno no llegó, y cuando pasa su hora se ve "Finalizada" sola: una cita cobrada está
+ * bloqueada, así que nadie tendría cómo cambiarla a mano.
+ */
+export function estadoVisible(estado: string, cobrada: boolean, fin: Date, ahora: Date = new Date()): string {
+  return cobrada && estado === "proxima" && fin.getTime() <= ahora.getTime() ? "finalizada" : estado;
+}
+
 /** Los estados que la URL pidió ocultar (`ocultar=cancelada,no_asistio`), sin repetidos ni inventados. */
 export function parsearOcultar(valor: string | undefined): EstadoCita[] {
   if (!valor) return [];

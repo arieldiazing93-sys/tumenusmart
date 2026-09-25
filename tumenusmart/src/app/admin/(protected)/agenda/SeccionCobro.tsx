@@ -25,7 +25,7 @@ const ICONOS_FORMA: Record<FormaPagoPos, string> = {
  * de esta computadora, igual que en el punto de venta.
  *
  * No cobra por su cuenta: solo junta los datos. Cobra el botón principal del pie
- * del panel, cuando la cita está en estado Finalizada.
+ * del panel, una vez que se eligió cómo paga.
  */
 export function SeccionCobro({
   valor,
@@ -33,14 +33,17 @@ export function SeccionCobro({
   caja,
   total,
   cobrando,
+  porAdelantado,
   retraso = 0,
 }: {
   valor: DatosCobro;
   onCambio: (cambios: Partial<DatosCobro>) => void;
   caja: EstadoCaja;
   total: number;
-  /** Si el estado de la cita ya está en Finalizada (se cobra al guardar). */
+  /** Si ya se eligió cobrar (el botón del pie dice "Cobrar"). */
   cobrando: boolean;
+  /** Si el turno todavía no llegó: se cobra por adelantado, el pago entra hoy y la cita queda confirmada. */
+  porAdelantado: boolean;
   /** Milisegundos que espera para entrar (las tarjetas del detalle entran una tras otra). */
   retraso?: number;
 }) {
@@ -74,8 +77,10 @@ export function SeccionCobro({
     <BloqueCita titulo="Cobro en caja" icono={<IconoBillete />} retraso={retraso}>
       <p className="-mt-1 text-[0.78rem] leading-snug text-tinta-suave">
         {cobrando
-          ? "Al tocar Cobrar, el pago entra en el turno de caja y la cita queda finalizada."
-          : "Elegí cómo paga para cobrar y finalizar la cita."}
+          ? porAdelantado
+            ? "Al tocar Cobrar, el pago entra hoy en el turno de caja y la cita queda confirmada para su día."
+            : "Al tocar Cobrar, el pago entra en el turno de caja y la cita queda finalizada."
+          : "Elegí cómo paga para cobrar. Si el turno es de otro día, el pago entra hoy en caja y la cita queda confirmada."}
       </p>
 
       {/* ---------- la caja ---------- */}

@@ -22,6 +22,7 @@ import {
 import { formatearTelefonoPersonal, normalizarTelefonoCliente } from "@/lib/agenda-personal";
 import { formatearGuarani } from "@/lib/format";
 import { imprimirComprobante } from "@/lib/impresion-comprobantes";
+import { instanteAsuncionDesdeTexto } from "@/lib/timezone";
 import { TIPOS_IDENTIFICACION_FISCAL } from "@/lib/tipo-cliente";
 import { construirLinkWhatsapp } from "@/lib/whatsapp";
 import { anularCobroCita, cobrarCita, crearCita, eliminarCita, guardarCita, reasignarCita } from "./actions";
@@ -46,9 +47,11 @@ const CAMPO_AMARILLO = { backgroundColor: "#FEF08A", borderColor: "#EAB308" } as
  * punto de venta para cobrarlo.
  *
  * Se cambian el estado, el cliente, el día y la hora, quién atiende, los servicios y sus
- * precios, y se aplica un descuento. "Guardar" deja todo tal cual sin cobrar. Cuando la
- * cita pasa a Finalizada, el botón se convierte en "Cobrar": registra la venta en el
- * turno de caja abierto y la cita queda cobrada (y aparece en Citas). Una cita cobrada
+ * precios, y se aplica un descuento. "Guardar" deja todo tal cual sin cobrar. Cuando se
+ * elige cómo paga el cliente (o la cita pasa a Finalizada), el botón se convierte en
+ * "Cobrar": registra la venta en el turno de caja abierto y la cita queda cobrada (y
+ * aparece en Citas). Se puede cobrar por adelantado un turno de otro día: el pago entra
+ * hoy en la caja y la cita queda confirmada (Próxima) para su día. Una cita cobrada
  * queda bloqueada: para tocarla hay que anular el cobro.
  */
 export function FormularioCita({
@@ -84,6 +87,9 @@ export function FormularioCita({
 
   // ---------- lo que se edita ----------
   const [estado, setEstado] = useState<string>(cita ? cita.estado : "proxima");
+  // Se eligió cómo paga: se quiere cobrar. Aparte del estado porque un turno de otro día se cobra por adelantado
+  // sin pasar a Finalizada.
+  const [quiereCobrar, setQuiereCobrar] = useState(false);
   const [nombre, setNombre] = useState(inicial?.clienteNombre ?? "");
   const [telefono, setTelefono] = useState(
     inicial?.clienteTelefono ? formatearTelefonoPersonal(inicial.clienteTelefono) : ""
@@ -142,7 +148,11 @@ export function FormularioCita({
   const horaValida = /^\d{2}:\d{2}$/.test(hora);
   const horaFin = horaValida ? horaFinDeCita(hora, duracion) : "--:--";
 
-  const cobrando = !esNueva && !cobrada && estado === "finalizada";
+  const cobrando = !esNueva && !cobrada && (quiereCobrar || estado === "finalizada");
+  // ¿El turno todavía no llegó? Entonces se cobra por adelantado: el pago entra hoy en caja y la cita queda
+  // confirmada para su día (el servidor decide igual con la hora real de la cita).
+  const inicioCita = horaValida && fecha ? instanteAsuncionDesdeTexto(`${fecha}T${hora}`) : null;
+  const turnoPorLlegar = !!inicioCita && inicioCita.getTime() > Date.now();
   // Qué comprobante sale de verdad: el local puede exigir factura, o la caja no poder emitirla.
   const comprobanteFinal: "ticket" | "factura" = !caja.listo
     ? "ticket"
@@ -182,8 +192,12 @@ export function FormularioCita({
 
   function cambiarCobro(cambios: Partial<DatosCobro>) {
     setDatosCobro((previo) => ({ ...previo, ...cambios }));
-    // Elegir cómo paga es querer cobrar: la cita pasa a Finalizada sola.
-    if (cambios.forma && !esNueva && !cobrada && caja.listo) setEstado("finalizada");
+    // Elegir cómo paga es querer cobrar: la cita pasa a Finalizada sola, salvo que su turno todavía no haya
+    // llegado (pago por adelantado): esa queda confirmada, Próxima.
+    if (cambios.forma && !esNueva && !cobrada && caja.listo) {
+      setQuiereCobrar(true);
+      setEstado(turnoPorLlegar ? "proxima" : "finalizada");
+    }
   }
 
   function armarDatos(forzar: boolean): DatosCita {
@@ -331,6 +345,7 @@ export function FormularioCita({
         setCobradoAhora(null);
         setAnulando(false);
         setMotivoAnulacion("");
+        setQuiereCobrar(false);
         setEstado("proxima");
         router.refresh();
       } catch {
@@ -552,7 +567,15 @@ export function FormularioCita({
                   aria-hidden="true"
                   className={`pointer-events-none absolute left-3 top-1/2 h-2.5 w-2.5 -translate-y-1/2 rounded-full ${estadoDeCita(estado).punto}`}
                 />
-                <Selector value={estado} onChange={(e) => setEstado(e.target.value)} style={{ paddingLeft: "2rem" }}>
+                <Selector
+                  value={estado}
+                  onChange={(e) => {
+                    setEstado(e.target.value);
+                    // Elegir un estado a mano deja sin efecto el "quiero cobrar" de haber elegido cómo paga.
+                    setQuiereCobrar(false);
+                  }}
+                  style={{ paddingLeft: "2rem" }}
+                >
                   {estadosOfrecidos.map((e) => (
                     <option key={e.valor} value={e.valor}>
                       {e.etiqueta}
@@ -771,6 +794,7 @@ export function FormularioCita({
             caja={caja}
             total={total}
             cobrando={cobrando}
+            porAdelantado={turnoPorLlegar}
             retraso={200}
           />
         )}

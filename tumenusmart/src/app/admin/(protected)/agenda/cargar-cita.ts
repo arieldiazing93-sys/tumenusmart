@@ -1,4 +1,4 @@
-import { partesLocales, horaDeMinutos } from "@/lib/agenda";
+import { partesLocales, horaDeMinutos, estadoVisible } from "@/lib/agenda";
 import type {
   ActividadCita,
   DetalleCita,
@@ -48,6 +48,7 @@ export async function cargarDetalleCita(db: PrismaLocal, id: string): Promise<De
       nota: true,
       extras: true,
       inicio: true,
+      fin: true,
       estado: true,
       bufferMin: true,
       origen: true,
@@ -88,7 +89,7 @@ export async function cargarDetalleCita(db: PrismaLocal, id: string): Promise<De
     id: c.id,
     codigo: codigoDeCita(c.id),
     origen: c.origen === "web" ? "web" : c.origen === "mostrador" ? "mostrador" : "panel",
-    estado: c.estado,
+    estado: estadoVisible(c.estado, !!cobrada, c.fin),
     clienteNombre: c.clienteNombre,
     clienteTelefono: c.clienteTelefono ?? "",
     clienteEmail: c.clienteEmail ?? "",

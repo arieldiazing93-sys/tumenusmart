@@ -136,8 +136,8 @@ export type DatosVenta = {
   creditoDias?: number;
   /**
    * Si esta venta cobra una cita de la agenda (ver cobrarCita en agenda/actions.ts):
-   * su id. La cita queda Finalizada y enlazada a la venta en la misma transacción
-   * que la crea — o no pasa ninguna de las dos cosas.
+   * su id. La cita queda enlazada a la venta (y Finalizada, o Próxima si su turno
+   * todavía no llegó) en la misma transacción que la crea — o no pasa ninguna de las dos cosas.
    */
   citaId?: string;
   /**
@@ -189,10 +189,13 @@ export async function registrarVenta(turnoId: string, datos: DatosVenta): Promis
   // cobrada ya y no estar cancelada. Se vuelve a comprobar adentro de la transacción.
   // La comisión de quien atiende esa cita, tal como está AHORA: queda guardada en la cita al cobrarla.
   let comisionDeLaCita: number | null = null;
+  // Un turno que todavía no llegó (el cliente lo paga por adelantado) no queda Finalizada: queda Próxima, o sea
+  // confirmada y paga, y se ve Finalizada sola cuando pasa su hora (ver estadoVisible en lib/agenda).
+  let estadoDeLaCitaCobrada: "proxima" | "finalizada" = "finalizada";
   if (datos.citaId) {
     const cita = await db.cita.findFirst({
       where: { id: datos.citaId },
-      select: { ventaPosId: true, estado: true, personal: { select: { comisionPorcentaje: true } } },
+      select: { ventaPosId: true, estado: true, inicio: true, personal: { select: { comisionPorcentaje: true } } },
     });
     if (!cita) return { ok: false, error: "Esa cita no existe." };
     if (cita.ventaPosId) return { ok: false, error: "Esa cita ya está cobrada." };
@@ -200,6 +203,7 @@ export async function registrarVenta(turnoId: string, datos: DatosVenta): Promis
       return { ok: false, error: "Esa cita está cancelada o sin asistencia. Reactivala para poder cobrarla." };
     }
     comisionDeLaCita = cita.personal.comisionPorcentaje == null ? null : Number(cita.personal.comisionPorcentaje);
+    if (cita.inicio.getTime() > Date.now()) estadoDeLaCitaCobrada = "proxima";
   }
 
   // Negocios que atienden sin reserva (barberías, salones): al cobrar en el mostrador el trabajo se le asigna a
@@ -609,9 +613,9 @@ export async function registrarVenta(turnoId: string, datos: DatosVenta): Promis
 
     await registrarConsumoVenta(tx, storeId, filas, { ventaPosId: venta.id }, registradoPor);
 
-    // Cobrar una cita: queda Finalizada y enlazada a esta venta. La condición evita
-    // que dos cajas cobren la misma cita a la vez: la segunda no encuentra nada que
-    // marcar y se deshace toda la venta (incluido el número de factura consumido).
+    // Cobrar una cita: queda enlazada a esta venta (Finalizada, o Próxima si su turno todavía no llegó). La
+    // condición evita que dos cajas cobren la misma cita a la vez: la segunda no encuentra nada que marcar y se
+    // deshace toda la venta (incluido el número de factura consumido).
     if (datos.citaId) {
       const marcada = await tx.cita.updateMany({
         where: {
@@ -620,7 +624,7 @@ export async function registrarVenta(turnoId: string, datos: DatosVenta): Promis
           ventaPosId: null,
           estado: { notIn: ["cancelada", "no_asistio"] },
         },
-        data: { ventaPosId: venta.id, estado: "finalizada", precio: total, comisionPorcentaje: comisionDeLaCita },
+        data: { ventaPosId: venta.id, estado: estadoDeLaCitaCobrada, precio: total, comisionPorcentaje: comisionDeLaCita },
       });
       if (marcada.count !== 1) throw new Error(CITA_NO_COBRABLE);
     }
