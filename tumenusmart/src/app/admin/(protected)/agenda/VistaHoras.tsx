@@ -233,6 +233,7 @@ export function VistaHoras({
                     key={c.id}
                     title={[
                       c.clienteNombre,
+                      c.serviciosTexto,
                       `${horaDeMinutos(c.desde)} – ${horaDeMinutos(c.hasta)}`,
                       estado.etiqueta,
                       c.personalNombre,
@@ -252,6 +253,7 @@ export function VistaHoras({
                       {horaDeMinutos(c.desde)} – {horaDeMinutos(c.hasta)}
                     </p>
                     <p className="truncate font-medium">{c.clienteNombre}</p>
+                    {c.serviciosTexto && <p className="truncate opacity-90">{c.serviciosTexto}</p>}
                     {c.precio != null && <p className="cifra truncate">{formatearGuarani(c.precio)}</p>}
                     {mostrarPersonal && <p className="truncate opacity-80">{c.personalNombre}</p>}
                   </div>

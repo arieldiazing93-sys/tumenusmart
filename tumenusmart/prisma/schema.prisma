@@ -211,6 +211,7 @@ model Store {
   serviciosAgenda  ServicioAgenda[]
   serviciosPersonal ServicioPersonal[]
   paginaReservas   PaginaReservas?
+  citaServicios    CitaServicio[]
 }
 
 /// Las direcciones que este local tuvo antes.
@@ -2219,10 +2220,45 @@ model Cita {
   estado        String          @default("pendiente")
   /// Lo que cuesta el turno. NULL = todavía sin precio.
   precio        Decimal?        @db.Decimal(10, 2)
+  /// Datos del cliente cuando el turno lo pidió él desde la página de reservas.
+  clienteTelefono String?
+  clienteEmail    String?
+  nota            String?
+  /// Respuestas a los campos extra del formulario: [{ clave, etiqueta, valor }].
+  extras          Json?
+  /// Los servicios, en una línea, para verlos en el calendario: "Corte Moderno + Barba".
+  serviciosTexto  String?
+  /// Tiempo de búfer que se reserva después del turno (limpiar, preparar), en minutos.
+  bufferMin       Int             @default(0)
+  /// panel = lo cargó el negocio; web = lo pidió el cliente desde la página de reservas.
+  origen          String          @default("panel")
+  /// false = todavía no se ve en el calendario (esperando que el cliente mande el
+  /// aviso por WhatsApp). Sigue reservando el horario un rato (ver disponibilidad.ts).
+  visible         Boolean         @default(true)
   createdAt     DateTime        @default(now())
+
+  servicios CitaServicio[]
 
   @@index([storeId, inicio])
   @@index([personalId])
+}
+
+/// Cada servicio de un turno, con su nombre, duración y precio tal como eran al
+/// reservar (así el turno no cambia si después se edita el servicio).
+model CitaServicio {
+  id         String          @id @default(cuid())
+  storeId    String
+  store      Store           @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  citaId     String
+  cita       Cita            @relation(fields: [citaId], references: [id], onDelete: Cascade)
+  servicioId String?
+  servicio   ServicioAgenda? @relation(fields: [servicioId], references: [id], onDelete: SetNull)
+  nombre     String
+  duracionMin Int
+  precio     Decimal         @db.Decimal(10, 2)
+
+  @@index([storeId])
+  @@index([citaId])
 }
 
 /// El horario general de trabajo del negocio para la Reserva de turnos: una fila
@@ -2268,7 +2304,8 @@ model ServicioAgenda {
   color       String   @default("#3B82F6")
   createdAt   DateTime @default(now())
 
-  personal ServicioPersonal[]
+  personal      ServicioPersonal[]
+  citaServicios CitaServicio[]
 
   @@index([storeId])
 }

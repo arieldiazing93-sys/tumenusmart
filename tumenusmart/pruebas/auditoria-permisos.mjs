@@ -50,6 +50,18 @@ const EXCEPCIONES = {
   "src/app/[slug]/reserva/[id]/actions.ts": {
     marcarReservaEnviada: "igual que la anterior",
   },
+  // La reserva pública de turnos: el cliente no tiene cuenta. El local sale de la
+  // dirección de la página (nunca del navegador), la página tiene que estar
+  // habilitada y todo lo que llega se vuelve a verificar contra la base.
+  "src/app/turnos/[slug]/actions.ts": {
+    proximaDisponibilidad: "solo lee: horas libres de los profesionales de ESE local",
+    horasDisponibles: "solo lee: horas libres de un profesional de ESE local",
+    crearCitaPublica:
+      "el cliente no tiene cuenta; crea la cita en el local de la dirección, " +
+      "revisando de nuevo servicios, profesional, hora libre y datos",
+    marcarCitaEnviada:
+      "solo muestra una cita web ya creada, filtrando por id + local; el id no se puede adivinar",
+  },
   "src/app/repartidor/[id]/actions.ts": {
     marcarPedidoEntregado:
       "el repartidor no tiene cuenta; la acción verifica que el pedido esté " +

@@ -1,14 +1,13 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { cache } from "react";
 import { prisma } from "@/lib/prisma";
 import { estaSuspendido } from "@/lib/local-por-slug";
-import { derivarPaletaMarca } from "@/lib/color-marca";
 import { iniciales } from "@/lib/agenda";
 import { formatearTelefonoPersonal } from "@/lib/agenda-personal";
 import { completarHorario, nombreDeDia, type HorarioDia } from "@/lib/horario-trabajo";
 import { completarGaleria, normalizarTema } from "@/lib/pagina-reservas";
-import { normalizarColor } from "@/lib/servicios-agenda";
 import { diaSemanaAsuncion } from "@/lib/timezone";
 import { construirLinkWhatsapp } from "@/lib/whatsapp";
 import { IconoWhatsapp } from "@/components/iconos";
@@ -21,6 +20,7 @@ import {
 } from "@/components/IconosRedes";
 import { CarruselGaleria } from "./CarruselGaleria";
 import { CompartirBoton } from "./CompartirBoton";
+import { variablesDePagina } from "./marco";
 
 export const dynamic = "force-dynamic";
 
@@ -86,14 +86,7 @@ export default async function PaginaPublicaReservas({ params }: { params: Promis
   if (!pagina) notFound();
 
   const tema = normalizarTema(pagina.tema);
-  const paleta = derivarPaletaMarca(normalizarColor(pagina.colorPrimario));
-  const estilo = {
-    "--brand": paleta.brand,
-    "--brand-dark": paleta.brandDark,
-    "--brand-light": paleta.brandLight,
-    "--brand-tinte": paleta.brandTinte,
-    "--brand-texto": paleta.brandTexto,
-  } as React.CSSProperties;
+  const estilo = variablesDePagina(pagina.colorPrimario);
 
   // Apagada por el dueño, o el negocio suspendido: el mensaje es neutro, sin mencionar pagos.
   if (!pagina.habilitada || estaSuspendido(pagina.store)) {
@@ -287,21 +280,12 @@ export default async function PaginaPublicaReservas({ params }: { params: Promis
         {/* ---------- crear cita: fija abajo ---------- */}
         <div className="fixed bottom-0 left-1/2 z-20 w-full max-w-xl -translate-x-1/2 border-t border-linea bg-papel/95 backdrop-blur sm:border-x">
           <div className="px-5 pb-4 pt-3">
-            {enlaceWhatsapp ? (
-              // Por ahora la cita se coordina por WhatsApp con el negocio.
-              <a
-                href={enlaceWhatsapp}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex h-12 w-full items-center justify-center rounded-xl bg-brand text-[0.95rem] font-semibold text-white transition-colors hover:bg-brand-dark active:scale-[0.99]"
-              >
-                Crear cita
-              </a>
-            ) : (
-              <span className="flex h-12 w-full items-center justify-center rounded-xl bg-papel-hundido text-[0.9rem] font-semibold text-tinta-suave">
-                Reservas no disponibles todavía
-              </span>
-            )}
+            <Link
+              href={`/turnos/${pagina.slug}/reservar`}
+              className="flex h-12 w-full items-center justify-center rounded-xl bg-brand text-[0.95rem] font-semibold text-white transition-colors hover:bg-brand-dark active:scale-[0.99]"
+            >
+              Crear cita
+            </Link>
             <p className="mt-2 text-center text-[0.7rem] text-tinta-suave">Reservas con TuMenuSmart</p>
           </div>
         </div>

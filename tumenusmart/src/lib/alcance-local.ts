@@ -64,6 +64,7 @@ export const MODELOS_POR_LOCAL = new Set([
   "ServicioAgenda",
   "ServicioPersonal",
   "PaginaReservas",
+  "CitaServicio",
 ]);
 
 /** Operaciones que leen o modifican filas existentes: se filtran por `where`. */

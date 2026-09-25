@@ -81,6 +81,8 @@ export default async function AgendaPage({
   const citasBase = await db.cita.findMany({
     where: {
       inicio: limitesEnAsuncion({ desde: dias[0], hasta: dias[dias.length - 1] }),
+      // Un turno pedido por la web que espera el aviso por WhatsApp todavía no se ve.
+      visible: true,
       ...(elegido ? { personalId: elegido.id } : {}),
       ...(ocultar.length > 0 ? { estado: { notIn: ocultar } } : {}),
     },
@@ -94,6 +96,7 @@ export default async function AgendaPage({
       fin: true,
       estado: true,
       precio: true,
+      serviciosTexto: true,
       personal: { select: { nombre: true, apellido: true } },
     },
   });
@@ -106,6 +109,7 @@ export default async function AgendaPage({
     fin: c.fin,
     estado: c.estado,
     precio: c.precio == null ? null : Number(c.precio),
+    serviciosTexto: c.serviciosTexto,
   }));
 
   return (

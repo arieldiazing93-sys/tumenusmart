@@ -234,6 +234,8 @@ export type CitaAgenda = {
   fin: Date;
   estado: string;
   precio: number | null;
+  /** Los servicios en una línea ("Corte Moderno + Barba"), si el turno los tiene. */
+  serviciosTexto: string | null;
 };
 
 /** El día ("YYYY-MM-DD") y los minutos desde la medianoche de un instante, en hora de Asunción. */

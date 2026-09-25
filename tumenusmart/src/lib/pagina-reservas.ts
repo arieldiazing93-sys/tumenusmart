@@ -281,7 +281,8 @@ export function datosIniciales(fila: FilaPagina | null, nombreNegocio: string): 
       whatsappPais: PAIS_POR_DEFECTO,
       whatsapp: "",
       avisoWhatsapp: true,
-      entradaCalendario: "al_reservar",
+      // Lo habitual: el cliente confirma mandando el aviso por WhatsApp, y recién ahí la cita entra al calendario.
+      entradaCalendario: "al_enviar_whatsapp",
       galeria: [],
       colorPrimario: COLOR_POR_DEFECTO,
       tema: "claro",

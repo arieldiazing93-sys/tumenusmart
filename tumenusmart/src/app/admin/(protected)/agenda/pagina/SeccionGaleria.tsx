@@ -39,7 +39,8 @@ export function SeccionGaleria({ datos, cambiar }: PropsSeccion) {
         <div>
           <h3 className="text-[1rem] font-semibold tracking-titular text-tinta">Galería de la empresa</h3>
           <p className="mt-0.5 text-[0.82rem] text-tinta-media">
-            Hasta {MAX_GALERIA} fotos de tu local o de tus mejores trabajos, cada una con una breve descripción.
+            Hasta {MAX_GALERIA} fotos de tu local o de tus mejores trabajos, cada una con una breve descripción. Se
+            optimizan solas al subirlas: pesan poco y se ven nítidas. Podés mandar la foto tal como salió de la cámara.
           </p>
         </div>
         <span className="cifra flex-none rounded-full bg-papel-hundido px-2.5 py-1 text-[0.78rem] font-semibold text-tinta-media">
