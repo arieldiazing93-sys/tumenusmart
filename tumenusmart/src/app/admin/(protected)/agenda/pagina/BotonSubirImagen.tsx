@@ -5,7 +5,6 @@ import { MensajeError, clasesBoton } from "@/components/ui";
 import {
   comprimirImagen,
   pesoLegible,
-  PARA_LOGO,
   type OpcionesCompresion,
   type ResultadoCompresion,
 } from "@/lib/comprimir-imagen";
@@ -19,8 +18,8 @@ import { subirImagenPagina } from "./actions";
  * en una miniatura de la carta. 1400 píxeles alcanza para verse nítida en un
  * celular de pantalla de alta densidad.
  */
-export const PARA_PERFIL: OpcionesCompresion = PARA_LOGO;
-export const PARA_BANNER: OpcionesCompresion = { ladoMaximo: 1400, calidad: 0.8 };
+// La foto de perfil se ve grande y centrada arriba de la página: más resolución que un logo.
+export const PARA_PERFIL: OpcionesCompresion = { ladoMaximo: 800, calidad: 0.85 };
 export const PARA_GALERIA: OpcionesCompresion = { ladoMaximo: 1400, calidad: 0.82 };
 
 /**

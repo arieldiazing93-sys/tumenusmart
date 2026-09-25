@@ -13,7 +13,7 @@ export type ResultadoPagina = { ok: true; slug: string } | { ok: false; error: s
 export type ResultadoImagenPagina = { ok: true; url: string } | { ok: false; error: string };
 
 /**
- * Sube una imagen de la página (foto de perfil, banner o una de la galería) en
+ * Sube una imagen de la página (foto de perfil o una de la galería) en
  * cuanto se elige, para que se vea enseguida. Solo devuelve la dirección: recién
  * se guarda en la página cuando se aprieta "Guardar cambios". Si después se
  * descarta, la imagen queda sin usar en el almacenamiento (igual que el logo).

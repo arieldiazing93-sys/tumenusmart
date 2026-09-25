@@ -72,7 +72,7 @@ function textoDelDia(h: HorarioDia | undefined): string {
 
 /**
  * La página pública de reservas de un negocio de turnos: lo que ve el cliente
- * cuando abre el link. Foto y banner, nombre, contacto, redes, "Acerca de", el
+ * cuando abre el link. Foto de perfil (grande y centrada), nombre, contacto, redes, "Acerca de", el
  * horario, la galería y el botón para crear la cita.
  *
  * Los colores salen del mismo mecanismo que el menú digital: la paleta del
@@ -160,26 +160,16 @@ export default async function PaginaPublicaReservas({ params }: { params: Promis
   return (
     <div data-tema={tema} style={estilo} className="min-h-screen bg-papel-suave text-tinta">
       <main className="relative mx-auto min-h-screen w-full max-w-xl bg-papel pb-32 sm:border-x sm:border-linea">
-        {/* ---------- banner ---------- */}
+        {/* ---------- cabecera: la foto de perfil, grande y centrada ---------- */}
         <div
-          className="relative h-40 sm:h-48"
-          style={{ backgroundImage: "linear-gradient(135deg, rgb(var(--brand)), rgb(var(--brand-dark)))" }}
+          className="relative px-5 pb-1 pt-10"
+          style={{ backgroundImage: "linear-gradient(to bottom, rgb(var(--brand-light)), transparent)" }}
         >
-          {pagina.bannerUrl && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={pagina.bannerUrl} alt="" className="h-full w-full object-cover" />
-          )}
           <div className="absolute right-3 top-3">
             <CompartirBoton nombre={pagina.nombre} />
           </div>
-        </div>
-
-        <div className="px-5">
-          {/* ---------- foto de perfil y contacto ---------- */}
-          {/* El "relative z-10" es lo que la deja POR ENCIMA del banner: un elemento con
-              posición (el banner lo es) se pinta sobre los que no la tienen, aunque vengan después. */}
-          <div className="relative z-10 -mt-16 flex items-end justify-between gap-3 sm:-mt-[4.5rem]">
-            <div className="flex h-32 w-32 flex-none items-center justify-center overflow-hidden rounded-full border-[5px] border-papel bg-brand-light text-[2.4rem] font-semibold text-brand-texto shadow-md sm:h-36 sm:w-36 sm:text-[2.7rem]">
+          <div className="flex flex-col items-center text-center">
+            <div className="flex h-44 w-44 flex-none items-center justify-center overflow-hidden rounded-full border-[5px] border-papel bg-brand-light text-[3.4rem] font-semibold text-brand-texto shadow-md sm:h-52 sm:w-52 sm:text-[4rem]">
               {pagina.fotoUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={pagina.fotoUrl} alt={pagina.nombre} className="h-full w-full object-cover" />
@@ -187,30 +177,32 @@ export default async function PaginaPublicaReservas({ params }: { params: Promis
                 iniciales(pagina.nombre)
               )}
             </div>
-            {/* Llamar y correo van acá; WhatsApp va una sola vez, con las redes. */}
-            <div className="flex gap-2 pb-1">
+            <h1 className="mt-4 text-[1.5rem] font-semibold leading-tight tracking-titular text-tinta">{pagina.nombre}</h1>
+            {pagina.industria && <p className="text-[0.95rem] text-tinta-media">{pagina.industria}</p>}
+            {pagina.telefono && (
+              <p className="cifra mt-1 text-[0.85rem] text-tinta-suave">{formatearTelefonoPersonal(pagina.telefono)}</p>
+            )}
+          </div>
+        </div>
+
+        <div className="px-5">
+          {/* ---------- contacto y redes, centrados ---------- */}
+          {(pagina.telefono || pagina.email || redes.length > 0) && (
+            <ul className="mt-4 flex flex-wrap justify-center gap-2.5">
               {pagina.telefono && (
-                <a href={`tel:+${pagina.telefono}`} aria-label="Llamar" className={CONTACTO}>
-                  <IconoTelefono tam={18} />
-                </a>
+                <li>
+                  <a href={`tel:+${pagina.telefono}`} aria-label="Llamar" className={CONTACTO}>
+                    <IconoTelefono tam={18} />
+                  </a>
+                </li>
               )}
               {pagina.email && (
-                <a href={`mailto:${pagina.email}`} aria-label="Enviar un correo" className={CONTACTO}>
-                  <IconoCorreo tam={18} />
-                </a>
+                <li>
+                  <a href={`mailto:${pagina.email}`} aria-label="Enviar un correo" className={CONTACTO}>
+                    <IconoCorreo tam={18} />
+                  </a>
+                </li>
               )}
-            </div>
-          </div>
-
-          <h1 className="mt-3 text-[1.4rem] font-semibold leading-tight tracking-titular text-tinta">{pagina.nombre}</h1>
-          {pagina.industria && <p className="text-[0.92rem] text-tinta-media">{pagina.industria}</p>}
-          {pagina.telefono && (
-            <p className="cifra mt-1 text-[0.82rem] text-tinta-suave">{formatearTelefonoPersonal(pagina.telefono)}</p>
-          )}
-
-          {/* ---------- redes ---------- */}
-          {redes.length > 0 && (
-            <ul className="mt-4 flex flex-wrap gap-2.5">
               {redes.map((r) => (
                 <li key={r.nombre}>
                   <a
@@ -219,7 +211,7 @@ export default async function PaginaPublicaReservas({ params }: { params: Promis
                     rel="noopener noreferrer"
                     aria-label={r.nombre}
                     title={r.nombre}
-                    className="flex h-11 w-11 items-center justify-center rounded-full bg-brand-light text-brand-texto transition-transform active:scale-95"
+                    className="flex h-10 w-10 items-center justify-center rounded-full bg-brand-light text-brand-texto transition-transform active:scale-95"
                   >
                     {r.icono}
                   </a>

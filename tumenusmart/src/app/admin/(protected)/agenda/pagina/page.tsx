@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 
 /**
  * La página pública de reservas del negocio: lo que ve el cliente en
- * /turnos/<dirección> — foto y banner, nombre, contacto, redes, galería,
+ * /turnos/<dirección> — foto de perfil, nombre, contacto, redes, galería,
  * colores y los datos que se le piden al reservar. Solo el dueño la arma.
  *
  * Es aparte de la configuración base del sistema: tiene sus propios datos. La

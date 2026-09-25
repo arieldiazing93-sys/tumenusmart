@@ -43,7 +43,7 @@ export function CarruselGaleria({ items }: { items: { url: string; descripcion: 
                 src={it.url}
                 alt={it.descripcion || `Foto ${i + 1}`}
                 loading={i === 0 ? "eager" : "lazy"}
-                className="aspect-[4/3] w-full rounded-xl object-cover"
+                className="aspect-[4/5] max-h-[80vh] w-full rounded-xl object-cover"
               />
               {it.descripcion && (
                 <figcaption className="mt-2.5 px-1 text-center text-[0.88rem] leading-snug text-tinta-media">
@@ -61,7 +61,7 @@ export function CarruselGaleria({ items }: { items: { url: string; descripcion: 
               onClick={() => ir(actual - 1)}
               disabled={actual === 0}
               aria-label="Foto anterior"
-              className="absolute left-2 top-[38%] flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-papel/90 text-tinta shadow backdrop-blur transition-opacity disabled:opacity-0"
+              className="absolute left-2 top-[42%] flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-papel/90 text-tinta shadow backdrop-blur transition-opacity disabled:opacity-0"
             >
               ‹
             </button>
@@ -70,7 +70,7 @@ export function CarruselGaleria({ items }: { items: { url: string; descripcion: 
               onClick={() => ir(actual + 1)}
               disabled={actual === items.length - 1}
               aria-label="Foto siguiente"
-              className="absolute right-2 top-[38%] flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-papel/90 text-tinta shadow backdrop-blur transition-opacity disabled:opacity-0"
+              className="absolute right-2 top-[42%] flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-papel/90 text-tinta shadow backdrop-blur transition-opacity disabled:opacity-0"
             >
               ›
             </button>

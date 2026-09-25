@@ -47,7 +47,7 @@ export function PerfilPagina({ datos, cambiar }: PropsSeccion) {
     <Tarjeta className="flex flex-col gap-4">
       {/* ---------- foto y nombre ---------- */}
       <div className="flex flex-col items-center gap-3 text-center">
-        <div className="flex h-28 w-28 items-center justify-center overflow-hidden rounded-full border border-linea bg-brand-light text-[1.6rem] font-semibold text-brand-texto">
+        <div className="flex h-36 w-36 items-center justify-center overflow-hidden rounded-full border border-linea bg-brand-light text-[2rem] font-semibold text-brand-texto">
           {datos.fotoUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={datos.fotoUrl} alt="Foto de perfil" className="h-full w-full object-cover" />
