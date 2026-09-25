@@ -177,6 +177,8 @@ export const SLUGS_RESERVADOS = new Set([
   "reservas",
   // /turnos/<dirección> es la página pública de reservas de los salones.
   "turnos",
+  // /personal/<id> es la vista de trabajo de cada persona del personal de un salón.
+  "personal",
   "repartidor",
   "_next",
   "favicon.ico",

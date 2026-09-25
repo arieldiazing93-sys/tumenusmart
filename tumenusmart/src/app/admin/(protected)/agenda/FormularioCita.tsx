@@ -325,7 +325,7 @@ export function FormularioCita({
       }}
       className="flex min-h-0 flex-1 flex-col"
     >
-      <div className="campos-grises flex flex-1 flex-col gap-4 overflow-y-auto bg-papel-suave px-5 py-5">
+      <div className="campos-grises flex flex-1 flex-col gap-4 overflow-y-auto bg-superficie px-5 py-5">
         {/* ---------- ya cobrada ---------- */}
         {cobrada && (
           <div className="rounded-xl border border-exito/30 bg-exito-luz p-3.5">

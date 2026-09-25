@@ -257,10 +257,9 @@ export function NavPanel({
   if (variante === "columna") {
     return (
       <div
-        // Fondo blanco + borde a la derecha para que el riel del menú se
-        // distinga del lienzo gris (papel-suave) donde flotan las tarjetas
-        // del contenido — antes los dos eran del mismo color y la pantalla
-        // se leía como un solo bloque homogéneo.
+        // Fondo blanco + borde a la derecha: el riel del menú se distingue del
+        // contenido por esa línea (el lienzo del panel ahora también es
+        // blanco, así que ya no alcanza con el color de fondo).
         className={`hidden h-full flex-none border-r border-linea bg-white transition-[width] duration-200 lg:block ${
           plegada ? "w-[3.5rem]" : "w-[15rem]"
         }`}

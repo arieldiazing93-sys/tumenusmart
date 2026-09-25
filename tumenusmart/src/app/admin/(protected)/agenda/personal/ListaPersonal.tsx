@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import { Entrada, Pastilla, Tabla, Td, Th, Tr, Vacio, clasesBoton } from "@/components/ui";
 import { PanelLateral } from "@/components/PanelLateral";
 import { formatearTelefonoPersonal, nombreCompleto, type MiembroFila } from "@/lib/agenda-personal";
@@ -130,9 +131,15 @@ export function ListaPersonal({ miembros }: { miembros: MiembroFila[] }) {
                     <Td className="cifra text-right">{m.servicios}</Td>
                     <Td className="cifra text-right">{m.citas}</Td>
                     <Td className="text-right">
-                      <button type="button" onClick={() => setPanel(m.id)} className={clasesBoton("suave", "sm")}>
-                        Editar
-                      </button>
+                      <div className="flex justify-end gap-2">
+                        {/* Su vista de trabajo: las citas que ya cobró, confirmadas a su nombre. */}
+                        <Link href={`/admin/agenda/citas?personal=${m.id}`} className={clasesBoton("navegar", "sm")}>
+                          Ver trabajo
+                        </Link>
+                        <button type="button" onClick={() => setPanel(m.id)} className={clasesBoton("suave", "sm")}>
+                          Editar
+                        </button>
+                      </div>
                     </Td>
                   </Tr>
                 ))}
@@ -161,9 +168,14 @@ export function ListaPersonal({ miembros }: { miembros: MiembroFila[] }) {
                     </span>
                   )}
                 </div>
-                <button type="button" onClick={() => setPanel(m.id)} className={clasesBoton("suave", "md")}>
-                  Editar
-                </button>
+                <div className="flex flex-none flex-col gap-1.5">
+                  <Link href={`/admin/agenda/citas?personal=${m.id}`} className={clasesBoton("navegar", "sm")}>
+                    Ver trabajo
+                  </Link>
+                  <button type="button" onClick={() => setPanel(m.id)} className={clasesBoton("suave", "sm")}>
+                    Editar
+                  </button>
+                </div>
               </li>
             ))}
           </ul>

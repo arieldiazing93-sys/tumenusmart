@@ -286,7 +286,8 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   const iniciales = nombreVisible.slice(0, 2).toUpperCase();
 
   return (
-    <div className="min-h-screen bg-papel-suave">
+    // Fondo blanco: el marco de trabajo se ve blanco y las tarjetas y tablas se distinguen por su borde.
+    <div className="min-h-screen bg-superficie">
       {/* ---------- barra de arriba ---------- */}
       <header className="sticky top-0 z-40 border-b border-linea bg-papel/90 backdrop-blur print:hidden">
         <div className="mx-auto flex h-14 max-w-[92rem] items-center gap-3 overflow-hidden px-4">

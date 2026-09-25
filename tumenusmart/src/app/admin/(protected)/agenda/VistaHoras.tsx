@@ -98,7 +98,7 @@ export function VistaHoras({
   return (
     <div
       data-scroll-agenda
-      className="max-h-[calc(100dvh-13rem)] min-h-[24rem] overflow-auto overscroll-contain"
+      className="max-h-[calc(100dvh-16rem)] min-h-[24rem] overflow-auto overscroll-contain"
     >
       <DesplazarAlIniciar rem={remInicial} />
       <div

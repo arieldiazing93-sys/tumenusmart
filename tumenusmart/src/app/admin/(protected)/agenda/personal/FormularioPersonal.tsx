@@ -6,6 +6,7 @@ import { Campo, Entrada, MensajeError, Selector, clasesBoton } from "@/component
 import { PAISES_TELEFONO, separarTelefono, type MiembroFila } from "@/lib/agenda-personal";
 import { comprimirImagen, PARA_LOGO } from "@/lib/comprimir-imagen";
 import { actualizarPersonal, crearPersonal, subirFotoDelPersonal } from "./actions";
+import { EnlaceTrabajoPersonal } from "./EnlaceTrabajoPersonal";
 
 /**
  * El formulario para dar de alta (o editar) a un miembro del personal. Vive
@@ -202,6 +203,15 @@ export function FormularioPersonal({
             placeholder="Ej: Barbero, Colorista, Manicurista"
           />
         </Campo>
+
+        {miembro && (
+          <EnlaceTrabajoPersonal
+            id={miembro.id}
+            nombre={miembro.nombre}
+            telefono={miembro.telefono}
+            activo={miembro.activo}
+          />
+        )}
 
         {miembro && (
           <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-linea bg-papel-suave p-3">
