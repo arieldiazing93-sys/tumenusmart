@@ -207,6 +207,7 @@ model Store {
   // --- Reserva de turnos ---
   miembrosPersonal MiembroPersonal[]
   citas            Cita[]
+  horariosTrabajo  HorarioTrabajo[]
 }
 
 /// Las direcciones que este local tuvo antes.
@@ -2211,4 +2212,26 @@ model Cita {
 
   @@index([storeId, inicio])
   @@index([personalId])
+}
+
+/// El horario general de trabajo del negocio para la Reserva de turnos: una fila
+/// por día de la semana, con si se trabaja ese día, de qué hora a qué hora y el
+/// descanso del medio (el almuerzo). Se guardan siempre los siete días juntos.
+model HorarioTrabajo {
+  id             String  @id @default(cuid())
+  storeId        String
+  store          Store   @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  /// 0 = domingo, 1 = lunes ... 6 = sábado (mismo criterio que HorarioAtencion).
+  diaSemana      Int
+  /// Apagado: ese día el negocio no atiende.
+  trabaja        Boolean @default(true)
+  /// "HH:MM"
+  inicio         String  @default("09:00")
+  fin            String  @default("18:00")
+  descansa       Boolean @default(false)
+  descansoInicio String  @default("13:00")
+  descansoFin    String  @default("14:00")
+
+  @@unique([storeId, diaSemana])
+  @@index([storeId])
 }

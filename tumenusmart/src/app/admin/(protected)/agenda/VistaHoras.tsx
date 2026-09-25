@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { formatearGuarani } from "@/lib/format";
+import { franjasDelDia, rangoDelHorario, type HorarioDia } from "@/lib/horario-trabajo";
 import {
   diaCorto,
+  diaDeLaSemana,
   diaLargo,
   esFinDeSemana,
   estadoDeCita,
@@ -24,6 +26,11 @@ const ANCHO_HORAS = "3.25rem";
 const ANCHO_MIN_DIA = "7.5rem";
 /** Un turno muy corto igual se dibuja con este alto, para que se pueda leer y tocar. */
 const REM_MINIMO_TURNO = 1.75;
+/** Las rayas diagonales de lo que queda fuera del horario de trabajo. */
+const RAYADO = {
+  backgroundImage:
+    "repeating-linear-gradient(135deg, rgb(var(--linea)) 0, rgb(var(--linea)) 1px, transparent 1px, transparent 7px)",
+};
 
 /**
  * La vista de Día y de Semana: las horas a la izquierda y un día por columna.
@@ -39,6 +46,7 @@ export function VistaHoras({
   hoy,
   ahora,
   parametros,
+  horarios,
   mostrarPersonal,
 }: {
   /** Uno (vista Día) o siete (vista Semana). */
@@ -48,6 +56,8 @@ export function VistaHoras({
   hoy: string;
   ahora: Date;
   parametros: ParametrosAgenda;
+  /** El horario de trabajo, o null si todavía no se configuró (entonces no se sombrea nada). */
+  horarios: HorarioDia[] | null;
   /** Escribir quién atiende en cada turno (cuando se ve a todo el personal junto). */
   mostrarPersonal: boolean;
 }) {
@@ -61,7 +71,11 @@ export function VistaHoras({
     return { ...c, dia: i.dia, desde: i.minutos, hasta: Math.max(hasta, i.minutos + 15) };
   });
 
-  const rango = rangoDeHoras(locales);
+  // La grilla dibuja el tramo en que se trabaja (y se amplía si algún turno cae afuera).
+  const rango = rangoDeHoras(locales, horarios ? rangoDelHorario(horarios) : null);
+  const horarioPorDia = new Map<number, HorarioDia>(
+    (horarios ?? []).map((h): [number, HorarioDia] => [h.diaSemana, h])
+  );
   const horasEnteras = (rango.fin - rango.inicio) / 60;
   const alto = horasEnteras * REM_POR_HORA;
   const { minutos: minutosAhora } = partesLocales(ahora);
@@ -171,6 +185,9 @@ export function VistaHoras({
                 : 0;
           const hayLineaAhora = esHoy && minutosAhora >= rango.inicio && minutosAhora <= rango.fin;
 
+          // Lo que el horario de trabajo dice que ese día no se atiende (rayado) o es el descanso (gris).
+          const franjas = franjasDelDia(horarioPorDia.get(diaDeLaSemana(dia)), rango);
+
           return (
             <div
               key={dia}
@@ -179,6 +196,27 @@ export function VistaHoras({
               }`}
               style={{ height: `${alto}rem`, ...fondoLineas }}
             >
+              {franjas.map((f, i) => (
+                <div
+                  key={i}
+                  aria-hidden="true"
+                  className={`pointer-events-none absolute inset-x-0 ${
+                    f.tipo === "descanso" ? "bg-tinta-suave/25" : "bg-papel-hundido"
+                  }`}
+                  style={{
+                    top: `${((f.desde - rango.inicio) / 60) * REM_POR_HORA}rem`,
+                    height: `${((f.hasta - f.desde) / 60) * REM_POR_HORA}rem`,
+                    ...(f.tipo === "cerrado" ? RAYADO : undefined),
+                  }}
+                >
+                  {f.tipo === "descanso" && (
+                    <span className="absolute left-1.5 top-1 text-[0.6rem] font-semibold uppercase tracking-wide text-tinta-media">
+                      Descanso
+                    </span>
+                  )}
+                </div>
+              ))}
+
               {remPasado > 0 && (
                 <div
                   className="pointer-events-none absolute inset-x-0 top-0 bg-papel-hundido/60"

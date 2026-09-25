@@ -180,6 +180,11 @@ export function numeroDeDia(clave: string): number {
   return partesDeClave(clave).dia;
 }
 
+/** Día de la semana de una fecha: 0 = domingo … 6 = sábado. */
+export function diaDeLaSemana(clave: string): number {
+  return partesDeClave(clave).diaSemana;
+}
+
 export function esFinDeSemana(clave: string): boolean {
   const { diaSemana } = partesDeClave(clave);
   return diaSemana === 0 || diaSemana === 6;
@@ -248,10 +253,17 @@ export function horaDeMinutos(minutos: number): string {
 const MINUTOS_INICIO_POR_DEFECTO = 8 * 60;
 const MINUTOS_FIN_POR_DEFECTO = 21 * 60;
 
-/** Desde qué hora y hasta cuál se dibuja la grilla, en minutos y en horas enteras. */
-export function rangoDeHoras(citas: { desde: number; hasta: number }[]): { inicio: number; fin: number } {
-  let inicio = MINUTOS_INICIO_POR_DEFECTO;
-  let fin = MINUTOS_FIN_POR_DEFECTO;
+/**
+ * Desde qué hora y hasta cuál se dibuja la grilla, en minutos y en horas
+ * enteras. Parte del horario de trabajo (`base`) si hay uno configurado, o de un
+ * tramo por defecto, y se amplía si algún turno cae afuera.
+ */
+export function rangoDeHoras(
+  citas: { desde: number; hasta: number }[],
+  base: { inicio: number; fin: number } | null = null
+): { inicio: number; fin: number } {
+  let inicio = base?.inicio ?? MINUTOS_INICIO_POR_DEFECTO;
+  let fin = base?.fin ?? MINUTOS_FIN_POR_DEFECTO;
   for (const c of citas) {
     inicio = Math.min(inicio, Math.floor(c.desde / 60) * 60);
     fin = Math.max(fin, Math.ceil(c.hasta / 60) * 60);

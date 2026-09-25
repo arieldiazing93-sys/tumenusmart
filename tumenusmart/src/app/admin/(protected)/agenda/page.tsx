@@ -14,6 +14,7 @@ import {
   type ParametrosAgenda,
 } from "@/lib/agenda";
 import { nombreCompleto } from "@/lib/agenda-personal";
+import { completarHorario } from "@/lib/horario-trabajo";
 import { Cabecera } from "@/components/ui";
 import { BandaPersonal } from "./BandaPersonal";
 import { BarraAgenda } from "./BarraAgenda";
@@ -62,6 +63,21 @@ export default async function AgendaPage({
   const parametros: ParametrosAgenda = { vista, fecha, personal: elegido?.id ?? null, ocultar };
 
   const dias = diasDeVista(vista, fecha);
+
+  // El horario de trabajo, si ya se configuró: el calendario sombrea lo que queda fuera de él.
+  const filasHorario = await db.horarioTrabajo.findMany({
+    select: {
+      diaSemana: true,
+      trabaja: true,
+      inicio: true,
+      fin: true,
+      descansa: true,
+      descansoInicio: true,
+      descansoFin: true,
+    },
+  });
+  const horarios = filasHorario.length > 0 ? completarHorario(filasHorario) : null;
+
   const citasBase = await db.cita.findMany({
     where: {
       inicio: limitesEnAsuncion({ desde: dias[0], hasta: dias[dias.length - 1] }),
@@ -136,6 +152,7 @@ export default async function AgendaPage({
             hoy={hoy}
             ahora={ahora}
             parametros={parametros}
+            horarios={horarios}
             mostrarPersonal={!elegido && personal.length > 1}
           />
         )}

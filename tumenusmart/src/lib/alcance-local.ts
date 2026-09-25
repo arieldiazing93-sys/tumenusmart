@@ -60,6 +60,7 @@ export const MODELOS_POR_LOCAL = new Set([
   "CategoriaGasto",
   "MiembroPersonal",
   "Cita",
+  "HorarioTrabajo",
 ]);
 
 /** Operaciones que leen o modifican filas existentes: se filtran por `where`. */
