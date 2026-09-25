@@ -129,6 +129,17 @@ export function leerComision(escrito: string): { ok: true; valor: number | null 
   return { ok: true, valor: Math.round(n * 100) / 100 };
 }
 
+/**
+ * Lo que vale el trabajo de una cita cobrada: sus servicios, ya con el descuento que les tocó. Es la base de la
+ * comisión y lo que se cuenta en su vista de trabajo. NO es el total de la venta: en el mostrador la misma cuenta
+ * puede llevar además un producto (un shampoo) que no es trabajo de nadie. Las citas cobradas antes de guardar ese
+ * monto usan el total de la venta.
+ */
+export function montoDelTrabajo(precioDeLaCita: unknown, totalDeLaVenta: unknown): number {
+  const n = Number(precioDeLaCita ?? totalDeLaVenta ?? 0);
+  return Number.isFinite(n) ? n : 0;
+}
+
 /** Cuánto le toca de un trabajo cobrado: el porcentaje del total, en guaraníes enteros. Sin porcentaje, 0. */
 export function calcularComision(total: number, porcentaje: number | null): number {
   if (porcentaje == null || !Number.isFinite(porcentaje) || porcentaje <= 0) return 0;

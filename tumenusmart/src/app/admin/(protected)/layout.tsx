@@ -76,6 +76,37 @@ function armarGrupos(hayIdeaSinVer: boolean, rol: string, ventasACredito: boolea
       ],
     },
     {
+      // Para los negocios que atienden con cita (peluquería, barbería, salón
+      // de belleza). No es lo mismo que "Reservas" de Día a día: eso es
+      // reservar mesa en un restaurante, esto es agendar a alguien con un
+      // profesional a una hora. Va entre "Día a día" y "Mi carta" porque el
+      // calendario también se usa durante el día.
+      titulo: "Reserva de turnos",
+      secciones: [
+        { href: "/admin/agenda", label: "Calendario", icono: "reservas" as const,
+          ver: conPermiso("agenda.ver") },
+        // Las citas confirmadas: las que ya se cobraron en la caja desde el detalle del calendario.
+        { href: "/admin/agenda/citas", label: "Citas", icono: "pedidos" as const,
+          ver: conPermiso("agenda.ver") },
+        // Reutiliza la pantalla de Clientes que ya existe (la misma de "Cómo va
+        // el negocio"), con el mismo permiso.
+        { href: "/admin/pos/clientes", label: "Clientes", icono: "usuarios" as const,
+          ver: conPermiso("pos.verHistorico") },
+        // Quienes atienden. Lo arma el dueño, igual que el resto de la configuración.
+        { href: "/admin/agenda/personal", label: "Personal", icono: "cuenta" as const,
+          ver: conPermiso("agenda.configurar") },
+        // Qué días se atiende, de qué hora a qué hora y el descanso.
+        { href: "/admin/agenda/horario", label: "Horario de trabajo", icono: "configuracion" as const,
+          ver: conPermiso("agenda.configurar") },
+        // Lo que se ofrece a los clientes (cortes, barba, color…): también se vende en el punto de venta.
+        { href: "/admin/agenda/servicios", label: "Servicios", icono: "productos" as const,
+          ver: conPermiso("agenda.configurar") },
+        // La página pública donde el cliente reserva: foto, redes, galería, colores y el WhatsApp de las reservas.
+        { href: "/admin/agenda/pagina", label: "Página de reservas", icono: "categorias" as const,
+          ver: conPermiso("agenda.configurar") },
+      ],
+    },
+    {
       titulo: "Mi carta",
       secciones: [
         { href: "/admin/productos", label: "Productos", icono: "productos" as const,
@@ -109,36 +140,6 @@ function armarGrupos(hayIdeaSinVer: boolean, rol: string, ventasACredito: boolea
           ver: conPermiso("stock.ver") },
         { href: "/admin/stock/gastos", label: "Gastos", icono: "cierre" as const,
           ver: conPermiso("stock.ver") },
-      ],
-    },
-    {
-      // Para los negocios que atienden con cita (peluquería, barbería, salón
-      // de belleza). No es lo mismo que "Reservas" de Día a día: eso es
-      // reservar mesa en un restaurante, esto es agendar a alguien con un
-      // profesional a una hora.
-      titulo: "Reserva de turnos",
-      secciones: [
-        { href: "/admin/agenda", label: "Calendario", icono: "reservas" as const,
-          ver: conPermiso("agenda.ver") },
-        // Las citas confirmadas: las que ya se cobraron en la caja desde el detalle del calendario.
-        { href: "/admin/agenda/citas", label: "Citas", icono: "pedidos" as const,
-          ver: conPermiso("agenda.ver") },
-        // Reutiliza la pantalla de Clientes que ya existe (la misma de "Cómo va
-        // el negocio"), con el mismo permiso.
-        { href: "/admin/pos/clientes", label: "Clientes", icono: "usuarios" as const,
-          ver: conPermiso("pos.verHistorico") },
-        // Quienes atienden. Lo arma el dueño, igual que el resto de la configuración.
-        { href: "/admin/agenda/personal", label: "Personal", icono: "cuenta" as const,
-          ver: conPermiso("agenda.configurar") },
-        // Qué días se atiende, de qué hora a qué hora y el descanso.
-        { href: "/admin/agenda/horario", label: "Horario de trabajo", icono: "configuracion" as const,
-          ver: conPermiso("agenda.configurar") },
-        // Lo que se ofrece a los clientes (cortes, barba, color…): también se vende en el punto de venta.
-        { href: "/admin/agenda/servicios", label: "Servicios", icono: "productos" as const,
-          ver: conPermiso("agenda.configurar") },
-        // La página pública donde el cliente reserva: foto, redes, galería, colores y el WhatsApp de las reservas.
-        { href: "/admin/agenda/pagina", label: "Página de reservas", icono: "categorias" as const,
-          ver: conPermiso("agenda.configurar") },
       ],
     },
     {

@@ -4,7 +4,7 @@ import { idLocalActual } from "@/lib/local-actual";
 import { prismaDelLocal } from "@/lib/prisma-local";
 import { Aviso, BotonEnlace, Cabecera, Tabla, Td, Th, Tr, Vacio } from "@/components/ui";
 import { diaLargo, horaDeMinutos, partesLocales } from "@/lib/agenda";
-import { calcularComision, nombreCompleto } from "@/lib/agenda-personal";
+import { calcularComision, montoDelTrabajo, nombreCompleto } from "@/lib/agenda-personal";
 import { claveSumarDias } from "@/lib/calendario";
 import { formatearGuarani } from "@/lib/format";
 import { detallePagos } from "@/lib/pago-venta";
@@ -102,7 +102,7 @@ export default async function ReportePersonalPage({
         // Todo el período, con lo mínimo: de acá salen los totales.
         db.cita.findMany({
           where: donde,
-          select: { personalId: true, comisionPorcentaje: true, ventaPos: { select: { total: true } } },
+          select: { personalId: true, comisionPorcentaje: true, precio: true, ventaPos: { select: { total: true } } },
         }),
         // Lo más reciente, con el detalle de cada trabajo.
         db.cita.findMany({
@@ -117,6 +117,7 @@ export default async function ReportePersonalPage({
             serviciosTexto: true,
             origen: true,
             comisionPorcentaje: true,
+            precio: true,
             ventaPos: { select: { total: true, pagos: { orderBy: { orden: "asc" }, select: { forma: true, monto: true } } } },
           },
         }),
@@ -133,7 +134,7 @@ export default async function ReportePersonalPage({
   const general: Acumulado = { cantidad: 0, cobrado: 0, comision: 0 };
   const sinComision = new Set<string>();
   for (const c of todos) {
-    const total = Number(c.ventaPos?.total ?? 0);
+    const total = montoDelTrabajo(c.precio, c.ventaPos?.total);
     const porcentaje = porcentajeDe(c.personalId, c.comisionPorcentaje);
     if (porcentaje === null) sinComision.add(c.personalId);
     const comision = calcularComision(total, porcentaje);
@@ -153,7 +154,7 @@ export default async function ReportePersonalPage({
 
   const filas = detalle.map((c) => {
     const { dia, minutos } = partesLocales(c.inicio);
-    const total = Number(c.ventaPos?.total ?? 0);
+    const total = montoDelTrabajo(c.precio, c.ventaPos?.total);
     const porcentaje = porcentajeDe(c.personalId, c.comisionPorcentaje);
     return {
       id: c.id,

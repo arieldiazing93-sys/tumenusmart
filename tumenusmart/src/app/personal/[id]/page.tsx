@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { AvatarPersonal } from "@/app/admin/(protected)/agenda/AvatarPersonal";
 import { AutoRefresh } from "@/components/AutoRefresh";
 import { diaLargo, horaDeMinutos, partesLocales } from "@/lib/agenda";
+import { montoDelTrabajo } from "@/lib/agenda-personal";
 import { claveSumarDias } from "@/lib/calendario";
 import { formatearGuarani } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
@@ -62,6 +63,8 @@ export default async function TrabajoDelPersonalPage({ params }: { params: Promi
         clienteNombre: true,
         inicio: true,
         serviciosTexto: true,
+        // Lo que valen sus servicios (sin los productos que se haya llevado el cliente en la misma cuenta).
+        precio: true,
         ventaPos: { select: { total: true } },
       },
     }),
@@ -75,7 +78,7 @@ export default async function TrabajoDelPersonalPage({ params }: { params: Promi
       hora: horaDeMinutos(minutos),
       cliente: c.clienteNombre,
       servicios: c.serviciosTexto,
-      total: Number(c.ventaPos?.total ?? 0),
+      total: montoDelTrabajo(c.precio, c.ventaPos?.total),
       inicio: c.inicio,
     };
   });

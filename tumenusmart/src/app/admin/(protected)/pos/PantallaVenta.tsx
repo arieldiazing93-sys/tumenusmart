@@ -21,7 +21,7 @@ import { AgregadosPickerPos } from "./AgregadosPickerPos";
 import { imprimirComprobante, type ResultadoImpresion } from "@/lib/impresion-comprobantes";
 
 type Agregado = { id: string; nombre: string; precioExtra: number };
-type Producto = { id: string; nombre: string; precio: number; agregados: Agregado[] };
+type Producto = { id: string; nombre: string; precio: number; esServicio: boolean; agregados: Agregado[] };
 type Categoria = { id: string; nombre: string; productos: Producto[] };
 type ProductoMitad = { id: string; nombre: string; precio: number; mitadYMitadModo: string; agregados: Agregado[] };
 type GrupoMitad = { nombreVisible: string; categoriaId: string; productos: ProductoMitad[] };
@@ -91,7 +91,8 @@ export function PantallaVenta({
   impresorasPorArea: Record<string, string>;
   /**
    * El personal al que se le puede asignar el trabajo al cobrar. Solo viene con gente si el local activó
-   * "preguntar el personal al cobrar" (barberías, salones): vacío, el cobro no pregunta nada.
+   * "preguntar el personal al cobrar" (barberías, salones): vacío, el cobro no pregunta nada. Aun con gente, solo
+   * se pregunta si la cuenta lleva algún servicio (ver `llevaServicio`): una cuenta de puros productos no asigna a nadie.
    */
   personal: { id: string; nombre: string }[];
 }) {
@@ -145,6 +146,15 @@ export function PantallaVenta({
     }
     return mapa;
   }, [carrito]);
+
+  // ¿La cuenta lleva algún servicio (un corte, una barba)? Solo entonces se pregunta quién hizo el trabajo: una
+  // cuenta de puros productos (un shampoo, un perfume) no le asigna nada a nadie.
+  const idsDeServicio = useMemo(
+    () => new Set(categorias.flatMap((c) => c.productos.filter((p) => p.esServicio).map((p) => p.id))),
+    [categorias]
+  );
+  const llevaServicio = carrito.some((i) => i.tipo === "producto" && idsDeServicio.has(i.productId));
+  const personalAAsignar = llevaServicio ? personal : [];
 
   const productosVisibles =
     categoriaId === TODOS
@@ -372,7 +382,7 @@ export function PantallaVenta({
       facturaEmail: esFactura && !esSinRegistroFiscal ? facturaEmail.trim() || undefined : undefined,
       descuento: descuentoPedido,
       creditoDias: esCredito ? creditoDias : undefined,
-      personalId: personal.length > 0 ? personalId : undefined,
+      personalId: personalAAsignar.length > 0 ? personalId : undefined,
       items: carrito.map((i) =>
         i.tipo === "combo"
           ? {
@@ -1055,7 +1065,7 @@ export function PantallaVenta({
           total={total}
           cobrando={cobrando}
           error={error}
-          personal={personal}
+          personal={personalAAsignar}
           permiteCredito={ventasACredito}
           bloqueClienteCredito={bloqueClienteCredito}
           creditoListo={creditoListo}

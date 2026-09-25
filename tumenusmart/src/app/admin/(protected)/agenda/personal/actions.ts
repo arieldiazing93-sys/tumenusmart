@@ -11,6 +11,7 @@ import {
   PERIODOS_COMISION,
   calcularComision,
   leerComision,
+  montoDelTrabajo,
   nombreCompleto,
   normalizarTelefonoPersonal,
   type PeriodoComision,
@@ -201,13 +202,15 @@ export async function trabajosDelPersonal(id: string, periodo: PeriodoComision):
       inicio: true,
       serviciosTexto: true,
       comisionPorcentaje: true,
+      // Lo que valen sus servicios: la base de la comisión (sin los productos de la misma cuenta).
+      precio: true,
       ventaPos: { select: { total: true } },
     },
   });
 
   const trabajos: TrabajoDelPersonal[] = citas.map((c) => {
     const { dia, minutos } = partesLocales(c.inicio);
-    const total = Number(c.ventaPos?.total ?? 0);
+    const total = montoDelTrabajo(c.precio, c.ventaPos?.total);
     const porcentaje = c.comisionPorcentaje == null ? comisionActual : Number(c.comisionPorcentaje);
     return {
       id: c.id,

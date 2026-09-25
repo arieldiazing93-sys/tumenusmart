@@ -154,6 +154,22 @@ export async function resolverSeleccion(
 }
 
 /**
+ * Cancela (borra) las reservas de la web que el cliente no confirmó a tiempo con el aviso por WhatsApp.
+ *
+ * Con la entrada al calendario "al enviar el aviso", una reserva nace oculta y solo se ve cuando el cliente toca
+ * "Enviar por WhatsApp". Si no lo toca dentro de MINUTOS_BLOQUEO_SIN_CONFIRMAR no queda nada a medias: se borra, así
+ * no ocupa un horario que otro cliente podría reservar ni cuenta para el freno de citas pendientes.
+ *
+ * Se llama desde las acciones públicas, que son las que leen y crean reservas (no hace falta un proceso aparte).
+ */
+export async function limpiarReservasSinEnviar(db: Db, storeId: string, ahora: Date): Promise<void> {
+  const limite = new Date(ahora.getTime() - MINUTOS_BLOQUEO_SIN_CONFIRMAR * 60_000);
+  await db.cita.deleteMany({
+    where: { storeId, origen: "web", visible: false, createdAt: { lt: limite } },
+  });
+}
+
+/**
  * Los tramos ocupados de cada profesional, por día. Cuentan los turnos que no
  * están cancelados ni con inasistencia y que ya se ven en el calendario o se
  * pidieron hace poco (un turno web sin confirmar reserva el horario un rato).

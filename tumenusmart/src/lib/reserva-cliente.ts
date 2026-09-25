@@ -208,4 +208,9 @@ export type CitaCreada = {
   enlaceWhatsapp: string | null;
   /** true si la cita recién aparece en el calendario del negocio cuando el cliente manda el aviso. */
   esperaEnvio: boolean;
+  /**
+   * Cuántos segundos tiene el cliente para mandar el aviso antes de que la reserva se cancele y el horario se
+   * libere. null si la cita se ve en el calendario desde que se crea (no hay nada que esperar).
+   */
+  venceEnSegundos: number | null;
 };

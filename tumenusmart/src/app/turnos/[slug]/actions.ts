@@ -3,7 +3,7 @@
 import type { Prisma } from "@prisma/client";
 import { diaLargo, horaDeMinutos } from "@/lib/agenda";
 import { claveSumarDias } from "@/lib/calendario";
-import { DIAS_ADELANTE } from "@/lib/disponibilidad";
+import { DIAS_ADELANTE, MINUTOS_BLOQUEO_SIN_CONFIRMAR } from "@/lib/disponibilidad";
 import { esHoraValida, aMinutos } from "@/lib/horario-trabajo";
 import { completarCampos } from "@/lib/pagina-reservas";
 import { prisma } from "@/lib/prisma";
@@ -20,6 +20,7 @@ import {
   cargarPaginaPublica,
   cargarPersonalPublico,
   disponibilidadDePersonal,
+  limpiarReservasSinEnviar,
   resolverSeleccion,
 } from "@/lib/reservas-publicas";
 import { claveDiaAsuncion, instanteAsuncionDesdeTexto } from "@/lib/timezone";
@@ -154,6 +155,10 @@ export async function crearCitaPublica(slug: string, datos: DatosCitaPublica): P
   if (!validado.ok) return validado;
   const cliente = validado.cliente;
 
+  // Las reservas que otros clientes dejaron sin enviar el aviso por WhatsApp ya se cancelaron: no ocupan horario
+  // ni cuentan para el freno de más abajo.
+  await limpiarReservasSinEnviar(prisma, storeId, ahora);
+
   // Freno a los pedidos en cadena con el mismo número: unas pocas citas pendientes alcanzan.
   if (cliente.telefono) {
     const pendientes = await prisma.cita.count({
@@ -266,6 +271,9 @@ export async function crearCitaPublica(slug: string, datos: DatosCitaPublica): P
       total: seleccion.total,
       enlaceWhatsapp,
       esperaEnvio: !visible,
+      // Cuánto tiene el cliente para mandar el aviso (unos segundos menos que lo real, por lo que tarda la respuesta
+      // en llegar): pasado ese tiempo la reserva se cancela y el horario se libera.
+      venceEnSegundos: visible ? null : Math.max(MINUTOS_BLOQUEO_SIN_CONFIRMAR * 60 - 5, 0),
     },
   };
 }
@@ -274,13 +282,23 @@ export async function crearCitaPublica(slug: string, datos: DatosCitaPublica): P
  * El cliente tocó "Enviar por WhatsApp": desde ese momento la cita se ve en el
  * calendario del negocio. Solo toca citas pedidas por la web y todavía ocultas, de
  * ESTE negocio; el id es imposible de adivinar.
+ *
+ * Solo vale dentro del tiempo que da la reserva (MINUTOS_BLOQUEO_SIN_CONFIRMAR): si ya pasó, la
+ * reserva se canceló y el horario se liberó, así que ya no se puede confirmar (`vencida`).
  */
-export async function marcarCitaEnviada(slug: string, citaId: string): Promise<{ ok: boolean }> {
+export async function marcarCitaEnviada(slug: string, citaId: string): Promise<{ ok: boolean; vencida?: boolean }> {
   const pagina = await cargarPaginaPublica(slug);
   if (!pagina || typeof citaId !== "string" || !citaId) return { ok: false };
-  await prisma.cita.updateMany({
-    where: { id: citaId, storeId: pagina.storeId, origen: "web", visible: false },
+  const storeId = pagina.storeId;
+
+  await limpiarReservasSinEnviar(prisma, storeId, new Date());
+  const marcada = await prisma.cita.updateMany({
+    where: { id: citaId, storeId, origen: "web", visible: false },
     data: { visible: true },
   });
-  return { ok: true };
+  if (marcada.count === 1) return { ok: true };
+
+  // Si ya se veía (tocó el botón más de una vez) está bien; si no existe más, la reserva venció y se canceló.
+  const existe = await prisma.cita.findFirst({ where: { id: citaId, storeId, origen: "web" }, select: { id: true } });
+  return existe ? { ok: true } : { ok: false, vencida: true };
 }

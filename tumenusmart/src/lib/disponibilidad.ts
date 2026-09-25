@@ -24,10 +24,12 @@ export const DIAS_ADELANTE = 60;
 
 /**
  * Un turno pedido por la web que todavía no se confirmó por WhatsApp (y por eso
- * no se ve en el calendario) igual reserva el horario este rato. Si el cliente
- * nunca manda el aviso, el horario se libera solo.
+ * no se ve en el calendario) reserva el horario solo este rato: es lo que tiene el
+ * cliente para tocar "Enviar por WhatsApp". Pasado ese tiempo la reserva se cancela
+ * (se borra) y el horario queda libre para otro cliente: una reserva que el negocio
+ * nunca vio no puede quedar ocupando un turno.
  */
-export const MINUTOS_BLOQUEO_SIN_CONFIRMAR = 30;
+export const MINUTOS_BLOQUEO_SIN_CONFIRMAR = 10;
 
 /** Un tramo ya ocupado de un día. `hasta` incluye el tiempo de búfer del turno. */
 export type Ocupado = { desde: number; hasta: number };

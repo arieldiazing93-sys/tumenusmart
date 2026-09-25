@@ -79,6 +79,8 @@ export default async function PosPage() {
           id: true,
           nombre: true,
           precio: true,
+          // Para saber si la cuenta lleva algún servicio (y entonces preguntar quién hizo el trabajo).
+          esServicio: true,
           mitadYMitadGrupo: true,
           mitadYMitadModo: true,
           opciones: {
@@ -129,6 +131,7 @@ export default async function PosPage() {
         id: p.id,
         nombre: p.nombre,
         precio: Number(p.precio),
+        esServicio: p.esServicio,
         agregados: agregadosDe(p),
       })),
     }));

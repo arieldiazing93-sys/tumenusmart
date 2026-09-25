@@ -15,7 +15,7 @@ import {
   urlCita,
   type VistaAgenda,
 } from "@/lib/agenda";
-import { nombreCompleto } from "@/lib/agenda-personal";
+import { montoDelTrabajo, nombreCompleto } from "@/lib/agenda-personal";
 import { claveSumarDias, diasDeLaSemana } from "@/lib/calendario";
 import { formatearGuarani, formatearNumero } from "@/lib/format";
 import { detallePagos } from "@/lib/pago-venta";
@@ -132,6 +132,8 @@ export default async function CitasPage({
       clienteNombre: true,
       inicio: true,
       serviciosTexto: true,
+      // Lo que valen sus servicios (sin los productos que se haya llevado el cliente en la misma cuenta).
+      precio: true,
       personal: { select: { nombre: true, apellido: true } },
       ventaPos: {
         select: {
@@ -151,7 +153,7 @@ export default async function CitasPage({
     const previo = trabajoPorPersona.get(c.personalId) ?? { cantidad: 0, cobrado: 0 };
     trabajoPorPersona.set(c.personalId, {
       cantidad: previo.cantidad + 1,
-      cobrado: previo.cobrado + Number(c.ventaPos?.total ?? 0),
+      cobrado: previo.cobrado + montoDelTrabajo(c.precio, c.ventaPos?.total),
     });
   }
   const totalEquipo = [...trabajoPorPersona.values()].reduce(
@@ -160,7 +162,7 @@ export default async function CitasPage({
   );
 
   const citas = personalElegido ? confirmadas.filter((c) => c.personalId === personalElegido.id) : confirmadas;
-  const cobrado = citas.reduce((suma, c) => suma + Number(c.ventaPos?.total ?? 0), 0);
+  const cobrado = citas.reduce((suma, c) => suma + montoDelTrabajo(c.precio, c.ventaPos?.total), 0);
   const promedio = citas.length > 0 ? cobrado / citas.length : 0;
 
   // Se muestran los activos y quien esté inactivo pero tenga trabajo en el período.
@@ -415,7 +417,7 @@ export default async function CitasPage({
                     </Pastilla>
                   </Td>
                   <Td className="cifra text-right font-medium text-tinta">
-                    {formatearGuarani(Number(venta?.total ?? 0))}
+                    {formatearGuarani(montoDelTrabajo(c.precio, venta?.total))}
                   </Td>
                   <Td className="text-right">
                     <BotonEnlace
