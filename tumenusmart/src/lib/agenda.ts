@@ -144,6 +144,11 @@ export function urlAgenda(base: ParametrosAgenda, cambios: Partial<ParametrosAge
   return `/admin/agenda?${consulta.toString()}`;
 }
 
+/** La dirección de la agenda con el detalle de esa cita abierto en el panel de la derecha. */
+export function urlCita(base: ParametrosAgenda, citaId: string): string {
+  return `${urlAgenda(base)}&cita=${encodeURIComponent(citaId)}`;
+}
+
 /** La fecha de la URL si es un día real ("2026-02-30" no lo es); si no, `hoy`. */
 export function parsearFecha(valor: string | undefined, hoy: string): string {
   if (!valor || !/^\d{4}-\d{2}-\d{2}$/.test(valor)) return hoy;
@@ -236,6 +241,8 @@ export type CitaAgenda = {
   precio: number | null;
   /** Los servicios en una línea ("Corte Moderno + Barba"), si el turno los tiene. */
   serviciosTexto: string | null;
+  /** true si ya se cobró en la caja (se marca con una tilde en el calendario). */
+  cobrada: boolean;
 };
 
 /** El día ("YYYY-MM-DD") y los minutos desde la medianoche de un instante, en hora de Asunción. */

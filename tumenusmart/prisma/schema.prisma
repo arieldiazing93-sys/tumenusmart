@@ -1307,6 +1307,9 @@ model VentaPos {
   // Ver Order.movimientosStock.
   movimientosStock MovimientoStock[]
 
+  /// La cita de la agenda que se cobró con esta venta, si es el caso (ver Cita.ventaPosId).
+  cita Cita?
+
   @@index([storeId])
   @@index([turnoPosId])
   @@index([storeId, creadoEn])
@@ -2235,6 +2238,15 @@ model Cita {
   /// false = todavía no se ve en el calendario (esperando que el cliente mande el
   /// aviso por WhatsApp). Sigue reservando el horario un rato (ver disponibilidad.ts).
   visible         Boolean         @default(true)
+  /// Descuento de la cuenta, en guaraníes (0 = sin descuento), y el porcentaje si se
+  /// cargó así. `precio` ya es lo que se cobra, con el descuento restado.
+  descuento           Decimal  @default(0) @db.Decimal(10, 2)
+  descuentoPorcentaje Decimal? @db.Decimal(5, 2)
+  /// La venta del punto de venta con la que se cobró la cita. Con esto la cita
+  /// "entró en caja": pasa a Finalizada y aparece en Citas. Si esa venta se cancela,
+  /// se suelta y la cita vuelve a estar sin cobrar.
+  ventaPosId      String?         @unique
+  ventaPos        VentaPos?       @relation(fields: [ventaPosId], references: [id], onDelete: SetNull)
   createdAt     DateTime        @default(now())
 
   servicios CitaServicio[]

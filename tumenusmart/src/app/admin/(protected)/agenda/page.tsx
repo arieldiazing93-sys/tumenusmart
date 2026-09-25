@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { pantallaConPermiso } from "@/lib/auth";
 import { idLocalActual } from "@/lib/local-actual";
 import { prismaDelLocal } from "@/lib/prisma-local";
@@ -10,14 +11,24 @@ import {
   parsearOcultar,
   parsearVista,
   tituloAgenda,
+  urlAgenda,
   type CitaAgenda,
   type ParametrosAgenda,
 } from "@/lib/agenda";
+import type { ActividadCita, EstadoCaja } from "@/lib/agenda-cita";
 import { nombreCompleto } from "@/lib/agenda-personal";
 import { completarHorario } from "@/lib/horario-trabajo";
-import { Cabecera } from "@/components/ui";
+import { Cabecera, clasesBoton } from "@/components/ui";
 import { BandaPersonal } from "./BandaPersonal";
 import { BarraAgenda } from "./BarraAgenda";
+import {
+  cargarActividadDeCita,
+  cargarDetalleCita,
+  cargarEstadoCaja,
+  cargarPersonalDelPanel,
+  cargarServiciosDelPanel,
+} from "./cargar-cita";
+import { PanelCita } from "./PanelCita";
 import { VistaHoras } from "./VistaHoras";
 import { VistaMes } from "./VistaMes";
 
@@ -33,14 +44,18 @@ const MAXIMO_TURNOS = 2000;
  *
  * Todo lo que se elige (vista, fecha, personal, filtros) vive en la dirección
  * de la página: `?vista=semana&fecha=2026-09-24&personal=…&ocultar=cancelada`.
+ *
+ * Tocar un turno agrega `&cita=<id>` y abre su detalle en el panel de la derecha:
+ * ahí se edita la cita y se cobra (`&cita=nueva` abre el panel para anotar una).
  */
 export default async function AgendaPage({
   searchParams,
 }: {
-  searchParams: Promise<{ vista?: string; fecha?: string; personal?: string; ocultar?: string }>;
+  searchParams: Promise<{ vista?: string; fecha?: string; personal?: string; ocultar?: string; cita?: string }>;
 }) {
   await pantallaConPermiso("agenda.ver");
-  const db = prismaDelLocal(await idLocalActual());
+  const storeId = await idLocalActual();
+  const db = prismaDelLocal(storeId);
 
   const sp = await searchParams;
   const ahora = new Date();
@@ -97,6 +112,7 @@ export default async function AgendaPage({
       estado: true,
       precio: true,
       serviciosTexto: true,
+      ventaPosId: true,
       personal: { select: { nombre: true, apellido: true } },
     },
   });
@@ -110,13 +126,46 @@ export default async function AgendaPage({
     estado: c.estado,
     precio: c.precio == null ? null : Number(c.precio),
     serviciosTexto: c.serviciosTexto,
+    cobrada: c.ventaPosId !== null,
   }));
+
+  // El panel de la derecha: el detalle de la cita tocada, o una cita nueva.
+  let panel: React.ReactNode = null;
+  if (sp.cita) {
+    const detalle = sp.cita === "nueva" ? null : await cargarDetalleCita(db, sp.cita);
+    // Una dirección con una cita que ya no existe simplemente no abre nada.
+    if (sp.cita === "nueva" || detalle) {
+      const [serviciosPanel, personalPanel, caja, actividad] = await Promise.all([
+        cargarServiciosDelPanel(db),
+        cargarPersonalDelPanel(db, detalle?.personalId ?? null),
+        detalle ? cargarEstadoCaja(db, storeId) : Promise.resolve<EstadoCaja>({ listo: false, motivo: "sin_estacion" }),
+        detalle ? cargarActividadDeCita(db, detalle) : Promise.resolve<ActividadCita[]>([]),
+      ]);
+      panel = (
+        <PanelCita
+          key={detalle?.id ?? "nueva"}
+          cita={detalle}
+          servicios={serviciosPanel}
+          personal={personalPanel}
+          caja={caja}
+          actividad={actividad}
+          parametros={parametros}
+          hoy={hoy}
+        />
+      );
+    }
+  }
 
   return (
     <div className="flex flex-col gap-3">
       <Cabecera
         titulo="Calendario"
-        bajada="Los turnos de tus clientes: quién viene, con quién y a qué hora."
+        bajada="Los turnos de tus clientes: quién viene, con quién y a qué hora. Tocá uno para ver su detalle y cobrarlo."
+        acciones={
+          <Link href={`${urlAgenda(parametros)}&cita=nueva`} scroll={false} className={clasesBoton("principal", "md")}>
+            + Nueva cita
+          </Link>
+        }
       />
 
       <BarraAgenda
@@ -167,6 +216,8 @@ export default async function AgendaPage({
           {ocultar.length > 0 ? "No hay turnos en este período con los filtros elegidos." : "No hay turnos en este período."}
         </p>
       )}
+
+      {panel}
     </div>
   );
 }

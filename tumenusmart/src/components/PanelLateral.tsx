@@ -16,13 +16,22 @@ import { createPortal } from "react-dom";
  * con la X, con Escape y tocando el fondo oscuro; mientras está abierto la
  * página de atrás no se mueve.
  */
+/** El ancho máximo en pantallas medianas y grandes (en el celular siempre ocupa todo el ancho). */
+const ANCHOS = {
+  normal: "sm:max-w-[26rem]",
+  // Para los paneles con más contenido, como el detalle de una cita que también cobra.
+  ancho: "sm:max-w-[31rem]",
+} as const;
+
 export function PanelLateral({
   titulo,
   onCerrar,
+  ancho = "normal",
   children,
 }: {
   titulo: string;
   onCerrar: () => void;
+  ancho?: keyof typeof ANCHOS;
   children: ReactNode;
 }) {
   // Se guarda la función más reciente para no rearmar los listeners en cada
@@ -58,7 +67,9 @@ export function PanelLateral({
         onClick={onCerrar}
         className="absolute inset-0 cursor-default bg-noche/40"
       />
-      <div className="absolute inset-y-0 right-0 flex w-full animate-[entrarDerecha_0.2s_ease-out] flex-col bg-superficie shadow-alta sm:max-w-[26rem] sm:border-l sm:border-linea">
+      <div
+        className={`absolute inset-y-0 right-0 flex w-full animate-[entrarDerecha_0.2s_ease-out] flex-col bg-superficie shadow-alta sm:border-l sm:border-linea ${ANCHOS[ancho]}`}
+      >
         <div className="flex flex-none items-center justify-between border-b border-linea px-5 py-4">
           <h2 className="text-[1.05rem] font-semibold tracking-titular text-tinta">{titulo}</h2>
           <button

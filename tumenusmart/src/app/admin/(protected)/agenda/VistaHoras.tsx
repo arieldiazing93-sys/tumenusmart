@@ -13,6 +13,7 @@ import {
   rangoDeHoras,
   repartirCarriles,
   urlAgenda,
+  urlCita,
   type CitaAgenda,
   type ParametrosAgenda,
 } from "@/lib/agenda";
@@ -229,8 +230,12 @@ export function VistaHoras({
                 const remAlto = Math.max(((c.hasta - c.desde) / 60) * REM_POR_HORA, REM_MINIMO_TURNO);
                 const izquierda = (c.carril / c.carriles) * 100;
                 return (
-                  <div
+                  // Tocar el turno abre su detalle a la derecha (y desde ahí se cobra).
+                  <Link
                     key={c.id}
+                    href={urlCita(parametros, c.id)}
+                    scroll={false}
+                    aria-label={`Abrir la cita de ${c.clienteNombre}`}
                     title={[
                       c.clienteNombre,
                       c.serviciosTexto,
@@ -241,7 +246,7 @@ export function VistaHoras({
                     ]
                       .filter(Boolean)
                       .join(" · ")}
-                    className={`absolute z-10 overflow-hidden rounded-md border border-l-4 px-1.5 py-1 text-[0.7rem] leading-tight shadow-sm ${estado.bloque}`}
+                    className={`absolute z-10 overflow-hidden rounded-md border border-l-4 px-1.5 py-1 text-[0.7rem] leading-tight shadow-sm transition-shadow hover:z-20 hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand ${estado.bloque}`}
                     style={{
                       top: `${((c.desde - rango.inicio) / 60) * REM_POR_HORA}rem`,
                       height: `${remAlto}rem`,
@@ -249,6 +254,15 @@ export function VistaHoras({
                       width: `calc(${(100 / c.carriles).toFixed(3)}% - 4px)`,
                     }}
                   >
+                    {c.cobrada && (
+                      <span
+                        aria-label="Cobrada"
+                        title="Cobrada en caja"
+                        className="absolute right-1 top-0.5 text-[0.78rem] font-bold leading-none"
+                      >
+                        ✓
+                      </span>
+                    )}
                     <p className="cifra truncate font-semibold">
                       {horaDeMinutos(c.desde)} – {horaDeMinutos(c.hasta)}
                     </p>
@@ -256,7 +270,7 @@ export function VistaHoras({
                     {c.serviciosTexto && <p className="truncate opacity-90">{c.serviciosTexto}</p>}
                     {c.precio != null && <p className="cifra truncate">{formatearGuarani(c.precio)}</p>}
                     {mostrarPersonal && <p className="truncate opacity-80">{c.personalNombre}</p>}
-                  </div>
+                  </Link>
                 );
               })}
 

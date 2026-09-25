@@ -85,7 +85,17 @@ export type ResultadoVenta =
   | { ok: false; error: string };
 
 export type ItemVentaInput =
-  | { productId: string; opcionIds?: string[]; cantidad: number }
+  | {
+      productId: string;
+      opcionIds?: string[];
+      cantidad: number;
+      /**
+       * Solo al cobrar una cita (ver `DatosVenta.citaId`): el precio final de un
+       * servicio, si se cambió en el turno (un "desde", un ajuste). Se ignora en
+       * cualquier otra venta y en cualquier producto que no sea un servicio.
+       */
+      precioServicio?: number;
+    }
   | { mitadYMitad: { productIdA: string; productIdB: string }; opcionIds?: string[]; cantidad: number };
 
 export type DatosVenta = {
@@ -123,7 +133,16 @@ export type DatosVenta = {
   descuento?: DescuentoPedido;
   /** Solo si se paga "a_credito": en cuántos días vence lo que debe el cliente (0 a 365; por defecto 30). */
   creditoDias?: number;
+  /**
+   * Si esta venta cobra una cita de la agenda (ver cobrarCita en agenda/actions.ts):
+   * su id. La cita queda Finalizada y enlazada a la venta en la misma transacción
+   * que la crea — o no pasa ninguna de las dos cosas.
+   */
+  citaId?: string;
 };
+
+/** Lo que se lanza dentro de la transacción si la cita ya no se puede cobrar (la cobraron en ese instante). */
+const CITA_NO_COBRABLE = "CITA_NO_COBRABLE";
 
 /**
  * Cobra el carrito y cierra la cuenta.
@@ -154,6 +173,20 @@ export async function registrarVenta(turnoId: string, datos: DatosVenta): Promis
 
   if (!Array.isArray(datos.items) || datos.items.length === 0) {
     return { ok: false, error: "El carrito está vacío." };
+  }
+
+  // Cobrar una cita: tiene que ser de este local (`db` ya filtra por local), no estar
+  // cobrada ya y no estar cancelada. Se vuelve a comprobar adentro de la transacción.
+  if (datos.citaId) {
+    const cita = await db.cita.findFirst({
+      where: { id: datos.citaId },
+      select: { ventaPosId: true, estado: true },
+    });
+    if (!cita) return { ok: false, error: "Esa cita no existe." };
+    if (cita.ventaPosId) return { ok: false, error: "Esa cita ya está cobrada." };
+    if (cita.estado === "cancelada" || cita.estado === "no_asistio") {
+      return { ok: false, error: "Esa cita está cancelada o sin asistencia. Reactivala para poder cobrarla." };
+    }
   }
 
   const esFactura = datos.comprobanteTipo === "factura";
@@ -367,8 +400,28 @@ export async function registrarVenta(turnoId: string, datos: DatosVenta): Promis
   const armado = armarPedido(catalogo, pedidas);
   if (!armado.ok) return { ok: false, error: armado.motivo };
 
-  const filas = armado.lineas;
-  const subtotal = armado.subtotal;
+  // Al cobrar una cita, el precio de un servicio puede haberse cambiado en el turno.
+  // `armarPedido` devuelve las líneas en el mismo orden en que se pidieron, así que
+  // se cruzan por posición. Solo cuenta para servicios y solo con una cita de por
+  // medio: en cualquier otro caso el precio es siempre el de la carta.
+  let filas = armado.lineas;
+  let subtotal = armado.subtotal;
+  if (datos.citaId) {
+    for (const it of datos.items) {
+      if (!("mitadYMitad" in it) && it.precioServicio !== undefined) {
+        if (!Number.isFinite(it.precioServicio) || it.precioServicio < 0) {
+          return { ok: false, error: "El precio de un servicio no es válido." };
+        }
+      }
+    }
+    filas = armado.lineas.map((f, i) => {
+      const pedido = datos.items[i];
+      const manual = pedido && !("mitadYMitad" in pedido) ? pedido.precioServicio : undefined;
+      if (manual === undefined || !f.productId || !esServicioElProducto.get(f.productId)) return f;
+      return { ...f, precioUnitario: Math.round(manual) };
+    });
+    subtotal = filas.reduce((suma, f) => suma + f.precioUnitario * f.cantidad, 0);
+  }
   if (subtotal <= 0) return { ok: false, error: "El total tiene que ser mayor a cero." };
 
   // Descuento general: se calcula acá sobre el subtotal recalculado, nunca con
@@ -406,7 +459,8 @@ export async function registrarVenta(turnoId: string, datos: DatosVenta): Promis
     });
   }
 
-  const ventaId = await prisma.$transaction(async (tx) => {
+  const ventaCreada = await prisma
+    .$transaction(async (tx) => {
     let datosFactura: Record<string, unknown> = { comprobanteTipo: "ticket" };
     // El número que consumió esta factura, para armar su Comprobante más abajo.
     let correlativoFactura: number | null = null;
@@ -510,6 +564,22 @@ export async function registrarVenta(turnoId: string, datos: DatosVenta): Promis
 
     await registrarConsumoVenta(tx, storeId, filas, { ventaPosId: venta.id }, registradoPor);
 
+    // Cobrar una cita: queda Finalizada y enlazada a esta venta. La condición evita
+    // que dos cajas cobren la misma cita a la vez: la segunda no encuentra nada que
+    // marcar y se deshace toda la venta (incluido el número de factura consumido).
+    if (datos.citaId) {
+      const marcada = await tx.cita.updateMany({
+        where: {
+          id: datos.citaId,
+          storeId,
+          ventaPosId: null,
+          estado: { notIn: ["cancelada", "no_asistio"] },
+        },
+        data: { ventaPosId: venta.id, estado: "finalizada", precio: total },
+      });
+      if (marcada.count !== 1) throw new Error(CITA_NO_COBRABLE);
+    }
+
     // La foto fiscal de la factura: todo lo que un proveedor de factura
     // electrónica (o un reporte) necesita, en una sola tabla. Va en la misma
     // transacción que el número consumido, así nunca quedan una sin la otra.
@@ -546,7 +616,16 @@ export async function registrarVenta(turnoId: string, datos: DatosVenta): Promis
     }
 
     return venta.id;
-  });
+  })
+    .catch((e: unknown) => {
+      // La cita se cobró (o se canceló) en el mismo instante desde otra pantalla.
+      if (e instanceof Error && e.message === CITA_NO_COBRABLE) return null;
+      throw e;
+    });
+  if (ventaCreada === null) {
+    return { ok: false, error: "Esa cita ya se cobró o se canceló mientras tanto. Actualizá la pantalla." };
+  }
+  const ventaId = ventaCreada;
 
   // Solo lo que conviene poder revisar después: las ventas con descuento y las
   // ventas a crédito. Cada venta común ya tiene su propio registro.
@@ -578,6 +657,10 @@ export async function registrarVenta(turnoId: string, datos: DatosVenta): Promis
 
   revalidatePath("/admin/pos");
   revalidatePath("/admin/pos/cuentas");
+  if (datos.citaId) {
+    revalidatePath("/admin/agenda");
+    revalidatePath("/admin/agenda/citas");
+  }
   return { ok: true, ventaId, total, areasImpresion };
 }
 
@@ -860,6 +943,13 @@ export async function cancelarVenta(ventaId: string, motivo: string): Promise<Re
     }
 
     await revertirMovimientosVenta(tx, storeId, { ventaPosId: ventaId }, identidad);
+
+    // Si esta venta había cobrado una cita de la agenda, la cita vuelve a estar sin
+    // cobrar (queda como Próxima) y sale de Citas.
+    await tx.cita.updateMany({
+      where: { storeId, ventaPosId: ventaId },
+      data: { ventaPosId: null, estado: "proxima" },
+    });
   });
 
   await registrarBitacora(storeId, sesion, {
@@ -876,5 +966,7 @@ export async function cancelarVenta(ventaId: string, motivo: string): Promise<Re
   revalidatePath("/admin/pos/cuentas");
   revalidatePath(`/admin/pos/venta/${ventaId}`);
   revalidatePath("/admin/stock/insumos");
+  revalidatePath("/admin/agenda");
+  revalidatePath("/admin/agenda/citas");
   return { ok: true };
 }

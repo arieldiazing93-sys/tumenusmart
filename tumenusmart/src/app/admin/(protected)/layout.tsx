@@ -120,6 +120,9 @@ function armarGrupos(hayIdeaSinVer: boolean, rol: string, ventasACredito: boolea
       secciones: [
         { href: "/admin/agenda", label: "Calendario", icono: "reservas" as const,
           ver: conPermiso("agenda.ver") },
+        // Las citas confirmadas: las que ya se cobraron en la caja desde el detalle del calendario.
+        { href: "/admin/agenda/citas", label: "Citas", icono: "pedidos" as const,
+          ver: conPermiso("agenda.ver") },
         // Reutiliza la pantalla de Clientes que ya existe (la misma de "Cómo va
         // el negocio"), con el mismo permiso.
         { href: "/admin/pos/clientes", label: "Clientes", icono: "usuarios" as const,
