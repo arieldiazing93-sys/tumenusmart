@@ -5,7 +5,6 @@ import type {
   EstadoCaja,
   PersonalDeCita,
   ServicioOpcion,
-  TonoActividad,
 } from "@/lib/agenda-cita";
 import { nombreCompleto } from "@/lib/agenda-personal";
 import { estacionActual } from "@/lib/estacion-actual";
@@ -201,23 +200,6 @@ export async function cargarEstadoCaja(db: PrismaLocal, storeId: string): Promis
   };
 }
 
-/** El código de la bitácora ("cita_cobrada") pasado al tono con que se dibuja el movimiento. */
-function tonoDeAccion(accion: string): TonoActividad {
-  switch (accion) {
-    case "cita_creada":
-      return "creada";
-    case "cita_cobrada":
-      return "cobro";
-    case "cita_cobro_anulado":
-    case "cita_eliminada":
-      return "anulado";
-    case "cita_estado_cambiado":
-      return "estado";
-    default:
-      return "edicion";
-  }
-}
-
 /** Lo que pasó con la cita: cómo se creó y lo que se fue anotando en la bitácora. Lo más nuevo, primero. */
 export async function cargarActividadDeCita(
   db: PrismaLocal,
@@ -227,13 +209,12 @@ export async function cargarActividadDeCita(
     where: { entidad: "Cita", entidadId: cita.id },
     orderBy: { createdAt: "desc" },
     take: 40,
-    select: { usuario: true, accion: true, descripcion: true, createdAt: true },
+    select: { usuario: true, descripcion: true, createdAt: true },
   });
   const actividad: ActividadCita[] = filas.map((f) => ({
     cuando: f.createdAt.toISOString(),
     quien: f.usuario,
     texto: f.descripcion,
-    tono: tonoDeAccion(f.accion),
   }));
   // Las citas del panel ya tienen su "creada" en la bitácora; las de la web las crea el cliente.
   if (cita.origen === "web") {
@@ -241,7 +222,6 @@ export async function cargarActividadDeCita(
       cuando: cita.creadaEn,
       quien: "Cliente",
       texto: "Reservó desde el enlace de reservas.",
-      tono: "creada",
     });
   }
   return actividad;

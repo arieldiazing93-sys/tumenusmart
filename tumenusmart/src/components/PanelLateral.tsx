@@ -27,18 +27,11 @@ export function PanelLateral({
   titulo,
   onCerrar,
   ancho = "normal",
-  sinCabecera = false,
   children,
 }: {
   titulo: string;
   onCerrar: () => void;
   ancho?: keyof typeof ANCHOS;
-  /**
-   * Sin la barra de título y la X de siempre: el contenido trae la suya (el detalle de
-   * la cita tiene una cabecera de color con su propia X). Escape y el fondo oscuro
-   * siguen cerrando el panel.
-   */
-  sinCabecera?: boolean;
   children: ReactNode;
 }) {
   // Se guarda la función más reciente para no rearmar los listeners en cada
@@ -77,31 +70,29 @@ export function PanelLateral({
       <div
         className={`absolute inset-y-0 right-0 flex w-full animate-[entrarDerecha_0.2s_ease-out] flex-col bg-superficie shadow-alta sm:border-l sm:border-linea ${ANCHOS[ancho]}`}
       >
-        {!sinCabecera && (
-          <div className="flex flex-none items-center justify-between border-b border-linea px-5 py-4">
-            <h2 className="text-[1.05rem] font-semibold tracking-titular text-tinta">{titulo}</h2>
-            <button
-              type="button"
-              onClick={onCerrar}
-              aria-label="Cerrar"
-              className="flex h-9 w-9 items-center justify-center rounded-lg text-tinta-media transition-colors hover:bg-papel-hundido hover:text-tinta"
+        <div className="flex flex-none items-center justify-between border-b border-linea px-5 py-4">
+          <h2 className="text-[1.05rem] font-semibold tracking-titular text-tinta">{titulo}</h2>
+          <button
+            type="button"
+            onClick={onCerrar}
+            aria-label="Cerrar"
+            className="flex h-9 w-9 items-center justify-center rounded-lg text-tinta-media transition-colors hover:bg-papel-hundido hover:text-tinta"
+          >
+            <svg
+              viewBox="0 0 24 24"
+              width={18}
+              height={18}
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={2}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
             >
-              <svg
-                viewBox="0 0 24 24"
-                width={18}
-                height={18}
-                fill="none"
-                stroke="currentColor"
-                strokeWidth={2}
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
-              >
-                <path d="M18 6 6 18M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
-        )}
+              <path d="M18 6 6 18M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
         {children}
       </div>
     </div>,

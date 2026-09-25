@@ -34,108 +34,49 @@ export function parsearVista(valor: string | undefined): VistaAgenda | null {
 export type EstadoCita = "pendiente" | "proxima" | "finalizada" | "cancelada" | "no_asistio";
 
 /**
- * Los estados y cómo se ven. Cada uno tiene su propio color con significado: ámbar
- * lo que falta confirmar, azul lo que viene, verde lo que ya se cobró, rojo lo que
- * se cayó, gris lo que no vino. Es el mismo color en el calendario, en las cifras de
- * arriba y en la cabecera del detalle de la cita, para entenderlo de un vistazo.
- *
- * Las clases van completas (nunca armadas con pedazos) porque Tailwind solo genera
- * las que ve escritas.
+ * Los estados y cómo se ven. Cada uno tiene su propio color con significado
+ * (mismos tonos que el resto del panel): ámbar lo que falta confirmar, azul lo
+ * que viene, verde lo que ya se hizo, rojo lo que se cayó, gris lo que no vino.
+ * Las clases van completas porque Tailwind solo genera las que ve escritas.
  */
 export const ESTADOS_CITA: {
   valor: EstadoCita;
   etiqueta: string;
-  /** El bloque del turno en el calendario: degradado suave, texto y una franja de color a la izquierda. */
+  /** El bloque del turno en el calendario: fondo, texto y una franja de color a la izquierda. */
   bloque: string;
-  /** El puntito de color (mes, filtro). */
+  /** El puntito de color (leyenda, mes y filtro). */
   punto: string;
-  /** El círculo con el ícono del estado (esquina del turno y cabecera del detalle). */
-  insignia: string;
-  /** La cabecera del detalle: degradado (con el color del texto que se lee bien encima). */
-  cabecera: string;
-  /** La pastilla de arriba del calendario y del selector de estado del detalle. */
-  pastilla: string;
-  /** La misma pastilla cuando está elegida: llena del color fuerte. */
-  elegida: string;
-  /** El numerito de esa pastilla. */
-  cantidad: string;
 }[] = [
   {
     valor: "pendiente",
     etiqueta: "Pendiente",
-    bloque: "border-amber-300 border-l-amber-500 bg-gradient-to-br from-amber-200/80 to-amber-50 text-amber-950",
-    punto: "bg-amber-500",
-    insignia: "bg-amber-500 text-amber-950",
-    cabecera: "from-amber-400 via-amber-500 to-orange-500 text-amber-950",
-    pastilla: "border-amber-300 bg-amber-50 text-amber-900 hover:border-amber-400 hover:bg-amber-100",
-    elegida: "border-amber-500 bg-amber-500 text-amber-950 shadow-md shadow-amber-500/30",
-    cantidad: "bg-amber-200 text-amber-900",
+    bloque: "border-aviso/30 border-l-aviso bg-aviso-luz text-aviso",
+    punto: "bg-aviso",
   },
   {
     valor: "proxima",
     etiqueta: "Próxima",
-    bloque: "border-sky-300 border-l-blue-500 bg-gradient-to-br from-sky-200/80 to-sky-50 text-blue-950",
-    punto: "bg-blue-500",
-    insignia: "bg-blue-500 text-white",
-    cabecera: "from-blue-600 via-blue-600 to-indigo-600 text-white",
-    pastilla: "border-sky-300 bg-sky-50 text-blue-900 hover:border-sky-400 hover:bg-sky-100",
-    elegida: "border-blue-600 bg-blue-600 text-white shadow-md shadow-blue-600/30",
-    cantidad: "bg-sky-200 text-blue-900",
+    bloque: "border-azul/30 border-l-azul bg-azul-luz text-azul-oscuro",
+    punto: "bg-azul",
   },
   {
     valor: "finalizada",
     etiqueta: "Finalizada",
-    bloque: "border-emerald-300 border-l-emerald-600 bg-gradient-to-br from-emerald-200/80 to-emerald-50 text-emerald-950",
-    punto: "bg-emerald-500",
-    insignia: "bg-emerald-600 text-white",
-    cabecera: "from-emerald-600 via-emerald-700 to-teal-700 text-white",
-    pastilla: "border-emerald-300 bg-emerald-50 text-emerald-900 hover:border-emerald-400 hover:bg-emerald-100",
-    elegida: "border-emerald-600 bg-emerald-600 text-white shadow-md shadow-emerald-600/30",
-    cantidad: "bg-emerald-200 text-emerald-900",
+    bloque: "border-exito/30 border-l-exito bg-exito-luz text-exito",
+    punto: "bg-exito",
   },
   {
     valor: "cancelada",
     etiqueta: "Cancelada",
-    bloque: "border-rose-300 border-l-red-500 bg-gradient-to-br from-rose-100 to-rose-50 text-red-900 line-through opacity-70",
-    punto: "bg-red-500",
-    insignia: "bg-red-500 text-white",
-    cabecera: "from-rose-600 via-red-600 to-red-700 text-white",
-    pastilla: "border-rose-300 bg-rose-50 text-red-900 hover:border-rose-400 hover:bg-rose-100",
-    elegida: "border-red-600 bg-red-600 text-white shadow-md shadow-red-600/30",
-    cantidad: "bg-rose-200 text-red-900",
+    bloque: "border-peligro/30 border-l-peligro bg-peligro-luz text-peligro line-through opacity-70",
+    punto: "bg-peligro",
   },
   {
     valor: "no_asistio",
     etiqueta: "No asistió",
-    bloque: "border-slate-300 border-l-slate-500 bg-gradient-to-br from-slate-200 to-slate-50 text-slate-700",
-    punto: "bg-slate-400",
-    insignia: "bg-slate-500 text-white",
-    cabecera: "from-slate-600 via-slate-700 to-slate-800 text-white",
-    pastilla: "border-slate-300 bg-slate-50 text-slate-700 hover:border-slate-400 hover:bg-slate-100",
-    elegida: "border-slate-600 bg-slate-600 text-white shadow-md shadow-slate-600/30",
-    cantidad: "bg-slate-200 text-slate-700",
+    bloque: "border-linea border-l-tinta-suave bg-papel-hundido text-tinta-media",
+    punto: "bg-tinta-suave",
   },
-];
-
-/** La cabecera del detalle cuando la cita todavía no existe (se está anotando una nueva). */
-export const CABECERA_CITA_NUEVA = "from-violet-600 via-purple-600 to-fuchsia-600 text-white";
-
-/**
- * Los tres momentos del día, con su color: la mañana amarilla, la tarde naranja, la
- * noche índigo. Pintan el fondo del calendario (mismos cortes que las horas de la
- * página de reservas: hasta las 12, hasta las 18 y el resto) para ubicarse por color.
- */
-export const MOMENTOS_DEL_DIA: {
-  desde: number;
-  hasta: number;
-  /** El tinte de fondo en la grilla. */
-  fondo: string;
-  /** La barrita al costado de las horas. */
-  barra: string;
-}[] = [
-  { desde: 0, hasta: 12 * 60, fondo: "bg-amber-100/45", barra: "bg-amber-300" },
-  { desde: 12 * 60, hasta: 18 * 60, fondo: "bg-orange-100/45", barra: "bg-orange-300" },
-  { desde: 18 * 60, hasta: 24 * 60, fondo: "bg-indigo-100/50", barra: "bg-indigo-300" },
 ];
 
 export function esEstadoCita(valor: string): valor is EstadoCita {
@@ -302,8 +243,6 @@ export type CitaAgenda = {
   serviciosTexto: string | null;
   /** true si ya se cobró en la caja (se marca con una tilde en el calendario). */
   cobrada: boolean;
-  /** El color de cada servicio del turno ("#RRGGBB"), tal como se eligió en Servicios. */
-  colores: string[];
 };
 
 /** El día ("YYYY-MM-DD") y los minutos desde la medianoche de un instante, en hora de Asunción. */

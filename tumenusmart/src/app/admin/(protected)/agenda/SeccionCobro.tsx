@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { Campo, Entrada, Selector, clasesBoton } from "@/components/ui";
 import type { DatosCobro, EstadoCaja } from "@/lib/agenda-cita";
@@ -10,45 +10,13 @@ import { FORMAS_PAGO_POS, type FormaPagoPos } from "@/lib/turno-pos";
 import { buscarClientePorIdentificacion } from "../pos/actions";
 import { EntradaConLupa } from "../pos/EntradaConLupa";
 import { BloqueCita, Conmutador } from "./BloqueCita";
-import { IconoBanco, IconoBillete, IconoRecibo, IconoTarjeta, IconoTilde } from "./IconosAgenda";
+import { IconoBillete } from "./IconosAgenda";
 
-/**
- * Cada forma de pago con su color: el efectivo en verde, la transferencia en azul, el
- * débito en violeta y el crédito en rosa. En reposo es una tarjeta suave del color; al
- * elegirla se llena de degradado, con una tilde que aparece con un saltito.
- */
-const ESTILO_FORMA: Record<
-  FormaPagoPos,
-  { icono: ReactNode; reposo: string; activa: string; tilde: string }
-> = {
-  efectivo: {
-    icono: <IconoBillete tam={18} />,
-    reposo: "border-emerald-200 bg-emerald-50/70 text-emerald-900 hover:border-emerald-400 hover:bg-emerald-50",
-    activa:
-      "border-transparent bg-gradient-to-br from-emerald-500 to-emerald-700 text-white shadow-lg shadow-emerald-600/30 ring-2 ring-emerald-300",
-    tilde: "text-emerald-600",
-  },
-  transferencia: {
-    icono: <IconoBanco tam={18} />,
-    reposo: "border-sky-200 bg-sky-50/70 text-sky-900 hover:border-sky-400 hover:bg-sky-50",
-    activa:
-      "border-transparent bg-gradient-to-br from-sky-500 to-blue-600 text-white shadow-lg shadow-blue-600/30 ring-2 ring-sky-300",
-    tilde: "text-blue-600",
-  },
-  tarjeta_debito: {
-    icono: <IconoTarjeta tam={18} />,
-    reposo: "border-violet-200 bg-violet-50/70 text-violet-900 hover:border-violet-400 hover:bg-violet-50",
-    activa:
-      "border-transparent bg-gradient-to-br from-violet-500 to-purple-600 text-white shadow-lg shadow-purple-600/30 ring-2 ring-violet-300",
-    tilde: "text-purple-600",
-  },
-  tarjeta_credito: {
-    icono: <IconoTarjeta tam={18} />,
-    reposo: "border-pink-200 bg-pink-50/70 text-pink-900 hover:border-pink-400 hover:bg-pink-50",
-    activa:
-      "border-transparent bg-gradient-to-br from-pink-500 to-rose-600 text-white shadow-lg shadow-rose-600/30 ring-2 ring-pink-300",
-    tilde: "text-rose-600",
-  },
+const ICONOS_FORMA: Record<FormaPagoPos, string> = {
+  efectivo: "💵",
+  transferencia: "🏦",
+  tarjeta_debito: "💳",
+  tarjeta_credito: "💳",
 };
 
 /**
@@ -103,12 +71,8 @@ export function SeccionCobro({
   }
 
   return (
-    <BloqueCita titulo="Cobro en caja" icono={<IconoBillete tam={17} />} tono="esmeralda" retraso={retraso}>
-      <p
-        className={`-mt-1 rounded-lg px-3 py-2 text-[0.8rem] leading-snug ${
-          cobrando ? "bg-emerald-100 font-medium text-emerald-800" : "bg-papel-suave text-tinta-suave"
-        }`}
-      >
+    <BloqueCita titulo="Cobro en caja" icono={<IconoBillete />} retraso={retraso}>
+      <p className="-mt-1 text-[0.78rem] leading-snug text-tinta-suave">
         {cobrando
           ? "Al tocar Cobrar, el pago entra en el turno de caja y la cita queda finalizada."
           : "Elegí cómo paga para cobrar y finalizar la cita."}
@@ -116,22 +80,18 @@ export function SeccionCobro({
 
       {/* ---------- la caja ---------- */}
       {caja.listo ? (
-        <p className="flex items-center gap-2.5 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-[0.82rem] font-semibold text-emerald-800">
-          {/* Un puntito verde que late: hay un turno abierto y listo para cobrar. */}
-          <span className="relative flex h-2.5 w-2.5 flex-none">
-            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-70" />
-            <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500" />
-          </span>
+        <p className="flex items-center gap-2 rounded-lg bg-exito-luz px-3 py-2 text-[0.8rem] font-medium text-exito">
+          <span aria-hidden="true" className="h-2 w-2 flex-none rounded-full bg-exito" />
           Caja {caja.estacion} · turno abierto
         </p>
       ) : (
-        <div className="rounded-xl border border-amber-300 bg-amber-50 p-3">
-          <p className="text-[0.86rem] font-semibold text-amber-900">
+        <div className="rounded-lg border border-aviso/30 bg-aviso-luz p-3">
+          <p className="text-[0.84rem] font-semibold text-aviso">
             {caja.motivo === "sin_estacion"
               ? "Esta computadora no está vinculada a una caja"
               : "No hay un turno de caja abierto"}
           </p>
-          <p className="mt-1 text-[0.8rem] leading-snug text-amber-800">
+          <p className="mt-1 text-[0.8rem] leading-snug text-tinta-media">
             {caja.motivo === "sin_estacion"
               ? "Para cobrar, la computadora tiene que estar vinculada a una caja en Punto de venta → Estaciones (lo hace el dueño)."
               : "Abrí el turno de caja para poder cobrar: lo que se cobra acá entra en esa caja."}
@@ -149,45 +109,31 @@ export function SeccionCobro({
 
       {/* ---------- forma de pago ---------- */}
       <div>
-        <p className="mb-2 text-[0.82rem] font-semibold text-tinta">Método de pago</p>
-        <div className="grid grid-cols-2 gap-2.5">
-          {FORMAS_PAGO_POS.map((f) => {
-            const estilo = ESTILO_FORMA[f.valor];
-            const elegida = valor.forma === f.valor;
-            return (
-              <button
-                key={f.valor}
-                type="button"
-                onClick={() => onCambio({ forma: f.valor })}
-                aria-pressed={elegida}
-                className={`relative flex min-h-[3.4rem] min-w-0 items-center gap-2.5 rounded-xl border-2 px-3 py-2.5 text-left text-[0.86rem] font-semibold leading-tight transition-all duration-200 hover:-translate-y-0.5 active:scale-95 ${
-                  elegida ? estilo.activa : estilo.reposo
-                }`}
-              >
-                <span
-                  className={`flex h-9 w-9 flex-none items-center justify-center rounded-full transition-colors ${
-                    elegida ? "bg-white/25" : "bg-white"
-                  }`}
-                >
-                  {estilo.icono}
-                </span>
-                <span className="min-w-0">{f.etiqueta}</span>
-                {elegida && (
-                  <span
-                    aria-hidden="true"
-                    className={`absolute right-1.5 top-1.5 flex h-5 w-5 animate-pop items-center justify-center rounded-full bg-white shadow ${estilo.tilde}`}
-                  >
-                    <IconoTilde tam={12} />
-                  </span>
-                )}
-              </button>
-            );
-          })}
+        <p className="mb-1.5 text-[0.82rem] font-semibold text-tinta">Método de pago</p>
+        <div className="grid grid-cols-2 gap-2">
+          {FORMAS_PAGO_POS.map((f) => (
+            <button
+              key={f.valor}
+              type="button"
+              onClick={() => onCambio({ forma: f.valor })}
+              aria-pressed={valor.forma === f.valor}
+              className={`flex min-w-0 items-center gap-2 rounded-lg border px-3 py-2.5 text-left text-[0.85rem] font-medium leading-tight transition-colors active:scale-[0.98] ${
+                valor.forma === f.valor
+                  ? "border-azul bg-azul-luz text-azul-oscuro"
+                  : "border-linea text-tinta-media hover:border-azul/40 hover:bg-papel-suave"
+              }`}
+            >
+              <span aria-hidden="true" className="text-base leading-none">
+                {ICONOS_FORMA[f.valor]}
+              </span>
+              {f.etiqueta}
+            </button>
+          ))}
         </div>
 
         {valor.forma === "efectivo" && (
-          <div className="mt-2.5 flex flex-wrap items-center gap-2.5 rounded-xl border border-emerald-200 bg-emerald-50/60 px-3 py-2.5">
-            <label htmlFor="cita-paga-con" className="text-[0.75rem] font-semibold uppercase tracking-rotulo text-emerald-800">
+          <div className="mt-2.5 flex flex-wrap items-center gap-2.5 rounded-lg border border-linea bg-papel-suave px-3 py-2">
+            <label htmlFor="cita-paga-con" className="text-[0.75rem] font-semibold uppercase tracking-rotulo text-tinta-suave">
               Paga con
             </label>
             <input
@@ -200,11 +146,11 @@ export function SeccionCobro({
               onChange={(e) => setPagaCon(e.target.value)}
               onWheel={(e) => e.currentTarget.blur()}
               placeholder={String(Math.round(total))}
-              className="w-32 rounded-lg border border-emerald-200 bg-superficie px-2.5 py-1.5 text-center text-[0.95rem] font-semibold text-tinta focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-200"
+              className="w-32 rounded-lg border border-linea bg-superficie px-2.5 py-1.5 text-center text-[0.95rem] font-semibold text-tinta focus:border-azul focus:outline-none focus:ring-2 focus:ring-azul/15"
             />
             {vuelto > 0 && (
               <p className="ml-auto text-[0.88rem] text-tinta">
-                Vuelto: <strong key={vuelto} className="cifra inline-block animate-pop text-emerald-700">{formatearGuarani(vuelto)}</strong>
+                Vuelto: <strong className="cifra text-exito">{formatearGuarani(vuelto)}</strong>
               </p>
             )}
           </div>
@@ -213,22 +159,13 @@ export function SeccionCobro({
 
       {/* ---------- comprobante ---------- */}
       <div>
-        <p className="mb-2 flex items-center gap-1.5 text-[0.82rem] font-semibold text-tinta">
-          <span className="text-indigo-500">
-            <IconoRecibo tam={15} />
-          </span>
-          Comprobante
-        </p>
+        <p className="mb-1.5 text-[0.82rem] font-semibold text-tinta">Comprobante</p>
         {!caja.listo ? (
           <p className="rounded-lg bg-papel-suave px-3 py-2 text-[0.78rem] text-tinta-media">
             Se elige al tener la caja lista.
           </p>
         ) : caja.facturaObligatoria ? (
-          <p
-            className={`rounded-lg px-3 py-2 text-[0.78rem] ${
-              caja.puedeFacturar ? "bg-indigo-50 font-medium text-indigo-800" : "bg-red-50 font-medium text-red-700"
-            }`}
-          >
+          <p className="rounded-lg bg-papel-suave px-3 py-2 text-[0.78rem] text-tinta-media">
             {caja.puedeFacturar
               ? "Este local factura todas las ventas: se emite factura."
               : "Este local exige facturar y esta caja no tiene un punto de expedición vigente: no se puede cobrar acá."}
@@ -250,7 +187,7 @@ export function SeccionCobro({
         )}
 
         {caja.listo && caja.puedeFacturar && esFactura && (
-          <div className="mt-2.5 flex animate-deslizar flex-col gap-2.5 rounded-xl border border-indigo-200 bg-indigo-50/50 p-3">
+          <div className="mt-2.5 flex flex-col gap-2.5 rounded-lg border border-linea bg-papel-suave p-3">
             <Conmutador
               etiqueta="Registro fiscal"
               opciones={[

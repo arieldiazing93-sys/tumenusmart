@@ -100,11 +100,8 @@ export type DetalleCita = {
   cobro: CobroDeCita | null;
 };
 
-/** De qué se trató un movimiento de la pestaña Actividad (decide su color y su ícono). */
-export type TonoActividad = "creada" | "cobro" | "anulado" | "estado" | "edicion";
-
 /** Una línea de la pestaña Actividad. */
-export type ActividadCita = { cuando: string; quien: string; texto: string; tono: TonoActividad };
+export type ActividadCita = { cuando: string; quien: string; texto: string };
 
 /**
  * Si se puede cobrar desde este navegador. Cobrar necesita que la computadora esté
