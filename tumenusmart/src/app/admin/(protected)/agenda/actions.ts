@@ -205,6 +205,8 @@ async function citaQueSePisa(
       personalId,
       ...(excluirId ? { id: { not: excluirId } } : {}),
       estado: { notIn: ["cancelada", "no_asistio"] },
+      // Lo cobrado en el mostrador sin reserva es un registro de un trabajo ya hecho, no un turno que ocupe agenda.
+      origen: { not: "mostrador" },
       OR: [{ visible: true }, { createdAt: { gt: limiteSinConfirmar } }],
       inicio: { lt: finConBufer },
       // Cota amplia (el búfer es de una hora como mucho); abajo se afina con el búfer de cada una.

@@ -2,7 +2,7 @@ import { pantallaConPermiso } from "@/lib/auth";
 import { idLocalActual } from "@/lib/local-actual";
 import { prisma } from "@/lib/prisma";
 import { prismaDelLocal } from "@/lib/prisma-local";
-import { Cabecera } from "@/components/ui";
+import { BotonEnlace, Cabecera } from "@/components/ui";
 import type { MiembroFila } from "@/lib/agenda-personal";
 import { ListaPersonal } from "./ListaPersonal";
 import { PedirPersonalEnVentaToggle } from "./PedirPersonalEnVentaToggle";
@@ -55,6 +55,11 @@ export default async function PersonalPage() {
       <Cabecera
         titulo="Personal"
         bajada="Quienes atienden a tus clientes. Cada uno tiene su propia agenda en el calendario."
+        acciones={
+          <BotonEnlace href="/admin/agenda/personal/reporte" tono="navegar" tam="md">
+            Reporte de personal
+          </BotonEnlace>
+        }
       />
       <PedirPersonalEnVentaToggle activa={store?.pedirPersonalEnVenta ?? false} />
       <ListaPersonal miembros={miembros} />

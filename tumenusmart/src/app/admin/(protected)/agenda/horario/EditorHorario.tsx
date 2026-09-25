@@ -53,7 +53,6 @@ function Palanca({
   etiqueta,
   activo,
   onChange,
-  tono,
   deshabilitado = false,
   className = "",
 }: {
@@ -62,14 +61,13 @@ function Palanca({
   etiqueta: string;
   activo: boolean;
   onChange: (nuevo: boolean) => void;
-  tono: "exito" | "azul";
   deshabilitado?: boolean;
   className?: string;
 }) {
   return (
     <div className={`flex h-[2.6rem] items-center gap-2.5 ${className}`}>
       <span className="text-[0.84rem] font-medium text-tinta-media xl:sr-only">{texto}</span>
-      <Interruptor activo={activo} onChange={onChange} etiqueta={etiqueta} tono={tono} deshabilitado={deshabilitado} />
+      <Interruptor activo={activo} onChange={onChange} etiqueta={etiqueta} tono="azul" deshabilitado={deshabilitado} />
     </div>
   );
 }
@@ -182,7 +180,6 @@ export function EditorHorario({ inicial }: { inicial: HorarioDia[] }) {
                 etiqueta={`Se trabaja el ${nombre.toLowerCase()}`}
                 activo={d.trabaja}
                 onChange={(v) => cambiar(d.diaSemana, { trabaja: v })}
-                tono="exito"
                 className="justify-end md:justify-start"
               />
 
@@ -207,7 +204,6 @@ export function EditorHorario({ inicial }: { inicial: HorarioDia[] }) {
                 etiqueta={`Hay descanso el ${nombre.toLowerCase()}`}
                 activo={descansoActivo}
                 onChange={(v) => cambiar(d.diaSemana, { descansa: v })}
-                tono="azul"
                 deshabilitado={!d.trabaja}
                 className="col-span-2 justify-between md:col-span-1 md:col-start-2 md:justify-start xl:col-start-auto"
               />

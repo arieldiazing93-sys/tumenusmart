@@ -101,6 +101,9 @@ export default async function AgendaPage({
       inicio: limitesEnAsuncion({ desde: dias[0], hasta: dias[dias.length - 1] }),
       // Un turno pedido por la web que espera el aviso por WhatsApp todavía no se ve.
       visible: true,
+      // Lo cobrado en el mostrador a alguien sin reserva no es un turno: cuenta en el historial del personal
+      // (Citas, su vista de trabajo y su comisión), pero el calendario es para organizar las reservas.
+      origen: { not: "mostrador" },
       ...(elegido ? { personalId: elegido.id } : {}),
     },
     orderBy: [{ inicio: "asc" }, { id: "asc" }],

@@ -175,6 +175,8 @@ export async function ocupadosPorPersonal(
       personalId: { in: personalIds },
       inicio: { gte: desde, lt: hasta },
       estado: { notIn: ["cancelada", "no_asistio"] },
+      // Lo cobrado en el mostrador sin reserva ya pasó: no ocupa agenda.
+      origen: { not: "mostrador" },
       OR: [{ visible: true }, { createdAt: { gt: limiteSinConfirmar } }],
     },
     select: { personalId: true, inicio: true, fin: true, bufferMin: true },
