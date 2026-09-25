@@ -177,16 +177,19 @@ export async function registrarVenta(turnoId: string, datos: DatosVenta): Promis
 
   // Cobrar una cita: tiene que ser de este local (`db` ya filtra por local), no estar
   // cobrada ya y no estar cancelada. Se vuelve a comprobar adentro de la transacción.
+  // La comisión de quien atiende esa cita, tal como está AHORA: queda guardada en la cita al cobrarla.
+  let comisionDeLaCita: number | null = null;
   if (datos.citaId) {
     const cita = await db.cita.findFirst({
       where: { id: datos.citaId },
-      select: { ventaPosId: true, estado: true },
+      select: { ventaPosId: true, estado: true, personal: { select: { comisionPorcentaje: true } } },
     });
     if (!cita) return { ok: false, error: "Esa cita no existe." };
     if (cita.ventaPosId) return { ok: false, error: "Esa cita ya está cobrada." };
     if (cita.estado === "cancelada" || cita.estado === "no_asistio") {
       return { ok: false, error: "Esa cita está cancelada o sin asistencia. Reactivala para poder cobrarla." };
     }
+    comisionDeLaCita = cita.personal.comisionPorcentaje == null ? null : Number(cita.personal.comisionPorcentaje);
   }
 
   const esFactura = datos.comprobanteTipo === "factura";
@@ -575,7 +578,7 @@ export async function registrarVenta(turnoId: string, datos: DatosVenta): Promis
           ventaPosId: null,
           estado: { notIn: ["cancelada", "no_asistio"] },
         },
-        data: { ventaPosId: venta.id, estado: "finalizada", precio: total },
+        data: { ventaPosId: venta.id, estado: "finalizada", precio: total, comisionPorcentaje: comisionDeLaCita },
       });
       if (marcada.count !== 1) throw new Error(CITA_NO_COBRABLE);
     }
@@ -948,7 +951,7 @@ export async function cancelarVenta(ventaId: string, motivo: string): Promise<Re
     // cobrar (queda como Próxima) y sale de Citas.
     await tx.cita.updateMany({
       where: { storeId, ventaPosId: ventaId },
-      data: { ventaPosId: null, estado: "proxima" },
+      data: { ventaPosId: null, estado: "proxima", comisionPorcentaje: null },
     });
   });
 

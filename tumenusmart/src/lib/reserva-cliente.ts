@@ -14,8 +14,6 @@ import { textoDuracion, type TipoPrecio } from "./servicios-agenda";
 
 /** Cuántos servicios se pueden juntar en una misma cita. */
 export const MAX_SERVICIOS_POR_CITA = 8;
-/** Largo máximo de la nota, como en la pantalla del cliente. */
-export const LARGO_NOTA = 150;
 
 // ---------------------------------------------------------------------------
 //  Lo que la página le muestra al cliente
@@ -62,7 +60,6 @@ export type DatosCliente = {
   telefono: string;
   email: string;
   direccion: string;
-  nota: string;
   /** Respuestas a los campos propios, por la clave de cada campo. */
   extras: Record<string, string>;
 };
@@ -74,7 +71,6 @@ export const DATOS_CLIENTE_VACIOS: DatosCliente = {
   telefono: "",
   email: "",
   direccion: "",
-  nota: "",
   extras: {},
 };
 
@@ -85,7 +81,6 @@ export type ClienteLimpio = {
   telefono: string | null;
   email: string | null;
   direccion: string | null;
-  nota: string | null;
   extras: { clave: string; etiqueta: string; valor: string }[];
 };
 
@@ -140,9 +135,6 @@ export function validarDatosCliente(
   const direccion = activo("direccion") ? recortar(d.direccion, 120) : "";
   if (obligatorio("direccion") && !direccion) return faltante("direccion");
 
-  const nota = activo("nota") ? recortar(d.nota, LARGO_NOTA) : "";
-  if (obligatorio("nota") && !nota) return faltante("nota");
-
   const extras: ClienteLimpio["extras"] = [];
   for (const campo of campos) {
     if (campo.tipo !== "personalizado" || !campo.activo) continue;
@@ -159,7 +151,6 @@ export function validarDatosCliente(
       telefono,
       email,
       direccion: direccion || null,
-      nota: nota || null,
       extras,
     },
   };
@@ -198,7 +189,6 @@ export function mensajeWhatsappCita(x: {
     `Hora: ${x.horaInicio} a ${x.horaFin}`,
     `Total: ${formatearGuarani(x.total)}`,
     ...x.cliente.extras.map((e) => `${e.etiqueta}: ${e.valor}`),
-    ...(x.cliente.nota ? [`Nota: ${x.cliente.nota}`] : []),
     "",
     `Cita ${x.codigo}`,
   ];

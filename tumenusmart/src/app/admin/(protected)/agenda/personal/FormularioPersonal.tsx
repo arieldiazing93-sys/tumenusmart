@@ -7,6 +7,7 @@ import { PAISES_TELEFONO, separarTelefono, type MiembroFila } from "@/lib/agenda
 import { comprimirImagen, PARA_LOGO } from "@/lib/comprimir-imagen";
 import { actualizarPersonal, crearPersonal, subirFotoDelPersonal } from "./actions";
 import { EnlaceTrabajoPersonal } from "./EnlaceTrabajoPersonal";
+import { TrabajosYComision } from "./TrabajosYComision";
 
 /**
  * El formulario para dar de alta (o editar) a un miembro del personal. Vive
@@ -203,6 +204,31 @@ export function FormularioPersonal({
             placeholder="Ej: Barbero, Colorista, Manicurista"
           />
         </Campo>
+
+        {/* La comisión por trabajo: el porcentaje de lo que se cobra en cada cita suya. */}
+        <Campo
+          etiqueta="Comisión por trabajo (opcional)"
+          ayuda="Lo que le toca de cada trabajo que cobrás a su nombre. Vacío = no cobra comisión."
+        >
+          <div className="flex items-center gap-2">
+            <div className="w-28 flex-none">
+              <Entrada
+                name="comision"
+                type="number"
+                min={0}
+                max={100}
+                step={0.5}
+                inputMode="decimal"
+                defaultValue={miembro?.comisionPorcentaje ?? ""}
+                placeholder="Ej.: 40"
+              />
+            </div>
+            <span className="text-[0.95rem] font-semibold text-tinta-media">%</span>
+          </div>
+        </Campo>
+
+        {/* Sus trabajos terminados y lo que gana de comisión (solo de una persona que ya existe). */}
+        {miembro && <TrabajosYComision id={miembro.id} />}
 
         {miembro && (
           <EnlaceTrabajoPersonal

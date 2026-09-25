@@ -26,6 +26,7 @@ import {
   cargarActividadDeCita,
   cargarDetalleCita,
   cargarEstadoCaja,
+  cargarNombreDelNegocio,
   cargarPersonalDelPanel,
   cargarServiciosDelPanel,
 } from "./cargar-cita";
@@ -136,11 +137,12 @@ export default async function AgendaPage({
     const detalle = sp.cita === "nueva" ? null : await cargarDetalleCita(db, sp.cita);
     // Una dirección con una cita que ya no existe simplemente no abre nada.
     if (sp.cita === "nueva" || detalle) {
-      const [serviciosPanel, personalPanel, caja, actividad] = await Promise.all([
+      const [serviciosPanel, personalPanel, caja, actividad, negocio] = await Promise.all([
         cargarServiciosDelPanel(db),
         cargarPersonalDelPanel(db, detalle?.personalId ?? null),
         detalle ? cargarEstadoCaja(db, storeId) : Promise.resolve<EstadoCaja>({ listo: false, motivo: "sin_estacion" }),
         detalle ? cargarActividadDeCita(db, detalle) : Promise.resolve<ActividadCita[]>([]),
+        cargarNombreDelNegocio(storeId),
       ]);
       panel = (
         <PanelCita
@@ -149,6 +151,7 @@ export default async function AgendaPage({
           servicios={serviciosPanel}
           personal={personalPanel}
           caja={caja}
+          negocio={negocio}
           actividad={actividad}
           parametros={parametros}
           hoy={hoy}

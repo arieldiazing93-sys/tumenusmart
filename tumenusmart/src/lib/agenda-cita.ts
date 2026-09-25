@@ -82,6 +82,7 @@ export type DetalleCita = {
   /** Solo dígitos, internacional (595984123456), o "". */
   clienteTelefono: string;
   clienteEmail: string;
+  /** Una nota vieja (de cuando el formulario público la pedía): ya no se carga, solo se lee si la hay. */
   nota: string;
   /** Las respuestas a los campos extra del formulario público (solo se leen). */
   extras: { etiqueta: string; valor: string }[];
@@ -129,7 +130,6 @@ export type DatosCita = {
   clienteNombre: string;
   clienteTelefono: string;
   clienteEmail: string;
-  nota: string;
   personalId: string;
   fecha: string;
   hora: string;

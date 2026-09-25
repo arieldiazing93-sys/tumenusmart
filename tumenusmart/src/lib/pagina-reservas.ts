@@ -107,7 +107,6 @@ export const CAMPOS_BASE: CampoFormulario[] = [
   { clave: "telefono", etiqueta: "Teléfono", activo: true, obligatorio: true, tipo: "base" },
   { clave: "email", etiqueta: "Correo electrónico", activo: true, obligatorio: false, tipo: "base" },
   { clave: "direccion", etiqueta: "Dirección", activo: false, obligatorio: false, tipo: "base" },
-  { clave: "nota", etiqueta: "Nota", activo: true, obligatorio: false, tipo: "base" },
 ];
 
 function esObjeto(valor: unknown): valor is Record<string, unknown> {

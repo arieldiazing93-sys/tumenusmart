@@ -11,7 +11,7 @@ import {
   type DatosCita,
   type DatosCobro,
 } from "@/lib/agenda-cita";
-import { normalizarTelefonoPersonal, PAIS_POR_DEFECTO, PAISES_TELEFONO, type ResultadoTelefono } from "@/lib/agenda-personal";
+import { nombreCompleto, normalizarTelefonoCliente } from "@/lib/agenda-personal";
 import { claveSumarDias } from "@/lib/calendario";
 import { MINUTOS_BLOQUEO_SIN_CONFIRMAR } from "@/lib/disponibilidad";
 import { estacionActual } from "@/lib/estacion-actual";
@@ -33,7 +33,6 @@ export type ResultadoCobroCita = { ok: true; ventaId: string; total: number } | 
 export type ResultadoSimple = { ok: true } | { ok: false; error: string };
 
 const LARGO_MAXIMO_NOMBRE = 80;
-const LARGO_MAXIMO_NOTA = 300;
 
 function refrescarAgenda() {
   revalidatePath("/admin/agenda");
@@ -52,7 +51,6 @@ type Preparados = {
   clienteNombre: string;
   clienteTelefono: string | null;
   clienteEmail: string | null;
-  nota: string | null;
   lineas: { servicioId: string | null; nombre: string; duracionMin: number; precio: number }[];
   serviciosTexto: string;
   fecha: string;
@@ -66,21 +64,6 @@ type CitaExistente = {
   bufferMin: number;
   servicios: { id: string; servicioId: string | null; nombre: string; duracionMin: number }[];
 };
-
-/**
- * El teléfono del cliente en formato internacional (solo dígitos). Un número que ya trae su
- * país (el que dejó el cliente en la página de reservas, aunque sea de Argentina o Brasil)
- * se conserva tal cual; uno escrito a la paraguaya ("0984 123 456") se completa con 595.
- */
-function telefonoDelCliente(escrito: string): ResultadoTelefono {
-  const digitos = escrito.replace(/\D/g, "");
-  const yaTraePais = PAISES_TELEFONO.some((p) => {
-    const resto = digitos.length - p.codigo.length;
-    return digitos.startsWith(p.codigo) && resto >= 7 && resto <= 12;
-  });
-  if (!digitos.startsWith("0") && yaTraePais) return { ok: true, telefono: digitos };
-  return normalizarTelefonoPersonal(PAIS_POR_DEFECTO, escrito);
-}
 
 /**
  * Lee y valida lo que mandó el panel. Nada se guarda tal cual: el profesional y los
@@ -106,7 +89,7 @@ async function prepararDatos(
   let clienteTelefono: string | null = null;
   const telefonoEscrito = String(datos.clienteTelefono ?? "").trim();
   if (telefonoEscrito) {
-    const t = telefonoDelCliente(telefonoEscrito);
+    const t = normalizarTelefonoCliente(telefonoEscrito);
     if (!t.ok) return { ok: false, error: t.error };
     clienteTelefono = t.telefono;
   }
@@ -114,11 +97,6 @@ async function prepararDatos(
   const email = String(datos.clienteEmail ?? "").trim();
   if (email && (!email.includes("@") || email.length > 120)) {
     return { ok: false, error: "El correo del cliente no es válido" };
-  }
-
-  const nota = String(datos.nota ?? "").trim();
-  if (nota.length > LARGO_MAXIMO_NOTA) {
-    return { ok: false, error: `La nota puede tener hasta ${LARGO_MAXIMO_NOTA} letras` };
   }
 
   const personal =
@@ -202,7 +180,6 @@ async function prepararDatos(
       clienteNombre,
       clienteTelefono,
       clienteEmail: email || null,
-      nota: nota || null,
       lineas,
       serviciosTexto: lineas
         .map((l) => l.nombre)
@@ -264,7 +241,6 @@ async function aplicarCambios(storeId: string, citaId: string, p: Preparados, es
         clienteNombre: p.clienteNombre,
         clienteTelefono: p.clienteTelefono,
         clienteEmail: p.clienteEmail,
-        nota: p.nota,
         inicio: p.inicio,
         fin: p.fin,
         estado,
@@ -386,7 +362,6 @@ export async function crearCita(datos: DatosCita): Promise<ResultadoCita> {
       clienteNombre: p.clienteNombre,
       clienteTelefono: p.clienteTelefono,
       clienteEmail: p.clienteEmail,
-      nota: p.nota,
       inicio: p.inicio,
       fin: p.fin,
       estado,
@@ -597,6 +572,63 @@ export async function anularCobroCita(citaId: string, motivo: string): Promise<R
     entidad: "Cita",
     entidadId: cita.id,
     detalle: { venta: cita.ventaPosId, motivo: limpio },
+  });
+
+  refrescarAgenda();
+  return { ok: true };
+}
+
+/**
+ * Pasa una cita YA COBRADA a otra persona del personal (se le cargó el trabajo a quien no
+ * era). Es lo único que se corrige de una cita cobrada sin anular el cobro: el resto queda
+ * bloqueado. La comisión pasa a ser la de la nueva persona, y el trabajo se cuenta en su vista.
+ */
+export async function reasignarCita(citaId: string, personalId: string): Promise<ResultadoSimple> {
+  const sesion = await exigirPermiso("agenda.ver");
+  const storeId = await idLocalActual();
+  const db = prismaDelLocal(storeId);
+
+  const cita = await db.cita.findFirst({
+    where: { id: citaId },
+    select: {
+      id: true,
+      ventaPosId: true,
+      clienteNombre: true,
+      personalId: true,
+      personal: { select: { nombre: true, apellido: true } },
+    },
+  });
+  if (!cita) return { ok: false, error: "Esa cita ya no existe." };
+  if (!cita.ventaPosId) {
+    return { ok: false, error: "Esta cita todavía no se cobró: cambiá a quien atiende y guardá." };
+  }
+
+  const nueva =
+    typeof personalId === "string" && personalId
+      ? await db.miembroPersonal.findFirst({
+          where: { id: personalId },
+          select: { id: true, nombre: true, apellido: true, comisionPorcentaje: true },
+        })
+      : null;
+  if (!nueva) return { ok: false, error: "Elegí a quién se le asigna el trabajo." };
+  if (nueva.id === cita.personalId) return { ok: true };
+
+  const cambiadas = await prisma.cita.updateMany({
+    where: { id: cita.id, storeId, ventaPosId: { not: null } },
+    data: {
+      personalId: nueva.id,
+      comisionPorcentaje: nueva.comisionPorcentaje == null ? null : Number(nueva.comisionPorcentaje),
+    },
+  });
+  if (cambiadas.count !== 1) return { ok: false, error: "No se pudo pasar el trabajo. Actualizá la pantalla." };
+
+  await registrarBitacora(storeId, sesion, {
+    modulo: "agenda",
+    accion: "cita_reasignada",
+    descripcion: `Pasó el trabajo de ${cita.clienteNombre} de ${nombreCompleto(cita.personal)} a ${nombreCompleto(nueva)}.`,
+    entidad: "Cita",
+    entidadId: cita.id,
+    detalle: { de: cita.personalId, a: nueva.id },
   });
 
   refrescarAgenda();

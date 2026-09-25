@@ -3,7 +3,8 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Area, Campo, Entrada, MensajeError, Selector, clasesBoton } from "@/components/ui";
-import { ESTADOS_CITA, estadoDeCita, urlAgenda, type ParametrosAgenda } from "@/lib/agenda";
+import { IconoWhatsapp } from "@/components/iconos";
+import { ESTADOS_CITA, diaLargo, estadoDeCita, urlAgenda, type ParametrosAgenda } from "@/lib/agenda";
 import {
   duracionDeServicios,
   horaFinDeCita,
@@ -18,15 +19,27 @@ import {
   type PersonalDeCita,
   type ServicioOpcion,
 } from "@/lib/agenda-cita";
-import { formatearTelefonoPersonal } from "@/lib/agenda-personal";
+import { formatearTelefonoPersonal, normalizarTelefonoCliente } from "@/lib/agenda-personal";
 import { formatearGuarani } from "@/lib/format";
 import { imprimirComprobante } from "@/lib/impresion-comprobantes";
 import { TIPOS_IDENTIFICACION_FISCAL } from "@/lib/tipo-cliente";
-import { anularCobroCita, cobrarCita, crearCita, eliminarCita, guardarCita } from "./actions";
+import { construirLinkWhatsapp } from "@/lib/whatsapp";
+import { anularCobroCita, cobrarCita, crearCita, eliminarCita, guardarCita, reasignarCita } from "./actions";
 import { BloqueCita, Conmutador } from "./BloqueCita";
 import { IconoCalendarioHora, IconoPersona, IconoTijera } from "./IconosAgenda";
 import { SeccionCobro } from "./SeccionCobro";
 import { ServiciosCita } from "./ServiciosCita";
+
+/** El botón de WhatsApp, con el mismo verde suave del que ya hay en Pedidos. */
+const BOTON_WHATSAPP =
+  "inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg border border-[#25D366]/30 bg-[#25D366]/10 px-3 text-[0.88rem] font-semibold text-[#128C7E] transition-colors";
+
+/**
+ * El campo de quién atiende va en amarillo, para ver de un vistazo a quién está asignado el
+ * trabajo (y notar si hay que pasarlo a otra persona). Va en línea porque `campos-grises`
+ * pinta todos los campos de gris con una regla más fuerte que cualquier clase.
+ */
+const CAMPO_AMARILLO = { backgroundColor: "#FEF08A", borderColor: "#EAB308" } as const;
 
 /**
  * El detalle de una cita, adentro del panel lateral: la ficha del turno y, a la vez, el
@@ -44,6 +57,7 @@ export function FormularioCita({
   servicios,
   personal,
   caja,
+  negocio,
   parametros,
   hoy,
   onCerrar,
@@ -56,6 +70,8 @@ export function FormularioCita({
   servicios: ServicioOpcion[];
   personal: PersonalDeCita[];
   caja: EstadoCaja;
+  /** El nombre del negocio, para el mensaje de WhatsApp al cliente. */
+  negocio: string;
   parametros: ParametrosAgenda;
   hoy: string;
   onCerrar: () => void;
@@ -73,7 +89,6 @@ export function FormularioCita({
     inicial?.clienteTelefono ? formatearTelefonoPersonal(inicial.clienteTelefono) : ""
   );
   const [email, setEmail] = useState(inicial?.clienteEmail ?? "");
-  const [nota, setNota] = useState(inicial?.nota ?? "");
   const [fecha, setFecha] = useState(inicial?.fecha ?? (parametros.fecha < hoy ? hoy : parametros.fecha));
   const [hora, setHora] = useState(inicial?.hora ?? "09:00");
   const [personalId, setPersonalId] = useState(inicial?.personalId ?? parametros.personal ?? personal[0]?.id ?? "");
@@ -152,6 +167,20 @@ export function FormularioCita({
     ? ESTADOS_CITA.filter((e) => e.valor === "pendiente" || e.valor === "proxima")
     : ESTADOS_CITA;
 
+  // WhatsApp directo al número del cliente (con el país que ya trae o el de Paraguay), como el de Pedidos.
+  const telefonoCliente = normalizarTelefonoCliente(telefono);
+  const enlaceWhatsapp = telefonoCliente.ok
+    ? construirLinkWhatsapp(
+        telefonoCliente.telefono,
+        `Hola ${nombre.trim()}, te escribimos de ${negocio} por tu cita del ${fecha ? diaLargo(fecha) : ""} a las ${hora}.`
+      )
+    : null;
+  // Notas y respuestas viejas del formulario público: solo se leen.
+  const datosDelFormulario = [
+    ...(cita?.nota ? [{ etiqueta: "Nota", valor: cita.nota }] : []),
+    ...(cita?.extras ?? []),
+  ];
+
   function cambiarCobro(cambios: Partial<DatosCobro>) {
     setDatosCobro((previo) => ({ ...previo, ...cambios }));
     // Elegir cómo paga es querer cobrar: la cita pasa a Finalizada sola.
@@ -164,7 +193,6 @@ export function FormularioCita({
       clienteNombre: nombre,
       clienteTelefono: telefono,
       clienteEmail: email,
-      nota,
       personalId,
       fecha,
       hora,
@@ -268,6 +296,25 @@ export function FormularioCita({
       } catch {
         setError("No se pudo eliminar la cita. Probá de nuevo.");
         setConfirmandoEliminar(false);
+      }
+    });
+  }
+
+  /** Pasa el trabajo de una cita ya cobrada a otra persona (lo único que se corrige sin anular el cobro). */
+  function reasignar() {
+    if (!cita) return;
+    const id = cita.id;
+    setError(null);
+    iniciar(async () => {
+      try {
+        const r = await reasignarCita(id, personalId);
+        if (!r.ok) {
+          setError(r.error);
+          return;
+        }
+        router.refresh();
+      } catch {
+        setError("No se pudo pasar el trabajo. Probá de nuevo.");
       }
     });
   }
@@ -415,6 +462,47 @@ export function FormularioCita({
           </div>
         )}
 
+        {/* Una cita cobrada queda bloqueada, menos esto: a quién se le asigna el trabajo. Sirve para corregir un
+            trabajo cargado a la persona que no era; la comisión pasa a ser la de la nueva persona. */}
+        {cobrada && cita && (
+          <div className="animate-deslizar rounded-xl border border-yellow-400 bg-yellow-50 p-4 shadow-sm">
+            <label className="block">
+              <span className="mb-1.5 block text-[0.82rem] font-semibold text-tinta">Trabajo asignado a</span>
+              <Selector
+                value={personalId}
+                onChange={(e) => setPersonalId(e.target.value)}
+                style={CAMPO_AMARILLO}
+                className="font-semibold"
+              >
+                {personal.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.nombre}
+                  </option>
+                ))}
+              </Selector>
+            </label>
+            {personalId !== cita.personalId ? (
+              <div className="mt-2.5 flex items-center justify-between gap-2">
+                <p className="text-[0.76rem] leading-snug text-tinta-media">
+                  El trabajo y su comisión pasan a esa persona.
+                </p>
+                <button
+                  type="button"
+                  onClick={reasignar}
+                  disabled={pendiente}
+                  className={clasesBoton("principal", "sm")}
+                >
+                  {pendiente ? "Pasando…" : "Pasar el trabajo"}
+                </button>
+              </div>
+            ) : (
+              <p className="mt-1.5 text-[0.76rem] text-tinta-suave">
+                Para pasarlo a otra persona, elegila y tocá “Pasar el trabajo”.
+              </p>
+            )}
+          </div>
+        )}
+
         {/* Todo lo editable: una cita cobrada queda bloqueada (fieldset disabled apaga todos sus campos a la vez). */}
         <fieldset disabled={cobrada} className="flex min-w-0 flex-col gap-4">
           {/* ---------- id, fuente y estado ---------- */}
@@ -506,9 +594,9 @@ export function FormularioCita({
                 />
               </Campo>
             </div>
-            {cita && cita.extras.length > 0 && (
+            {datosDelFormulario.length > 0 && (
               <dl className="rounded-lg bg-papel-suave px-3 py-2.5 text-[0.8rem]">
-                {cita.extras.map((x) => (
+                {datosDelFormulario.map((x) => (
                   <div key={x.etiqueta} className="flex gap-2 py-0.5">
                     <dt className="flex-none font-semibold text-tinta">{x.etiqueta}:</dt>
                     <dd className="min-w-0 break-words text-tinta-media">{x.valor}</dd>
@@ -516,15 +604,24 @@ export function FormularioCita({
                 ))}
               </dl>
             )}
-            <Campo etiqueta="Nota">
-              <Area
-                rows={2}
-                value={nota}
-                onChange={(e) => setNota(e.target.value)}
-                maxLength={300}
-                placeholder="Algo para tener en cuenta (opcional)"
-              />
-            </Campo>
+            {/* Escribirle al cliente por WhatsApp, directo a su número. Sin teléfono cargado, apagado. */}
+            {enlaceWhatsapp ? (
+              <a
+                href={enlaceWhatsapp}
+                target="_blank"
+                rel="noopener noreferrer"
+                title={`Escribirle a ${nombre.trim() || "el cliente"} por WhatsApp`}
+                className={`${BOTON_WHATSAPP} hover:bg-[#25D366]/20`}
+              >
+                <IconoWhatsapp tam={18} />
+                Escribirle por WhatsApp
+              </a>
+            ) : (
+              <span aria-disabled="true" className={`${BOTON_WHATSAPP} cursor-not-allowed opacity-50`}>
+                <IconoWhatsapp tam={18} />
+                Cargá el teléfono para escribirle
+              </span>
+            )}
           </BloqueCita>
 
           {/* ---------- cuándo y con quién ---------- */}
@@ -565,16 +662,25 @@ export function FormularioCita({
               </div>
             </div>
 
-            <Campo etiqueta="Personal *">
-              <Selector value={personalId} onChange={(e) => setPersonalId(e.target.value)} required>
-                {personal.length === 0 && <option value="">No hay personal cargado</option>}
-                {personal.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.nombre}
-                  </option>
-                ))}
-              </Selector>
-            </Campo>
+            {/* Quién atiende, en amarillo. Con la cita ya cobrada este campo pasa arriba (ver "Trabajo asignado a"). */}
+            {!cobrada && (
+              <Campo etiqueta="Personal *">
+                <Selector
+                  value={personalId}
+                  onChange={(e) => setPersonalId(e.target.value)}
+                  required
+                  style={CAMPO_AMARILLO}
+                  className="font-semibold"
+                >
+                  {personal.length === 0 && <option value="">No hay personal cargado</option>}
+                  {personal.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.nombre}
+                    </option>
+                  ))}
+                </Selector>
+              </Campo>
+            )}
             {noRealiza.length > 0 && (
               <p className="rounded-lg bg-aviso-luz px-3 py-2 text-[0.8rem] leading-snug text-aviso">
                 Esta persona no tiene asignado: {noRealiza.join(", ")}. Igual podés dejarlo así.

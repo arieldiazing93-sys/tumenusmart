@@ -62,6 +62,7 @@ export function PanelCita({
   servicios,
   personal,
   caja,
+  negocio,
   actividad,
   parametros,
   hoy,
@@ -71,6 +72,8 @@ export function PanelCita({
   servicios: ServicioOpcion[];
   personal: PersonalDeCita[];
   caja: EstadoCaja;
+  /** El nombre del negocio, para el mensaje de WhatsApp al cliente. */
+  negocio: string;
   actividad: Movimiento[];
   parametros: ParametrosAgenda;
   hoy: string;
@@ -135,6 +138,7 @@ export function PanelCita({
           servicios={servicios}
           personal={personal}
           caja={caja}
+          negocio={negocio}
           parametros={parametros}
           hoy={hoy}
           onCerrar={cerrar}

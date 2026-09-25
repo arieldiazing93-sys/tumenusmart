@@ -183,7 +183,12 @@ export function ListaPersonal({ miembros }: { miembros: MiembroFila[] }) {
       )}
 
       {panel && (panel === "nuevo" || enEdicion) && (
-        <PanelLateral titulo={panel === "nuevo" ? "Añadir personal" : "Editar personal"} onCerrar={() => setPanel(null)}>
+        <PanelLateral
+          titulo={panel === "nuevo" ? "Añadir personal" : "Editar personal"}
+          onCerrar={() => setPanel(null)}
+          // Al editar hay más para ver (el reporte de trabajos y comisión): el panel es más ancho.
+          ancho={panel === "nuevo" ? "normal" : "ancho"}
+        >
           <FormularioPersonal key={panel} miembro={enEdicion} onCerrar={() => setPanel(null)} />
         </PanelLateral>
       )}

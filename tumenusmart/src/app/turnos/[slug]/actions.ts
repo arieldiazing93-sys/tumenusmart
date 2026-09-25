@@ -201,7 +201,6 @@ export async function crearCitaPublica(slug: string, datos: DatosCitaPublica): P
           clienteNombre: [cliente.nombre, cliente.apellido].filter(Boolean).join(" "),
           clienteTelefono: cliente.telefono,
           clienteEmail: cliente.email,
-          nota: cliente.nota,
           extras: extras.length > 0 ? (extras as unknown as Prisma.InputJsonValue) : undefined,
           inicio,
           fin,

@@ -5,11 +5,36 @@ import { exigirPermiso } from "@/lib/auth";
 import { registrarBitacora } from "@/lib/bitacora";
 import { idLocalActual } from "@/lib/local-actual";
 import { prismaDelLocal } from "@/lib/prisma-local";
-import { nombreCompleto, normalizarTelefonoPersonal } from "@/lib/agenda-personal";
+import { horaDeMinutos, partesLocales } from "@/lib/agenda";
+import {
+  PERIODOS_COMISION,
+  calcularComision,
+  leerComision,
+  nombreCompleto,
+  normalizarTelefonoPersonal,
+  type PeriodoComision,
+  type TrabajoDelPersonal,
+} from "@/lib/agenda-personal";
+import { calcularRangoFecha } from "@/lib/rango-fecha";
 import { subirFotoPersonal } from "@/lib/supabase-storage";
 
 export type ResultadoPersonal = { ok: true } | { ok: false; error: string };
 export type ResultadoFotoPersonal = { ok: true; url: string } | { ok: false; error: string };
+export type ResultadoTrabajos =
+  | {
+      ok: true;
+      /** La comisión que tiene ahora la persona; null si no cobra. */
+      comisionActual: number | null;
+      trabajos: TrabajoDelPersonal[];
+      totalCobrado: number;
+      totalComision: number;
+      /** true si hay más trabajos de los que se muestran (se acota el período). */
+      hayMas: boolean;
+    }
+  | { ok: false; error: string };
+
+/** Tope de trabajos que se listan de una vez en el reporte. */
+const MAXIMO_TRABAJOS = 300;
 
 const LARGO_MAXIMO_TEXTO = 60;
 
@@ -23,6 +48,7 @@ type DatosPersonal = {
   telefono: string;
   profesion: string | null;
   fotoUrl: string | null;
+  comisionPorcentaje: number | null;
 };
 
 /** Lee y valida lo que mandó el formulario. Nunca se guarda lo que llega tal cual. */
@@ -43,9 +69,20 @@ function leerDatos(formData: FormData): { ok: true; datos: DatosPersonal } | { o
   const fotoUrl = texto(formData.get("fotoUrl"));
   if (fotoUrl && !/^https:\/\//i.test(fotoUrl)) return { ok: false, error: "La foto no es válida. Subila de nuevo." };
 
+  // La comisión por trabajo: vacío = no cobra comisión.
+  const comision = leerComision(texto(formData.get("comision")));
+  if (!comision.ok) return { ok: false, error: comision.error };
+
   return {
     ok: true,
-    datos: { nombre, apellido, telefono: telefono.telefono, profesion: profesion || null, fotoUrl: fotoUrl || null },
+    datos: {
+      nombre,
+      apellido,
+      telefono: telefono.telefono,
+      profesion: profesion || null,
+      fotoUrl: fotoUrl || null,
+      comisionPorcentaje: comision.valor,
+    },
   };
 }
 
@@ -125,4 +162,70 @@ export async function actualizarPersonal(id: string, formData: FormData): Promis
 
   refrescarPantallas();
   return { ok: true };
+}
+
+/**
+ * El reporte de trabajos de una persona: las citas que ya cobró (o sea, los trabajos
+ * terminados) en el período elegido y lo que le toca de comisión por cada una.
+ *
+ * Cada cita usa el porcentaje que tenía la persona AL COBRARLA (así cambiar la comisión
+ * después no mueve lo que ya ganó); las citas cobradas antes de que existiera la comisión
+ * usan la que tiene ahora. Solo cuentan las cobradas cuyo cobro no se anuló.
+ */
+export async function trabajosDelPersonal(id: string, periodo: PeriodoComision): Promise<ResultadoTrabajos> {
+  await exigirPermiso("agenda.configurar");
+  const db = prismaDelLocal(await idLocalActual());
+
+  if (!PERIODOS_COMISION.some((p) => p.valor === periodo)) {
+    return { ok: false, error: "El período no es válido." };
+  }
+  const rango = calcularRangoFecha(periodo, undefined, undefined);
+  if (!rango) return { ok: false, error: "El período no es válido." };
+
+  const persona = await db.miembroPersonal.findFirst({ where: { id }, select: { comisionPorcentaje: true } });
+  if (!persona) return { ok: false, error: "No se encontró a esa persona." };
+  const comisionActual = persona.comisionPorcentaje == null ? null : Number(persona.comisionPorcentaje);
+
+  const citas = await db.cita.findMany({
+    where: {
+      personalId: id,
+      inicio: { gte: rango.gte, lt: rango.lt },
+      ventaPos: { is: { cancelada: false } },
+    },
+    orderBy: [{ inicio: "desc" }, { id: "asc" }],
+    take: MAXIMO_TRABAJOS,
+    select: {
+      id: true,
+      clienteNombre: true,
+      inicio: true,
+      serviciosTexto: true,
+      comisionPorcentaje: true,
+      ventaPos: { select: { total: true } },
+    },
+  });
+
+  const trabajos: TrabajoDelPersonal[] = citas.map((c) => {
+    const { dia, minutos } = partesLocales(c.inicio);
+    const total = Number(c.ventaPos?.total ?? 0);
+    const porcentaje = c.comisionPorcentaje == null ? comisionActual : Number(c.comisionPorcentaje);
+    return {
+      id: c.id,
+      dia,
+      hora: horaDeMinutos(minutos),
+      cliente: c.clienteNombre,
+      servicios: c.serviciosTexto,
+      total,
+      porcentaje,
+      comision: calcularComision(total, porcentaje),
+    };
+  });
+
+  return {
+    ok: true,
+    comisionActual,
+    trabajos,
+    totalCobrado: trabajos.reduce((suma, t) => suma + t.total, 0),
+    totalComision: trabajos.reduce((suma, t) => suma + t.comision, 0),
+    hayMas: citas.length >= MAXIMO_TRABAJOS,
+  };
 }

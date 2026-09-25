@@ -26,6 +26,7 @@ export default async function PersonalPage() {
       profesion: true,
       fotoUrl: true,
       activo: true,
+      comisionPorcentaje: true,
       _count: { select: { citas: true, servicios: true } },
     },
   });
@@ -40,6 +41,7 @@ export default async function PersonalPage() {
     activo: f.activo,
     servicios: f._count.servicios,
     citas: f._count.citas,
+    comisionPorcentaje: f.comisionPorcentaje == null ? null : Number(f.comisionPorcentaje),
   }));
 
   return (

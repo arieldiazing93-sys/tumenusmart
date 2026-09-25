@@ -2199,6 +2199,9 @@ model MiembroPersonal {
   orden     Int      @default(0)
   /// Se desactiva en vez de borrarse: sus turnos viejos siguen mostrándose.
   activo    Boolean  @default(true)
+  /// Comisión por trabajo: el porcentaje (0 a 100) de lo que se cobra en cada cita suya.
+  /// NULL = no cobra comisión. Cada cita guarda el porcentaje que tenía al cobrarse.
+  comisionPorcentaje Decimal? @db.Decimal(5, 2)
   createdAt DateTime @default(now())
 
   citas     Cita[]
@@ -2247,6 +2250,9 @@ model Cita {
   /// se suelta y la cita vuelve a estar sin cobrar.
   ventaPosId      String?         @unique
   ventaPos        VentaPos?       @relation(fields: [ventaPosId], references: [id], onDelete: SetNull)
+  /// El porcentaje de comisión de quien atendió, tal como era al cobrar la cita (así
+  /// cambiarlo después no mueve lo ya ganado). NULL = todavía no se cobró, o no tenía.
+  comisionPorcentaje Decimal? @db.Decimal(5, 2)
   createdAt     DateTime        @default(now())
 
   servicios CitaServicio[]

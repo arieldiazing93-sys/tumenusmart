@@ -226,3 +226,12 @@ export async function cargarActividadDeCita(
   }
   return actividad;
 }
+
+/** El nombre del negocio para escribirle al cliente ("te escribimos de …"): el de su página de reservas, o el del local. */
+export async function cargarNombreDelNegocio(storeId: string): Promise<string> {
+  const [pagina, store] = await Promise.all([
+    prisma.paginaReservas.findUnique({ where: { storeId }, select: { nombre: true } }),
+    prisma.store.findUnique({ where: { id: storeId }, select: { nombre: true } }),
+  ]);
+  return pagina?.nombre?.trim() || store?.nombre || "el local";
+}

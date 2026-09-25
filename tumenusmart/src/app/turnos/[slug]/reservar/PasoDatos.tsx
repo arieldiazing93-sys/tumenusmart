@@ -4,7 +4,7 @@ import { AvatarPersonal } from "@/app/admin/(protected)/agenda/AvatarPersonal";
 import { PAISES_TELEFONO } from "@/lib/agenda-personal";
 import { formatearGuarani } from "@/lib/format";
 import type { CampoFormulario } from "@/lib/pagina-reservas";
-import { LARGO_NOTA, type DatosCliente, type PersonalPublico } from "@/lib/reserva-cliente";
+import type { DatosCliente, PersonalPublico } from "@/lib/reserva-cliente";
 import { textoDuracion } from "@/lib/servicios-agenda";
 
 const CAMPO =
@@ -56,7 +56,6 @@ export function PasoDatos({
   const telefono = pide("telefono");
   const email = pide("email");
   const direccion = pide("direccion");
-  const nota = pide("nota");
 
   return (
     <div>
@@ -222,22 +221,6 @@ export function PasoDatos({
               />
             </label>
           ))}
-
-        {nota && (
-          <label className="block">
-            <Etiqueta texto={nota.etiqueta} opcional={nota.opcional} />
-            <textarea
-              value={datos.nota}
-              onChange={(e) => onCambiar({ nota: e.target.value.slice(0, LARGO_NOTA) })}
-              maxLength={LARGO_NOTA}
-              rows={4}
-              className={CAMPO}
-            />
-            <span className="cifra mt-1 block text-right text-[0.75rem] text-tinta-suave">
-              {datos.nota.length} / {LARGO_NOTA}
-            </span>
-          </label>
-        )}
       </div>
     </div>
   );
