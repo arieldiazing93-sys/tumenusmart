@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { diaCorto, fechaVecina, numeroDeDia } from "@/lib/agenda";
-import { claveSumarDias, construirGrillaMes, diasDeLaSemana, DIAS_SEMANA, NOMBRES_MES } from "@/lib/calendario";
+import { construirGrillaMes, diasDeLaSemana, DIAS_SEMANA, NOMBRES_MES } from "@/lib/calendario";
 import { DIAS_ADELANTE, momentoDelDia, type MomentoDelDia } from "@/lib/disponibilidad";
 import { aMinutos } from "@/lib/horario-trabajo";
 import { horasDisponibles } from "../actions";
@@ -70,13 +70,24 @@ export function PasoFechaHora({
   }, [dias, dia]);
 
   const hayHoras = (d: string) => (dias?.[d]?.length ?? 0) > 0;
-  const limiteMaximo = claveSumarDias(hoy, DIAS_ADELANTE - 1);
+
+  // Lo que ya pasó no se muestra: ni los días anteriores ni hoy si ya no quedan horas
+  // (pasó el cierre). Mientras todavía se están buscando las horas, hoy se deja para no parpadear.
+  const diaVisible = (d: string) => d > hoy || (d === hoy && (dias === null || hayHoras(hoy)));
 
   const semana = diasDeLaSemana(ancla);
   const [anio, mes] = ancla.split("-").map(Number);
-  const anteriorBloqueado = vista === "semana" ? semana[0] <= hoy : ancla.slice(0, 7) <= hoy.slice(0, 7);
-  const siguienteBloqueado =
-    vista === "semana" ? semana[6] >= limiteMaximo : ancla.slice(0, 7) >= limiteMaximo.slice(0, 7);
+
+  // Las flechas solo aparecen si llevan a algún lado: hacia atrás, si hay horas libres antes de
+  // lo que se está viendo; hacia adelante, si hay horas libres después. Así, pasado el horario
+  // de hoy, no hay flecha para volver a días que ya no existen.
+  const diasConHoras = dias ? Object.keys(dias).sort() : [];
+  const primerDia = diasConHoras[0];
+  const ultimoDia = diasConHoras[diasConHoras.length - 1];
+  const hayAnterior =
+    !!primerDia && (vista === "semana" ? primerDia < semana[0] : primerDia.slice(0, 7) < ancla.slice(0, 7));
+  const haySiguiente =
+    !!ultimoDia && (vista === "semana" ? ultimoDia > semana[6] : ultimoDia.slice(0, 7) > ancla.slice(0, 7));
 
   const horasDelDia = dia ? (dias?.[dia] ?? []) : [];
   const grupos = useMemo(() => {
@@ -121,21 +132,29 @@ export function PasoFechaHora({
           <span className="rounded-xl bg-papel-hundido px-3.5 py-2 text-[0.85rem] font-semibold text-tinta">
             {NOMBRES_MES[mes - 1]} {anio}
           </span>
+          {/* Sin adónde ir, la flecha no se ve (invisible y no solo apagada; sigue ocupando su lugar
+              para que el mes no se corra). */}
           <button
             type="button"
             onClick={() => setAncla(fechaVecina(vista, ancla, -1))}
-            disabled={anteriorBloqueado}
             aria-label={vista === "semana" ? "Semana anterior" : "Mes anterior"}
-            className="flex h-9 w-9 items-center justify-center rounded-lg text-tinta transition-colors hover:bg-papel-hundido disabled:opacity-30"
+            aria-hidden={!hayAnterior}
+            tabIndex={hayAnterior ? 0 : -1}
+            className={`flex h-9 w-9 items-center justify-center rounded-lg text-tinta transition-colors hover:bg-papel-hundido ${
+              hayAnterior ? "" : "invisible"
+            }`}
           >
             ‹
           </button>
           <button
             type="button"
             onClick={() => setAncla(fechaVecina(vista, ancla, 1))}
-            disabled={siguienteBloqueado}
             aria-label={vista === "semana" ? "Semana siguiente" : "Mes siguiente"}
-            className="flex h-9 w-9 items-center justify-center rounded-lg text-tinta transition-colors hover:bg-papel-hundido disabled:opacity-30"
+            aria-hidden={!haySiguiente}
+            tabIndex={haySiguiente ? 0 : -1}
+            className={`flex h-9 w-9 items-center justify-center rounded-lg text-tinta transition-colors hover:bg-papel-hundido ${
+              haySiguiente ? "" : "invisible"
+            }`}
           >
             ›
           </button>
@@ -145,7 +164,7 @@ export function PasoFechaHora({
       {/* ---------- los días ---------- */}
       {vista === "semana" ? (
         <div className="mt-4 grid grid-cols-7 gap-1.5 sm:gap-2">
-          {semana.map((d) => {
+          {semana.filter(diaVisible).map((d) => {
             const activo = hayHoras(d);
             const nombre = diaCorto(d);
             return (
@@ -173,7 +192,8 @@ export function PasoFechaHora({
           </div>
           <div className="grid grid-cols-7 gap-1.5">
             {construirGrillaMes(anio, mes - 1).map((c) => {
-              if (!c.enMes) return <span key={c.fecha} aria-hidden="true" />;
+              // Los días de otros meses y los que ya pasaron dejan su lugar vacío.
+              if (!c.enMes || !diaVisible(c.fecha)) return <span key={c.fecha} aria-hidden="true" />;
               const activo = hayHoras(c.fecha);
               return (
                 <button

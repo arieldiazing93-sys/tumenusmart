@@ -74,7 +74,10 @@ export function CitaConfirmada({
         Volver a la página
       </Link>
 
-      <Link href="/" className="mt-6 inline-block py-1 text-[0.72rem] text-tinta-suave transition-colors hover:text-tinta hover:underline">
+      <Link
+        href="/"
+        className="-mr-[0.14em] mt-7 inline-block py-1.5 text-center font-mono text-[0.82rem] font-semibold uppercase leading-tight tracking-[0.14em] text-tinta-media transition-colors hover:text-tinta hover:underline"
+      >
         Desarrollado por tumenusmart.com
       </Link>
     </div>

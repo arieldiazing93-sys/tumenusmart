@@ -278,8 +278,14 @@ export default async function PaginaPublicaReservas({ params }: { params: Promis
             >
               Crear cita
             </Link>
-            <p className="mt-1.5 text-center text-[0.72rem] text-tinta-suave">
-              <Link href="/" className="inline-block py-1 transition-colors hover:text-tinta hover:underline">
+            {/* Tipografía distinta del resto (la monoespaciada del sistema), en mayúsculas y en el grosor más
+                fuerte que se carga. El -mr compensa el espacio que "tracking" agrega después de la última
+                letra, para que el texto quede centrado de verdad. */}
+            <p className="mt-1.5 text-center">
+              <Link
+                href="/"
+                className="-mr-[0.14em] inline-block py-1.5 font-mono text-[0.82rem] font-semibold uppercase leading-tight tracking-[0.14em] text-tinta-media transition-colors hover:text-tinta hover:underline"
+              >
                 Desarrollado por tumenusmart.com
               </Link>
             </p>
