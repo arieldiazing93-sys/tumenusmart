@@ -5,6 +5,7 @@ import type {
   EstadoCaja,
   PersonalDeCita,
   ServicioOpcion,
+  TonoActividad,
 } from "@/lib/agenda-cita";
 import { nombreCompleto } from "@/lib/agenda-personal";
 import { estacionActual } from "@/lib/estacion-actual";
@@ -13,6 +14,7 @@ import { detallePagos } from "@/lib/pago-venta";
 import { prisma } from "@/lib/prisma";
 import type { PrismaLocal } from "@/lib/prisma-local";
 import { codigoDeCita } from "@/lib/reserva-cliente";
+import { normalizarColor } from "@/lib/servicios-agenda";
 import { turnoAbierto } from "../pos/turno-actual";
 
 /**
@@ -61,7 +63,7 @@ export async function cargarDetalleCita(db: PrismaLocal, id: string): Promise<De
           nombre: true,
           duracionMin: true,
           precio: true,
-          servicio: { select: { product: { select: { category: { select: { nombre: true } } } } } },
+          servicio: { select: { color: true, product: { select: { category: { select: { nombre: true } } } } } },
         },
       },
       ventaPos: {
@@ -104,6 +106,7 @@ export async function cargarDetalleCita(db: PrismaLocal, id: string): Promise<De
       categoriaNombre: s.servicio?.product.category.nombre ?? null,
       duracionMin: s.duracionMin,
       precio: Number(s.precio),
+      color: normalizarColor(s.servicio?.color),
     })),
     bufferMin: c.bufferMin,
     descuentoMonto: Number(c.descuento),
@@ -133,6 +136,7 @@ export async function cargarServiciosDelPanel(db: PrismaLocal): Promise<Servicio
       duracionMin: true,
       bufferMin: true,
       tipoPrecio: true,
+      color: true,
       product: { select: { nombre: true, precio: true, category: { select: { nombre: true } } } },
       personal: { select: { personalId: true } },
     },
@@ -145,6 +149,7 @@ export async function cargarServiciosDelPanel(db: PrismaLocal): Promise<Servicio
     bufferMin: f.bufferMin,
     precio: Number(f.product.precio),
     tipoPrecio: f.tipoPrecio,
+    color: normalizarColor(f.color),
     personalIds: f.personal.map((p) => p.personalId),
   }));
 }
@@ -196,6 +201,23 @@ export async function cargarEstadoCaja(db: PrismaLocal, storeId: string): Promis
   };
 }
 
+/** El código de la bitácora ("cita_cobrada") pasado al tono con que se dibuja el movimiento. */
+function tonoDeAccion(accion: string): TonoActividad {
+  switch (accion) {
+    case "cita_creada":
+      return "creada";
+    case "cita_cobrada":
+      return "cobro";
+    case "cita_cobro_anulado":
+    case "cita_eliminada":
+      return "anulado";
+    case "cita_estado_cambiado":
+      return "estado";
+    default:
+      return "edicion";
+  }
+}
+
 /** Lo que pasó con la cita: cómo se creó y lo que se fue anotando en la bitácora. Lo más nuevo, primero. */
 export async function cargarActividadDeCita(
   db: PrismaLocal,
@@ -205,12 +227,13 @@ export async function cargarActividadDeCita(
     where: { entidad: "Cita", entidadId: cita.id },
     orderBy: { createdAt: "desc" },
     take: 40,
-    select: { usuario: true, descripcion: true, createdAt: true },
+    select: { usuario: true, accion: true, descripcion: true, createdAt: true },
   });
   const actividad: ActividadCita[] = filas.map((f) => ({
     cuando: f.createdAt.toISOString(),
     quien: f.usuario,
     texto: f.descripcion,
+    tono: tonoDeAccion(f.accion),
   }));
   // Las citas del panel ya tienen su "creada" en la bitácora; las de la web las crea el cliente.
   if (cita.origen === "web") {
@@ -218,6 +241,7 @@ export async function cargarActividadDeCita(
       cuando: cita.creadaEn,
       quien: "Cliente",
       texto: "Reservó desde el enlace de reservas.",
+      tono: "creada",
     });
   }
   return actividad;

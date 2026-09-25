@@ -37,6 +37,8 @@ export type LineaServicioCita = {
   categoriaNombre: string | null;
   duracionMin: number;
   precio: number;
+  /** El color del servicio ("#RRGGBB"), el que se eligió en Servicios. */
+  color: string;
 };
 
 /** Un servicio del catálogo, para agregarlo a la cita. */
@@ -49,6 +51,7 @@ export type ServicioOpcion = {
   bufferMin: number;
   precio: number;
   tipoPrecio: string;
+  color: string;
   /** Quiénes lo realizan (solo para avisar si se elige a alguien que no lo hace). */
   personalIds: string[];
 };
@@ -97,8 +100,11 @@ export type DetalleCita = {
   cobro: CobroDeCita | null;
 };
 
+/** De qué se trató un movimiento de la pestaña Actividad (decide su color y su ícono). */
+export type TonoActividad = "creada" | "cobro" | "anulado" | "estado" | "edicion";
+
 /** Una línea de la pestaña Actividad. */
-export type ActividadCita = { cuando: string; quien: string; texto: string };
+export type ActividadCita = { cuando: string; quien: string; texto: string; tono: TonoActividad };
 
 /**
  * Si se puede cobrar desde este navegador. Cobrar necesita que la computadora esté

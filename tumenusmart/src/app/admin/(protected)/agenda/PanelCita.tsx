@@ -12,7 +12,6 @@ import type {
   ServicioOpcion,
 } from "@/lib/agenda-cita";
 import { claveSumarDias } from "@/lib/calendario";
-import { ActividadCita } from "./ActividadCita";
 import { FormularioCita } from "./FormularioCita";
 
 /** Cuántos días después se propone la nueva cita al tocar "Reservar de nuevo". */
@@ -51,8 +50,8 @@ function comoNueva(c: DetalleCita, servicios: ServicioOpcion[]): DetalleCita {
 
 /**
  * El detalle de la cita: un panel que entra desde la derecha al tocar un turno del
- * calendario. Tiene dos pestañas —Editar cita (que también cobra) y Actividad— y sirve
- * además para anotar una cita nueva.
+ * calendario. Tiene su propia cabecera de color (con las pestañas Editar cita y
+ * Actividad) y sirve además para anotar una cita nueva.
  *
  * Está abierto mientras la dirección de la agenda lleve `?cita=…`; al cerrarlo se saca
  * ese dato de la dirección (por eso sobrevive a recargar la página).
@@ -77,7 +76,6 @@ export function PanelCita({
 }) {
   const router = useRouter();
   const [montado, setMontado] = useState(false);
-  const [pestana, setPestana] = useState<"editar" | "actividad">("editar");
   const [copia, setCopia] = useState<DetalleCita | null>(null);
 
   // El panel se dibuja recién en el navegador (va en un portal): así la primera pantalla
@@ -92,59 +90,26 @@ export function PanelCita({
 
   if (!montado) return null;
 
-  const haciaNueva = cita === null || copia !== null;
-
   return (
     <PanelLateral
       titulo={cita && !copia ? `Cita ${cita.codigo}` : "Nueva cita"}
       onCerrar={cerrar}
       ancho="ancho"
+      sinCabecera
     >
-      {!haciaNueva && (
-        <div role="tablist" aria-label="Secciones de la cita" className="flex flex-none gap-1 border-b border-linea px-5 pt-2">
-          {(
-            [
-              { valor: "editar", etiqueta: "Editar cita" },
-              { valor: "actividad", etiqueta: "Actividad" },
-            ] as const
-          ).map((p) => (
-            <button
-              key={p.valor}
-              type="button"
-              role="tab"
-              aria-selected={pestana === p.valor}
-              onClick={() => setPestana(p.valor)}
-              className={`-mb-px border-b-2 px-3 py-2.5 text-[0.86rem] font-semibold transition-colors ${
-                pestana === p.valor
-                  ? "border-brand text-brand-texto"
-                  : "border-transparent text-tinta-media hover:text-tinta"
-              }`}
-            >
-              {p.etiqueta}
-            </button>
-          ))}
-        </div>
-      )}
-
-      {/* El formulario se queda armado aunque se mire la otra pestaña: no se pierde lo escrito. */}
-      <div className={pestana === "editar" || haciaNueva ? "flex min-h-0 flex-1 flex-col" : "hidden"}>
-        <FormularioCita
-          key={copia ? "copia" : (cita?.id ?? "nueva")}
-          cita={copia ? null : cita}
-          inicial={copia ?? cita}
-          servicios={servicios}
-          personal={personal}
-          caja={caja}
-          parametros={parametros}
-          hoy={hoy}
-          onCerrar={cerrar}
-          onReservarDeNuevo={(c) => {
-            setPestana("editar");
-            setCopia(comoNueva(c, servicios));
-          }}
-        />
-      </div>
-      {!haciaNueva && pestana === "actividad" && <ActividadCita actividad={actividad} />}
+      <FormularioCita
+        key={copia ? "copia" : (cita?.id ?? "nueva")}
+        cita={copia ? null : cita}
+        inicial={copia ?? cita}
+        servicios={servicios}
+        personal={personal}
+        caja={caja}
+        actividad={actividad}
+        parametros={parametros}
+        hoy={hoy}
+        onCerrar={cerrar}
+        onReservarDeNuevo={(c) => setCopia(comoNueva(c, servicios))}
+      />
     </PanelLateral>
   );
 }

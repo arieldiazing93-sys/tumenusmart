@@ -101,9 +101,9 @@ const IconoFiltro = () => (
 const BOTON =
   "inline-flex h-10 items-center justify-center gap-2 rounded-lg border px-3 text-[0.85rem] font-semibold " +
   "transition-colors duration-150 active:scale-[0.97] sm:h-9";
-const BOTON_NEUTRO = `${BOTON} border-linea bg-superficie text-tinta hover:border-brand hover:text-brand`;
-/** Azul: navegar. Es el mismo criterio que el resto del panel. */
-const BOTON_HOY = `${BOTON} border-azul/35 bg-azul-luz text-azul-oscuro hover:border-azul hover:bg-azul hover:text-white`;
+const BOTON_NEUTRO = `${BOTON} border-linea bg-superficie text-tinta hover:-translate-y-0.5 hover:border-brand hover:text-brand hover:shadow-md`;
+/** Azul: navegar (mismo criterio que el resto del panel), ahora con degradado y sombra de color. */
+const BOTON_HOY = `${BOTON} border-transparent bg-gradient-to-br from-sky-500 to-blue-600 text-white shadow-md shadow-blue-600/25 hover:-translate-y-0.5 hover:brightness-110 hover:shadow-lg`;
 
 const ITEM_MENU =
   "flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2.5 text-left text-[0.88rem] font-medium " +
@@ -237,7 +237,6 @@ export function BarraAgenda({
     if (window.matchMedia("(max-width: 639px)").matches) router.replace(urlDia, { scroll: false });
   }, [vistaEnUrl, urlDia, router]);
 
-  const vistaActual = VISTAS_AGENDA.find((v) => v.valor === parametros.vista) ?? VISTAS_AGENDA[1];
   const indiceElegido = personal.findIndex((p) => p.id === parametros.personal);
   const elegido = indiceElegido >= 0 ? personal[indiceElegido] : null;
 
@@ -266,31 +265,29 @@ export function BarraAgenda({
     </div>
   );
 
-  // ---------- Día / Semana / Mes ----------
+  // ---------- Día / Semana / Mes: tres pastillas, la elegida llena de color ----------
   const vista = (
-    <Desplegable titulo="Ver por" etiqueta={vistaActual.etiqueta} alinear="izquierda" ancho="sm:w-44">
-      {(cerrar) => (
-        <>
-          {VISTAS_AGENDA.map((v) => {
-            const elegida = v.valor === parametros.vista;
-            return (
-              <Link
-                key={v.valor}
-                href={urlAgenda(parametros, { vista: v.valor })}
-                scroll={false}
-                onClick={cerrar}
-                role="menuitemradio"
-                aria-checked={elegida}
-                className={`${ITEM_MENU} ${elegida ? ITEM_MENU_ACTIVO : ""}`}
-              >
-                <span className="flex-1">{v.etiqueta}</span>
-                {elegida && <IconoCheck />}
-              </Link>
-            );
-          })}
-        </>
-      )}
-    </Desplegable>
+    <div role="tablist" aria-label="Ver por" className="flex rounded-xl bg-papel-hundido p-1">
+      {VISTAS_AGENDA.map((v) => {
+        const elegida = v.valor === parametros.vista;
+        return (
+          <Link
+            key={v.valor}
+            href={urlAgenda(parametros, { vista: v.valor })}
+            scroll={false}
+            role="tab"
+            aria-selected={elegida}
+            className={`flex h-9 flex-1 items-center justify-center rounded-lg px-4 text-[0.85rem] font-bold transition-all duration-200 active:scale-95 sm:h-8 ${
+              elegida
+                ? "bg-gradient-to-br from-brand to-brand-dark text-white shadow-md shadow-brand/30"
+                : "text-tinta-media hover:bg-superficie hover:text-tinta"
+            }`}
+          >
+            {v.etiqueta}
+          </Link>
+        );
+      })}
+    </div>
   );
 
   // ---------- a quién se mira ----------
@@ -407,9 +404,9 @@ export function BarraAgenda({
           Filtro. Si no entra todo en una fila (una tablet vertical), Personal y Filtro bajan a una segunda. */}
       <div className="hidden flex-wrap items-center gap-2 sm:flex">
         {navegacion}
-        <div className="w-32 flex-none">{vista}</div>
-        <h2 className="flex min-w-[10rem] flex-1 items-center justify-center gap-2 px-2 text-[1.05rem] font-semibold tracking-titular text-tinta">
-          <span className="text-brand">
+        <div className="flex-none">{vista}</div>
+        <h2 className="flex min-w-[10rem] flex-1 items-center justify-center gap-2.5 px-2 text-[1.1rem] font-bold tracking-titular text-tinta">
+          <span className="flex h-8 w-8 flex-none items-center justify-center rounded-xl bg-gradient-to-br from-brand to-brand-dark text-white shadow-md shadow-brand/30">
             <IconoCalendario />
           </span>
           <span className="truncate">{titulo}</span>
@@ -418,16 +415,16 @@ export function BarraAgenda({
         <div className="w-28 flex-none">{filtro}</div>
       </div>
 
-      {/* Celular: arriba las flechas y el título; abajo los tres botones repartidos a todo el ancho. */}
+      {/* Celular: arriba las flechas y el título; en el medio Día/Semana/Mes; abajo Personal y Filtro repartidos. */}
       <div className="flex flex-col gap-2 sm:hidden">
         <div className="flex items-center gap-2">
           {navegacion}
-          <h2 className="min-w-0 flex-1 truncate text-right text-[1rem] font-semibold tracking-titular text-tinta">
+          <h2 className="min-w-0 flex-1 truncate text-right text-[1rem] font-bold tracking-titular text-tinta">
             {titulo}
           </h2>
         </div>
-        <div className="grid grid-cols-3 gap-2">
-          {vista}
+        {vista}
+        <div className="grid grid-cols-2 gap-2">
           {selectorPersonal}
           {filtro}
         </div>

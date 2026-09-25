@@ -13,14 +13,17 @@ import {
   tituloAgenda,
   urlAgenda,
   type CitaAgenda,
+  type EstadoCita,
   type ParametrosAgenda,
 } from "@/lib/agenda";
 import type { ActividadCita, EstadoCaja } from "@/lib/agenda-cita";
 import { nombreCompleto } from "@/lib/agenda-personal";
 import { completarHorario } from "@/lib/horario-trabajo";
+import { normalizarColor } from "@/lib/servicios-agenda";
 import { Cabecera, clasesBoton } from "@/components/ui";
 import { BandaPersonal } from "./BandaPersonal";
 import { BarraAgenda } from "./BarraAgenda";
+import { IconoEstado } from "./IconosAgenda";
 import {
   cargarActividadDeCita,
   cargarDetalleCita,
@@ -93,29 +96,39 @@ export default async function AgendaPage({
   });
   const horarios = filasHorario.length > 0 ? completarHorario(filasHorario) : null;
 
-  const citasBase = await db.cita.findMany({
-    where: {
-      inicio: limitesEnAsuncion({ desde: dias[0], hasta: dias[dias.length - 1] }),
-      // Un turno pedido por la web que espera el aviso por WhatsApp todavía no se ve.
-      visible: true,
-      ...(elegido ? { personalId: elegido.id } : {}),
-      ...(ocultar.length > 0 ? { estado: { notIn: ocultar } } : {}),
-    },
-    orderBy: [{ inicio: "asc" }, { id: "asc" }],
-    take: MAXIMO_TURNOS,
-    select: {
-      id: true,
-      personalId: true,
-      clienteNombre: true,
-      inicio: true,
-      fin: true,
-      estado: true,
-      precio: true,
-      serviciosTexto: true,
-      ventaPosId: true,
-      personal: { select: { nombre: true, apellido: true } },
-    },
-  });
+  // Lo que se ve del período: un turno pedido por la web que espera el aviso por WhatsApp todavía no cuenta.
+  const enElPeriodo = {
+    inicio: limitesEnAsuncion({ desde: dias[0], hasta: dias[dias.length - 1] }),
+    visible: true,
+    ...(elegido ? { personalId: elegido.id } : {}),
+  };
+
+  const [citasBase, conteoPorEstado] = await Promise.all([
+    db.cita.findMany({
+      where: {
+        ...enElPeriodo,
+        ...(ocultar.length > 0 ? { estado: { notIn: ocultar } } : {}),
+      },
+      orderBy: [{ inicio: "asc" }, { id: "asc" }],
+      take: MAXIMO_TURNOS,
+      select: {
+        id: true,
+        personalId: true,
+        clienteNombre: true,
+        inicio: true,
+        fin: true,
+        estado: true,
+        precio: true,
+        serviciosTexto: true,
+        ventaPosId: true,
+        personal: { select: { nombre: true, apellido: true } },
+        // El color de cada servicio (el que se eligió en Servicios): son los puntitos del turno.
+        servicios: { select: { servicio: { select: { color: true } } } },
+      },
+    }),
+    // Cuántos turnos hay de cada estado, también de los que el filtro tiene ocultos: son los numeritos de arriba.
+    db.cita.groupBy({ by: ["estado"], where: enElPeriodo, _count: { _all: true } }),
+  ]);
   const citas: CitaAgenda[] = citasBase.map((c) => ({
     id: c.id,
     personalId: c.personalId,
@@ -127,7 +140,17 @@ export default async function AgendaPage({
     precio: c.precio == null ? null : Number(c.precio),
     serviciosTexto: c.serviciosTexto,
     cobrada: c.ventaPosId !== null,
+    colores: c.servicios.flatMap((s) => (s.servicio ? [normalizarColor(s.servicio.color)] : [])),
   }));
+  const cantidadPorEstado = new Map(conteoPorEstado.map((f) => [f.estado, f._count._all] as const));
+
+  // Cuántos turnos tiene cada persona en el período (solo si se está viendo a todo el personal).
+  const turnosPorPersona: Record<string, number> | null = elegido
+    ? null
+    : citas.reduce<Record<string, number>>((mapa, c) => {
+        mapa[c.personalId] = (mapa[c.personalId] ?? 0) + 1;
+        return mapa;
+      }, {});
 
   // El panel de la derecha: el detalle de la cita tocada, o una cita nueva.
   let panel: React.ReactNode = null;
@@ -168,34 +191,49 @@ export default async function AgendaPage({
         }
       />
 
-      <BarraAgenda
-        parametros={parametros}
-        hoy={hoy}
-        titulo={tituloAgenda(vista, fecha)}
-        personal={personal}
-        vistaEnUrl={vistaPedida !== null}
-      />
+      <div className="rounded-2xl border border-linea bg-gradient-to-r from-superficie via-superficie to-brand-light/60 p-2.5 shadow-sm">
+        <BarraAgenda
+          parametros={parametros}
+          hoy={hoy}
+          titulo={tituloAgenda(vista, fecha)}
+          personal={personal}
+          vistaEnUrl={vistaPedida !== null}
+        />
+      </div>
 
-      {/* Los colores de los estados: sirven de leyenda, y lo que está oculto por el filtro se ve apagado. */}
-      <ul aria-label="Estados de los turnos" className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[0.76rem] text-tinta-media">
-        {ESTADOS_CITA.map((e) => (
-          <li
-            key={e.valor}
-            className={`flex items-center gap-1.5 ${ocultar.includes(e.valor) ? "line-through opacity-40" : ""}`}
-          >
-            <span className={`h-2.5 w-2.5 rounded-full ${e.punto}`} />
-            {e.etiqueta}
-          </li>
-        ))}
+      {/* Un color por estado, con cuántos turnos hay de cada uno. Tocar uno lo muestra u oculta en el calendario
+          (lo oculto queda apagado y tachado). */}
+      <ul aria-label="Estados de los turnos" className="flex flex-wrap items-center gap-2">
+        {ESTADOS_CITA.map((e) => {
+          const oculto = ocultar.includes(e.valor);
+          const ocultarDespues: EstadoCita[] = oculto
+            ? ocultar.filter((o) => o !== e.valor)
+            : [...ocultar, e.valor];
+          return (
+            <li key={e.valor}>
+              <Link
+                href={urlAgenda(parametros, { ocultar: ocultarDespues })}
+                scroll={false}
+                title={`${oculto ? "Mostrar" : "Ocultar"} los turnos ${e.etiqueta.toLowerCase()}`}
+                className={`inline-flex items-center gap-2 rounded-full border-2 py-1 pl-1 pr-1.5 text-[0.78rem] font-semibold transition-all duration-200 hover:-translate-y-0.5 active:scale-95 ${e.pastilla} ${
+                  oculto ? "line-through opacity-50" : "shadow-sm"
+                }`}
+              >
+                <span className={`flex h-5 w-5 items-center justify-center rounded-full ${e.insignia}`}>
+                  <IconoEstado estado={e.valor} tam={11} />
+                </span>
+                {e.etiqueta}
+                <span className={`min-w-5 rounded-full px-1.5 text-center text-[0.7rem] font-bold ${e.cantidad}`}>
+                  {cantidadPorEstado.get(e.valor) ?? 0}
+                </span>
+              </Link>
+            </li>
+          );
+        })}
       </ul>
 
-      <section className="overflow-hidden rounded-xl border border-linea bg-superficie shadow-sm">
-        <BandaPersonal
-          nombre={elegido?.nombre ?? null}
-          fotoUrl={elegido?.fotoUrl ?? null}
-          indice={indiceElegido}
-          cantidad={personal.length}
-        />
+      <section className="overflow-hidden rounded-2xl border border-linea bg-superficie shadow-media">
+        <BandaPersonal personal={personal} elegidoId={elegido?.id ?? null} parametros={parametros} turnos={turnosPorPersona} />
         {vista === "mes" ? (
           <VistaMes fecha={fecha} citas={citas} hoy={hoy} parametros={parametros} />
         ) : (

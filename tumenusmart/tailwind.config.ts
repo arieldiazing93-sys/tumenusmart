@@ -238,11 +238,47 @@ const config: Config = {
           "0%": { backgroundColor: "rgb(210 80 31 / 0.12)" },
           "100%": { backgroundColor: "rgb(210 80 31 / 0)" },
         },
+
+        // ---- La Reserva de turnos (calendario y detalle de la cita) ----
+        // Los turnos entran uno tras otro al abrir el calendario. Se usa siempre con
+        // fill-mode `backwards`: durante la demora se ve el primer cuadro y AL TERMINAR
+        // no queda ningún transform pegado (ver el aviso de `entrarPanel` más arriba).
+        aparecerBloque: {
+          "0%": { opacity: "0", transform: "scale(0.92) translateY(6px)" },
+          "100%": { opacity: "1", transform: "scale(1) translateY(0)" },
+        },
+        // Las tarjetas del detalle de la cita entrando de a una. Igual: fill-mode `backwards`.
+        deslizarArriba: {
+          "0%": { opacity: "0", transform: "translateY(12px)" },
+          "100%": { opacity: "1", transform: "translateY(0)" },
+        },
+        // Un número o un botón que acaba de cambiar: crece un poco y vuelve.
+        pop: {
+          "0%": { transform: "scale(1)" },
+          "40%": { transform: "scale(1.12)" },
+          "100%": { transform: "scale(1)" },
+        },
+        // El degradado de la cabecera del detalle moviéndose despacio.
+        fluir: {
+          "0%, 100%": { backgroundPosition: "0% 50%" },
+          "50%": { backgroundPosition: "100% 50%" },
+        },
+        // El botón de cobrar latiendo en verde, para que se note que es lo que sigue.
+        pulsoVerde: {
+          "0%": { boxShadow: "0 0 0 0 rgba(16,185,129,0.5)" },
+          "70%": { boxShadow: "0 0 0 12px rgba(16,185,129,0)" },
+          "100%": { boxShadow: "0 0 0 0 rgba(16,185,129,0)" },
+        },
       },
       animation: {
         "destacado-entrada": "destacado-entrada 0.5s ease-out",
         subir: "subir 0.62s cubic-bezier(0.22,0.7,0.3,1) both",
         panel: "entrarPanel 0.18s ease-out both",
+        bloque: "aparecerBloque 0.42s cubic-bezier(0.22,0.7,0.3,1) backwards",
+        deslizar: "deslizarArriba 0.45s cubic-bezier(0.22,0.7,0.3,1) backwards",
+        pop: "pop 0.38s ease-out",
+        fluir: "fluir 9s ease infinite",
+        pulsoVerde: "pulsoVerde 2.2s ease-out infinite",
       },
     },
   },
