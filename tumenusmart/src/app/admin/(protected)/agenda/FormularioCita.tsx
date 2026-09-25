@@ -30,9 +30,9 @@ import { IconoCalendarioHora, IconoPersona, IconoTijera } from "./IconosAgenda";
 import { SeccionCobro } from "./SeccionCobro";
 import { ServiciosCita } from "./ServiciosCita";
 
-/** El botón de WhatsApp, con el mismo verde suave del que ya hay en Pedidos. */
+/** El botón de WhatsApp (solo el ícono, al lado del teléfono), con el mismo verde suave del que ya hay en Pedidos. */
 const BOTON_WHATSAPP =
-  "inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg border border-[#25D366]/30 bg-[#25D366]/10 px-3 text-[0.88rem] font-semibold text-[#128C7E] transition-colors";
+  "flex w-11 flex-none items-center justify-center rounded-lg border border-[#25D366]/30 bg-[#25D366]/10 text-[#128C7E] transition-colors";
 
 /**
  * El campo de quién atiende va en amarillo, para ver de un vistazo a quién está asignado el
@@ -88,7 +88,6 @@ export function FormularioCita({
   const [telefono, setTelefono] = useState(
     inicial?.clienteTelefono ? formatearTelefonoPersonal(inicial.clienteTelefono) : ""
   );
-  const [email, setEmail] = useState(inicial?.clienteEmail ?? "");
   const [fecha, setFecha] = useState(inicial?.fecha ?? (parametros.fecha < hoy ? hoy : parametros.fecha));
   const [hora, setHora] = useState(inicial?.hora ?? "09:00");
   const [personalId, setPersonalId] = useState(inicial?.personalId ?? parametros.personal ?? personal[0]?.id ?? "");
@@ -192,7 +191,6 @@ export function FormularioCita({
       estado,
       clienteNombre: nombre,
       clienteTelefono: telefono,
-      clienteEmail: email,
       personalId,
       fecha,
       hora,
@@ -372,7 +370,7 @@ export function FormularioCita({
       }}
       className="flex min-h-0 flex-1 flex-col"
     >
-      <div className="campos-grises flex flex-1 flex-col gap-4 overflow-y-auto bg-superficie px-5 py-5">
+      <div className="campos-grises flex flex-1 flex-col gap-3 overflow-y-auto bg-superficie px-4 py-3.5">
         {/* ---------- ya cobrada ---------- */}
         {cobrada && (
           <div className="rounded-xl border border-exito/30 bg-exito-luz p-3.5">
@@ -504,13 +502,13 @@ export function FormularioCita({
         )}
 
         {/* Todo lo editable: una cita cobrada queda bloqueada (fieldset disabled apaga todos sus campos a la vez). */}
-        <fieldset disabled={cobrada} className="flex min-w-0 flex-col gap-4">
-          {/* ---------- id, fuente y estado ---------- */}
-          <div className="animate-deslizar flex items-start justify-between gap-3 rounded-xl border border-linea bg-superficie p-4 shadow-sm">
+        <fieldset disabled={cobrada} className="flex min-w-0 flex-col gap-3">
+          {/* ---------- id, fuente y estado: una sola línea, sin tarjeta ---------- */}
+          <div className="animate-deslizar flex items-center justify-between gap-3">
             {cita ? (
-              <div className="min-w-0 text-[0.84rem] leading-relaxed text-tinta-media">
+              <div className="min-w-0 text-[0.8rem] text-tinta-media">
                 <p className="flex items-center gap-1.5">
-                  <span className="font-semibold text-tinta">Id</span> – <span className="cifra">{cita.codigo}</span>
+                  <span className="font-semibold text-tinta">Id</span> <span className="cifra">{cita.codigo}</span>
                   <button
                     type="button"
                     onClick={copiarCodigo}
@@ -537,17 +535,18 @@ export function FormularioCita({
                       </svg>
                     )}
                   </button>
-                </p>
-                <p>
-                  <span className="font-semibold text-tinta">Fuente</span> – {textoFuente(cita.origen)}
+                  <span aria-hidden="true" className="text-tinta-suave">
+                    ·
+                  </span>
+                  <span className="truncate">{textoFuente(cita.origen)}</span>
                 </p>
               </div>
             ) : (
-              <p className="text-[0.84rem] leading-snug text-tinta-media">Anotá un turno a mano.</p>
+              <p className="text-[0.8rem] leading-snug text-tinta-media">Anotá un turno a mano.</p>
             )}
 
             <label className="block w-40 flex-none">
-              <span className="mb-1.5 block text-[0.82rem] font-semibold text-tinta">Estado</span>
+              <span className="sr-only">Estado de la cita</span>
               <span className="relative block">
                 <span
                   aria-hidden="true"
@@ -566,33 +565,52 @@ export function FormularioCita({
 
           {/* ---------- cliente ---------- */}
           <BloqueCita titulo="Cliente" icono={<IconoPersona />} retraso={50}>
-            <Campo etiqueta="Nombre *">
-              <Entrada
-                value={nombre}
-                onChange={(e) => setNombre(e.target.value)}
-                maxLength={80}
-                placeholder="Nombre y apellido"
-                autoFocus={esNueva}
-              />
-            </Campo>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <Campo etiqueta="Teléfono">
+            {/* Lo que importa del cliente: su nombre y su WhatsApp. Nombre y teléfono van en una sola fila. */}
+            <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+              <Campo etiqueta="Nombre *">
                 <Entrada
-                  type="tel"
-                  value={telefono}
-                  onChange={(e) => setTelefono(e.target.value)}
-                  placeholder="0984 123 456"
+                  value={nombre}
+                  onChange={(e) => setNombre(e.target.value)}
+                  maxLength={80}
+                  placeholder="Nombre y apellido"
+                  autoFocus={esNueva}
                 />
               </Campo>
-              <Campo etiqueta="Correo">
-                <Entrada
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  maxLength={120}
-                  placeholder="cliente@correo.com"
-                />
-              </Campo>
+              <div>
+                <span className="mb-1.5 block text-[0.82rem] font-semibold text-tinta">Teléfono</span>
+                {/* El teléfono con el botón de WhatsApp al lado (directo a ese número), como el de Pedidos. */}
+                <div className="flex items-stretch gap-1.5">
+                  <div className="min-w-0 flex-1">
+                    <Entrada
+                      type="tel"
+                      value={telefono}
+                      onChange={(e) => setTelefono(e.target.value)}
+                      placeholder="0984 123 456"
+                      aria-label="Teléfono"
+                    />
+                  </div>
+                  {enlaceWhatsapp ? (
+                    <a
+                      href={enlaceWhatsapp}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      title={`Escribirle a ${nombre.trim() || "el cliente"} por WhatsApp`}
+                      aria-label="Escribirle por WhatsApp"
+                      className={`${BOTON_WHATSAPP} hover:bg-[#25D366]/20`}
+                    >
+                      <IconoWhatsapp tam={20} />
+                    </a>
+                  ) : (
+                    <span
+                      aria-disabled="true"
+                      title="Cargá el teléfono para escribirle por WhatsApp"
+                      className={`${BOTON_WHATSAPP} cursor-not-allowed opacity-40`}
+                    >
+                      <IconoWhatsapp tam={20} />
+                    </span>
+                  )}
+                </div>
+              </div>
             </div>
             {datosDelFormulario.length > 0 && (
               <dl className="rounded-lg bg-papel-suave px-3 py-2.5 text-[0.8rem]">
@@ -603,24 +621,6 @@ export function FormularioCita({
                   </div>
                 ))}
               </dl>
-            )}
-            {/* Escribirle al cliente por WhatsApp, directo a su número. Sin teléfono cargado, apagado. */}
-            {enlaceWhatsapp ? (
-              <a
-                href={enlaceWhatsapp}
-                target="_blank"
-                rel="noopener noreferrer"
-                title={`Escribirle a ${nombre.trim() || "el cliente"} por WhatsApp`}
-                className={`${BOTON_WHATSAPP} hover:bg-[#25D366]/20`}
-              >
-                <IconoWhatsapp tam={18} />
-                Escribirle por WhatsApp
-              </a>
-            ) : (
-              <span aria-disabled="true" className={`${BOTON_WHATSAPP} cursor-not-allowed opacity-50`}>
-                <IconoWhatsapp tam={18} />
-                Cargá el teléfono para escribirle
-              </span>
             )}
           </BloqueCita>
 
@@ -777,7 +777,7 @@ export function FormularioCita({
       </div>
 
       {/* ---------- pie fijo ---------- */}
-      <div className="flex flex-none flex-col gap-2.5 border-t border-linea bg-superficie px-5 py-3.5">
+      <div className="flex flex-none flex-col gap-2 border-t border-linea bg-superficie px-4 py-3">
         {error && <MensajeError>{error}</MensajeError>}
 
         {choque && (
@@ -812,34 +812,51 @@ export function FormularioCita({
             </div>
           </div>
         ) : (
-          <div className="flex flex-wrap items-center gap-2">
-            {!esNueva && !cobrada && (
-              <button
-                type="button"
-                onClick={() => setConfirmandoEliminar(true)}
-                className="inline-flex h-10 items-center rounded-lg px-2 text-[0.88rem] font-semibold text-peligro transition-colors hover:bg-peligro-luz"
-              >
-                Eliminar
-              </button>
-            )}
+          // Siempre dos filas fijas: arriba lo secundario (Eliminar y Reservar de nuevo) y abajo Cancelar y el botón
+          // principal, que ocupa el resto del ancho. Así, cuando el botón pasa de "Guardar" a "Cobrar Gs. 45.000" no
+          // se pisa con los de al lado ni el pie cambia de alto (que empujaba el formulario).
+          <div className="flex flex-col gap-2">
             {cita && (
-              <button type="button" onClick={() => onReservarDeNuevo(cita)} className={clasesBoton("navegar", "md")}>
-                Reservar de nuevo
-              </button>
+              <div className="flex items-center justify-between gap-2">
+                {!cobrada ? (
+                  <button
+                    type="button"
+                    onClick={() => setConfirmandoEliminar(true)}
+                    className="inline-flex h-9 items-center rounded-lg px-2 text-[0.86rem] font-semibold text-peligro transition-colors hover:bg-peligro-luz"
+                  >
+                    Eliminar
+                  </button>
+                ) : (
+                  <span />
+                )}
+                <button type="button" onClick={() => onReservarDeNuevo(cita)} className={clasesBoton("navegar", "sm")}>
+                  Reservar de nuevo
+                </button>
+              </div>
             )}
-            <span className="hidden flex-1 sm:block" />
-            <button type="button" onClick={onCerrar} className={clasesBoton("suave", "md")}>
-              {cobrada ? "Cerrar" : "Cancelar"}
-            </button>
-            {!cobrada && (
-              <button
-                type="submit"
-                disabled={pendiente || cajaImpide || (cobrando && total <= 0)}
-                className={clasesBoton("principal", "md")}
-              >
-                {textoBotonPrincipal}
-              </button>
-            )}
+            <div className="flex items-center gap-2">
+              {!cobrada && (
+                <button type="button" onClick={onCerrar} className={clasesBoton("suave", "md")}>
+                  Cancelar
+                </button>
+              )}
+              {/* El ancho lo da este contenedor: el botón lo ocupa entero, sea cual sea el texto. */}
+              <div className="min-w-0 flex-1">
+                {cobrada ? (
+                  <button type="button" onClick={onCerrar} className={`${clasesBoton("suave", "md")} w-full`}>
+                    Cerrar
+                  </button>
+                ) : (
+                  <button
+                    type="submit"
+                    disabled={pendiente || cajaImpide || (cobrando && total <= 0)}
+                    className={`${clasesBoton("principal", "md")} w-full`}
+                  >
+                    {textoBotonPrincipal}
+                  </button>
+                )}
+              </div>
+            </div>
           </div>
         )}
       </div>

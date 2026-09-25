@@ -129,7 +129,6 @@ export type DatosCita = {
   estado: string;
   clienteNombre: string;
   clienteTelefono: string;
-  clienteEmail: string;
   personalId: string;
   fecha: string;
   hora: string;

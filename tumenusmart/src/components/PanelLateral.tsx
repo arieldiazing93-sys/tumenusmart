@@ -27,11 +27,18 @@ export function PanelLateral({
   titulo,
   onCerrar,
   ancho = "normal",
+  encabezado,
   children,
 }: {
   titulo: string;
   onCerrar: () => void;
   ancho?: keyof typeof ANCHOS;
+  /**
+   * Lo que va en la barra de arriba en lugar del título (por ejemplo unas pestañas), para no gastar
+   * una fila más. Tiene que ocupar el alto de la barra: la X queda a la derecha. `titulo` sigue
+   * siendo el nombre del panel para los lectores de pantalla.
+   */
+  encabezado?: ReactNode;
   children: ReactNode;
 }) {
   // Se guarda la función más reciente para no rearmar los listeners en cada
@@ -70,13 +77,19 @@ export function PanelLateral({
       <div
         className={`absolute inset-y-0 right-0 flex w-full animate-[entrarDerecha_0.2s_ease-out] flex-col bg-superficie shadow-alta sm:border-l sm:border-linea ${ANCHOS[ancho]}`}
       >
-        <div className="flex flex-none items-center justify-between border-b border-linea px-5 py-4">
-          <h2 className="text-[1.05rem] font-semibold tracking-titular text-tinta">{titulo}</h2>
+        <div
+          className={`flex flex-none justify-between border-b border-linea px-5 ${
+            encabezado ? "items-stretch" : "items-center py-4"
+          }`}
+        >
+          {encabezado ?? <h2 className="text-[1.05rem] font-semibold tracking-titular text-tinta">{titulo}</h2>}
           <button
             type="button"
             onClick={onCerrar}
             aria-label="Cerrar"
-            className="flex h-9 w-9 items-center justify-center rounded-lg text-tinta-media transition-colors hover:bg-papel-hundido hover:text-tinta"
+            className={`flex h-9 w-9 flex-none items-center justify-center rounded-lg text-tinta-media transition-colors hover:bg-papel-hundido hover:text-tinta ${
+              encabezado ? "self-center" : ""
+            }`}
           >
             <svg
               viewBox="0 0 24 24"

@@ -102,33 +102,36 @@ export function PanelCita({
       titulo={cita && !copia ? `Cita ${cita.codigo}` : "Nueva cita"}
       onCerrar={cerrar}
       ancho="ancho"
+      // Las pestañas van en la barra de arriba, junto a la X: así no hace falta una fila para el título y otra
+      // para ellas. (El código de la cita está en la primera fila del formulario.)
+      encabezado={
+        haciaNueva ? undefined : (
+          <div role="tablist" aria-label="Secciones de la cita" className="flex gap-1">
+            {(
+              [
+                { valor: "editar", etiqueta: "Editar cita" },
+                { valor: "actividad", etiqueta: "Actividad" },
+              ] as const
+            ).map((p) => (
+              <button
+                key={p.valor}
+                type="button"
+                role="tab"
+                aria-selected={pestana === p.valor}
+                onClick={() => setPestana(p.valor)}
+                className={`-mb-px flex items-center border-b-2 px-3 py-3 text-[0.86rem] font-semibold transition-colors ${
+                  pestana === p.valor
+                    ? "border-azul text-azul-oscuro"
+                    : "border-transparent text-tinta-media hover:text-tinta"
+                }`}
+              >
+                {p.etiqueta}
+              </button>
+            ))}
+          </div>
+        )
+      }
     >
-      {!haciaNueva && (
-        <div role="tablist" aria-label="Secciones de la cita" className="flex flex-none gap-1 border-b border-linea px-5 pt-2">
-          {(
-            [
-              { valor: "editar", etiqueta: "Editar cita" },
-              { valor: "actividad", etiqueta: "Actividad" },
-            ] as const
-          ).map((p) => (
-            <button
-              key={p.valor}
-              type="button"
-              role="tab"
-              aria-selected={pestana === p.valor}
-              onClick={() => setPestana(p.valor)}
-              className={`-mb-px border-b-2 px-3 py-2.5 text-[0.86rem] font-semibold transition-colors ${
-                pestana === p.valor
-                  ? "border-azul text-azul-oscuro"
-                  : "border-transparent text-tinta-media hover:text-tinta"
-              }`}
-            >
-              {p.etiqueta}
-            </button>
-          ))}
-        </div>
-      )}
-
       {/* El formulario se queda armado aunque se mire la otra pestaña: no se pierde lo escrito. */}
       <div className={pestana === "editar" || haciaNueva ? "flex min-h-0 flex-1 flex-col" : "hidden"}>
         <FormularioCita

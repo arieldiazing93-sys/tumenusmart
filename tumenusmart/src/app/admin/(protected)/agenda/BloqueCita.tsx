@@ -18,16 +18,16 @@ export function BloqueCita({
 }) {
   return (
     <section
-      className="animate-deslizar rounded-xl border border-linea bg-superficie p-4 shadow-sm"
+      className="animate-deslizar rounded-xl border border-linea bg-superficie p-3.5 shadow-sm"
       style={{ animationDelay: `${retraso}ms` }}
     >
-      <div className="mb-3 flex items-center gap-2.5">
-        <span className="flex h-7 w-7 flex-none items-center justify-center rounded-lg bg-azul-luz text-azul">
+      <div className="mb-2.5 flex items-center gap-2">
+        <span className="flex h-6 w-6 flex-none items-center justify-center rounded-md bg-azul-luz text-azul">
           {icono}
         </span>
-        <h3 className="text-[0.95rem] font-semibold tracking-titular text-tinta">{titulo}</h3>
+        <h3 className="text-[0.92rem] font-semibold tracking-titular text-tinta">{titulo}</h3>
       </div>
-      <div className="flex flex-col gap-3">{children}</div>
+      <div className="flex flex-col gap-2.5">{children}</div>
     </section>
   );
 }

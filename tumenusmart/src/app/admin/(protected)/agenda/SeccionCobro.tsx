@@ -132,21 +132,25 @@ export function SeccionCobro({
         </div>
 
         {valor.forma === "efectivo" && (
-          <div className="mt-2.5 flex flex-wrap items-center gap-2.5 rounded-lg border border-linea bg-papel-suave px-3 py-2">
+          <div className="mt-2.5 flex flex-wrap items-center gap-2.5 rounded-lg border border-linea bg-superficie px-3 py-2">
             <label htmlFor="cita-paga-con" className="text-[0.75rem] font-semibold uppercase tracking-rotulo text-tinta-suave">
               Paga con
             </label>
+            {/* Arranca vacío y en blanco, sin ningún monto de ejemplo: lo que se ve ahí lo escribió el cajero.
+                El fondo va en línea porque `campos-grises` pinta todos los campos de gris con una regla más fuerte. */}
             <input
               id="cita-paga-con"
               type="number"
               min={0}
               step={1000}
               inputMode="numeric"
+              autoComplete="off"
               value={pagaCon}
               onChange={(e) => setPagaCon(e.target.value)}
               onWheel={(e) => e.currentTarget.blur()}
-              placeholder={String(Math.round(total))}
-              className="w-32 rounded-lg border border-linea bg-superficie px-2.5 py-1.5 text-center text-[0.95rem] font-semibold text-tinta focus:border-azul focus:outline-none focus:ring-2 focus:ring-azul/15"
+              aria-label="Con cuánto paga el cliente"
+              style={{ backgroundColor: "rgb(var(--superficie))" }}
+              className="w-32 rounded-lg border border-linea px-2.5 py-1.5 text-center text-[0.95rem] font-semibold text-tinta focus:border-azul focus:outline-none focus:ring-2 focus:ring-azul/15"
             />
             {vuelto > 0 && (
               <p className="ml-auto text-[0.88rem] text-tinta">

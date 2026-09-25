@@ -50,7 +50,6 @@ type Preparados = {
   bufferMin: number;
   clienteNombre: string;
   clienteTelefono: string | null;
-  clienteEmail: string | null;
   lineas: { servicioId: string | null; nombre: string; duracionMin: number; precio: number }[];
   serviciosTexto: string;
   fecha: string;
@@ -92,11 +91,6 @@ async function prepararDatos(
     const t = normalizarTelefonoCliente(telefonoEscrito);
     if (!t.ok) return { ok: false, error: t.error };
     clienteTelefono = t.telefono;
-  }
-
-  const email = String(datos.clienteEmail ?? "").trim();
-  if (email && (!email.includes("@") || email.length > 120)) {
-    return { ok: false, error: "El correo del cliente no es válido" };
   }
 
   const personal =
@@ -179,7 +173,6 @@ async function prepararDatos(
       bufferMin,
       clienteNombre,
       clienteTelefono,
-      clienteEmail: email || null,
       lineas,
       serviciosTexto: lineas
         .map((l) => l.nombre)
@@ -240,7 +233,6 @@ async function aplicarCambios(storeId: string, citaId: string, p: Preparados, es
         personalId: p.personalId,
         clienteNombre: p.clienteNombre,
         clienteTelefono: p.clienteTelefono,
-        clienteEmail: p.clienteEmail,
         inicio: p.inicio,
         fin: p.fin,
         estado,
@@ -361,7 +353,6 @@ export async function crearCita(datos: DatosCita): Promise<ResultadoCita> {
       personalId: p.personalId,
       clienteNombre: p.clienteNombre,
       clienteTelefono: p.clienteTelefono,
-      clienteEmail: p.clienteEmail,
       inicio: p.inicio,
       fin: p.fin,
       estado,
