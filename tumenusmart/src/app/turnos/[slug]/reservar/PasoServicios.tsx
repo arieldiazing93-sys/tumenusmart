@@ -99,9 +99,15 @@ export function PasoServicios({
       ) : (
         <div className="mt-2">
           {visibles.map((c) => (
-            <details key={c.id} open className="group border-b border-linea">
-              <summary className="flex cursor-pointer list-none items-center justify-between py-4 text-[0.98rem] font-semibold text-tinta [&::-webkit-details-marker]:hidden">
-                {c.nombre}
+            <details key={c.id} open className="group mt-4 first:mt-2">
+              {/* La franja de cada categoría va de borde a borde y toma el color que el negocio eligió
+                  en Apariencia (un tinte suave de ese color, que sirve igual en tema claro y oscuro). */}
+              <summary className="-mx-4 flex cursor-pointer list-none items-center gap-3 border-y border-brand/25 bg-brand/15 px-4 py-3.5 [&::-webkit-details-marker]:hidden">
+                <span aria-hidden="true" className="h-5 w-1 flex-none rounded-full bg-brand" />
+                <span className="min-w-0 flex-1 truncate text-[0.98rem] font-semibold text-tinta">{c.nombre}</span>
+                <span className="cifra flex-none rounded-full bg-brand px-2 py-0.5 text-[0.72rem] font-semibold text-white">
+                  {c.servicios.length}
+                </span>
                 <svg
                   viewBox="0 0 24 24"
                   width={18}
@@ -124,7 +130,7 @@ export function PasoServicios({
                     <li key={s.id}>
                       <label
                         className={`flex cursor-pointer items-center gap-3 rounded-lg px-2 py-3.5 transition-colors ${
-                          marcado ? "bg-brand-light/50" : "hover:bg-papel-suave"
+                          marcado ? "bg-brand/10" : "hover:bg-papel-suave"
                         }`}
                       >
                         <span className="min-w-0 flex-1">

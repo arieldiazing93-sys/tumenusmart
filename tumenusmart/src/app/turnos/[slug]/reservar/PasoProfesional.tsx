@@ -96,7 +96,7 @@ export function PasoProfesional({
                 }
               }}
               className={`flex items-start gap-3 rounded-xl border p-4 transition-colors ${
-                elegido ? "border-brand bg-brand-light/50" : "border-linea bg-superficie"
+                elegido ? "border-brand bg-brand/10" : "border-linea bg-superficie"
               } ${disponible ? "cursor-pointer hover:border-brand" : "opacity-60"}`}
             >
               <AvatarPersonal nombre={p.nombre} fotoUrl={p.fotoUrl} indice={i} className="h-12 w-12 text-[0.95rem]" />
