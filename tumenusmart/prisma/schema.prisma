@@ -56,6 +56,12 @@ model Store {
   /// por cobrar. Apagado (default), todo sigue como siempre.
   ventasACredito Boolean @default(false)
 
+  /// Para los negocios que atienden con personal (barberías, salones): prendido, al cobrar
+  /// en el mostrador el Punto de Venta pregunta A QUIÉN se le asigna el trabajo (una
+  /// persona del personal de la Reserva de turnos). Se activa en Reserva de turnos →
+  /// Personal. Apagado (default), el Punto de Venta no muestra el personal.
+  pedirPersonalEnVenta Boolean @default(false)
+
   /// Cómo se ve la carta pública de este local.
   ///
   /// "lista"    — filas compactas con miniatura. Es lo mejor para el local que
@@ -2236,7 +2242,9 @@ model Cita {
   serviciosTexto  String?
   /// Tiempo de búfer que se reserva después del turno (limpiar, preparar), en minutos.
   bufferMin       Int             @default(0)
-  /// panel = lo cargó el negocio; web = lo pidió el cliente desde la página de reservas.
+  /// panel = lo cargó el negocio; web = lo pidió el cliente desde la página de reservas;
+  /// mostrador = alguien que llegó sin reserva, se cobró en el Punto de Venta y se le
+  /// asignó a una persona del personal (la cita nace ya finalizada y cobrada).
   origen          String          @default("panel")
   /// false = todavía no se ve en el calendario (esperando que el cliente mande el
   /// aviso por WhatsApp). Sigue reservando el horario un rato (ver disponibilidad.ts).

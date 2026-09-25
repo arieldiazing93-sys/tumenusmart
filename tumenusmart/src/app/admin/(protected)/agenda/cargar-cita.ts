@@ -87,7 +87,7 @@ export async function cargarDetalleCita(db: PrismaLocal, id: string): Promise<De
   return {
     id: c.id,
     codigo: codigoDeCita(c.id),
-    origen: c.origen === "web" ? "web" : "panel",
+    origen: c.origen === "web" ? "web" : c.origen === "mostrador" ? "mostrador" : "panel",
     estado: c.estado,
     clienteNombre: c.clienteNombre,
     clienteTelefono: c.clienteTelefono ?? "",

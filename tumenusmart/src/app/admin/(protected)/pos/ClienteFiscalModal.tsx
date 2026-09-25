@@ -22,8 +22,7 @@ export type DatosClienteFiscal = {
  * La Clave no se puede mostrar todavía: sale de un contador que recién se
  * incrementa cuando el cliente se crea de verdad.
  *
- * Mismo tratamiento visual que CobrarModal: hoja desde abajo en el celular,
- * cuadro centrado en pantallas más anchas.
+ * Hoja desde abajo en el celular, cuadro centrado en pantallas más anchas.
  */
 export function ClienteFiscalModal({
   numeroInicial,
@@ -69,7 +68,8 @@ export function ClienteFiscalModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-tinta/45 sm:items-center sm:p-4"
+      // z-[60]: se abre desde el panel de cobro (que va en un portal con z-50) y tiene que quedar por encima.
+      className="fixed inset-0 z-[60] flex items-end justify-center bg-tinta/45 sm:items-center sm:p-4"
       onClick={onCerrar}
     >
       <div

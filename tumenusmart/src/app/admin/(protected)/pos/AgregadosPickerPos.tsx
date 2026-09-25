@@ -13,8 +13,7 @@ type Agregado = { id: string; nombre: string; precioExtra: number };
  * online, no del mostrador) — es lo que de verdad hace perder tiempo al
  * cajero si no está a mano: "con queso extra", "sin límite de aderezo", etc.
  *
- * Mismo tratamiento visual que CobrarModal: hoja desde abajo en el celular,
- * cuadro centrado en pantallas más anchas.
+ * Hoja desde abajo en el celular, cuadro centrado en pantallas más anchas.
  */
 export function AgregadosPickerPos({
   nombre,

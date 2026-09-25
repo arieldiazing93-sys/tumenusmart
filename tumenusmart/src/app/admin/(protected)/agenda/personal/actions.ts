@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { exigirPermiso } from "@/lib/auth";
 import { registrarBitacora } from "@/lib/bitacora";
 import { idLocalActual } from "@/lib/local-actual";
+import { prisma as prismaGlobal } from "@/lib/prisma";
 import { prismaDelLocal } from "@/lib/prisma-local";
 import { horaDeMinutos, partesLocales } from "@/lib/agenda";
 import {
@@ -228,4 +229,34 @@ export async function trabajosDelPersonal(id: string, periodo: PeriodoComision):
     totalComision: trabajos.reduce((suma, t) => suma + t.comision, 0),
     hayMas: citas.length >= MAXIMO_TRABAJOS,
   };
+}
+
+/**
+ * Prende o apaga "preguntar el personal al cobrar en el punto de venta": para los negocios donde
+ * llega gente sin reserva (barberías, salones), el punto de venta pregunta a quién se le asigna el
+ * trabajo. Es una opción del local (Store.pedirPersonalEnVenta); apagada, los demás negocios no
+ * ven nada del personal en el punto de venta. Se guarda al instante.
+ */
+export async function alternarPedirPersonalEnVenta(activo: boolean): Promise<ResultadoPersonal> {
+  const sesion = await exigirPermiso("agenda.configurar");
+  const idLocal = await idLocalActual();
+
+  await prismaGlobal.store.update({
+    where: { id: idLocal },
+    data: { pedirPersonalEnVenta: activo === true },
+  });
+
+  await registrarBitacora(idLocal, sesion, {
+    modulo: "configuracion",
+    accion: activo ? "pedir_personal_en_venta_activado" : "pedir_personal_en_venta_desactivado",
+    descripcion: activo
+      ? 'Activó "Preguntar el personal al cobrar": el punto de venta pregunta a quién se le asigna el trabajo.'
+      : 'Desactivó "Preguntar el personal al cobrar".',
+    entidad: "Store",
+    entidadId: idLocal,
+  });
+
+  revalidatePath("/admin/pos");
+  revalidatePath("/admin/agenda/personal");
+  return { ok: true };
 }

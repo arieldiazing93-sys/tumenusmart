@@ -8,7 +8,7 @@ import { actualizarCliente } from "./actions";
 
 /**
  * Edición de un cliente ya existente, en ventana modal (mismo estilo que
- * ClienteFiscalModal/CobrarModal del POS).
+ * ClienteFiscalModal del POS).
  *
  * Clave queda de solo lectura (correlativo interno, no algo que se
  * "corrige"). Tipo + N° de identificación SÍ se pueden corregir: los datos

@@ -18,6 +18,7 @@ import { aplanarReceta } from "@/lib/insumo-elaborado";
 import { cargarElaborados } from "@/lib/cargar-elaborados";
 import { desglosarIva, formatearNumeroFactura } from "@/lib/factura-pos";
 import { anularComprobantes, crearComprobante, descripcionDeItem } from "@/lib/comprobante";
+import { DURACION_MINIMA_CITA } from "@/lib/agenda-cita";
 import { calcularDescuento, type DescuentoPedido } from "@/lib/descuento-venta";
 import { SIN_REGISTRO_FISCAL } from "@/lib/tipo-cliente";
 import { turnoAbierto, pedidosDelTurno, entregasSinRendir, netoMovimientosCaja } from "./turno-actual";
@@ -139,6 +140,12 @@ export type DatosVenta = {
    * que la crea — o no pasa ninguna de las dos cosas.
    */
   citaId?: string;
+  /**
+   * A quién del personal se le asigna el trabajo (negocios con "preguntar el personal al cobrar",
+   * ver Store.pedirPersonalEnVenta). Solo se usa si el local lo tiene activado y la venta no cobra
+   * una cita (esa ya tiene su persona): el servidor lo exige y lo verifica, nunca confía en el navegador.
+   */
+  personalId?: string;
 };
 
 /** Lo que se lanza dentro de la transacción si la cita ya no se puede cobrar (la cobraron en ese instante). */
@@ -164,7 +171,10 @@ export async function registrarVenta(turnoId: string, datos: DatosVenta): Promis
       where: { id: turnoId },
       select: { id: true, estado: true, estacion: { select: { puntoExpedicion: true } } },
     }),
-    prisma.store.findUnique({ where: { id: storeId }, select: { facturaObligatoria: true, ventasACredito: true } }),
+    prisma.store.findUnique({
+      where: { id: storeId },
+      select: { facturaObligatoria: true, ventasACredito: true, pedirPersonalEnVenta: true },
+    }),
   ]);
   if (!turno) return { ok: false, error: "Ese turno no existe." };
   if (turno.estado !== "abierto") {
@@ -190,6 +200,25 @@ export async function registrarVenta(turnoId: string, datos: DatosVenta): Promis
       return { ok: false, error: "Esa cita está cancelada o sin asistencia. Reactivala para poder cobrarla." };
     }
     comisionDeLaCita = cita.personal.comisionPorcentaje == null ? null : Number(cita.personal.comisionPorcentaje);
+  }
+
+  // Negocios que atienden sin reserva (barberías, salones): al cobrar en el mostrador el trabajo se le asigna a
+  // una persona del personal, y esa venta queda como una cita ya cobrada suya (para su vista de trabajo y su
+  // comisión). Solo si el local lo activó y hay personal cargado; con una cita de por medio no hace falta.
+  let personalAsignado: { id: string; comisionPorcentaje: number | null } | null = null;
+  if (!datos.citaId && store?.pedirPersonalEnVenta && (await db.miembroPersonal.count({ where: { activo: true } })) > 0) {
+    const elegido =
+      typeof datos.personalId === "string" && datos.personalId
+        ? await db.miembroPersonal.findFirst({
+            where: { id: datos.personalId, activo: true },
+            select: { id: true, comisionPorcentaje: true },
+          })
+        : null;
+    if (!elegido) return { ok: false, error: "Elegí a quién se le asigna el trabajo." };
+    personalAsignado = {
+      id: elegido.id,
+      comisionPorcentaje: elegido.comisionPorcentaje == null ? null : Number(elegido.comisionPorcentaje),
+    };
   }
 
   const esFactura = datos.comprobanteTipo === "factura";
@@ -447,6 +476,19 @@ export async function registrarVenta(turnoId: string, datos: DatosVenta): Promis
     ),
   ];
 
+  // Si el trabajo se asigna a alguien del personal: cuánto dura cada servicio (para la hora de inicio de su cita).
+  const servicioDelProducto = new Map<string, { id: string; duracionMin: number }>();
+  if (personalAsignado) {
+    const idsProductos = [...new Set(filas.flatMap((f) => (f.productId ? [f.productId] : [])))];
+    if (idsProductos.length > 0) {
+      const servicios = await db.servicioAgenda.findMany({
+        where: { productId: { in: idsProductos } },
+        select: { id: true, productId: true, duracionMin: true },
+      });
+      for (const s of servicios) servicioDelProducto.set(s.productId, { id: s.id, duracionMin: s.duracionMin });
+    }
+  }
+
   const numero = await siguienteNumeroVentaPos(storeId);
   const registradoPor = sesion.nombre?.trim() || sesion.email;
   const tipoEntrega = datos.tipoEntrega === "llevar" ? "llevar" : "local";
@@ -583,6 +625,61 @@ export async function registrarVenta(turnoId: string, datos: DatosVenta): Promis
       if (marcada.count !== 1) throw new Error(CITA_NO_COBRABLE);
     }
 
+    // Alguien que llegó sin reserva y se le asignó el trabajo a una persona: la venta queda como una cita ya
+    // cobrada de esa persona (nace Finalizada, con la hora en que terminó el trabajo), así aparece en Citas, en su
+    // vista de trabajo y en su comisión igual que una cita reservada.
+    if (personalAsignado) {
+      const fin = new Date();
+      const lineasCita = filas.map((f) => {
+        const servicio = f.productId ? servicioDelProducto.get(f.productId) : undefined;
+        return {
+          servicioId: servicio?.id ?? null,
+          nombre: f.cantidad > 1 ? `${f.cantidad} × ${f.nombreProducto}` : f.nombreProducto,
+          duracionMin: (servicio?.duracionMin ?? 0) * f.cantidad,
+          precio: f.precioUnitario * f.cantidad,
+        };
+      });
+      const duracion = Math.max(
+        lineasCita.reduce((suma, l) => suma + l.duracionMin, 0),
+        DURACION_MINIMA_CITA
+      );
+      await tx.cita.create({
+        data: {
+          storeId,
+          personalId: personalAsignado.id,
+          clienteNombre:
+            clienteNombre ||
+            (esFactura && !esSinRegistroFiscal ? datos.facturaRazonSocial?.trim() : "") ||
+            "Cliente de mostrador",
+          clienteTelefono,
+          inicio: new Date(fin.getTime() - duracion * 60_000),
+          fin,
+          estado: "finalizada",
+          precio: total,
+          descuento: descuento.monto,
+          descuentoPorcentaje: descuento.porcentaje,
+          serviciosTexto: lineasCita
+            .map((l) => l.nombre)
+            .join(" + ")
+            .slice(0, 300),
+          bufferMin: 0,
+          origen: "mostrador",
+          visible: true,
+          ventaPosId: venta.id,
+          comisionPorcentaje: personalAsignado.comisionPorcentaje,
+          servicios: {
+            create: lineasCita.map((l) => ({
+              storeId,
+              servicioId: l.servicioId,
+              nombre: l.nombre,
+              duracionMin: l.duracionMin,
+              precio: l.precio,
+            })),
+          },
+        },
+      });
+    }
+
     // La foto fiscal de la factura: todo lo que un proveedor de factura
     // electrónica (o un reporte) necesita, en una sola tabla. Va en la misma
     // transacción que el número consumido, así nunca quedan una sin la otra.
@@ -660,7 +757,7 @@ export async function registrarVenta(turnoId: string, datos: DatosVenta): Promis
 
   revalidatePath("/admin/pos");
   revalidatePath("/admin/pos/cuentas");
-  if (datos.citaId) {
+  if (datos.citaId || personalAsignado) {
     revalidatePath("/admin/agenda");
     revalidatePath("/admin/agenda/citas");
   }
@@ -946,6 +1043,10 @@ export async function cancelarVenta(ventaId: string, motivo: string): Promise<Re
     }
 
     await revertirMovimientosVenta(tx, storeId, { ventaPosId: ventaId }, identidad);
+
+    // Una venta del mostrador que se le asignó a alguien del personal creó su propia cita (ya
+    // cobrada): si la venta se cancela, esa cita no tiene sentido y se borra.
+    await tx.cita.deleteMany({ where: { storeId, ventaPosId: ventaId, origen: "mostrador" } });
 
     // Si esta venta había cobrado una cita de la agenda, la cita vuelve a estar sin
     // cobrar (queda como Próxima) y sale de Citas.

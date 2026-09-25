@@ -76,7 +76,7 @@ export type DetalleCita = {
   id: string;
   /** Los últimos 6 caracteres del id, para reconocerla ("AB12CD"). */
   codigo: string;
-  origen: "panel" | "web";
+  origen: "panel" | "web" | "mostrador";
   estado: string;
   clienteNombre: string;
   /** Solo dígitos, internacional (595984123456), o "". */
@@ -187,5 +187,7 @@ export function resumirDescuento(subtotal: number, pedido: DescuentoPedido | nul
 
 /** De dónde vino la cita. */
 export function textoFuente(origen: string): string {
-  return origen === "web" ? "Enlace de reserva" : "Cargada en el panel";
+  if (origen === "web") return "Enlace de reserva";
+  if (origen === "mostrador") return "Mostrador (sin reserva)";
+  return "Cargada en el panel";
 }

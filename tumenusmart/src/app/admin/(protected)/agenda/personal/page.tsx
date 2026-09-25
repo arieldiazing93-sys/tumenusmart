@@ -1,9 +1,11 @@
 import { pantallaConPermiso } from "@/lib/auth";
 import { idLocalActual } from "@/lib/local-actual";
+import { prisma } from "@/lib/prisma";
 import { prismaDelLocal } from "@/lib/prisma-local";
 import { Cabecera } from "@/components/ui";
 import type { MiembroFila } from "@/lib/agenda-personal";
 import { ListaPersonal } from "./ListaPersonal";
+import { PedirPersonalEnVentaToggle } from "./PedirPersonalEnVentaToggle";
 
 export const dynamic = "force-dynamic";
 
@@ -13,7 +15,11 @@ export const dynamic = "force-dynamic";
  */
 export default async function PersonalPage() {
   await pantallaConPermiso("agenda.configurar");
-  const db = prismaDelLocal(await idLocalActual());
+  const storeId = await idLocalActual();
+  const db = prismaDelLocal(storeId);
+
+  // Store no está entre los modelos por local: se lee con el cliente global.
+  const store = await prisma.store.findUnique({ where: { id: storeId }, select: { pedirPersonalEnVenta: true } });
 
   const filas = await db.miembroPersonal.findMany({
     // Los activos primero; entre ellos, en el orden en que se cargaron.
@@ -50,6 +56,7 @@ export default async function PersonalPage() {
         titulo="Personal"
         bajada="Quienes atienden a tus clientes. Cada uno tiene su propia agenda en el calendario."
       />
+      <PedirPersonalEnVentaToggle activa={store?.pedirPersonalEnVenta ?? false} />
       <ListaPersonal miembros={miembros} />
     </div>
   );

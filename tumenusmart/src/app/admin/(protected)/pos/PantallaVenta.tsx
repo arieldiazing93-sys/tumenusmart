@@ -11,7 +11,7 @@ import { FORMA_PAGO_A_CREDITO } from "@/lib/turno-pos";
 import type { PagoCobro } from "@/lib/pago-venta";
 import { SIN_REGISTRO_FISCAL, TIPOS_IDENTIFICACION_FISCAL, etiquetaCortaTipoIdentificacion } from "@/lib/tipo-cliente";
 import { buscarClientePorIdentificacion, buscarClientePorTelefono, registrarVenta } from "./actions";
-import { CobrarModal } from "./CobrarModal";
+import { CobrarPanel } from "./CobrarPanel";
 import { MovimientosCajaBoton } from "./caja/MovimientosCajaBoton";
 import { EntradaConLupa } from "./EntradaConLupa";
 import { ClienteFiscalModal, type DatosClienteFiscal } from "./ClienteFiscalModal";
@@ -53,7 +53,7 @@ const CHIP_INACTIVO = "border-linea text-tinta-media hover:border-brand hover:te
  * La pantalla de venta rápida de mostrador.
  *
  * Grilla de productos + carrito. Cargar el pedido no cobra todavía —
- * "Confirmar pedido" recién abre el paso de cobro (CobrarModal), donde se
+ * "Confirmar pedido" recién abre el paso de cobro (CobrarPanel), donde se
  * elige la forma de pago y, si es efectivo, se calcula el vuelto. Al cobrar
  * se va al ticket; volver de ahí a esta pantalla la deja en blanco de
  * nuevo, lista para la próxima cuenta.
@@ -72,6 +72,7 @@ export function PantallaVenta({
   ventasACredito,
   nombreImpresoraTicket,
   impresorasPorArea,
+  personal,
 }: {
   turnoId: string;
   categorias: Categoria[];
@@ -88,6 +89,11 @@ export function PantallaVenta({
   nombreImpresoraTicket: string | null;
   /** Mapa Área de Impresión → impresora QZ Tray, en esta estación. */
   impresorasPorArea: Record<string, string>;
+  /**
+   * El personal al que se le puede asignar el trabajo al cobrar. Solo viene con gente si el local activó
+   * "preguntar el personal al cobrar" (barberías, salones): vacío, el cobro no pregunta nada.
+   */
+  personal: { id: string; nombre: string }[];
 }) {
   const router = useRouter();
   // Si el local exige facturar todo y esta estación puede hacerlo, no hay
@@ -319,7 +325,7 @@ export function PantallaVenta({
     }
   }
 
-  async function confirmarCobro(pagos: PagoCobro[], creditoDias?: number) {
+  async function confirmarCobro(pagos: PagoCobro[], creditoDias?: number, personalId?: string) {
     // A crédito va sola (no se combina con otras formas): una única fila "a_credito".
     const esCredito = pagos.length === 1 && pagos[0].forma === FORMA_PAGO_A_CREDITO;
     if (
@@ -366,6 +372,7 @@ export function PantallaVenta({
       facturaEmail: esFactura && !esSinRegistroFiscal ? facturaEmail.trim() || undefined : undefined,
       descuento: descuentoPedido,
       creditoDias: esCredito ? creditoDias : undefined,
+      personalId: personal.length > 0 ? personalId : undefined,
       items: carrito.map((i) =>
         i.tipo === "combo"
           ? {
@@ -1042,12 +1049,13 @@ export function PantallaVenta({
       )}
 
       {mostrarCobro && (
-        <CobrarModal
+        <CobrarPanel
           clienteNombre={clienteNombre}
           cantidadItems={cantidadTotal}
           total={total}
           cobrando={cobrando}
           error={error}
+          personal={personal}
           permiteCredito={ventasACredito}
           bloqueClienteCredito={bloqueClienteCredito}
           creditoListo={creditoListo}

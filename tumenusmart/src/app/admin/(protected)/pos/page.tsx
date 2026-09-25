@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { prismaDelLocal } from "@/lib/prisma-local";
 import { idLocalActual } from "@/lib/local-actual";
 import { estacionActual } from "@/lib/estacion-actual";
+import { nombreCompleto } from "@/lib/agenda-personal";
 import { diasParaVencer } from "@/lib/factura-pos";
 import { turnoAbierto } from "./turno-actual";
 import { PantallaVenta } from "./PantallaVenta";
@@ -50,8 +51,20 @@ export default async function PosPage() {
   // eso se lee con el cliente global, no con `db`.
   const store = await prisma.store.findUnique({
     where: { id: storeId },
-    select: { facturaObligatoria: true, ventasACredito: true },
+    select: { facturaObligatoria: true, ventasACredito: true, pedirPersonalEnVenta: true },
   });
+
+  // Solo si el local activó "preguntar el personal al cobrar" (barberías, salones): el personal activo,
+  // para elegir a quién se le asigna el trabajo. En los demás negocios el punto de venta no lo muestra.
+  const personalParaVenta = store?.pedirPersonalEnVenta
+    ? (
+        await db.miembroPersonal.findMany({
+          where: { activo: true },
+          orderBy: [{ orden: "asc" }, { createdAt: "asc" }, { id: "asc" }],
+          select: { id: true, nombre: true, apellido: true },
+        })
+      ).map((p) => ({ id: p.id, nombre: nombreCompleto(p) }))
+    : [];
 
   const categorias = await db.category.findMany({
     where: { activa: true },
@@ -164,6 +177,7 @@ export default async function PosPage() {
       ventasACredito={store?.ventasACredito ?? false}
       nombreImpresoraTicket={nombreImpresoraTicket}
       impresorasPorArea={impresorasPorArea}
+      personal={personalParaVenta}
     />
   );
 }
