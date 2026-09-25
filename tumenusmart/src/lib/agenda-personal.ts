@@ -6,6 +6,8 @@
  * valida tiene que decir siempre lo mismo.
  */
 
+import type { HorarioDia } from "./horario-trabajo";
+
 /** Un miembro del personal como lo muestra la pantalla de Personal. */
 export type MiembroFila = {
   id: string;
@@ -22,6 +24,8 @@ export type MiembroFila = {
   citas: number;
   /** Su comisión por trabajo, en porcentaje (0 a 100); null si no cobra comisión. */
   comisionPorcentaje: number | null;
+  /** Su horario propio (los siete días); null si no lo tiene y usa el horario general del negocio. */
+  horarioPropio: HorarioDia[] | null;
 };
 
 /** "Juan" + "Britez" → "Juan Britez". El apellido puede faltar en datos viejos. */

@@ -17,7 +17,7 @@ import {
   horasDelPeriodo,
   type Ocupado,
 } from "./disponibilidad";
-import { completarHorario } from "./horario-trabajo";
+import { horarioEfectivo, type HorarioDia } from "./horario-trabajo";
 import { estaSuspendido } from "./local-por-slug";
 import { prisma } from "./prisma";
 import { MAX_SERVICIOS_POR_CITA, type PersonalPublico, type ServicioPublico } from "./reserva-cliente";
@@ -223,20 +223,29 @@ export async function disponibilidadDePersonal(
   personalIds: string[],
   ahora: Date
 ): Promise<Map<string, Record<string, number[]>>> {
-  const filas = await db.horarioTrabajo.findMany({
-    where: { storeId },
-    select: {
-      diaSemana: true,
-      trabaja: true,
-      inicio: true,
-      fin: true,
-      descansa: true,
-      descansoInicio: true,
-      descansoFin: true,
-    },
-  });
-  // Sin horario guardado se usa el de ejemplo (lunes a sábado de 9 a 18, descanso de 13 a 14).
-  const horarios = completarHorario(filas);
+  const columnasDeHorario = {
+    diaSemana: true,
+    trabaja: true,
+    inicio: true,
+    fin: true,
+    descansa: true,
+    descansoInicio: true,
+    descansoFin: true,
+  } as const;
+  const [filasGenerales, filasPropias] = await Promise.all([
+    db.horarioTrabajo.findMany({ where: { storeId }, select: columnasDeHorario }),
+    // El horario propio de cada persona que se está mirando (una persona sin filas usa el general).
+    db.horarioPersonal.findMany({
+      where: { storeId, personalId: { in: personalIds } },
+      select: { personalId: true, ...columnasDeHorario },
+    }),
+  ]);
+  const propioDe = new Map<string, HorarioDia[]>();
+  for (const { personalId, ...dia } of filasPropias) {
+    const lista = propioDe.get(personalId) ?? [];
+    lista.push(dia);
+    propioDe.set(personalId, lista);
+  }
   const hoy = claveDiaAsuncion(ahora);
   const minutosAhora = partesLocales(ahora).minutos;
   const ocupados = await ocupadosPorPersonal(db, storeId, personalIds, hoy, ahora);
@@ -246,7 +255,9 @@ export async function disponibilidadDePersonal(
     salida.set(
       id,
       horasDelPeriodo({
-        horarios,
+        // Su horario propio si lo tiene; si no, el general (y si tampoco se guardó ninguno, el de ejemplo:
+        // lunes a sábado de 9 a 18, descanso de 13 a 14).
+        horarios: horarioEfectivo(propioDe.get(id) ?? [], filasGenerales),
         ocupadosPorDia: ocupados.get(id) ?? new Map<string, Ocupado[]>(),
         duracion: seleccion.duracion,
         buffer: seleccion.buffer,

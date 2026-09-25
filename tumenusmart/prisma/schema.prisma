@@ -214,6 +214,7 @@ model Store {
   miembrosPersonal MiembroPersonal[]
   citas            Cita[]
   horariosTrabajo  HorarioTrabajo[]
+  horariosPersonal HorarioPersonal[]
   serviciosAgenda  ServicioAgenda[]
   serviciosPersonal ServicioPersonal[]
   paginaReservas   PaginaReservas?
@@ -2212,6 +2213,8 @@ model MiembroPersonal {
 
   citas     Cita[]
   servicios ServicioPersonal[]
+  /// Su horario propio (siete filas si lo tiene). Sin filas usa el horario general del negocio.
+  horario   HorarioPersonal[]
 
   @@index([storeId])
 }
@@ -2306,6 +2309,30 @@ model HorarioTrabajo {
   descansoFin    String  @default("14:00")
 
   @@unique([storeId, diaSemana])
+  @@index([storeId])
+}
+
+/// El horario propio de una persona del personal (un turno completo, uno intermedio, uno de tarde y noche…):
+/// las mismas columnas que HorarioTrabajo, una fila por día. Una persona CON filas usa este horario; una
+/// persona SIN filas usa el horario general del negocio (HorarioTrabajo). Se guardan siempre los siete días juntos.
+model HorarioPersonal {
+  id             String          @id @default(cuid())
+  storeId        String
+  store          Store           @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  personalId     String
+  personal       MiembroPersonal @relation(fields: [personalId], references: [id], onDelete: Cascade)
+  /// 0 = domingo, 1 = lunes ... 6 = sábado.
+  diaSemana      Int
+  /// Apagado: ese día esa persona no atiende.
+  trabaja        Boolean         @default(true)
+  /// "HH:MM"
+  inicio         String          @default("09:00")
+  fin            String          @default("18:00")
+  descansa       Boolean         @default(false)
+  descansoInicio String          @default("13:00")
+  descansoFin    String          @default("14:00")
+
+  @@unique([personalId, diaSemana])
   @@index([storeId])
 }
 

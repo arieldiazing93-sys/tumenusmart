@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { prismaDelLocal } from "@/lib/prisma-local";
 import { BotonEnlace, Cabecera } from "@/components/ui";
 import type { MiembroFila } from "@/lib/agenda-personal";
+import { completarHorario, type HorarioDia } from "@/lib/horario-trabajo";
 import { ListaPersonal } from "./ListaPersonal";
 import { PedirPersonalEnVentaToggle } from "./PedirPersonalEnVentaToggle";
 
@@ -37,6 +38,27 @@ export default async function PersonalPage() {
     },
   });
 
+  // El horario general del negocio y el propio de cada persona que lo tenga (el resto usa el general).
+  const columnasDeHorario = {
+    diaSemana: true,
+    trabaja: true,
+    inicio: true,
+    fin: true,
+    descansa: true,
+    descansoInicio: true,
+    descansoFin: true,
+  } as const;
+  const [filasGenerales, filasPropias] = await Promise.all([
+    db.horarioTrabajo.findMany({ select: columnasDeHorario }),
+    db.horarioPersonal.findMany({ select: { personalId: true, ...columnasDeHorario } }),
+  ]);
+  const propioDe = new Map<string, HorarioDia[]>();
+  for (const { personalId, ...dia } of filasPropias) {
+    const lista = propioDe.get(personalId) ?? [];
+    lista.push(dia);
+    propioDe.set(personalId, lista);
+  }
+
   const miembros: MiembroFila[] = filas.map((f) => ({
     id: f.id,
     nombre: f.nombre,
@@ -48,6 +70,7 @@ export default async function PersonalPage() {
     servicios: f._count.servicios,
     citas: f._count.citas,
     comisionPorcentaje: f.comisionPorcentaje == null ? null : Number(f.comisionPorcentaje),
+    horarioPropio: propioDe.has(f.id) ? completarHorario(propioDe.get(f.id) ?? []) : null,
   }));
 
   return (
@@ -62,7 +85,7 @@ export default async function PersonalPage() {
         }
       />
       <PedirPersonalEnVentaToggle activa={store?.pedirPersonalEnVenta ?? false} />
-      <ListaPersonal miembros={miembros} />
+      <ListaPersonal miembros={miembros} horarioGeneral={completarHorario(filasGenerales)} />
     </div>
   );
 }

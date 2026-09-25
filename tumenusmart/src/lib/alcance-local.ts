@@ -61,6 +61,7 @@ export const MODELOS_POR_LOCAL = new Set([
   "MiembroPersonal",
   "Cita",
   "HorarioTrabajo",
+  "HorarioPersonal",
   "ServicioAgenda",
   "ServicioPersonal",
   "PaginaReservas",

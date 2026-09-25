@@ -29,7 +29,7 @@ export const DIAS_ADELANTE = 60;
  * (se borra) y el horario queda libre para otro cliente: una reserva que el negocio
  * nunca vio no puede quedar ocupando un turno.
  */
-export const MINUTOS_BLOQUEO_SIN_CONFIRMAR = 10;
+export const MINUTOS_BLOQUEO_SIN_CONFIRMAR = 5;
 
 /** Un tramo ya ocupado de un día. `hasta` incluye el tiempo de búfer del turno. */
 export type Ocupado = { desde: number; hasta: number };

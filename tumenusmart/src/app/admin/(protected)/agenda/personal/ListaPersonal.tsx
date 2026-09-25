@@ -5,7 +5,9 @@ import Link from "next/link";
 import { Entrada, Pastilla, Tabla, Td, Th, Tr, Vacio, clasesBoton } from "@/components/ui";
 import { PanelLateral } from "@/components/PanelLateral";
 import { formatearTelefonoPersonal, nombreCompleto, type MiembroFila } from "@/lib/agenda-personal";
+import type { HorarioDia } from "@/lib/horario-trabajo";
 import { AvatarPersonal } from "../AvatarPersonal";
+import { FichaPersonal } from "./FichaPersonal";
 import { FormularioPersonal } from "./FormularioPersonal";
 
 /** Sin tildes ni mayúsculas, para que "barbero" encuentre a "Bárbero". */
@@ -24,17 +26,20 @@ function textoServicios(n: number): string {
   return n === 1 ? "1 servicio" : `${n} servicios`;
 }
 
+/** Qué muestra el panel lateral: nada, el alta, la ficha de una persona o el formulario para editarla. */
+type PanelPersonal = null | { modo: "nuevo" } | { modo: "ver" | "editar"; id: string };
+
 /**
  * La pantalla de Personal: el buscador, el botón para añadir y la lista.
- * "Añadir personal" y "Editar" abren el mismo panel lateral con el formulario.
+ * "Añadir personal" abre el panel lateral con el formulario; "Ver" abre la ficha de la
+ * persona (sus datos, su horario, sus trabajos), y desde ahí se pasa a editarla.
  *
  * En pantalla ancha la lista es una tabla; en el celular son tarjetas, con el
- * botón Editar siempre a la mano.
+ * botón Ver siempre a la mano.
  */
-export function ListaPersonal({ miembros }: { miembros: MiembroFila[] }) {
+export function ListaPersonal({ miembros, horarioGeneral }: { miembros: MiembroFila[]; horarioGeneral: HorarioDia[] }) {
   const [busqueda, setBusqueda] = useState("");
-  // null: cerrado · "nuevo": alta · un id: editando a esa persona.
-  const [panel, setPanel] = useState<null | "nuevo" | string>(null);
+  const [panel, setPanel] = useState<PanelPersonal>(null);
 
   const visibles = useMemo(() => {
     const q = sinTildes(busqueda.trim());
@@ -42,9 +47,10 @@ export function ListaPersonal({ miembros }: { miembros: MiembroFila[] }) {
     return miembros.filter((m) => sinTildes(`${nombreCompleto(m)} ${m.profesion ?? ""}`).includes(q));
   }, [miembros, busqueda]);
 
-  const enEdicion = panel && panel !== "nuevo" ? (miembros.find((m) => m.id === panel) ?? null) : null;
+  // La persona a la que se refiere el panel (al añadir, ninguna).
+  const persona = panel && panel.modo !== "nuevo" ? (miembros.find((m) => m.id === panel.id) ?? null) : null;
   const botonAnadir = (
-    <button type="button" onClick={() => setPanel("nuevo")} className={clasesBoton("principal", "md")}>
+    <button type="button" onClick={() => setPanel({ modo: "nuevo" })} className={clasesBoton("principal", "md")}>
       <span aria-hidden="true" className="text-[1.1rem] leading-none">
         +
       </span>
@@ -122,6 +128,7 @@ export function ListaPersonal({ miembros }: { miembros: MiembroFila[] }) {
                         />
                         <span className="font-semibold text-tinta">{nombreCompleto(m)}</span>
                         {!m.activo && <Pastilla>Inactivo</Pastilla>}
+                        {m.horarioPropio && <Pastilla color="azul">Horario propio</Pastilla>}
                       </div>
                     </Td>
                     <Td>{m.profesion || <span className="text-tinta-suave">—</span>}</Td>
@@ -136,8 +143,12 @@ export function ListaPersonal({ miembros }: { miembros: MiembroFila[] }) {
                         <Link href={`/admin/agenda/citas?personal=${m.id}`} className={clasesBoton("navegar", "sm")}>
                           Ver trabajo
                         </Link>
-                        <button type="button" onClick={() => setPanel(m.id)} className={clasesBoton("suave", "sm")}>
-                          Editar
+                        <button
+                          type="button"
+                          onClick={() => setPanel({ modo: "ver", id: m.id })}
+                          className={clasesBoton("suave", "sm")}
+                        >
+                          Ver
                         </button>
                       </div>
                     </Td>
@@ -172,8 +183,12 @@ export function ListaPersonal({ miembros }: { miembros: MiembroFila[] }) {
                   <Link href={`/admin/agenda/citas?personal=${m.id}`} className={clasesBoton("navegar", "sm")}>
                     Ver trabajo
                   </Link>
-                  <button type="button" onClick={() => setPanel(m.id)} className={clasesBoton("suave", "sm")}>
-                    Editar
+                  <button
+                    type="button"
+                    onClick={() => setPanel({ modo: "ver", id: m.id })}
+                    className={clasesBoton("suave", "sm")}
+                  >
+                    Ver
                   </button>
                 </div>
               </li>
@@ -182,14 +197,30 @@ export function ListaPersonal({ miembros }: { miembros: MiembroFila[] }) {
         </>
       )}
 
-      {panel && (panel === "nuevo" || enEdicion) && (
+      {panel && (panel.modo === "nuevo" || persona) && (
         <PanelLateral
-          titulo={panel === "nuevo" ? "Añadir personal" : "Editar personal"}
+          titulo={panel.modo === "nuevo" ? "Añadir personal" : panel.modo === "editar" ? "Editar personal" : "Personal"}
           onCerrar={() => setPanel(null)}
-          // Al editar hay más para ver (el reporte de trabajos y comisión): el panel es más ancho.
-          ancho={panel === "nuevo" ? "normal" : "ancho"}
+          // La ficha tiene más para ver (el horario y el reporte de trabajos y comisión): el panel es más ancho.
+          ancho={panel.modo === "ver" ? "ancho" : "normal"}
         >
-          <FormularioPersonal key={panel} miembro={enEdicion} onCerrar={() => setPanel(null)} />
+          {panel.modo === "ver" && persona ? (
+            <FichaPersonal
+              key={persona.id}
+              miembro={persona}
+              indice={miembros.indexOf(persona)}
+              horarioGeneral={horarioGeneral}
+              onEditar={() => setPanel({ modo: "editar", id: persona.id })}
+              onCerrar={() => setPanel(null)}
+            />
+          ) : (
+            <FormularioPersonal
+              key={panel.modo === "nuevo" ? "nuevo" : `editar-${panel.id}`}
+              miembro={persona}
+              // Al editar, guardar o cancelar vuelve a la ficha; al añadir, cierra el panel.
+              onCerrar={() => setPanel(persona ? { modo: "ver", id: persona.id } : null)}
+            />
+          )}
         </PanelLateral>
       )}
     </div>

@@ -81,13 +81,30 @@ function Palanca({
  * abajo una barra con "Descartar" y "Guardar cambios", y si se intenta salir de
  * la página con cambios sin guardar el navegador avisa.
  */
-export function EditorHorario({ inicial }: { inicial: HorarioDia[] }) {
+export function EditorHorario({
+  inicial,
+  personalId = null,
+}: {
+  inicial: HorarioDia[];
+  /** null: el horario general del negocio; un id: el horario propio de esa persona. */
+  personalId?: string | null;
+}) {
   const router = useRouter();
   const [guardado, setGuardado] = useState(inicial);
   const [dias, setDias] = useState(inicial);
   const [pendiente, iniciar] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [recienGuardado, setRecienGuardado] = useState(false);
+
+  // Si lo guardado cambia desde afuera (a la persona se le quitó su horario propio y vuelve a valer el general, por
+  // ejemplo), el editor arranca de nuevo con eso. Al guardar desde acá llega lo mismo que ya se ve: no cambia nada.
+  const firmaInicial = JSON.stringify(inicial);
+  useEffect(() => {
+    setGuardado(inicial);
+    setDias(inicial);
+    setError(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [firmaInicial]);
 
   const hayCambios = JSON.stringify(dias) !== JSON.stringify(guardado);
   const errores = new Map<number, string | null>(
@@ -127,7 +144,7 @@ export function EditorHorario({ inicial }: { inicial: HorarioDia[] }) {
     if (hayErrores) return;
     setError(null);
     iniciar(async () => {
-      const resultado = await guardarHorarioTrabajo(dias);
+      const resultado = await guardarHorarioTrabajo(dias, personalId);
       if (!resultado.ok) {
         setError(resultado.error);
         return;

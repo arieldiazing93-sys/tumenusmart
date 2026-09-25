@@ -19,7 +19,7 @@ import {
 } from "@/lib/agenda";
 import type { ActividadCita, EstadoCaja } from "@/lib/agenda-cita";
 import { nombreCompleto } from "@/lib/agenda-personal";
-import { completarHorario } from "@/lib/horario-trabajo";
+import { completarHorario, horarioEfectivo, type HorarioDia } from "@/lib/horario-trabajo";
 import { Cabecera, clasesBoton } from "@/components/ui";
 import { BandaPersonal } from "./BandaPersonal";
 import { BarraAgenda } from "./BarraAgenda";
@@ -82,19 +82,37 @@ export default async function AgendaPage({
 
   const dias = diasDeVista(vista, fecha);
 
-  // El horario de trabajo, si ya se configuró: el calendario sombrea lo que queda fuera de él.
-  const filasHorario = await db.horarioTrabajo.findMany({
-    select: {
-      diaSemana: true,
-      trabaja: true,
-      inicio: true,
-      fin: true,
-      descansa: true,
-      descansoInicio: true,
-      descansoFin: true,
-    },
-  });
-  const horarios = filasHorario.length > 0 ? completarHorario(filasHorario) : null;
+  // Los horarios de trabajo, si ya se configuraron: el calendario sombrea lo que queda fuera de ellos. Cada persona
+  // tiene el suyo propio o, si no, el general; viendo a todos juntos se sombrea solo lo que nadie atiende.
+  const columnasDeHorario = {
+    diaSemana: true,
+    trabaja: true,
+    inicio: true,
+    fin: true,
+    descansa: true,
+    descansoInicio: true,
+    descansoFin: true,
+  } as const;
+  const [filasGenerales, filasPropias] = await Promise.all([
+    db.horarioTrabajo.findMany({ select: columnasDeHorario }),
+    db.horarioPersonal.findMany({
+      where: { personalId: { in: personal.map((p) => p.id) } },
+      select: { personalId: true, ...columnasDeHorario },
+    }),
+  ]);
+  const propioDe = new Map<string, HorarioDia[]>();
+  for (const { personalId, ...dia } of filasPropias) {
+    const lista = propioDe.get(personalId) ?? [];
+    lista.push(dia);
+    propioDe.set(personalId, lista);
+  }
+  const personalVisto = elegido ? [elegido] : personal;
+  const horarios: HorarioDia[][] | null =
+    filasGenerales.length === 0 && filasPropias.length === 0
+      ? null
+      : personalVisto.length > 0
+        ? personalVisto.map((p) => horarioEfectivo(propioDe.get(p.id) ?? [], filasGenerales))
+        : [completarHorario(filasGenerales)];
 
   const citasBase = await db.cita.findMany({
     where: {

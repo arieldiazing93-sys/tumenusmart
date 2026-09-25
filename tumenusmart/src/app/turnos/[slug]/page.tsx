@@ -6,7 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { estaSuspendido } from "@/lib/local-por-slug";
 import { iniciales } from "@/lib/agenda";
 import { formatearTelefonoPersonal } from "@/lib/agenda-personal";
-import { completarHorario, nombreDeDia, type HorarioDia } from "@/lib/horario-trabajo";
+import { horarioDelNegocio, nombreDeDia, type HorarioDia } from "@/lib/horario-trabajo";
 import { completarGaleria, normalizarTema } from "@/lib/pagina-reservas";
 import { diaSemanaAsuncion } from "@/lib/timezone";
 import { construirLinkWhatsapp } from "@/lib/whatsapp";
@@ -107,19 +107,35 @@ export default async function PaginaPublicaReservas({ params }: { params: Promis
     );
   }
 
-  const filasHorario = await prisma.horarioTrabajo.findMany({
-    where: { storeId: pagina.storeId },
-    select: {
-      diaSemana: true,
-      trabaja: true,
-      inicio: true,
-      fin: true,
-      descansa: true,
-      descansoInicio: true,
-      descansoFin: true,
-    },
-  });
-  const horarios = filasHorario.length > 0 ? completarHorario(filasHorario) : null;
+  const columnasDeHorario = {
+    diaSemana: true,
+    trabaja: true,
+    inicio: true,
+    fin: true,
+    descansa: true,
+    descansoInicio: true,
+    descansoFin: true,
+  } as const;
+  const [filasHorario, filasPropias, personalActivo] = await Promise.all([
+    prisma.horarioTrabajo.findMany({ where: { storeId: pagina.storeId }, select: columnasDeHorario }),
+    prisma.horarioPersonal.findMany({
+      where: { storeId: pagina.storeId, personal: { activo: true } },
+      select: { personalId: true, ...columnasDeHorario },
+    }),
+    prisma.miembroPersonal.findMany({ where: { storeId: pagina.storeId, activo: true }, select: { id: true } }),
+  ]);
+  const propioDe = new Map<string, HorarioDia[]>();
+  for (const { personalId, ...dia } of filasPropias) {
+    const lista = propioDe.get(personalId) ?? [];
+    lista.push(dia);
+    propioDe.set(personalId, lista);
+  }
+  // El horario del negocio es el de todo el personal junto (cada uno con el suyo o con el general).
+  const horarios = horarioDelNegocio(
+    filasHorario,
+    propioDe,
+    personalActivo.map((p) => p.id)
+  );
   const hoy = horarios?.find((h) => h.diaSemana === diaSemanaAsuncion());
 
   const galeria = completarGaleria(pagina.galeria);

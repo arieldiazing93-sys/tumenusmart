@@ -6,8 +6,6 @@ import { Campo, Entrada, MensajeError, Selector, clasesBoton } from "@/component
 import { PAISES_TELEFONO, separarTelefono, type MiembroFila } from "@/lib/agenda-personal";
 import { comprimirImagen, PARA_LOGO } from "@/lib/comprimir-imagen";
 import { actualizarPersonal, crearPersonal, subirFotoDelPersonal } from "./actions";
-import { EnlaceTrabajoPersonal } from "./EnlaceTrabajoPersonal";
-import { TrabajosYComision } from "./TrabajosYComision";
 
 /**
  * El formulario para dar de alta (o editar) a un miembro del personal. Vive
@@ -227,18 +225,21 @@ export function FormularioPersonal({
           </div>
         </Campo>
 
-        {/* Sus trabajos terminados y lo que gana de comisión (solo de una persona que ya existe). */}
-        {miembro && <TrabajosYComision id={miembro.id} />}
+        {/* Aclaración para el dueño (y para quien cargue al personal): la comisión es solo de los servicios. */}
+        <div className="-mt-1 rounded-lg border border-azul/25 bg-azul-luz px-3 py-2.5 text-[0.8rem] leading-snug text-azul-oscuro">
+          <p className="font-semibold">¿Sobre qué se calcula la comisión?</p>
+          <ul className="mt-1 list-disc space-y-0.5 pl-4">
+            <li>
+              Solo sobre los <strong>servicios</strong> que hizo (ya con el descuento que se haya aplicado).
+            </li>
+            <li>
+              Los <strong>productos</strong> (un shampoo, un perfume) no suman comisión.
+            </li>
+            <li>Si una misma venta lleva un producto y un servicio, solo el servicio le da comisión.</li>
+          </ul>
+        </div>
 
-        {miembro && (
-          <EnlaceTrabajoPersonal
-            id={miembro.id}
-            nombre={miembro.nombre}
-            telefono={miembro.telefono}
-            activo={miembro.activo}
-          />
-        )}
-
+        {/* Sus trabajos terminados, su enlace de trabajo y su horario están en la ficha ("Ver"). */}
         {miembro && (
           <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-linea bg-papel-suave p-3">
             <input

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { formatearGuarani } from "@/lib/format";
-import { franjasDelDia, rangoDelHorario, type HorarioDia } from "@/lib/horario-trabajo";
+import { franjasDelDiaDeVarios, rangoDelHorario, type HorarioDia } from "@/lib/horario-trabajo";
 import {
   diaCorto,
   diaDeLaSemana,
@@ -57,8 +57,11 @@ export function VistaHoras({
   hoy: string;
   ahora: Date;
   parametros: ParametrosAgenda;
-  /** El horario de trabajo, o null si todavía no se configuró (entonces no se sombrea nada). */
-  horarios: HorarioDia[] | null;
+  /**
+   * El horario de la semana de cada persona que se está viendo (una sola si se eligió a alguien; todas si se ve
+   * a todo el personal junto), o null si todavía no se configuró ninguno (entonces no se sombrea nada).
+   */
+  horarios: HorarioDia[][] | null;
   /** Escribir quién atiende en cada turno (cuando se ve a todo el personal junto). */
   mostrarPersonal: boolean;
 }) {
@@ -73,10 +76,16 @@ export function VistaHoras({
   });
 
   // La grilla dibuja el tramo en que se trabaja (y se amplía si algún turno cae afuera).
-  const rango = rangoDeHoras(locales, horarios ? rangoDelHorario(horarios) : null);
-  const horarioPorDia = new Map<number, HorarioDia>(
-    (horarios ?? []).map((h): [number, HorarioDia] => [h.diaSemana, h])
-  );
+  const rango = rangoDeHoras(locales, horarios ? rangoDelHorario(horarios.flat()) : null);
+  // Para cada día de la semana, el horario de cada persona que se ve ese día.
+  const horariosPorDia = new Map<number, HorarioDia[]>();
+  for (const semana of horarios ?? []) {
+    for (const h of semana) {
+      const lista = horariosPorDia.get(h.diaSemana) ?? [];
+      lista.push(h);
+      horariosPorDia.set(h.diaSemana, lista);
+    }
+  }
   const horasEnteras = (rango.fin - rango.inicio) / 60;
   const alto = horasEnteras * REM_POR_HORA;
   const { minutos: minutosAhora } = partesLocales(ahora);
@@ -187,8 +196,8 @@ export function VistaHoras({
                 : 0;
           const hayLineaAhora = esHoy && minutosAhora >= rango.inicio && minutosAhora <= rango.fin;
 
-          // Lo que el horario de trabajo dice que ese día no se atiende (rayado) o es el descanso (gris).
-          const franjas = franjasDelDia(horarioPorDia.get(diaDeLaSemana(dia)), rango);
+          // Lo que los horarios de trabajo dicen que ese día nadie atiende (rayado) o es el descanso (gris).
+          const franjas = franjasDelDiaDeVarios(horariosPorDia.get(diaDeLaSemana(dia)) ?? [], rango);
 
           return (
             <div
