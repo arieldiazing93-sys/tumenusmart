@@ -175,41 +175,44 @@ export default async function AgendaPage({
         titulo={tituloAgenda(vista, fecha)}
         personal={personal}
         vistaEnUrl={vistaPedida !== null}
+        leyenda={
+          // Los colores de los estados: sirven de leyenda. Tocar uno lo oculta o lo vuelve a mostrar en el
+          // calendario (lo oculto queda apagado y tachado). En el celular es una sola fila que se desliza.
+          <ul
+            aria-label="Estados de los turnos"
+            className="flex items-center gap-0.5 overflow-x-auto sm:flex-wrap sm:overflow-visible"
+          >
+            {ESTADOS_CITA.map((e) => {
+              const oculto = ocultar.includes(e.valor);
+              const ocultarDespues: EstadoCita[] = oculto
+                ? ocultar.filter((o) => o !== e.valor)
+                : [...ocultar, e.valor];
+              return (
+                <li key={e.valor} className="flex-none">
+                  <Link
+                    href={urlAgenda(parametros, { ocultar: ocultarDespues })}
+                    scroll={false}
+                    title={`${oculto ? "Mostrar" : "Ocultar"} los turnos ${e.etiqueta.toLowerCase()}`}
+                    className={`inline-flex items-center gap-1.5 rounded-full px-2 py-1 text-[0.74rem] font-medium text-tinta-media transition-colors hover:bg-papel-hundido hover:text-tinta ${
+                      oculto ? "line-through opacity-50" : ""
+                    }`}
+                  >
+                    <span className={`h-2.5 w-2.5 rounded-full ${e.punto}`} />
+                    {e.etiqueta}
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        }
       />
 
-      {/* Los colores de los estados: sirven de leyenda. Tocar uno lo oculta o lo vuelve a mostrar en el
-          calendario (lo oculto queda apagado y tachado). */}
-      <ul aria-label="Estados de los turnos" className="flex flex-wrap items-center gap-1.5">
-        {ESTADOS_CITA.map((e) => {
-          const oculto = ocultar.includes(e.valor);
-          const ocultarDespues: EstadoCita[] = oculto
-            ? ocultar.filter((o) => o !== e.valor)
-            : [...ocultar, e.valor];
-          return (
-            <li key={e.valor}>
-              <Link
-                href={urlAgenda(parametros, { ocultar: ocultarDespues })}
-                scroll={false}
-                title={`${oculto ? "Mostrar" : "Ocultar"} los turnos ${e.etiqueta.toLowerCase()}`}
-                className={`inline-flex items-center gap-1.5 rounded-full border border-linea bg-superficie px-2.5 py-1 text-[0.76rem] font-medium text-tinta-media transition-colors hover:border-azul/40 hover:text-tinta ${
-                  oculto ? "line-through opacity-50" : ""
-                }`}
-              >
-                <span className={`h-2.5 w-2.5 rounded-full ${e.punto}`} />
-                {e.etiqueta}
-              </Link>
-            </li>
-          );
-        })}
-      </ul>
-
       <section className="overflow-hidden rounded-xl border border-linea bg-superficie shadow-sm">
-        <BandaPersonal
-          nombre={elegido?.nombre ?? null}
-          fotoUrl={elegido?.fotoUrl ?? null}
-          indice={indiceElegido}
-          cantidad={personal.length}
-        />
+        {/* La franja de quién es la agenda solo aparece al elegir a una persona: viendo a todos no aporta nada
+            (el botón Personal ya lo dice) y ocuparía una fila. */}
+        {elegido && (
+          <BandaPersonal nombre={elegido.nombre} fotoUrl={elegido.fotoUrl} indice={indiceElegido} />
+        )}
         {vista === "mes" ? (
           <VistaMes fecha={fecha} citas={citas} hoy={hoy} parametros={parametros} />
         ) : (

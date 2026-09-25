@@ -98,7 +98,7 @@ export function VistaHoras({
   return (
     <div
       data-scroll-agenda
-      className="max-h-[calc(100dvh-16rem)] min-h-[24rem] overflow-auto overscroll-contain"
+      className="max-h-[calc(100dvh-13rem)] min-h-[24rem] overflow-auto overscroll-contain"
     >
       <DesplazarAlIniciar rem={remInicial} />
       <div
@@ -115,24 +115,25 @@ export function VistaHoras({
           return (
             <div
               key={dia}
-              className={`sticky top-0 z-30 flex items-center justify-center border-b border-l border-linea px-1 py-2 ${
+              className={`sticky top-0 z-30 flex items-center justify-center border-b border-l border-linea px-1 py-1.5 ${
                 esHoy ? "bg-azul-luz" : "bg-superficie"
               }`}
             >
               {n === 1 ? (
                 <p
-                  className={`rounded-full px-3 py-1 text-[0.9rem] font-semibold ${
+                  className={`rounded-full px-3 py-0.5 text-[0.9rem] font-semibold ${
                     esHoy ? "bg-azul text-white" : "text-tinta"
                   }`}
                 >
                   {diaLargo(dia)}
                 </p>
               ) : (
+                // El día y su número en una sola línea ("LUN 21"): la cabecera queda baja.
                 <Link
                   href={urlAgenda(parametros, { vista: "dia", fecha: dia })}
                   scroll={false}
                   aria-label={`Ver ${diaLargo(dia)}`}
-                  className="group flex flex-col items-center gap-0.5"
+                  className="group flex items-center gap-1.5"
                 >
                   <span
                     className={`text-[0.68rem] font-semibold uppercase tracking-wide ${
@@ -142,7 +143,7 @@ export function VistaHoras({
                     {diaCorto(dia)}
                   </span>
                   <span
-                    className={`flex h-7 min-w-7 items-center justify-center rounded-full px-1 text-[0.95rem] font-semibold transition-colors ${
+                    className={`flex h-6 min-w-6 items-center justify-center rounded-full px-1 text-[0.9rem] font-semibold transition-colors ${
                       esHoy ? "bg-azul text-white" : "text-tinta group-hover:bg-papel-hundido"
                     }`}
                   >

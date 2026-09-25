@@ -218,6 +218,7 @@ export function BarraAgenda({
   titulo,
   personal,
   vistaEnUrl,
+  leyenda,
 }: {
   parametros: ParametrosAgenda;
   /** "YYYY-MM-DD" de hoy en Asunción. */
@@ -227,6 +228,8 @@ export function BarraAgenda({
   personal: Miembro[];
   /** false si la dirección no traía la vista: en el celular se abre en "Día". */
   vistaEnUrl: boolean;
+  /** Los colores de los estados: van en la misma fila si entran, y si no, en una fila propia abajo. */
+  leyenda: ReactNode;
 }) {
   const router = useRouter();
 
@@ -400,9 +403,10 @@ export function BarraAgenda({
 
   return (
     <>
-      {/* Tablet y pantalla ancha: Hoy y las flechas, la vista, el título en el medio, y a la derecha Personal y
-          Filtro. Si no entra todo en una fila (una tablet vertical), Personal y Filtro bajan a una segunda. */}
-      <div className="hidden flex-wrap items-center gap-2 sm:flex">
+      {/* Tablet y pantalla ancha: Hoy y las flechas, la vista, el título y los colores de los estados en el medio, y
+          a la derecha Personal y Filtro. Todo en una sola fila cuando entra; si no (una tablet vertical), los colores
+          bajan a una fila propia y, si hace falta, Personal y Filtro también. */}
+      <div className="hidden flex-wrap items-center gap-x-2 gap-y-1.5 sm:flex">
         {navegacion}
         <div className="flex-none">{vista}</div>
         <h2 className="flex min-w-[10rem] flex-1 items-center justify-center gap-2 px-2 text-[1.05rem] font-semibold tracking-titular text-tinta">
@@ -411,12 +415,14 @@ export function BarraAgenda({
           </span>
           <span className="truncate">{titulo}</span>
         </h2>
+        <div className="order-last basis-full xl:order-none xl:basis-auto">{leyenda}</div>
         <div className="ml-auto w-44 flex-none">{selectorPersonal}</div>
         <div className="w-28 flex-none">{filtro}</div>
       </div>
 
-      {/* Celular: arriba las flechas y el título; en el medio Día/Semana/Mes; abajo Personal y Filtro repartidos. */}
-      <div className="flex flex-col gap-2 sm:hidden">
+      {/* Celular: arriba las flechas y el título; en el medio Día/Semana/Mes; abajo Personal y Filtro repartidos, y
+          los colores de los estados en una sola fila que se desliza. */}
+      <div className="flex flex-col gap-1.5 sm:hidden">
         <div className="flex items-center gap-2">
           {navegacion}
           <h2 className="min-w-0 flex-1 truncate text-right text-[1rem] font-semibold tracking-titular text-tinta">
@@ -428,6 +434,7 @@ export function BarraAgenda({
           {selectorPersonal}
           {filtro}
         </div>
+        {leyenda}
       </div>
     </>
   );
