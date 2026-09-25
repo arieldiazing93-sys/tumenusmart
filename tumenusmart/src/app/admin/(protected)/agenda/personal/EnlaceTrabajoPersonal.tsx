@@ -46,7 +46,8 @@ export function EnlaceTrabajoPersonal({
     <div className="rounded-lg border border-linea bg-superficie p-3">
       <p className="text-[0.86rem] font-semibold text-tinta">Su enlace de trabajo</p>
       <p className="mt-0.5 text-[0.78rem] leading-snug text-tinta-suave">
-        Ahí ve las citas que ya cobraste a su nombre. No lleva contraseña: pasáselo solo a esa persona.
+        Ahí ve lo que tiene que hacer hoy y en los próximos días de la semana (las citas que ya cobraste a su nombre,
+        también las pagadas por adelantado). No lleva contraseña: pasáselo solo a esa persona.
         {!activo && " Como está inactivo, el enlace no funciona hasta que lo actives."}
       </p>
       {url && <p className="mt-2 truncate rounded-md bg-papel-suave px-2.5 py-1.5 text-[0.76rem] text-tinta-media">{url}</p>}

@@ -7,9 +7,12 @@ import { montoDelTrabajo } from "@/lib/agenda-personal";
 import { claveSumarDias } from "@/lib/calendario";
 import { formatearGuarani } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
-import { claveDiaAsuncion, fechaAsuncionDesdeTexto, inicioDeMesEnAsuncion } from "@/lib/timezone";
+import { claveDiaAsuncion, fechaAsuncionDesdeTexto } from "@/lib/timezone";
 
 export const dynamic = "force-dynamic";
+
+/** Cuántos días adelante ve (contando hoy): la semana. */
+const DIAS_QUE_VE = 7;
 
 // Es un enlace privado de cada persona: que no aparezca en los buscadores.
 export const metadata: Metadata = {
@@ -18,15 +21,15 @@ export const metadata: Metadata = {
 };
 
 /**
- * La vista de trabajo de una persona del personal (una barbera, un colorista…): las citas
- * que ya se cobraron a su nombre, o sea, las que quedaron confirmadas y le tocan. Es el
- * mismo criterio que la pantalla del repartidor (/repartidor/[id]): no hay usuario ni
- * contraseña; el enlace lleva el id de la persona (imposible de adivinar) y el dueño se
- * lo pasa por WhatsApp desde Personal.
+ * La vista de trabajo de una persona del personal (una barbera, un colorista…): lo que tiene que hacer HOY y en
+ * los próximos días de la semana, para que sepa qué le toca. Son las citas que ya se cobraron a su nombre, o sea,
+ * las que quedaron confirmadas: si un cliente pagó su turno para dentro de dos o tres días, aparece en ese día.
+ * Es el mismo criterio que la pantalla del repartidor (/repartidor/[id]): no hay usuario ni contraseña; el enlace
+ * lleva el id de la persona (imposible de adivinar) y el dueño se lo pasa por WhatsApp desde Personal.
  *
- * Solo lee, y todo queda atado al local de ESA persona: aunque el enlace circule, nunca
- * muestra citas de otro negocio ni de otra persona. Se actualiza sola cada medio minuto,
- * así una cita cobrada en la caja aparece acá sin recargar.
+ * Solo lee, y todo queda atado al local de ESA persona: aunque el enlace circule, nunca muestra citas de otro
+ * negocio ni de otra persona. Se actualiza sola cada medio minuto, así una cita cobrada en la caja aparece acá sin
+ * recargar. Lo de días pasados no se muestra: es una vista de lo que hay que hacer, no un historial.
  */
 export default async function TrabajoDelPersonalPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -39,12 +42,10 @@ export default async function TrabajoDelPersonalPage({ params }: { params: Promi
   if (!miembro || !miembro.activo) notFound();
   const storeId = miembro.storeId;
 
-  const ahora = new Date();
-  const hoy = claveDiaAsuncion(ahora);
-  const inicioSemana = fechaAsuncionDesdeTexto(claveSumarDias(hoy, -6)) as Date;
-  const finHoy = fechaAsuncionDesdeTexto(claveSumarDias(hoy, 1)) as Date;
-  const inicioMes = inicioDeMesEnAsuncion(ahora);
-  const desde = inicioMes < inicioSemana ? inicioMes : inicioSemana;
+  const hoy = claveDiaAsuncion(new Date());
+  const manana = claveSumarDias(hoy, 1);
+  const inicioHoy = fechaAsuncionDesdeTexto(hoy) as Date;
+  const finSemana = fechaAsuncionDesdeTexto(claveSumarDias(hoy, DIAS_QUE_VE)) as Date;
 
   const [store, confirmadas] = await Promise.all([
     prisma.store.findUnique({ where: { id: storeId }, select: { nombre: true } }),
@@ -54,9 +55,10 @@ export default async function TrabajoDelPersonalPage({ params }: { params: Promi
         personalId: id,
         // Confirmada = cobrada en la caja (y ese cobro no se anuló).
         ventaPos: { is: { cancelada: false } },
-        inicio: { gte: desde, lt: finHoy },
+        // Desde el comienzo de hoy hasta el final del séptimo día.
+        inicio: { gte: inicioHoy, lt: finSemana },
       },
-      orderBy: [{ inicio: "desc" }, { id: "asc" }],
+      orderBy: [{ inicio: "asc" }, { id: "asc" }],
       take: 400,
       select: {
         id: true,
@@ -79,27 +81,35 @@ export default async function TrabajoDelPersonalPage({ params }: { params: Promi
       cliente: c.clienteNombre,
       servicios: c.serviciosTexto,
       total: montoDelTrabajo(c.precio, c.ventaPos?.total),
-      inicio: c.inicio,
     };
   });
 
-  const deHoy = trabajos.filter((t) => t.dia === hoy).sort((a, b) => a.inicio.getTime() - b.inicio.getTime());
-  const cantidadSemana = trabajos.filter((t) => t.inicio >= inicioSemana).length;
-  const cantidadMes = trabajos.filter((t) => t.inicio >= inicioMes).length;
-
-  // Los seis días anteriores a hoy que tuvieron trabajo, el más reciente primero.
-  const anteriores = new Map<string, typeof trabajos>();
+  const deHoy = trabajos.filter((t) => t.dia === hoy);
+  // Los días que siguen, en orden, cada uno con sus trabajos (ya vienen ordenados por hora).
+  const proximos = new Map<string, typeof trabajos>();
   for (const t of trabajos) {
-    if (t.dia === hoy || t.inicio < inicioSemana) continue;
-    anteriores.set(t.dia, [...(anteriores.get(t.dia) ?? []), t]);
+    if (t.dia === hoy) continue;
+    proximos.set(t.dia, [...(proximos.get(t.dia) ?? []), t]);
   }
+  const cantidadProximos = trabajos.length - deHoy.length;
+  const deManana = proximos.get(manana)?.length ?? 0;
 
   const nombreNegocio = store?.nombre ?? "";
   const cifras = [
     { rotulo: "Hoy", valor: deHoy.length },
-    { rotulo: "Últimos 7 días", valor: cantidadSemana },
-    { rotulo: "Este mes", valor: cantidadMes },
+    { rotulo: "Mañana", valor: deManana },
+    { rotulo: "Esta semana", valor: trabajos.length },
   ];
+
+  const plural = (n: number) => (n === 1 ? "trabajo confirmado" : "trabajos confirmados");
+  const mensaje =
+    deHoy.length > 0
+      ? `Hoy tenés ${deHoy.length} ${plural(deHoy.length)}.${
+          cantidadProximos > 0 ? ` Y ${cantidadProximos} más en los próximos días.` : ""
+        }`
+      : cantidadProximos > 0
+        ? `Hoy no tenés trabajos confirmados. En los próximos días tenés ${cantidadProximos}.`
+        : "Todavía no tenés trabajos confirmados. Cuando se cobre una cita tuya, aparece acá.";
 
   return (
     <main className="mx-auto min-h-screen max-w-md bg-superficie px-4 py-6">
@@ -119,11 +129,7 @@ export default async function TrabajoDelPersonalPage({ params }: { params: Promi
         </div>
       </header>
 
-      <p className="mt-5 text-[0.9rem] text-tinta-media">
-        {deHoy.length === 0
-          ? "Todavía no tenés trabajos confirmados hoy. Cuando se cobre una cita tuya, aparece acá."
-          : `Hoy tenés ${deHoy.length} ${deHoy.length === 1 ? "trabajo confirmado" : "trabajos confirmados"}.`}
-      </p>
+      <p className="mt-5 text-[0.9rem] text-tinta-media">{mensaje}</p>
 
       <ul className="mt-3 grid grid-cols-3 gap-2">
         {cifras.map((c) => (
@@ -157,13 +163,15 @@ export default async function TrabajoDelPersonalPage({ params }: { params: Promi
         </section>
       )}
 
-      {anteriores.size > 0 && (
+      {proximos.size > 0 && (
         <section className="mt-6">
-          <h2 className="mb-2 text-[0.8rem] font-semibold uppercase tracking-wide text-tinta-suave">Días anteriores</h2>
+          <h2 className="mb-2 text-[0.8rem] font-semibold uppercase tracking-wide text-tinta-suave">Próximos días</h2>
           <div className="flex flex-col gap-3">
-            {[...anteriores.entries()].map(([dia, lista]) => (
+            {[...proximos.entries()].map(([dia, lista]) => (
               <div key={dia}>
-                <p className="mb-1 text-[0.8rem] font-semibold text-tinta-media">{diaLargo(dia)}</p>
+                <p className="mb-1 text-[0.8rem] font-semibold text-tinta-media">
+                  {dia === manana ? `Mañana · ${diaLargo(dia)}` : diaLargo(dia)}
+                </p>
                 <ul className="flex flex-col overflow-hidden rounded-xl border border-linea">
                   {lista.map((t) => (
                     <li
