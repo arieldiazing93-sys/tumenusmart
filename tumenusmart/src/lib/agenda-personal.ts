@@ -16,6 +16,8 @@ export type MiembroFila = {
   profesion: string | null;
   fotoUrl: string | null;
   activo: boolean;
+  /** Cuántos servicios realiza. */
+  servicios: number;
   /** Cuántos turnos tiene (de cualquier estado). */
   citas: number;
 };

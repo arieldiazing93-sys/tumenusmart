@@ -19,6 +19,10 @@ function textoCitas(n: number): string {
   return n === 1 ? "1 cita" : `${n} citas`;
 }
 
+function textoServicios(n: number): string {
+  return n === 1 ? "1 servicio" : `${n} servicios`;
+}
+
 /**
  * La pantalla de Personal: el buscador, el botón para añadir y la lista.
  * "Añadir personal" y "Editar" abren el mismo panel lateral con el formulario.
@@ -99,6 +103,7 @@ export function ListaPersonal({ miembros }: { miembros: MiembroFila[] }) {
                   <Th>Nombre</Th>
                   <Th>Profesión</Th>
                   <Th>Teléfono</Th>
+                  <Th className="text-right">Servicios asignados</Th>
                   <Th className="text-right">Conteo de citas</Th>
                   <Th className="text-right">Opciones</Th>
                 </tr>
@@ -122,6 +127,7 @@ export function ListaPersonal({ miembros }: { miembros: MiembroFila[] }) {
                     <Td className="cifra whitespace-nowrap">
                       {formatearTelefonoPersonal(m.telefono) || <span className="text-tinta-suave">—</span>}
                     </Td>
+                    <Td className="cifra text-right">{m.servicios}</Td>
                     <Td className="cifra text-right">{m.citas}</Td>
                     <Td className="text-right">
                       <button type="button" onClick={() => setPanel(m.id)} className={clasesBoton("suave", "sm")}>
@@ -147,7 +153,7 @@ export function ListaPersonal({ miembros }: { miembros: MiembroFila[] }) {
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-[0.92rem] font-semibold text-tinta">{nombreCompleto(m)}</p>
                   <p className="truncate text-[0.8rem] text-tinta-media">
-                    {m.profesion || "Sin profesión"} · {textoCitas(m.citas)}
+                    {m.profesion || "Sin profesión"} · {textoServicios(m.servicios)} · {textoCitas(m.citas)}
                   </p>
                   {!m.activo && (
                     <span className="mt-1 inline-block">

@@ -130,6 +130,9 @@ function armarGrupos(hayIdeaSinVer: boolean, rol: string, ventasACredito: boolea
         // Qué días se atiende, de qué hora a qué hora y el descanso.
         { href: "/admin/agenda/horario", label: "Horario de trabajo", icono: "configuracion" as const,
           ver: conPermiso("agenda.configurar") },
+        // Lo que se ofrece a los clientes (cortes, barba, color…): también se vende en el punto de venta.
+        { href: "/admin/agenda/servicios", label: "Servicios", icono: "productos" as const,
+          ver: conPermiso("agenda.configurar") },
       ],
     },
     {

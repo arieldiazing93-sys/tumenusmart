@@ -26,7 +26,7 @@ export default async function PersonalPage() {
       profesion: true,
       fotoUrl: true,
       activo: true,
-      _count: { select: { citas: true } },
+      _count: { select: { citas: true, servicios: true } },
     },
   });
 
@@ -38,6 +38,7 @@ export default async function PersonalPage() {
     profesion: f.profesion,
     fotoUrl: f.fotoUrl,
     activo: f.activo,
+    servicios: f._count.servicios,
     citas: f._count.citas,
   }));
 

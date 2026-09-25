@@ -208,6 +208,8 @@ model Store {
   miembrosPersonal MiembroPersonal[]
   citas            Cita[]
   horariosTrabajo  HorarioTrabajo[]
+  serviciosAgenda  ServicioAgenda[]
+  serviciosPersonal ServicioPersonal[]
 }
 
 /// Las direcciones que este local tuvo antes.
@@ -420,6 +422,10 @@ model Category {
   // menú público, pero se conservan en el admin — útil para promos de un
   // día sin tener que borrar nada.
   activa    Boolean   @default(true)
+  /// true = es una categoría de servicios de la Reserva de turnos (Cortes,
+  /// Barba, Color…). Sus servicios son Products con esServicio = true, así que
+  /// se venden en el punto de venta y se facturan como cualquier producto.
+  paraServicios Boolean @default(false)
   productos Product[]
   createdAt DateTime  @default(now())
   // Días y horarios en que esta categoría se OCULTA de la carta pública —
@@ -524,6 +530,9 @@ model Product {
   // usadoComoModificador) también es un Product, así que su propia receta
   // funciona igual, sin ningún caso especial.
   receta      RecetaItem[]
+  /// Si es un servicio de la Reserva de turnos: su duración, búfer, color y
+  /// quién lo realiza (ver ServicioAgenda).
+  servicioAgenda ServicioAgenda?
   orderItems  OrderItem[]
   ventaPosItems VentaPosItem[]
   createdAt   DateTime        @default(now())
@@ -2187,7 +2196,8 @@ model MiembroPersonal {
   activo    Boolean  @default(true)
   createdAt DateTime @default(now())
 
-  citas Cita[]
+  citas     Cita[]
+  servicios ServicioPersonal[]
 
   @@index([storeId])
 }
@@ -2234,4 +2244,45 @@ model HorarioTrabajo {
 
   @@unique([storeId, diaSemana])
   @@index([storeId])
+}
+
+/// Lo propio de la agenda de un servicio: cuánto dura, el tiempo de búfer, su
+/// color y quién lo realiza. El servicio en sí (nombre, categoría, precio, IVA)
+/// es un Product con esServicio = true: así se vende en el punto de venta y se
+/// factura (incluida la factura electrónica, "prestación de servicios") sin
+/// duplicar nada.
+model ServicioAgenda {
+  id          String   @id @default(cuid())
+  storeId     String
+  store       Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  productId   String   @unique
+  product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  /// Cuánto dura el servicio, en minutos.
+  duracionMin Int
+  /// Tiempo de búfer después del servicio (limpiar, preparar), en minutos. 0 = sin búfer.
+  bufferMin   Int      @default(0)
+  /// fijo | desde: si el monto es exacto o "desde" tanto (ver src/lib/servicios-agenda.ts).
+  tipoPrecio  String   @default("fijo")
+  /// Color del servicio en la agenda, "#RRGGBB".
+  color       String   @default("#3B82F6")
+  createdAt   DateTime @default(now())
+
+  personal ServicioPersonal[]
+
+  @@index([storeId])
+}
+
+/// Qué miembros del personal realizan un servicio.
+model ServicioPersonal {
+  id         String          @id @default(cuid())
+  storeId    String
+  store      Store           @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  servicioId String
+  servicio   ServicioAgenda  @relation(fields: [servicioId], references: [id], onDelete: Cascade)
+  personalId String
+  personal   MiembroPersonal @relation(fields: [personalId], references: [id], onDelete: Cascade)
+
+  @@unique([servicioId, personalId])
+  @@index([storeId])
+  @@index([personalId])
 }
