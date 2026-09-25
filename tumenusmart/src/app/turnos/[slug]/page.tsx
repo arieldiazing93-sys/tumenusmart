@@ -10,13 +10,13 @@ import { completarHorario, nombreDeDia, type HorarioDia } from "@/lib/horario-tr
 import { completarGaleria, normalizarTema } from "@/lib/pagina-reservas";
 import { diaSemanaAsuncion } from "@/lib/timezone";
 import { construirLinkWhatsapp } from "@/lib/whatsapp";
-import { IconoWhatsapp } from "@/components/iconos";
 import {
   IconoCorreo,
   IconoFacebook,
   IconoInstagram,
   IconoTelefono,
   IconoTiktok,
+  IconoWhatsappLinea,
 } from "@/components/IconosRedes";
 import { CarruselGaleria } from "./CarruselGaleria";
 import { CompartirBoton } from "./CompartirBoton";
@@ -133,8 +133,8 @@ export default async function PaginaPublicaReservas({ params }: { params: Promis
     { nombre: "Facebook", enlace: pagina.facebook, icono: <IconoFacebook tam={20} /> },
     {
       nombre: "WhatsApp",
-      enlace: pagina.whatsapp ? `https://wa.me/${pagina.whatsapp}` : null,
-      icono: <IconoWhatsapp tam={20} />,
+      enlace: enlaceWhatsapp,
+      icono: <IconoWhatsappLinea tam={20} />,
     },
   ].filter((r) => r.enlace);
 
@@ -160,8 +160,10 @@ export default async function PaginaPublicaReservas({ params }: { params: Promis
 
         <div className="px-5">
           {/* ---------- foto de perfil y contacto ---------- */}
-          <div className="-mt-12 flex items-end justify-between gap-3">
-            <div className="flex h-24 w-24 flex-none items-center justify-center overflow-hidden rounded-full border-4 border-papel bg-brand-light text-[1.7rem] font-semibold text-brand-texto shadow-sm">
+          {/* El "relative z-10" es lo que la deja POR ENCIMA del banner: un elemento con
+              posición (el banner lo es) se pinta sobre los que no la tienen, aunque vengan después. */}
+          <div className="relative z-10 -mt-16 flex items-end justify-between gap-3 sm:-mt-[4.5rem]">
+            <div className="flex h-32 w-32 flex-none items-center justify-center overflow-hidden rounded-full border-[5px] border-papel bg-brand-light text-[2.4rem] font-semibold text-brand-texto shadow-md sm:h-36 sm:w-36 sm:text-[2.7rem]">
               {pagina.fotoUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={pagina.fotoUrl} alt={pagina.nombre} className="h-full w-full object-cover" />
@@ -169,21 +171,11 @@ export default async function PaginaPublicaReservas({ params }: { params: Promis
                 iniciales(pagina.nombre)
               )}
             </div>
+            {/* Llamar y correo van acá; WhatsApp va una sola vez, con las redes. */}
             <div className="flex gap-2 pb-1">
               {pagina.telefono && (
                 <a href={`tel:+${pagina.telefono}`} aria-label="Llamar" className={CONTACTO}>
                   <IconoTelefono tam={18} />
-                </a>
-              )}
-              {enlaceWhatsapp && (
-                <a
-                  href={enlaceWhatsapp}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  aria-label="Escribir por WhatsApp"
-                  className={CONTACTO}
-                >
-                  <IconoWhatsapp tam={18} />
                 </a>
               )}
               {pagina.email && (
@@ -286,7 +278,11 @@ export default async function PaginaPublicaReservas({ params }: { params: Promis
             >
               Crear cita
             </Link>
-            <p className="mt-2 text-center text-[0.7rem] text-tinta-suave">Reservas con TuMenuSmart</p>
+            <p className="mt-1.5 text-center text-[0.72rem] text-tinta-suave">
+              <Link href="/" className="inline-block py-1 transition-colors hover:text-tinta hover:underline">
+                Desarrollado por tumenusmart.com
+              </Link>
+            </p>
           </div>
         </div>
       </main>
