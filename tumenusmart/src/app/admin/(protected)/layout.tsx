@@ -8,6 +8,7 @@ import { cerrarSesion } from "./logout/actions";
 import { idLocalActual, listarLocales } from "@/lib/local-actual";
 import { ideaDeLaSemana } from "@/lib/idea-semanal";
 import { SelectorLocal } from "./SelectorLocal";
+import { AvisoReservasNuevas } from "./AvisoReservasNuevas";
 import { COOKIE_MENU, NavPanel, type GrupoSecciones } from "@/components/NavPanel";
 import { puede, type Permiso } from "@/lib/permisos";
 import { estadoSuscripcion, type EstadoSuscripcion } from "@/lib/suscripcion";
@@ -266,6 +267,16 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     }
   }
 
+  // El aviso sonoro de reservas nuevas solo tiene sentido si el negocio tiene abierta su página pública de reservas
+  // (si no, nunca entra una) y quien mira puede ver el calendario. Un local sin turnos no consulta nada.
+  let avisarReservas = false;
+  if (localActualId && puede(sesion.rol, "agenda.ver")) {
+    avisarReservas = await prisma.paginaReservas
+      .findUnique({ where: { storeId: localActualId }, select: { habilitada: true } })
+      .then((pagina) => pagina?.habilitada === true)
+      .catch(() => false);
+  }
+
   // Aviso de idea nueva: un punto al lado de "Ideas" hasta que el dueño entre
   // a leerla. Es la única notificación del panel, así que se gana el lugar.
   let hayIdeaSinVer = false;
@@ -309,6 +320,9 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           </Link>
 
           <div className="ml-auto flex min-w-0 items-center gap-2.5">
+            {/* La campana del aviso de reservas nuevas (y sus carteles, que se dibujan fuera de la barra). */}
+            {avisarReservas && <AvisoReservasNuevas />}
+
             {/*
               El selector de local vive en la barra recién desde pantalla
               mediana. En un teléfono de 375px hacía que la barra midiera 573:

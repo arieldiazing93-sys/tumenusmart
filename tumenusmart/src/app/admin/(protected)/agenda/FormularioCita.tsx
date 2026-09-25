@@ -25,7 +25,7 @@ import { imprimirComprobante } from "@/lib/impresion-comprobantes";
 import { instanteAsuncionDesdeTexto } from "@/lib/timezone";
 import { TIPOS_IDENTIFICACION_FISCAL } from "@/lib/tipo-cliente";
 import { construirLinkWhatsapp } from "@/lib/whatsapp";
-import { anularCobroCita, cobrarCita, crearCita, eliminarCita, guardarCita, reasignarCita } from "./actions";
+import { anularCobroCita, cobrarCita, crearCita, eliminarCita, guardarCita, reasignarCita, reprogramarCita } from "./actions";
 import { BloqueCita, Conmutador } from "./BloqueCita";
 import { IconoCalendarioHora, IconoPersona, IconoTijera } from "./IconosAgenda";
 import { SeccionCobro } from "./SeccionCobro";
@@ -84,6 +84,10 @@ export function FormularioCita({
   const [pendiente, iniciar] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [choque, setChoque] = useState<string | null>(null);
+  // Mover el turno de una cita ya cobrada (el cliente pagó pero no puede ir ese día): el día y la hora nuevos.
+  const [nuevaFecha, setNuevaFecha] = useState(cita?.fecha ?? "");
+  const [nuevaHora, setNuevaHora] = useState(cita?.hora ?? "");
+  const [choqueMover, setChoqueMover] = useState<string | null>(null);
 
   // ---------- lo que se edita ----------
   const [estado, setEstado] = useState<string>(cita ? cita.estado : "proxima");
@@ -312,6 +316,28 @@ export function FormularioCita({
     });
   }
 
+  /** Mueve de día y hora una cita ya cobrada: el cobro no se toca, solo cambia cuándo se atiende. */
+  function mover(forzar: boolean) {
+    if (!cita) return;
+    const id = cita.id;
+    setError(null);
+    setChoqueMover(null);
+    iniciar(async () => {
+      try {
+        const r = await reprogramarCita(id, nuevaFecha, nuevaHora, forzar);
+        if (!r.ok) {
+          if (r.conflicto) setChoqueMover(r.error);
+          else setError(r.error);
+          return;
+        }
+        // El calendario se va al día nuevo, donde quedó el turno.
+        router.replace(urlAgenda(parametros, { fecha: nuevaFecha }), { scroll: false });
+      } catch {
+        setError("No se pudo mover el turno. Probá de nuevo.");
+      }
+    });
+  }
+
   /** Pasa el trabajo de una cita ya cobrada a otra persona (lo único que se corrige sin anular el cobro). */
   function reasignar() {
     if (!cita) return;
@@ -512,6 +538,74 @@ export function FormularioCita({
               <p className="mt-1.5 text-[0.76rem] text-tinta-suave">
                 Para pasarlo a otra persona, elegila y tocá “Pasar el trabajo”.
               </p>
+            )}
+          </div>
+        )}
+
+        {/* También se puede mover de día y hora (el cliente ya pagó pero no puede ir ese día): el cobro no cambia, solo
+            el turno. Una venta del mostrador no tiene turno que mover. */}
+        {cobrada && cita && cita.origen !== "mostrador" && (
+          <div className="animate-deslizar rounded-xl border border-azul/25 bg-azul-luz p-4">
+            <p className="text-[0.82rem] font-semibold text-azul-oscuro">Cambiar el día o la hora</p>
+            <p className="mt-0.5 text-[0.76rem] leading-snug text-tinta-media">
+              El cliente ya pagó: el cobro no cambia, solo se mueve el turno.
+            </p>
+            <div className="mt-2.5 grid grid-cols-2 gap-2">
+              <label className="block min-w-0">
+                <span className="mb-1 block text-[0.74rem] font-medium text-tinta-suave">Día</span>
+                <Entrada
+                  type="date"
+                  value={nuevaFecha}
+                  min={hoy}
+                  onChange={(e) => {
+                    setNuevaFecha(e.target.value);
+                    setChoqueMover(null);
+                  }}
+                />
+              </label>
+              <label className="block min-w-0">
+                <span className="mb-1 block text-[0.74rem] font-medium text-tinta-suave">Hora de inicio</span>
+                <Entrada
+                  type="time"
+                  value={nuevaHora}
+                  className="cifra"
+                  onChange={(e) => {
+                    setNuevaHora(e.target.value);
+                    setChoqueMover(null);
+                  }}
+                />
+              </label>
+            </div>
+            {choqueMover ? (
+              <div className="mt-2.5 rounded-lg border border-aviso/30 bg-aviso-luz p-2.5">
+                <p className="text-[0.8rem] leading-snug text-aviso">{choqueMover}</p>
+                <button
+                  type="button"
+                  onClick={() => mover(true)}
+                  disabled={pendiente}
+                  className={`mt-2 ${clasesBoton("suave", "sm")}`}
+                >
+                  {pendiente ? "Moviendo…" : "Mover igual"}
+                </button>
+              </div>
+            ) : (
+              nuevaFecha !== "" &&
+              /^\d{2}:\d{2}$/.test(nuevaHora) &&
+              (nuevaFecha !== cita.fecha || nuevaHora !== cita.hora) && (
+                <div className="mt-2.5 flex items-center justify-between gap-2">
+                  <p className="text-[0.76rem] leading-snug text-tinta-media">
+                    Pasa al {diaLargo(nuevaFecha)} a las {nuevaHora}.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => mover(false)}
+                    disabled={pendiente}
+                    className={clasesBoton("principal", "sm")}
+                  >
+                    {pendiente ? "Moviendo…" : "Mover turno"}
+                  </button>
+                </div>
+              )
             )}
           </div>
         )}

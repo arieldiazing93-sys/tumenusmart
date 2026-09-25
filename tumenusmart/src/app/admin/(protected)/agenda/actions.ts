@@ -628,3 +628,88 @@ export async function reasignarCita(citaId: string, personalId: string): Promise
   refrescarAgenda();
   return { ok: true };
 }
+
+/**
+ * Mueve de día y hora una cita YA COBRADA: el cliente pagó su turno pero no puede ir ese día y avisó.
+ *
+ * El cobro no se toca: la venta sigue en la caja donde entró, con su monto y su comprobante. Solo cambia cuándo se
+ * atiende (se conserva la duración, la persona y los servicios). Si el turno nuevo todavía no llegó, la cita queda
+ * Próxima (confirmada y paga); si ya pasó, Finalizada. Como Citas, la vista de la persona y su comisión cuentan por
+ * el día del turno, el trabajo pasa al día nuevo. Avisa si ese horario se pisa con otra cita de la persona.
+ *
+ * Una venta del mostrador no tiene turno que mover.
+ */
+export async function reprogramarCita(
+  citaId: string,
+  fecha: string,
+  hora: string,
+  forzar = false
+): Promise<ResultadoCita> {
+  const sesion = await exigirPermiso("agenda.ver");
+  const storeId = await idLocalActual();
+  const db = prismaDelLocal(storeId);
+
+  const cita = await db.cita.findFirst({
+    where: { id: citaId },
+    select: {
+      id: true,
+      ventaPosId: true,
+      origen: true,
+      personalId: true,
+      clienteNombre: true,
+      inicio: true,
+      fin: true,
+      bufferMin: true,
+    },
+  });
+  if (!cita) return { ok: false, error: "Esa cita ya no existe." };
+  if (!cita.ventaPosId) {
+    return { ok: false, error: "Esta cita todavía no se cobró: cambiale el día y la hora y guardá." };
+  }
+  if (cita.origen === "mostrador") {
+    return { ok: false, error: "Es una venta del mostrador: no tiene un turno para mover." };
+  }
+
+  const diaPedido = typeof fecha === "string" ? fecha : "";
+  const horaPedida = typeof hora === "string" ? hora : "";
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(diaPedido) || claveSumarDias(diaPedido, 0) !== diaPedido || !esHoraValida(horaPedida)) {
+    return { ok: false, error: "El día o la hora no son válidos" };
+  }
+  const nuevoInicio = instanteAsuncionDesdeTexto(`${diaPedido}T${horaPedida}`);
+  if (!nuevoInicio) return { ok: false, error: "El día o la hora no son válidos" };
+  if (nuevoInicio.getTime() === cita.inicio.getTime()) return { ok: true, citaId: cita.id };
+
+  // Dura lo mismo que antes.
+  const nuevoFin = new Date(nuevoInicio.getTime() + (cita.fin.getTime() - cita.inicio.getTime()));
+
+  if (!forzar) {
+    const choque = await citaQueSePisa(
+      db,
+      cita.personalId,
+      nuevoInicio,
+      new Date(nuevoFin.getTime() + cita.bufferMin * 60_000),
+      cita.id
+    );
+    if (choque) return { ok: false, error: mensajeDeChoque(choque), conflicto: true };
+  }
+
+  const estado = nuevoInicio.getTime() > Date.now() ? "proxima" : "finalizada";
+  const movidas = await prisma.cita.updateMany({
+    where: { id: cita.id, storeId, ventaPosId: { not: null } },
+    data: { inicio: nuevoInicio, fin: nuevoFin, estado },
+  });
+  if (movidas.count !== 1) return { ok: false, error: "No se pudo mover el turno. Actualizá la pantalla." };
+
+  const antes = partesLocales(cita.inicio);
+  await registrarBitacora(storeId, sesion, {
+    modulo: "agenda",
+    accion: "cita_cobrada_reprogramada",
+    descripcion: `Movió el turno ya cobrado de ${cita.clienteNombre} del ${diaLargo(antes.dia)} a las ${horaDeMinutos(antes.minutos)} al ${diaLargo(diaPedido)} a las ${horaPedida}. El cobro no cambió.`,
+    entidad: "Cita",
+    entidadId: cita.id,
+    detalle: { venta: cita.ventaPosId, de: cita.inicio.toISOString(), a: nuevoInicio.toISOString() },
+  });
+
+  refrescarAgenda();
+  return { ok: true, citaId: cita.id };
+}
