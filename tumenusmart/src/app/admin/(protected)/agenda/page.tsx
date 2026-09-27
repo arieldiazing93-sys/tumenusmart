@@ -186,12 +186,13 @@ export default async function AgendaPage({
   }
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-2">
       <Cabecera
         titulo="Calendario"
         bajada="Los turnos de tus clientes: quién viene, con quién y a qué hora. Tocá uno para ver su detalle y cobrarlo."
+        compacta
         acciones={
-          <Link href={`${urlAgenda(parametros)}&cita=nueva`} scroll={false} className={clasesBoton("principal", "md")}>
+          <Link href={`${urlAgenda(parametros)}&cita=nueva`} scroll={false} className={clasesBoton("principal", "sm")}>
             + Nueva cita
           </Link>
         }

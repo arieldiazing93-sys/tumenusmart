@@ -97,10 +97,10 @@ const IconoFiltro = () => (
 //  Botones
 // ---------------------------------------------------------------------------
 
-/** Base de todos los botones de la barra: 40px de alto en el celular (para el dedo), 36 en pantalla ancha. */
+/** Base de todos los botones de la barra: 40px de alto en el celular (para el dedo), 32 en pantalla ancha (más compacta). */
 const BOTON =
   "inline-flex h-10 items-center justify-center gap-2 rounded-lg border px-3 text-[0.85rem] font-semibold " +
-  "transition-colors duration-150 active:scale-[0.97] sm:h-9";
+  "transition-colors duration-150 active:scale-[0.97] sm:h-8";
 const BOTON_NEUTRO = `${BOTON} border-linea bg-superficie text-tinta hover:border-brand hover:text-brand`;
 /** Azul: navegar. Es el mismo criterio que el resto del panel. */
 const BOTON_HOY = `${BOTON} border-azul/35 bg-azul-luz text-azul-oscuro hover:border-azul hover:bg-azul hover:text-white`;
@@ -277,7 +277,7 @@ export function BarraAgenda({
             scroll={false}
             role="tab"
             aria-selected={elegida}
-            className={`flex h-9 flex-1 items-center justify-center rounded-md px-4 text-[0.85rem] font-semibold transition-colors duration-150 sm:h-8 ${
+            className={`flex h-9 flex-1 items-center justify-center rounded-md px-4 text-[0.85rem] font-semibold transition-colors duration-150 sm:h-7 ${
               elegida
                 ? "bg-superficie text-azul-oscuro shadow-sm ring-1 ring-azul/25"
                 : "text-tinta-media hover:text-tinta"

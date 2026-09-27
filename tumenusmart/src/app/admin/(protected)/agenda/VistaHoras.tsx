@@ -255,10 +255,10 @@ export function VistaHoras({
                     ]
                       .filter(Boolean)
                       .join(" · ")}
-                    className={`animate-bloque absolute z-10 overflow-hidden rounded-md border border-l-4 px-1.5 py-1 text-[0.7rem] leading-tight shadow-sm transition-[transform,box-shadow] duration-150 hover:z-20 hover:-translate-y-px hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand ${estado.bloque}`}
+                    className={`animate-bloque absolute z-10 rounded-md border border-l-4 px-1.5 py-1 text-[0.7rem] leading-tight shadow-sm transition-[transform,box-shadow] duration-150 hover:z-20 hover:-translate-y-px hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand ${estado.bloque}`}
                     style={{
                       top: `${((c.desde - rango.inicio) / 60) * REM_POR_HORA}rem`,
-                      height: `${remAlto}rem`,
+                      minHeight: `${remAlto}rem`,
                       left: `calc(${izquierda.toFixed(3)}% + 2px)`,
                       width: `calc(${(100 / c.carriles).toFixed(3)}% - 4px)`,
                       // Los turnos entran apenas escalonados al abrir el calendario.

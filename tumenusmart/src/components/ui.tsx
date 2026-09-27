@@ -103,17 +103,32 @@ export function Cabecera({
   titulo,
   bajada,
   acciones,
+  compacta = false,
 }: {
   titulo: string;
   bajada?: ReactNode;
   acciones?: ReactNode;
+  /** Más baja y con letra más chica: para una pantalla donde el espacio de arriba importa (ej. el Calendario). */
+  compacta?: boolean;
 }) {
   return (
-    <header className="mb-4 flex flex-wrap items-start justify-between gap-x-4 gap-y-2.5 border-b border-linea pb-3">
+    <header
+      className={`flex flex-wrap items-start justify-between gap-x-4 border-b border-linea ${
+        compacta ? "mb-2 gap-y-2 pb-2" : "mb-4 gap-y-2.5 pb-3"
+      }`}
+    >
       <div className="min-w-0">
-        <h1 className="text-[1.3rem] font-semibold tracking-titular text-tinta">{titulo}</h1>
+        <h1 className={`font-semibold tracking-titular text-tinta ${compacta ? "text-[1.1rem]" : "text-[1.3rem]"}`}>
+          {titulo}
+        </h1>
         {bajada && (
-          <p className="mt-0.5 max-w-2xl text-[0.83rem] leading-snug text-tinta-media">{bajada}</p>
+          <p
+            className={`max-w-2xl leading-snug text-tinta-media ${
+              compacta ? "mt-0 text-[0.76rem]" : "mt-0.5 text-[0.83rem]"
+            }`}
+          >
+            {bajada}
+          </p>
         )}
       </div>
       {acciones && <div className="flex flex-wrap items-center gap-2">{acciones}</div>}

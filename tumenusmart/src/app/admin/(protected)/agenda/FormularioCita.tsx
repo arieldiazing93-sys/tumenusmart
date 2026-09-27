@@ -942,11 +942,7 @@ export function FormularioCita({
             {cita && (
               <div className="flex items-center justify-between gap-2">
                 {!cobrada ? (
-                  <button
-                    type="button"
-                    onClick={() => setConfirmandoEliminar(true)}
-                    className="inline-flex h-9 items-center rounded-lg px-2 text-[0.86rem] font-semibold text-peligro transition-colors hover:bg-peligro-luz"
-                  >
+                  <button type="button" onClick={() => setConfirmandoEliminar(true)} className={clasesBoton("peligro", "sm")}>
                     Eliminar
                   </button>
                 ) : (
@@ -973,7 +969,7 @@ export function FormularioCita({
                   <button
                     type="submit"
                     disabled={pendiente || cajaImpide || (cobrando && total <= 0)}
-                    className={`${clasesBoton("principal", "md")} w-full`}
+                    className={`${clasesBoton("exito", "md")} w-full`}
                   >
                     {textoBotonPrincipal}
                   </button>
