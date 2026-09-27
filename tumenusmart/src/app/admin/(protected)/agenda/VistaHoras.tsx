@@ -97,13 +97,6 @@ export function VistaHoras({
   else if (locales.length > 0) enfocar = Math.min(...locales.map((c) => c.desde)) - 30;
   const remInicial = Math.max(0, ((enfocar - rango.inicio) / 60) * REM_POR_HORA);
 
-  // Las líneas: una firme cada hora y una fina cada cuarto.
-  const fondoLineas = {
-    backgroundImage:
-      "linear-gradient(to bottom, rgb(var(--linea)) 1px, transparent 1px), linear-gradient(to bottom, rgb(var(--linea-fina)) 1px, transparent 1px)",
-    backgroundSize: `100% ${REM_POR_HORA}rem, 100% ${REM_POR_HORA / 4}rem`,
-  };
-
   return (
     <div
       data-scroll-agenda
@@ -203,7 +196,7 @@ export function VistaHoras({
             <div
               key={dia}
               className="relative border-l border-linea bg-superficie"
-              style={{ height: `${alto}rem`, ...fondoLineas }}
+              style={{ height: `${alto}rem` }}
             >
               {franjas.map((f, i) => (
                 <div

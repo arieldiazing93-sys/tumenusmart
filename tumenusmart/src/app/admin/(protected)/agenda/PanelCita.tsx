@@ -11,43 +11,8 @@ import type {
   PersonalDeCita,
   ServicioOpcion,
 } from "@/lib/agenda-cita";
-import { claveSumarDias } from "@/lib/calendario";
 import { ActividadCita } from "./ActividadCita";
 import { FormularioCita } from "./FormularioCita";
-
-/** Cuántos días después se propone la nueva cita al tocar "Reservar de nuevo". */
-const DIAS_PARA_VOLVER = 7;
-
-/**
- * Una cita nueva con los datos de otra ("Reservar de nuevo"): el mismo cliente, quien
- * atiende y los servicios, con los precios de hoy, para el mismo día y hora de la
- * semana siguiente. Nada de lo cobrado ni el descuento pasan a la nueva.
- */
-function comoNueva(c: DetalleCita, servicios: ServicioOpcion[]): DetalleCita {
-  const catalogo = new Map(servicios.map((s) => [s.id, s] as const));
-  return {
-    ...c,
-    id: "",
-    codigo: "",
-    estado: "proxima",
-    origen: "panel",
-    fecha: claveSumarDias(c.fecha, DIAS_PARA_VOLVER),
-    // Un servicio que ya no existe no se puede volver a reservar.
-    servicios: c.servicios
-      .filter((s) => s.servicioId !== null)
-      .map((s, i) => ({
-        ...s,
-        clave: `copia-${i}-${s.servicioId}`,
-        citaServicioId: null,
-        precio: (s.servicioId ? catalogo.get(s.servicioId)?.precio : undefined) ?? s.precio,
-      })),
-    nota: "",
-    extras: [],
-    descuentoMonto: 0,
-    descuentoPorcentaje: null,
-    cobro: null,
-  };
-}
 
 /**
  * El detalle de la cita: un panel que entra desde la derecha al tocar un turno del
@@ -81,7 +46,6 @@ export function PanelCita({
   const router = useRouter();
   const [montado, setMontado] = useState(false);
   const [pestana, setPestana] = useState<"editar" | "actividad">("editar");
-  const [copia, setCopia] = useState<DetalleCita | null>(null);
 
   // El panel se dibuja recién en el navegador (va en un portal): así la primera pantalla
   // que llega del servidor y la del navegador coinciden siempre.
@@ -95,17 +59,17 @@ export function PanelCita({
 
   if (!montado) return null;
 
-  const haciaNueva = cita === null || copia !== null;
+  const esNueva = cita === null;
 
   return (
     <PanelLateral
-      titulo={cita && !copia ? `Cita ${cita.codigo}` : "Nueva cita"}
+      titulo={cita ? `Cita ${cita.codigo}` : "Nueva cita"}
       onCerrar={cerrar}
       ancho="ancho"
       // Las pestañas van en la barra de arriba, junto a la X: así no hace falta una fila para el título y otra
       // para ellas. (El código de la cita está en la primera fila del formulario.)
       encabezado={
-        haciaNueva ? undefined : (
+        esNueva ? undefined : (
           <div role="tablist" aria-label="Secciones de la cita" className="flex gap-1">
             {(
               [
@@ -133,11 +97,11 @@ export function PanelCita({
       }
     >
       {/* El formulario se queda armado aunque se mire la otra pestaña: no se pierde lo escrito. */}
-      <div className={pestana === "editar" || haciaNueva ? "flex min-h-0 flex-1 flex-col" : "hidden"}>
+      <div className={pestana === "editar" || esNueva ? "flex min-h-0 flex-1 flex-col" : "hidden"}>
         <FormularioCita
-          key={copia ? "copia" : (cita?.id ?? "nueva")}
-          cita={copia ? null : cita}
-          inicial={copia ?? cita}
+          key={cita?.id ?? "nueva"}
+          cita={cita}
+          inicial={cita}
           servicios={servicios}
           personal={personal}
           caja={caja}
@@ -145,13 +109,9 @@ export function PanelCita({
           parametros={parametros}
           hoy={hoy}
           onCerrar={cerrar}
-          onReservarDeNuevo={(c) => {
-            setPestana("editar");
-            setCopia(comoNueva(c, servicios));
-          }}
         />
       </div>
-      {!haciaNueva && pestana === "actividad" && <ActividadCita actividad={actividad} />}
+      {!esNueva && pestana === "actividad" && <ActividadCita actividad={actividad} />}
     </PanelLateral>
   );
 }

@@ -64,11 +64,10 @@ export function FormularioCita({
   parametros,
   hoy,
   onCerrar,
-  onReservarDeNuevo,
 }: {
   /** La cita que se está viendo; null si es una cita nueva. */
   cita: DetalleCita | null;
-  /** Con qué se llenan los campos: la propia cita, una copia (Reservar de nuevo) o nada. */
+  /** Con qué se llenan los campos: la propia cita, o nada si es nueva. */
   inicial: DetalleCita | null;
   servicios: ServicioOpcion[];
   personal: PersonalDeCita[];
@@ -78,7 +77,6 @@ export function FormularioCita({
   parametros: ParametrosAgenda;
   hoy: string;
   onCerrar: () => void;
-  onReservarDeNuevo: (c: DetalleCita) => void;
 }) {
   const router = useRouter();
   const [pendiente, iniciar] = useTransition();
@@ -935,23 +933,14 @@ export function FormularioCita({
             </div>
           </div>
         ) : (
-          // Siempre dos filas fijas: arriba lo secundario (Eliminar y Reservar de nuevo) y abajo Cancelar y el botón
-          // principal, que ocupa el resto del ancho. Así, cuando el botón pasa de "Guardar" a "Cobrar Gs. 45.000" no
-          // se pisa con los de al lado ni el pie cambia de alto (que empujaba el formulario).
+          // Dos filas fijas: arriba Eliminar (si corresponde) y abajo Cancelar y el botón principal, que ocupa el
+          // resto del ancho. Así, cuando el botón pasa de "Guardar" a "Cobrar Gs. 45.000" no se pisa con los de al
+          // lado ni el pie cambia de alto (que empujaba el formulario).
           <div className="flex flex-col gap-2">
-            {cita && (
-              <div className="flex items-center justify-between gap-2">
-                {!cobrada ? (
-                  <button type="button" onClick={() => setConfirmandoEliminar(true)} className={clasesBoton("peligro", "sm")}>
-                    Eliminar
-                  </button>
-                ) : (
-                  <span />
-                )}
-                <button type="button" onClick={() => onReservarDeNuevo(cita)} className={clasesBoton("navegar", "sm")}>
-                  Reservar de nuevo
-                </button>
-              </div>
+            {cita && !cobrada && (
+              <button type="button" onClick={() => setConfirmandoEliminar(true)} className={clasesBoton("peligro", "sm")}>
+                Eliminar
+              </button>
             )}
             <div className="flex items-center gap-2">
               {!cobrada && (
