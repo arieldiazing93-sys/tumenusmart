@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Campo, Entrada, MensajeError, Pastilla, Tabla, Td, Th, Tr, Vacio, clasesBoton } from "@/components/ui";
+import { Campo, Entrada, MensajeError, Tabla, Td, Th, Tr, Vacio, clasesBoton } from "@/components/ui";
 import { Modal } from "@/components/Modal";
 import { PanelLateral } from "@/components/PanelLateral";
 import { formatearGuarani } from "@/lib/format";
@@ -13,6 +13,7 @@ import {
   eliminarServicio as eliminarServicioAccion,
   renombrarCategoriaServicio,
 } from "./actions";
+import { AlternarActivoServicio } from "./AlternarActivoServicio";
 import { FormularioServicio } from "./FormularioServicio";
 
 type Categoria = { id: string; nombre: string };
@@ -354,10 +355,7 @@ export function GestorServicios({
                                   />
                                 )}
                                 <div className="min-w-0">
-                                  <p className="flex flex-wrap items-center gap-2 font-semibold text-tinta">
-                                    {s.nombre}
-                                    {!s.activo && <Pastilla>Inactivo</Pastilla>}
-                                  </p>
+                                  <p className="font-semibold text-tinta">{s.nombre}</p>
                                   <p className="truncate text-[0.76rem] text-tinta-suave">
                                     {s.personalIds.map((id) => nombresDePersonal.get(id)).filter(Boolean).join(", ") ||
                                       "Sin personal"}
@@ -373,7 +371,8 @@ export function GestorServicios({
                             </Td>
                             <Td className="cifra whitespace-nowrap font-medium text-tinta">{textoPrecio(s)}</Td>
                             <Td className="text-right">
-                              <div className="flex justify-end gap-2">
+                              <div className="flex items-center justify-end gap-2">
+                                <AlternarActivoServicio id={s.id} activo={s.activo} nombre={s.nombre} />
                                 <button type="button" onClick={() => setPanel(s.id)} className={clasesBoton("suave", "sm")}>
                                   Editar
                                 </button>
@@ -413,10 +412,7 @@ export function GestorServicios({
                             />
                           )}
                           <div className="min-w-0 flex-1">
-                            <p className="flex flex-wrap items-center gap-2 text-[0.95rem] font-semibold text-tinta">
-                              {s.nombre}
-                              {!s.activo && <Pastilla>Inactivo</Pastilla>}
-                            </p>
+                            <p className="text-[0.95rem] font-semibold text-tinta">{s.nombre}</p>
                             <p className="mt-0.5 text-[0.82rem] text-tinta-media">
                               {textoDuracion(s.duracionMin)}
                               {s.bufferMin > 0 ? ` (+ ${s.bufferMin} min de búfer)` : ""} ·{" "}
@@ -427,6 +423,7 @@ export function GestorServicios({
                                 "Sin personal"}
                             </p>
                           </div>
+                          <AlternarActivoServicio id={s.id} activo={s.activo} nombre={s.nombre} />
                         </div>
                         <div className="mt-3 flex gap-2">
                           <button

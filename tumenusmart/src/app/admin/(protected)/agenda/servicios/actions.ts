@@ -317,6 +317,38 @@ export async function actualizarServicio(servicioId: string, formData: FormData)
   return { ok: true };
 }
 
+/**
+ * Suspende (o reactiva) un servicio de un toque, sin pasar por el formulario completo: deja de
+ * ofrecerse en el punto de venta y en la reserva online, pero se conserva con su historial —
+ * la misma casilla "Activo" de Editar, solo que de un solo click, como el "Se acabó" de Productos.
+ */
+export async function alternarActivoServicio(servicioId: string, activo: boolean): Promise<ResultadoServicio> {
+  const sesion = await exigirPermiso("agenda.configurar");
+  const idLocal = await idLocalActual();
+  const db = prismaDelLocal(idLocal);
+
+  const servicio = await db.servicioAgenda.findFirst({
+    where: { id: servicioId },
+    select: { productId: true, product: { select: { nombre: true, disponible: true } } },
+  });
+  if (!servicio) return { ok: false, error: "Ese servicio ya no existe." };
+
+  await db.product.update({ where: { id: servicio.productId }, data: { disponible: activo } });
+
+  if (servicio.product.disponible !== activo) {
+    await registrarBitacora(idLocal, sesion, {
+      modulo: "agenda",
+      accion: activo ? "servicio_activado" : "servicio_suspendido",
+      descripcion: `${activo ? "Reactivó" : "Suspendió"} el servicio ${servicio.product.nombre}.`,
+      entidad: "Product",
+      entidadId: servicio.productId,
+    });
+  }
+
+  refrescarPantallas();
+  return { ok: true };
+}
+
 export async function eliminarServicio(servicioId: string): Promise<ResultadoServicio> {
   const sesion = await exigirPermiso("agenda.configurar");
   const idLocal = await idLocalActual();
