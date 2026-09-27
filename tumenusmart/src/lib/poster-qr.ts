@@ -56,9 +56,24 @@ function ajustarTexto(
  */
 export function dibujarPoster(
   canvas: HTMLCanvasElement,
-  opciones: { nombreNegocio: string; url: string; marcaColor?: string }
+  opciones: {
+    nombreNegocio: string;
+    url: string;
+    marcaColor?: string;
+    /** El renglón de color debajo del nombre. Por defecto, el afiche de la carta digital. */
+    bajada?: string;
+    instruccion1?: string;
+    instruccion2?: string;
+  }
 ): void {
-  const { nombreNegocio, url, marcaColor = "#e05d2f" } = opciones;
+  const {
+    nombreNegocio,
+    url,
+    marcaColor = "#e05d2f",
+    bajada = "NUESTRA CARTA DIGITAL",
+    instruccion1 = "Apuntá la cámara de tu celular",
+    instruccion2 = "y hacé tu pedido desde la mesa",
+  } = opciones;
 
   canvas.width = ANCHO_POSTER;
   canvas.height = ALTO_POSTER;
@@ -84,7 +99,7 @@ export function dibujarPoster(
   // Bajada
   ctx.fillStyle = marcaColor;
   ctx.font = `600 44px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif`;
-  ctx.fillText("NUESTRA CARTA DIGITAL", ANCHO_POSTER / 2, 262);
+  ctx.fillText(bajada, ANCHO_POSTER / 2, 262);
 
   // Marco y QR
   const ladoMarco = 780;
@@ -111,11 +126,11 @@ export function dibujarPoster(
   // Instrucción
   ctx.fillStyle = "#171717";
   ctx.font = `bold 54px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif`;
-  ctx.fillText("Apuntá la cámara de tu celular", ANCHO_POSTER / 2, yMarco + ladoMarco + 110);
+  ctx.fillText(instruccion1, ANCHO_POSTER / 2, yMarco + ladoMarco + 110);
 
   ctx.fillStyle = "#525252";
   ctx.font = `40px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif`;
-  ctx.fillText("y hacé tu pedido desde la mesa", ANCHO_POSTER / 2, yMarco + ladoMarco + 172);
+  ctx.fillText(instruccion2, ANCHO_POSTER / 2, yMarco + ladoMarco + 172);
 
   // URL al pie, por si alguien prefiere escribirla
   const tamUrl = ajustarTexto(ctx, url, ANCHO_POSTER - 160, 34, "500");

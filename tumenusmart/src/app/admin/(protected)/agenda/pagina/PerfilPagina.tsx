@@ -1,11 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Campo, Entrada, Pastilla, Selector, Tarjeta, clasesBoton } from "@/components/ui";
 import { Interruptor } from "@/components/Interruptor";
 import { normalizarSlug } from "@/lib/alcance-local";
 import { iniciales } from "@/lib/agenda";
 import { ENTRADAS_CALENDARIO } from "@/lib/pagina-reservas";
+import { generarMatrizQR } from "@/lib/qr";
+import { dibujarPoster, matrizASvg } from "@/lib/poster-qr";
 import { BotonSubirImagen, PARA_PERFIL } from "./BotonSubirImagen";
 import { CampoTelefonoPagina } from "./CampoTelefonoPagina";
 import type { PropsSeccion } from "./tipos";
@@ -21,6 +23,10 @@ export function PerfilPagina({ datos, cambiar }: PropsSeccion) {
   const [origen, setOrigen] = useState("");
   const [editandoDireccion, setEditandoDireccion] = useState(false);
   const [copiado, setCopiado] = useState(false);
+  const [mostrarQr, setMostrarQr] = useState(false);
+  const [descargandoQr, setDescargandoQr] = useState(false);
+  const [errorQr, setErrorQr] = useState<string | null>(null);
+  const canvasQrRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
     setOrigen(window.location.origin);
@@ -30,8 +36,29 @@ export function PerfilPagina({ datos, cambiar }: PropsSeccion) {
     const t = setTimeout(() => setCopiado(false), 2000);
     return () => clearTimeout(t);
   }, [copiado]);
+  // Cerrar el QR con Escape, como cualquier ventana de este panel.
+  useEffect(() => {
+    if (!mostrarQr) return;
+    const alPresionar = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setMostrarQr(false);
+    };
+    window.addEventListener("keydown", alPresionar);
+    return () => window.removeEventListener("keydown", alPresionar);
+  }, [mostrarQr]);
 
   const enlace = `${origen}/turnos/${datos.slug}`;
+
+  // El QR se genera acá mismo, en el navegador, a partir del propio link: no sale ningún dato hacia
+  // afuera (no hay un servicio externo de por medio) y funciona igual en cualquier navegador, porque
+  // solo usa SVG y Canvas, que son estándares de toda la vida.
+  const svgQr = useMemo(() => {
+    if (!origen) return null;
+    try {
+      return matrizASvg(generarMatrizQR(enlace), 220);
+    } catch {
+      return null;
+    }
+  }, [origen, enlace]);
 
   async function copiar() {
     try {
@@ -40,6 +67,39 @@ export function PerfilPagina({ datos, cambiar }: PropsSeccion) {
     } catch {
       // Sin permiso del navegador: se deja el enlace a la vista para copiarlo a mano.
       setEditandoDireccion(true);
+    }
+  }
+
+  function descargarQr() {
+    setErrorQr(null);
+    setDescargandoQr(true);
+    try {
+      const canvas = canvasQrRef.current;
+      if (!canvas) throw new Error("No se pudo preparar el afiche");
+      dibujarPoster(canvas, {
+        nombreNegocio: datos.nombre || "Reservá tu turno",
+        url: enlace,
+        bajada: "RESERVÁ TU TURNO",
+        instruccion1: "Apuntá la cámara de tu celular",
+        instruccion2: "y reservá tu turno online",
+      });
+      canvas.toBlob((blob) => {
+        setDescargandoQr(false);
+        if (!blob) {
+          setErrorQr("No se pudo generar la imagen del afiche.");
+          return;
+        }
+        const enlaceDescarga = document.createElement("a");
+        enlaceDescarga.href = URL.createObjectURL(blob);
+        enlaceDescarga.download = `reservas-${datos.slug || "negocio"}-qr.png`;
+        document.body.appendChild(enlaceDescarga);
+        enlaceDescarga.click();
+        document.body.removeChild(enlaceDescarga);
+        setTimeout(() => URL.revokeObjectURL(enlaceDescarga.href), 10000);
+      }, "image/png");
+    } catch (err) {
+      setDescargandoQr(false);
+      setErrorQr(err instanceof Error ? err.message : "No se pudo generar el afiche");
     }
   }
 
@@ -135,6 +195,20 @@ export function PerfilPagina({ datos, cambiar }: PropsSeccion) {
             </button>
           </div>
 
+          <button
+            type="button"
+            onClick={() => setMostrarQr(true)}
+            className={`mt-2 w-full ${clasesBoton("suave", "sm")}`}
+          >
+            <svg viewBox="0 0 24 24" width={15} height={15} fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <rect x="3" y="3" width="7" height="7" rx="1" />
+              <rect x="14" y="3" width="7" height="7" rx="1" />
+              <rect x="3" y="14" width="7" height="7" rx="1" />
+              <path d="M14 14h3v3h-3zM19 14h2v2h-2zM14 19h2v2h-2zM19 19h2v2h-2z" />
+            </svg>
+            Ver código QR
+          </button>
+
           {editandoDireccion && (
             <div className="mt-3 flex flex-col gap-2">
               <Campo
@@ -215,6 +289,68 @@ export function PerfilPagina({ datos, cambiar }: PropsSeccion) {
           </Campo>
         </div>
       </div>
+
+      {/* ---------- QR de la página de reservas ---------- */}
+      {mostrarQr && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="QR de tu página de reservas"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-tinta/40 p-4"
+          onClick={() => setMostrarQr(false)}
+        >
+          <div
+            className="w-full max-w-sm rounded-2xl border border-linea bg-superficie p-5 shadow-alta"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-3 flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <h3 className="text-[1.05rem] font-semibold tracking-titular text-tinta">Código QR</h3>
+                <p className="text-[0.8rem] leading-snug text-tinta-media">
+                  Pegalo en tu local o en tus redes: apuntan la cámara y entran directo a reservar.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setMostrarQr(false)}
+                aria-label="Cerrar"
+                className="flex h-8 w-8 flex-none items-center justify-center rounded-lg text-tinta-suave transition-colors hover:bg-papel-hundido hover:text-tinta"
+              >
+                <svg viewBox="0 0 24 24" width={16} height={16} fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M18 6 6 18M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="mb-4 flex justify-center rounded-xl border border-linea bg-papel-suave p-5">
+              {svgQr ? (
+                <div
+                  className="rounded-lg bg-white p-2.5"
+                  // El SVG lo armamos acá mismo a partir del link de este negocio: no hay contenido externo.
+                  dangerouslySetInnerHTML={{ __html: svgQr }}
+                />
+              ) : (
+                <p className="text-[0.85rem] text-tinta-media">Generando…</p>
+              )}
+            </div>
+
+            <button
+              type="button"
+              onClick={descargarQr}
+              disabled={descargandoQr || !svgQr}
+              className={`w-full ${clasesBoton("principal", "md")}`}
+            >
+              {descargandoQr ? "Generando…" : "Descargar afiche PNG"}
+            </button>
+            <p className="mt-2 text-center text-[0.72rem] text-tinta-suave">
+              1200×1600 px · listo para imprimir en carta u oficio
+            </p>
+            {errorQr && <p className="mt-2 text-[0.82rem] font-medium text-peligro">{errorQr}</p>}
+
+            <canvas ref={canvasQrRef} className="hidden" />
+          </div>
+        </div>
+      )}
     </Tarjeta>
   );
 }
