@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { exigirPermiso } from "@/lib/auth";
 import { registrarBitacora } from "@/lib/bitacora";
-import { esEstadoCita, diaLargo, estadoDeCita, horaDeMinutos, partesLocales } from "@/lib/agenda";
+import { esEstadoCita, diaDeLaSemana, diaLargo, estadoDeCita, horaDeMinutos, partesLocales } from "@/lib/agenda";
 import {
   PRECIO_MAXIMO_SERVICIO,
   duracionDeServicios,
@@ -13,10 +13,10 @@ import {
 } from "@/lib/agenda-cita";
 import { nombreCompleto, normalizarTelefonoCliente } from "@/lib/agenda-personal";
 import { claveSumarDias } from "@/lib/calendario";
-import { MINUTOS_BLOQUEO_SIN_CONFIRMAR } from "@/lib/disponibilidad";
+import { MINUTOS_BLOQUEO_SIN_CONFIRMAR, tramosDeTrabajo } from "@/lib/disponibilidad";
 import { estacionActual } from "@/lib/estacion-actual";
 import { formatearGuarani } from "@/lib/format";
-import { esHoraValida } from "@/lib/horario-trabajo";
+import { aMinutos, esHoraValida, horarioEfectivo, nombreDeDia, textoDeHoras, type HorarioDia } from "@/lib/horario-trabajo";
 import { idLocalActual } from "@/lib/local-actual";
 import { prisma } from "@/lib/prisma";
 import { prismaDelLocal, type PrismaLocal } from "@/lib/prisma-local";
@@ -47,6 +47,7 @@ type Preparados = {
   personalId: string;
   inicio: Date;
   fin: Date;
+  duracionMin: number;
   bufferMin: number;
   clienteNombre: string;
   clienteTelefono: string | null;
@@ -170,6 +171,7 @@ async function prepararDatos(
       personalId: personal.id,
       inicio,
       fin: new Date(inicio.getTime() + duracion * 60_000),
+      duracionMin: duracion,
       bufferMin,
       clienteNombre,
       clienteTelefono,
@@ -221,6 +223,44 @@ async function citaQueSePisa(
 
 function mensajeDeChoque(c: { clienteNombre: string; hora: string }): string {
   return `Ese profesional ya tiene una cita a las ${c.hora} (${c.clienteNombre}) que se pisa con este horario.`;
+}
+
+/**
+ * ¿Ese profesional atiende este día a esta hora? Mira su horario propio (o, si no tiene, el
+ * general del negocio; sin ninguno de los dos configurado, se usa el mismo horario de ejemplo
+ * que ya ve el calendario y la reserva pública). Devuelve un aviso si no entra —para poder
+ * guardar igual, lo mismo que un choque de horario— o null si está dentro de un tramo de
+ * atención (sin pisar el descanso ni el cierre).
+ */
+async function fueraDeHorario(
+  db: PrismaLocal,
+  personalId: string,
+  fecha: string,
+  hora: string,
+  duracionMin: number
+): Promise<string | null> {
+  const columnas = {
+    diaSemana: true,
+    trabaja: true,
+    inicio: true,
+    fin: true,
+    descansa: true,
+    descansoInicio: true,
+    descansoFin: true,
+  } as const;
+  const [generales, propias] = await Promise.all([
+    db.horarioTrabajo.findMany({ select: columnas }),
+    db.horarioPersonal.findMany({ where: { personalId }, select: columnas }),
+  ]);
+  const diaSemana = diaDeLaSemana(fecha);
+  const horario = horarioEfectivo(propias, generales).find((h) => h.diaSemana === diaSemana) as HorarioDia;
+  const inicioMin = aMinutos(hora);
+  const cabe = tramosDeTrabajo(horario).some((t) => t.desde <= inicioMin && inicioMin + duracionMin <= t.hasta);
+  if (cabe) return null;
+  const dia = nombreDeDia(diaSemana).toLowerCase();
+  return horario.trabaja
+    ? `Ese horario queda afuera de la atención de los ${dia} (atiende ${textoDeHoras(horario)}).`
+    : `Ese profesional no atiende los ${dia}.`;
 }
 
 /**
@@ -294,8 +334,10 @@ export async function guardarCita(citaId: string, datos: DatosCita): Promise<Res
   if (!preparados.ok) return preparados;
   const p = preparados.p;
 
-  // Una cita cancelada o sin asistencia no ocupa horario, así que no puede pisar a otra.
+  // Una cita cancelada o sin asistencia no ocupa horario, así que no hace falta revisar nada de esto.
   if (!datos.forzar && datos.estado !== "cancelada" && datos.estado !== "no_asistio") {
+    const fuera = await fueraDeHorario(db, p.personalId, p.fecha, p.hora, p.duracionMin);
+    if (fuera) return { ok: false, error: fuera, conflicto: true };
     const choque = await citaQueSePisa(
       db,
       p.personalId,
@@ -339,6 +381,8 @@ export async function crearCita(datos: DatosCita): Promise<ResultadoCita> {
   const p = preparados.p;
 
   if (!datos.forzar) {
+    const fuera = await fueraDeHorario(db, p.personalId, p.fecha, p.hora, p.duracionMin);
+    if (fuera) return { ok: false, error: fuera, conflicto: true };
     const choque = await citaQueSePisa(
       db,
       p.personalId,
@@ -683,6 +727,9 @@ export async function reprogramarCita(
   const nuevoFin = new Date(nuevoInicio.getTime() + (cita.fin.getTime() - cita.inicio.getTime()));
 
   if (!forzar) {
+    const duracionMin = Math.round((cita.fin.getTime() - cita.inicio.getTime()) / 60_000);
+    const fuera = await fueraDeHorario(db, cita.personalId, diaPedido, horaPedida, duracionMin);
+    if (fuera) return { ok: false, error: fuera, conflicto: true };
     const choque = await citaQueSePisa(
       db,
       cita.personalId,

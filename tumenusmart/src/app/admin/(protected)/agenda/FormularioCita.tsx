@@ -680,133 +680,8 @@ export function FormularioCita({
             </label>
           </div>
 
-          {/* ---------- cliente ---------- */}
-          <BloqueCita titulo="Cliente" icono={<IconoPersona />} retraso={50}>
-            {/* Lo que importa del cliente: su nombre y su WhatsApp. Nombre y teléfono van en una sola fila. */}
-            <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
-              <Campo etiqueta="Nombre *">
-                <Entrada
-                  value={nombre}
-                  onChange={(e) => setNombre(e.target.value)}
-                  maxLength={80}
-                  placeholder="Nombre y apellido"
-                  autoFocus={esNueva}
-                />
-              </Campo>
-              <div>
-                <span className="mb-1.5 block text-[0.82rem] font-semibold text-tinta">Teléfono</span>
-                {/* El teléfono con el botón de WhatsApp al lado (directo a ese número), como el de Pedidos. */}
-                <div className="flex items-stretch gap-1.5">
-                  <div className="min-w-0 flex-1">
-                    <Entrada
-                      type="tel"
-                      value={telefono}
-                      onChange={(e) => setTelefono(e.target.value)}
-                      placeholder="0984 123 456"
-                      aria-label="Teléfono"
-                    />
-                  </div>
-                  {enlaceWhatsapp ? (
-                    <a
-                      href={enlaceWhatsapp}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      title={`Escribirle a ${nombre.trim() || "el cliente"} por WhatsApp`}
-                      aria-label="Escribirle por WhatsApp"
-                      className={`${BOTON_WHATSAPP} hover:bg-[#25D366]/20`}
-                    >
-                      <IconoWhatsapp tam={20} />
-                    </a>
-                  ) : (
-                    <span
-                      aria-disabled="true"
-                      title="Cargá el teléfono para escribirle por WhatsApp"
-                      className={`${BOTON_WHATSAPP} cursor-not-allowed opacity-40`}
-                    >
-                      <IconoWhatsapp tam={20} />
-                    </span>
-                  )}
-                </div>
-              </div>
-            </div>
-            {datosDelFormulario.length > 0 && (
-              <dl className="rounded-lg bg-papel-suave px-3 py-2.5 text-[0.8rem]">
-                {datosDelFormulario.map((x) => (
-                  <div key={x.etiqueta} className="flex gap-2 py-0.5">
-                    <dt className="flex-none font-semibold text-tinta">{x.etiqueta}:</dt>
-                    <dd className="min-w-0 break-words text-tinta-media">{x.valor}</dd>
-                  </div>
-                ))}
-              </dl>
-            )}
-          </BloqueCita>
-
-          {/* ---------- cuándo y con quién ---------- */}
-          <BloqueCita titulo="Día y hora" icono={<IconoCalendarioHora />} retraso={100}>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <Campo etiqueta="Fecha *">
-                <Entrada
-                  type="date"
-                  value={fecha}
-                  onChange={(e) => setFecha(e.target.value)}
-                  min={esNueva ? hoy : undefined}
-                  required
-                />
-              </Campo>
-              <div>
-                <span className="mb-1.5 block text-[0.82rem] font-semibold text-tinta">Hora de inicio *</span>
-                <div className="flex items-center gap-2">
-                  <div className="min-w-0 flex-1">
-                    <Entrada
-                      type="time"
-                      step={300}
-                      value={hora}
-                      onChange={(e) => setHora(e.target.value)}
-                      aria-label="Hora de inicio"
-                      required
-                    />
-                  </div>
-                  <span aria-hidden="true" className="text-tinta-suave">
-                    →
-                  </span>
-                  <span
-                    className="cifra flex-none rounded-lg bg-papel-hundido px-2.5 py-2.5 text-[0.88rem] font-medium text-tinta-media"
-                    title="Hora en que termina, según lo que dura cada servicio"
-                  >
-                    {horaFin}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* Quién atiende, en amarillo. Con la cita ya cobrada este campo pasa arriba (ver "Trabajo asignado a"). */}
-            {!cobrada && (
-              <Campo etiqueta="Personal *">
-                <Selector
-                  value={personalId}
-                  onChange={(e) => setPersonalId(e.target.value)}
-                  required
-                  style={CAMPO_AMARILLO}
-                  className="font-semibold"
-                >
-                  {personal.length === 0 && <option value="">No hay personal cargado</option>}
-                  {personal.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.nombre}
-                    </option>
-                  ))}
-                </Selector>
-              </Campo>
-            )}
-            {noRealiza.length > 0 && (
-              <p className="rounded-lg bg-aviso-luz px-3 py-2 text-[0.8rem] leading-snug text-aviso">
-                Esta persona no tiene asignado: {noRealiza.join(", ")}. Igual podés dejarlo así.
-              </p>
-            )}
-          </BloqueCita>
-
-          {/* ---------- servicios, descuento y total ---------- */}
-          <BloqueCita titulo="Servicios *" icono={<IconoTijera />} retraso={150}>
+          {/* ---------- servicios, descuento y total (primero, como en la reserva pública) ---------- */}
+          <BloqueCita titulo="Servicios *" icono={<IconoTijera />} retraso={50}>
             <ServiciosCita lineas={lineas} catalogo={servicios} onCambio={setLineas} />
 
             <div className="rounded-lg border border-linea bg-superficie">
@@ -877,6 +752,136 @@ export function FormularioCita({
                 <span className="cifra text-[1.15rem] font-bold text-tinta">{formatearGuarani(total)}</span>
               </div>
             </div>
+          </BloqueCita>
+
+          {/* ---------- con quién (segundo, como en la reserva pública) ---------- */}
+          {/* Con la cita ya cobrada este campo pasa arriba (ver "Trabajo asignado a"): solo queda el aviso, si aplica. */}
+          {(!cobrada || noRealiza.length > 0) && (
+            <BloqueCita titulo="Personal" icono={<IconoPersona />} retraso={100}>
+              {!cobrada && (
+                <Campo etiqueta="Personal *">
+                  <Selector
+                    value={personalId}
+                    onChange={(e) => setPersonalId(e.target.value)}
+                    required
+                    style={CAMPO_AMARILLO}
+                    className="font-semibold"
+                  >
+                    {personal.length === 0 && <option value="">No hay personal cargado</option>}
+                    {personal.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.nombre}
+                      </option>
+                    ))}
+                  </Selector>
+                </Campo>
+              )}
+              {noRealiza.length > 0 && (
+                <p className="rounded-lg bg-aviso-luz px-3 py-2 text-[0.8rem] leading-snug text-aviso">
+                  Esta persona no tiene asignado: {noRealiza.join(", ")}. Igual podés dejarlo así.
+                </p>
+              )}
+            </BloqueCita>
+          )}
+
+          {/* ---------- cuándo (tercero, como en la reserva pública) ---------- */}
+          <BloqueCita titulo="Día y hora" icono={<IconoCalendarioHora />} retraso={150}>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <Campo etiqueta="Fecha *">
+                <Entrada
+                  type="date"
+                  value={fecha}
+                  onChange={(e) => setFecha(e.target.value)}
+                  min={esNueva ? hoy : undefined}
+                  required
+                />
+              </Campo>
+              <div>
+                <span className="mb-1.5 block text-[0.82rem] font-semibold text-tinta">Hora de inicio *</span>
+                <div className="flex items-center gap-2">
+                  <div className="min-w-0 flex-1">
+                    <Entrada
+                      type="time"
+                      step={300}
+                      value={hora}
+                      onChange={(e) => setHora(e.target.value)}
+                      aria-label="Hora de inicio"
+                      required
+                    />
+                  </div>
+                  <span aria-hidden="true" className="text-tinta-suave">
+                    →
+                  </span>
+                  <span
+                    className="cifra flex-none rounded-lg bg-papel-hundido px-2.5 py-2.5 text-[0.88rem] font-medium text-tinta-media"
+                    title="Hora en que termina, según lo que dura cada servicio"
+                  >
+                    {horaFin}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </BloqueCita>
+
+          {/* ---------- cliente (último, como en la reserva pública) ---------- */}
+          <BloqueCita titulo="Cliente" icono={<IconoPersona />} retraso={200}>
+            {/* Lo que importa del cliente: su nombre y su WhatsApp. Nombre y teléfono van en una sola fila. */}
+            <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+              <Campo etiqueta="Nombre *">
+                <Entrada
+                  value={nombre}
+                  onChange={(e) => setNombre(e.target.value)}
+                  maxLength={80}
+                  placeholder="Nombre y apellido"
+                  autoFocus={esNueva}
+                />
+              </Campo>
+              <div>
+                <span className="mb-1.5 block text-[0.82rem] font-semibold text-tinta">Teléfono</span>
+                {/* El teléfono con el botón de WhatsApp al lado (directo a ese número), como el de Pedidos. */}
+                <div className="flex items-stretch gap-1.5">
+                  <div className="min-w-0 flex-1">
+                    <Entrada
+                      type="tel"
+                      value={telefono}
+                      onChange={(e) => setTelefono(e.target.value)}
+                      placeholder="0984 123 456"
+                      aria-label="Teléfono"
+                    />
+                  </div>
+                  {enlaceWhatsapp ? (
+                    <a
+                      href={enlaceWhatsapp}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      title={`Escribirle a ${nombre.trim() || "el cliente"} por WhatsApp`}
+                      aria-label="Escribirle por WhatsApp"
+                      className={`${BOTON_WHATSAPP} hover:bg-[#25D366]/20`}
+                    >
+                      <IconoWhatsapp tam={20} />
+                    </a>
+                  ) : (
+                    <span
+                      aria-disabled="true"
+                      title="Cargá el teléfono para escribirle por WhatsApp"
+                      className={`${BOTON_WHATSAPP} cursor-not-allowed opacity-40`}
+                    >
+                      <IconoWhatsapp tam={20} />
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+            {datosDelFormulario.length > 0 && (
+              <dl className="rounded-lg bg-papel-suave px-3 py-2.5 text-[0.8rem]">
+                {datosDelFormulario.map((x) => (
+                  <div key={x.etiqueta} className="flex gap-2 py-0.5">
+                    <dt className="flex-none font-semibold text-tinta">{x.etiqueta}:</dt>
+                    <dd className="min-w-0 break-words text-tinta-media">{x.valor}</dd>
+                  </div>
+                ))}
+              </dl>
+            )}
           </BloqueCita>
         </fieldset>
 
