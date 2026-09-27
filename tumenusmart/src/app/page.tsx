@@ -56,6 +56,24 @@ const INCLUYE = [
   },
 ];
 
+const TURNOS_ITEMS = [
+  {
+    titulo: "Calendario en Día, Semana o Mes",
+    texto:
+      "Cada profesional con su horario propio: el sistema solo ofrece horas libres de verdad, sin pisar otro turno ni el día de descanso.",
+  },
+  {
+    titulo: "Reserva pública con aviso por WhatsApp",
+    texto:
+      "El cliente elige servicio, profesional y hora desde tu página, y te llega el aviso al toque. Vos confirmás desde el mismo panel.",
+  },
+  {
+    titulo: "Cobro y comisión, sin planillas",
+    texto:
+      "Al atender, cobrás la cita como una venta más: factura, forma de pago y la comisión de cada profesional, calculadas solas.",
+  },
+];
+
 const PASOS = [
   {
     titulo: "Lo damos de alta",
@@ -106,6 +124,9 @@ export default async function PortadaPage() {
             </a>
             <a href="#pos" className="hidden hover:text-tinta md:inline">
               Punto de venta
+            </a>
+            <a href="#turnos" className="hidden hover:text-tinta md:inline">
+              Reserva de turnos
             </a>
 
             {/* Para el dueño que ya es cliente y perdió el enlace que le
@@ -269,6 +290,35 @@ export default async function PortadaPage() {
 
           <PosMuestra />
         </div>
+      </section>
+
+      {/* ---------------- reserva de turnos ---------------- */}
+      <section id="turnos" className="mx-auto max-w-6xl px-5 py-16 sm:px-8 lg:py-24">
+        <span className="rotulo">Para peluquerías, barberías y salones</span>
+        <h2 className="mt-3 max-w-[26ch] text-[clamp(1.7rem,3.6vw,2.6rem)] font-semibold leading-tight">
+          Reserva de turnos con calendario propio, y el cobro entra directo a la caja.
+        </h2>
+        <p className="mt-4 max-w-[62ch] text-[1.06rem] text-tinta-media">
+          El cliente reserva solo desde una página con tu marca: elige el servicio, con
+          quién quiere atenderse y una hora libre de verdad, según el horario de cada
+          profesional. El turno aparece en tu calendario del día, la semana o el mes —y al
+          atenderlo, cobrás desde la misma cita: entra al mismo punto de venta, con IVA,
+          factura y la comisión de cada profesional calculada sola.
+        </p>
+
+        <div className="mt-10 grid gap-x-8 gap-y-8 sm:grid-cols-3">
+          {TURNOS_ITEMS.map((item, i) => (
+            <div key={item.titulo} className="border-t-2 border-brand pt-5">
+              <span className="font-mono text-[0.68rem] tracking-wider text-brand">
+                {String(i + 1).padStart(2, "0")}
+              </span>
+              <h3 className="mt-2 text-[1.06rem] font-semibold">{item.titulo}</h3>
+              <p className="mt-1.5 text-[0.95rem] text-tinta-media">{item.texto}</p>
+            </div>
+          ))}
+        </div>
+
+        <TurnosMuestra />
       </section>
 
       {/* ---------------- cómo empieza ---------------- */}
@@ -571,6 +621,76 @@ function PosMuestra() {
           <div className="mt-4 flex items-center justify-between rounded-lg border border-noche-linea bg-noche-panel px-3 py-2.5 text-[0.74rem]">
             <span className="text-noche-suave">Arqueo de hoy</span>
             <span className="cifra font-semibold text-emerald-300">Gs. 1.240.000</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const TURNOS_MUESTRA = [
+  { hora: "09:00", cliente: "Estanislao", servicio: "Perfilado de barba", color: "#F59E0B" },
+  { hora: "09:30", cliente: "Ariel", servicio: "Corte moderno", color: "#3B82F6" },
+];
+
+/**
+ * El calendario del día y el cobro que entra a la caja, dibujados con CSS: mismo
+ * criterio que el resto de la portada, ni una sola imagen.
+ */
+function TurnosMuestra() {
+  return (
+    <div className="mt-10 flex max-w-[380px] animate-subir flex-col [animation-delay:60ms]">
+      {/* el turno en el calendario */}
+      <div className="w-[min(280px,80vw)] self-start overflow-hidden rounded-[22px] border border-linea bg-white shadow-alta">
+        <div className="flex items-center justify-between border-b border-linea-fina bg-papel-suave px-3.5 py-2">
+          <span className="text-[0.78rem] font-semibold tracking-titular">Lunes 28</span>
+          <span className="font-mono text-[0.58rem] uppercase tracking-wide text-tinta-suave">Día</span>
+        </div>
+
+        <div className="flex flex-col gap-2 p-3">
+          {TURNOS_MUESTRA.map((t) => (
+            <div
+              key={t.cliente}
+              className="rounded-lg border-l-4 bg-papel-suave px-2.5 py-2"
+              style={{ borderLeftColor: t.color }}
+            >
+              <p className="cifra text-[0.68rem] font-semibold text-tinta-media">{t.hora}</p>
+              <p className="text-[0.8rem] font-medium leading-tight">{t.cliente}</p>
+              <p className="text-[0.68rem] text-tinta-suave">{t.servicio}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* el hilo entre las dos cosas */}
+      <div className="ml-[130px] h-[26px] w-px bg-gradient-to-b from-linea to-transparent" />
+      <p className="mb-0.5 ml-[92px] mt-1.5 font-mono text-[0.6rem] uppercase tracking-[0.12em] text-tinta-suave">
+        Y al cobrar, esto entra en caja
+      </p>
+
+      {/* el cobro de la cita */}
+      <div className="w-[min(256px,76vw)] overflow-hidden rounded-xl border border-linea bg-white shadow-media">
+        <div className="flex items-center gap-1.5 bg-exito px-2.5 py-1.5 text-[0.64rem] font-semibold text-white">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M20 6 9 17l-5-5" />
+          </svg>
+          Cobrada en caja
+        </div>
+        <div className="p-2.5 text-[0.72rem] leading-relaxed text-tinta-media">
+          <div className="flex justify-between font-semibold text-tinta">
+            <span>Ariel · Corte moderno</span>
+            <span className="cifra">Gs. 40.000</span>
+          </div>
+          <div className="mt-1.5 flex justify-between border-t border-linea-fina pt-1.5">
+            <span>Comisión Estanislao (40%)</span>
+            <span className="cifra">Gs. 16.000</span>
+          </div>
+          <div className="mt-1.5 border-t border-linea-fina pt-1.5">
+            <div className="flex justify-between">
+              <span>Transferencia</span>
+              <span className="cifra font-semibold text-tinta">Gs. 40.000</span>
+            </div>
+            <p className="cifra mt-1 text-[0.66rem] text-exito">✓ Factura N° 001-002-0000047</p>
           </div>
         </div>
       </div>

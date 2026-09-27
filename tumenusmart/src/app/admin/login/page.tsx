@@ -67,94 +67,96 @@ export default async function AdminLoginPage({
 
   return (
     <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center px-4 py-10">
-      <h1 className="mb-1 flex items-center gap-2.5 text-[1.4rem] font-semibold tracking-titular text-tinta">
+      <h1 className="mb-5 flex items-center gap-2.5 text-[1.4rem] font-semibold tracking-titular text-tinta">
         <Logo tam={30} color="#D2501F" />
         TuMenuSmart
       </h1>
 
-      {primerArranque ? (
-        <>
-          <p className="mb-6 text-sm text-tinta-media">
-            Primer ingreso: creá tu cuenta de administrador.
-          </p>
-
-          {aviso && (
-            <p className="mb-4 rounded-lg bg-peligro-luz px-3 py-2 text-sm text-peligro">{aviso}</p>
-          )}
-
-          <form action={crearPrimerUsuario} className="flex flex-col gap-3">
-            <label className="flex flex-col gap-1 text-sm text-tinta-media">
-              Contraseña actual del sistema
-              <CampoContrasena name="passwordSistema" required autoFocus className={CAMPO} />
-            </label>
-
-            <hr className="my-1 border-linea" />
-
-            <label className="flex flex-col gap-1 text-sm text-tinta-media">
-              Tu nombre
-              <input type="text" name="nombre" placeholder="Ariel" className={CAMPO} />
-            </label>
-
-            <label className="flex flex-col gap-1 text-sm text-tinta-media">
-              Tu correo
-              <input
-                type="email"
-                name="email"
-                required
-                autoComplete="username"
-                placeholder="vos@ejemplo.com"
-                className={CAMPO}
-              />
-            </label>
-
-            <label className="flex flex-col gap-1 text-sm text-tinta-media">
-              Contraseña nueva
-              <CampoContrasena
-                name="passwordNueva"
-                required
-                autoComplete="new-password"
-                className={CAMPO}
-              />
-            </label>
-
-            <label className="flex flex-col gap-1 text-sm text-tinta-media">
-              Repetila
-              <CampoContrasena
-                name="passwordRepetida"
-                required
-                autoComplete="new-password"
-                className={CAMPO}
-              />
-            </label>
-
-            <p className="text-xs text-tinta-suave">
-              Al menos 8 caracteres, con letras y números. Desde acá vas a poder crear los
-              usuarios de cada local.
+      <div className="rounded-2xl border border-linea bg-superficie p-6 shadow-sm">
+        {primerArranque ? (
+          <>
+            <p className="mb-6 text-sm text-tinta-media">
+              Primer ingreso: creá tu cuenta de administrador.
             </p>
 
-            <button
-              type="submit"
-              className={`mt-1 ${clasesBoton("principal")}`}
-            >
-              Crear mi cuenta y entrar
-            </button>
-          </form>
-        </>
-      ) : (
-        <>
-          <p className="mb-6 text-sm text-tinta-media">Panel de administración</p>
+            {aviso && (
+              <p className="mb-4 rounded-lg bg-peligro-luz px-3 py-2 text-sm text-peligro">{aviso}</p>
+            )}
 
-          {aviso && (
-            <p className="mb-4 rounded-lg bg-peligro-luz px-3 py-2 text-sm text-peligro">{aviso}</p>
-          )}
+            <form action={crearPrimerUsuario} className="flex flex-col gap-3">
+              <label className="flex flex-col gap-1 text-sm text-tinta-media">
+                Contraseña actual del sistema
+                <CampoContrasena name="passwordSistema" required autoFocus className={CAMPO} />
+              </label>
 
-          <FormularioIngreso />
+              <hr className="my-1 border-linea" />
 
-          <p className="mt-6 text-xs text-tinta-suave">
-            ¿Olvidaste tu contraseña? Pedile al administrador que te la restablezca.
-          </p>
-        </>
-      )}
+              <label className="flex flex-col gap-1 text-sm text-tinta-media">
+                Tu nombre
+                <input type="text" name="nombre" placeholder="Ariel" className={CAMPO} />
+              </label>
+
+              <label className="flex flex-col gap-1 text-sm text-tinta-media">
+                Tu correo
+                <input
+                  type="email"
+                  name="email"
+                  required
+                  autoComplete="username"
+                  placeholder="vos@ejemplo.com"
+                  className={CAMPO}
+                />
+              </label>
+
+              <label className="flex flex-col gap-1 text-sm text-tinta-media">
+                Contraseña nueva
+                <CampoContrasena
+                  name="passwordNueva"
+                  required
+                  autoComplete="new-password"
+                  className={CAMPO}
+                />
+              </label>
+
+              <label className="flex flex-col gap-1 text-sm text-tinta-media">
+                Repetila
+                <CampoContrasena
+                  name="passwordRepetida"
+                  required
+                  autoComplete="new-password"
+                  className={CAMPO}
+                />
+              </label>
+
+              <p className="text-xs text-tinta-suave">
+                Al menos 8 caracteres, con letras y números. Desde acá vas a poder crear los
+                usuarios de cada local.
+              </p>
+
+              <button
+                type="submit"
+                className={`mt-1 ${clasesBoton("principal")}`}
+              >
+                Crear mi cuenta y entrar
+              </button>
+            </form>
+          </>
+        ) : (
+          <>
+            <p className="mb-6 text-sm text-tinta-media">Panel de administración</p>
+
+            {aviso && (
+              <p className="mb-4 rounded-lg bg-peligro-luz px-3 py-2 text-sm text-peligro">{aviso}</p>
+            )}
+
+            <FormularioIngreso />
+
+            <p className="mt-6 text-xs text-tinta-suave">
+              ¿Olvidaste tu contraseña? Pedile al administrador que te la restablezca.
+            </p>
+          </>
+        )}
+      </div>
     </main>
   );
 }
