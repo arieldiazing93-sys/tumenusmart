@@ -133,6 +133,8 @@ type DatosServicio = {
   precio: number;
   iva: string;
   color: string;
+  /** Ya subida aparte (subirFotoProducto, con su propia validación de formato y tamaño); acá solo se guarda la URL. */
+  imagenUrl: string | null;
 };
 
 /**
@@ -197,6 +199,7 @@ async function leerDatosServicio(
       precio,
       iva: normalizarIva(formData.get("iva")),
       color: normalizarColor(formData.get("color")),
+      imagenUrl: String(formData.get("imagenUrl") ?? "") || null,
     },
   };
 }
@@ -220,6 +223,7 @@ export async function crearServicio(formData: FormData): Promise<ResultadoServic
       nombre: d.nombre,
       precio: d.precio,
       iva: d.iva,
+      imagenUrl: d.imagenUrl,
       unidadMedida: "unidad",
       esServicio: true,
       disponible: true,
@@ -272,7 +276,14 @@ export async function actualizarServicio(servicioId: string, formData: FormData)
   await prisma.$transaction([
     prisma.product.update({
       where: { id: anterior.productId },
-      data: { nombre: d.nombre, categoryId: d.categoryId, precio: d.precio, iva: d.iva, disponible: activo },
+      data: {
+        nombre: d.nombre,
+        categoryId: d.categoryId,
+        precio: d.precio,
+        iva: d.iva,
+        imagenUrl: d.imagenUrl,
+        disponible: activo,
+      },
     }),
     prisma.servicioAgenda.update({
       where: { id: anterior.id },

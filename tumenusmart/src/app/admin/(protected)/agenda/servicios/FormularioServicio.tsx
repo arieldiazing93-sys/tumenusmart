@@ -17,6 +17,7 @@ import {
   type PersonalOpcion,
   type ServicioFila,
 } from "@/lib/servicios-agenda";
+import { ImagenProductoField } from "../../productos/ImagenProductoField";
 import { AvatarPersonal } from "../AvatarPersonal";
 import { actualizarServicio, crearServicio } from "./actions";
 
@@ -115,6 +116,12 @@ export function FormularioServicio({
               ))}
             </Selector>
           </Campo>
+
+          <ImagenProductoField
+            initialUrl={servicio?.imagenUrl ?? null}
+            etiqueta="Foto del servicio (opcional)"
+            ayuda="Un ejemplo del corte, la barba o el diseño terminado, para que el cliente sepa qué está reservando. Se muestra cuadrada."
+          />
 
           <div>
             <span className="mb-1.5 block text-[0.82rem] font-semibold text-tinta">Quién lo realiza *</span>

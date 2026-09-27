@@ -26,6 +26,8 @@ export type ServicioFila = {
   bufferMin: number;
   tipoPrecio: TipoPrecio;
   color: string;
+  /** Una foto de referencia (el corte, la barba, el diseño…), en formato cuadrado. */
+  imagenUrl: string | null;
   /** Ids de los miembros del personal que lo realizan. */
   personalIds: string[];
 };

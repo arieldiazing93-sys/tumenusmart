@@ -64,7 +64,12 @@ export async function cargarServiciosReservables(
       bufferMin: true,
       tipoPrecio: true,
       product: {
-        select: { nombre: true, precio: true, category: { select: { id: true, nombre: true, orden: true } } },
+        select: {
+          nombre: true,
+          precio: true,
+          imagenUrl: true,
+          category: { select: { id: true, nombre: true, orden: true } },
+        },
       },
       personal: { select: { personalId: true, personal: { select: { activo: true } } } },
     },
@@ -78,6 +83,7 @@ export async function cargarServiciosReservables(
       bufferMin: f.bufferMin,
       precio: Number(f.product.precio),
       tipoPrecio: normalizarTipoPrecio(f.tipoPrecio),
+      imagenUrl: f.product.imagenUrl,
       personalIds: f.personal.filter((p) => p.personal.activo).map((p) => p.personalId),
       categoryId: f.product.category.id,
       categoriaNombre: f.product.category.nombre,

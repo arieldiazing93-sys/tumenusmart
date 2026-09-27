@@ -26,6 +26,8 @@ export type ServicioPublico = {
   bufferMin: number;
   precio: number;
   tipoPrecio: TipoPrecio;
+  /** Una foto de referencia (el corte, la barba, el diseño…), en formato cuadrado. */
+  imagenUrl: string | null;
   /** Quiénes lo realizan (solo personal activo). */
   personalIds: string[];
 };

@@ -339,11 +339,20 @@ export function GestorServicios({
                           <Tr key={s.id}>
                             <Td>
                               <div className="flex items-center gap-2.5">
-                                <span
-                                  aria-hidden="true"
-                                  className="h-3 w-3 flex-none rounded-full"
-                                  style={{ backgroundColor: s.color }}
-                                />
+                                {s.imagenUrl ? (
+                                  // eslint-disable-next-line @next/next/no-img-element
+                                  <img
+                                    src={s.imagenUrl}
+                                    alt=""
+                                    className="h-9 w-9 flex-none rounded-md border border-linea object-cover"
+                                  />
+                                ) : (
+                                  <span
+                                    aria-hidden="true"
+                                    className="h-3 w-3 flex-none rounded-full"
+                                    style={{ backgroundColor: s.color }}
+                                  />
+                                )}
                                 <div className="min-w-0">
                                   <p className="flex flex-wrap items-center gap-2 font-semibold text-tinta">
                                     {s.nombre}
@@ -389,11 +398,20 @@ export function GestorServicios({
                     {delaCategoria.map((s) => (
                       <li key={s.id} className="rounded-xl border border-linea bg-superficie p-3">
                         <div className="flex items-start gap-2.5">
-                          <span
-                            aria-hidden="true"
-                            className="mt-1.5 h-3 w-3 flex-none rounded-full"
-                            style={{ backgroundColor: s.color }}
-                          />
+                          {s.imagenUrl ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              src={s.imagenUrl}
+                              alt=""
+                              className="h-10 w-10 flex-none rounded-md border border-linea object-cover"
+                            />
+                          ) : (
+                            <span
+                              aria-hidden="true"
+                              className="mt-1.5 h-3 w-3 flex-none rounded-full"
+                              style={{ backgroundColor: s.color }}
+                            />
+                          )}
                           <div className="min-w-0 flex-1">
                             <p className="flex flex-wrap items-center gap-2 text-[0.95rem] font-semibold text-tinta">
                               {s.nombre}

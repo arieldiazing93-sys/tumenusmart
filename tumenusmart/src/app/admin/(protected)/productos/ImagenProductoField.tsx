@@ -4,7 +4,16 @@ import { useRef, useState } from "react";
 import { subirFotoProducto } from "./actions";
 import { comprimirImagen, pesoLegible, PARA_PRODUCTO } from "@/lib/comprimir-imagen";
 
-export function ImagenProductoField({ initialUrl }: { initialUrl: string | null }) {
+export function ImagenProductoField({
+  initialUrl,
+  etiqueta = "Foto del producto",
+  ayuda,
+}: {
+  initialUrl: string | null;
+  etiqueta?: string;
+  /** Una línea de ayuda debajo del campo, si hace falta explicar para qué sirve acá. */
+  ayuda?: string;
+}) {
   const [url, setUrl] = useState(initialUrl ?? "");
   const [subiendo, setSubiendo] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -48,15 +57,14 @@ export function ImagenProductoField({ initialUrl }: { initialUrl: string | null 
 
   return (
     <div>
-      <label className="mb-1 block text-sm font-semibold text-tinta">
-        Foto del producto
-      </label>
+      <label className="mb-1 block text-sm font-semibold text-tinta">{etiqueta}</label>
+      {ayuda && <p className="mb-1.5 text-xs leading-snug text-tinta-media">{ayuda}</p>}
 
       <div className="flex items-center gap-3">
         <div className="flex h-20 w-20 flex-none items-center justify-center overflow-hidden rounded-lg border border-linea bg-papel-suave">
           {url ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={url} alt="Foto del producto" className="h-full w-full object-cover" />
+            <img src={url} alt={etiqueta} className="h-full w-full object-cover" />
           ) : (
             <span className="text-xs text-tinta-suave">Sin foto</span>
           )}

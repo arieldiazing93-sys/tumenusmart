@@ -47,6 +47,7 @@ export default async function ReservarPage({ params }: { params: Promise<{ slug:
       bufferMin: s.bufferMin,
       precio: s.precio,
       tipoPrecio: s.tipoPrecio,
+      imagenUrl: s.imagenUrl,
       personalIds: s.personalIds,
     });
   }

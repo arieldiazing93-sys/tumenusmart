@@ -133,6 +133,14 @@ export function PasoServicios({
                           marcado ? "bg-brand/10" : "hover:bg-papel-suave"
                         }`}
                       >
+                        {s.imagenUrl && (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={s.imagenUrl}
+                            alt=""
+                            className="h-12 w-12 flex-none rounded-lg border border-linea object-cover"
+                          />
+                        )}
                         <span className="min-w-0 flex-1">
                           <span className="block text-[0.95rem] font-medium text-tinta">{s.nombre}</span>
                           <span className="block text-[0.8rem] text-tinta-suave">{textoDuracion(s.duracionMin)}</span>
