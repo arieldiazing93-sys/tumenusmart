@@ -180,13 +180,13 @@ export function ListaPersonal({ miembros, horarioGeneral }: { miembros: MiembroF
                   )}
                 </div>
                 <div className="flex flex-none flex-col gap-1.5">
-                  <Link href={`/admin/agenda/citas?personal=${m.id}`} className={clasesBoton("navegar", "sm")}>
+                  <Link href={`/admin/agenda/citas?personal=${m.id}`} className={clasesBoton("navegar", "md")}>
                     Ver trabajo
                   </Link>
                   <button
                     type="button"
                     onClick={() => setPanel({ modo: "ver", id: m.id })}
-                    className={clasesBoton("suave", "sm")}
+                    className={clasesBoton("suave", "md")}
                   >
                     Ver
                   </button>

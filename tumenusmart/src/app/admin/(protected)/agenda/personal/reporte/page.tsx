@@ -159,113 +159,208 @@ export default async function ReportePersonalPage({
               {/* ---------- por persona (solo cuando se mira a todo el personal) ---------- */}
               {!personalElegido && (
                 <div className="mb-4">
-                  <Tabla>
-                    <thead>
-                      <tr>
-                        <Th>Personal</Th>
-                        <Th className="text-right">Trabajos</Th>
-                        <Th className="text-right">Cobrado</Th>
-                        <Th className="text-right">Comisión</Th>
-                        <Th className="text-right">
-                          <span className="sr-only">Acción</span>
-                        </Th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {personas
-                        .filter((p) => p.activo || porPersona.has(p.id))
-                        .map((p) => {
-                          const suma = porPersona.get(p.id) ?? { cantidad: 0, cobrado: 0, comision: 0 };
-                          return (
-                            <Tr key={p.id}>
-                              <Td>
-                                <span className="flex items-center gap-2.5">
-                                  <AvatarPersonal nombre={p.nombre} fotoUrl={p.fotoUrl} indice={p.indice} />
-                                  <span className="min-w-0">
-                                    <span className="block truncate font-medium text-tinta">{p.nombre}</span>
-                                    <span className="block text-[0.72rem] text-tinta-suave">
-                                      {p.comision != null ? `Comisión ${textoPorcentaje(p.comision)}%` : "Sin comisión"}
+                  {/* Pantalla ancha: tabla. */}
+                  <div className="hidden md:block">
+                    <Tabla>
+                      <thead>
+                        <tr>
+                          <Th>Personal</Th>
+                          <Th className="text-right">Trabajos</Th>
+                          <Th className="text-right">Cobrado</Th>
+                          <Th className="text-right">Comisión</Th>
+                          <Th className="text-right">
+                            <span className="sr-only">Acción</span>
+                          </Th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {personas
+                          .filter((p) => p.activo || porPersona.has(p.id))
+                          .map((p) => {
+                            const suma = porPersona.get(p.id) ?? { cantidad: 0, cobrado: 0, comision: 0 };
+                            return (
+                              <Tr key={p.id}>
+                                <Td>
+                                  <span className="flex items-center gap-2.5">
+                                    <AvatarPersonal nombre={p.nombre} fotoUrl={p.fotoUrl} indice={p.indice} />
+                                    <span className="min-w-0">
+                                      <span className="block truncate font-medium text-tinta">{p.nombre}</span>
+                                      <span className="block text-[0.72rem] text-tinta-suave">
+                                        {p.comision != null ? `Comisión ${textoPorcentaje(p.comision)}%` : "Sin comisión"}
+                                      </span>
                                     </span>
                                   </span>
-                                </span>
-                              </Td>
-                              <Td className="cifra text-right">{suma.cantidad}</Td>
-                              <Td className="cifra text-right">{formatearGuarani(suma.cobrado)}</Td>
-                              <Td className="cifra text-right font-medium text-exito">{formatearGuarani(suma.comision)}</Td>
-                              <Td className="text-right">
-                                {suma.cantidad > 0 && (
-                                  <BotonEnlace href={urlDe(p.id)} tono="navegar" tam="sm">
-                                    Ver su trabajo
-                                  </BotonEnlace>
-                                )}
-                              </Td>
-                            </Tr>
-                          );
-                        })}
-                    </tbody>
-                    <tfoot>
-                      <tr>
-                        <Td className="text-right font-medium">Total</Td>
-                        <Td className="cifra text-right font-semibold text-tinta">{general.cantidad}</Td>
-                        <Td className="cifra text-right font-semibold text-tinta">{formatearGuarani(general.cobrado)}</Td>
-                        <Td className="cifra text-right font-semibold text-exito">{formatearGuarani(general.comision)}</Td>
-                        <Td>{null}</Td>
-                      </tr>
-                    </tfoot>
-                  </Tabla>
+                                </Td>
+                                <Td className="cifra text-right">{suma.cantidad}</Td>
+                                <Td className="cifra text-right">{formatearGuarani(suma.cobrado)}</Td>
+                                <Td className="cifra text-right font-medium text-exito">{formatearGuarani(suma.comision)}</Td>
+                                <Td className="text-right">
+                                  {suma.cantidad > 0 && (
+                                    <BotonEnlace href={urlDe(p.id)} tono="navegar" tam="sm">
+                                      Ver su trabajo
+                                    </BotonEnlace>
+                                  )}
+                                </Td>
+                              </Tr>
+                            );
+                          })}
+                      </tbody>
+                      <tfoot>
+                        <tr>
+                          <Td className="text-right font-medium">Total</Td>
+                          <Td className="cifra text-right font-semibold text-tinta">{general.cantidad}</Td>
+                          <Td className="cifra text-right font-semibold text-tinta">{formatearGuarani(general.cobrado)}</Td>
+                          <Td className="cifra text-right font-semibold text-exito">{formatearGuarani(general.comision)}</Td>
+                          <Td>{null}</Td>
+                        </tr>
+                      </tfoot>
+                    </Tabla>
+                  </div>
+
+                  {/* Celular: una tarjeta por persona. */}
+                  <ul className="flex flex-col gap-2 md:hidden">
+                    {personas
+                      .filter((p) => p.activo || porPersona.has(p.id))
+                      .map((p) => {
+                        const suma = porPersona.get(p.id) ?? { cantidad: 0, cobrado: 0, comision: 0 };
+                        return (
+                          <li key={p.id} className="rounded-xl border border-linea bg-superficie p-3">
+                            <div className="flex items-center gap-2.5">
+                              <AvatarPersonal nombre={p.nombre} fotoUrl={p.fotoUrl} indice={p.indice} />
+                              <div className="min-w-0 flex-1">
+                                <p className="truncate font-medium text-tinta">{p.nombre}</p>
+                                <p className="text-[0.72rem] text-tinta-suave">
+                                  {p.comision != null ? `Comisión ${textoPorcentaje(p.comision)}%` : "Sin comisión"}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="mt-2.5 grid grid-cols-3 gap-2 border-t border-linea-fina pt-2.5 text-center">
+                              <div>
+                                <p className="cifra text-[0.86rem] font-semibold text-tinta">{suma.cantidad}</p>
+                                <p className="text-[0.66rem] text-tinta-suave">Trabajos</p>
+                              </div>
+                              <div>
+                                <p className="cifra text-[0.86rem] font-semibold text-tinta">
+                                  {formatearGuarani(suma.cobrado)}
+                                </p>
+                                <p className="text-[0.66rem] text-tinta-suave">Cobrado</p>
+                              </div>
+                              <div>
+                                <p className="cifra text-[0.86rem] font-semibold text-exito">
+                                  {formatearGuarani(suma.comision)}
+                                </p>
+                                <p className="text-[0.66rem] text-tinta-suave">Comisión</p>
+                              </div>
+                            </div>
+                            {suma.cantidad > 0 && (
+                              <BotonEnlace href={urlDe(p.id)} tono="navegar" tam="md" className="mt-3 w-full">
+                                Ver su trabajo
+                              </BotonEnlace>
+                            )}
+                          </li>
+                        );
+                      })}
+                  </ul>
                 </div>
               )}
 
               {/* ---------- el detalle de cada trabajo ---------- */}
               <p className="mb-1.5 text-[0.82rem] font-semibold text-tinta">Detalle de trabajos</p>
-              <Tabla>
-                <thead>
-                  <tr>
-                    <Th>Fecha y hora</Th>
-                    {!personalElegido && <Th>Personal</Th>}
-                    <Th>Cliente</Th>
-                    <Th>Servicios</Th>
-                    <Th>Pago</Th>
-                    <Th className="text-right">Total</Th>
-                    <Th className="text-right">%</Th>
-                    <Th className="text-right">Comisión</Th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filas.map((f) => (
-                    <Tr key={f.id}>
-                      <Td>
-                        <span className="block font-medium text-tinta">{diaLargo(f.dia)}</span>
-                        <span className="cifra text-[0.78rem] text-tinta-suave">{f.hora}</span>
-                      </Td>
-                      {!personalElegido && <Td>{f.personal}</Td>}
-                      <Td className="font-medium text-tinta">
-                        {f.cliente}
-                        {f.sinReserva && <span className="block text-[0.7rem] font-normal text-tinta-suave">Sin reserva</span>}
-                      </Td>
-                      <Td>{f.servicios ?? "—"}</Td>
-                      <Td>{f.pago}</Td>
-                      <Td className="cifra text-right font-medium text-tinta">{formatearGuarani(f.total)}</Td>
-                      <Td className="cifra text-right">{f.porcentaje != null ? `${textoPorcentaje(f.porcentaje)}%` : "—"}</Td>
-                      <Td className="cifra text-right font-medium text-exito">
-                        {f.porcentaje != null ? formatearGuarani(f.comision) : "—"}
-                      </Td>
-                    </Tr>
-                  ))}
-                </tbody>
-                {!hayMas && (
-                  <tfoot>
+
+              {/* Pantalla ancha: tabla. */}
+              <div className="hidden md:block">
+                <Tabla>
+                  <thead>
                     <tr>
-                      <Td colSpan={columnas - 3} className="text-right font-medium">
-                        Total
-                      </Td>
-                      <Td className="cifra text-right font-semibold text-tinta">{formatearGuarani(general.cobrado)}</Td>
-                      <Td>{null}</Td>
-                      <Td className="cifra text-right font-semibold text-exito">{formatearGuarani(general.comision)}</Td>
+                      <Th>Fecha y hora</Th>
+                      {!personalElegido && <Th>Personal</Th>}
+                      <Th>Cliente</Th>
+                      <Th>Servicios</Th>
+                      <Th>Pago</Th>
+                      <Th className="text-right">Total</Th>
+                      <Th className="text-right">%</Th>
+                      <Th className="text-right">Comisión</Th>
                     </tr>
-                  </tfoot>
-                )}
-              </Tabla>
+                  </thead>
+                  <tbody>
+                    {filas.map((f) => (
+                      <Tr key={f.id}>
+                        <Td>
+                          <span className="block font-medium text-tinta">{diaLargo(f.dia)}</span>
+                          <span className="cifra text-[0.78rem] text-tinta-suave">{f.hora}</span>
+                        </Td>
+                        {!personalElegido && <Td>{f.personal}</Td>}
+                        <Td className="font-medium text-tinta">
+                          {f.cliente}
+                          {f.sinReserva && (
+                            <span className="block text-[0.7rem] font-normal text-tinta-suave">Sin reserva</span>
+                          )}
+                        </Td>
+                        <Td>{f.servicios ?? "—"}</Td>
+                        <Td>{f.pago}</Td>
+                        <Td className="cifra text-right font-medium text-tinta">{formatearGuarani(f.total)}</Td>
+                        <Td className="cifra text-right">
+                          {f.porcentaje != null ? `${textoPorcentaje(f.porcentaje)}%` : "—"}
+                        </Td>
+                        <Td className="cifra text-right font-medium text-exito">
+                          {f.porcentaje != null ? formatearGuarani(f.comision) : "—"}
+                        </Td>
+                      </Tr>
+                    ))}
+                  </tbody>
+                  {!hayMas && (
+                    <tfoot>
+                      <tr>
+                        <Td colSpan={columnas - 3} className="text-right font-medium">
+                          Total
+                        </Td>
+                        <Td className="cifra text-right font-semibold text-tinta">{formatearGuarani(general.cobrado)}</Td>
+                        <Td>{null}</Td>
+                        <Td className="cifra text-right font-semibold text-exito">{formatearGuarani(general.comision)}</Td>
+                      </tr>
+                    </tfoot>
+                  )}
+                </Tabla>
+              </div>
+
+              {/* Celular: una tarjeta por trabajo. */}
+              <ul className="flex flex-col gap-2 md:hidden">
+                {filas.map((f) => (
+                  <li key={f.id} className="rounded-xl border border-linea bg-superficie p-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="font-medium text-tinta">{diaLargo(f.dia)}</p>
+                        <p className="cifra text-[0.78rem] text-tinta-suave">{f.hora}</p>
+                      </div>
+                      {!personalElegido && (
+                        <p className="min-w-0 truncate text-[0.78rem] text-tinta-suave">{f.personal}</p>
+                      )}
+                    </div>
+
+                    <p className="mt-2 truncate text-[0.95rem] font-semibold text-tinta">
+                      {f.cliente}
+                      {f.sinReserva && (
+                        <span className="ml-1.5 text-[0.72rem] font-normal text-tinta-suave">(Sin reserva)</span>
+                      )}
+                    </p>
+                    <p className="truncate text-[0.82rem] text-tinta-media">{f.servicios ?? "—"}</p>
+                    <p className="text-[0.78rem] text-tinta-suave">{f.pago}</p>
+
+                    <div className="mt-2.5 flex items-center justify-between border-t border-linea-fina pt-2.5 text-[0.82rem]">
+                      <span className="text-tinta-media">
+                        {f.porcentaje != null ? `${textoPorcentaje(f.porcentaje)}%` : "—"}
+                      </span>
+                      <span className="cifra font-semibold text-tinta">{formatearGuarani(f.total)}</span>
+                    </div>
+                    <div className="mt-1 flex items-center justify-between text-[0.82rem]">
+                      <span className="text-tinta-suave">Comisión</span>
+                      <span className="cifra font-semibold text-exito">
+                        {f.porcentaje != null ? formatearGuarani(f.comision) : "—"}
+                      </span>
+                    </div>
+                  </li>
+                ))}
+              </ul>
 
               {hayMas && (
                 <p className="mt-3 text-center text-[0.8rem] text-tinta-suave">

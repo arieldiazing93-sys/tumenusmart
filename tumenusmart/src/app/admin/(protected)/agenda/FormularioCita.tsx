@@ -548,7 +548,7 @@ export function FormularioCita({
             <p className="mt-0.5 text-[0.76rem] leading-snug text-tinta-media">
               El cliente ya pagó: el cobro no cambia, solo se mueve el turno.
             </p>
-            <div className="mt-2.5 grid grid-cols-2 gap-2">
+            <div className="mt-2.5 grid grid-cols-1 gap-2 sm:grid-cols-2">
               <label className="block min-w-0">
                 <span className="mb-1 block text-[0.74rem] font-medium text-tinta-suave">Día</span>
                 <Entrada
@@ -621,7 +621,7 @@ export function FormularioCita({
                     onClick={copiarCodigo}
                     aria-label="Copiar el código de la cita"
                     title="Copiar"
-                    className="flex h-6 w-6 items-center justify-center rounded text-tinta-suave transition-colors hover:bg-papel-hundido hover:text-tinta"
+                    className="flex h-8 w-8 items-center justify-center rounded text-tinta-suave transition-colors hover:bg-papel-hundido hover:text-tinta"
                   >
                     {copiado ? (
                       <span className="text-[0.7rem] font-semibold text-exito">✓</span>

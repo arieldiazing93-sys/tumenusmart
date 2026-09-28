@@ -121,7 +121,7 @@ export function ServiciosCita({
                     onClick={() => quitar(l.clave)}
                     aria-label={`Quitar ${l.nombre}`}
                     title="Quitar servicio"
-                    className="flex h-9 w-9 flex-none items-center justify-center rounded-lg text-tinta-suave transition-colors hover:bg-peligro-luz hover:text-peligro"
+                    className="flex h-10 w-10 flex-none items-center justify-center rounded-lg text-tinta-suave transition-colors hover:bg-peligro-luz hover:text-peligro"
                   >
                     <svg
                       viewBox="0 0 24 24"

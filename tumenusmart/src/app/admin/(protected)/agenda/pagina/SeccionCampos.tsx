@@ -51,8 +51,12 @@ export function SeccionCampos({ datos, cambiar }: PropsSeccion) {
         {campos.map((c) => {
           const bloqueado = c.tipo === "fijo";
           return (
-            <li key={c.clave} className="flex items-center gap-3 py-3">
-              <label className={`flex min-w-0 flex-1 items-center gap-3 ${bloqueado ? "" : "cursor-pointer"}`}>
+            <li key={c.clave} className="flex flex-wrap items-center gap-3 py-3">
+              <label
+                className={`flex min-w-0 basis-full items-center gap-3 sm:basis-auto sm:flex-1 ${
+                  bloqueado ? "" : "cursor-pointer"
+                }`}
+              >
                 <input
                   type="checkbox"
                   checked={c.activo}

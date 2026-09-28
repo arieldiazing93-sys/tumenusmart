@@ -27,6 +27,9 @@ export function Interruptor({
   tono?: keyof typeof FONDOS;
   deshabilitado?: boolean;
 }) {
+  // El botón mide 40px de alto (buen tamaño para el dedo) aunque el dibujo del interruptor
+  // siga siendo el mismo de siempre: el track chico queda centrado adentro de un área
+  // tocable más grande, sin cambiar cómo se ve en ningún lado que ya lo usa.
   return (
     <button
       type="button"
@@ -35,16 +38,20 @@ export function Interruptor({
       aria-label={etiqueta}
       disabled={deshabilitado}
       onClick={() => onChange(!activo)}
-      className={`relative inline-flex h-6 w-11 flex-none items-center rounded-full transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-45 ${
-        activo ? FONDOS[tono] : "bg-tinta-suave/35"
-      }`}
+      className="inline-flex h-10 w-11 flex-none items-center justify-center disabled:cursor-not-allowed disabled:opacity-45"
     >
       <span
         aria-hidden="true"
-        className={`inline-block h-5 w-5 rounded-full bg-white shadow transition-transform duration-150 ${
-          activo ? "translate-x-[1.375rem]" : "translate-x-0.5"
+        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-150 ${
+          activo ? FONDOS[tono] : "bg-tinta-suave/35"
         }`}
-      />
+      >
+        <span
+          className={`inline-block h-5 w-5 rounded-full bg-white shadow transition-transform duration-150 ${
+            activo ? "translate-x-[1.375rem]" : "translate-x-0.5"
+          }`}
+        />
+      </span>
     </button>
   );
 }

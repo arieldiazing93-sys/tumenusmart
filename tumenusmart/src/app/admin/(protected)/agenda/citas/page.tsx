@@ -244,7 +244,7 @@ export default async function CitasPage({
         <form
           method="get"
           action="/admin/agenda/citas"
-          className={`flex items-center gap-1.5 rounded-lg border px-1.5 py-1 ${
+          className={`flex flex-wrap items-center gap-1.5 rounded-lg border px-2 py-1.5 ${
             enRango ? "border-azul/40 bg-azul-luz/40" : "border-linea"
           }`}
         >
@@ -255,7 +255,7 @@ export default async function CitasPage({
             aria-label="Desde"
             defaultValue={enRango ? periodo.desde : ""}
             required
-            className="h-7 rounded-md border border-linea px-1.5 text-xs"
+            className="h-10 rounded-md border border-linea px-2 text-[0.82rem] sm:h-9"
           />
           <span className="text-tinta-suave">–</span>
           <input
@@ -264,9 +264,12 @@ export default async function CitasPage({
             aria-label="Hasta"
             defaultValue={enRango ? periodo.hasta : ""}
             required
-            className="h-7 rounded-md border border-linea px-1.5 text-xs"
+            className="h-10 rounded-md border border-linea px-2 text-[0.82rem] sm:h-9"
           />
-          <button type="submit" className="h-7 rounded-md bg-noche-panel px-3 text-xs font-medium text-white">
+          <button
+            type="submit"
+            className="h-10 flex-none rounded-md bg-noche-panel px-3.5 text-[0.82rem] font-medium text-white sm:h-9"
+          >
             Filtrar
           </button>
         </form>
@@ -364,84 +367,153 @@ export default async function CitasPage({
           }
         />
       ) : (
-        <Tabla>
-          <thead>
-            <tr>
-              <Th>Fecha y hora</Th>
-              <Th>Cliente</Th>
-              <Th>Servicios</Th>
-              {!personalElegido && <Th>Personal</Th>}
-              <Th>Pago</Th>
-              <Th>Comprobante</Th>
-              <Th>Estado</Th>
-              <Th className="text-right">Total</Th>
-              <Th className="text-right">
-                <span className="sr-only">Acción</span>
-              </Th>
-            </tr>
-          </thead>
-          <tbody>
+        <>
+          {/* Pantalla ancha: tabla. */}
+          <div className="hidden md:block">
+            <Tabla>
+              <thead>
+                <tr>
+                  <Th>Fecha y hora</Th>
+                  <Th>Cliente</Th>
+                  <Th>Servicios</Th>
+                  {!personalElegido && <Th>Personal</Th>}
+                  <Th>Pago</Th>
+                  <Th>Comprobante</Th>
+                  <Th>Estado</Th>
+                  <Th className="text-right">Total</Th>
+                  <Th className="text-right">
+                    <span className="sr-only">Acción</span>
+                  </Th>
+                </tr>
+              </thead>
+              <tbody>
+                {citas.map((c) => {
+                  const { dia, minutos } = partesLocales(c.inicio);
+                  const venta = c.ventaPos;
+                  return (
+                    <Tr key={c.id}>
+                      <Td>
+                        <span className="block font-medium text-tinta">{diaLargo(dia)}</span>
+                        <span className="cifra text-[0.78rem] text-tinta-suave">{horaDeMinutos(minutos)}</span>
+                      </Td>
+                      <Td className="font-medium text-tinta">{c.clienteNombre}</Td>
+                      <Td>{c.serviciosTexto ?? "—"}</Td>
+                      {!personalElegido && <Td>{nombreCompleto(c.personal)}</Td>}
+                      <Td>
+                        {venta
+                          ? detallePagos(venta.pagos.map((p) => ({ forma: p.forma, monto: Number(p.monto) })))
+                          : "—"}
+                      </Td>
+                      <Td>
+                        {venta?.comprobanteTipo === "factura" && venta.facturaNumero ? (
+                          <>
+                            <span className="cifra text-[0.8rem]">{venta.facturaNumero}</span>
+                            {venta.facturaAnulada && (
+                              <span className="block text-[0.7rem] font-medium uppercase text-peligro">Anulada</span>
+                            )}
+                          </>
+                        ) : (
+                          <>
+                            Ticket
+                            {venta && (
+                              <span className="block text-[0.7rem] text-tinta-suave">
+                                {formatearNumero(venta.numero)}
+                              </span>
+                            )}
+                          </>
+                        )}
+                      </Td>
+                      <Td>
+                        <Pastilla color="exito" punto>
+                          Confirmada
+                        </Pastilla>
+                      </Td>
+                      <Td className="cifra text-right font-medium text-tinta">
+                        {formatearGuarani(montoDelTrabajo(c.precio, venta?.total))}
+                      </Td>
+                      <Td className="text-right">
+                        <BotonEnlace
+                          href={urlCita({ vista: "dia", fecha: dia, personal: null, ocultar: [] }, c.id)}
+                          tono="navegar"
+                          tam="sm"
+                        >
+                          Ver
+                        </BotonEnlace>
+                      </Td>
+                    </Tr>
+                  );
+                })}
+              </tbody>
+              <tfoot>
+                <tr>
+                  <Td colSpan={columnas - 2} className="text-right font-medium">
+                    Total cobrado
+                  </Td>
+                  <Td className="cifra text-right font-semibold text-tinta">{formatearGuarani(cobrado)}</Td>
+                  <Td>{null}</Td>
+                </tr>
+              </tfoot>
+            </Tabla>
+          </div>
+
+          {/* Celular: una tarjeta por cita. */}
+          <ul className="flex flex-col gap-2 md:hidden">
             {citas.map((c) => {
               const { dia, minutos } = partesLocales(c.inicio);
               const venta = c.ventaPos;
               return (
-                <Tr key={c.id}>
-                  <Td>
-                    <span className="block font-medium text-tinta">{diaLargo(dia)}</span>
-                    <span className="cifra text-[0.78rem] text-tinta-suave">{horaDeMinutos(minutos)}</span>
-                  </Td>
-                  <Td className="font-medium text-tinta">{c.clienteNombre}</Td>
-                  <Td>{c.serviciosTexto ?? "—"}</Td>
-                  {!personalElegido && <Td>{nombreCompleto(c.personal)}</Td>}
-                  <Td>
-                    {venta ? detallePagos(venta.pagos.map((p) => ({ forma: p.forma, monto: Number(p.monto) }))) : "—"}
-                  </Td>
-                  <Td>
-                    {venta?.comprobanteTipo === "factura" && venta.facturaNumero ? (
-                      <>
-                        <span className="cifra text-[0.8rem]">{venta.facturaNumero}</span>
-                        {venta.facturaAnulada && (
-                          <span className="block text-[0.7rem] font-medium uppercase text-peligro">Anulada</span>
-                        )}
-                      </>
-                    ) : (
-                      <>
-                        Ticket
-                        {venta && <span className="block text-[0.7rem] text-tinta-suave">{formatearNumero(venta.numero)}</span>}
-                      </>
-                    )}
-                  </Td>
-                  <Td>
+                <li key={c.id} className="rounded-xl border border-linea bg-superficie p-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="font-medium text-tinta">{diaLargo(dia)}</p>
+                      <p className="cifra text-[0.78rem] text-tinta-suave">{horaDeMinutos(minutos)}</p>
+                    </div>
                     <Pastilla color="exito" punto>
                       Confirmada
                     </Pastilla>
-                  </Td>
-                  <Td className="cifra text-right font-medium text-tinta">
-                    {formatearGuarani(montoDelTrabajo(c.precio, venta?.total))}
-                  </Td>
-                  <Td className="text-right">
-                    <BotonEnlace
-                      href={urlCita({ vista: "dia", fecha: dia, personal: null, ocultar: [] }, c.id)}
-                      tono="navegar"
-                      tam="sm"
-                    >
-                      Ver
-                    </BotonEnlace>
-                  </Td>
-                </Tr>
+                  </div>
+
+                  <p className="mt-2 truncate text-[0.95rem] font-semibold text-tinta">{c.clienteNombre}</p>
+                  <p className="truncate text-[0.82rem] text-tinta-media">{c.serviciosTexto ?? "—"}</p>
+                  {!personalElegido && (
+                    <p className="truncate text-[0.78rem] text-tinta-suave">{nombreCompleto(c.personal)}</p>
+                  )}
+
+                  <div className="mt-2.5 flex items-center justify-between gap-2 border-t border-linea-fina pt-2.5 text-[0.82rem] text-tinta-media">
+                    <span className="min-w-0 truncate">
+                      {venta
+                        ? detallePagos(venta.pagos.map((p) => ({ forma: p.forma, monto: Number(p.monto) })))
+                        : "—"}
+                    </span>
+                    <span className="cifra flex-none font-semibold text-tinta">
+                      {formatearGuarani(montoDelTrabajo(c.precio, venta?.total))}
+                    </span>
+                  </div>
+
+                  <p className="mt-1 text-[0.76rem] text-tinta-suave">
+                    {venta?.comprobanteTipo === "factura" && venta.facturaNumero ? (
+                      <>
+                        Factura <span className="cifra">{venta.facturaNumero}</span>
+                        {venta.facturaAnulada && (
+                          <span className="ml-1 font-medium uppercase text-peligro">(Anulada)</span>
+                        )}
+                      </>
+                    ) : (
+                      <>Ticket{venta && <span className="cifra"> · {formatearNumero(venta.numero)}</span>}</>
+                    )}
+                  </p>
+
+                  <Link
+                    href={urlCita({ vista: "dia", fecha: dia, personal: null, ocultar: [] }, c.id)}
+                    className={`mt-3 w-full ${clasesBoton("navegar", "md")}`}
+                  >
+                    Ver
+                  </Link>
+                </li>
               );
             })}
-          </tbody>
-          <tfoot>
-            <tr>
-              <Td colSpan={columnas - 2} className="text-right font-medium">
-                Total cobrado
-              </Td>
-              <Td className="cifra text-right font-semibold text-tinta">{formatearGuarani(cobrado)}</Td>
-              <Td>{null}</Td>
-            </tr>
-          </tfoot>
-        </Tabla>
+          </ul>
+        </>
       )}
 
       {confirmadas.length >= MAXIMO_CITAS && (

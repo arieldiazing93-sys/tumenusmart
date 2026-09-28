@@ -138,7 +138,7 @@ export function PasoServicios({
                           <img
                             src={s.imagenUrl}
                             alt=""
-                            className="h-12 w-12 flex-none rounded-lg border border-linea object-cover"
+                            className="h-24 w-24 flex-none rounded-xl border border-linea object-cover"
                           />
                         )}
                         <span className="min-w-0 flex-1">

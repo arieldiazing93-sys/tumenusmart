@@ -41,7 +41,7 @@ export function AlternarActivoServicio({
           }
         });
       }}
-      className={`flex flex-none items-center gap-1.5 rounded-full border px-2.5 py-1 text-[0.74rem] font-semibold transition-colors duration-150 disabled:opacity-60 ${
+      className={`flex h-8 flex-none items-center gap-1.5 rounded-full border px-3 text-[0.74rem] font-semibold transition-colors duration-150 disabled:opacity-60 ${
         valor ? "border-exito/40 bg-exito-tinte text-exito" : "border-peligro/40 bg-peligro-tinte text-peligro"
       }`}
     >

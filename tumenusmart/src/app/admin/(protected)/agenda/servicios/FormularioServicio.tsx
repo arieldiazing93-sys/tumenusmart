@@ -250,7 +250,7 @@ export function FormularioServicio({
                   aria-label={`Color ${c}`}
                   aria-pressed={color === c}
                   style={{ backgroundColor: c }}
-                  className={`h-8 w-8 rounded-full border-2 transition-transform duration-100 ${
+                  className={`h-9 w-9 rounded-full border-2 transition-transform duration-100 ${
                     color === c ? "scale-110 border-tinta" : "border-transparent hover:scale-105"
                   }`}
                 />
@@ -261,7 +261,7 @@ export function FormularioServicio({
                   value={color}
                   onChange={(e) => setColor(e.target.value.toUpperCase())}
                   aria-label="Elegir otro color"
-                  className="h-8 w-10 cursor-pointer rounded border border-linea bg-transparent p-0.5"
+                  className="h-9 w-11 cursor-pointer rounded border border-linea bg-transparent p-0.5"
                 />
                 Otro
               </label>
