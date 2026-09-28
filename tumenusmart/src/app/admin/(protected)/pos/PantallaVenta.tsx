@@ -669,7 +669,7 @@ export function PantallaVenta({
                     </span>
                   )}
                   <p className="text-[0.86rem] font-medium leading-snug text-tinta">{p.nombre}</p>
-                  <p className="cifra mt-1.5 text-[0.9rem] font-semibold text-brand-texto">
+                  <p className="cifra mt-1.5 text-[0.9rem] font-semibold text-tinta">
                     {formatearGuarani(p.precio)}
                   </p>
                   {p.agregados.length > 0 && (
