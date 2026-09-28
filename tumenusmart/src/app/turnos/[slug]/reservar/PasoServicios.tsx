@@ -129,7 +129,7 @@ export function PasoServicios({
                   return (
                     <li key={s.id}>
                       <label
-                        className={`flex cursor-pointer items-center gap-3 rounded-lg px-2 py-3.5 transition-colors ${
+                        className={`block cursor-pointer rounded-lg px-2 py-2 transition-colors ${
                           marcado ? "bg-brand/10" : "hover:bg-papel-suave"
                         }`}
                       >
@@ -138,23 +138,25 @@ export function PasoServicios({
                           <img
                             src={s.imagenUrl}
                             alt=""
-                            className="h-24 w-24 flex-none rounded-xl border border-linea object-cover"
+                            className="aspect-[4/3] w-full rounded-lg border border-linea object-cover"
                           />
                         )}
-                        <span className="min-w-0 flex-1">
-                          <span className="block text-[0.95rem] font-medium text-tinta">{s.nombre}</span>
-                          <span className="block text-[0.8rem] text-tinta-suave">{textoDuracion(s.duracionMin)}</span>
+                        <span className="flex items-center gap-3 py-1.5">
+                          <span className="min-w-0 flex-1">
+                            <span className="block text-[0.95rem] font-medium text-tinta">{s.nombre}</span>
+                            <span className="block text-[0.8rem] text-tinta-suave">{textoDuracion(s.duracionMin)}</span>
+                          </span>
+                          <span className="cifra flex-none text-[0.88rem] font-medium text-tinta">
+                            {textoPrecioServicio(s)}
+                          </span>
+                          <input
+                            type="checkbox"
+                            checked={marcado}
+                            onChange={() => alternar(s.id)}
+                            aria-label={`Elegir ${s.nombre}`}
+                            className="h-5 w-5 flex-none accent-brand"
+                          />
                         </span>
-                        <span className="cifra flex-none text-[0.88rem] font-medium text-tinta">
-                          {textoPrecioServicio(s)}
-                        </span>
-                        <input
-                          type="checkbox"
-                          checked={marcado}
-                          onChange={() => alternar(s.id)}
-                          aria-label={`Elegir ${s.nombre}`}
-                          className="h-5 w-5 flex-none accent-brand"
-                        />
                       </label>
                     </li>
                   );
