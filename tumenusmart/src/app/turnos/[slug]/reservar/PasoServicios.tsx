@@ -138,7 +138,7 @@ export function PasoServicios({
                           <img
                             src={s.imagenUrl}
                             alt=""
-                            className="aspect-[4/3] w-full rounded-lg border border-linea object-cover"
+                            className="aspect-[4/3] w-full rounded-lg border border-linea object-cover object-top"
                           />
                         )}
                         <span className="flex items-center gap-3 py-1.5">
