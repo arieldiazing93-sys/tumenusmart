@@ -176,10 +176,10 @@ export function NavPanel({
             */}
             {!compacta && (
               /*
-                El título va en tinta oscura, salvo el del grupo que contiene
-                la sección activa: ese va en naranja aunque esté colapsado,
-                porque con todos los grupos arrancando colapsados hace falta
-                una forma de saber dónde estás sin abrir cada uno.
+                El título va en azul (es navegación, mismo significado que el
+                resto del panel), salvo el del grupo que contiene la sección
+                activa: ese va en naranja aunque esté colapsado, porque hace
+                falta una forma de saber dónde estás sin abrir cada uno.
 
                 La separación entre letras baja de 0.19em a 0.15em porque a
                 este tamaño la anterior desarma las palabras.
@@ -193,8 +193,8 @@ export function NavPanel({
                 type="button"
                 onClick={() => alternarGrupo(grupo.titulo)}
                 aria-expanded={!colapsado}
-                className={`flex w-full items-center justify-between gap-2 rounded-lg px-3 pb-2 text-[0.75rem] font-bold uppercase tracking-[0.15em] hover:text-brand ${
-                  grupoActivo === grupo.titulo ? "text-brand" : "text-tinta"
+                className={`flex w-full items-center justify-between gap-2 rounded-lg px-3 pb-2 text-[0.75rem] font-bold uppercase tracking-[0.15em] ${
+                  grupoActivo === grupo.titulo ? "text-brand" : "text-azul-oscuro hover:text-brand"
                 }`}
               >
                 <span className="flex-1 text-left">{grupo.titulo}</span>
