@@ -74,14 +74,38 @@ export function NavPanel({
   const ruta = usePathname();
   const [abierto, setAbierto] = useState(false);
   const [plegada, setPlegada] = useState(plegadaInicial);
-  // Qué grupos están colapsados (título tocado). Arranca con TODOS
-  // colapsados —la lista ya es larga y así se lee de un vistazo— y en
-  // memoria, no en cookie: esto es para acomodar la vista mientras se
-  // navega, no una preferencia que haga falta recordar entre sesiones.
-  // Sigue vivo mientras se cambia de pantalla dentro del admin porque el
-  // layout no vuelve a montar este componente en cada navegación.
+
+  /**
+   * Qué sección está activa.
+   *
+   * Se compara por prefijo para que /admin/productos/abc123 siga marcando
+   * "Productos". Pero /admin/configuracion/horarios NO debe marcar dos: gana
+   * la coincidencia más larga.
+   */
+  const activa = grupos
+    .flatMap((g) => g.secciones)
+    .filter((s) => ruta === s.href || ruta.startsWith(s.href + "/"))
+    .sort((a, b) => b.href.length - a.href.length)[0]?.href;
+
+  // El grupo dueño de la sección activa, para marcar su título en naranja
+  // aunque esté colapsado — así se sabe dónde estás sin tener que
+  // desplegarlo primero.
+  const grupoActivo = grupos.find((g) => g.secciones.some((s) => s.href === activa))?.titulo;
+
+  // Qué grupos están colapsados (título tocado). Arranca con el primero
+  // ("Día a día", lo que se toca seguido) y el de la sección en la que ya
+  // estás parado abiertos de una — el resto, cerrado. Antes arrancaba TODO
+  // cerrado: quien recién entraba veía puros títulos grises sin un solo
+  // enlace debajo, hasta tocar cada uno. En memoria y no en cookie: esto es
+  // para acomodar la vista mientras se navega, no una preferencia que haga
+  // falta recordar entre sesiones. Sigue vivo mientras se cambia de pantalla
+  // dentro del admin porque el layout no vuelve a montar este componente en
+  // cada navegación.
   const [colapsados, setColapsados] = useState<Set<string>>(
-    () => new Set(grupos.map((g) => g.titulo))
+    () =>
+      new Set(
+        grupos.map((g) => g.titulo).filter((titulo, i) => i !== 0 && titulo !== grupoActivo)
+      )
   );
 
   function alternarGrupo(titulo: string) {
@@ -123,23 +147,6 @@ export function NavPanel({
       return nuevo;
     });
   }
-
-  /**
-   * Qué sección está activa.
-   *
-   * Se compara por prefijo para que /admin/productos/abc123 siga marcando
-   * "Productos". Pero /admin/configuracion/horarios NO debe marcar dos: gana
-   * la coincidencia más larga.
-   */
-  const activa = grupos
-    .flatMap((g) => g.secciones)
-    .filter((s) => ruta === s.href || ruta.startsWith(s.href + "/"))
-    .sort((a, b) => b.href.length - a.href.length)[0]?.href;
-
-  // El grupo dueño de la sección activa, para marcar su título en naranja
-  // aunque esté colapsado — así se sabe dónde estás sin tener que
-  // desplegarlo primero.
-  const grupoActivo = grupos.find((g) => g.secciones.some((s) => s.href === activa))?.titulo;
 
   function lista(compacta: boolean) {
     return (
