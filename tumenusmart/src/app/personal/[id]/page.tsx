@@ -141,15 +141,23 @@ export default async function TrabajoDelPersonalPage({
   }
 
   const cifrasPeriodo = [
-    { rotulo: "Clientes atendidos", valor: String(trabajosPeriodo.length) },
-    { rotulo: "Cobrado", valor: formatearGuarani(cobradoPeriodo) },
+    { rotulo: "Clientes atendidos", valor: String(trabajosPeriodo.length), tono: "neutro" as const },
+    { rotulo: "Cobrado", valor: formatearGuarani(cobradoPeriodo), tono: "neutro" as const },
     { rotulo: "Comisión", valor: formatearGuarani(comisionPeriodo), tono: "exito" as const },
     {
       rotulo: "Canceladas",
       valor: String(canceladasPeriodo),
-      tono: canceladasPeriodo > 0 ? ("peligro" as const) : undefined,
+      // Sin cancelaciones no hay nada que avisar: la tarjeta queda neutra, no en rojo.
+      tono: canceladasPeriodo > 0 ? ("peligro" as const) : ("neutro" as const),
     },
   ];
+  // El fondo de cada tarjeta dice de qué se trata de un vistazo: ni tan fuerte como un
+  // cartel de aviso, ni tan débil que no se note al lado de las otras tres.
+  const TONOS_TARJETA = {
+    neutro: { tarjeta: "border-linea bg-papel-hundido", valor: "text-tinta", rotulo: "text-tinta-suave" },
+    exito: { tarjeta: "border-exito/40 bg-exito-tinte", valor: "text-exito", rotulo: "text-exito/75" },
+    peligro: { tarjeta: "border-peligro/40 bg-peligro-tinte", valor: "text-peligro", rotulo: "text-peligro/75" },
+  } as const;
 
   /** La dirección de esta misma página con esos cambios; lo que no se cambia se mantiene. */
   function hrefPeriodo(cambios: { vista?: VistaAgenda; fecha?: string }) {
@@ -321,19 +329,17 @@ export default async function TrabajoDelPersonalPage({
         <p className="mt-2.5 text-[0.85rem] font-medium text-tinta">{tituloAgenda(vista, fechaPedida)}</p>
 
         <ul className="mt-2.5 grid grid-cols-2 gap-2">
-          {cifrasPeriodo.map((c) => (
-            <li key={c.rotulo} className="min-w-0 rounded-xl border border-linea bg-superficie px-3 py-3">
-              <p
-                className={`cifra truncate text-[1.05rem] font-semibold leading-none ${
-                  c.tono === "exito" ? "text-exito" : c.tono === "peligro" ? "text-peligro" : "text-tinta"
-                }`}
-                title={c.valor}
-              >
-                {c.valor}
-              </p>
-              <p className="mt-1.5 truncate text-[0.72rem] font-medium text-tinta-suave">{c.rotulo}</p>
-            </li>
-          ))}
+          {cifrasPeriodo.map((c) => {
+            const t = TONOS_TARJETA[c.tono];
+            return (
+              <li key={c.rotulo} className={`min-w-0 rounded-xl border px-3 py-3 ${t.tarjeta}`}>
+                <p className={`cifra truncate text-[1.05rem] font-semibold leading-none ${t.valor}`} title={c.valor}>
+                  {c.valor}
+                </p>
+                <p className={`mt-1.5 truncate text-[0.72rem] font-medium ${t.rotulo}`}>{c.rotulo}</p>
+              </li>
+            );
+          })}
         </ul>
       </section>
 
