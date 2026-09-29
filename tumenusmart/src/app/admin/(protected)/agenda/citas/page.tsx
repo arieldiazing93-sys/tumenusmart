@@ -8,6 +8,7 @@ import {
   diaLargo,
   fechaVecina,
   horaDeMinutos,
+  limitesDelPeriodo,
   parsearFecha,
   parsearVista,
   partesLocales,
@@ -16,7 +17,7 @@ import {
   type VistaAgenda,
 } from "@/lib/agenda";
 import { montoDelTrabajo, nombreCompleto } from "@/lib/agenda-personal";
-import { claveSumarDias, diasDeLaSemana } from "@/lib/calendario";
+import { claveSumarDias } from "@/lib/calendario";
 import { formatearGuarani, formatearNumero } from "@/lib/format";
 import { detallePagos } from "@/lib/pago-venta";
 import { limitesEnAsuncion } from "@/lib/rango-dias";
@@ -39,16 +40,6 @@ const BOTON_HOY = `${BOTON} border-azul/35 bg-azul-luz px-4 text-azul-oscuro hov
 function diaValido(valor: string | undefined): string | null {
   if (!valor || !/^\d{4}-\d{2}-\d{2}$/.test(valor)) return null;
   return claveSumarDias(valor, 0) === valor ? valor : null;
-}
-
-/** El primer y el último día del período que se está mirando: el día, la semana (lunes a domingo) o el mes. */
-function limitesDelPeriodo(vista: VistaAgenda, fecha: string): { desde: string; hasta: string } {
-  if (vista === "dia") return { desde: fecha, hasta: fecha };
-  if (vista === "semana") {
-    const dias = diasDeLaSemana(fecha);
-    return { desde: dias[0], hasta: dias[6] };
-  }
-  return { desde: `${fecha.slice(0, 7)}-01`, hasta: claveSumarDias(fechaVecina("mes", fecha, 1), -1) };
 }
 
 /** "2026-09-12" → "12/09/2026". */

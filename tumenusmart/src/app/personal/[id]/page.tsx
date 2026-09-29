@@ -1,13 +1,32 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AvatarPersonal } from "@/app/admin/(protected)/agenda/AvatarPersonal";
 import { AutoRefresh } from "@/components/AutoRefresh";
-import { diaLargo, horaDeMinutos, partesLocales } from "@/lib/agenda";
-import { montoDelTrabajo } from "@/lib/agenda-personal";
+import {
+  VISTAS_AGENDA,
+  diaLargo,
+  fechaVecina,
+  horaDeMinutos,
+  limitesDelPeriodo,
+  parsearFecha,
+  parsearVista,
+  partesLocales,
+  tituloAgenda,
+  type VistaAgenda,
+} from "@/lib/agenda";
+import { calcularComision, montoDelTrabajo } from "@/lib/agenda-personal";
 import { claveSumarDias } from "@/lib/calendario";
 import { formatearGuarani } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
+import { limitesEnAsuncion } from "@/lib/rango-dias";
 import { claveDiaAsuncion, fechaAsuncionDesdeTexto } from "@/lib/timezone";
+
+/** Los botones chicos de "Hoy" y las flechas, de un vistazo (mismo criterio que Citas del panel). */
+const BOTON =
+  "inline-flex h-8 items-center justify-center rounded-lg border px-2.5 text-[0.78rem] font-semibold transition-colors duration-150";
+const BOTON_NEUTRO = `${BOTON} border-linea bg-superficie text-tinta`;
+const BOTON_HOY = `${BOTON} border-azul/35 bg-azul-luz px-3 text-azul-oscuro`;
 
 export const dynamic = "force-dynamic";
 
@@ -30,24 +49,50 @@ export const metadata: Metadata = {
  * Solo lee, y todo queda atado al local de ESA persona: aunque el enlace circule, nunca muestra citas de otro
  * negocio ni de otra persona. Se actualiza sola cada medio minuto, así una cita cobrada en la caja aparece acá sin
  * recargar. Lo de días pasados no se muestra: es una vista de lo que hay que hacer, no un historial.
+ *
+ * Más abajo, "Tus números" deja ver cómo le fue en un período (Día, Semana o Mes, con Hoy y flechas, igual que el
+ * calendario del panel): cuántos clientes atendió, cuánto cobró, cuánto le tocó de comisión y cuántas citas se le
+ * cancelaron. Ese período sí mira para atrás (es un historial), a diferencia de "Hoy"/"Próximos días" de arriba.
  */
-export default async function TrabajoDelPersonalPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function TrabajoDelPersonalPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ vista?: string; fecha?: string }>;
+}) {
   const { id } = await params;
+  const sp = await searchParams;
 
   const miembro = await prisma.miembroPersonal.findUnique({
     where: { id },
-    select: { id: true, storeId: true, nombre: true, apellido: true, profesion: true, fotoUrl: true, activo: true },
+    select: {
+      id: true,
+      storeId: true,
+      nombre: true,
+      apellido: true,
+      profesion: true,
+      fotoUrl: true,
+      activo: true,
+      comisionPorcentaje: true,
+    },
   });
   // Quien ya no trabaja en el local (inactivo) deja de ver lo suyo con el mismo enlace.
   if (!miembro || !miembro.activo) notFound();
   const storeId = miembro.storeId;
+  const comisionActual = miembro.comisionPorcentaje == null ? null : Number(miembro.comisionPorcentaje);
 
   const hoy = claveDiaAsuncion(new Date());
   const manana = claveSumarDias(hoy, 1);
   const inicioHoy = fechaAsuncionDesdeTexto(hoy) as Date;
   const finSemana = fechaAsuncionDesdeTexto(claveSumarDias(hoy, DIAS_QUE_VE)) as Date;
 
-  const [store, confirmadas] = await Promise.all([
+  const vista = parsearVista(sp.vista) ?? "dia";
+  const fechaPedida = parsearFecha(sp.fecha, hoy);
+  const periodo = limitesDelPeriodo(vista, fechaPedida);
+  const rangoPeriodo = limitesEnAsuncion(periodo);
+
+  const [store, confirmadas, trabajosPeriodo, canceladasPeriodo] = await Promise.all([
     prisma.store.findUnique({ where: { id: storeId }, select: { nombre: true } }),
     prisma.cita.findMany({
       where: {
@@ -70,7 +115,49 @@ export default async function TrabajoDelPersonalPage({ params }: { params: Promi
         ventaPos: { select: { total: true } },
       },
     }),
+    // "Tus números": los trabajos ya cobrados del período elegido (Día/Semana/Mes), para el total y la comisión.
+    prisma.cita.findMany({
+      where: {
+        storeId,
+        personalId: id,
+        ventaPos: { is: { cancelada: false } },
+        inicio: rangoPeriodo,
+      },
+      select: { comisionPorcentaje: true, precio: true, ventaPos: { select: { total: true } } },
+    }),
+    // Las citas que se le cancelaron en ese mismo período (sin importar si ya se habían cobrado por adelantado).
+    prisma.cita.count({
+      where: { storeId, personalId: id, estado: "cancelada", inicio: rangoPeriodo },
+    }),
   ]);
+
+  let cobradoPeriodo = 0;
+  let comisionPeriodo = 0;
+  for (const c of trabajosPeriodo) {
+    const total = montoDelTrabajo(c.precio, c.ventaPos?.total);
+    const porcentaje = c.comisionPorcentaje == null ? comisionActual : Number(c.comisionPorcentaje);
+    cobradoPeriodo += total;
+    comisionPeriodo += calcularComision(total, porcentaje);
+  }
+
+  const cifrasPeriodo = [
+    { rotulo: "Clientes atendidos", valor: String(trabajosPeriodo.length) },
+    { rotulo: "Cobrado", valor: formatearGuarani(cobradoPeriodo) },
+    { rotulo: "Comisión", valor: formatearGuarani(comisionPeriodo), tono: "exito" as const },
+    {
+      rotulo: "Canceladas",
+      valor: String(canceladasPeriodo),
+      tono: canceladasPeriodo > 0 ? ("peligro" as const) : undefined,
+    },
+  ];
+
+  /** La dirección de esta misma página con esos cambios; lo que no se cambia se mantiene. */
+  function hrefPeriodo(cambios: { vista?: VistaAgenda; fecha?: string }) {
+    const params = new URLSearchParams();
+    params.set("vista", cambios.vista ?? vista);
+    params.set("fecha", cambios.fecha ?? fechaPedida);
+    return `/personal/${id}?${params.toString()}`;
+  }
 
   const trabajos = confirmadas.map((c) => {
     const { dia, minutos } = partesLocales(c.inicio);
@@ -192,6 +279,63 @@ export default async function TrabajoDelPersonalPage({ params }: { params: Promi
           </div>
         </section>
       )}
+
+      <section className="mt-6">
+        <h2 className="mb-2 text-[0.8rem] font-semibold uppercase tracking-wide text-tinta-suave">Tus números</h2>
+
+        <div className="flex flex-wrap items-center gap-1.5">
+          <Link href={hrefPeriodo({ fecha: hoy })} className={BOTON_HOY}>
+            Hoy
+          </Link>
+          <Link
+            href={hrefPeriodo({ fecha: fechaVecina(vista, fechaPedida, -1) })}
+            aria-label="Período anterior"
+            className={`${BOTON_NEUTRO} w-8 px-0`}
+          >
+            ‹
+          </Link>
+          <Link
+            href={hrefPeriodo({ fecha: fechaVecina(vista, fechaPedida, 1) })}
+            aria-label="Período siguiente"
+            className={`${BOTON_NEUTRO} w-8 px-0`}
+          >
+            ›
+          </Link>
+          <div role="tablist" aria-label="Ver por" className="ml-auto flex rounded-lg bg-papel-hundido p-0.5">
+            {VISTAS_AGENDA.map((v) => (
+              <Link
+                key={v.valor}
+                href={hrefPeriodo({ vista: v.valor })}
+                role="tab"
+                aria-selected={v.valor === vista}
+                className={`flex h-7 items-center justify-center rounded-md px-2.5 text-[0.76rem] font-semibold transition-colors duration-150 ${
+                  v.valor === vista ? "bg-superficie text-azul-oscuro shadow-sm" : "text-tinta-media"
+                }`}
+              >
+                {v.etiqueta}
+              </Link>
+            ))}
+          </div>
+        </div>
+
+        <p className="mt-2.5 text-[0.85rem] font-medium text-tinta">{tituloAgenda(vista, fechaPedida)}</p>
+
+        <ul className="mt-2.5 grid grid-cols-2 gap-2">
+          {cifrasPeriodo.map((c) => (
+            <li key={c.rotulo} className="min-w-0 rounded-xl border border-linea bg-superficie px-3 py-3">
+              <p
+                className={`cifra truncate text-[1.05rem] font-semibold leading-none ${
+                  c.tono === "exito" ? "text-exito" : c.tono === "peligro" ? "text-peligro" : "text-tinta"
+                }`}
+                title={c.valor}
+              >
+                {c.valor}
+              </p>
+              <p className="mt-1.5 truncate text-[0.72rem] font-medium text-tinta-suave">{c.rotulo}</p>
+            </li>
+          ))}
+        </ul>
+      </section>
 
       <p className="mt-8 text-center text-[0.72rem] text-tinta-suave">Se actualiza sola. Solo ves lo tuyo.</p>
     </main>

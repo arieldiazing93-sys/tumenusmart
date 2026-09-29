@@ -234,6 +234,16 @@ export function tituloAgenda(vista: VistaAgenda, clave: string): string {
   return `${desde} – ${b.dia} ${MESES_CORTOS[b.mes]}${a.anio !== b.anio ? ` ${b.anio}` : ""}`;
 }
 
+/** El primer y el último día del período: el día, la semana (lunes a domingo) o el mes. */
+export function limitesDelPeriodo(vista: VistaAgenda, fecha: string): { desde: string; hasta: string } {
+  if (vista === "dia") return { desde: fecha, hasta: fecha };
+  if (vista === "semana") {
+    const dias = diasDeLaSemana(fecha);
+    return { desde: dias[0], hasta: dias[6] };
+  }
+  return { desde: `${fecha.slice(0, 7)}-01`, hasta: claveSumarDias(fechaVecina("mes", fecha, 1), -1) };
+}
+
 // ---------------------------------------------------------------------------
 //  Turnos en la grilla
 // ---------------------------------------------------------------------------
