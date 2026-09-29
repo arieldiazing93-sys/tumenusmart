@@ -68,6 +68,10 @@ export default async function ReportePersonalPage({
   const urlExcel = periodo
     ? `/admin/agenda/personal/reporte/exportar?personal=${personalElegido?.id ?? "todos"}&desde=${periodo.desde}&hasta=${periodo.hasta}`
     : null;
+  // La versión imprimible: mismo criterio, para "Imprimir / Guardar como PDF" desde el navegador.
+  const urlImprimir = periodo
+    ? `/admin/agenda/personal/reporte/imprimir?personal=${personalElegido?.id ?? "todos"}&desde=${periodo.desde}&hasta=${periodo.hasta}`
+    : null;
 
   return (
     <div>
@@ -110,11 +114,21 @@ export default async function ReportePersonalPage({
                 · {periodo.desde === periodo.hasta ? diaEnTexto(periodo.desde) : `${diaEnTexto(periodo.desde)} – ${diaEnTexto(periodo.hasta)}`}
               </span>
             </h2>
-            {/* Verde: sacar el reporte a un archivo. Baja lo mismo que se está viendo, con todos los trabajos. */}
-            {urlExcel && general.cantidad > 0 && (
-              <a href={urlExcel} className={clasesBoton("exito", "sm")}>
-                Descargar Excel
-              </a>
+            {/* Verde: sacar el reporte a un archivo (Excel). Azul: lleva a otra pantalla — el PDF se
+                imprime/guarda desde ahí con el botón del navegador, mismo criterio que Estadísticas. */}
+            {general.cantidad > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {urlExcel && (
+                  <a href={urlExcel} className={clasesBoton("exito", "sm")}>
+                    Descargar Excel
+                  </a>
+                )}
+                {urlImprimir && (
+                  <a href={urlImprimir} target="_blank" rel="noopener noreferrer" className={clasesBoton("navegar", "sm")}>
+                    Ver reporte / PDF
+                  </a>
+                )}
+              </div>
             )}
           </div>
 
