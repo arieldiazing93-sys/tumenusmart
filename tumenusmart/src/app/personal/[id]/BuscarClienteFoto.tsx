@@ -161,16 +161,18 @@ function FichaFotoCliente({
       <p className="text-[0.78rem] text-tinta-suave">{cliente.telefono ?? "—"}</p>
 
       {cliente.fotoUrl ? (
-        // Mismo tamaño que la foto de Servicios: 4/3 a todo el ancho, para
-        // que se vea el corte de verdad, no una miniatura.
+        // La mayoría de las cámaras de celular sacan en vertical (9:16): un
+        // cuadro 4:3 con object-cover las recortaba arriba y abajo. Acá se ve
+        // COMPLETA siempre, sin cortar nada — se adapta sola a vertical u
+        // horizontal, con relleno arriba/abajo o a los costados si hace falta.
         // eslint-disable-next-line @next/next/no-img-element
         <img
           src={cliente.fotoUrl}
           alt={`Último peinado de ${cliente.nombre}`}
-          className="mt-3 aspect-[4/3] w-full rounded-lg border border-linea object-cover object-top"
+          className="mt-3 max-h-[70vh] w-full rounded-lg border border-linea bg-papel-suave object-contain"
         />
       ) : (
-        <div className="mt-3 flex aspect-[4/3] w-full items-center justify-center rounded-lg border border-linea bg-papel-suave">
+        <div className="mt-3 flex h-64 w-full items-center justify-center rounded-lg border border-linea bg-papel-suave">
           <span className="px-4 text-center text-[0.82rem] text-tinta-suave">Todavía no tiene una foto cargada</span>
         </div>
       )}
