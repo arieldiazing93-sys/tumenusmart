@@ -1,8 +1,8 @@
 import type { ReactNode } from "react";
 
 /**
- * Las tarjetas del detalle de la cita: fondo blanco, borde suave y un ícono azul claro
- * junto al título. Sin más color que ese: lo que destaca son los datos.
+ * Las tarjetas del detalle de la cita: fondo blanco, borde azul bien marcado (mismo azul
+ * del ícono) y un ícono azul claro junto al título — separa cada sección de un vistazo.
  */
 export function BloqueCita({
   titulo,
@@ -18,7 +18,7 @@ export function BloqueCita({
 }) {
   return (
     <section
-      className="animate-deslizar rounded-xl border border-linea bg-superficie p-3.5 shadow-sm"
+      className="animate-deslizar rounded-xl border-2 border-azul/50 bg-superficie p-3.5 shadow-sm"
       style={{ animationDelay: `${retraso}ms` }}
     >
       <div className="mb-2.5 flex items-center gap-2">
