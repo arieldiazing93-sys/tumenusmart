@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AvatarPersonal } from "@/app/admin/(protected)/agenda/AvatarPersonal";
 import { AutoRefresh } from "@/components/AutoRefresh";
+import { BuscarClienteFoto } from "./BuscarClienteFoto";
 import {
   VISTAS_AGENDA,
   diaLargo,
@@ -234,6 +235,8 @@ export default async function TrabajoDelPersonalPage({
           </li>
         ))}
       </ul>
+
+      <BuscarClienteFoto personalId={id} />
 
       {deHoy.length > 0 && (
         <section className="mt-6">
