@@ -51,9 +51,10 @@ export function PedirPersonalEnVentaToggle({ activa }: { activa: boolean }) {
         <div className="min-w-0">
           <p className="text-[0.9rem] font-semibold text-tinta">Preguntar el personal al cobrar en el punto de venta</p>
           <p className="mt-0.5 text-[0.8rem] leading-snug text-tinta-media">
-            Para los negocios donde llega gente sin reserva: al cobrar en el mostrador pregunta a quién se le asigna el
-            trabajo, y queda a su nombre (cuenta en su vista de trabajo y en su comisión). Apagado, el punto de venta no
-            muestra el personal.
+            Para los negocios donde llega gente sin reserva: al cobrar en el mostrador pregunta quién atendió, y esa
+            venta cuenta en su vista de trabajo y en su comisión — la de servicio si hizo un corte o una barba, la
+            de producto si vendió algo de la carta (o las dos, si vendió las dos cosas). Apagado, el punto de venta
+            no muestra el personal.
           </p>
         </div>
       </div>

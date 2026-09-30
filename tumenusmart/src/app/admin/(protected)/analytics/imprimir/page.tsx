@@ -85,10 +85,10 @@ export default async function ImprimirAnalyticsPage({
       </table>
 
       <h2 className="mb-3 font-semibold text-tinta">
-        Top {Math.min(TOPE_TABLA, clientes.length)} clientes por cantidad de pedidos
+        Top {Math.min(TOPE_TABLA, clientes.length)} clientes por cantidad de visitas
       </h2>
       {top.length === 0 ? (
-        <p className="text-sm text-tinta-suave">Sin pedidos en este período.</p>
+        <p className="text-sm text-tinta-suave">Sin movimiento en este período.</p>
       ) : (
         <table className="w-full border-collapse text-sm">
           <thead>
@@ -96,9 +96,9 @@ export default async function ImprimirAnalyticsPage({
               <th className="py-1.5">#</th>
               <th className="py-1.5">Cliente</th>
               <th className="py-1.5">Teléfono</th>
-              <th className="py-1.5 text-right">Pedidos</th>
+              <th className="py-1.5 text-right">Visitas</th>
               <th className="py-1.5 text-right">Gasto total</th>
-              <th className="py-1.5 text-right">Último pedido</th>
+              <th className="py-1.5 text-right">Última visita</th>
             </tr>
           </thead>
           <tbody>

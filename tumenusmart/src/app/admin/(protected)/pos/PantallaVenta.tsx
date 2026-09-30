@@ -147,14 +147,11 @@ export function PantallaVenta({
     return mapa;
   }, [carrito]);
 
-  // ¿La cuenta lleva algún servicio (un corte, una barba)? Solo entonces se pregunta quién hizo el trabajo: una
-  // cuenta de puros productos (un shampoo, un perfume) no le asigna nada a nadie.
-  const idsDeServicio = useMemo(
-    () => new Set(categorias.flatMap((c) => c.productos.filter((p) => p.esServicio).map((p) => p.id))),
-    [categorias]
-  );
-  const llevaServicio = carrito.some((i) => i.tipo === "producto" && idsDeServicio.has(i.productId));
-  const personalAAsignar = llevaServicio ? personal : [];
+  // ¿La cuenta lleva algún producto de la carta, sea servicio (un corte, una barba) o mercadería (un shampoo,
+  // una cera)? Entonces se pregunta quién atendió o vendió — un servicio suma su comisión de servicio, un
+  // producto la de producto. Un combo mitad y mitad solo, sin ningún otro producto, no pregunta nada (no
+  // tiene un único producto al que asignarle la venta).
+  const personalAAsignar = carrito.some((i) => i.tipo === "producto") ? personal : [];
 
   const productosVisibles =
     categoriaId === TODOS

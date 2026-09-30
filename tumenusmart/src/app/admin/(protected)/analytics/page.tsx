@@ -128,7 +128,7 @@ export default async function AnalyticsPage({
     <div>
       <Cabecera
         titulo="Analytics"
-        bajada="Quiénes son tus clientes más frecuentes en el período que elijas, para saber a quién cuidar primero."
+        bajada="Quiénes son tus clientes más frecuentes en el período que elijas, para saber a quién cuidar primero. Cuenta pedidos online y ventas de mostrador, incluidos los turnos de Reserva de turnos ya cobrados."
         acciones={
           <>
             <a
@@ -261,7 +261,7 @@ export default async function AnalyticsPage({
         <h2 className="font-semibold text-tinta">
           {telefonoBuscado
             ? `${clientesFiltrados.length} resultado${clientesFiltrados.length === 1 ? "" : "s"} para "${telefonoBuscado}"`
-            : `Top ${Math.min(TOPE_TABLA, clientesFiltrados.length)} clientes por cantidad de pedidos`}
+            : `Top ${Math.min(TOPE_TABLA, clientesFiltrados.length)} clientes por cantidad de visitas`}
         </h2>
         {!telefonoBuscado && clientesFiltrados.length > TOPE_TABLA && (
           <p className="text-xs text-tinta-suave">
@@ -274,7 +274,7 @@ export default async function AnalyticsPage({
         <p className="text-sm text-tinta-suave">
           {telefonoBuscado
             ? "Ningún cliente de este período tiene ese teléfono."
-            : "Todavía no hay pedidos en este período."}
+            : "Todavía no hay movimiento en este período."}
         </p>
       ) : (
         <div className="overflow-x-auto rounded-lg border border-linea bg-white">
@@ -284,7 +284,7 @@ export default async function AnalyticsPage({
                 <th className="px-3 py-2 w-8">#</th>
                 <th className="px-3 py-2">Cliente</th>
                 <th className="px-3 py-2">Teléfono</th>
-                <th className="px-3 py-2 text-right">Pedidos</th>
+                <th className="px-3 py-2 text-right">Visitas</th>
                 <th className="px-3 py-2 text-right">Gasto total</th>
                 <th className="px-3 py-2 text-right">Último pedido</th>
                 {fidelizacionActiva && (

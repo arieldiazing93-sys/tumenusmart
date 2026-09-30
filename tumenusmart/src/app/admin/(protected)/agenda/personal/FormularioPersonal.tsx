@@ -205,8 +205,8 @@ export function FormularioPersonal({
 
         {/* La comisión por trabajo: el porcentaje de lo que se cobra en cada cita suya. */}
         <Campo
-          etiqueta="Comisión por trabajo (opcional)"
-          ayuda="Lo que le toca de cada trabajo que cobrás a su nombre. Vacío = no cobra comisión."
+          etiqueta="Comisión por servicio (opcional)"
+          ayuda="Lo que le toca de cada corte, barba, etc. que cobrás a su nombre. Vacío = no cobra comisión de servicio."
         >
           <div className="flex items-center gap-2">
             <div className="w-28 flex-none">
@@ -225,17 +225,41 @@ export function FormularioPersonal({
           </div>
         </Campo>
 
-        {/* Aclaración para el dueño (y para quien cargue al personal): la comisión es solo de los servicios. */}
+        {/* La comisión por producto: aparte de la de servicio, para cuando vende algo de la carta. */}
+        <Campo
+          etiqueta="Comisión por producto vendido (opcional)"
+          ayuda="Lo que le toca de cada producto (shampoo, cera…) que vendas a su nombre. Vacío = no cobra comisión de producto."
+        >
+          <div className="flex items-center gap-2">
+            <div className="w-28 flex-none">
+              <Entrada
+                name="comisionProducto"
+                type="number"
+                min={0}
+                max={100}
+                step={0.5}
+                inputMode="decimal"
+                defaultValue={miembro?.comisionProductoPorcentaje ?? ""}
+                placeholder="Ej.: 20"
+              />
+            </div>
+            <span className="text-[0.95rem] font-semibold text-tinta-media">%</span>
+          </div>
+        </Campo>
+
+        {/* Aclaración para el dueño (y para quien cargue al personal): son dos comisiones distintas. */}
         <div className="-mt-1 rounded-lg border border-azul/25 bg-azul-luz px-3 py-2.5 text-[0.8rem] leading-snug text-azul-oscuro">
-          <p className="font-semibold">¿Sobre qué se calcula la comisión?</p>
+          <p className="font-semibold">¿Sobre qué se calcula cada comisión?</p>
           <ul className="mt-1 list-disc space-y-0.5 pl-4">
             <li>
-              Solo sobre los <strong>servicios</strong> que hizo (ya con el descuento que se haya aplicado).
+              La de <strong>servicio</strong> sale de los servicios que hizo (corte, barba…), ya con el descuento
+              que se haya aplicado.
             </li>
             <li>
-              Los <strong>productos</strong> (un shampoo, un perfume) no suman comisión.
+              La de <strong>producto</strong> sale de los productos que vendió (shampoo, cera…), aparte y con su
+              propio porcentaje.
             </li>
-            <li>Si una misma venta lleva un producto y un servicio, solo el servicio le da comisión.</li>
+            <li>Si una misma venta lleva las dos cosas, las dos comisiones se calculan y se suman.</li>
           </ul>
         </div>
 

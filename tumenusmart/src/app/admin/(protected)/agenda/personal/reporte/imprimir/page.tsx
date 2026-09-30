@@ -41,6 +41,8 @@ export default async function ImprimirReportePersonalPage({
     localActual(),
   ]);
   const { periodo, demasiadoLargo, personalElegido, personas, porPersona, general, filas, hayMas } = reporte;
+  // Sin trabajos NI ventas con comisión de producto: ahí sí no hay nada que mostrar (mismo criterio que la pantalla).
+  const hayMovimiento = general.cantidad > 0 || general.comisionProducto > 0;
 
   if (!periodo || demasiadoLargo) {
     return (
@@ -79,8 +81,8 @@ export default async function ImprimirReportePersonalPage({
         </div>
       </div>
 
-      {general.cantidad === 0 ? (
-        <p className="text-sm text-tinta-suave">No hay trabajos terminados en este período.</p>
+      {!hayMovimiento ? (
+        <p className="text-sm text-tinta-suave">No hay movimiento en este período.</p>
       ) : (
         <>
           {!personalElegido && (
@@ -90,35 +92,46 @@ export default async function ImprimirReportePersonalPage({
                 <thead>
                   <tr className="border-b border-linea text-left text-xs uppercase tracking-wide text-tinta-media">
                     <th className="py-1.5">Personal</th>
-                    <th className="py-1.5 text-right">Comisión</th>
                     <th className="py-1.5 text-right">Trabajos</th>
                     <th className="py-1.5 text-right">Cobrado</th>
-                    <th className="py-1.5 text-right">Comisión (Gs.)</th>
+                    <th className="py-1.5 text-right">Comisión servicios</th>
+                    <th className="py-1.5 text-right">Comisión productos</th>
                   </tr>
                 </thead>
                 <tbody>
                   {aMostrar.map((p) => {
-                    const suma = porPersona.get(p.id) ?? { cantidad: 0, cobrado: 0, comision: 0 };
+                    const suma = porPersona.get(p.id) ?? { cantidad: 0, cobrado: 0, comision: 0, comisionProducto: 0 };
                     return (
                       <tr key={p.id} className="border-b border-linea-fina">
-                        <td className="py-1.5 text-tinta">{p.nombre}</td>
-                        <td className="py-1.5 text-right text-tinta-media">
-                          {p.comision != null ? `${textoPorcentaje(p.comision)}%` : "Sin comisión"}
+                        <td className="py-1.5 text-tinta">
+                          {p.nombre}
+                          <span className="block text-xs text-tinta-suave">
+                            {p.comision != null ? `Servicio ${textoPorcentaje(p.comision)}%` : "Sin comisión servicio"}
+                            {" · "}
+                            {p.comisionProducto != null
+                              ? `Producto ${textoPorcentaje(p.comisionProducto)}%`
+                              : "Sin comisión producto"}
+                          </span>
                         </td>
                         <td className="py-1.5 text-right text-tinta">{suma.cantidad}</td>
                         <td className="py-1.5 text-right text-tinta">{formatearGuarani(Math.round(suma.cobrado))}</td>
                         <td className="py-1.5 text-right font-semibold text-tinta">
                           {formatearGuarani(Math.round(suma.comision))}
                         </td>
+                        <td className="py-1.5 text-right font-semibold text-tinta">
+                          {formatearGuarani(Math.round(suma.comisionProducto))}
+                        </td>
                       </tr>
                     );
                   })}
                   <tr className="border-t-2 border-linea font-semibold">
                     <td className="py-2 text-tinta">TOTAL</td>
-                    <td />
                     <td className="py-2 text-right text-tinta">{general.cantidad}</td>
                     <td className="py-2 text-right text-tinta">{formatearGuarani(Math.round(general.cobrado))}</td>
                     <td className="py-2 text-right text-tinta">{formatearGuarani(Math.round(general.comision))}</td>
+                    <td className="py-2 text-right text-tinta">
+                      {formatearGuarani(Math.round(general.comisionProducto))}
+                    </td>
                   </tr>
                 </tbody>
               </table>

@@ -189,14 +189,19 @@ export function FichaPersonal({
         {/* ---------- datos ---------- */}
         <dl className="grid grid-cols-2 gap-2">
           <Dato rotulo="Teléfono">{telefono || "—"}</Dato>
-          <Dato rotulo="Comisión">
+          <Dato rotulo="Comisión por servicio">
             {miembro.comisionPorcentaje != null ? `${textoPorcentaje(miembro.comisionPorcentaje)} %` : "No cobra"}
+          </Dato>
+          <Dato rotulo="Comisión por producto">
+            {miembro.comisionProductoPorcentaje != null
+              ? `${textoPorcentaje(miembro.comisionProductoPorcentaje)} %`
+              : "No cobra"}
           </Dato>
           <Dato rotulo="Servicios que realiza">{miembro.servicios}</Dato>
           <Dato rotulo="Citas">{miembro.citas}</Dato>
         </dl>
         <p className="-mt-2 text-[0.76rem] leading-snug text-tinta-suave">
-          La comisión se calcula solo sobre los servicios: los productos que se lleve el cliente no suman.
+          La comisión de servicio sale de los servicios que hizo; la de producto, de lo que vendió de la carta.
         </p>
 
         {/* ---------- horario ---------- */}

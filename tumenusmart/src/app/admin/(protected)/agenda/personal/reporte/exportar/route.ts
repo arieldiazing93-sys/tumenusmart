@@ -69,7 +69,15 @@ export async function GET(request: NextRequest) {
 
   // ---------- hoja 1: el resumen por persona ----------
   const { libro, hoja: resumen } = nuevoLibro("Resumen");
-  resumen.columns = [{ width: 32 }, { width: 16 }, { width: 12 }, { width: 18 }, { width: 18 }];
+  resumen.columns = [
+    { width: 32 },
+    { width: 16 },
+    { width: 12 },
+    { width: 18 },
+    { width: 18 },
+    { width: 16 },
+    { width: 18 },
+  ];
 
   filaTitulo(resumen, ["Negocio", local.nombre], 2);
   filaTitulo(resumen, ["Reporte", "Movimiento del personal"], 2);
@@ -77,38 +85,64 @@ export async function GET(request: NextRequest) {
   filaTitulo(resumen, ["Período", textoPeriodo], 2);
   resumen.addRow([]);
 
-  filaTitulo(resumen, ["Personal", "Comisión (%)", "Trabajos", "Cobrado (Gs.)", "Comisión (Gs.)"], 5);
+  filaTitulo(
+    resumen,
+    [
+      "Personal",
+      "Comisión servicio (%)",
+      "Trabajos",
+      "Cobrado (Gs.)",
+      "Comisión servicio (Gs.)",
+      "Comisión producto (%)",
+      "Comisión producto (Gs.)",
+    ],
+    7
+  );
   // Se ve a quien está activo y a quien, aunque esté inactivo, tuvo trabajo en el período.
   const aMostrar = personalElegido ? [personalElegido] : personas.filter((p) => p.activo || porPersona.has(p.id));
   for (const p of aMostrar) {
-    const suma = porPersona.get(p.id) ?? { cantidad: 0, cobrado: 0, comision: 0 };
+    const suma = porPersona.get(p.id) ?? { cantidad: 0, cobrado: 0, comision: 0, comisionProducto: 0 };
     const fila = resumen.addRow([
       p.nombre,
       p.comision != null ? textoPorcentaje(p.comision) : "Sin comisión",
       suma.cantidad,
       Math.round(suma.cobrado),
       Math.round(suma.comision),
+      p.comisionProducto != null ? textoPorcentaje(p.comisionProducto) : "Sin comisión",
+      Math.round(suma.comisionProducto),
     ]);
     fila.getCell(4).numFmt = FORMATO_GUARANIES;
     fila.getCell(5).numFmt = FORMATO_GUARANIES;
+    fila.getCell(7).numFmt = FORMATO_GUARANIES;
   }
   resumen.addRow([]);
   const filaTotal = filaTitulo(
     resumen,
-    ["TOTAL", "", general.cantidad, Math.round(general.cobrado), Math.round(general.comision)],
-    5
+    [
+      "TOTAL",
+      "",
+      general.cantidad,
+      Math.round(general.cobrado),
+      Math.round(general.comision),
+      "",
+      Math.round(general.comisionProducto),
+    ],
+    7
   );
   filaTotal.getCell(4).numFmt = FORMATO_GUARANIES;
   filaTotal.getCell(5).numFmt = FORMATO_GUARANIES;
+  filaTotal.getCell(7).numFmt = FORMATO_GUARANIES;
 
   resumen.addRow([]);
-  resumen.addRow(["Lo cobrado y la comisión cuentan solo los servicios: los productos que se lleve el cliente no suman."]);
   resumen.addRow([
-    "Cada trabajo usa el porcentaje que tenía la persona al cobrarlo. Cuenta por el día del trabajo, no por el día del cobro.",
+    "Son dos comisiones separadas. La de servicio sale de los trabajos (los productos que se lleve el cliente no suman ahí); la de producto sale de lo que vendió de la carta, sin importar si hizo un trabajo o no.",
   ]);
-  if (general.cantidad === 0) {
+  resumen.addRow([
+    "Cada trabajo/venta usa el porcentaje que tenía la persona al cobrarlo. La de servicio cuenta por el día del trabajo; la de producto, por el día de la venta.",
+  ]);
+  if (general.cantidad === 0 && general.comisionProducto === 0) {
     resumen.addRow([]);
-    resumen.addRow(["No hay trabajos terminados en este período."]);
+    resumen.addRow(["No hay movimiento en este período."]);
   }
 
   // ---------- hoja 2: cada trabajo ----------

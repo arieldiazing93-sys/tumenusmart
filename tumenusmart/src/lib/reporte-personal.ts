@@ -1,12 +1,15 @@
 /**
  * El reporte de movimiento del personal de la Reserva de turnos: los trabajos que terminó cada persona (citas
  * cobradas, con reserva o cobradas en el mostrador a alguien sin reserva) y lo que le toca de comisión en un
- * período. Lo comparten la pantalla del reporte y su descarga en Excel, para que digan siempre lo mismo.
+ * período. Lo comparten la pantalla del reporte, su descarga en Excel y su versión imprimible, para que digan
+ * siempre lo mismo.
  *
- * Cuenta por el día del trabajo (`Cita.inicio`), igual que Citas y la vista de cada persona. Lo que vale cada
- * trabajo es lo de sus servicios (`montoDelTrabajo`): los productos que se lleve el cliente en la misma cuenta no
- * suman. Cada trabajo usa el porcentaje que tenía quien lo hizo AL COBRARLO; los cobrados antes de existir la
- * comisión usan el que tiene ahora.
+ * Son dos comisiones separadas. La de SERVICIO cuenta por el día del trabajo (`Cita.inicio`), igual que Citas y
+ * la vista de cada persona: lo que vale cada trabajo es lo de sus servicios (`montoDelTrabajo`), los productos
+ * que se lleve el cliente en la misma cuenta no suman ahí. La de PRODUCTO sale de otra fuente (`VentaPos`, no
+ * `Cita`: una venta de productos no es un turno) y cuenta por el día de la venta (`VentaPos.creadoEn`) — se
+ * suma como un total aparte, sin detalle línea por línea. Cada trabajo/venta usa el porcentaje que tenía quien
+ * lo hizo AL COBRARLO; los de antes de existir la comisión usan la que tiene ahora.
  */
 
 import type { Prisma } from "@prisma/client";
@@ -35,11 +38,19 @@ export type PersonaReporte = {
   activo: boolean;
   /** Su posición en la lista, para darle su color al avatar. */
   indice: number;
-  /** Su comisión de hoy, en porcentaje; null si no cobra. */
+  /** Su comisión de servicio de hoy, en porcentaje; null si no cobra. */
   comision: number | null;
+  /** Su comisión de producto de hoy, en porcentaje; null si no cobra. */
+  comisionProducto: number | null;
 };
 
-export type Acumulado = { cantidad: number; cobrado: number; comision: number };
+export type Acumulado = {
+  cantidad: number;
+  cobrado: number;
+  comision: number;
+  /** Lo que le toca de los productos que vendió en el período (aparte de `comision`, que es solo servicio). */
+  comisionProducto: number;
+};
 
 /** Un trabajo terminado, ya con lo que le toca de comisión. */
 export type FilaTrabajo = {
@@ -69,8 +80,10 @@ export type DatosReporte = {
   demasiadoLargo: boolean;
   porPersona: Map<string, Acumulado>;
   general: Acumulado;
-  /** Los nombres de quienes hicieron trabajos pero todavía no tienen comisión cargada. */
+  /** Los nombres de quienes hicieron trabajos pero todavía no tienen comisión de servicio cargada. */
   nombresSinComision: string[];
+  /** Los nombres de quienes vendieron productos pero todavía no tienen comisión de producto cargada. */
+  nombresSinComisionProducto: string[];
   filas: FilaTrabajo[];
   /** true si hay más trabajos que las filas que se traen (los totales igual cuentan todos). */
   hayMas: boolean;
@@ -91,7 +104,15 @@ export async function cargarReportePersonal(
 ): Promise<DatosReporte> {
   const equipo = await db.miembroPersonal.findMany({
     orderBy: [{ activo: "desc" }, { orden: "asc" }, { createdAt: "asc" }, { id: "asc" }],
-    select: { id: true, nombre: true, apellido: true, fotoUrl: true, activo: true, comisionPorcentaje: true },
+    select: {
+      id: true,
+      nombre: true,
+      apellido: true,
+      fotoUrl: true,
+      activo: true,
+      comisionPorcentaje: true,
+      comisionProductoPorcentaje: true,
+    },
   });
   const personas: PersonaReporte[] = equipo.map((p, indice) => ({
     id: p.id,
@@ -100,6 +121,7 @@ export async function cargarReportePersonal(
     activo: p.activo,
     indice,
     comision: p.comisionPorcentaje == null ? null : Number(p.comisionPorcentaje),
+    comisionProducto: p.comisionProductoPorcentaje == null ? null : Number(p.comisionProductoPorcentaje),
   }));
   const personaPorId = new Map(personas.map((p) => [p.id, p] as const));
   const personalElegido = personaPorId.get(pedido.personal ?? "") ?? null;
@@ -120,8 +142,20 @@ export async function cargarReportePersonal(
           ventaPos: { is: { cancelada: false } },
         }
       : null;
+  // Una venta con comisión de producto: cuenta por el día en que se cobró (no hay un "día del trabajo"
+  // como con una cita — una venta de productos no es un turno agendado).
+  const dondeVenta: Prisma.VentaPosWhereInput | null =
+    periodo && !demasiadoLargo
+      ? {
+          // O la de esta persona puntual, o cualquiera que tenga una asignada — nunca las dos claves
+          // "personalId" juntas en el mismo objeto, porque la segunda pisaría a la primera.
+          personalId: personalElegido ? personalElegido.id : { not: null },
+          creadoEn: limitesEnAsuncion(periodo),
+          cancelada: false,
+        }
+      : null;
 
-  const [todos, detalle] = donde
+  const [todos, detalle, ventasProducto] = donde
     ? await Promise.all([
         // Todo el período, con lo mínimo: de acá salen los totales.
         db.cita.findMany({
@@ -145,32 +179,54 @@ export async function cargarReportePersonal(
             ventaPos: { select: { total: true, pagos: { orderBy: { orden: "asc" }, select: { forma: true, monto: true } } } },
           },
         }),
+        // La comisión de producto: un total aparte, sin detalle línea por línea (ver comentario de arriba).
+        db.ventaPos.findMany({
+          where: dondeVenta!,
+          select: { personalId: true, comisionProductoPorcentaje: true, comisionProductoBase: true },
+        }),
       ])
-    : [[], []];
+    : [[], [], []];
 
   /** El porcentaje de un trabajo: el que tenía al cobrarlo o, si no tenía, el que tiene la persona ahora. */
   function porcentajeDe(personalId: string, guardado: unknown): number | null {
     if (guardado != null) return Number(guardado);
     return personaPorId.get(personalId)?.comision ?? null;
   }
+  /** Lo mismo, para la comisión de producto: el % que tenía al venderlo o, si no tenía, el que tiene ahora. */
+  function porcentajeProductoDe(personalId: string, guardado: unknown): number | null {
+    if (guardado != null) return Number(guardado);
+    return personaPorId.get(personalId)?.comisionProducto ?? null;
+  }
 
   const porPersona = new Map<string, Acumulado>();
-  const general: Acumulado = { cantidad: 0, cobrado: 0, comision: 0 };
+  const general: Acumulado = { cantidad: 0, cobrado: 0, comision: 0, comisionProducto: 0 };
   const sinComision = new Set<string>();
+  const sinComisionProducto = new Set<string>();
   for (const c of todos) {
     const total = montoDelTrabajo(c.precio, c.ventaPos?.total);
     const porcentaje = porcentajeDe(c.personalId, c.comisionPorcentaje);
     if (porcentaje === null) sinComision.add(c.personalId);
     const comision = calcularComision(total, porcentaje);
-    const previo = porPersona.get(c.personalId) ?? { cantidad: 0, cobrado: 0, comision: 0 };
+    const previo = porPersona.get(c.personalId) ?? { cantidad: 0, cobrado: 0, comision: 0, comisionProducto: 0 };
     porPersona.set(c.personalId, {
       cantidad: previo.cantidad + 1,
       cobrado: previo.cobrado + total,
       comision: previo.comision + comision,
+      comisionProducto: previo.comisionProducto,
     });
     general.cantidad += 1;
     general.cobrado += total;
     general.comision += comision;
+  }
+  for (const v of ventasProducto) {
+    if (!v.personalId) continue;
+    const base = v.comisionProductoBase == null ? 0 : Number(v.comisionProductoBase);
+    const porcentaje = porcentajeProductoDe(v.personalId, v.comisionProductoPorcentaje);
+    if (porcentaje === null) sinComisionProducto.add(v.personalId);
+    const comisionProducto = calcularComision(base, porcentaje);
+    const previo = porPersona.get(v.personalId) ?? { cantidad: 0, cobrado: 0, comision: 0, comisionProducto: 0 };
+    porPersona.set(v.personalId, { ...previo, comisionProducto: previo.comisionProducto + comisionProducto });
+    general.comisionProducto += comisionProducto;
   }
 
   const filas: FilaTrabajo[] = detalle.map((c) => {
@@ -200,6 +256,7 @@ export async function cargarReportePersonal(
     porPersona,
     general,
     nombresSinComision: personas.filter((p) => sinComision.has(p.id)).map((p) => p.nombre),
+    nombresSinComisionProducto: personas.filter((p) => sinComisionProducto.has(p.id)).map((p) => p.nombre),
     filas,
     hayMas: general.cantidad > filas.length,
   };

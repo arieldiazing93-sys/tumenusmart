@@ -68,8 +68,9 @@ export function CobrarPanel({
   cobrando: boolean;
   error: string | null;
   /**
-   * El personal al que se le puede asignar el trabajo. Con gente, el cobro pregunta "¿Quién hizo el
-   * trabajo?" y no deja cobrar sin elegir; vacío (la mayoría de los negocios), no pregunta nada.
+   * El personal al que se le puede asignar la venta (el servicio, el producto, o los dos). Con gente,
+   * el cobro pregunta "¿Quién atendió esto?" y no deja cobrar sin elegir; vacío (la mayoría de los
+   * negocios), no pregunta nada.
    */
   personal: { id: string; nombre: string }[];
   /** Si el local vende a crédito (Configuración): se ofrece "A crédito" como forma de pago. */
@@ -197,7 +198,7 @@ export function CobrarPanel({
           {pideAsignar && (
             <div className="rounded-xl border border-yellow-400 bg-yellow-50 p-3.5">
               <label className="block">
-                <span className="mb-1.5 block text-[0.82rem] font-semibold text-tinta">¿Quién hizo el trabajo? *</span>
+                <span className="mb-1.5 block text-[0.82rem] font-semibold text-tinta">¿Quién atendió esto? *</span>
                 <select
                   value={personalId}
                   onChange={(e) => setPersonalId(e.target.value)}

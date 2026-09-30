@@ -48,16 +48,30 @@ export default async function ReportePersonalPage({
     { etiqueta: "Mes anterior", desde: `${ultimoDiaMesAnterior.slice(0, 7)}-01`, hasta: ultimoDiaMesAnterior },
   ];
 
-  const { personas, personalElegido, periodo, demasiadoLargo, porPersona, general, nombresSinComision, filas, hayMas } =
-    await cargarReportePersonal(db, sp, MAXIMO_FILAS);
+  const {
+    personas,
+    personalElegido,
+    periodo,
+    demasiadoLargo,
+    porPersona,
+    general,
+    nombresSinComision,
+    nombresSinComisionProducto,
+    filas,
+    hayMas,
+  } = await cargarReportePersonal(db, sp, MAXIMO_FILAS);
   const promedio = general.cantidad > 0 ? general.cobrado / general.cantidad : 0;
   const columnas = personalElegido ? 7 : 8;
+  // Sin trabajos NI ventas con comisión de producto: ahí sí no hay nada que mostrar. Antes solo miraba los
+  // trabajos, y a alguien que solo vendió productos (sin hacer ningún corte) le mostraba "sin nada" igual.
+  const hayMovimiento = general.cantidad > 0 || general.comisionProducto > 0;
 
   const resumen = [
     { rotulo: general.cantidad === 1 ? "Trabajo" : "Trabajos", valor: String(general.cantidad), tono: "neutro" },
     { rotulo: "Cobrado", valor: formatearGuarani(general.cobrado), tono: "neutro" },
     { rotulo: "Promedio por trabajo", valor: formatearGuarani(promedio), tono: "neutro" },
-    { rotulo: "Comisión", valor: formatearGuarani(general.comision), tono: "exito" },
+    { rotulo: "Comisión de servicios", valor: formatearGuarani(general.comision), tono: "exito" },
+    { rotulo: "Comisión de productos", valor: formatearGuarani(general.comisionProducto), tono: "exito" },
   ];
 
   const urlDe = (personalId: string) =>
@@ -116,7 +130,7 @@ export default async function ReportePersonalPage({
             </h2>
             {/* Verde: sacar el reporte a un archivo (Excel). Azul: lleva a otra pantalla — el PDF se
                 imprime/guarda desde ahí con el botón del navegador, mismo criterio que Estadísticas. */}
-            {general.cantidad > 0 && (
+            {hayMovimiento && (
               <div className="flex flex-wrap gap-2">
                 {urlExcel && (
                   <a href={urlExcel} className={clasesBoton("exito", "sm")}>
@@ -132,7 +146,7 @@ export default async function ReportePersonalPage({
             )}
           </div>
 
-          <dl className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <dl className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-5">
             {resumen.map((r) => (
               <div
                 key={r.rotulo}
@@ -154,19 +168,28 @@ export default async function ReportePersonalPage({
             <div className="mb-3">
               <Aviso>
                 {nombresSinComision.join(", ")} {nombresSinComision.length === 1 ? "todavía no tiene" : "todavía no tienen"} una
-                comisión cargada, así que no se le calcula. Poné el porcentaje en Personal → Editar.
+                comisión de servicio cargada, así que no se le calcula. Poné el porcentaje en Personal → Editar.
+              </Aviso>
+            </div>
+          )}
+          {nombresSinComisionProducto.length > 0 && (
+            <div className="mb-3">
+              <Aviso>
+                {nombresSinComisionProducto.join(", ")}{" "}
+                {nombresSinComisionProducto.length === 1 ? "todavía no tiene" : "todavía no tienen"} una comisión de
+                producto cargada, así que no se le calcula. Poné el porcentaje en Personal → Editar.
               </Aviso>
             </div>
           )}
 
-          {general.cantidad === 0 ? (
+          {!hayMovimiento ? (
             <Vacio
               titulo={
                 personalElegido
-                  ? `${personalElegido.nombre} no tiene trabajos terminados en este período`
-                  : "No hay trabajos terminados en este período"
+                  ? `${personalElegido.nombre} no tiene movimiento en este período`
+                  : "No hay movimiento en este período"
               }
-              detalle="Un trabajo cuenta cuando se cobra: una cita cobrada en el calendario, o una venta del mostrador asignada a esa persona."
+              detalle="Cuenta un trabajo cobrado (una cita, o una venta del mostrador asignada a esa persona) o una venta de productos con su comisión."
             />
           ) : (
             <>
@@ -181,7 +204,8 @@ export default async function ReportePersonalPage({
                           <Th>Personal</Th>
                           <Th className="text-right">Trabajos</Th>
                           <Th className="text-right">Cobrado</Th>
-                          <Th className="text-right">Comisión</Th>
+                          <Th className="text-right">Comisión servicios</Th>
+                          <Th className="text-right">Comisión productos</Th>
                           <Th className="text-right">
                             <span className="sr-only">Acción</span>
                           </Th>
@@ -191,7 +215,7 @@ export default async function ReportePersonalPage({
                         {personas
                           .filter((p) => p.activo || porPersona.has(p.id))
                           .map((p) => {
-                            const suma = porPersona.get(p.id) ?? { cantidad: 0, cobrado: 0, comision: 0 };
+                            const suma = porPersona.get(p.id) ?? { cantidad: 0, cobrado: 0, comision: 0, comisionProducto: 0 };
                             return (
                               <Tr key={p.id}>
                                 <Td>
@@ -200,7 +224,11 @@ export default async function ReportePersonalPage({
                                     <span className="min-w-0">
                                       <span className="block truncate font-medium text-tinta">{p.nombre}</span>
                                       <span className="block text-[0.72rem] text-tinta-suave">
-                                        {p.comision != null ? `Comisión ${textoPorcentaje(p.comision)}%` : "Sin comisión"}
+                                        {p.comision != null ? `Servicio ${textoPorcentaje(p.comision)}%` : "Sin comisión servicio"}
+                                        {" · "}
+                                        {p.comisionProducto != null
+                                          ? `Producto ${textoPorcentaje(p.comisionProducto)}%`
+                                          : "Sin comisión producto"}
                                       </span>
                                     </span>
                                   </span>
@@ -208,6 +236,9 @@ export default async function ReportePersonalPage({
                                 <Td className="cifra text-right">{suma.cantidad}</Td>
                                 <Td className="cifra text-right">{formatearGuarani(suma.cobrado)}</Td>
                                 <Td className="cifra text-right font-medium text-exito">{formatearGuarani(suma.comision)}</Td>
+                                <Td className="cifra text-right font-medium text-exito">
+                                  {formatearGuarani(suma.comisionProducto)}
+                                </Td>
                                 <Td className="text-right">
                                   {suma.cantidad > 0 && (
                                     <BotonEnlace href={urlDe(p.id)} tono="navegar" tam="sm">
@@ -225,6 +256,9 @@ export default async function ReportePersonalPage({
                           <Td className="cifra text-right font-semibold text-tinta">{general.cantidad}</Td>
                           <Td className="cifra text-right font-semibold text-tinta">{formatearGuarani(general.cobrado)}</Td>
                           <Td className="cifra text-right font-semibold text-exito">{formatearGuarani(general.comision)}</Td>
+                          <Td className="cifra text-right font-semibold text-exito">
+                            {formatearGuarani(general.comisionProducto)}
+                          </Td>
                           <Td>{null}</Td>
                         </tr>
                       </tfoot>
@@ -236,7 +270,12 @@ export default async function ReportePersonalPage({
                     {personas
                       .filter((p) => p.activo || porPersona.has(p.id))
                       .map((p) => {
-                        const suma = porPersona.get(p.id) ?? { cantidad: 0, cobrado: 0, comision: 0 };
+                        const suma = porPersona.get(p.id) ?? {
+                          cantidad: 0,
+                          cobrado: 0,
+                          comision: 0,
+                          comisionProducto: 0,
+                        };
                         return (
                           <li key={p.id} className="rounded-xl border border-linea bg-superficie p-3">
                             <div className="flex items-center gap-2.5">
@@ -244,11 +283,15 @@ export default async function ReportePersonalPage({
                               <div className="min-w-0 flex-1">
                                 <p className="truncate font-medium text-tinta">{p.nombre}</p>
                                 <p className="text-[0.72rem] text-tinta-suave">
-                                  {p.comision != null ? `Comisión ${textoPorcentaje(p.comision)}%` : "Sin comisión"}
+                                  {p.comision != null ? `Servicio ${textoPorcentaje(p.comision)}%` : "Sin comisión servicio"}
+                                  {" · "}
+                                  {p.comisionProducto != null
+                                    ? `Producto ${textoPorcentaje(p.comisionProducto)}%`
+                                    : "Sin comisión producto"}
                                 </p>
                               </div>
                             </div>
-                            <div className="mt-2.5 grid grid-cols-3 gap-2 border-t border-linea-fina pt-2.5 text-center">
+                            <div className="mt-2.5 grid grid-cols-2 gap-2 border-t border-linea-fina pt-2.5 text-center sm:grid-cols-4">
                               <div>
                                 <p className="cifra text-[0.86rem] font-semibold text-tinta">{suma.cantidad}</p>
                                 <p className="text-[0.66rem] text-tinta-suave">Trabajos</p>
@@ -263,7 +306,13 @@ export default async function ReportePersonalPage({
                                 <p className="cifra text-[0.86rem] font-semibold text-exito">
                                   {formatearGuarani(suma.comision)}
                                 </p>
-                                <p className="text-[0.66rem] text-tinta-suave">Comisión</p>
+                                <p className="text-[0.66rem] text-tinta-suave">Com. servicios</p>
+                              </div>
+                              <div>
+                                <p className="cifra text-[0.86rem] font-semibold text-exito">
+                                  {formatearGuarani(suma.comisionProducto)}
+                                </p>
+                                <p className="text-[0.66rem] text-tinta-suave">Com. productos</p>
                               </div>
                             </div>
                             {suma.cantidad > 0 && (

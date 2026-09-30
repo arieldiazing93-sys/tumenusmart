@@ -34,6 +34,7 @@ export default async function PersonalPage() {
       fotoUrl: true,
       activo: true,
       comisionPorcentaje: true,
+      comisionProductoPorcentaje: true,
       _count: { select: { citas: true, servicios: true } },
     },
   });
@@ -70,6 +71,8 @@ export default async function PersonalPage() {
     servicios: f._count.servicios,
     citas: f._count.citas,
     comisionPorcentaje: f.comisionPorcentaje == null ? null : Number(f.comisionPorcentaje),
+    comisionProductoPorcentaje:
+      f.comisionProductoPorcentaje == null ? null : Number(f.comisionProductoPorcentaje),
     horarioPropio: propioDe.has(f.id) ? completarHorario(propioDe.get(f.id) ?? []) : null,
   }));
 

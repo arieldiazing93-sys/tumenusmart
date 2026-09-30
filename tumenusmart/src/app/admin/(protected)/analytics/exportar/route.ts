@@ -81,7 +81,7 @@ export async function GET(request: NextRequest) {
   hoja.addRow([distribucion.unaVez, distribucion.dosATres, distribucion.cuatroOMas]);
   hoja.addRow([]);
 
-  const encabezados: (string | number)[] = ["#", "Cliente", "Teléfono", "Pedidos", "Gasto total (Gs.)", "Último pedido"];
+  const encabezados: (string | number)[] = ["#", "Cliente", "Teléfono", "Visitas", "Gasto total (Gs.)", "Última visita"];
   if (fidelizacionActiva) encabezados.push(`Fidelización (de ${umbral})`);
   filaTitulo(hoja, encabezados, encabezados.length);
 

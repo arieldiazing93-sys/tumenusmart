@@ -1236,6 +1236,19 @@ model VentaPos {
   tipoEntrega     String  @default("local")
   nota            String?
 
+  // Quién vendió los PRODUCTOS de esta cuenta (comisión de producto, independiente de la comisión de
+  // servicio que ya se lleva con Cita.personalId/precio). Se pregunta igual que el personal de un
+  // servicio — mismo interruptor "preguntar el personal al cobrar" —, pero acá SÍ cuenta una cuenta de
+  // solo productos: por eso es un campo aparte y no reutiliza Cita (una venta de productos no es un
+  // turno, no tiene duración ni horario, así que no nace una Cita para esto).
+  personalId                  String?
+  personal                    MiembroPersonal? @relation(fields: [personalId], references: [id])
+  // El % que tenía la persona al cobrar (congelado, mismo criterio que Cita.comisionPorcentaje).
+  comisionProductoPorcentaje  Decimal?         @db.Decimal(5, 2)
+  // La base de esa comisión: el subtotal de las líneas que SON PRODUCTO (no servicio) en esta cuenta,
+  // ya con su parte del descuento general restada — mismo criterio que Cita.precio para servicios.
+  comisionProductoBase        Decimal?         @db.Decimal(10, 2)
+
   // Anular una cuenta ya cobrada (se cargó mal, el cliente se arrepintió,
   // etc.) sin borrar el registro — deja rastro de quién y por qué. Solo se
   // permite mientras el turno (turnoPos) sigue "abierto": una vez cerrado,
@@ -1320,6 +1333,7 @@ model VentaPos {
   @@index([storeId])
   @@index([turnoPosId])
   @@index([storeId, creadoEn])
+  @@index([personalId])
 }
 
 model VentaPosItem {
@@ -2209,12 +2223,18 @@ model MiembroPersonal {
   /// Comisión por trabajo: el porcentaje (0 a 100) de lo que se cobra en cada cita suya.
   /// NULL = no cobra comisión. Cada cita guarda el porcentaje que tenía al cobrarse.
   comisionPorcentaje Decimal? @db.Decimal(5, 2)
+  /// Comisión por PRODUCTO (0 a 100): aparte de la de servicio, para cuando esta persona vende algo
+  /// de la carta (un shampoo, una cera) en el mostrador — no hace falta que haya un servicio en la
+  /// misma cuenta. NULL = no cobra comisión de producto. Cada venta guarda el % que tenía al cobrarse.
+  comisionProductoPorcentaje Decimal? @db.Decimal(5, 2)
   createdAt DateTime @default(now())
 
   citas     Cita[]
   servicios ServicioPersonal[]
   /// Su horario propio (siete filas si lo tiene). Sin filas usa el horario general del negocio.
   horario   HorarioPersonal[]
+  /// Ventas del mostrador donde se le asignó la comisión de producto (ver VentaPos.personalId).
+  ventasProducto VentaPos[]
 
   @@index([storeId])
 }

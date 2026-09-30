@@ -22,8 +22,10 @@ export type MiembroFila = {
   servicios: number;
   /** Cuántos turnos tiene (de cualquier estado). */
   citas: number;
-  /** Su comisión por trabajo, en porcentaje (0 a 100); null si no cobra comisión. */
+  /** Su comisión por servicio, en porcentaje (0 a 100); null si no cobra comisión de servicio. */
   comisionPorcentaje: number | null;
+  /** Su comisión por producto vendido, en porcentaje (0 a 100); null si no cobra comisión de producto. */
+  comisionProductoPorcentaje: number | null;
   /** Su horario propio (los siete días); null si no lo tiene y usa el horario general del negocio. */
   horarioPropio: HorarioDia[] | null;
 };

@@ -51,6 +51,7 @@ type DatosPersonal = {
   profesion: string | null;
   fotoUrl: string | null;
   comisionPorcentaje: number | null;
+  comisionProductoPorcentaje: number | null;
 };
 
 /** Lee y valida lo que mandó el formulario. Nunca se guarda lo que llega tal cual. */
@@ -71,9 +72,12 @@ function leerDatos(formData: FormData): { ok: true; datos: DatosPersonal } | { o
   const fotoUrl = texto(formData.get("fotoUrl"));
   if (fotoUrl && !/^https:\/\//i.test(fotoUrl)) return { ok: false, error: "La foto no es válida. Subila de nuevo." };
 
-  // La comisión por trabajo: vacío = no cobra comisión.
+  // La comisión por servicio y la comisión por producto: vacío = no cobra esa comisión. Son dos campos
+  // independientes, la misma validación para los dos.
   const comision = leerComision(texto(formData.get("comision")));
   if (!comision.ok) return { ok: false, error: comision.error };
+  const comisionProducto = leerComision(texto(formData.get("comisionProducto")));
+  if (!comisionProducto.ok) return { ok: false, error: comisionProducto.error };
 
   return {
     ok: true,
@@ -84,6 +88,7 @@ function leerDatos(formData: FormData): { ok: true; datos: DatosPersonal } | { o
       profesion: profesion || null,
       fotoUrl: fotoUrl || null,
       comisionPorcentaje: comision.valor,
+      comisionProductoPorcentaje: comisionProducto.valor,
     },
   };
 }

@@ -207,25 +207,32 @@ export async function registrarVenta(turnoId: string, datos: DatosVenta): Promis
   }
 
   // Negocios que atienden sin reserva (barberías, salones): al cobrar en el mostrador el trabajo se le asigna a
-  // una persona del personal, y esa venta queda como una cita ya cobrada suya (para su vista de trabajo y su
-  // comisión). Solo si el local lo activó y hay personal cargado; con una cita de por medio no hace falta.
-  // Solo cuenta si la cuenta lleva algún SERVICIO: una cuenta de puros productos (un shampoo, un perfume) no
-  // pregunta ni asigna a nadie. Eso se decide más abajo, cuando ya se sabe qué líneas hay.
+  // una persona del personal. Si la cuenta lleva algún SERVICIO, esa venta queda como una cita ya cobrada suya
+  // (para su vista de trabajo y su comisión de servicio). Si lleva algún PRODUCTO, se le asigna la comisión de
+  // producto (sin crear ninguna cita: una venta de productos no es un turno). Alcanza con que haya UNA de las
+  // dos cosas para que se pregunte; con una cita de por medio no hace falta. Solo si el local lo activó y hay
+  // personal cargado. Qué líneas hay se sabe más abajo, así que la decisión final queda ahí.
   const pideAsignarPersonal =
     !datos.citaId && !!store?.pedirPersonalEnVenta && (await db.miembroPersonal.count({ where: { activo: true } })) > 0;
-  let personalElegido: { id: string; comisionPorcentaje: number | null } | null = null;
+  let personalElegido: {
+    id: string;
+    comisionPorcentaje: number | null;
+    comisionProductoPorcentaje: number | null;
+  } | null = null;
   if (pideAsignarPersonal && typeof datos.personalId === "string" && datos.personalId) {
     const elegido = await db.miembroPersonal.findFirst({
       where: { id: datos.personalId, activo: true },
-      select: { id: true, comisionPorcentaje: true },
+      select: { id: true, comisionPorcentaje: true, comisionProductoPorcentaje: true },
     });
     if (!elegido) return { ok: false, error: "Esa persona ya no está activa. Elegí a quién se le asigna el trabajo." };
     personalElegido = {
       id: elegido.id,
       comisionPorcentaje: elegido.comisionPorcentaje == null ? null : Number(elegido.comisionPorcentaje),
+      comisionProductoPorcentaje:
+        elegido.comisionProductoPorcentaje == null ? null : Number(elegido.comisionProductoPorcentaje),
     };
   }
-  let personalAsignado: { id: string; comisionPorcentaje: number | null } | null = null;
+  let personalAsignado: typeof personalElegido = null;
 
   const esFactura = datos.comprobanteTipo === "factura";
   const esSinRegistroFiscal = datos.facturaTipoIdentificacion === SIN_REGISTRO_FISCAL.tipo;
@@ -462,10 +469,12 @@ export async function registrarVenta(turnoId: string, datos: DatosVenta): Promis
   }
   if (subtotal <= 0) return { ok: false, error: "El total tiene que ser mayor a cero." };
 
-  // Lo que en esta cuenta es un servicio. Solo eso se le asigna a una persona (y solo eso cuenta para su
-  // comisión): los productos que se lleve el cliente están en la carta y no llevan personal.
+  // Lo que en esta cuenta es un servicio (base de la comisión de servicio, vía una Cita) y lo que es
+  // un producto de verdad (base de la comisión de producto, sin Cita) — un combo mitad y mitad no
+  // tiene un único producto (f.productId queda null) y no cuenta para ninguna de las dos.
   const lineasDeServicio = filas.filter((f) => !!f.productId && esServicioElProducto.get(f.productId) === true);
-  if (pideAsignarPersonal && lineasDeServicio.length > 0) {
+  const lineasDeProducto = filas.filter((f) => !!f.productId && esServicioElProducto.get(f.productId) === false);
+  if (pideAsignarPersonal && (lineasDeServicio.length > 0 || lineasDeProducto.length > 0)) {
     if (!personalElegido) return { ok: false, error: "Elegí a quién se le asigna el trabajo." };
     personalAsignado = personalElegido;
   }
@@ -476,6 +485,12 @@ export async function registrarVenta(turnoId: string, datos: DatosVenta): Promis
   const descuento = calcularDescuento(subtotal, datos.descuento);
   if (!descuento.ok) return { ok: false, error: descuento.error };
   const total = subtotal - descuento.monto;
+
+  // La base de la comisión de producto: el subtotal de las líneas de producto, con su parte
+  // proporcional del descuento general ya restada — mismo criterio que la de servicio (más abajo).
+  const subtotalProductos = lineasDeProducto.reduce((suma, f) => suma + f.precioUnitario * f.cantidad, 0);
+  const descuentoProductos = subtotal > 0 ? Math.round((descuento.monto * subtotalProductos) / subtotal) : 0;
+  const comisionProductoBase = subtotalProductos - descuentoProductos;
 
   // Cómo se paga, contra el total que acaba de calcular el servidor: una forma
   // cobra todo; varias tienen que sumar exactamente el total.
@@ -490,9 +505,10 @@ export async function registrarVenta(turnoId: string, datos: DatosVenta): Promis
     ),
   ];
 
-  // Si el trabajo se asigna a alguien del personal: cuánto dura cada servicio (para la hora de inicio de su cita).
+  // Si el trabajo se asigna a alguien del personal y hay servicios: cuánto dura cada uno (para la hora
+  // de inicio de la cita). Una venta de solo productos no entra acá: no nace ninguna cita.
   const servicioDelProducto = new Map<string, { id: string; duracionMin: number }>();
-  if (personalAsignado) {
+  if (personalAsignado && lineasDeServicio.length > 0) {
     const idsProductos = [...new Set(lineasDeServicio.flatMap((f) => (f.productId ? [f.productId] : [])))];
     if (idsProductos.length > 0) {
       const servicios = await db.servicioAgenda.findMany({
@@ -600,6 +616,15 @@ export async function registrarVenta(turnoId: string, datos: DatosVenta): Promis
         clienteTelefono,
         tipoEntrega,
         nota,
+        // Comisión de producto: solo si de verdad hubo líneas de producto (si personalAsignado
+        // quedó puesto solo por el servicio de la cita, acá no corresponde nada).
+        ...(personalAsignado && lineasDeProducto.length > 0
+          ? {
+              personalId: personalAsignado.id,
+              comisionProductoPorcentaje: personalAsignado.comisionProductoPorcentaje,
+              comisionProductoBase,
+            }
+          : {}),
         ...datosFactura,
         items: {
           create: filas.map((f) => ({
@@ -639,12 +664,13 @@ export async function registrarVenta(turnoId: string, datos: DatosVenta): Promis
       if (marcada.count !== 1) throw new Error(CITA_NO_COBRABLE);
     }
 
-    // Alguien que llegó sin reserva y se le asignó el trabajo a una persona: la venta queda como una cita ya
-    // cobrada de esa persona (nace Finalizada, con la hora en que terminó el trabajo), así aparece en Citas, en su
-    // vista de trabajo y en su comisión igual que una cita reservada. La cita lleva SOLO los servicios: lo que
-    // valen (`precio`, ya con la parte que les toca del descuento) es la base de su comisión, sin los productos
-    // que se haya llevado el cliente en la misma cuenta.
-    if (personalAsignado) {
+    // Alguien que llegó sin reserva y se le asignó el trabajo a una persona: si la cuenta lleva algún SERVICIO,
+    // la venta queda como una cita ya cobrada de esa persona (nace Finalizada, con la hora en que terminó el
+    // trabajo), así aparece en Citas, en su vista de trabajo y en su comisión igual que una cita reservada. La
+    // cita lleva SOLO los servicios: lo que valen (`precio`, ya con la parte que les toca del descuento) es la
+    // base de su comisión, sin los productos que se haya llevado el cliente en la misma cuenta — esos ya
+    // quedaron aparte, en VentaPos.comisionProductoBase. Una venta de solo productos no crea ninguna cita.
+    if (personalAsignado && lineasDeServicio.length > 0) {
       const fin = new Date();
       const subtotalServicios = lineasDeServicio.reduce((suma, f) => suma + f.precioUnitario * f.cantidad, 0);
       const descuentoServicios = Math.round((descuento.monto * subtotalServicios) / subtotal);
