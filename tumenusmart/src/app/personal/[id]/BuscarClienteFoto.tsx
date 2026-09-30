@@ -160,14 +160,20 @@ function FichaFotoCliente({
       <p className="mt-2 text-[0.95rem] font-semibold text-tinta">{cliente.nombre}</p>
       <p className="text-[0.78rem] text-tinta-suave">{cliente.telefono ?? "—"}</p>
 
-      <div className="mt-3 flex h-48 w-full items-center justify-center overflow-hidden rounded-lg border border-linea bg-papel-suave">
-        {cliente.fotoUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={cliente.fotoUrl} alt={`Último peinado de ${cliente.nombre}`} className="h-full w-full object-cover" />
-        ) : (
+      {cliente.fotoUrl ? (
+        // Mismo tamaño que la foto de Servicios: 4/3 a todo el ancho, para
+        // que se vea el corte de verdad, no una miniatura.
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={cliente.fotoUrl}
+          alt={`Último peinado de ${cliente.nombre}`}
+          className="mt-3 aspect-[4/3] w-full rounded-lg border border-linea object-cover object-top"
+        />
+      ) : (
+        <div className="mt-3 flex aspect-[4/3] w-full items-center justify-center rounded-lg border border-linea bg-papel-suave">
           <span className="px-4 text-center text-[0.82rem] text-tinta-suave">Todavía no tiene una foto cargada</span>
-        )}
-      </div>
+        </div>
+      )}
 
       <label className={`mt-3 block w-full cursor-pointer text-center ${clasesBoton("principal", "md")}`}>
         {subiendo ? "Subiendo…" : cliente.fotoUrl ? "Cambiar foto" : "Subir foto de cómo quedó"}
