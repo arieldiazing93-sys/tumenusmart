@@ -701,6 +701,11 @@ model Customer {
   // usa para enviar nada todavía.
   email  String?
 
+  // El último peinado/corte que se le hizo, de Reserva de turnos: se
+  // PISA cada vez que se sube una foto nueva (no es una galería) — el
+  // barbero busca al cliente y ve solo la última.
+  fotoUrl String?
+
   // El mismo número puede ser cliente de dos locales distintos: son
   // personas distintas para cada negocio. Postgres no choca dos NULL entre
   // sí, así que un cliente sin teléfono, otro sin identificación fiscal y

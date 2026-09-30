@@ -80,3 +80,8 @@ export async function subirFotoPersonal(archivo: File): Promise<string> {
 export async function subirImagenPaginaReservas(archivo: File): Promise<string> {
   return subirImagen(archivo, "reservas/");
 }
+
+/** El último peinado/corte del cliente, en Reserva de turnos. */
+export async function subirFotoCliente(archivo: File): Promise<string> {
+  return subirImagen(archivo, "clientes/");
+}

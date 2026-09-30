@@ -6,9 +6,23 @@ import { exigirPermiso } from "@/lib/auth";
 import { idLocalActual } from "@/lib/local-actual";
 import { prismaDelLocal, siguienteNumeroCliente } from "@/lib/prisma-local";
 import { prisma } from "@/lib/prisma";
+import { subirFotoCliente } from "@/lib/supabase-storage";
 
 export type ResultadoActualizarCliente = { ok: true } | { ok: false; error: string };
 export type ResultadoCrearCliente = { ok: true } | { ok: false; error: string };
+export type ResultadoFotoCliente = { ok: true; url: string } | { ok: false; error: string };
+
+/** Sube el último peinado/corte del cliente (Reserva de turnos). Se llama antes de guardar: acá solo se sube la imagen, `actualizarCliente` guarda su dirección. */
+export async function subirFotoDelCliente(formData: FormData): Promise<ResultadoFotoCliente> {
+  await exigirPermiso("pos.verHistorico");
+  const archivo = formData.get("archivo");
+  if (!(archivo instanceof File)) return { ok: false, error: "No se recibió ninguna imagen" };
+  try {
+    return { ok: true, url: await subirFotoCliente(archivo) };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "No se pudo subir la foto" };
+  }
+}
 
 /**
  * Alta manual de un cliente, sin pasar por una venta.
@@ -87,7 +101,13 @@ export async function crearCliente(datos: {
  */
 export async function actualizarCliente(
   id: string,
-  datos: { nombre: string; email: string; tipoIdentificacion: string; numeroIdentificacion: string }
+  datos: {
+    nombre: string;
+    email: string;
+    tipoIdentificacion: string;
+    numeroIdentificacion: string;
+    fotoUrl: string;
+  }
 ): Promise<ResultadoActualizarCliente> {
   await exigirPermiso("pos.verHistorico");
   const prisma = prismaDelLocal(await idLocalActual());
@@ -104,6 +124,10 @@ export async function actualizarCliente(
     return { ok: false, error: "Completá el tipo y el número de identificación, o dejá los dos vacíos." };
   }
 
+  // La foto ya se subió aparte (subirFotoDelCliente); acá solo llega su dirección.
+  const fotoUrl = datos.fotoUrl.trim();
+  if (fotoUrl && !/^https:\/\//i.test(fotoUrl)) return { ok: false, error: "La foto no es válida. Subila de nuevo." };
+
   try {
     await prisma.customer.update({
       where: { id },
@@ -112,6 +136,7 @@ export async function actualizarCliente(
         email: email || null,
         tipoIdentificacion: tipoIdentificacion || null,
         numeroIdentificacion: numeroIdentificacion || null,
+        fotoUrl: fotoUrl || null,
       },
     });
   } catch (err) {

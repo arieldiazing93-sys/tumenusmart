@@ -41,6 +41,7 @@ export default async function ClientesPosPage({
       telefono: true,
       tipoIdentificacion: true,
       numeroIdentificacion: true,
+      fotoUrl: true,
     },
     take: 200,
   });
@@ -83,6 +84,7 @@ export default async function ClientesPosPage({
               <Th>Teléfono</Th>
               <Th>Identificación fiscal</Th>
               <Th>Correo</Th>
+              <Th>Imagen</Th>
               <Th>
                 <span className="sr-only">Acciones</span>
               </Th>
@@ -99,6 +101,7 @@ export default async function ClientesPosPage({
                 telefono={c.telefono}
                 tipoIdentificacion={c.tipoIdentificacion}
                 numeroIdentificacion={c.numeroIdentificacion}
+                fotoUrl={c.fotoUrl}
               />
             ))}
           </tbody>

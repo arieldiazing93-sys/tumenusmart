@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
-import { Boton, Campo, Entrada, Selector, MensajeError } from "@/components/ui";
+import { useEffect, useRef, useState, useTransition } from "react";
+import { Boton, Campo, Entrada, Selector, MensajeError, clasesBoton } from "@/components/ui";
 import { TIPOS_IDENTIFICACION_FISCAL } from "@/lib/tipo-cliente";
 import { formatearNumero } from "@/lib/format";
-import { actualizarCliente } from "./actions";
+import { comprimirImagen, PARA_PRODUCTO } from "@/lib/comprimir-imagen";
+import { actualizarCliente, subirFotoDelCliente } from "./actions";
 
 /**
  * Edición de un cliente ya existente, en ventana modal (mismo estilo que
@@ -24,6 +25,7 @@ export function ClienteEditarModal({
   email,
   tipoIdentificacion,
   numeroIdentificacion,
+  fotoUrl,
   onCerrar,
   onGuardado,
 }: {
@@ -33,6 +35,8 @@ export function ClienteEditarModal({
   email: string | null;
   tipoIdentificacion: string | null;
   numeroIdentificacion: string | null;
+  /** El último peinado/corte que se le hizo (Reserva de turnos). */
+  fotoUrl?: string | null;
   onCerrar: () => void;
   onGuardado: () => void;
 }) {
@@ -41,6 +45,10 @@ export function ClienteEditarModal({
   const [valorTipo, setValorTipo] = useState(tipoIdentificacion ?? TIPOS_IDENTIFICACION_FISCAL[0].valor);
   const [valorNumeroIdent, setValorNumeroIdent] = useState(numeroIdentificacion ?? "");
   const [tieneIdentificacion, setTieneIdentificacion] = useState(!!numeroIdentificacion);
+  const [valorFoto, setValorFoto] = useState(fotoUrl ?? "");
+  const [subiendoFoto, setSubiendoFoto] = useState(false);
+  const [errorFoto, setErrorFoto] = useState<string | null>(null);
+  const inputFoto = useRef<HTMLInputElement>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -52,6 +60,32 @@ export function ClienteEditarModal({
     return () => window.removeEventListener("keydown", alTeclado);
   }, [onCerrar]);
 
+  async function alElegirFoto(e: React.ChangeEvent<HTMLInputElement>) {
+    const elegido = e.target.files?.[0];
+    if (!elegido) return;
+    setErrorFoto(null);
+    setSubiendoFoto(true);
+    try {
+      // El barbero necesita ver el detalle del corte, no solo reconocer una
+      // cara chica: mismo tamaño que la foto de un producto, más grande que
+      // el avatar redondo del personal.
+      const { archivo: liviano } = await comprimirImagen(elegido, PARA_PRODUCTO);
+      const datos = new FormData();
+      datos.set("archivo", liviano);
+      const subida = await subirFotoDelCliente(datos);
+      if (!subida.ok) {
+        setErrorFoto(subida.error);
+        return;
+      }
+      setValorFoto(subida.url);
+    } catch (err) {
+      setErrorFoto(err instanceof Error ? err.message : "No se pudo subir la foto");
+    } finally {
+      setSubiendoFoto(false);
+      if (inputFoto.current) inputFoto.current.value = "";
+    }
+  }
+
   function guardar() {
     setError(null);
     startTransition(async () => {
@@ -60,6 +94,7 @@ export function ClienteEditarModal({
         email: valorEmail,
         tipoIdentificacion: tieneIdentificacion ? valorTipo : "",
         numeroIdentificacion: tieneIdentificacion ? valorNumeroIdent : "",
+        fotoUrl: valorFoto,
       });
       if (!r.ok) {
         setError(r.error);
@@ -150,6 +185,48 @@ export function ClienteEditarModal({
               placeholder="cliente@correo.com"
             />
           </Campo>
+
+          <div>
+            <label className="mb-1 block text-sm font-semibold text-tinta">
+              Último peinado/corte (opcional)
+            </label>
+            <p className="mb-1.5 text-xs leading-snug text-tinta-media">
+              Se pisa cada vez que subís una foto nueva: siempre queda solo la última.
+            </p>
+            <div className="flex items-center gap-3">
+              <div className="flex h-20 w-20 flex-none items-center justify-center overflow-hidden rounded-lg border border-linea bg-papel-suave">
+                {valorFoto ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={valorFoto} alt="Último peinado" className="h-full w-full object-cover" />
+                ) : (
+                  <span className="text-xs text-tinta-suave">Sin foto</span>
+                )}
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className={`${clasesBoton("suave", "sm")} cursor-pointer`}>
+                  {subiendoFoto ? "Subiendo…" : valorFoto ? "Cambiar foto" : "Subir foto"}
+                  <input
+                    ref={inputFoto}
+                    type="file"
+                    accept="image/*"
+                    onChange={alElegirFoto}
+                    disabled={subiendoFoto}
+                    className="hidden"
+                  />
+                </label>
+                {valorFoto && (
+                  <button
+                    type="button"
+                    onClick={() => setValorFoto("")}
+                    className="text-left text-xs text-peligro hover:underline"
+                  >
+                    Quitar foto
+                  </button>
+                )}
+              </div>
+            </div>
+            {errorFoto && <MensajeError>{errorFoto}</MensajeError>}
+          </div>
 
           {error && <MensajeError>{error}</MensajeError>}
         </div>
