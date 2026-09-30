@@ -36,6 +36,7 @@ export default async function ServiciosPage() {
         bufferMin: true,
         tipoPrecio: true,
         color: true,
+        ocultoEnMenuPublico: true,
         product: {
           select: { nombre: true, precio: true, iva: true, disponible: true, categoryId: true, imagenUrl: true },
         },
@@ -62,6 +63,7 @@ export default async function ServiciosPage() {
     color: s.color,
     imagenUrl: s.product.imagenUrl,
     personalIds: s.personal.map((p) => p.personalId),
+    ocultoEnMenuPublico: s.ocultoEnMenuPublico,
   }));
 
   const personal: PersonalOpcion[] = miembros.map((m) => ({

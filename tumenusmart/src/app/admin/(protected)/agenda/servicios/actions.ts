@@ -135,6 +135,7 @@ type DatosServicio = {
   color: string;
   /** Ya subida aparte (subirFotoProducto, con su propia validación de formato y tamaño); acá solo se guarda la URL. */
   imagenUrl: string | null;
+  ocultoEnMenuPublico: boolean;
 };
 
 /**
@@ -200,6 +201,7 @@ async function leerDatosServicio(
       iva: normalizarIva(formData.get("iva")),
       color: normalizarColor(formData.get("color")),
       imagenUrl: String(formData.get("imagenUrl") ?? "") || null,
+      ocultoEnMenuPublico: formData.get("ocultoEnMenuPublico") === "on",
     },
   };
 }
@@ -234,6 +236,7 @@ export async function crearServicio(formData: FormData): Promise<ResultadoServic
           bufferMin: d.bufferMin,
           tipoPrecio: d.tipoPrecio,
           color: d.color,
+          ocultoEnMenuPublico: d.ocultoEnMenuPublico,
           personal: { create: d.personalIds.map((personalId) => ({ storeId: idLocal, personalId })) },
         },
       },
@@ -261,7 +264,12 @@ export async function actualizarServicio(servicioId: string, formData: FormData)
 
   const anterior = await db.servicioAgenda.findFirst({
     where: { id: servicioId },
-    select: { id: true, productId: true, product: { select: { nombre: true, precio: true, disponible: true } } },
+    select: {
+      id: true,
+      productId: true,
+      ocultoEnMenuPublico: true,
+      product: { select: { nombre: true, precio: true, disponible: true } },
+    },
   });
   if (!anterior) return { ok: false, error: "Ese servicio ya no existe." };
 
@@ -287,7 +295,13 @@ export async function actualizarServicio(servicioId: string, formData: FormData)
     }),
     prisma.servicioAgenda.update({
       where: { id: anterior.id },
-      data: { duracionMin: d.duracionMin, bufferMin: d.bufferMin, tipoPrecio: d.tipoPrecio, color: d.color },
+      data: {
+        duracionMin: d.duracionMin,
+        bufferMin: d.bufferMin,
+        tipoPrecio: d.tipoPrecio,
+        color: d.color,
+        ocultoEnMenuPublico: d.ocultoEnMenuPublico,
+      },
     }),
     prisma.servicioPersonal.deleteMany({ where: { servicioId: anterior.id } }),
     prisma.servicioPersonal.createMany({
@@ -302,6 +316,9 @@ export async function actualizarServicio(servicioId: string, formData: FormData)
   }
   if (anterior.product.nombre !== d.nombre) cambios.push(`nombre "${anterior.product.nombre}" → "${d.nombre}"`);
   if (anterior.product.disponible !== activo) cambios.push(activo ? "lo volvió a activar" : "lo desactivó");
+  if (anterior.ocultoEnMenuPublico !== d.ocultoEnMenuPublico) {
+    cambios.push(d.ocultoEnMenuPublico ? "lo ocultó del menú público" : "lo volvió a mostrar en el menú público");
+  }
   await registrarBitacora(idLocal, sesion, {
     modulo: "agenda",
     accion: "servicio_editado",

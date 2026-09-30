@@ -2380,6 +2380,9 @@ model ServicioAgenda {
   tipoPrecio  String   @default("fijo")
   /// Color del servicio en la agenda, "#RRGGBB".
   color       String   @default("#3B82F6")
+  /// true = no aparece en la página pública de reservas, pero se puede seguir agregando a
+  /// mano desde la ficha de una cita (un extra interno, ej. una seña con precio abierto).
+  ocultoEnMenuPublico Boolean @default(false)
   createdAt   DateTime @default(now())
 
   personal      ServicioPersonal[]

@@ -30,6 +30,8 @@ export type ServicioFila = {
   imagenUrl: string | null;
   /** Ids de los miembros del personal que lo realizan. */
   personalIds: string[];
+  /** true = no aparece en la página pública de reservas, solo se puede agregar a mano desde una cita. */
+  ocultoEnMenuPublico: boolean;
 };
 
 /** Un miembro del personal como se ofrece para elegir quién realiza un servicio. */

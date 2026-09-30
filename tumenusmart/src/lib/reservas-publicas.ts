@@ -55,6 +55,7 @@ export async function cargarServiciosReservables(
     where: {
       storeId,
       ...(ids ? { id: { in: ids } } : {}),
+      ocultoEnMenuPublico: false,
       product: { disponible: true, esServicio: true, category: { paraServicios: true } },
     },
     orderBy: [{ createdAt: "asc" }, { id: "asc" }],

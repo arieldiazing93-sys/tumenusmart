@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Campo, Entrada, MensajeError, Tabla, Td, Th, Tr, Vacio, clasesBoton } from "@/components/ui";
+import { Campo, Entrada, MensajeError, Pastilla, Tabla, Td, Th, Tr, Vacio, clasesBoton } from "@/components/ui";
 import { Modal } from "@/components/Modal";
 import { PanelLateral } from "@/components/PanelLateral";
 import { formatearGuarani } from "@/lib/format";
@@ -355,7 +355,12 @@ export function GestorServicios({
                                   />
                                 )}
                                 <div className="min-w-0">
-                                  <p className="font-semibold text-tinta">{s.nombre}</p>
+                                  <p className="flex items-center gap-1.5 font-semibold text-tinta">
+                                    <span className="truncate">{s.nombre}</span>
+                                    {s.ocultoEnMenuPublico && (
+                                      <Pastilla color="neutro">Oculto del menú</Pastilla>
+                                    )}
+                                  </p>
                                   <p className="truncate text-[0.76rem] text-tinta-suave">
                                     {s.personalIds.map((id) => nombresDePersonal.get(id)).filter(Boolean).join(", ") ||
                                       "Sin personal"}
@@ -412,7 +417,10 @@ export function GestorServicios({
                             />
                           )}
                           <div className="min-w-0 flex-1">
-                            <p className="text-[0.95rem] font-semibold text-tinta">{s.nombre}</p>
+                            <p className="flex items-center gap-1.5 text-[0.95rem] font-semibold text-tinta">
+                              <span className="truncate">{s.nombre}</span>
+                              {s.ocultoEnMenuPublico && <Pastilla color="neutro">Oculto del menú</Pastilla>}
+                            </p>
                             <p className="mt-0.5 text-[0.82rem] text-tinta-media">
                               {textoDuracion(s.duracionMin)}
                               {s.bufferMin > 0 ? ` (+ ${s.bufferMin} min de búfer)` : ""} ·{" "}

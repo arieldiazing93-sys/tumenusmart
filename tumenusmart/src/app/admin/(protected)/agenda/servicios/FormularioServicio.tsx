@@ -269,6 +269,22 @@ export function FormularioServicio({
             <input type="hidden" name="color" value={color} />
           </div>
 
+          <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-linea bg-papel-suave p-3">
+            <input
+              type="checkbox"
+              name="ocultoEnMenuPublico"
+              defaultChecked={servicio?.ocultoEnMenuPublico ?? false}
+              className="mt-0.5 h-4 w-4 flex-none accent-brand"
+            />
+            <span>
+              <span className="block text-[0.86rem] font-semibold text-tinta">Ocultar del menú público</span>
+              <span className="block text-[0.78rem] leading-snug text-tinta-suave">
+                No aparece en la página de reservas del cliente, pero lo podés seguir agregando vos a mano desde la
+                ficha de una cita. Útil para un extra interno, por ejemplo una seña con precio abierto.
+              </span>
+            </span>
+          </label>
+
           {servicio && (
             <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-linea bg-papel-suave p-3">
               <input
