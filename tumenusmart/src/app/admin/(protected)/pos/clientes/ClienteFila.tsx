@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { Td, Tr } from "@/components/ui";
+import { Td, Tr, clasesBoton } from "@/components/ui";
 import { etiquetaTipoIdentificacion } from "@/lib/tipo-cliente";
 import { formatearNumero } from "@/lib/format";
 import { ClienteVerModal } from "./ClienteVerModal";
@@ -70,11 +70,7 @@ export function ClienteFila({ id, numero, nombre, email, telefono, tipoIdentific
         <Td>{email ?? "—"}</Td>
         <Td>
           {fotoUrl ? (
-            <button
-              type="button"
-              onClick={() => setModal("foto")}
-              className="text-[0.8rem] font-medium text-brand-texto hover:underline"
-            >
+            <button type="button" onClick={() => setModal("foto")} className={clasesBoton("suave", "sm")}>
               Ver imagen
             </button>
           ) : (
@@ -82,11 +78,7 @@ export function ClienteFila({ id, numero, nombre, email, telefono, tipoIdentific
           )}
         </Td>
         <Td>
-          <button
-            type="button"
-            onClick={() => setModal("ver")}
-            className="text-[0.8rem] font-medium text-brand-texto hover:underline"
-          >
+          <button type="button" onClick={() => setModal("ver")} className={clasesBoton("navegar", "sm")}>
             Ver
           </button>
         </Td>
