@@ -43,7 +43,7 @@ export function EnlaceTrabajoPersonal({
   const whatsapp = telefono && url ? `https://wa.me/${telefono}?text=${encodeURIComponent(mensaje)}` : null;
 
   return (
-    <div className="rounded-lg border border-linea bg-superficie p-3">
+    <div className="rounded-lg border-2 border-azul/50 bg-superficie p-3">
       <p className="text-[0.86rem] font-semibold text-tinta">Su enlace de trabajo</p>
       <p className="mt-0.5 text-[0.78rem] leading-snug text-tinta-suave">
         Ahí ve lo que tiene que hacer hoy y en los próximos días de la semana (las citas que ya cobraste a su nombre,

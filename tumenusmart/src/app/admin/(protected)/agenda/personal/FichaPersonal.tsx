@@ -86,7 +86,7 @@ function BloqueHorario({ miembro, horarioGeneral }: { miembro: MiembroFila; hora
   }
 
   return (
-    <section className="rounded-lg border border-linea bg-superficie p-3.5">
+    <section className="rounded-lg border-2 border-azul/50 bg-superficie p-3.5">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-[0.92rem] font-semibold text-tinta">Horario de trabajo</p>

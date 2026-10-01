@@ -148,6 +148,7 @@ export async function GET(request: NextRequest) {
   // ---------- hoja 2: cada trabajo ----------
   const trabajos = libro.addWorksheet("Trabajos");
   trabajos.columns = [
+    { width: 18 },
     { width: 12 },
     { width: 8 },
     { width: 28 },
@@ -161,11 +162,24 @@ export async function GET(request: NextRequest) {
   ];
   filaTitulo(
     trabajos,
-    ["Fecha", "Hora", "Personal", "Cliente", "Servicios", "Origen", "Forma de pago", "Total (Gs.)", "%", "Comisión (Gs.)"],
-    10
+    [
+      "Comprobante",
+      "Fecha",
+      "Hora",
+      "Personal",
+      "Cliente",
+      "Servicios",
+      "Origen",
+      "Forma de pago",
+      "Total (Gs.)",
+      "%",
+      "Comisión (Gs.)",
+    ],
+    11
   );
   for (const f of filas) {
     const fila = trabajos.addRow([
+      f.comprobante,
       diaEnTexto(f.dia),
       f.hora,
       f.personal,
@@ -177,18 +191,18 @@ export async function GET(request: NextRequest) {
       f.porcentaje != null ? textoPorcentaje(f.porcentaje) : "—",
       f.porcentaje != null ? Math.round(f.comision) : "—",
     ]);
-    fila.getCell(8).numFmt = FORMATO_GUARANIES;
-    fila.getCell(10).numFmt = FORMATO_GUARANIES;
+    fila.getCell(9).numFmt = FORMATO_GUARANIES;
+    fila.getCell(11).numFmt = FORMATO_GUARANIES;
   }
   if (filas.length > 0) {
     trabajos.addRow([]);
     const total = filaTitulo(
       trabajos,
-      ["", "", "", "", "", "", "TOTAL", Math.round(general.cobrado), "", Math.round(general.comision)],
-      10
+      ["", "", "", "", "", "", "", "TOTAL", Math.round(general.cobrado), "", Math.round(general.comision)],
+      11
     );
-    total.getCell(8).numFmt = FORMATO_GUARANIES;
-    total.getCell(10).numFmt = FORMATO_GUARANIES;
+    total.getCell(9).numFmt = FORMATO_GUARANIES;
+    total.getCell(11).numFmt = FORMATO_GUARANIES;
   }
   if (hayMas) {
     trabajos.addRow([]);

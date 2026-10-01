@@ -1,14 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { diaLargo } from "@/lib/agenda";
 import { PERIODOS_COMISION, type PeriodoComision } from "@/lib/agenda-personal";
 import { formatearGuarani } from "@/lib/format";
 import { trabajosDelPersonal, type ResultadoTrabajos } from "./actions";
-
-function textoPorcentaje(valor: number): string {
-  return String(valor).replace(".", ",");
-}
 
 /**
  * Los trabajos que terminó una persona (las citas que ya cobró a su nombre) en el período
@@ -35,7 +30,7 @@ export function TrabajosYComision({ id }: { id: string }) {
   }, [id, periodo]);
 
   return (
-    <div className="rounded-lg border border-linea bg-superficie p-3">
+    <div className="rounded-lg border-2 border-azul/50 bg-superficie p-3">
       <p className="text-[0.86rem] font-semibold text-tinta">Trabajos y comisión</p>
       <p className="mt-0.5 text-[0.78rem] leading-snug text-tinta-suave">
         Los trabajos que terminó (citas cobradas a su nombre) y lo que le toca de comisión.
@@ -90,39 +85,19 @@ export function TrabajosYComision({ id }: { id: string }) {
             </p>
           )}
 
-          {resultado.trabajos.length === 0 ? (
+          {resultado.trabajos.length === 0 && (
             <p className="mt-3 rounded-lg border border-dashed border-linea bg-papel-suave px-3 py-4 text-center text-[0.82rem] text-tinta-media">
               No hay trabajos terminados en este período.
             </p>
-          ) : (
-            <ul className="mt-3 flex flex-col">
-              {resultado.trabajos.map((t) => (
-                <li key={t.id} className="border-t border-linea-fina py-2 first:border-t-0">
-                  <div className="flex items-baseline justify-between gap-2">
-                    <span className="min-w-0 truncate text-[0.86rem] font-medium text-tinta">{t.cliente}</span>
-                    <span className="cifra flex-none text-[0.84rem] font-semibold text-tinta">
-                      {formatearGuarani(t.total)}
-                    </span>
-                  </div>
-                  <div className="flex items-baseline justify-between gap-2 text-[0.74rem] text-tinta-suave">
-                    <span className="min-w-0 truncate">
-                      {diaLargo(t.dia)} · <span className="cifra">{t.hora}</span>
-                      {t.servicios ? ` · ${t.servicios}` : ""}
-                    </span>
-                    <span className="cifra flex-none text-exito">
-                      {t.porcentaje != null
-                        ? `${textoPorcentaje(t.porcentaje)}% = ${formatearGuarani(t.comision)}`
-                        : "—"}
-                    </span>
-                  </div>
-                </li>
-              ))}
-            </ul>
           )}
 
+          {/* Rarísimo (más de 300 trabajos en el período) pero posible: las cifras de arriba salen de
+              una lista con tope, así que si lo pasa dejan de ser exactas — mejor avisarlo que mostrar
+              un número que parece total y no lo es. El detalle fila por fila se ve en Reporte de personal. */}
           {resultado.hayMas && (
-            <p className="mt-2 text-center text-[0.74rem] text-tinta-suave">
-              Se muestran los últimos trabajos del período: elegí uno más corto para ver todos.
+            <p className="mt-2 rounded-lg bg-aviso-luz px-3 py-2 text-[0.76rem] leading-snug text-aviso">
+              Hay más de 300 trabajos en este período: las cifras de arriba no los cuentan todos. Para el total
+              exacto, mirá el Reporte de personal.
             </p>
           )}
         </>

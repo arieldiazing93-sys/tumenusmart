@@ -142,6 +142,7 @@ export default async function ImprimirReportePersonalPage({
           <table className="w-full border-collapse text-sm">
             <thead>
               <tr className="border-b border-linea text-left text-xs uppercase tracking-wide text-tinta-media">
+                <th className="py-1.5">Comprobante</th>
                 <th className="py-1.5">Fecha</th>
                 {!personalElegido && <th className="py-1.5">Personal</th>}
                 <th className="py-1.5">Cliente</th>
@@ -153,6 +154,7 @@ export default async function ImprimirReportePersonalPage({
             <tbody>
               {filas.map((f) => (
                 <tr key={f.id} className="border-b border-linea-fina">
+                  <td className="py-1.5 text-tinta-media">{f.comprobante}</td>
                   <td className="py-1.5 text-tinta-media">
                     {diaEnTexto(f.dia)} {f.hora}
                   </td>
@@ -169,7 +171,7 @@ export default async function ImprimirReportePersonalPage({
                 </tr>
               ))}
               <tr className="border-t-2 border-linea font-semibold">
-                <td className="py-2 text-tinta" colSpan={personalElegido ? 3 : 4}>
+                <td className="py-2 text-tinta" colSpan={personalElegido ? 4 : 5}>
                   TOTAL
                 </td>
                 <td className="py-2 text-right text-tinta">{formatearGuarani(Math.round(general.cobrado))}</td>

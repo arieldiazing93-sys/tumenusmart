@@ -61,7 +61,7 @@ export default async function ReportePersonalPage({
     hayMas,
   } = await cargarReportePersonal(db, sp, MAXIMO_FILAS);
   const promedio = general.cantidad > 0 ? general.cobrado / general.cantidad : 0;
-  const columnas = personalElegido ? 7 : 8;
+  const columnas = personalElegido ? 8 : 9;
   // Sin trabajos NI ventas con comisión de producto: ahí sí no hay nada que mostrar. Antes solo miraba los
   // trabajos, y a alguien que solo vendió productos (sin hacer ningún corte) le mostraba "sin nada" igual.
   const hayMovimiento = general.cantidad > 0 || general.comisionProducto > 0;
@@ -335,6 +335,7 @@ export default async function ReportePersonalPage({
                 <Tabla>
                   <thead>
                     <tr>
+                      <Th>Comprobante</Th>
                       <Th>Fecha y hora</Th>
                       {!personalElegido && <Th>Personal</Th>}
                       <Th>Cliente</Th>
@@ -348,6 +349,7 @@ export default async function ReportePersonalPage({
                   <tbody>
                     {filas.map((f) => (
                       <Tr key={f.id}>
+                        <Td className="cifra text-[0.82rem]">{f.comprobante}</Td>
                         <Td>
                           <span className="block font-medium text-tinta">{diaLargo(f.dia)}</span>
                           <span className="cifra text-[0.78rem] text-tinta-suave">{f.hora}</span>
@@ -407,7 +409,9 @@ export default async function ReportePersonalPage({
                       )}
                     </p>
                     <p className="truncate text-[0.82rem] text-tinta-media">{f.servicios ?? "—"}</p>
-                    <p className="text-[0.78rem] text-tinta-suave">{f.pago}</p>
+                    <p className="cifra text-[0.78rem] text-tinta-suave">
+                      {f.pago} · {f.comprobante}
+                    </p>
 
                     <div className="mt-2.5 flex items-center justify-between border-t border-linea-fina pt-2.5 text-[0.82rem]">
                       <span className="text-tinta-media">

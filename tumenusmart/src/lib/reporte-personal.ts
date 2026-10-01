@@ -16,9 +16,22 @@ import type { Prisma } from "@prisma/client";
 import { horaDeMinutos, partesLocales } from "./agenda";
 import { calcularComision, montoDelTrabajo, nombreCompleto } from "./agenda-personal";
 import { claveSumarDias } from "./calendario";
+import { formatearNumero } from "./format";
 import { detallePagos } from "./pago-venta";
 import type { PrismaLocal } from "./prisma-local";
 import { limitesEnAsuncion } from "./rango-dias";
+
+/** "Ticket #0082" / "Factura 001-001-0000001", para identificar la venta puntual de un trabajo. */
+function comprobanteDe(
+  venta: { numero: number; comprobanteTipo: string; facturaNumero: string | null; facturaAnulada: boolean } | null | undefined
+): string {
+  if (!venta) return "—";
+  const base =
+    venta.comprobanteTipo === "factura" && venta.facturaNumero
+      ? `Factura ${venta.facturaNumero}`
+      : `Ticket ${formatearNumero(venta.numero)}`;
+  return venta.facturaAnulada ? `${base} (Anulada)` : base;
+}
 
 /** El período más largo que se puede pedir de una vez. */
 export const MAXIMO_DIAS_REPORTE = 366;
@@ -64,6 +77,8 @@ export type FilaTrabajo = {
   /** true si fue una venta del mostrador a alguien sin reserva. */
   sinReserva: boolean;
   pago: string;
+  /** "Ticket #0082" / "Factura 001-001-0000001", para identificar la venta puntual. */
+  comprobante: string;
   /** Lo que valen sus servicios (ya con el descuento que les tocó). */
   total: number;
   /** El porcentaje con que se calculó; null si no tenía comisión. */
@@ -176,7 +191,16 @@ export async function cargarReportePersonal(
             origen: true,
             comisionPorcentaje: true,
             precio: true,
-            ventaPos: { select: { total: true, pagos: { orderBy: { orden: "asc" }, select: { forma: true, monto: true } } } },
+            ventaPos: {
+              select: {
+                total: true,
+                numero: true,
+                comprobanteTipo: true,
+                facturaNumero: true,
+                facturaAnulada: true,
+                pagos: { orderBy: { orden: "asc" }, select: { forma: true, monto: true } },
+              },
+            },
           },
         }),
         // La comisión de producto: un total aparte, sin detalle línea por línea (ver comentario de arriba).
@@ -242,6 +266,7 @@ export async function cargarReportePersonal(
       servicios: c.serviciosTexto,
       sinReserva: c.origen === "mostrador",
       pago: c.ventaPos ? detallePagos(c.ventaPos.pagos.map((p) => ({ forma: p.forma, monto: Number(p.monto) }))) : "—",
+      comprobante: comprobanteDe(c.ventaPos),
       total,
       porcentaje,
       comision: calcularComision(total, porcentaje),
