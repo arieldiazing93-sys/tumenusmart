@@ -32,7 +32,7 @@ import { actualizarServicio, crearServicio } from "./actions";
 
 function Seccion({ titulo, children }: { titulo: string; children: React.ReactNode }) {
   return (
-    <section className="flex flex-col gap-3 border-b border-linea pb-5 last:border-b-0 last:pb-0">
+    <section className="flex flex-col gap-3 rounded-xl border-2 border-azul/50 bg-superficie p-3.5">
       <h3 className="text-[0.95rem] font-semibold tracking-titular text-tinta">{titulo}</h3>
       {children}
     </section>
@@ -138,13 +138,13 @@ export function FormularioServicio({
               <ul className="flex flex-col gap-1.5">
                 {ofrecidos.map((p, i) => (
                   <li key={p.id}>
-                    <label className="flex cursor-pointer items-center gap-3 rounded-lg border border-linea bg-superficie px-3 py-2.5 transition-colors hover:border-brand has-[:checked]:border-brand has-[:checked]:bg-brand-light/50">
+                    <label className="flex cursor-pointer items-center gap-3 rounded-lg border border-linea bg-superficie px-3 py-2.5 transition-colors hover:border-aviso has-[:checked]:border-aviso has-[:checked]:bg-aviso-tinte">
                       <input
                         type="checkbox"
                         name="personalId"
                         value={p.id}
                         defaultChecked={marcados.includes(p.id)}
-                        className="h-4 w-4 flex-none accent-brand"
+                        className="h-4 w-4 flex-none accent-aviso"
                       />
                       <AvatarPersonal nombre={p.nombre} fotoUrl={p.fotoUrl} indice={i} className="h-7 w-7 text-[0.68rem]" />
                       <span className="min-w-0 flex-1 truncate text-[0.88rem] font-medium text-tinta">
