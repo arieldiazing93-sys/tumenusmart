@@ -39,7 +39,7 @@ export function SeccionCampos({ datos, cambiar }: PropsSeccion) {
   }
 
   return (
-    <Tarjeta className="campos-grises flex flex-col gap-3 border-2 border-azul/50">
+    <Tarjeta className="campos-grises flex flex-col gap-3 !border-2 !border-azul/50">
       <div>
         <h3 className="text-[1rem] font-semibold tracking-titular text-tinta">Campos del formulario de reserva</h3>
         <p className="mt-0.5 text-[0.82rem] text-tinta-media">

@@ -34,7 +34,7 @@ export function SeccionGaleria({ datos, cambiar }: PropsSeccion) {
   }
 
   return (
-    <Tarjeta className="campos-grises flex flex-col gap-4 border-2 border-azul/50">
+    <Tarjeta className="campos-grises flex flex-col gap-4 !border-2 !border-azul/50">
       <div className="flex items-start justify-between gap-3">
         <div>
           <h3 className="text-[1rem] font-semibold tracking-titular text-tinta">Galería de la empresa</h3>
