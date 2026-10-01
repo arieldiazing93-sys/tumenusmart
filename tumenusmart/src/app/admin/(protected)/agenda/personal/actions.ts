@@ -30,6 +30,8 @@ export type ResultadoTrabajos =
       trabajos: TrabajoDelPersonal[];
       totalCobrado: number;
       totalComision: number;
+      /** Lo que le toca de los productos que vendió en el período (otra fuente: VentaPos, no Cita). */
+      totalComisionProducto: number;
       /** true si hay más trabajos de los que se muestran (se acota el período). */
       hayMas: boolean;
     }
@@ -189,9 +191,14 @@ export async function trabajosDelPersonal(id: string, periodo: PeriodoComision):
   const rango = calcularRangoFecha(periodo, undefined, undefined);
   if (!rango) return { ok: false, error: "El período no es válido." };
 
-  const persona = await db.miembroPersonal.findFirst({ where: { id }, select: { comisionPorcentaje: true } });
+  const persona = await db.miembroPersonal.findFirst({
+    where: { id },
+    select: { comisionPorcentaje: true, comisionProductoPorcentaje: true },
+  });
   if (!persona) return { ok: false, error: "No se encontró a esa persona." };
   const comisionActual = persona.comisionPorcentaje == null ? null : Number(persona.comisionPorcentaje);
+  const comisionProductoActual =
+    persona.comisionProductoPorcentaje == null ? null : Number(persona.comisionProductoPorcentaje);
 
   const citas = await db.cita.findMany({
     where: {
@@ -229,12 +236,26 @@ export async function trabajosDelPersonal(id: string, periodo: PeriodoComision):
     };
   });
 
+  // La comisión de producto es otra fuente (VentaPos, no Cita) y cuenta por el día de la venta, no el de un
+  // turno — mismo criterio que el reporte de personal del panel (ver src/lib/reporte-personal.ts).
+  const ventasProducto = await db.ventaPos.findMany({
+    where: { personalId: id, creadoEn: { gte: rango.gte, lt: rango.lt }, cancelada: false },
+    select: { comisionProductoPorcentaje: true, comisionProductoBase: true },
+  });
+  let totalComisionProducto = 0;
+  for (const v of ventasProducto) {
+    const base = v.comisionProductoBase == null ? 0 : Number(v.comisionProductoBase);
+    const porcentaje = v.comisionProductoPorcentaje == null ? comisionProductoActual : Number(v.comisionProductoPorcentaje);
+    totalComisionProducto += calcularComision(base, porcentaje);
+  }
+
   return {
     ok: true,
     comisionActual,
     trabajos,
     totalCobrado: trabajos.reduce((suma, t) => suma + t.total, 0),
     totalComision: trabajos.reduce((suma, t) => suma + t.comision, 0),
+    totalComisionProducto,
     hayMas: citas.length >= MAXIMO_TRABAJOS,
   };
 }

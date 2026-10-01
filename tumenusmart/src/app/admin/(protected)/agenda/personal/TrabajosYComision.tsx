@@ -60,7 +60,7 @@ export function TrabajosYComision({ id }: { id: string }) {
         <p className="mt-3 rounded-lg bg-peligro-luz px-3 py-2 text-[0.8rem] text-peligro">{resultado.error}</p>
       ) : (
         <>
-          <dl className="mt-3 grid grid-cols-3 gap-2 text-center">
+          <dl className="mt-3 grid grid-cols-2 gap-2 text-center">
             <div className="rounded-lg bg-papel-suave px-2 py-2">
               <dt className="text-[0.68rem] font-medium text-tinta-suave">Trabajos</dt>
               <dd className="cifra mt-0.5 text-[1.05rem] font-semibold text-tinta">{resultado.trabajos.length}</dd>
@@ -72,9 +72,15 @@ export function TrabajosYComision({ id }: { id: string }) {
               </dd>
             </div>
             <div className="rounded-lg bg-exito-luz px-2 py-2">
-              <dt className="text-[0.68rem] font-medium text-exito">Comisión</dt>
+              <dt className="text-[0.68rem] font-medium text-exito">Comisión servicio</dt>
               <dd className="cifra mt-0.5 truncate text-[0.9rem] font-bold text-exito">
                 {formatearGuarani(resultado.totalComision)}
+              </dd>
+            </div>
+            <div className="rounded-lg bg-exito-luz px-2 py-2">
+              <dt className="text-[0.68rem] font-medium text-exito">Comisión producto</dt>
+              <dd className="cifra mt-0.5 truncate text-[0.9rem] font-bold text-exito">
+                {formatearGuarani(resultado.totalComisionProducto)}
               </dd>
             </div>
           </dl>
@@ -85,9 +91,11 @@ export function TrabajosYComision({ id }: { id: string }) {
             </p>
           )}
 
-          {resultado.trabajos.length === 0 && (
+          {/* Sin trabajos NI comisión de producto: ahí sí no hay nada que mostrar. Alguien que solo
+              vendió productos (sin hacer ningún corte) no puede caer acá solo por tener 0 trabajos. */}
+          {resultado.trabajos.length === 0 && resultado.totalComisionProducto === 0 && (
             <p className="mt-3 rounded-lg border border-dashed border-linea bg-papel-suave px-3 py-4 text-center text-[0.82rem] text-tinta-media">
-              No hay trabajos terminados en este período.
+              No hay movimiento en este período.
             </p>
           )}
 

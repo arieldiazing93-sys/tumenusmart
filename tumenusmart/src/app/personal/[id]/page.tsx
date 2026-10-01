@@ -76,12 +76,15 @@ export default async function TrabajoDelPersonalPage({
       fotoUrl: true,
       activo: true,
       comisionPorcentaje: true,
+      comisionProductoPorcentaje: true,
     },
   });
   // Quien ya no trabaja en el local (inactivo) deja de ver lo suyo con el mismo enlace.
   if (!miembro || !miembro.activo) notFound();
   const storeId = miembro.storeId;
   const comisionActual = miembro.comisionPorcentaje == null ? null : Number(miembro.comisionPorcentaje);
+  const comisionProductoActual =
+    miembro.comisionProductoPorcentaje == null ? null : Number(miembro.comisionProductoPorcentaje);
 
   const hoy = claveDiaAsuncion(new Date());
   const manana = claveSumarDias(hoy, 1);
@@ -93,7 +96,7 @@ export default async function TrabajoDelPersonalPage({
   const periodo = limitesDelPeriodo(vista, fechaPedida);
   const rangoPeriodo = limitesEnAsuncion(periodo);
 
-  const [store, confirmadas, trabajosPeriodo, canceladasPeriodo] = await Promise.all([
+  const [store, confirmadas, trabajosPeriodo, ventasProductoPeriodo, canceladasPeriodo] = await Promise.all([
     prisma.store.findUnique({ where: { id: storeId }, select: { nombre: true } }),
     prisma.cita.findMany({
       where: {
@@ -126,6 +129,12 @@ export default async function TrabajoDelPersonalPage({
       },
       select: { comisionPorcentaje: true, precio: true, ventaPos: { select: { total: true } } },
     }),
+    // La comisión de producto es otra fuente (VentaPos, no Cita) y cuenta por el día de la venta, no el de
+    // un turno — mismo criterio que el reporte de personal del panel (ver src/lib/reporte-personal.ts).
+    prisma.ventaPos.findMany({
+      where: { storeId, personalId: id, cancelada: false, creadoEn: rangoPeriodo },
+      select: { comisionProductoPorcentaje: true, comisionProductoBase: true },
+    }),
     // Las citas que se le cancelaron en ese mismo período (sin importar si ya se habían cobrado por adelantado).
     prisma.cita.count({
       where: { storeId, personalId: id, estado: "cancelada", inicio: rangoPeriodo },
@@ -141,10 +150,18 @@ export default async function TrabajoDelPersonalPage({
     comisionPeriodo += calcularComision(total, porcentaje);
   }
 
+  let comisionProductoPeriodo = 0;
+  for (const v of ventasProductoPeriodo) {
+    const base = v.comisionProductoBase == null ? 0 : Number(v.comisionProductoBase);
+    const porcentaje = v.comisionProductoPorcentaje == null ? comisionProductoActual : Number(v.comisionProductoPorcentaje);
+    comisionProductoPeriodo += calcularComision(base, porcentaje);
+  }
+
   const cifrasPeriodo = [
     { rotulo: "Clientes atendidos", valor: String(trabajosPeriodo.length), tono: "neutro" as const },
     { rotulo: "Cobrado", valor: formatearGuarani(cobradoPeriodo), tono: "neutro" as const },
-    { rotulo: "Comisión", valor: formatearGuarani(comisionPeriodo), tono: "exito" as const },
+    { rotulo: "Comisión servicio", valor: formatearGuarani(comisionPeriodo), tono: "exito" as const },
+    { rotulo: "Comisión producto", valor: formatearGuarani(comisionProductoPeriodo), tono: "exito" as const },
     {
       rotulo: "Canceladas",
       valor: String(canceladasPeriodo),
