@@ -720,7 +720,7 @@ export function PantallaVenta({
                   <div className="min-w-0">
                     <p className="truncate text-[0.85rem] font-medium text-tinta">{i.nombre}</p>
                     {i.detalle && <p className="truncate text-[0.76rem] text-tinta-suave">+ {i.detalle}</p>}
-                    <p className="cifra text-[0.78rem] text-tinta-suave">
+                    <p className="cifra text-[0.78rem] font-medium text-tinta">
                       {formatearGuarani(i.precio)} c/u · {formatearGuarani(i.precio * i.cantidad)}
                     </p>
                   </div>

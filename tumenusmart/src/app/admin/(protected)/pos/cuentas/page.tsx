@@ -5,6 +5,7 @@ import { idLocalActual } from "@/lib/local-actual";
 import { Cabecera, clasesBoton, Pastilla, Tabla, Th, Td, Tr, Vacio, BotonEnlace } from "@/components/ui";
 import { calcularRangoFecha, type FiltroFecha } from "@/lib/rango-fecha";
 import { formatearGuarani, formatearNumero } from "@/lib/format";
+import { nombreCompleto } from "@/lib/agenda-personal";
 import { etiquetaFormaPagoPos, FORMAS_PAGO_POS, FORMA_PAGO_MIXTO } from "@/lib/turno-pos";
 import { detallePagos, filtroPorFormaPago, montoCobradoConForma } from "@/lib/pago-venta";
 import { ZONA_NEGOCIO } from "@/lib/timezone";
@@ -76,6 +77,7 @@ export default async function CuentasPosPage({
       clienteNombre: true,
       comprobanteTipo: true,
       facturaNumero: true,
+      personal: { select: { nombre: true, apellido: true } },
     },
   });
 
@@ -205,6 +207,7 @@ export default async function CuentasPosPage({
               <Th>Cliente</Th>
               <Th>Forma de pago</Th>
               <Th>Cajero</Th>
+              <Th>Personal</Th>
               <Th>Estado</Th>
               <Th className="text-right">Total</Th>
               <Th className="text-right">
@@ -248,6 +251,7 @@ export default async function CuentasPosPage({
                   )}
                 </Td>
                 <Td>{v.registradoPor}</Td>
+                <Td>{v.personal ? nombreCompleto(v.personal) : "—"}</Td>
                 <Td>
                   <Pastilla color={v.cancelada ? "peligro" : "exito"}>
                     {v.cancelada ? "Cancelada" : "Activa"}
@@ -270,7 +274,7 @@ export default async function CuentasPosPage({
           </tbody>
           <tfoot>
             <tr>
-              <Td colSpan={6} className="text-right font-medium">
+              <Td colSpan={7} className="text-right font-medium">
                 {filtraPorUnaForma
                   ? `Cobrado en ${etiquetaFormaPagoPos(formaPago ?? "").toLowerCase()} (sin canceladas)`
                   : "Total (sin canceladas)"}

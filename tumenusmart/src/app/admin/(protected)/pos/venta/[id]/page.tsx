@@ -9,6 +9,7 @@ import { textoPorcentaje } from "@/lib/descuento-venta";
 import { esVentaACredito, etiquetaFormaPagoPos } from "@/lib/turno-pos";
 import { detallePagos } from "@/lib/pago-venta";
 import { estadoDeCuenta, redondear2, saldoDeCompra } from "@/lib/pagos-compra";
+import { nombreCompleto } from "@/lib/agenda-personal";
 import { ZONA_NEGOCIO } from "@/lib/timezone";
 import { CancelarVentaBoton } from "./CancelarVentaBoton";
 import { RegistrarCobroBoton } from "../../cuentas-por-cobrar/RegistrarCobroBoton";
@@ -40,6 +41,7 @@ export default async function DetalleVentaPosPage({
       turnoPos: { select: { estado: true } },
       pagos: { orderBy: { orden: "asc" } },
       cobros: { orderBy: [{ fecha: "asc" }, { createdAt: "asc" }] },
+      personal: { select: { nombre: true, apellido: true } },
     },
   });
   if (!venta) notFound();
@@ -135,6 +137,12 @@ export default async function DetalleVentaPosPage({
               <dt className="text-tinta-suave">Cajero</dt>
               <dd className="font-semibold text-tinta">{venta.registradoPor}</dd>
             </div>
+            {venta.personal && (
+              <div>
+                <dt className="text-tinta-suave">Personal asignado</dt>
+                <dd className="font-semibold text-tinta">{nombreCompleto(venta.personal)}</dd>
+              </div>
+            )}
             <div>
               <dt className="text-tinta-suave">Forma de pago</dt>
               <dd className="font-semibold text-tinta">

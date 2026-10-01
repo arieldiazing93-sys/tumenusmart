@@ -135,10 +135,13 @@ export async function crearProducto(formData: FormData): Promise<ResultadoProduc
   });
 
   revalidatePath("/admin/productos");
+  revalidatePath(`/admin/productos/${producto.id}`);
   revalidatePath("/[slug]", "layout");
-  // Vuelve a la lista de la misma categoría (no al detalle del producto)
-  // para poder seguir cargando productos sin ir y venir entre pantallas.
-  redirect(`/admin/productos?categoria=${producto.categoryId}&guardado=1`);
+  // A la ficha del producto recién creado, no a la lista: ahí aparecen Receta
+  // y Grupos de agregados (necesitan que el producto ya exista) — si vuelve a
+  // la lista, quien lo cargó puede no saber que falta terminar de
+  // configurarlo. Mismo destino que actualizarProducto, más abajo.
+  redirect(`/admin/productos/${producto.id}?guardado=1`);
 }
 
 export async function actualizarProducto(

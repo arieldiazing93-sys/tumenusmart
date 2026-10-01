@@ -7,6 +7,7 @@ import { etiquetaFormaPagoPos, FORMA_PAGO_MIXTO } from "@/lib/turno-pos";
 import { detallePagos, filtroPorFormaPago, montoCobradoConForma } from "@/lib/pago-venta";
 import { ZONA_NEGOCIO } from "@/lib/timezone";
 import { nuevoLibro, filaTitulo, respuestaXlsx } from "@/lib/excel-reporte";
+import { nombreCompleto } from "@/lib/agenda-personal";
 
 export const dynamic = "force-dynamic";
 
@@ -40,6 +41,7 @@ export async function GET(request: NextRequest) {
         registradoPor: true,
         creadoEn: true,
         cancelada: true,
+        personal: { select: { nombre: true, apellido: true } },
       },
     }),
   ]);
@@ -66,6 +68,7 @@ export async function GET(request: NextRequest) {
     { width: 12 },
     { width: 40 },
     { width: 20 },
+    { width: 20 },
     { width: 14 },
     { width: 16 },
   ];
@@ -75,7 +78,7 @@ export async function GET(request: NextRequest) {
   filaTitulo(hoja, ["Período", periodo], 2);
   hoja.addRow([]);
 
-  filaTitulo(hoja, ["Cuenta", "Fecha", "Hora", "Forma de pago", "Cajero", "Estado", "Total (Gs.)"], 7);
+  filaTitulo(hoja, ["Cuenta", "Fecha", "Hora", "Forma de pago", "Cajero", "Personal", "Estado", "Total (Gs.)"], 8);
   // Las canceladas quedan en la planilla para que no desaparezcan del
   // registro, pero no suman al total: no es plata que haya entrado a la caja.
   // Filtrando por una forma concreta se suma solo lo cobrado CON esa forma (de
@@ -99,10 +102,11 @@ export async function GET(request: NextRequest) {
         ? detallePagos(v.pagos.map((p) => ({ forma: p.forma, monto: Number(p.monto) })))
         : etiquetaFormaPagoPos(v.formaPago),
       v.registradoPor,
+      v.personal ? nombreCompleto(v.personal) : "—",
       v.cancelada ? "Cancelada" : "Activa",
       Math.round(Number(v.total)),
     ]);
-    fila.getCell(7).numFmt = "#,##0";
+    fila.getCell(8).numFmt = "#,##0";
   }
 
   hoja.addRow([]);
@@ -114,14 +118,15 @@ export async function GET(request: NextRequest) {
       "",
       "",
       "",
+      "",
       filtraPorUnaForma
         ? `TOTAL cobrado en ${etiquetaFormaPagoPos(formaPago ?? "").toLowerCase()}, sin canceladas (Gs.)`
         : "TOTAL GENERAL, sin canceladas (Gs.)",
       Math.round(total),
     ],
-    7
+    8
   );
-  filaTotal.getCell(7).numFmt = "#,##0";
+  filaTotal.getCell(8).numFmt = "#,##0";
 
   if (ventas.length === 0) {
     hoja.addRow([]);

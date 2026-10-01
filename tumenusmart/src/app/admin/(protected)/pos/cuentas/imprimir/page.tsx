@@ -7,6 +7,7 @@ import { etiquetaFormaPagoPos, FORMA_PAGO_MIXTO } from "@/lib/turno-pos";
 import { detallePagos, filtroPorFormaPago, montoCobradoConForma } from "@/lib/pago-venta";
 import { ZONA_NEGOCIO } from "@/lib/timezone";
 import { ImprimirBoton } from "../../../estadisticas/imprimir/ImprimirBoton";
+import { nombreCompleto } from "@/lib/agenda-personal";
 
 export const dynamic = "force-dynamic";
 
@@ -38,6 +39,7 @@ export default async function ImprimirCuentasPosPage({
         registradoPor: true,
         creadoEn: true,
         cancelada: true,
+        personal: { select: { nombre: true, apellido: true } },
       },
     }),
   ]);
@@ -86,6 +88,7 @@ export default async function ImprimirCuentasPosPage({
               <th className="py-1.5">Fecha</th>
               <th className="py-1.5">Forma de pago</th>
               <th className="py-1.5">Cajero</th>
+              <th className="py-1.5">Personal</th>
               <th className="py-1.5">Estado</th>
               <th className="py-1.5 text-right">Total</th>
             </tr>
@@ -110,6 +113,7 @@ export default async function ImprimirCuentasPosPage({
                     : etiquetaFormaPagoPos(v.formaPago)}
                 </td>
                 <td className="py-1.5 text-tinta-media">{v.registradoPor}</td>
+                <td className="py-1.5 text-tinta-media">{v.personal ? nombreCompleto(v.personal) : "—"}</td>
                 <td className="py-1.5 text-tinta-media">{v.cancelada ? "Cancelada" : "Activa"}</td>
                 <td
                   className={`cifra py-1.5 text-right ${v.cancelada ? "text-tinta-suave line-through" : ""}`}
@@ -121,7 +125,7 @@ export default async function ImprimirCuentasPosPage({
           </tbody>
           <tfoot>
             <tr className="border-t-2 border-linea font-semibold text-tinta">
-              <td className="py-2" colSpan={5}>
+              <td className="py-2" colSpan={6}>
                 {filtraPorUnaForma
                   ? `Cobrado en ${etiquetaFormaPagoPos(formaPago ?? "").toLowerCase()} (sin canceladas)`
                   : "Total recaudado (sin canceladas)"}
