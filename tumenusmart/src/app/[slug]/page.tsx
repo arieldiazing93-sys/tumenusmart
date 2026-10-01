@@ -48,7 +48,7 @@ export default async function CatalogoPage({
   const store = await localPorSlug(slug);
   const storeId = store.id;
 
-  const [categoriasCrudas, destacados, estadoTienda] = await Promise.all([
+  const [categoriasCrudas, destacados, estadoTienda, paginaReservas] = await Promise.all([
     prisma.category.findMany({
       where: { storeId, activa: true },
       orderBy: { orden: "asc" },
@@ -80,6 +80,10 @@ export default async function CatalogoPage({
       orderBy: { orden: "asc" },
     }),
     obtenerEstadoTienda(storeId),
+    // La Reserva de turnos (barberías, salones) es una página pública aparte, con su
+    // propia dirección (no necesariamente el mismo slug que el menú) — si el negocio la
+    // tiene habilitada, se linkea desde acá igual que "Reservar mesa".
+    prisma.paginaReservas.findUnique({ where: { storeId }, select: { habilitada: true, slug: true } }),
   ]);
 
   // Una categoría con tramos de bloqueo propios (ej: "Hamburguesas Simple"
@@ -245,14 +249,24 @@ export default async function CatalogoPage({
             Solo aparece si el local reserva mesas con anticipación — hay
             locales que solo hacen delivery/retiro y no tienen mesas físicas.
           */}
-          {store.aceptaReservas && (
-            <div className="mt-3.5">
-              <Link
-                href={`/${slug}/reservas`}
-                className="inline-flex items-center rounded-xl bg-azul px-5 py-2.5 text-[0.88rem] font-semibold text-white shadow-media transition-colors hover:bg-azul-oscuro"
-              >
-                Reservar mesa
-              </Link>
+          {(store.aceptaReservas || paginaReservas?.habilitada) && (
+            <div className="mt-3.5 flex flex-wrap gap-2">
+              {store.aceptaReservas && (
+                <Link
+                  href={`/${slug}/reservas`}
+                  className="inline-flex items-center rounded-xl bg-azul px-5 py-2.5 text-[0.88rem] font-semibold text-white shadow-media transition-colors hover:bg-azul-oscuro"
+                >
+                  Reservar mesa
+                </Link>
+              )}
+              {paginaReservas?.habilitada && (
+                <Link
+                  href={`/turnos/${paginaReservas.slug}`}
+                  className="inline-flex items-center rounded-xl bg-brand px-5 py-2.5 text-[0.88rem] font-semibold text-white shadow-media transition-colors hover:bg-brand-dark"
+                >
+                  Reservar turno
+                </Link>
+              )}
             </div>
           )}
         </div>
