@@ -103,7 +103,18 @@ export default async function PortadaPage() {
     })
     .catch(() => null);
 
+  // Mismo criterio que la carta: la Reserva de turnos también se muestra con una
+  // página que de verdad está recibiendo reservas, no una maqueta armada para la foto.
+  const paginaDemo = await prisma.paginaReservas
+    .findFirst({
+      where: { habilitada: true },
+      orderBy: { createdAt: "asc" },
+      select: { slug: true },
+    })
+    .catch(() => null);
+
   const cartaReal = vitrina ? `/${vitrina.slug}` : "#incluye";
+  const reservaReal = paginaDemo ? `/turnos/${paginaDemo.slug}` : "#turnos";
   const linkVentas = construirLinkWhatsapp(WHATSAPP_VENTAS, MENSAJE_VENTAS);
 
   return (
@@ -305,6 +316,12 @@ export default async function PortadaPage() {
           atenderlo, cobrás desde la misma cita: entra al mismo punto de venta, con IVA,
           factura y la comisión de cada profesional calculada sola.
         </p>
+
+        <div className="mt-6">
+          <Link href={reservaReal} className={BOTON}>
+            Ver una reserva real
+          </Link>
+        </div>
 
         <div className="mt-10 grid gap-x-8 gap-y-8 sm:grid-cols-3">
           {TURNOS_ITEMS.map((item, i) => (
