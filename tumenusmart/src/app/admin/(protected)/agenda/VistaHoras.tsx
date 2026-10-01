@@ -22,8 +22,13 @@ import { DesplazarAlIniciar } from "./DesplazarAlIniciar";
 const REM_POR_HORA = 5;
 /** El ancho de la columna de las horas, a la izquierda. */
 const ANCHO_HORAS = "3.25rem";
-/** El ancho mínimo de cada día: si no entran, la semana se desliza de costado. */
-const ANCHO_MIN_DIA = "7.5rem";
+/**
+ * El ancho mínimo de cada día: si no entran, la semana se desliza de costado (con su propia
+ * barra horizontal, igual que la vertical). Más ancho que un turno solo porque cuando dos
+ * citas de personas distintas coinciden en el mismo horario, se reparten el ancho del día
+ * entre sí (ver `repartirCarriles`) — con poco ancho cada una queda ilegible.
+ */
+const ANCHO_MIN_DIA = "14rem";
 /** Un turno muy corto igual se dibuja con este alto, para que se pueda leer y tocar. */
 const REM_MINIMO_TURNO = 1.75;
 /** Las rayas diagonales de lo que queda fuera del horario de trabajo. */

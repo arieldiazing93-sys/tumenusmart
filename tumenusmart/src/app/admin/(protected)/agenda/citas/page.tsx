@@ -364,12 +364,12 @@ export default async function CitasPage({
             <Tabla>
               <thead>
                 <tr>
+                  <Th>Comprobante</Th>
                   <Th>Fecha y hora</Th>
                   <Th>Cliente</Th>
                   <Th>Servicios</Th>
                   {!personalElegido && <Th>Personal</Th>}
                   <Th>Pago</Th>
-                  <Th>Comprobante</Th>
                   <Th>Estado</Th>
                   <Th className="text-right">Total</Th>
                   <Th className="text-right">
@@ -383,18 +383,6 @@ export default async function CitasPage({
                   const venta = c.ventaPos;
                   return (
                     <Tr key={c.id}>
-                      <Td>
-                        <span className="block font-medium text-tinta">{diaLargo(dia)}</span>
-                        <span className="cifra text-[0.78rem] text-tinta-suave">{horaDeMinutos(minutos)}</span>
-                      </Td>
-                      <Td className="font-medium text-tinta">{c.clienteNombre}</Td>
-                      <Td>{c.serviciosTexto ?? "—"}</Td>
-                      {!personalElegido && <Td>{nombreCompleto(c.personal)}</Td>}
-                      <Td>
-                        {venta
-                          ? detallePagos(venta.pagos.map((p) => ({ forma: p.forma, monto: Number(p.monto) })))
-                          : "—"}
-                      </Td>
                       <Td>
                         {venta?.comprobanteTipo === "factura" && venta.facturaNumero ? (
                           <>
@@ -413,6 +401,18 @@ export default async function CitasPage({
                             )}
                           </>
                         )}
+                      </Td>
+                      <Td>
+                        <span className="block font-medium text-tinta">{diaLargo(dia)}</span>
+                        <span className="cifra text-[0.78rem] text-tinta-suave">{horaDeMinutos(minutos)}</span>
+                      </Td>
+                      <Td className="font-medium text-tinta">{c.clienteNombre}</Td>
+                      <Td>{c.serviciosTexto ?? "—"}</Td>
+                      {!personalElegido && <Td>{nombreCompleto(c.personal)}</Td>}
+                      <Td>
+                        {venta
+                          ? detallePagos(venta.pagos.map((p) => ({ forma: p.forma, monto: Number(p.monto) })))
+                          : "—"}
                       </Td>
                       <Td>
                         <Pastilla color="exito" punto>

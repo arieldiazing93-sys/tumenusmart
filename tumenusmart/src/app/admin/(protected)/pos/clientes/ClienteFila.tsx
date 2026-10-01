@@ -70,7 +70,11 @@ export function ClienteFila({ id, numero, nombre, email, telefono, tipoIdentific
         <Td>{email ?? "—"}</Td>
         <Td>
           {fotoUrl ? (
-            <button type="button" onClick={() => setModal("foto")} className={clasesBoton("suave", "sm")}>
+            <button
+              type="button"
+              onClick={() => setModal("foto")}
+              className="inline-flex h-8 flex-none items-center justify-center gap-2 whitespace-nowrap rounded-lg border border-violeta/30 bg-violeta-tinte px-3 text-[0.82rem] font-semibold text-violeta-oscuro transition-colors duration-150 hover:border-violeta hover:bg-violeta hover:text-white"
+            >
               Ver imagen
             </button>
           ) : (

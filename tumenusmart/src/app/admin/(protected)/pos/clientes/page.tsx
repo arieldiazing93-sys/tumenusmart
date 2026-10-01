@@ -79,13 +79,13 @@ export default async function ClientesPosPage({
         <Tabla>
           <thead>
             <tr>
-              <Th>Clave</Th>
-              <Th>Nombre / Razón social</Th>
-              <Th>Teléfono</Th>
-              <Th>Identificación fiscal</Th>
-              <Th>Correo</Th>
-              <Th>Imagen</Th>
-              <Th>
+              <Th className="bg-azul-luz">Clave</Th>
+              <Th className="bg-azul-luz">Nombre / Razón social</Th>
+              <Th className="bg-azul-luz">Teléfono</Th>
+              <Th className="bg-azul-luz">Identificación fiscal</Th>
+              <Th className="bg-azul-luz">Correo</Th>
+              <Th className="bg-azul-luz">Imagen</Th>
+              <Th className="bg-azul-luz">
                 <span className="sr-only">Acciones</span>
               </Th>
             </tr>

@@ -951,7 +951,7 @@ export function FormularioCita({
               {/* El ancho lo da este contenedor: el botón lo ocupa entero, sea cual sea el texto. */}
               <div className="min-w-0 flex-1">
                 {cobrada ? (
-                  <button type="button" onClick={onCerrar} className={`${clasesBoton("suave", "md")} w-full`}>
+                  <button type="button" onClick={onCerrar} className={`${clasesBoton("peligro", "md")} w-full`}>
                     Cerrar
                   </button>
                 ) : (
