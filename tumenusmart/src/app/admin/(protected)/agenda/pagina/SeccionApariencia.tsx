@@ -38,7 +38,7 @@ export function SeccionApariencia({ datos, cambiar }: PropsSeccion) {
   } as React.CSSProperties;
 
   return (
-    <Tarjeta className="flex flex-col gap-6">
+    <Tarjeta className="campos-grises flex flex-col gap-6 border-2 border-azul/50">
       {/* ---------- color ---------- */}
       <section>
         <h3 className="text-[1rem] font-semibold tracking-titular text-tinta">Color de la página</h3>

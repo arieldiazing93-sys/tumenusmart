@@ -270,7 +270,7 @@ export function FormularioPersonal({
               type="checkbox"
               name="activo"
               defaultChecked={miembro.activo}
-              className="mt-0.5 h-4 w-4 flex-none accent-brand"
+              className="mt-0.5 h-4 w-4 flex-none accent-azul"
             />
             <span>
               <span className="block text-[0.86rem] font-semibold text-tinta">Activo</span>
@@ -287,7 +287,7 @@ export function FormularioPersonal({
       <div className="flex flex-none flex-col gap-2 border-t border-linea bg-superficie px-5 py-4">
         {error && <MensajeError>{error}</MensajeError>}
         <div className="flex justify-end gap-2">
-          <button type="button" onClick={onCerrar} className={clasesBoton("suave", "md")}>
+          <button type="button" onClick={onCerrar} className={clasesBoton("peligro", "md")}>
             Cancelar
           </button>
           <button type="submit" disabled={pendiente || subiendo} className={clasesBoton("principal", "md")}>

@@ -7,7 +7,7 @@ import type { PropsSeccion } from "./tipos";
 /** Información de la empresa: nombre, contacto, rubro y una breve descripción. */
 export function SeccionEmpresa({ datos, cambiar }: PropsSeccion) {
   return (
-    <Tarjeta className="flex flex-col gap-4">
+    <Tarjeta className="campos-grises flex flex-col gap-4 border-2 border-azul/50">
       <h3 className="text-[1rem] font-semibold tracking-titular text-tinta">Información general</h3>
 
       <Campo etiqueta="Nombre del negocio *">

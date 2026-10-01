@@ -104,7 +104,7 @@ export function PerfilPagina({ datos, cambiar }: PropsSeccion) {
   }
 
   return (
-    <Tarjeta className="flex flex-col gap-4">
+    <Tarjeta className="campos-grises flex flex-col gap-4 border-2 border-azul/50">
       {/* ---------- foto y nombre ---------- */}
       <div className="flex flex-col items-center gap-3 text-center">
         <div className="flex h-36 w-36 items-center justify-center overflow-hidden rounded-full border border-linea bg-brand-light text-[2rem] font-semibold text-brand-texto">

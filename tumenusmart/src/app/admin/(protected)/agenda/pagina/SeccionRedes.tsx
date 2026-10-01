@@ -34,7 +34,7 @@ export function SeccionRedes({ datos, cambiar }: PropsSeccion) {
   }
 
   return (
-    <Tarjeta className="flex flex-col gap-4">
+    <Tarjeta className="campos-grises flex flex-col gap-4 border-2 border-azul/50">
       <div>
         <h3 className="text-[1rem] font-semibold tracking-titular text-tinta">Enlaces sociales</h3>
         <p className="mt-0.5 text-[0.82rem] text-tinta-media">
