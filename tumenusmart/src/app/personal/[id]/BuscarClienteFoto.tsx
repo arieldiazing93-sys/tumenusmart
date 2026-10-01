@@ -81,24 +81,24 @@ export function BuscarClienteFoto({ personalId }: { personalId: string }) {
                 </li>
               ) : (
                 resultados.map((c) => (
-                  <li key={c.id}>
-                    <button
-                      type="button"
-                      onClick={() => setElegido(c)}
-                      className="flex w-full items-center gap-3 rounded-lg border border-linea bg-superficie p-2.5 text-left hover:bg-papel-suave"
-                    >
-                      <div className="flex h-11 w-11 flex-none items-center justify-center overflow-hidden rounded-full border border-linea bg-papel-suave">
-                        {c.fotoUrl ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img src={c.fotoUrl} alt="" className="h-full w-full object-cover" />
-                        ) : (
-                          <span className="text-[0.62rem] text-tinta-suave">Sin foto</span>
-                        )}
-                      </div>
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate text-[0.88rem] font-semibold text-tinta">{c.nombre}</span>
-                        <span className="block text-[0.76rem] text-tinta-suave">{c.telefono ?? "—"}</span>
-                      </span>
+                  <li
+                    key={c.id}
+                    className="flex items-center gap-3 rounded-lg border border-linea bg-superficie p-2.5"
+                  >
+                    <div className="flex h-11 w-11 flex-none items-center justify-center overflow-hidden rounded-full border border-linea bg-papel-suave">
+                      {c.fotoUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={c.fotoUrl} alt="" className="h-full w-full object-cover" />
+                      ) : (
+                        <span className="text-[0.62rem] text-tinta-suave">Sin foto</span>
+                      )}
+                    </div>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-[0.88rem] font-semibold text-tinta">{c.nombre}</span>
+                      <span className="block text-[0.76rem] text-tinta-suave">{c.telefono ?? "—"}</span>
+                    </span>
+                    <button type="button" onClick={() => setElegido(c)} className={clasesBoton("navegar", "sm")}>
+                      Ver
                     </button>
                   </li>
                 ))
@@ -168,8 +168,8 @@ function FichaFotoCliente({
   return (
     <div className="rounded-xl border border-linea bg-superficie p-3.5">
       <div className="flex items-center justify-between gap-2">
-        <button type="button" onClick={onVolver} className="text-[0.78rem] font-medium text-tinta-suave hover:underline">
-          ← Buscar otro cliente
+        <button type="button" onClick={onVolver} className={clasesBoton("navegar", "sm")}>
+          ← Atrás
         </button>
         <button
           type="button"
