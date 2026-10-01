@@ -207,7 +207,7 @@ export function GestorServicios({
 
       <div className="grid gap-3 lg:grid-cols-[20rem_minmax(0,1fr)] lg:items-start">
         {/* ---------- categorías ---------- */}
-        <section className="rounded-xl border border-linea bg-superficie p-4">
+        <section className="rounded-xl border-2 border-azul/50 bg-superficie p-4">
           <div className="flex items-center justify-between gap-3">
             <h2 className="text-[1rem] font-semibold tracking-titular text-tinta">Categoría de servicio</h2>
             <button type="button" onClick={() => setVentana({ tipo: "nueva" })} className={clasesBoton("principal", "sm")}>
@@ -293,7 +293,7 @@ export function GestorServicios({
         </section>
 
         {/* ---------- servicios de la categoría ---------- */}
-        <section className="min-w-0 rounded-xl border border-linea bg-superficie p-4">
+        <section className="min-w-0 rounded-xl border-2 border-azul/50 bg-superficie p-4">
           {!actual ? (
             <Vacio
               titulo="Empezá creando una categoría"

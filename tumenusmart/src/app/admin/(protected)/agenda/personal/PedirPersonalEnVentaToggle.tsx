@@ -37,7 +37,7 @@ export function PedirPersonalEnVentaToggle({ activa }: { activa: boolean }) {
   }
 
   return (
-    <div className="rounded-xl border border-linea bg-superficie p-3.5">
+    <div className="rounded-xl border-2 border-azul/50 bg-superficie p-3.5">
       <div className="flex items-start gap-3">
         <div className="pt-0.5">
           <Interruptor

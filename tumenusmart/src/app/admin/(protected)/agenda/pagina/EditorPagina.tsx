@@ -109,7 +109,7 @@ export function EditorPagina({ inicial, yaGuardada }: { inicial: DatosPagina; ya
           <PerfilPagina datos={datos} cambiar={cambiar} />
 
           {/* Pantalla ancha: lista vertical. */}
-          <nav aria-label="Secciones de la página" className="hidden rounded-xl border border-linea bg-superficie p-2 lg:block">
+          <nav aria-label="Secciones de la página" className="hidden rounded-xl border-2 border-azul/50 bg-superficie p-2 lg:block">
             <ul className="flex flex-col gap-0.5">
               {SECCIONES.map((s) => (
                 <li key={s.valor}>

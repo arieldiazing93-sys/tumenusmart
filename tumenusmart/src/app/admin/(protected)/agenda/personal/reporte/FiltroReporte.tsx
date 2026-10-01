@@ -28,7 +28,7 @@ export function FiltroReporte({
     <form
       method="get"
       action="/admin/agenda/personal/reporte"
-      className="mb-4 rounded-xl border border-linea bg-superficie p-3.5"
+      className="mb-4 rounded-xl border-2 border-azul/50 bg-superficie p-3.5"
     >
       <div className="flex flex-wrap items-end gap-3">
         <Campo etiqueta="Personal" className="min-w-[13rem] flex-1">

@@ -183,7 +183,7 @@ export function CobrarPanel({
       <div className="flex min-h-0 flex-1 flex-col">
         <div className="flex flex-1 flex-col gap-4 overflow-y-auto px-4 py-4">
           {/* ---------- lo que se cobra ---------- */}
-          <div className="flex items-center justify-between gap-3 rounded-xl border border-linea bg-superficie p-3.5 shadow-sm">
+          <div className="flex items-center justify-between gap-3 rounded-xl border-2 border-azul/50 bg-superficie p-3.5 shadow-sm">
             <div className="min-w-0">
               <p className="text-[0.7rem] font-semibold uppercase tracking-rotulo text-tinta-suave">A cobrar</p>
               <p className="truncate text-[0.85rem] text-tinta-media">

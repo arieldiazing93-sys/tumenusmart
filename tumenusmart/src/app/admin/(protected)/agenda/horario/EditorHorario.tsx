@@ -157,7 +157,7 @@ export function EditorHorario({
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="overflow-hidden rounded-xl border border-linea bg-superficie">
+      <div className="overflow-hidden rounded-xl border-2 border-azul/50 bg-superficie">
         {/* Cabecera de la tabla: solo en pantalla ancha. */}
         <div
           className={`hidden gap-x-3 border-b border-linea bg-papel-suave px-4 py-3 text-[0.72rem] font-semibold uppercase tracking-rotulo text-tinta-suave xl:grid ${COLUMNAS}`}

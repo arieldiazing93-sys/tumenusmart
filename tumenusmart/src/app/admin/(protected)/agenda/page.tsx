@@ -206,7 +206,7 @@ export default async function AgendaPage({
         vistaEnUrl={vistaPedida !== null}
       />
 
-      <section className="overflow-hidden rounded-xl border border-linea bg-superficie shadow-sm">
+      <section className="overflow-hidden rounded-xl border-2 border-azul/50 bg-superficie shadow-sm">
         {/* La franja de quién es la agenda solo aparece al elegir a una persona: viendo a todos no aporta nada
             (el botón Personal ya lo dice) y ocuparía una fila. */}
         {elegido && (

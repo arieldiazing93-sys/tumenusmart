@@ -332,7 +332,7 @@ export default async function CitasPage({
           </ul>
         )}
 
-        <dl className="ml-auto flex flex-none items-stretch divide-x divide-linea overflow-hidden rounded-lg border border-linea bg-superficie">
+        <dl className="ml-auto flex flex-none items-stretch divide-x divide-linea overflow-hidden rounded-lg border-2 border-azul/50 bg-superficie">
           {resumen.map((r) => (
             <div key={r.rotulo} className="px-3 py-1">
               <dt className="text-[0.66rem] font-medium text-tinta-suave">{r.rotulo}</dt>
