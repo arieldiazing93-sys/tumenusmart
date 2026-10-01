@@ -21,6 +21,16 @@ export function BuscarClienteFoto({ personalId }: { personalId: string }) {
   const [resultados, setResultados] = useState<ClienteEncontrado[] | null>(null);
   const [elegido, setElegido] = useState<ClienteEncontrado | null>(null);
 
+  // Vuelve todo a cero: lo usa la X de arriba, para cerrar sin tener que apretar
+  // "atrás" del navegador (que en un enlace abierto desde WhatsApp saca de la
+  // página entera, obligando a volver a pedir el enlace).
+  function cerrarTodo() {
+    setTelefono("");
+    setError(null);
+    setResultados(null);
+    setElegido(null);
+  }
+
   async function buscar(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError(null);
@@ -103,6 +113,7 @@ export function BuscarClienteFoto({ personalId }: { personalId: string }) {
           personalId={personalId}
           cliente={elegido}
           onVolver={() => setElegido(null)}
+          onCerrar={cerrarTodo}
           onActualizado={(url) => {
             setElegido((prev) => (prev ? { ...prev, fotoUrl: url } : prev));
             setResultados((prev) => prev?.map((c) => (c.id === elegido.id ? { ...c, fotoUrl: url } : c)) ?? prev);
@@ -117,11 +128,14 @@ function FichaFotoCliente({
   personalId,
   cliente,
   onVolver,
+  onCerrar,
   onActualizado,
 }: {
   personalId: string;
   cliente: ClienteEncontrado;
   onVolver: () => void;
+  /** Cierra del todo (vuelve a la búsqueda vacía), para no tener que usar "atrás" del navegador. */
+  onCerrar: () => void;
   onActualizado: (url: string) => void;
 }) {
   const [subiendo, setSubiendo] = useState(false);
@@ -153,9 +167,20 @@ function FichaFotoCliente({
 
   return (
     <div className="rounded-xl border border-linea bg-superficie p-3.5">
-      <button type="button" onClick={onVolver} className="text-[0.78rem] font-medium text-tinta-suave hover:underline">
-        ← Buscar otro cliente
-      </button>
+      <div className="flex items-center justify-between gap-2">
+        <button type="button" onClick={onVolver} className="text-[0.78rem] font-medium text-tinta-suave hover:underline">
+          ← Buscar otro cliente
+        </button>
+        <button
+          type="button"
+          onClick={onCerrar}
+          aria-label="Cerrar"
+          title="Cerrar"
+          className="flex h-8 w-8 flex-none items-center justify-center rounded-full text-tinta-suave transition-colors hover:bg-papel-suave hover:text-tinta"
+        >
+          ✕
+        </button>
+      </div>
 
       <p className="mt-2 text-[0.95rem] font-semibold text-tinta">{cliente.nombre}</p>
       <p className="text-[0.78rem] text-tinta-suave">{cliente.telefono ?? "—"}</p>
