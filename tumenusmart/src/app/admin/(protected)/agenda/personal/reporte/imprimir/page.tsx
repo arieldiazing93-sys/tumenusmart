@@ -138,7 +138,11 @@ export default async function ImprimirReportePersonalPage({
             </>
           )}
 
-          <h2 className="mb-3 font-semibold text-tinta">Detalle de trabajos</h2>
+          <h2 className="mb-1 font-semibold text-tinta">Detalle</h2>
+          <p className="mb-3 text-xs text-tinta-suave">
+            Trabajos (citas) y ventas de productos, mezclados por fecha. El TOTAL de abajo es solo de los trabajos
+            — la comisión de productos ya está arriba, en su propia tarjeta.
+          </p>
           <table className="w-full border-collapse text-sm">
             <thead>
               <tr className="border-b border-linea text-left text-xs uppercase tracking-wide text-tinta-media">
@@ -172,7 +176,7 @@ export default async function ImprimirReportePersonalPage({
               ))}
               <tr className="border-t-2 border-linea font-semibold">
                 <td className="py-2 text-tinta" colSpan={personalElegido ? 4 : 5}>
-                  TOTAL
+                  TOTAL SERVICIOS
                 </td>
                 <td className="py-2 text-right text-tinta">{formatearGuarani(Math.round(general.cobrado))}</td>
                 <td className="py-2 text-right text-tinta">{formatearGuarani(Math.round(general.comision))}</td>
@@ -181,8 +185,8 @@ export default async function ImprimirReportePersonalPage({
           </table>
           {hayMas && (
             <p className="mt-3 text-xs text-tinta-suave">
-              Se listan los primeros {MAXIMO_FILAS_PDF} trabajos del período; los totales de arriba cuentan todos. Para
-              el detalle completo, descargá el Excel.
+              Se listan los primeros {MAXIMO_FILAS_PDF} del período; los totales de arriba cuentan todos. Para el
+              detalle completo, descargá el Excel.
             </p>
           )}
         </>

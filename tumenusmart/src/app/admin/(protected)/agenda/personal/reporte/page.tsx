@@ -327,8 +327,12 @@ export default async function ReportePersonalPage({
                 </div>
               )}
 
-              {/* ---------- el detalle de cada trabajo ---------- */}
-              <p className="mb-1.5 text-[0.82rem] font-semibold text-tinta">Detalle de trabajos</p>
+              {/* ---------- el detalle de cada trabajo y cada venta de producto, mezclados por fecha ---------- */}
+              <p className="text-[0.82rem] font-semibold text-tinta">Detalle</p>
+              <p className="mb-1.5 text-[0.76rem] text-tinta-suave">
+                Trabajos (citas) y ventas de productos, mezclados por fecha. "Total servicios" del pie es solo de los
+                trabajos — la comisión de productos ya está arriba, en su propia tarjeta.
+              </p>
 
               {/* Pantalla ancha: tabla. */}
               <div className="hidden md:block">
@@ -377,7 +381,7 @@ export default async function ReportePersonalPage({
                     <tfoot>
                       <tr>
                         <Td colSpan={columnas - 3} className="text-right font-medium">
-                          Total
+                          Total servicios
                         </Td>
                         <Td className="cifra text-right font-semibold text-tinta">{formatearGuarani(general.cobrado)}</Td>
                         <Td>{null}</Td>
@@ -431,7 +435,7 @@ export default async function ReportePersonalPage({
 
               {hayMas && (
                 <p className="mt-3 text-center text-[0.8rem] text-tinta-suave">
-                  Se muestran los últimos {MAXIMO_FILAS} trabajos del período. Los totales de arriba cuentan todos: acotá las
+                  Se muestran los últimos {MAXIMO_FILAS} del período. Los totales de arriba cuentan todos: acotá las
                   fechas para ver el detalle completo.
                 </p>
               )}

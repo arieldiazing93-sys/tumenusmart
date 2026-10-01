@@ -7,9 +7,14 @@
  * Son dos comisiones separadas. La de SERVICIO cuenta por el día del trabajo (`Cita.inicio`), igual que Citas y
  * la vista de cada persona: lo que vale cada trabajo es lo de sus servicios (`montoDelTrabajo`), los productos
  * que se lleve el cliente en la misma cuenta no suman ahí. La de PRODUCTO sale de otra fuente (`VentaPos`, no
- * `Cita`: una venta de productos no es un turno) y cuenta por el día de la venta (`VentaPos.creadoEn`) — se
- * suma como un total aparte, sin detalle línea por línea. Cada trabajo/venta usa el porcentaje que tenía quien
- * lo hizo AL COBRARLO; los de antes de existir la comisión usan la que tiene ahora.
+ * `Cita`: una venta de productos no es un turno) y cuenta por el día de la venta (`VentaPos.creadoEn`). Cada
+ * trabajo/venta usa el porcentaje que tenía quien lo hizo AL COBRARLO; los de antes de existir la comisión usan
+ * la que tiene ahora.
+ *
+ * El detalle fila por fila mezcla las dos fuentes (cada fila dice de cuál es, `tipo`) y queda ordenado por
+ * fecha como si fuera uno solo — así se puede encontrar cualquier venta puntual (ej. el ticket de un producto)
+ * sin tener que adivinar en qué lista buscarla. Los totales de arriba (`general`/`porPersona`) siguen cada uno
+ * por su lado, nunca se mezclan entre sí.
  */
 
 import type { Prisma } from "@prisma/client";
@@ -65,7 +70,7 @@ export type Acumulado = {
   comisionProducto: number;
 };
 
-/** Un trabajo terminado, ya con lo que le toca de comisión. */
+/** Un trabajo terminado o una venta de producto, ya con lo que le toca de comisión. */
 export type FilaTrabajo = {
   id: string;
   personal: string;
@@ -79,11 +84,13 @@ export type FilaTrabajo = {
   pago: string;
   /** "Ticket #0082" / "Factura 001-001-0000001", para identificar la venta puntual. */
   comprobante: string;
-  /** Lo que valen sus servicios (ya con el descuento que les tocó). */
+  /** Lo que valen sus servicios, o la base de productos de esa venta (ya con el descuento que les tocó). */
   total: number;
   /** El porcentaje con que se calculó; null si no tenía comisión. */
   porcentaje: number | null;
   comision: number;
+  /** De qué comisión sale esta fila: un trabajo (Cita) o una venta de productos (VentaPos). */
+  tipo: "servicio" | "producto";
 };
 
 export type DatosReporte = {
@@ -203,10 +210,23 @@ export async function cargarReportePersonal(
             },
           },
         }),
-        // La comisión de producto: un total aparte, sin detalle línea por línea (ver comentario de arriba).
+        // La comisión de producto: se mezcla con el detalle de trabajos más abajo (ver comentario de arriba).
         db.ventaPos.findMany({
           where: dondeVenta!,
-          select: { personalId: true, comisionProductoPorcentaje: true, comisionProductoBase: true },
+          orderBy: [{ creadoEn: orden }, { id: "asc" }],
+          select: {
+            id: true,
+            personalId: true,
+            comisionProductoPorcentaje: true,
+            comisionProductoBase: true,
+            clienteNombre: true,
+            creadoEn: true,
+            numero: true,
+            comprobanteTipo: true,
+            facturaNumero: true,
+            facturaAnulada: true,
+            pagos: { orderBy: { orden: "asc" }, select: { forma: true, monto: true } },
+          },
         }),
       ])
     : [[], [], []];
@@ -253,7 +273,7 @@ export async function cargarReportePersonal(
     general.comisionProducto += comisionProducto;
   }
 
-  const filas: FilaTrabajo[] = detalle.map((c) => {
+  const filasDeTrabajo: FilaTrabajo[] = detalle.map((c) => {
     const { dia, minutos } = partesLocales(c.inicio);
     const total = montoDelTrabajo(c.precio, c.ventaPos?.total);
     const porcentaje = porcentajeDe(c.personalId, c.comisionPorcentaje);
@@ -270,8 +290,38 @@ export async function cargarReportePersonal(
       total,
       porcentaje,
       comision: calcularComision(total, porcentaje),
+      tipo: "servicio",
     };
   });
+
+  const filasDeProducto: FilaTrabajo[] = ventasProducto.map((v) => {
+    const { dia, minutos } = partesLocales(v.creadoEn);
+    const base = v.comisionProductoBase == null ? 0 : Number(v.comisionProductoBase);
+    const porcentaje = v.personalId ? porcentajeProductoDe(v.personalId, v.comisionProductoPorcentaje) : null;
+    return {
+      id: v.id,
+      personal: (v.personalId && personaPorId.get(v.personalId)?.nombre) || "—",
+      dia,
+      hora: horaDeMinutos(minutos),
+      cliente: v.clienteNombre?.trim() || "Cliente de mostrador",
+      servicios: "Venta de productos",
+      sinReserva: true,
+      pago: detallePagos(v.pagos.map((p) => ({ forma: p.forma, monto: Number(p.monto) }))),
+      comprobante: comprobanteDe(v),
+      total: base,
+      porcentaje,
+      comision: calcularComision(base, porcentaje),
+      tipo: "producto",
+    };
+  });
+
+  // Las dos fuentes mezcladas, como si fuera un solo detalle — ver comentario de arriba del archivo.
+  const clave = (f: FilaTrabajo) => `${f.dia}T${f.hora}`;
+  const filasCombinadas = [...filasDeTrabajo, ...filasDeProducto].sort((a, b) => {
+    const [x, y] = orden === "desc" ? [clave(b), clave(a)] : [clave(a), clave(b)];
+    return x < y ? -1 : x > y ? 1 : 0;
+  });
+  const filas = filasCombinadas.slice(0, maximoFilas);
 
   return {
     personas,
@@ -283,6 +333,6 @@ export async function cargarReportePersonal(
     nombresSinComision: personas.filter((p) => sinComision.has(p.id)).map((p) => p.nombre),
     nombresSinComisionProducto: personas.filter((p) => sinComisionProducto.has(p.id)).map((p) => p.nombre),
     filas,
-    hayMas: general.cantidad > filas.length,
+    hayMas: general.cantidad + ventasProducto.length > filas.length,
   };
 }

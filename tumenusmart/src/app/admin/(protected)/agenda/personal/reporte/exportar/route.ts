@@ -145,8 +145,8 @@ export async function GET(request: NextRequest) {
     resumen.addRow(["No hay movimiento en este período."]);
   }
 
-  // ---------- hoja 2: cada trabajo ----------
-  const trabajos = libro.addWorksheet("Trabajos");
+  // ---------- hoja 2: cada trabajo y cada venta de producto, mezclados por fecha ----------
+  const trabajos = libro.addWorksheet("Detalle");
   trabajos.columns = [
     { width: 18 },
     { width: 12 },
@@ -198,16 +198,20 @@ export async function GET(request: NextRequest) {
     trabajos.addRow([]);
     const total = filaTitulo(
       trabajos,
-      ["", "", "", "", "", "", "", "TOTAL", Math.round(general.cobrado), "", Math.round(general.comision)],
+      ["", "", "", "", "", "", "", "TOTAL SERVICIOS", Math.round(general.cobrado), "", Math.round(general.comision)],
       11
     );
     total.getCell(9).numFmt = FORMATO_GUARANIES;
     total.getCell(11).numFmt = FORMATO_GUARANIES;
+    trabajos.addRow([]);
+    trabajos.addRow([
+      "Esta hoja mezcla trabajos (citas) y ventas de productos por fecha. El TOTAL de acá arriba es solo de los trabajos — la comisión de productos ya está en la hoja Resumen, en su propia columna.",
+    ]);
   }
   if (hayMas) {
     trabajos.addRow([]);
     trabajos.addRow([
-      `Se listan los primeros ${MAXIMO_FILAS_EXCEL} trabajos del período; los totales de la hoja Resumen cuentan todos.`,
+      `Se listan los primeros ${MAXIMO_FILAS_EXCEL} del período; los totales de la hoja Resumen cuentan todos.`,
     ]);
   }
 
