@@ -9,7 +9,10 @@
 // deja como mejora futura, documentada, no como un descuido.
 const CSP = [
   "default-src 'self'",
-  "script-src 'self' 'unsafe-inline'",
+  // El Registro de asistencia carga el detector de caras (MediaPipe, de Google) desde el CDN de
+  // jsDelivr: el código en script-src, y el modelo y los archivos WebAssembly en connect-src.
+  // 'wasm-unsafe-eval' es lo único que habilita WebAssembly, sin abrir la puerta a eval().
+  "script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://cdn.jsdelivr.net",
   "style-src 'self' 'unsafe-inline'",
   // Supabase Storage (fotos de producto y logos) + los tiles del mapa
   // (Leaflet + OpenStreetMap, usado para marcar la ubicación de entrega).
@@ -18,7 +21,8 @@ const CSP = [
   // wss/ws a localhost: QZ Tray (impresión silenciosa) escucha ahí en la
   // computadora de cada estación — sin esto el navegador corta el
   // WebSocket en silencio y se confunde con "QZ Tray no está instalado".
-  "connect-src 'self' wss://localhost:* ws://localhost:*",
+  "connect-src 'self' wss://localhost:* ws://localhost:* https://cdn.jsdelivr.net https://storage.googleapis.com",
+  "worker-src 'self' blob:",
   // Nadie puede embeber el panel ni la carta en un <iframe> ajeno —
   // reemplaza y refuerza a X-Frame-Options.
   "frame-ancestors 'none'",
@@ -64,11 +68,13 @@ const nextConfig = {
             value: "max-age=63072000; includeSubDomains",
           },
           // Se deja "geolocation=(self)" porque el checkout la usa de
-          // verdad (marcar la ubicación de entrega en el mapa). El resto,
-          // sin motivo para existir en esta app, se corta.
+          // verdad (marcar la ubicación de entrega en el mapa), y "camera=(self)"
+          // porque el Registro de asistencia usa la cámara de este mismo sitio
+          // (el navegador igual pide permiso). El resto, sin motivo para
+          // existir en esta app, se corta.
           {
             key: "Permissions-Policy",
-            value: "camera=(), microphone=(), geolocation=(self), payment=()",
+            value: "camera=(self), microphone=(), geolocation=(self), payment=()",
           },
         ],
       },

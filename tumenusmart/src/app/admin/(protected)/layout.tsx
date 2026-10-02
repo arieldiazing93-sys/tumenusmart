@@ -108,6 +108,15 @@ function armarGrupos(hayIdeaSinVer: boolean, rol: string, ventasACredito: boolea
       ],
     },
     {
+      // Control de asistencia del personal (marcar entrada y salida con la cámara). Por ahora solo
+      // está la prueba de que la cámara reconoce a una persona de verdad; el resto se arma después.
+      titulo: "Asistencia",
+      secciones: [
+        { href: "/admin/asistencia", label: "Registro de asistencia", icono: "usuarios" as const,
+          ver: conPermiso("agenda.configurar") },
+      ],
+    },
+    {
       titulo: "Mi carta",
       secciones: [
         { href: "/admin/productos", label: "Productos", icono: "productos" as const,
