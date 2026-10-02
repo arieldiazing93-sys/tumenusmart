@@ -73,6 +73,7 @@ export async function guardarPaginaReservas(entrada: DatosPagina): Promise<Resul
     avisoWhatsapp: d.avisoWhatsapp,
     entradaCalendario: d.entradaCalendario,
     galeria: d.galeria as unknown as Prisma.InputJsonValue,
+    googleMapsUrl: d.googleMapsUrl,
     colorPrimario: d.colorPrimario,
     tema: d.tema,
     campos: d.campos as unknown as Prisma.InputJsonValue,

@@ -57,6 +57,8 @@ export type DatosPagina = {
   avisoWhatsapp: boolean;
   entradaCalendario: EntradaCalendario;
   galeria: ItemGaleria[];
+  /** El enlace a la ficha de Google Maps del negocio, para el QR de "dejanos tu reseña". */
+  googleMapsUrl: string;
   colorPrimario: string;
   tema: TemaPagina;
   campos: CampoFormulario[];
@@ -243,6 +245,7 @@ export type FilaPagina = {
   avisoWhatsapp: boolean;
   entradaCalendario: string;
   galeria: unknown;
+  googleMapsUrl: string | null;
   colorPrimario: string;
   tema: string;
   campos: unknown;
@@ -283,6 +286,7 @@ export function datosIniciales(fila: FilaPagina | null, nombreNegocio: string): 
       // Lo habitual: el cliente confirma mandando el aviso por WhatsApp, y recién ahí la cita entra al calendario.
       entradaCalendario: "al_enviar_whatsapp",
       galeria: [],
+      googleMapsUrl: "",
       colorPrimario: COLOR_POR_DEFECTO,
       tema: "claro",
       campos: completarCampos([]),
@@ -309,6 +313,7 @@ export function datosIniciales(fila: FilaPagina | null, nombreNegocio: string): 
     avisoWhatsapp: fila.avisoWhatsapp,
     entradaCalendario: normalizarEntradaCalendario(fila.entradaCalendario),
     galeria: completarGaleria(fila.galeria),
+    googleMapsUrl: fila.googleMapsUrl ?? "",
     colorPrimario: normalizarColor(fila.colorPrimario),
     tema: normalizarTema(fila.tema),
     campos: completarCampos(fila.campos),
@@ -337,6 +342,7 @@ export type DatosParaGuardar = {
   avisoWhatsapp: boolean;
   entradaCalendario: EntradaCalendario;
   galeria: ItemGaleria[];
+  googleMapsUrl: string | null;
   colorPrimario: string;
   tema: TemaPagina;
   campos: CampoFormulario[];
@@ -350,6 +356,25 @@ function imagen(valor: unknown): { ok: true; url: string | null } | { ok: false 
   const t = typeof valor === "string" ? valor.trim() : "";
   if (!t) return { ok: true, url: null };
   return /^https:\/\//i.test(t) && t.length <= 500 ? { ok: true, url: t } : { ok: false };
+}
+
+/**
+ * El enlace a la ficha de Google Maps del negocio (el que se comparte desde Maps, o el
+ * que arma el QR de reseñas) — opcional, pero si se carga tiene que ser un https:// real.
+ */
+function enlaceGoogleMaps(valor: unknown): { ok: true; url: string | null } | { ok: false; error: string } {
+  const t = typeof valor === "string" ? valor.trim() : "";
+  if (!t) return { ok: true, url: null };
+  if (t.length > 300) return { ok: false, error: "El enlace de Google Maps es demasiado largo" };
+  if (!/^https:\/\//i.test(t)) {
+    return { ok: false, error: "El enlace de Google Maps tiene que empezar con https://" };
+  }
+  try {
+    new URL(t);
+  } catch {
+    return { ok: false, error: "Ese enlace de Google Maps no es válido. Revisalo." };
+  }
+  return { ok: true, url: t };
 }
 
 /**
@@ -415,6 +440,9 @@ export function sanearDatosPagina(
   }
   const galeria = completarGaleria(e.galeria);
 
+  const googleMaps = enlaceGoogleMaps(e.googleMapsUrl);
+  if (!googleMaps.ok) return { ok: false, error: googleMaps.error };
+
   return {
     ok: true,
     datos: {
@@ -434,6 +462,7 @@ export function sanearDatosPagina(
       avisoWhatsapp: e.avisoWhatsapp !== false,
       entradaCalendario: normalizarEntradaCalendario(e.entradaCalendario),
       galeria,
+      googleMapsUrl: googleMaps.url,
       colorPrimario: normalizarColor(e.colorPrimario),
       tema: normalizarTema(e.tema),
       campos: completarCampos(e.campos),

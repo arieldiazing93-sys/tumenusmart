@@ -2438,6 +2438,8 @@ model PaginaReservas {
   entradaCalendario String @default("al_reservar")
   /// Hasta 5 fotos: [{ "url": "https://…", "descripcion": "…" }].
   galeria Json @default("[]")
+  /// Enlace a la ficha de Google Maps del negocio, para el QR de "dejanos tu reseña".
+  googleMapsUrl String?
   /// El color de la página, "#RRGGBB".
   colorPrimario String @default("#3B82F6")
   /// claro | oscuro | sistema.
