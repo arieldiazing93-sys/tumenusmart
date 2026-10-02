@@ -185,7 +185,7 @@ export default async function AnalistaPage() {
       )}
 
       {sinCosto > 0 && (
-        <div className="mt-8 rounded-lg border border-dashed border-linea bg-white p-4">
+        <div className="mt-8 rounded-lg border-2 border-dashed border-azul/50 bg-white p-4">
           <h2 className="text-sm font-semibold text-tinta">
             Falta un dato para hablar de ganancia
           </h2>
@@ -209,7 +209,7 @@ function FaltanDatos({ actuales, necesarios }: { actuales: number; necesarios: n
   const avance = Math.min(100, Math.round((actuales / necesarios) * 100));
 
   return (
-    <div className="rounded-lg border border-linea bg-white p-6">
+    <div className="rounded-lg border-2 border-azul/50 bg-white p-6">
       <h2 className="text-base font-semibold text-tinta">
         Todavía no tengo suficientes pedidos
       </h2>
@@ -256,7 +256,7 @@ function TarjetaIdea({ idea }: { idea: Idea }) {
 
   return (
     <article
-      className={`rounded-lg border border-linea border-l-4 bg-white p-4 ${estilo.borde}`}
+      className={`rounded-lg border-2 border-azul/50 border-l-4 bg-white p-4 ${estilo.borde}`}
     >
       <div className="mb-1 flex flex-wrap items-center gap-2">
         <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${estilo.chip}`}>

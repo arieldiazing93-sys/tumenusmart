@@ -34,7 +34,7 @@ export default async function CerrarTurnoPage() {
     return (
       <div>
         <Cabecera titulo="Cerrar turno" />
-        <Tarjeta className="max-w-lg shadow-sm">
+        <Tarjeta className="max-w-lg shadow-sm !border-2 !border-azul/50">
           <p className="mb-3 rounded-lg bg-aviso-luz px-3.5 py-3 text-[0.85rem] font-medium text-aviso">
             Todavía no se puede cerrar: hay {pendientes.length}{" "}
             {pendientes.length === 1 ? "entrega" : "entregas"} de delivery sin rendir —{" "}
@@ -76,7 +76,7 @@ export default async function CerrarTurnoPage() {
         titulo="Cerrar turno"
         bajada="Corte ciego: contá la caja y declará cada forma de pago antes de ver lo que calculó el sistema."
       />
-      <Tarjeta className="max-w-lg shadow-sm">
+      <Tarjeta className="max-w-lg shadow-sm !border-2 !border-azul/50">
         {/* A propósito NO se le pasa a este formulario lo que calculó el
             sistema (resumen.porForma): un corte de caja en Paraguay es
             ciego — si el cajero viera el número de antemano, terminaría

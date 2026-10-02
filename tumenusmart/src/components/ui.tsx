@@ -376,9 +376,9 @@ export function MensajeError({ children }: { children: ReactNode }) {
  * Sin esto, una tabla ancha en el celular estira la página entera y todo el
  * panel queda corrido para el costado.
  */
-export function Tabla({ children }: { children: ReactNode }) {
+export function Tabla({ children, className = "" }: { children: ReactNode; className?: string }) {
   return (
-    <div className="overflow-x-auto rounded-xl border border-linea bg-superficie">
+    <div className={`overflow-x-auto rounded-xl border border-linea bg-superficie ${className}`}>
       <table className="w-full min-w-[34rem] border-collapse text-left">{children}</table>
     </div>
   );

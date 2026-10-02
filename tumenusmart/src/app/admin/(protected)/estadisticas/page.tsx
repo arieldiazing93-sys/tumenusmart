@@ -211,14 +211,14 @@ export default async function AdminEstadisticasPage({
 
       <div className="mb-8">
         <h2 className="mb-3 font-semibold text-tinta">Ventas por día</h2>
-        <div className="rounded-lg border border-linea bg-white p-4">
+        <div className="rounded-lg border-2 border-azul/50 bg-white p-4">
           <VentasPorDiaChart datos={datosChart} />
         </div>
       </div>
 
       <div className="mb-8">
         <h2 className="mb-3 font-semibold text-tinta">Ventas por tipo de entrega</h2>
-        <div className="rounded-lg border border-linea bg-white p-4">
+        <div className="rounded-lg border-2 border-azul/50 bg-white p-4">
           {stats.ventasValidas === 0 ? (
             <p className="text-sm text-tinta-suave">Sin ventas en este período.</p>
           ) : (
@@ -261,7 +261,7 @@ export default async function AdminEstadisticasPage({
           </p>
         ) : (
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-            <div className="overflow-hidden rounded-lg border border-linea bg-white lg:col-span-2">
+            <div className="overflow-hidden rounded-lg border-2 border-azul/50 bg-white lg:col-span-2">
               <table className="w-full text-left text-sm">
                 <thead className="border-b border-linea bg-papel-suave text-xs uppercase tracking-wide text-tinta-media">
                   <tr>
@@ -305,7 +305,7 @@ export default async function AdminEstadisticasPage({
               </table>
             </div>
 
-            <div className="rounded-lg border border-linea bg-white p-4">
+            <div className="rounded-lg border-2 border-azul/50 bg-white p-4">
               <p className="mb-1 text-sm font-medium text-tinta-media">Sin ventas</p>
               <p className="mb-3 text-xs text-tinta-media">
                 Productos visibles en el menú que no vendieron ni una unidad en este período.
@@ -358,12 +358,12 @@ export default async function AdminEstadisticasPage({
         </div>
 
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-          <div className="rounded-lg border border-linea bg-white p-4 lg:col-span-2">
+          <div className="rounded-lg border-2 border-azul/50 bg-white p-4 lg:col-span-2">
             <p className="mb-2 text-sm font-medium text-tinta-media">Reservas por día</p>
             <VentasPorDiaChart datos={datosChartReservas} sufijoTooltip="reservas" color="#0891b2" />
           </div>
 
-          <div className="rounded-lg border border-linea bg-white p-4">
+          <div className="rounded-lg border-2 border-azul/50 bg-white p-4">
             <p className="mb-3 text-sm font-medium text-tinta-media">Por turno</p>
             <div className="flex flex-col gap-3">
               {(["dia", "tarde", "noche"] as const).map((t) => (

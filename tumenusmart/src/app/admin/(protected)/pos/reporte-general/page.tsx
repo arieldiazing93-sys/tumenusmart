@@ -138,7 +138,7 @@ export default async function ReporteGeneralPosPage({
           detalle="Los pedidos de mostrador, las ventas del Punto de Venta y el delivery entregado van a aparecer acá."
         />
       ) : (
-        <Tabla>
+        <Tabla className="!border-2 !border-azul/50">
           <thead>
             <tr>
               <Th>N°</Th>

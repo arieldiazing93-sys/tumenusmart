@@ -277,7 +277,7 @@ export default async function AnalyticsPage({
             : "Todavía no hay movimiento en este período."}
         </p>
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-linea bg-white">
+        <div className="overflow-x-auto rounded-lg border-2 border-azul/50 bg-white">
           <table className="w-full min-w-[640px] text-left text-sm">
             <thead className="border-b border-linea bg-papel-suave text-xs uppercase tracking-wide text-tinta-media">
               <tr>

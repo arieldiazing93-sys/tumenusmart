@@ -257,7 +257,7 @@ export default async function ComprobanteTurnoPosPage({
       </div>
 
       {/* --- la hoja --- */}
-      <div className="rounded-xl border border-linea bg-white p-5 print:rounded-none print:border-0 print:p-0">
+      <div className="rounded-xl border-2 border-azul/50 bg-white p-5 print:rounded-none print:border-0 print:p-0">
         <header className="mb-4 border-b border-linea pb-3 print:mb-4 print:pb-3">
           <p className="rotulo">Cierre de turno · Punto de venta</p>
           <h1 className="mt-1 text-[1.35rem] font-semibold tracking-titular text-tinta print:text-[16pt]">
