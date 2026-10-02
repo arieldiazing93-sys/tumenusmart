@@ -350,7 +350,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
             <form action={cerrarSesion} className="flex-none">
               <button
                 type="submit"
-                className="rounded-lg px-2.5 py-1.5 text-[0.82rem] font-medium text-tinta-suave transition-colors hover:bg-peligro-luz hover:text-peligro"
+                className="rounded-lg border border-peligro/40 bg-peligro-tinte px-3 py-1.5 text-[0.82rem] font-semibold text-peligro transition-colors hover:border-peligro hover:bg-peligro hover:text-white"
               >
                 Salir
               </button>
