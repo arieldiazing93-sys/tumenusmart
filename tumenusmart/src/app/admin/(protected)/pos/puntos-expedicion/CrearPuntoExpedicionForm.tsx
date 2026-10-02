@@ -25,7 +25,7 @@ export function CrearPuntoExpedicionForm() {
   }
 
   return (
-    <Tarjeta className="mb-6 flex flex-col gap-3">
+    <Tarjeta className="mb-6 flex flex-col gap-3 !border-2 !border-azul/50">
       <p className="rotulo text-[0.8rem] font-bold">Nuevo punto de expedición</p>
       <form ref={formRef} action={alCrear} className="grid grid-cols-2 gap-3 sm:grid-cols-3">
         <div className="col-span-2 sm:col-span-3">

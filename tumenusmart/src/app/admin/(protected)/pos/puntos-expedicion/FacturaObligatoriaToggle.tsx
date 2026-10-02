@@ -33,7 +33,7 @@ export function FacturaObligatoriaToggle({ obligatoria }: { obligatoria: boolean
   }
 
   return (
-    <div className={`mb-5 rounded-lg border p-4 ${activo ? "border-brand/30 bg-papel-suave" : "border-linea bg-white"}`}>
+    <div className={`mb-5 rounded-lg border-2 border-azul/50 p-4 ${activo ? "bg-papel-suave" : "bg-white"}`}>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="font-medium text-tinta">

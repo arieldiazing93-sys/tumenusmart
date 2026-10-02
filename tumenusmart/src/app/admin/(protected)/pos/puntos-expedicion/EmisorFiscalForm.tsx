@@ -113,7 +113,7 @@ export function EmisorFiscalForm({ inicial }: { inicial: DatosEmisor }) {
   }
 
   return (
-    <Tarjeta className="mb-6">
+    <Tarjeta className="mb-6 !border-2 !border-azul/50">
       <details className="group">
         <summary className="flex cursor-pointer list-none flex-wrap items-center justify-between gap-2">
           <span className="block">

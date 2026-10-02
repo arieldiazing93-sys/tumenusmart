@@ -59,7 +59,7 @@ export function PuntoExpedicionFila({
 
   if (editando) {
     return (
-      <Tarjeta className="flex flex-col gap-3">
+      <Tarjeta className="flex flex-col gap-3 !border-2 !border-azul/50">
         <form action={guardar} className="grid grid-cols-2 gap-3 sm:grid-cols-3">
           <div className="col-span-2 sm:col-span-3">
             <Campo etiqueta="Nombre">
@@ -111,7 +111,7 @@ export function PuntoExpedicionFila({
   }
 
   return (
-    <div className={`rounded-lg border bg-white px-4 py-3 ${activo ? "border-linea" : "border-linea opacity-60"}`}>
+    <div className={`rounded-lg border-2 border-azul/50 bg-white px-4 py-3 ${activo ? "" : "opacity-60"}`}>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <span className="font-medium">
