@@ -8,8 +8,8 @@ export const dynamic = "force-dynamic";
 
 /**
  * El celular fijo del Registro de asistencia: la dirección que se abre en el celular que queda en la pared del
- * local, y cómo dejarlo andando. Ahí el personal elige su nombre, pone su PIN, hace uno o dos gestos delante de la
- * cámara (la prueba de que es una persona de verdad) y marca entrada, almuerzo o salida.
+ * local, y cómo dejarlo andando. Ahí el personal elige su nombre, pone su PIN, elige qué marca (entrada, almuerzo o
+ * salida) y mira a la cámara: apenas ve su cara de frente saca la foto y la marcación queda guardada.
  */
 export default async function CelularFijoPage() {
   await pantallaConPermiso("asistencia.gestionar");
@@ -44,17 +44,17 @@ export default async function CelularFijoPage() {
             Dejalo enchufado, con la pantalla prendida y la cámara de frente, a la altura de la cara de quien marca.
           </li>
           <li>
-            Elegí un lugar <strong className="text-tinta">bien iluminado</strong> y a la vista: la prueba de la cámara
-            anda mejor con buena luz, y un lugar visible desalienta a quien quiera hacer trampa.
+            Elegí un lugar <strong className="text-tinta">bien iluminado</strong> y a la vista: la cámara ve mejor la cara
+            con buena luz, y un lugar visible desalienta a quien quiera hacer trampa.
           </li>
         </ol>
       </Tarjeta>
 
       <Aviso titulo="Cómo se evita que marquen por otro" color="azul">
-        Cada marcación pide el PIN y un par de gestos al azar (parpadear, abrir la boca, sonreír o girar la cabeza), que
-        una foto o un video de otra persona no puede hacer a tiempo. Además queda guardada la foto de cada marcación:
-        en <strong>Marcaciones</strong> podés compararla con la selfie del alta. Si alguien no logra pasar la prueba,
-        puede marcar igual y esa marcación queda señalada para que la revises.
+        Cada marcación pide el PIN de la persona y la cámara tiene que ver una cara de frente. Queda guardada la foto de
+        cada marcación: en <strong>Marcaciones</strong> podés compararla con la selfie del alta. La cámara detecta que hay
+        una cara, pero no reconoce de quién es: por eso conviene mirar las fotos de vez en cuando. Si la cámara no llega a
+        ver la cara, la persona puede marcar igual y esa marcación queda señalada para que la revises.
       </Aviso>
     </div>
   );

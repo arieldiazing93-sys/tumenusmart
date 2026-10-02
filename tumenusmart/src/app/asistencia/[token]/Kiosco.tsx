@@ -7,9 +7,6 @@ import { clasesBoton } from "@/components/ui";
 import { ETIQUETA_TIPO, type MarcaReciente, type TipoMarcacion } from "@/lib/asistencia";
 import { registrarMarcacion, verificarPin, type ResultadoMarcacion } from "./actions";
 
-/** Cuántos gestos se le piden a quien marca para comprobar que es una persona de verdad. */
-const GESTOS_POR_MARCACION = 2;
-
 export type ColaboradorKiosco = {
   id: string;
   nombre: string;
@@ -60,8 +57,8 @@ function sinTildes(texto: string): string {
 
 /**
  * El celular fijo del Registro de asistencia, en la pared del local: la persona toca su nombre, pone su PIN,
- * elige qué marca (entrada, salida a almorzar, vuelta, salida), mira a la cámara y hace uno o dos gestos al
- * azar. La foto queda guardada con la marcación. Sin usuario ni contraseña: la llave está en la dirección.
+ * elige qué marca (entrada, salida a almorzar, vuelta, salida) y mira a la cámara: apenas ve su cara de frente
+ * saca la foto y la marcación queda guardada. Sin usuario ni contraseña: la llave está en la dirección.
  */
 export function Kiosco({
   token,
@@ -188,7 +185,6 @@ export function Kiosco({
     datos.set("colaboradorId", id);
     datos.set("pin", pinElegido);
     datos.set("tipo", tipo);
-    datos.set("gestos", JSON.stringify(r.gestos));
     datos.set("verificada", r.verificada ? "1" : "0");
     datos.set("archivo", r.foto, "marcacion.jpg");
 
@@ -386,7 +382,7 @@ export function Kiosco({
             <p className="text-center text-[1.05rem] font-semibold text-tinta">
               {estado.nombre}: {ETIQUETA_TIPO[estado.tipo].toLowerCase()}
             </p>
-            <VerificadorPersona gestos={GESTOS_POR_MARCACION} onResultado={alVerificar} onCancelar={reiniciar} />
+            <VerificadorPersona modo="marcacion" onResultado={alVerificar} onCancelar={reiniciar} />
           </>
         )}
 
@@ -417,7 +413,7 @@ export function Kiosco({
             )}
             {!estado.resultado.verificada && (
               <p className="rounded-lg bg-aviso-luz px-4 py-2 text-[0.85rem] text-aviso">
-                Se marcó sin la prueba de persona real: el dueño va a revisar tu foto.
+                La cámara no llegó a ver tu cara: el dueño va a revisar tu foto.
               </p>
             )}
             <button type="button" onClick={reiniciar} className={clasesBoton("principal", "md")}>

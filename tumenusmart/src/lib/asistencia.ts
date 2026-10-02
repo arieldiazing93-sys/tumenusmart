@@ -7,8 +7,6 @@
  * almorzar marca entrada y salida nomás.
  */
 
-import { GESTOS } from "./vision-facial";
-
 export type TipoMarcacion = "entrada" | "salida_almuerzo" | "vuelta_almuerzo" | "salida";
 
 export const TIPOS_MARCACION: TipoMarcacion[] = ["entrada", "salida_almuerzo", "vuelta_almuerzo", "salida"];
@@ -96,13 +94,6 @@ export function calcularTardanza(
   if (!horaEntrada || !horaValida(horaEntrada) || !horaValida(horaMarcada)) return null;
   const atraso = minutosDeHora(horaMarcada) - minutosDeHora(horaEntrada);
   return atraso > toleranciaMin ? atraso : 0;
-}
-
-/** Deja solo los gestos que existen: lo que manda el celular nunca se guarda tal cual. */
-export function gestosValidos(valor: unknown): string[] {
-  if (!Array.isArray(valor)) return [];
-  const conocidos = Object.keys(GESTOS);
-  return valor.filter((g): g is string => typeof g === "string" && conocidos.includes(g)).slice(0, 3);
 }
 
 /** "8 h 05 min", "45 min", "—" si no hay dato. */
@@ -233,7 +224,7 @@ export function armarTurnos<M extends MarcaDeTurno>(marcas: M[], dia: string, ho
     }
     if (t.tardanzaMin !== null && t.tardanzaMin > 0) t.avisos.push(`Llegó ${t.tardanzaMin} min tarde`);
     const todas = [t.entrada, t.salidaAlmuerzo, t.vueltaAlmuerzo, t.salida];
-    if (todas.some((m) => m && !m.verificada)) t.avisos.push("Marcó sin la prueba de persona real");
+    if (todas.some((m) => m && !m.verificada)) t.avisos.push("La cámara no vio su cara al marcar: revisá la foto");
   }
 
   return turnos;
@@ -245,9 +236,8 @@ export type CeldaMarca = {
   /** "08:03", en hora de Asunción. */
   hora: string;
   fotoUrl: string | null;
+  /** La cámara vio su cara de frente al sacar la foto. false = marcó igual sin que la viera (revisar la foto). */
   verificada: boolean;
-  /** Los gestos que hizo, ya en palabras: ["parpadeo", "boca abierta"]. */
-  gestos: string[];
   tardanzaMin: number | null;
 };
 

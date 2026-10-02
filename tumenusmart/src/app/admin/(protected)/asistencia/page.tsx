@@ -7,7 +7,6 @@ import { diaLargo, parsearFecha } from "@/lib/agenda";
 import {
   armarTurnos,
   formatearDuracion,
-  gestosValidos,
   nombreDeColaborador,
   type CeldaMarca,
   type FilaAsistencia,
@@ -15,7 +14,6 @@ import {
 } from "@/lib/asistencia";
 import { claveSumarDias, diasDeLaSemana } from "@/lib/calendario";
 import { claveDiaAsuncion, horaAsuncion } from "@/lib/timezone";
-import { GESTOS, type Gesto } from "@/lib/vision-facial";
 import { ListadoMarcaciones } from "./ListadoMarcaciones";
 
 export const dynamic = "force-dynamic";
@@ -36,7 +34,6 @@ function celdaDe(m: {
   fecha: Date;
   fotoUrl: string | null;
   verificada: boolean;
-  gestos: unknown;
   tardanzaMin: number | null;
 }): CeldaMarca {
   return {
@@ -44,7 +41,6 @@ function celdaDe(m: {
     hora: horaAsuncion(m.fecha),
     fotoUrl: m.fotoUrl,
     verificada: m.verificada,
-    gestos: gestosValidos(m.gestos).map((g) => GESTOS[g as Gesto].corto),
     tardanzaMin: m.tardanzaMin,
   };
 }
@@ -52,7 +48,7 @@ function celdaDe(m: {
 /**
  * Las marcaciones del personal: quién entró, salió a almorzar, volvió y se fue, con la foto de cada una. Por
  * defecto muestra HOY; se puede mirar otro día, una semana o un mes, y filtrar por persona. Cada turno dice
- * cuánto trabajó y lo que conviene revisar (no marcó la salida, llegó tarde, marcó sin la prueba de la cámara).
+ * cuánto trabajó y lo que conviene revisar (no marcó la salida, llegó tarde, la cámara no vio su cara al marcar).
  */
 export default async function MarcacionesPage({
   searchParams,
@@ -87,7 +83,6 @@ export default async function MarcacionesPage({
       dia: true,
       fecha: true,
       fotoUrl: true,
-      gestos: true,
       verificada: true,
       tardanzaMin: true,
     },
@@ -266,7 +261,7 @@ export default async function MarcacionesPage({
             <Cifra valor={conMarcas.size} rotulo="Personas que marcaron" />
             <Cifra valor={formatearDuracion(minutosTotales)} rotulo="Horas trabajadas" detalle="Sin contar el almuerzo" />
             <Cifra valor={tardanzas} rotulo="Llegadas tarde" detalle="Pasada la tolerancia" />
-            <Cifra valor={paraRevisar} rotulo="Para revisar" detalle="Sin salida, sin vuelta o sin prueba" />
+            <Cifra valor={paraRevisar} rotulo="Para revisar" detalle="Sin salida, sin vuelta o sin cara" />
           </div>
 
           {sinMarcar.length > 0 && (

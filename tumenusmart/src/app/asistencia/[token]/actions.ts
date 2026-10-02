@@ -9,7 +9,6 @@ import {
   SEGUNDOS_ENTRE_MARCAS,
   calcularTardanza,
   esTipoMarcacion,
-  gestosValidos,
   pinValido,
   type MarcaReciente,
   type TipoMarcacion,
@@ -26,8 +25,8 @@ import { claveDiaAsuncion, horaAsuncion } from "@/lib/timezone";
  * alguien arme un id a mano, nunca toca a otro negocio. El PIN se bloquea unos minutos tras varios errores
  * seguidos, así no se puede adivinar probando.
  *
- * Lo que el celular dice sobre los gestos ("hizo parpadeo y boca") lo comprueba el propio celular: el servidor
- * no puede verlo. Por eso cada marcación guarda la foto, que es la prueba que el dueño revisa.
+ * Que la cámara haya visto una cara de frente lo comprueba el propio celular: el servidor no puede verlo. Por eso
+ * cada marcación guarda la foto, que es la prueba que el dueño revisa.
  */
 
 type ColaboradorVerificado = {
@@ -142,8 +141,8 @@ export type ResultadoMarcacion =
   | { ok: false; error: string };
 
 /**
- * Segundo paso: guarda la marcación. Llega todo junto en el formulario (token, persona, PIN, qué marca, los
- * gestos y la foto). El PIN se vuelve a comprobar acá: el paso anterior no deja "sesión" de ningún tipo.
+ * Segundo paso: guarda la marcación. Llega todo junto en el formulario (token, persona, PIN, qué marca, si la
+ * cámara vio su cara y la foto). El PIN se vuelve a comprobar acá: el paso anterior no deja "sesión" de ningún tipo.
  */
 export async function registrarMarcacion(formData: FormData): Promise<ResultadoMarcacion> {
   const local = await localPorToken(texto(formData.get("token")));
@@ -175,13 +174,8 @@ export async function registrarMarcacion(formData: FormData): Promise<ResultadoM
     return { ok: false, error: err instanceof Error ? err.message : "No se pudo guardar la foto." };
   }
 
-  let gestos: string[] = [];
-  try {
-    gestos = gestosValidos(JSON.parse(texto(formData.get("gestos")) || "[]"));
-  } catch {
-    gestos = [];
-  }
-  const verificada = texto(formData.get("verificada")) === "1" && gestos.length > 0;
+  // El celular dice si su cámara llegó a ver una cara de frente; si no, la marcación queda para revisar.
+  const verificada = texto(formData.get("verificada")) === "1";
 
   const hora = horaAsuncion(ahora);
   // La salida, el almuerzo y la vuelta son del turno que ya está abierto (su jornada es la de la entrada);
@@ -198,7 +192,6 @@ export async function registrarMarcacion(formData: FormData): Promise<ResultadoM
       fecha: ahora,
       dia,
       fotoUrl,
-      gestos,
       verificada,
       tardanzaMin,
     },

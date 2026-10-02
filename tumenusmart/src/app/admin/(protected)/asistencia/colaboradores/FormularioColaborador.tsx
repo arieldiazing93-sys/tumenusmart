@@ -120,7 +120,7 @@ export function FormularioColaborador({
         {/* ---------- selfie ---------- */}
         <div className="flex flex-col items-center gap-3 border-b border-linea pb-5">
           {camara ? (
-            <VerificadorPersona gestos={0} onResultado={alSacarSelfie} onCancelar={() => setCamara(false)} />
+            <VerificadorPersona modo="selfie" onResultado={alSacarSelfie} onCancelar={() => setCamara(false)} />
           ) : (
             <>
               <div className="flex h-32 w-32 items-center justify-center overflow-hidden rounded-full border-2 border-azul/50 bg-brand-light text-brand">

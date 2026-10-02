@@ -36,7 +36,7 @@ function BotonHora({ celda, alAbrir }: { celda: CeldaMarca | null; alAbrir: () =
       }`}
     >
       {celda.hora}
-      {!celda.verificada && <span aria-label="Sin la prueba de persona real">!</span>}
+      {!celda.verificada && <span aria-label="La cámara no vio su cara">!</span>}
     </button>
   );
 }
@@ -228,14 +228,13 @@ function ModalFoto({ abierta, onCerrar }: { abierta: NonNullable<Abierta>; onCer
         <div className="mt-3 flex flex-wrap items-center gap-2">
           {celda.verificada ? (
             <Pastilla color="exito" punto>
-              Prueba de persona real superada
+              La cámara vio su cara
             </Pastilla>
           ) : (
             <Pastilla color="aviso" punto>
-              Marcó sin la prueba: revisá la foto
+              La cámara no vio su cara: revisá la foto
             </Pastilla>
           )}
-          {celda.gestos.length > 0 && <span className="text-[0.78rem] text-tinta-media">Gestos: {celda.gestos.join(" + ")}</span>}
           {celda.tardanzaMin !== null && celda.tardanzaMin > 0 && (
             <Pastilla color="aviso">Llegó {celda.tardanzaMin} min tarde</Pastilla>
           )}
