@@ -314,8 +314,14 @@ export type FilaAsistencia = {
   cargo: string | null;
   fotoAlta: string | null;
   celdas: Record<TipoMarcacion, CeldaMarca | null>;
+  /** Lo que trabajó, ya en texto ("8 h 05 min"; "—" si el turno no se cerró). */
   trabajado: string;
   almuerzo: string;
+  /** Los mismos datos en minutos (NULL = no hay dato), para sumar y para el Excel. */
+  minutosTrabajados: number | null;
+  minutosAlmuerzo: number | null;
+  /** Minutos de tardanza de la entrada (0 = a tiempo, NULL = no se controla). */
+  tardanzaMin: number | null;
   estado: EstadoTurno;
   avisos: string[];
 };

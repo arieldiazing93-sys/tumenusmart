@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Pastilla, Tabla, Td, Th, Tr, clasesBoton } from "@/components/ui";
+import { Pastilla, clasesBoton } from "@/components/ui";
 import {
   ETIQUETA_TIPO,
   ETIQUETA_TIPO_CORTA,
@@ -13,13 +13,18 @@ import {
 } from "@/lib/asistencia";
 import { AvatarPersonal } from "../agenda/AvatarPersonal";
 
-const ESTADOS: Record<EstadoTurno, { texto: string; color: "exito" | "azul" | "peligro" }> = {
-  completo: { texto: "Completo", color: "exito" },
-  en_curso: { texto: "En el trabajo", color: "azul" },
-  incompleto: { texto: "Incompleto", color: "peligro" },
+const ESTADOS: Record<EstadoTurno, { texto: string; clases: string }> = {
+  completo: { texto: "Completo", clases: "bg-exito-luz text-exito" },
+  en_curso: { texto: "En el trabajo", clases: "bg-azul-luz text-azul-oscuro" },
+  incompleto: { texto: "Incompleto", clases: "bg-peligro-luz text-peligro" },
 };
 
 type Abierta = { fila: FilaAsistencia; tipo: TipoMarcacion } | null;
+
+/** "Jue 02/10": el día en poco lugar (el nombre largo va en la foto ampliada). */
+function diaCorto(f: FilaAsistencia): string {
+  return `${f.diaTexto.slice(0, 3)} ${f.dia.slice(8, 10)}/${f.dia.slice(5, 7)}`;
+}
 
 /** Un horario que se puede tocar para ver la foto de esa marcación. Sin marcación: un guion. */
 function BotonHora({ celda, alAbrir }: { celda: CeldaMarca | null; alAbrir: () => void }) {
@@ -29,7 +34,7 @@ function BotonHora({ celda, alAbrir }: { celda: CeldaMarca | null; alAbrir: () =
       type="button"
       onClick={alAbrir}
       title="Ver la foto de esta marcación"
-      className={`cifra inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-[0.84rem] font-semibold transition-colors ${
+      className={`cifra inline-flex items-center gap-1 rounded border px-1.5 py-px text-[0.78rem] font-semibold leading-snug transition-colors ${
         celda.verificada
           ? "border-azul/35 bg-azul-luz text-azul-oscuro hover:border-azul hover:bg-azul hover:text-white"
           : "border-aviso/40 bg-aviso-luz text-aviso hover:border-aviso hover:bg-aviso hover:text-white"
@@ -41,9 +46,21 @@ function BotonHora({ celda, alAbrir }: { celda: CeldaMarca | null; alAbrir: () =
   );
 }
 
+/** Una etiqueta de estado chica, de una línea. */
+function Estado({ estado }: { estado: EstadoTurno }) {
+  return (
+    <span
+      className={`inline-flex flex-none items-center whitespace-nowrap rounded-full px-2 py-px text-[0.68rem] font-semibold ${ESTADOS[estado].clases}`}
+    >
+      {ESTADOS[estado].texto}
+    </span>
+  );
+}
+
 /**
- * El listado de marcaciones, un turno por fila: las cuatro horas (cada una se toca para ver la foto), lo que
- * trabajó y lo que conviene revisar. En pantalla ancha es una tabla; en el celular, una tarjeta por turno.
+ * El listado de marcaciones, un turno por fila y compacto: las cuatro horas (cada una se toca para ver la foto), lo que
+ * trabajó y lo que conviene revisar, todo en una o dos líneas para ver muchas personas de un vistazo. En pantalla ancha
+ * es una tabla; en el celular, una tarjeta chica por turno.
  */
 export function ListadoMarcaciones({ filas }: { filas: FilaAsistencia[] }) {
   const [abierta, setAbierta] = useState<Abierta>(null);
@@ -51,77 +68,73 @@ export function ListadoMarcaciones({ filas }: { filas: FilaAsistencia[] }) {
   return (
     <>
       {/* Pantalla ancha: tabla. */}
-      <div className="hidden md:block">
-        <Tabla className="!border-2 !border-azul/50">
-          <thead>
+      <div className="hidden overflow-x-auto rounded-xl border-2 border-azul/50 bg-superficie md:block">
+        <table className="w-full min-w-[40rem] border-collapse text-left text-[0.8rem]">
+          <thead className="bg-papel-suave text-[0.68rem] uppercase tracking-wide text-tinta-suave">
             <tr>
-              <Th>Día</Th>
-              <Th>Colaborador</Th>
+              <th className="px-2.5 py-1.5 font-semibold">Día</th>
+              <th className="px-2.5 py-1.5 font-semibold">Colaborador</th>
               {TIPOS_MARCACION.map((t) => (
-                <Th key={t}>{ETIQUETA_TIPO_CORTA[t]}</Th>
+                <th key={t} className="px-2.5 py-1.5 font-semibold">
+                  {ETIQUETA_TIPO_CORTA[t]}
+                </th>
               ))}
-              <Th className="text-right">Trabajado</Th>
-              <Th>Estado</Th>
+              <th className="px-2.5 py-1.5 text-right font-semibold">Trabajado</th>
+              <th className="px-2.5 py-1.5 font-semibold">Estado</th>
             </tr>
           </thead>
           <tbody>
             {filas.map((f, i) => (
-              <Tr key={f.clave}>
-                <Td className="whitespace-nowrap font-medium text-tinta">{f.diaTexto}</Td>
-                <Td>
-                  <div className="flex items-center gap-2.5">
-                    <AvatarPersonal nombre={f.nombre} fotoUrl={f.fotoAlta} indice={i} className="h-8 w-8 text-[0.7rem]" />
-                    <div className="min-w-0">
-                      <p className="truncate font-semibold text-tinta">{f.nombre}</p>
-                      {f.cargo && <p className="truncate text-[0.74rem] text-tinta-suave">{f.cargo}</p>}
-                    </div>
+              <tr key={f.clave} className="border-t border-linea-fina transition-colors duration-100 hover:bg-papel-suave">
+                <td className="whitespace-nowrap px-2.5 py-1 font-medium text-tinta-media">{diaCorto(f)}</td>
+                <td className="px-2.5 py-1" title={f.cargo ?? undefined}>
+                  <div className="flex items-center gap-2">
+                    <AvatarPersonal nombre={f.nombre} fotoUrl={f.fotoAlta} indice={i} className="h-6 w-6 text-[0.6rem]" />
+                    <span className="max-w-[12rem] truncate font-semibold text-tinta">{f.nombre}</span>
                   </div>
-                </Td>
+                </td>
                 {TIPOS_MARCACION.map((t) => (
-                  <Td key={t}>
+                  <td key={t} className="px-2.5 py-1">
                     <BotonHora celda={f.celdas[t]} alAbrir={() => setAbierta({ fila: f, tipo: t })} />
-                  </Td>
+                  </td>
                 ))}
-                <Td className="cifra whitespace-nowrap text-right font-semibold text-tinta">
+                <td
+                  className="cifra whitespace-nowrap px-2.5 py-1 text-right font-semibold text-tinta"
+                  title={f.almuerzo !== "—" ? `Almuerzo: ${f.almuerzo}` : undefined}
+                >
                   {f.trabajado}
-                  {f.almuerzo !== "—" && <span className="block text-[0.72rem] font-normal text-tinta-suave">almuerzo {f.almuerzo}</span>}
-                </Td>
-                <Td>
-                  <div className="flex flex-col items-start gap-1">
-                    <Pastilla color={ESTADOS[f.estado].color} punto>
-                      {ESTADOS[f.estado].texto}
-                    </Pastilla>
-                    {f.avisos.map((a) => (
-                      <span key={a} className="text-[0.74rem] leading-tight text-aviso">
-                        {a}
+                </td>
+                <td className="px-2.5 py-1">
+                  <div className="flex items-center gap-2">
+                    <Estado estado={f.estado} />
+                    {f.avisos.length > 0 && (
+                      <span className="max-w-[16rem] truncate text-[0.7rem] text-aviso" title={f.avisos.join(" · ")}>
+                        {f.avisos.join(" · ")}
                       </span>
-                    ))}
+                    )}
                   </div>
-                </Td>
-              </Tr>
+                </td>
+              </tr>
             ))}
           </tbody>
-        </Tabla>
+        </table>
       </div>
 
-      {/* Celular y tablet vertical: una tarjeta por turno. */}
-      <ul className="flex flex-col gap-2 md:hidden">
+      {/* Celular y tablet vertical: una tarjeta chica por turno. */}
+      <ul className="flex flex-col gap-1.5 md:hidden">
         {filas.map((f, i) => (
-          <li key={f.clave} className="rounded-xl border-2 border-azul/50 bg-superficie p-3">
-            <div className="flex items-center gap-3">
-              <AvatarPersonal nombre={f.nombre} fotoUrl={f.fotoAlta} indice={i} className="h-10 w-10 text-[0.8rem]" />
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-[0.92rem] font-semibold text-tinta">{f.nombre}</p>
-                <p className="truncate text-[0.78rem] text-tinta-media">{f.diaTexto}</p>
-              </div>
-              <Pastilla color={ESTADOS[f.estado].color} punto>
-                {ESTADOS[f.estado].texto}
-              </Pastilla>
+          <li key={f.clave} className="rounded-lg border-2 border-azul/50 bg-superficie px-2.5 py-2">
+            <div className="flex items-center gap-2">
+              <AvatarPersonal nombre={f.nombre} fotoUrl={f.fotoAlta} indice={i} className="h-7 w-7 text-[0.65rem]" />
+              <p className="min-w-0 flex-1 truncate text-[0.86rem] font-semibold text-tinta">
+                {f.nombre} <span className="font-normal text-tinta-suave">· {diaCorto(f)}</span>
+              </p>
+              <Estado estado={f.estado} />
             </div>
-            <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2">
+            <dl className="mt-1.5 grid grid-cols-4 gap-1">
               {TIPOS_MARCACION.map((t) => (
-                <div key={t}>
-                  <dt className="text-[0.7rem] font-semibold uppercase tracking-wide text-tinta-suave">
+                <div key={t} className="min-w-0">
+                  <dt className="truncate text-[0.6rem] font-semibold uppercase tracking-wide text-tinta-suave">
                     {ETIQUETA_TIPO_CORTA[t]}
                   </dt>
                   <dd className="mt-0.5">
@@ -130,17 +143,12 @@ export function ListadoMarcaciones({ filas }: { filas: FilaAsistencia[] }) {
                 </div>
               ))}
             </dl>
-            <div className="mt-3 flex items-baseline justify-between gap-3 border-t border-linea pt-2">
-              <span className="text-[0.78rem] text-tinta-suave">Trabajado</span>
-              <span className="cifra text-[0.92rem] font-semibold text-tinta">{f.trabajado}</span>
-            </div>
-            {f.avisos.length > 0 && (
-              <ul className="mt-1.5 list-disc pl-4 text-[0.76rem] leading-snug text-aviso">
-                {f.avisos.map((a) => (
-                  <li key={a}>{a}</li>
-                ))}
-              </ul>
-            )}
+            <p className="mt-1.5 flex flex-wrap items-baseline gap-x-2 text-[0.74rem] leading-snug">
+              <span className="text-tinta-suave">
+                Trabajado <strong className="cifra text-tinta">{f.trabajado}</strong>
+              </span>
+              {f.avisos.length > 0 && <span className="text-aviso">{f.avisos.join(" · ")}</span>}
+            </p>
           </li>
         ))}
       </ul>
@@ -149,6 +157,7 @@ export function ListadoMarcaciones({ filas }: { filas: FilaAsistencia[] }) {
     </>
   );
 }
+
 
 /** La foto de una marcación al lado de la selfie del alta, para compararlas a ojo. */
 function ModalFoto({ abierta, onCerrar }: { abierta: NonNullable<Abierta>; onCerrar: () => void }) {
