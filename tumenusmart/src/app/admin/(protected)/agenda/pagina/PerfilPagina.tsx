@@ -12,6 +12,10 @@ import { BotonSubirImagen, PARA_PERFIL } from "./BotonSubirImagen";
 import { CampoTelefonoPagina } from "./CampoTelefonoPagina";
 import type { PropsSeccion } from "./tipos";
 
+/** Los botones "Ver código QR": fondo verde intermedio, para que resalten del resto. */
+const BOTON_QR =
+  "mt-2 flex w-full items-center justify-center gap-2 rounded-lg border border-exito/30 bg-exito-tinte px-4 py-2.5 text-[0.88rem] font-semibold text-exito transition-colors duration-150 hover:border-exito hover:bg-exito hover:text-white";
+
 /**
  * La columna de la izquierda del editor: la foto de perfil, el nombre, el
  * interruptor "Habilitar la reserva en línea", la dirección de la página (con
@@ -143,7 +147,7 @@ export function PerfilPagina({ datos, cambiar }: PropsSeccion) {
           <button
             type="button"
             onClick={() => setMostrarQr(true)}
-            className={`mt-2 w-full ${clasesBoton("suave", "sm")}`}
+            className={BOTON_QR}
           >
             <IconoQR />
             Ver código QR
@@ -201,7 +205,7 @@ export function PerfilPagina({ datos, cambiar }: PropsSeccion) {
               <button
                 type="button"
                 onClick={() => setMostrarQrGoogle(true)}
-                className={`mt-2 w-full ${clasesBoton("suave", "sm")}`}
+                className={BOTON_QR}
               >
                 <IconoQR />
                 Ver código QR de Google Maps
