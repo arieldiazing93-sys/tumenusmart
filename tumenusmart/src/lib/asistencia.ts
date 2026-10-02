@@ -35,10 +35,10 @@ export function esTipoMarcacion(valor: string): valor is TipoMarcacion {
 
 /**
  * Hasta cuántas horas después de la última marcación un turno sigue "abierto". Pasado ese
- * tiempo se entiende que se olvidó de marcar la salida y se arranca un turno nuevo. Alcanza
- * para un turno nocturno que cruza la medianoche.
+ * tiempo se entiende que se olvidó de marcar la salida y la próxima marcación es una entrada
+ * nueva. Alcanza para un turno de 12 horas, también el nocturno que cruza la medianoche.
  */
-export const HORAS_TURNO_ABIERTO = 18;
+export const HORAS_TURNO_ABIERTO = 14;
 
 /** Lo que tienen que esperar entre una marcación y la siguiente de la misma persona, si el dueño no cambió el valor. */
 export const MINUTOS_ENTRE_MARCAS_PREDETERMINADO = 5;
@@ -52,24 +52,58 @@ export const MINUTOS_ENTRE_MARCAS_MAXIMO = 240;
 export const MAXIMO_INTENTOS_PIN = 5;
 export const MINUTOS_BLOQUEO_PIN = 3;
 
+/** El horario de almuerzo del negocio (ver Store.almuerzoDesde / almuerzoHasta / almuerzoMaxMin). */
+export type ReglasAlmuerzo = {
+  /** "HH:MM": desde cuándo una marcación de quien ya entró cuenta como salida a almorzar. */
+  desde: string;
+  /** "HH:MM": hasta cuándo. */
+  hasta: string;
+  /** Lo máximo que puede pasar entre la salida a almorzar y la vuelta. */
+  maxMin: number;
+};
+
+export const ALMUERZO_PREDETERMINADO: ReglasAlmuerzo = { desde: "11:00", hasta: "15:00", maxMin: 180 };
+export const ALMUERZO_MAXIMO_MIN = 480;
+
+/** ¿La hora ("HH:MM") cae dentro de la ventana de almuerzo? Acepta una ventana que cruza la medianoche. */
+function enVentanaDeAlmuerzo(hora: string, reglas: ReglasAlmuerzo): boolean {
+  const h = minutosDeHora(hora);
+  const desde = minutosDeHora(reglas.desde);
+  const hasta = minutosDeHora(reglas.hasta);
+  return desde <= hasta ? h >= desde && h <= hasta : h >= desde || h <= hasta;
+}
+
 /**
- * Qué marcación toca ahora, según lo último que marcó la persona (null = nada reciente, o el turno ya cerró). La
- * primera de la lista es la que se registra sola; si hay una segunda, es la alternativa que la persona puede elegir
- * (quien no llegó a almorzar y se va marca la salida en vez de la salida a almorzar).
+ * Qué marcación es la que está haciendo la persona AHORA. No se la pregunta nadie: sale de lo último que marcó, de la
+ * hora y del horario de almuerzo del negocio, porque en la vida real la secuencia no siempre se cumple completa (quien
+ * pasa el día afuera en un soporte técnico no marca almuerzo, y quien se olvida de marcar lo deja pasar).
+ *
+ * - Sin turno abierto (nada reciente, o lo último fue la salida): ENTRADA.
+ * - Ya entró: si marca dentro del horario de almuerzo (y esa persona almuerza), es SALIDA A ALMORZAR; fuera de ese
+ *   horario es la SALIDA — quien volvió a la tarde de su trabajo afuera marca solo la salida y el reporte deja vacías
+ *   las columnas del almuerzo.
+ * - Salió a almorzar: si pasó menos del máximo de almuerzo, es la VUELTA; si pasó más, ya no volvió: es la SALIDA.
+ * - Volvió del almuerzo: SALIDA.
  */
-export function marcacionesPermitidas(ultimo: TipoMarcacion | null, haceAlmuerzo = true): TipoMarcacion[] {
+export function proximaMarcacion(
+  ultima: { tipo: string; fecha: Date } | null,
+  ahora: Date,
+  haceAlmuerzo: boolean,
+  reglas: ReglasAlmuerzo
+): TipoMarcacion {
+  const ultimo = ultima && esTipoMarcacion(ultima.tipo) ? ultima.tipo : null;
   switch (ultimo) {
     case null:
     case "salida":
-      return ["entrada"];
+      return "entrada";
     case "entrada":
-      // Quien no sale a almorzar pasa directo a la salida.
-      return haceAlmuerzo ? ["salida_almuerzo", "salida"] : ["salida"];
-    case "salida_almuerzo":
-      // Si no vuelve, se va: también puede marcar la salida.
-      return ["vuelta_almuerzo", "salida"];
+      return haceAlmuerzo && enVentanaDeAlmuerzo(horaAsuncion(ahora), reglas) ? "salida_almuerzo" : "salida";
+    case "salida_almuerzo": {
+      const minutos = ultima ? (ahora.getTime() - ultima.fecha.getTime()) / 60_000 : Number.POSITIVE_INFINITY;
+      return minutos <= reglas.maxMin ? "vuelta_almuerzo" : "salida";
+    }
     case "vuelta_almuerzo":
-      return ["salida"];
+      return "salida";
   }
 }
 

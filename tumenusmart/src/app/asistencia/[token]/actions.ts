@@ -2,11 +2,9 @@
 
 import { prisma } from "@/lib/prisma";
 import {
-  ETIQUETA_TIPO,
   MAXIMO_INTENTOS_PIN,
   MINUTOS_BLOQUEO_PIN,
   calcularTardanza,
-  esTipoMarcacion,
   mensajeDeEspera,
   pinValido,
   type TipoMarcacion,
@@ -102,10 +100,8 @@ export type ResultadoIdentificacion =
   | {
       ok: true;
       nombre: string;
-      /** La marcación que toca, la que se registra sola. */
+      /** La marcación que le toca, la que se registra sola (la decide el sistema, no la persona). */
       tipo: TipoMarcacion;
-      /** Si hay otra posible (quien no almorzó y se va), para que la pueda elegir en vez de la sugerida. */
-      alternativas: TipoMarcacion[];
     }
   | { ok: false; error: string };
 
@@ -123,16 +119,11 @@ export async function identificarPin(token: string, pin: string): Promise<Result
   const { colaborador } = identificado;
 
   const ahora = new Date();
-  const estado = await estadoDeMarcacion(local.id, colaborador.id, colaborador.haceAlmuerzo, ahora);
+  const estado = await estadoDeMarcacion(local, colaborador.id, colaborador.haceAlmuerzo, ahora);
   const espera = mensajeDeEspera(estado.ultima, local.minutosEntreMarcas, ahora);
   if (espera) return { ok: false, error: espera };
 
-  return {
-    ok: true,
-    nombre: colaborador.nombre,
-    tipo: estado.permitidas[0],
-    alternativas: estado.permitidas.slice(1),
-  };
+  return { ok: true, nombre: colaborador.nombre, tipo: estado.proxima };
 }
 
 export type ResultadoMarcacion =
@@ -148,8 +139,10 @@ export type ResultadoMarcacion =
   | { ok: false; error: string };
 
 /**
- * Segundo paso: guarda la marcación. Llega todo junto en el formulario (token, PIN, qué marca, si la cámara vio su cara
- * y la foto). El PIN se vuelve a comprobar acá: el paso anterior no deja "sesión" de ningún tipo.
+ * Segundo paso: guarda la marcación. Llega todo junto en el formulario (token, PIN, si la cámara vio su cara y la
+ * foto). El PIN se vuelve a comprobar acá: el paso anterior no deja "sesión" de ningún tipo. Qué marcación es la
+ * vuelve a decidir el servidor con la hora de ESTE momento: si alguien puso el PIN a las 14:59 y se sacó la selfie a
+ * las 15:01, queda la que corresponde a las 15:01, y la pantalla de "Listo" le dice cuál fue.
  */
 export async function registrarMarcacion(formData: FormData): Promise<ResultadoMarcacion> {
   const local = await localPorToken(texto(formData.get("token")));
@@ -159,14 +152,10 @@ export async function registrarMarcacion(formData: FormData): Promise<ResultadoM
   if (!identificado.ok) return identificado;
   const colaborador = identificado.colaborador;
 
-  const tipo = texto(formData.get("tipo"));
-  if (!esTipoMarcacion(tipo)) return { ok: false, error: "Esa marcación no existe." };
-
+  // Qué marcación es la decide el servidor en este mismo momento, no el celular: la persona no elige nada.
   const ahora = new Date();
-  const estado = await estadoDeMarcacion(local.id, colaborador.id, colaborador.haceAlmuerzo, ahora);
-  if (!estado.permitidas.includes(tipo)) {
-    return { ok: false, error: `Ahora no podés marcar "${ETIQUETA_TIPO[tipo]}". Volvé a empezar.` };
-  }
+  const estado = await estadoDeMarcacion(local, colaborador.id, colaborador.haceAlmuerzo, ahora);
+  const tipo = estado.proxima;
   const espera = mensajeDeEspera(estado.ultima, local.minutosEntreMarcas, ahora);
   if (espera) return { ok: false, error: espera };
 

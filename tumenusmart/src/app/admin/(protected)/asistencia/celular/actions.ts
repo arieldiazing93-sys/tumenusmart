@@ -3,7 +3,7 @@
 import { randomBytes } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { exigirPermiso } from "@/lib/auth";
-import { MINUTOS_ENTRE_MARCAS_MAXIMO } from "@/lib/asistencia";
+import { ALMUERZO_MAXIMO_MIN, MINUTOS_ENTRE_MARCAS_MAXIMO, horaValida } from "@/lib/asistencia";
 import { registrarBitacora } from "@/lib/bitacora";
 import { idLocalActual } from "@/lib/local-actual";
 import { prisma } from "@/lib/prisma";
@@ -38,27 +38,59 @@ export async function generarEnlaceAsistencia(): Promise<ResultadoEnlaceAsistenc
   return { ok: true };
 }
 
+export type ReglasMarcacionForm = {
+  /** Minutos que tienen que pasar entre una marcación de una persona y la siguiente suya (0 = sin espera). */
+  minutosEntreMarcas: number;
+  /** El horario de almuerzo del negocio, "HH:MM". */
+  almuerzoDesde: string;
+  almuerzoHasta: string;
+  /** Lo máximo que puede pasar entre la salida a almorzar y la vuelta, en minutos. */
+  almuerzoMaxMin: number;
+};
+
 /**
- * Cuántos minutos tienen que pasar entre una marcación de una persona y la siguiente suya. Evita marcar dos veces por
- * error y que alguien marque entrada y salida seguidas. 0 = sin espera.
+ * Guarda las reglas del celular fijo. El tiempo entre marcaciones evita marcar dos veces por error y que alguien
+ * marque entrada y salida seguidas. El horario de almuerzo es lo que le permite al sistema decidir solo si una marcación
+ * de quien ya entró es la salida a almorzar (dentro del horario) o la salida del día (fuera de él).
  */
-export async function guardarMinutosEntreMarcas(minutos: number): Promise<ResultadoEnlaceAsistencia> {
+export async function guardarReglasMarcacion(reglas: ReglasMarcacionForm): Promise<ResultadoEnlaceAsistencia> {
   const sesion = await exigirPermiso("asistencia.gestionar");
   const idLocal = await idLocalActual();
 
-  if (!Number.isInteger(minutos) || minutos < 0 || minutos > MINUTOS_ENTRE_MARCAS_MAXIMO) {
-    return { ok: false, error: `Son minutos enteros, de 0 a ${MINUTOS_ENTRE_MARCAS_MAXIMO}.` };
+  if (
+    !Number.isInteger(reglas.minutosEntreMarcas) ||
+    reglas.minutosEntreMarcas < 0 ||
+    reglas.minutosEntreMarcas > MINUTOS_ENTRE_MARCAS_MAXIMO
+  ) {
+    return { ok: false, error: `El tiempo entre marcaciones son minutos enteros, de 0 a ${MINUTOS_ENTRE_MARCAS_MAXIMO}.` };
+  }
+  if (!horaValida(reglas.almuerzoDesde) || !horaValida(reglas.almuerzoHasta)) {
+    return { ok: false, error: "El horario de almuerzo no es válido: poné la hora de inicio y la de fin." };
+  }
+  if (reglas.almuerzoDesde === reglas.almuerzoHasta) {
+    return { ok: false, error: "El horario de almuerzo no puede empezar y terminar a la misma hora." };
+  }
+  if (!Number.isInteger(reglas.almuerzoMaxMin) || reglas.almuerzoMaxMin < 10 || reglas.almuerzoMaxMin > ALMUERZO_MAXIMO_MIN) {
+    return { ok: false, error: `El máximo de almuerzo son minutos enteros, de 10 a ${ALMUERZO_MAXIMO_MIN}.` };
   }
 
-  await prisma.store.update({ where: { id: idLocal }, data: { minutosEntreMarcas: minutos } });
+  await prisma.store.update({
+    where: { id: idLocal },
+    data: {
+      minutosEntreMarcas: reglas.minutosEntreMarcas,
+      almuerzoDesde: reglas.almuerzoDesde,
+      almuerzoHasta: reglas.almuerzoHasta,
+      almuerzoMaxMin: reglas.almuerzoMaxMin,
+    },
+  });
 
   await registrarBitacora(idLocal, sesion, {
     modulo: "asistencia",
-    accion: "minutos_entre_marcas_cambiado",
-    descripcion: `Cambió el tiempo mínimo entre una marcación y la siguiente a ${minutos} min.`,
+    accion: "reglas_de_marcacion_cambiadas",
+    descripcion: `Cambió las reglas del celular fijo: ${reglas.minutosEntreMarcas} min entre marcaciones, almuerzo de ${reglas.almuerzoDesde} a ${reglas.almuerzoHasta} (hasta ${reglas.almuerzoMaxMin} min).`,
     entidad: "Store",
     entidadId: idLocal,
-    detalle: { minutos },
+    detalle: { ...reglas },
   });
 
   revalidatePath("/admin/asistencia/celular");

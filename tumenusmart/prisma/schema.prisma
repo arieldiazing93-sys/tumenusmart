@@ -72,6 +72,14 @@ model Store {
   bloqueoAsistenciaHasta DateTime?
   /// Cuántos minutos tienen que pasar entre una marcación de una persona y la siguiente suya.
   minutosEntreMarcas     Int       @default(5)
+  /// El horario de almuerzo del negocio ("HH:MM"): una marcación dentro de esta ventana, para quien ya entró y sale
+  /// a almorzar, cuenta como "salida a almorzar"; fuera de ella, como la salida del día. Quien pasa el día afuera
+  /// (un soporte técnico, una visita) y vuelve a la tarde marca solo la salida, sin que nadie le pregunte nada.
+  almuerzoDesde          String    @default("11:00")
+  almuerzoHasta          String    @default("15:00")
+  /// Lo máximo que puede pasar entre la salida a almorzar y la vuelta. Pasado ese tiempo, la próxima marcación ya no
+  /// es la vuelta del almuerzo sino la salida (se fue sin volver, o se olvidó de marcar la vuelta).
+  almuerzoMaxMin         Int       @default(180)
 
   /// Cómo se ve la carta pública de este local.
   ///

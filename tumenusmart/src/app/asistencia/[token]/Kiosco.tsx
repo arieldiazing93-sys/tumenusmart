@@ -11,7 +11,7 @@ type Exito = Extract<ResultadoMarcacion, { ok: true }>;
 type Paso =
   | { paso: "inicio" }
   | { paso: "pin" }
-  | { paso: "camara"; pin: string; nombre: string; tipo: TipoMarcacion; alternativas: TipoMarcacion[] }
+  | { paso: "camara"; pin: string; nombre: string; tipo: TipoMarcacion }
   | { paso: "guardando"; nombre: string; tipo: TipoMarcacion }
   | { paso: "listo"; resultado: Exito }
   | { paso: "error"; mensaje: string };
@@ -31,8 +31,9 @@ const LARGO_MAXIMO_PIN = 6;
  * El celular fijo del Registro de asistencia, en la pared del local. El camino es siempre el mismo y corto:
  * "Registrar asistencia" → el PIN de la persona (que es lo que la identifica) → la cámara le saca la selfie sola y la
  * marcación queda guardada. No hay que elegir el nombre en una lista (con muchas personas sería interminable) ni qué se
- * marca: el sistema sabe qué le toca (entrada, salida a almorzar, vuelta del almuerzo o salida) según lo último que
- * marcó. Sin usuario ni contraseña: la llave está en la dirección.
+ * marca: el sistema decide qué le toca (entrada, salida a almorzar, vuelta del almuerzo o salida) según lo último que
+ * marcó, la hora y el horario de almuerzo del negocio, así quien se saltea un paso (pasó el día afuera, se olvidó de
+ * marcar) no tiene que explicar nada. Sin usuario ni contraseña: la llave está en la dirección.
  */
 export function Kiosco({ token, nombreNegocio }: { token: string; nombreNegocio: string }) {
   const [estado, setEstado] = useState<Paso>({ paso: "inicio" });
@@ -128,7 +129,7 @@ export function Kiosco({ token, nombreNegocio }: { token: string; nombreNegocio:
         setPin("");
         return;
       }
-      setEstado({ paso: "camara", pin, nombre: r.nombre, tipo: r.tipo, alternativas: r.alternativas });
+      setEstado({ paso: "camara", pin, nombre: r.nombre, tipo: r.tipo });
     } catch {
       setErrorPin("No se pudo conectar. Revisá el internet y probá de nuevo.");
     } finally {
@@ -144,7 +145,6 @@ export function Kiosco({ token, nombreNegocio }: { token: string; nombreNegocio:
     const datos = new FormData();
     datos.set("token", token);
     datos.set("pin", pinPuesto);
-    datos.set("tipo", tipo);
     datos.set("verificada", r.verificada ? "1" : "0");
     datos.set("archivo", r.foto, "marcacion.jpg");
 
@@ -259,17 +259,6 @@ export function Kiosco({ token, nombreNegocio }: { token: string; nombreNegocio:
               <p className="mt-0.5 text-[0.95rem] text-tinta-media">
                 Vas a marcar: <strong className="text-tinta">{ETIQUETA_TIPO[estado.tipo].toLowerCase()}</strong>
               </p>
-              {/* Quien no llegó a almorzar y se va puede cambiar la marcación antes de sacarse la selfie. */}
-              {estado.alternativas.map((alt) => (
-                <button
-                  key={alt}
-                  type="button"
-                  onClick={() => setEstado({ ...estado, tipo: alt, alternativas: [estado.tipo] })}
-                  className="mt-1.5 text-[0.85rem] font-semibold text-azul underline underline-offset-2"
-                >
-                  ¿No es eso? Marcar {ETIQUETA_TIPO[alt].toLowerCase()}
-                </button>
-              ))}
             </div>
             <VerificadorPersona modo="marcacion" onResultado={alVerificar} onCancelar={reiniciar} />
           </>

@@ -224,9 +224,10 @@ export function FormularioColaborador({
           <span>
             <span className="block text-[0.86rem] font-semibold text-tinta">Sale a almorzar</span>
             <span className="block text-[0.78rem] leading-snug text-tinta-suave">
-              Si lo tildás, después de la entrada la marcación que toca es la salida a almorzar, y después la vuelta. Si
-              no, después de la entrada toca directamente la salida. Quien se va sin almorzar puede cambiarlo en el
-              momento, en el celular.
+              Si lo tildás, lo que marque dentro del horario de almuerzo del negocio (después de haber entrado) queda como
+              salida a almorzar, y lo siguiente como la vuelta. Si no, después de la entrada lo siguiente es siempre la
+              salida. Quien pasa el día afuera o se olvida de marcar el almuerzo no necesita cambiar nada: lo que marca
+              fuera del horario de almuerzo queda como salida.
             </span>
           </span>
         </label>

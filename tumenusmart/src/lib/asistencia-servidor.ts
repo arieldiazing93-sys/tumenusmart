@@ -8,7 +8,13 @@
 
 import { createHmac } from "node:crypto";
 import { prisma } from "./prisma";
-import { HORAS_TURNO_ABIERTO, esTipoMarcacion, marcacionesPermitidas, type MarcaReciente } from "./asistencia";
+import {
+  HORAS_TURNO_ABIERTO,
+  esTipoMarcacion,
+  proximaMarcacion,
+  type MarcaReciente,
+  type ReglasAlmuerzo,
+} from "./asistencia";
 import { horaAsuncion } from "./timezone";
 
 const FORMATO_TOKEN = /^[A-Za-z0-9_-]{16,64}$/;
@@ -39,22 +45,32 @@ export async function localPorToken(token: string) {
       intentosPinAsistencia: true,
       bloqueoAsistenciaHasta: true,
       minutosEntreMarcas: true,
+      almuerzoDesde: true,
+      almuerzoHasta: true,
+      almuerzoMaxMin: true,
     },
   });
 }
 
 export type LocalAsistencia = NonNullable<Awaited<ReturnType<typeof localPorToken>>>;
 
+/** El horario de almuerzo del local, listo para `proximaMarcacion`. */
+export function reglasDeAlmuerzo(local: LocalAsistencia): ReglasAlmuerzo {
+  return { desde: local.almuerzoDesde, hasta: local.almuerzoHasta, maxMin: local.almuerzoMaxMin };
+}
+
 /**
- * Lo que ya marcó esta persona en el turno actual y lo que le toca marcar ahora. Se mira lo de las últimas
- * `HORAS_TURNO_ABIERTO` horas (no solo "hoy") para que un turno que cruza la medianoche siga siendo uno.
+ * Lo que ya marcó esta persona en el turno actual y la marcación que le toca ahora (la decide el sistema, ver
+ * `proximaMarcacion`). Se mira lo de las últimas `HORAS_TURNO_ABIERTO` horas (no solo "hoy") para que un turno que
+ * cruza la medianoche siga siendo uno.
  */
 export async function estadoDeMarcacion(
-  storeId: string,
+  local: LocalAsistencia,
   colaboradorId: string,
   haceAlmuerzo: boolean,
   ahora: Date = new Date()
 ) {
+  const storeId = local.id;
   const desde = new Date(ahora.getTime() - HORAS_TURNO_ABIERTO * 3600_000);
   const filas = await prisma.marcacionAsistencia.findMany({
     where: { storeId, colaboradorId, fecha: { gte: desde } },
@@ -64,7 +80,6 @@ export async function estadoDeMarcacion(
   });
 
   const ultima = filas[0] ?? null;
-  const ultimoTipo = ultima && esTipoMarcacion(ultima.tipo) ? ultima.tipo : null;
   const recientes: MarcaReciente[] = [];
   for (const f of [...filas].reverse()) {
     if (esTipoMarcacion(f.tipo)) recientes.push({ tipo: f.tipo, hora: horaAsuncion(f.fecha) });
@@ -72,7 +87,7 @@ export async function estadoDeMarcacion(
 
   return {
     ultima,
-    permitidas: marcacionesPermitidas(ultimoTipo, haceAlmuerzo),
+    proxima: proximaMarcacion(ultima, ahora, haceAlmuerzo, reglasDeAlmuerzo(local)),
     recientes,
   };
 }
