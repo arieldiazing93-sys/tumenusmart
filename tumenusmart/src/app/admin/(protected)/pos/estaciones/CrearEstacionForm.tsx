@@ -23,7 +23,7 @@ export function CrearEstacionForm() {
   }
 
   return (
-    <Tarjeta className="mb-6 flex flex-col gap-3">
+    <Tarjeta className="mb-6 flex flex-col gap-3 !border-2 !border-azul/50">
       <p className="rotulo text-[0.8rem] font-bold">Nueva estación</p>
       <form ref={formRef} action={alCrear} className="flex flex-wrap items-end gap-3">
         <div className="min-w-[14rem] flex-1">

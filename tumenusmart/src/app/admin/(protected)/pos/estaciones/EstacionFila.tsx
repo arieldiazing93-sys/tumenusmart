@@ -157,9 +157,7 @@ export function EstacionFila({
 
   return (
     <div
-      className={`rounded-lg border bg-white px-4 py-3 ${
-        activa ? "border-linea" : "border-linea opacity-60"
-      }`}
+      className={`rounded-lg border-2 border-azul/50 bg-white px-4 py-3 ${activa ? "" : "opacity-60"}`}
     >
       <div className="flex flex-wrap items-center justify-between gap-3">
         {editando ? (

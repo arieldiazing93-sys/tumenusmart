@@ -40,7 +40,7 @@ export default async function EstacionesPage() {
         bajada="Cada notebook/caja física del local. Un turno de Punto de Venta abierto en una estación no interrumpe el de otra."
       />
 
-      <div className="mb-6 max-w-lg rounded-lg border border-linea bg-papel-suave px-4 py-3 text-[0.85rem] text-tinta-media">
+      <div className="mb-6 max-w-lg rounded-lg border-2 border-azul/50 bg-papel-suave px-4 py-3 text-[0.85rem] text-tinta-media">
         Para que un cajero nunca tenga que elegir dónde está trabajando, cada
         computadora se vincula UNA SOLA VEZ a su estación — desde ESTA
         pantalla, físicamente en esa notebook. Si se cambia de computadora o
