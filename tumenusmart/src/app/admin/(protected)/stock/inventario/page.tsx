@@ -100,7 +100,7 @@ async function vistaHistorial(idLocal: string) {
           (el Excel se descarga, el PDF se abre en otra pestaña), así que sale con
           lo que está escrito acá. Sin fechas, es el mes actual. */}
       {inventarios.length > 0 && (
-        <Tarjeta className="mt-6 flex flex-col gap-3">
+        <Tarjeta className="!border-2 !border-azul/50 mt-6 flex flex-col gap-3">
           <p className="rotulo text-[0.8rem] font-bold">Reporte de inventarios</p>
           <form method="get" className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
             <Campo etiqueta="Almacén">

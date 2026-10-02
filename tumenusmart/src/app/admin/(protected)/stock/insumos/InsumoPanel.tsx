@@ -76,7 +76,7 @@ export function InsumoPanel({
   }
 
   return (
-    <Tarjeta className="flex flex-col gap-4">
+    <Tarjeta className="!border-2 !border-azul/50 flex flex-col gap-4">
       <div>
         <h2 className="text-[1.1rem] font-semibold tracking-titular text-tinta">{insumo.nombre}</h2>
         <div className="mt-1 flex flex-wrap items-center gap-2">

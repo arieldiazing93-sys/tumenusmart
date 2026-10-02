@@ -40,7 +40,7 @@ export default async function GastosPage() {
       {/* Reporte: cada botón manda este mismo formulario a su propia dirección
           (el Excel se descarga, el PDF se abre en otra pestaña), así que sale con
           lo que está escrito acá. Sin fechas, es el mes actual. */}
-      <Tarjeta className="mb-6 flex flex-col gap-3">
+      <Tarjeta className="!border-2 !border-azul/50 mb-6 flex flex-col gap-3">
         <p className="rotulo text-[0.8rem] font-bold">Reporte de gastos</p>
         <form method="get" className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <Campo etiqueta="Desde">

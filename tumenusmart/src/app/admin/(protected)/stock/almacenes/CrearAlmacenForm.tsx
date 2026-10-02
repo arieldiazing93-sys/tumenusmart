@@ -22,7 +22,7 @@ export function CrearAlmacenForm({ onCreado }: { onCreado: (almacenId: string) =
   }
 
   return (
-    <Tarjeta className="flex flex-col gap-3">
+    <Tarjeta className="!border-2 !border-azul/50 flex flex-col gap-3">
       <p className="rotulo text-[0.8rem] font-bold">Nuevo almacén</p>
       <form ref={formRef} action={alCrear} className="flex flex-col gap-3">
         <Campo etiqueta="Nombre">

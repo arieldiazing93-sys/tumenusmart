@@ -87,7 +87,7 @@ export function NuevoMovimientoAlmacenForm({ almacenes }: { almacenes: Almacen[]
   }
 
   return (
-    <Tarjeta padding={false} className="flex flex-col gap-2 p-3">
+    <Tarjeta padding={false} className="!border-2 !border-azul/50 flex flex-col gap-2 p-3">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
         <p className="rotulo text-[0.78rem] font-bold">Nuevo movimiento</p>
         <div className="inline-flex overflow-hidden rounded-lg border border-linea">

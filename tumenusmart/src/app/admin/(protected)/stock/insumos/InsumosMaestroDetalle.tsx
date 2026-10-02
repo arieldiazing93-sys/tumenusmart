@@ -151,7 +151,7 @@ export function InsumosMaestroDetalle({
 
       <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[26rem_minmax(0,1fr)]">
         {/* ---------------- izquierda: categoría + lista ---------------- */}
-        <Tarjeta padding={false} className="flex flex-col overflow-hidden">
+        <Tarjeta padding={false} className="!border-2 !border-azul/50 flex flex-col overflow-hidden">
           <div className="flex flex-col gap-2 border-b border-linea p-3">
             <Selector
               aria-label="Categoría"

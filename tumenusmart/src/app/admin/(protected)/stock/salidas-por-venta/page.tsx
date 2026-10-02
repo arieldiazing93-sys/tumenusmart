@@ -100,7 +100,7 @@ export default async function SalidasPorVentaPage({
 
       <form
         method="get"
-        className="grid grid-cols-2 gap-2 rounded-xl border border-linea bg-superficie p-3 sm:grid-cols-3 lg:grid-cols-6"
+        className="grid grid-cols-2 gap-2 rounded-xl border-2 border-azul/50 bg-superficie p-3 sm:grid-cols-3 lg:grid-cols-6"
       >
         <Campo etiqueta="Desde">
           <Entrada type="date" name="desde" defaultValue={rango.desde} />
@@ -177,7 +177,7 @@ export default async function SalidasPorVentaPage({
             {!mostrarAlmacen && ` · Almacén: ${[...almacenesUsados][0]}`}
           </p>
 
-          <div className="overflow-x-auto rounded-lg border border-linea bg-superficie">
+          <div className="overflow-x-auto rounded-lg border-2 border-azul/50 bg-superficie">
             <table className="w-full min-w-[30rem] border-collapse text-left text-[0.74rem] leading-[1.2]">
               <thead>
                 <tr className="bg-exito-luz text-[0.64rem] font-semibold uppercase tracking-rotulo text-tinta-suave">

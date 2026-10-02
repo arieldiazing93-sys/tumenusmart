@@ -99,7 +99,7 @@ export default async function CompraDetallePage({ params }: { params: Promise<{ 
         </div>
       )}
 
-      <Tarjeta className="grid grid-cols-1 gap-3 text-[0.88rem] sm:grid-cols-2 lg:grid-cols-3">
+      <Tarjeta className="!border-2 !border-azul/50 grid grid-cols-1 gap-3 text-[0.88rem] sm:grid-cols-2 lg:grid-cols-3">
         <div>
           <p className="rotulo">Proveedor</p>
           <p className="font-medium">{compra.proveedor?.nombre ?? "—"}</p>
@@ -172,7 +172,7 @@ export default async function CompraDetallePage({ params }: { params: Promise<{ 
         </tbody>
       </Tabla>
 
-      <Tarjeta className="self-end sm:w-80">
+      <Tarjeta className="!border-2 !border-azul/50 self-end sm:w-80">
         <dl className="cifra flex flex-col gap-1.5 text-[0.88rem]">
           <div className="flex justify-between gap-4">
             <dt className="text-tinta-media">Subtotal</dt>
@@ -196,7 +196,7 @@ export default async function CompraDetallePage({ params }: { params: Promise<{ 
       </Tarjeta>
 
       {esCredito && (
-        <Tarjeta className="flex flex-col gap-3">
+        <Tarjeta className="!border-2 !border-azul/50 flex flex-col gap-3">
           <div id="pagos" className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex flex-wrap items-center gap-2">
               <p className="rotulo text-[0.8rem] font-bold">Pagos al proveedor</p>

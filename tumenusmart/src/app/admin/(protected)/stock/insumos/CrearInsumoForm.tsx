@@ -54,7 +54,7 @@ export function CrearInsumoForm({
   }
 
   return (
-    <Tarjeta className="flex flex-col gap-3">
+    <Tarjeta className="!border-2 !border-azul/50 flex flex-col gap-3">
       <div>
         <p className="rotulo text-[0.8rem] font-bold">{esPreparacion ? "Nueva preparación" : "Nuevo insumo"}</p>
         {esPreparacion && (

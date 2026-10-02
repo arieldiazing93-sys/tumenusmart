@@ -53,7 +53,7 @@ export default async function ComprasPage({ searchParams }: { searchParams: Prom
         acciones={<BotonEnlace href="/admin/stock/compras/nueva">+ Nueva compra</BotonEnlace>}
       />
 
-      <form method="get" className="mb-5 grid grid-cols-1 gap-3 rounded-xl border border-linea bg-superficie p-4 sm:grid-cols-2 lg:grid-cols-4">
+      <form method="get" className="mb-5 grid grid-cols-1 gap-3 rounded-xl border-2 border-azul/50 bg-superficie p-4 sm:grid-cols-2 lg:grid-cols-4">
         <Campo etiqueta="Proveedor">
           <Selector name="proveedor" defaultValue={proveedor ?? ""}>
             <option value="">Todos</option>

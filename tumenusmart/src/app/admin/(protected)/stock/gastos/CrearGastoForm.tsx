@@ -48,7 +48,7 @@ export function CrearGastoForm({
   }
 
   return (
-    <Tarjeta className="mb-6 flex flex-col gap-3">
+    <Tarjeta className="!border-2 !border-azul/50 mb-6 flex flex-col gap-3">
       <p className="rotulo text-[0.8rem] font-bold">Nuevo gasto</p>
       <form ref={formRef} action={alCrear} className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <Campo etiqueta="Concepto">

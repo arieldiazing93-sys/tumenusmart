@@ -203,7 +203,7 @@ export function NuevoInventario({
   // ------------------------------------------------------------------ guardado
   if (guardado) {
     return (
-      <Tarjeta className="flex flex-col gap-3">
+      <Tarjeta className="!border-2 !border-azul/50 flex flex-col gap-3">
         <p className="text-[1rem] font-semibold text-exito">✓ Inventario guardado</p>
         <p className="text-sm text-tinta-media">
           Contaste {guardado.contados} {guardado.contados === 1 ? "insumo" : "insumos"} en {nombreAlmacen}.{" "}
@@ -227,7 +227,7 @@ export function NuevoInventario({
   // ------------------------------------------------------- paso 1: qué contar
   if (!comenzado) {
     return (
-      <Tarjeta className="flex flex-col gap-4">
+      <Tarjeta className="!border-2 !border-azul/50 flex flex-col gap-4">
         <Campo etiqueta="Almacén que vas a contar">
           <Selector value={almacenId} onChange={(e) => cambiarAlmacen(e.target.value)} className="sm:max-w-xs">
             {almacenes.map((a) => (
@@ -345,7 +345,7 @@ export function NuevoInventario({
         </tbody>
       </Tabla>
 
-      <Tarjeta className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+      <Tarjeta className="!border-2 !border-azul/50 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex flex-col gap-1 text-sm text-tinta-media">
           <p>
             Contaste <span className="font-semibold text-tinta">{cantidadContadas}</span> de {calculadas.length}{" "}

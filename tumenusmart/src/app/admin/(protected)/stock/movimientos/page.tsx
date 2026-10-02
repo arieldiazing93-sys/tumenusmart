@@ -118,7 +118,7 @@ export default async function MovimientosAlmacenPage({
 
       <form
         method="get"
-        className="grid grid-cols-1 gap-3 rounded-xl border border-linea bg-superficie p-4 sm:grid-cols-2 lg:grid-cols-4"
+        className="grid grid-cols-1 gap-3 rounded-xl border-2 border-azul/50 bg-superficie p-4 sm:grid-cols-2 lg:grid-cols-4"
       >
         <Campo etiqueta="Desde">
           <Entrada type="date" name="desde" defaultValue={rango.desde} />
@@ -158,7 +158,7 @@ export default async function MovimientosAlmacenPage({
       </form>
 
       {salidas > 0 && (
-        <Tarjeta>
+        <Tarjeta className="!border-2 !border-azul/50">
           <p className="rotulo">Lo que salió en este período, a costo de hoy</p>
           <p className="cifra mt-1 text-[1.35rem] font-semibold text-tinta">
             {formatearGuarani(Math.round(costoDeLasSalidas))}

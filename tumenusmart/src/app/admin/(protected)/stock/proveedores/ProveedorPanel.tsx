@@ -43,7 +43,7 @@ export function ProveedorPanel({
   }
 
   return (
-    <Tarjeta className="flex flex-col gap-4">
+    <Tarjeta className="!border-2 !border-azul/50 flex flex-col gap-4">
       <div>
         <h2 className="text-[1.1rem] font-semibold tracking-titular text-tinta">{proveedor.nombre}</h2>
         <div className="mt-1">

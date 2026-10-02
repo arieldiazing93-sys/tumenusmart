@@ -38,7 +38,7 @@ export default async function AlmacenesPage() {
           (el Excel se descarga, el PDF se abre en otra pestaña), así que sale con
           lo que está escrito acá. Sin fechas, es el mes actual. */}
       {almacenes.length > 0 && (
-        <Tarjeta className="mt-6 flex flex-col gap-3">
+        <Tarjeta className="!border-2 !border-azul/50 mt-6 flex flex-col gap-3">
           <p className="rotulo text-[0.8rem] font-bold">Reporte de almacén</p>
           <form method="get" className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <Campo etiqueta="Almacén">

@@ -33,14 +33,14 @@ export function DetalleInventarioPanel({ id }: { id: string }) {
 
   if (error) {
     return (
-      <Tarjeta>
+      <Tarjeta className="!border-2 !border-azul/50">
         <p className="text-sm font-medium text-peligro">{error}</p>
       </Tarjeta>
     );
   }
   if (!datos) {
     return (
-      <Tarjeta>
+      <Tarjeta className="!border-2 !border-azul/50">
         <p className="text-sm text-tinta-suave">Cargando el inventario…</p>
       </Tarjeta>
     );
@@ -52,7 +52,7 @@ export function DetalleInventarioPanel({ id }: { id: string }) {
   let categoriaAnterior: string | null = null;
 
   return (
-    <Tarjeta className="flex flex-col gap-4">
+    <Tarjeta className="!border-2 !border-azul/50 flex flex-col gap-4">
       <div>
         <h2 className="text-[1.1rem] font-semibold tracking-titular text-tinta">Inventario del {datos.fecha}</h2>
         <p className="mt-0.5 text-sm text-tinta-media">

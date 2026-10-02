@@ -71,11 +71,11 @@ export default async function CuentasPorPagarPage({
       />
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <Tarjeta>
+        <Tarjeta className="!border-2 !border-azul/50">
           <p className="rotulo">Total que debés</p>
           <p className="cifra mt-1 text-[1.35rem] font-semibold text-tinta">{formatearGuarani(cuentas.totalSaldo)}</p>
         </Tarjeta>
-        <Tarjeta>
+        <Tarjeta className="!border-2 !border-azul/50">
           <p className="rotulo">Ya vencido</p>
           <p
             className={`cifra mt-1 text-[1.35rem] font-semibold ${cuentas.saldoVencido > 0 ? "text-peligro" : "text-tinta"}`}
@@ -83,7 +83,7 @@ export default async function CuentasPorPagarPage({
             {formatearGuarani(cuentas.saldoVencido)}
           </p>
         </Tarjeta>
-        <Tarjeta>
+        <Tarjeta className="!border-2 !border-azul/50">
           <p className="rotulo">Vence en los próximos 7 días</p>
           <p className="cifra mt-1 text-[1.35rem] font-semibold text-tinta">{formatearGuarani(cuentas.saldoPorVencer)}</p>
         </Tarjeta>
@@ -125,7 +125,7 @@ export default async function CuentasPorPagarPage({
 
       <form
         method="get"
-        className="grid grid-cols-1 gap-3 rounded-xl border border-linea bg-superficie p-4 sm:grid-cols-3"
+        className="grid grid-cols-1 gap-3 rounded-xl border-2 border-azul/50 bg-superficie p-4 sm:grid-cols-3"
       >
         <Campo etiqueta="Proveedor">
           <Selector name="proveedor" defaultValue={proveedor ?? ""}>
