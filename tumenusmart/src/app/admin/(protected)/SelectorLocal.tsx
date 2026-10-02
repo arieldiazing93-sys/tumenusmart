@@ -26,7 +26,7 @@ export function SelectorLocal({
 
   return (
     <label className="flex items-center gap-2 text-sm">
-      <span className="text-tinta-suave">Local:</span>
+      <span className="font-semibold text-aviso">Local:</span>
       <select
         value={actual}
         disabled={pendiente}
@@ -37,7 +37,7 @@ export function SelectorLocal({
             router.refresh();
           });
         }}
-        className="rounded-lg border border-linea px-2 py-1 text-sm font-medium text-tinta"
+        className="rounded-lg border-2 border-aviso/50 bg-aviso-tinte px-2 py-1 text-sm font-semibold text-aviso"
       >
         {locales.map((l) => (
           <option key={l.id} value={l.id}>
