@@ -62,6 +62,11 @@ model Store {
   /// Personal. Apagado (default), el Punto de Venta no muestra el personal.
   pedirPersonalEnVenta Boolean @default(false)
 
+  /// La llave del enlace del celular fijo del Registro de asistencia (/asistencia/<token>). Es
+  /// larga y al azar: quien tenga el enlace puede marcar (con su PIN y su cara), así que se
+  /// puede regenerar o apagar (NULL = el registro de asistencia no está habilitado).
+  tokenAsistencia String? @unique
+
   /// Cómo se ve la carta pública de este local.
   ///
   /// "lista"    — filas compactas con miniatura. Es lo mejor para el local que
@@ -219,6 +224,10 @@ model Store {
   serviciosPersonal ServicioPersonal[]
   paginaReservas   PaginaReservas?
   citaServicios    CitaServicio[]
+
+  // --- Registro de asistencia ---
+  colaboradores         Colaborador[]
+  marcacionesAsistencia MarcacionAsistencia[]
 }
 
 /// Las direcciones que este local tuvo antes.
@@ -2449,4 +2458,66 @@ model PaginaReservas {
   campos  Json   @default("[]")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+/// Quien marca su asistencia (entrada, almuerzo, salida) en el celular fijo del local. No es un
+/// usuario del panel: es cualquier persona que trabaja ahí (cajero, cocinero, barbero…). El dueño
+/// la da de alta en persona: le saca la selfie y le elige un PIN.
+model Colaborador {
+  id       String  @id @default(cuid())
+  storeId  String
+  store    Store   @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  nombre   String
+  apellido String?
+  cargo    String?
+  /// La selfie del alta, sacada por el dueño con la persona delante. Es la referencia para
+  /// comparar a ojo con la foto de cada marcación.
+  fotoUrl  String?
+  /// El PIN de 4 a 6 números, cifrado (scrypt). Nunca se guarda en claro.
+  pinHash  String
+  /// "HH:MM": a qué hora tiene que entrar. NULL = no se controla la tardanza.
+  horaEntrada   String?
+  /// Cuántos minutos de gracia después de la hora de entrada antes de contar la tardanza.
+  toleranciaMin Int     @default(10)
+  /// Se desactiva en vez de borrarse: sus marcaciones viejas siguen en los reportes.
+  activo   Boolean @default(true)
+  /// Contra la adivinanza del PIN: tras varios errores seguidos se bloquea unos minutos.
+  intentosFallidos Int       @default(0)
+  bloqueadoHasta   DateTime?
+  createdAt DateTime @default(now())
+
+  marcaciones MarcacionAsistencia[]
+
+  @@index([storeId])
+}
+
+/// Una marcación: alguien marcó entrada, salida a almorzar, vuelta del almuerzo o salida final,
+/// con la foto del momento como prueba.
+model MarcacionAsistencia {
+  id            String      @id @default(cuid())
+  storeId       String
+  store         Store       @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  colaboradorId String
+  colaborador   Colaborador @relation(fields: [colaboradorId], references: [id], onDelete: Cascade)
+  /// entrada | salida_almuerzo | vuelta_almuerzo | salida (ver src/lib/asistencia.ts)
+  tipo          String
+  /// El instante real (UTC): en pantalla se muestra en hora de Asunción.
+  fecha         DateTime    @default(now())
+  /// La jornada a la que pertenece, "YYYY-MM-DD" en hora de Asunción: el día en que empezó el
+  /// turno. Una salida pasada la medianoche cuenta en la jornada de su entrada.
+  dia           String
+  /// La foto sacada al marcar.
+  fotoUrl       String?
+  /// Los gestos que se le pidieron para comprobar que es una persona ("parpadear", "boca"…).
+  gestos        Json        @default("[]")
+  /// El celular confirmó que hizo los gestos. false = se marcó sin la prueba (revisar la foto).
+  verificada    Boolean     @default(false)
+  /// Solo en la entrada, y solo si tiene hora de entrada: los minutos que pasó de la tolerancia
+  /// (0 = llegó a tiempo). NULL = no se controla.
+  tardanzaMin   Int?
+  nota          String?
+  createdAt     DateTime    @default(now())
+
+  @@index([storeId, dia])
+  @@index([colaboradorId, fecha])
 }

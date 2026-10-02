@@ -85,3 +85,8 @@ export async function subirImagenPaginaReservas(archivo: File): Promise<string> 
 export async function subirFotoCliente(archivo: File): Promise<string> {
   return subirImagen(archivo, "clientes/");
 }
+
+/** La selfie del alta de un colaborador y las fotos de cada marcación, en el Registro de asistencia. */
+export async function subirFotoAsistencia(archivo: File): Promise<string> {
+  return subirImagen(archivo, "asistencia/");
+}

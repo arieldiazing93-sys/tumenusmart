@@ -16,7 +16,6 @@ import {
   type SeguimientoGesto,
 } from "@/lib/vision-facial";
 
-const GESTOS_POR_DESAFIO = 2;
 const SEGUNDOS_POR_GESTO = 6;
 /** Por debajo de este brillo promedio (0 a 255) la imagen es muy oscura para confiar en la detección. */
 const LUZ_MINIMA = 70;
@@ -93,6 +92,8 @@ export function PruebaGestos() {
   const [desafioUI, setDesafioUI] = useState<{ gestos: Gesto[]; indice: number } | null>(null);
   const [segundosRestantes, setSegundosRestantes] = useState(SEGUNDOS_POR_GESTO);
   const [intentos, setIntentos] = useState<Intento[]>([]);
+  // Cuántos gestos pide cada desafío: con el celular en un lugar a la vista, con uno puede alcanzar.
+  const [cantidadGestos, setCantidadGestos] = useState(2);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const detectorRef = useRef<DetectorRostro | null>(null);
@@ -261,7 +262,7 @@ export function PruebaGestos() {
 
   function empezarDesafio() {
     if (fase !== "listo" || desafioRef.current) return;
-    const gestos = sortearGestos(GESTOS_POR_DESAFIO);
+    const gestos = sortearGestos(cantidadGestos);
     const ahora = performance.now();
     desafioRef.current = {
       gestos,
@@ -321,16 +322,61 @@ export function PruebaGestos() {
               </div>
             )}
             {desafioUI && (
-              <div className="absolute inset-x-0 bottom-0 bg-tinta/80 p-3 text-center text-white">
-                <p className="text-[0.72rem] font-semibold uppercase tracking-wide text-white/70">
-                  Gesto {desafioUI.indice + 1} de {desafioUI.gestos.length} · {segundosRestantes} s
-                </p>
-                <p className="text-[1.15rem] font-semibold">{GESTOS[desafioUI.gestos[desafioUI.indice]].instruccion}</p>
+              // Todos los gestos a la vista desde el principio: el que ya hiciste queda tachado en verde, el
+              // que toca ahora va resaltado y los que faltan quedan apagados. Nada desaparece de golpe.
+              <div className="absolute inset-x-0 bottom-0 bg-tinta/85 p-3 text-white">
+                <div className="mb-2 flex items-center justify-between gap-2 text-[0.72rem] font-semibold uppercase tracking-wide text-white/70">
+                  <span>{desafioUI.gestos.length === 1 ? "Hacé este gesto" : "Hacé estos gestos, en orden"}</span>
+                  <span className="cifra">{segundosRestantes} s</span>
+                </div>
+                <ol className="flex flex-col gap-1.5">
+                  {desafioUI.gestos.map((g, n) => {
+                    const hecho = n < desafioUI.indice;
+                    const actual = n === desafioUI.indice;
+                    return (
+                      <li
+                        key={`${g}-${n}`}
+                        className={`flex items-center gap-2.5 rounded-lg px-3 py-2 text-[1.05rem] font-semibold ${
+                          actual ? "bg-white text-tinta" : hecho ? "bg-exito/90 text-white" : "bg-white/10 text-white/60"
+                        }`}
+                      >
+                        <span
+                          className={`flex h-6 w-6 flex-none items-center justify-center rounded-full text-[0.8rem] ${
+                            actual ? "bg-tinta text-white" : "bg-white/20"
+                          }`}
+                        >
+                          {hecho ? "✓" : n + 1}
+                        </span>
+                        {GESTOS[g].instruccion}
+                      </li>
+                    );
+                  })}
+                </ol>
               </div>
             )}
           </div>
 
           {error && <p className="rounded-lg bg-peligro-luz px-3 py-2 text-[0.82rem] text-peligro">{error}</p>}
+
+          <div role="group" aria-label="Cantidad de gestos" className="flex items-center justify-center gap-2 text-[0.82rem]">
+            <span className="text-tinta-media">Gestos por desafío:</span>
+            {[1, 2].map((n) => (
+              <button
+                key={n}
+                type="button"
+                aria-pressed={cantidadGestos === n}
+                disabled={!!desafioUI}
+                onClick={() => setCantidadGestos(n)}
+                className={`h-8 w-9 rounded-full border text-[0.85rem] font-semibold transition-colors disabled:opacity-50 ${
+                  cantidadGestos === n
+                    ? "border-azul bg-azul-luz text-azul-oscuro"
+                    : "border-linea text-tinta-media hover:border-azul/40"
+                }`}
+              >
+                {n}
+              </button>
+            ))}
+          </div>
 
           <div className="flex flex-wrap justify-center gap-2">
             {(fase === "inicio" || fase === "error") && (

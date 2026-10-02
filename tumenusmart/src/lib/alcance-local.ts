@@ -66,6 +66,8 @@ export const MODELOS_POR_LOCAL = new Set([
   "ServicioPersonal",
   "PaginaReservas",
   "CitaServicio",
+  "Colaborador",
+  "MarcacionAsistencia",
 ]);
 
 /** Operaciones que leen o modifican filas existentes: se filtran por `where`. */
@@ -180,6 +182,8 @@ export const SLUGS_RESERVADOS = new Set([
   "turnos",
   // /personal/<id> es la vista de trabajo de cada persona del personal de un salón.
   "personal",
+  // /asistencia/<llave> es el celular fijo del local donde el personal marca entrada y salida.
+  "asistencia",
   "repartidor",
   "_next",
   "favicon.ico",

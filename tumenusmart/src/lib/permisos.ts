@@ -56,6 +56,8 @@ export type Permiso =
   // Armar la agenda: cargar y editar el personal (y más adelante horarios,
   // servicios y la página de reservas). Del dueño, como el resto de la configuración.
   | "agenda.configurar"
+  // --- registro de asistencia: quién entró y salió, con foto. Del dueño: son datos del personal. ---
+  | "asistencia.gestionar"
   // --- el negocio ---
   | "estadisticas.ver"
   | "ideas.ver"
@@ -128,6 +130,7 @@ const PERMISOS_LOCAL: Permiso[] = [
   "stock.ver",
   "stock.editar",
   "agenda.configurar",
+  "asistencia.gestionar",
   "estadisticas.ver",
   "ideas.ver",
   "analytics.ver",

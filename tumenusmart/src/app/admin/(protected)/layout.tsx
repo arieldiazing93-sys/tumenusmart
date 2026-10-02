@@ -108,12 +108,17 @@ function armarGrupos(hayIdeaSinVer: boolean, rol: string, ventasACredito: boolea
       ],
     },
     {
-      // Control de asistencia del personal (marcar entrada y salida con la cámara). Por ahora solo
-      // está la prueba de que la cámara reconoce a una persona de verdad; el resto se arma después.
+      // Control de asistencia del personal: marcan entrada, almuerzo y salida en un celular fijo del
+      // local, con PIN y una prueba de persona real con la cámara. Acá el dueño ve lo marcado, da de
+      // alta a las personas y saca el enlace del celular.
       titulo: "Asistencia",
       secciones: [
-        { href: "/admin/asistencia", label: "Registro de asistencia", icono: "usuarios" as const,
-          ver: conPermiso("agenda.configurar") },
+        { href: "/admin/asistencia", label: "Marcaciones", icono: "reservas" as const,
+          ver: conPermiso("asistencia.gestionar") },
+        { href: "/admin/asistencia/colaboradores", label: "Colaboradores", icono: "usuarios" as const,
+          ver: conPermiso("asistencia.gestionar") },
+        { href: "/admin/asistencia/celular", label: "Celular fijo", icono: "pos" as const,
+          ver: conPermiso("asistencia.gestionar") },
       ],
     },
     {
