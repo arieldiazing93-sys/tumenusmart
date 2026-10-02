@@ -1,37 +1,43 @@
 "use server";
 
-import { passwordCoincide } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import {
   ETIQUETA_TIPO,
   MAXIMO_INTENTOS_PIN,
   MINUTOS_BLOQUEO_PIN,
-  SEGUNDOS_ENTRE_MARCAS,
   calcularTardanza,
   esTipoMarcacion,
+  mensajeDeEspera,
   pinValido,
-  type MarcaReciente,
   type TipoMarcacion,
 } from "@/lib/asistencia";
-import { estadoDeMarcacion, localPorToken } from "@/lib/asistencia-servidor";
+import {
+  claveDePin,
+  estadoDeMarcacion,
+  localPorToken,
+  type LocalAsistencia,
+} from "@/lib/asistencia-servidor";
 import { subirFotoAsistencia } from "@/lib/supabase-storage";
 import { claveDiaAsuncion, horaAsuncion } from "@/lib/timezone";
 
 /**
  * Las acciones del celular fijo del Registro de asistencia (/asistencia/[token]), sin usuario ni contraseña.
  *
- * Quien tiene el enlace llega hasta la lista de personas; para marcar hace falta además el PIN de esa persona.
- * Cada acción vuelve a resolver el local desde la llave y busca a la persona SOLO dentro de ese local: aunque
- * alguien arme un id a mano, nunca toca a otro negocio. El PIN se bloquea unos minutos tras varios errores
- * seguidos, así no se puede adivinar probando.
+ * La persona toca "Registrar asistencia", pone SU PIN y se saca la selfie: el PIN es lo que la identifica (por eso
+ * no se puede repetir dentro de un local), y el sistema decide solo qué marcación le toca (entrada, salida a almorzar,
+ * vuelta o salida) según lo último que marcó. Cada acción vuelve a resolver el local desde la llave y busca a la
+ * persona SOLO dentro de ese local: aunque alguien arme un dato a mano, nunca toca a otro negocio.
  *
- * Que la cámara haya visto una cara de frente lo comprueba el propio celular: el servidor no puede verlo. Por eso
- * cada marcación guarda la foto, que es la prueba que el dueño revisa.
+ * Como el PIN identifica, no se puede bloquear "a esa persona" por errarle: se bloquea el celular unos minutos tras
+ * varios PIN incorrectos seguidos (cualquier marcación buena vuelve el conteo a cero). Y que la cámara haya visto una
+ * cara de frente lo comprueba el propio celular: el servidor no puede verlo, por eso cada marcación guarda la foto,
+ * que es la prueba que el dueño revisa contra la selfie del alta.
  */
 
-type ColaboradorVerificado = {
+type ColaboradorIdentificado = {
   id: string;
   nombre: string;
+  haceAlmuerzo: boolean;
   horaEntrada: string | null;
   toleranciaMin: number;
 };
@@ -40,91 +46,92 @@ function texto(valor: FormDataEntryValue | null): string {
   return String(valor ?? "").trim();
 }
 
-/** Comprueba el PIN de una persona del local, con el bloqueo por intentos fallidos. */
-async function comprobarPin(
-  storeId: string,
-  colaboradorId: string,
+/** Busca a la persona por su PIN (dentro del local) y lleva la cuenta de los errores seguidos. */
+async function identificarPorPin(
+  local: LocalAsistencia,
   pin: string
-): Promise<{ ok: true; colaborador: ColaboradorVerificado } | { ok: false; error: string }> {
-  const colaborador = await prisma.colaborador.findFirst({
-    where: { id: colaboradorId, storeId, activo: true },
-    select: {
-      id: true,
-      nombre: true,
-      pinHash: true,
-      horaEntrada: true,
-      toleranciaMin: true,
-      intentosFallidos: true,
-      bloqueadoHasta: true,
-    },
-  });
-  if (!colaborador) return { ok: false, error: "No se encontró a esa persona." };
-
+): Promise<{ ok: true; colaborador: ColaboradorIdentificado } | { ok: false; error: string }> {
   const ahora = new Date();
-  if (colaborador.bloqueadoHasta && colaborador.bloqueadoHasta > ahora) {
-    const minutos = Math.max(1, Math.ceil((colaborador.bloqueadoHasta.getTime() - ahora.getTime()) / 60000));
-    return { ok: false, error: `Demasiados intentos con el PIN. Probá de nuevo en ${minutos} min.` };
+  if (local.bloqueoAsistenciaHasta && local.bloqueoAsistenciaHasta > ahora) {
+    const minutos = Math.max(1, Math.ceil((local.bloqueoAsistenciaHasta.getTime() - ahora.getTime()) / 60000));
+    return { ok: false, error: `Demasiados PIN incorrectos. Probá de nuevo en ${minutos} min.` };
   }
 
   if (!pinValido(pin)) return { ok: false, error: "El PIN tiene entre 4 y 6 números." };
 
-  if (!(await passwordCoincide(pin, colaborador.pinHash))) {
+  const colaborador = await prisma.colaborador.findFirst({
+    where: { storeId: local.id, pinClave: claveDePin(local.id, pin), activo: true },
+    select: { id: true, nombre: true, haceAlmuerzo: true, horaEntrada: true, toleranciaMin: true },
+  });
+
+  if (!colaborador) {
     // El incremento es atómico: dos intentos a la vez no se pisan el conteo.
-    const { intentosFallidos } = await prisma.colaborador.update({
-      where: { id: colaborador.id },
-      data: { intentosFallidos: { increment: 1 } },
-      select: { intentosFallidos: true },
+    const { intentosPinAsistencia } = await prisma.store.update({
+      where: { id: local.id },
+      data: { intentosPinAsistencia: { increment: 1 } },
+      select: { intentosPinAsistencia: true },
     });
-    if (intentosFallidos >= MAXIMO_INTENTOS_PIN) {
-      await prisma.colaborador.update({
-        where: { id: colaborador.id },
-        data: { intentosFallidos: 0, bloqueadoHasta: new Date(ahora.getTime() + MINUTOS_BLOQUEO_PIN * 60000) },
+    if (intentosPinAsistencia >= MAXIMO_INTENTOS_PIN) {
+      await prisma.store.update({
+        where: { id: local.id },
+        data: {
+          intentosPinAsistencia: 0,
+          bloqueoAsistenciaHasta: new Date(ahora.getTime() + MINUTOS_BLOQUEO_PIN * 60000),
+        },
       });
-      return { ok: false, error: `PIN incorrecto. Se bloqueó por ${MINUTOS_BLOQUEO_PIN} minutos.` };
+      return { ok: false, error: `PIN incorrecto. El celular se bloquea ${MINUTOS_BLOQUEO_PIN} minutos.` };
     }
-    const quedan = MAXIMO_INTENTOS_PIN - intentosFallidos;
-    return { ok: false, error: `PIN incorrecto. Te ${quedan === 1 ? "queda 1 intento" : `quedan ${quedan} intentos`}.` };
+    const quedan = MAXIMO_INTENTOS_PIN - intentosPinAsistencia;
+    return {
+      ok: false,
+      error: `PIN incorrecto. ${quedan === 1 ? "Te queda 1 intento" : `Te quedan ${quedan} intentos`}.`,
+    };
   }
 
-  if (colaborador.intentosFallidos > 0 || colaborador.bloqueadoHasta) {
-    await prisma.colaborador.update({
-      where: { id: colaborador.id },
-      data: { intentosFallidos: 0, bloqueadoHasta: null },
+  if (local.intentosPinAsistencia > 0 || local.bloqueoAsistenciaHasta) {
+    await prisma.store.update({
+      where: { id: local.id },
+      data: { intentosPinAsistencia: 0, bloqueoAsistenciaHasta: null },
     });
   }
 
-  return {
-    ok: true,
-    colaborador: {
-      id: colaborador.id,
-      nombre: colaborador.nombre,
-      horaEntrada: colaborador.horaEntrada,
-      toleranciaMin: colaborador.toleranciaMin,
-    },
-  };
+  return { ok: true, colaborador };
 }
 
-export type ResultadoPin =
-  | { ok: true; nombre: string; permitidas: TipoMarcacion[]; recientes: MarcaReciente[] }
+export type ResultadoIdentificacion =
+  | {
+      ok: true;
+      nombre: string;
+      /** La marcación que toca, la que se registra sola. */
+      tipo: TipoMarcacion;
+      /** Si hay otra posible (quien no almorzó y se va), para que la pueda elegir en vez de la sugerida. */
+      alternativas: TipoMarcacion[];
+    }
   | { ok: false; error: string };
 
 /**
- * Primer paso: la persona eligió su nombre y puso su PIN. Si es correcto devuelve qué puede marcar ahora y lo
- * que ya marcó en este turno, así el celular le muestra solo los botones que tienen sentido.
+ * Primer paso: la persona puso su PIN. Si es de alguien del local devuelve su nombre y qué marcación le toca, así el
+ * celular le muestra "Hola, Ariel: vas a marcar la entrada" antes de sacarle la selfie. Si todavía no pasó el tiempo
+ * mínimo desde su última marcación, se lo dice acá (antes de la selfie) y le avisa a qué hora puede volver.
  */
-export async function verificarPin(token: string, colaboradorId: string, pin: string): Promise<ResultadoPin> {
+export async function identificarPin(token: string, pin: string): Promise<ResultadoIdentificacion> {
   const local = await localPorToken(token);
   if (!local) return { ok: false, error: "Este enlace ya no está activo." };
 
-  const comprobado = await comprobarPin(local.id, colaboradorId, pin);
-  if (!comprobado.ok) return comprobado;
+  const identificado = await identificarPorPin(local, pin);
+  if (!identificado.ok) return identificado;
+  const { colaborador } = identificado;
 
-  const estado = await estadoDeMarcacion(local.id, comprobado.colaborador.id);
+  const ahora = new Date();
+  const estado = await estadoDeMarcacion(local.id, colaborador.id, colaborador.haceAlmuerzo, ahora);
+  const espera = mensajeDeEspera(estado.ultima, local.minutosEntreMarcas, ahora);
+  if (espera) return { ok: false, error: espera };
+
   return {
     ok: true,
-    nombre: comprobado.colaborador.nombre,
-    permitidas: estado.permitidas,
-    recientes: estado.recientes,
+    nombre: colaborador.nombre,
+    tipo: estado.permitidas[0],
+    alternativas: estado.permitidas.slice(1),
   };
 }
 
@@ -141,28 +148,27 @@ export type ResultadoMarcacion =
   | { ok: false; error: string };
 
 /**
- * Segundo paso: guarda la marcación. Llega todo junto en el formulario (token, persona, PIN, qué marca, si la
- * cámara vio su cara y la foto). El PIN se vuelve a comprobar acá: el paso anterior no deja "sesión" de ningún tipo.
+ * Segundo paso: guarda la marcación. Llega todo junto en el formulario (token, PIN, qué marca, si la cámara vio su cara
+ * y la foto). El PIN se vuelve a comprobar acá: el paso anterior no deja "sesión" de ningún tipo.
  */
 export async function registrarMarcacion(formData: FormData): Promise<ResultadoMarcacion> {
   const local = await localPorToken(texto(formData.get("token")));
   if (!local) return { ok: false, error: "Este enlace ya no está activo." };
 
-  const comprobado = await comprobarPin(local.id, texto(formData.get("colaboradorId")), texto(formData.get("pin")));
-  if (!comprobado.ok) return comprobado;
-  const colaborador = comprobado.colaborador;
+  const identificado = await identificarPorPin(local, texto(formData.get("pin")));
+  if (!identificado.ok) return identificado;
+  const colaborador = identificado.colaborador;
 
   const tipo = texto(formData.get("tipo"));
   if (!esTipoMarcacion(tipo)) return { ok: false, error: "Esa marcación no existe." };
 
   const ahora = new Date();
-  const estado = await estadoDeMarcacion(local.id, colaborador.id, ahora);
+  const estado = await estadoDeMarcacion(local.id, colaborador.id, colaborador.haceAlmuerzo, ahora);
   if (!estado.permitidas.includes(tipo)) {
     return { ok: false, error: `Ahora no podés marcar "${ETIQUETA_TIPO[tipo]}". Volvé a empezar.` };
   }
-  if (estado.ultima && ahora.getTime() - estado.ultima.fecha.getTime() < SEGUNDOS_ENTRE_MARCAS * 1000) {
-    return { ok: false, error: "Ya marcaste hace un momento. Esperá unos segundos." };
-  }
+  const espera = mensajeDeEspera(estado.ultima, local.minutosEntreMarcas, ahora);
+  if (espera) return { ok: false, error: espera };
 
   const archivo = formData.get("archivo");
   if (!(archivo instanceof File)) return { ok: false, error: "Falta la foto. Probá de nuevo." };

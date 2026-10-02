@@ -90,7 +90,8 @@ export function ListaColaboradores({ colaboradores }: { colaboradores: Colaborad
                     <Pastilla>Sin hora de entrada</Pastilla>
                   )}
                   {!c.activo && <Pastilla>Inactivo</Pastilla>}
-                  {c.bloqueado && <Pastilla color="peligro">PIN bloqueado</Pastilla>}
+                  {c.sinPin && <Pastilla color="peligro">Sin PIN: no puede marcar</Pastilla>}
+                  {!c.haceAlmuerzo && <Pastilla>No almuerza</Pastilla>}
                 </div>
               </div>
               <button

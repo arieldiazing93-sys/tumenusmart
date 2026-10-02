@@ -66,6 +66,12 @@ model Store {
   /// larga y al azar: quien tenga el enlace puede marcar (con su PIN y su cara), así que se
   /// puede regenerar o apagar (NULL = el registro de asistencia no está habilitado).
   tokenAsistencia String? @unique
+  /// Contra la adivinanza de PIN en el celular fijo: los PIN incorrectos seguidos (sin ninguna marcación
+  /// buena en el medio) y, al llegar al tope, hasta cuándo queda bloqueado el celular.
+  intentosPinAsistencia  Int       @default(0)
+  bloqueoAsistenciaHasta DateTime?
+  /// Cuántos minutos tienen que pasar entre una marcación de una persona y la siguiente suya.
+  minutosEntreMarcas     Int       @default(5)
 
   /// Cómo se ve la carta pública de este local.
   ///
@@ -2473,21 +2479,24 @@ model Colaborador {
   /// La selfie del alta, sacada por el dueño con la persona delante. Es la referencia para
   /// comparar a ojo con la foto de cada marcación.
   fotoUrl  String?
-  /// El PIN de 4 a 6 números, cifrado (scrypt). Nunca se guarda en claro.
-  pinHash  String
+  /// El PIN de 4 a 6 números NO se guarda: se guarda su huella (HMAC con una clave del servidor, ver
+  /// src/lib/asistencia-servidor.ts). El PIN es lo que identifica a la persona en el celular fijo (toca
+  /// "Registrar asistencia", pone su PIN y listo), así que no puede repetirse dentro del mismo local.
+  /// NULL = todavía no tiene PIN (no puede marcar).
+  pinClave String?
+  /// false = no sale a almorzar: después de la entrada, la próxima marcación es la salida.
+  haceAlmuerzo Boolean @default(true)
   /// "HH:MM": a qué hora tiene que entrar. NULL = no se controla la tardanza.
   horaEntrada   String?
   /// Cuántos minutos de gracia después de la hora de entrada antes de contar la tardanza.
   toleranciaMin Int     @default(10)
   /// Se desactiva en vez de borrarse: sus marcaciones viejas siguen en los reportes.
   activo   Boolean @default(true)
-  /// Contra la adivinanza del PIN: tras varios errores seguidos se bloquea unos minutos.
-  intentosFallidos Int       @default(0)
-  bloqueadoHasta   DateTime?
   createdAt DateTime @default(now())
 
   marcaciones MarcacionAsistencia[]
 
+  @@unique([storeId, pinClave])
   @@index([storeId])
 }
 

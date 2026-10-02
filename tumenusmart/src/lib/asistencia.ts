@@ -7,6 +7,8 @@
  * almorzar marca entrada y salida nomás.
  */
 
+import { horaAsuncion } from "./timezone";
+
 export type TipoMarcacion = "entrada" | "salida_almuerzo" | "vuelta_almuerzo" | "salida";
 
 export const TIPOS_MARCACION: TipoMarcacion[] = ["entrada", "salida_almuerzo", "vuelta_almuerzo", "salida"];
@@ -38,25 +40,31 @@ export function esTipoMarcacion(valor: string): valor is TipoMarcacion {
  */
 export const HORAS_TURNO_ABIERTO = 18;
 
-/** Entre una marcación y la siguiente de la misma persona tienen que pasar al menos estos segundos (evita el doble toque). */
-export const SEGUNDOS_ENTRE_MARCAS = 45;
+/** Lo que tienen que esperar entre una marcación y la siguiente de la misma persona, si el dueño no cambió el valor. */
+export const MINUTOS_ENTRE_MARCAS_PREDETERMINADO = 5;
+export const MINUTOS_ENTRE_MARCAS_MAXIMO = 240;
 
-/** Cuántas veces puede errarle al PIN antes de que se bloquee, y por cuántos minutos. */
+/**
+ * Cuántos PIN incorrectos seguidos (sin ninguna marcación buena en el medio) aguanta el celular fijo antes de
+ * bloquearse, y por cuántos minutos. Como el PIN es lo que identifica a la persona, no se puede bloquear "a esa
+ * persona": se bloquea el celular.
+ */
 export const MAXIMO_INTENTOS_PIN = 5;
-export const MINUTOS_BLOQUEO_PIN = 5;
+export const MINUTOS_BLOQUEO_PIN = 3;
 
-/** Una marcación ya hecha, tal como se le muestra a la persona en el celular fijo: qué fue y a qué hora ("08:03"). */
-export type MarcaReciente = { tipo: TipoMarcacion; hora: string };
-
-/** Qué puede marcar ahora, según lo último que marcó (null = nada reciente, o el turno ya cerró). */
-export function marcacionesPermitidas(ultimo: TipoMarcacion | null): TipoMarcacion[] {
+/**
+ * Qué marcación toca ahora, según lo último que marcó la persona (null = nada reciente, o el turno ya cerró). La
+ * primera de la lista es la que se registra sola; si hay una segunda, es la alternativa que la persona puede elegir
+ * (quien no llegó a almorzar y se va marca la salida en vez de la salida a almorzar).
+ */
+export function marcacionesPermitidas(ultimo: TipoMarcacion | null, haceAlmuerzo = true): TipoMarcacion[] {
   switch (ultimo) {
     case null:
     case "salida":
       return ["entrada"];
     case "entrada":
-      // Sin almuerzo puede salir directo.
-      return ["salida_almuerzo", "salida"];
+      // Quien no sale a almorzar pasa directo a la salida.
+      return haceAlmuerzo ? ["salida_almuerzo", "salida"] : ["salida"];
     case "salida_almuerzo":
       // Si no vuelve, se va: también puede marcar la salida.
       return ["vuelta_almuerzo", "salida"];
@@ -64,6 +72,26 @@ export function marcacionesPermitidas(ultimo: TipoMarcacion | null): TipoMarcaci
       return ["salida"];
   }
 }
+
+/**
+ * Si todavía no pasó el tiempo mínimo desde la última marcación, el aviso para la persona ("Ya marcaste entrada a las
+ * 08:00. Podés marcar de nuevo a partir de las 08:05."); NULL si ya puede marcar. La hora se redondea hacia arriba al
+ * minuto, así quien vuelve a la hora que se le dijo no se encuentra con que todavía faltan segundos.
+ */
+export function mensajeDeEspera(
+  ultima: { tipo: string; fecha: Date } | null,
+  minutosEntreMarcas: number,
+  ahora: Date
+): string | null {
+  if (!ultima || minutosEntreMarcas <= 0) return null;
+  const libre = new Date(Math.ceil((ultima.fecha.getTime() + minutosEntreMarcas * 60_000) / 60_000) * 60_000);
+  if (ahora.getTime() >= libre.getTime()) return null;
+  const que = esTipoMarcacion(ultima.tipo) ? ETIQUETA_TIPO[ultima.tipo].toLowerCase() : "recién";
+  return `Ya marcaste ${que} a las ${horaAsuncion(ultima.fecha)}. Podés marcar de nuevo a partir de las ${horaAsuncion(libre)}.`;
+}
+
+/** Una marcación ya hecha, tal como se le muestra a la persona en el celular fijo: qué fue y a qué hora ("08:03"). */
+export type MarcaReciente = { tipo: TipoMarcacion; hora: string };
 
 /** El PIN: de 4 a 6 números. */
 export function pinValido(pin: string): boolean {
@@ -119,9 +147,10 @@ export type ColaboradorFila = {
   fotoUrl: string | null;
   horaEntrada: string | null;
   toleranciaMin: number;
+  haceAlmuerzo: boolean;
   activo: boolean;
-  /** true = se bloqueó por errarle varias veces al PIN y todavía no pasó el tiempo. */
-  bloqueado: boolean;
+  /** true = todavía no tiene PIN (no puede marcar hasta que el dueño le ponga uno). */
+  sinPin: boolean;
 };
 
 export function nombreDeColaborador(c: { nombre: string; apellido: string | null }): string {

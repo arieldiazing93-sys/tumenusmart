@@ -92,21 +92,16 @@ export function NavPanel({
   // desplegarlo primero.
   const grupoActivo = grupos.find((g) => g.secciones.some((s) => s.href === activa))?.titulo;
 
-  // Qué grupos están colapsados (título tocado). Arranca con el primero
-  // ("Día a día", lo que se toca seguido) y el de la sección en la que ya
-  // estás parado abiertos de una — el resto, cerrado. Antes arrancaba TODO
-  // cerrado: quien recién entraba veía puros títulos grises sin un solo
-  // enlace debajo, hasta tocar cada uno. En memoria y no en cookie: esto es
-  // para acomodar la vista mientras se navega, no una preferencia que haga
-  // falta recordar entre sesiones. Sigue vivo mientras se cambia de pantalla
-  // dentro del admin porque el layout no vuelve a montar este componente en
-  // cada navegación.
-  const [colapsados, setColapsados] = useState<Set<string>>(
-    () =>
-      new Set(
-        grupos.map((g) => g.titulo).filter((titulo, i) => i !== 0 && titulo !== grupoActivo)
-      )
-  );
+  // Qué grupos están colapsados (título tocado). Al entrar o recargar la
+  // página TODOS arrancan cerrados: cada persona abre solo lo que necesita
+  // (antes "Día a día" y el grupo de la pantalla actual arrancaban abiertos, y
+  // no siempre se entra ahí). Para no perder dónde estás parado, el título del
+  // grupo que tiene la sección activa lleva un puntito cuando está cerrado. En
+  // memoria y no en cookie: esto es para acomodar la vista mientras se
+  // navega, no una preferencia que haga falta recordar entre sesiones. Sigue
+  // vivo mientras se cambia de pantalla dentro del admin porque el layout no
+  // vuelve a montar este componente en cada navegación.
+  const [colapsados, setColapsados] = useState<Set<string>>(() => new Set(grupos.map((g) => g.titulo)));
 
   function alternarGrupo(titulo: string) {
     setColapsados((actuales) => {
@@ -177,10 +172,9 @@ export function NavPanel({
             {!compacta && (
               /*
                 El título va siempre en azul (es navegación, mismo significado
-                que el resto del panel) — el grupo de la sección activa ya se
-                distingue solo porque arranca desplegado, con su enlace
-                resaltado adentro, así que el título no necesita un color
-                aparte para eso.
+                que el resto del panel) — el grupo de la sección activa se
+                distingue con un puntito cuando está cerrado, y con su enlace
+                resaltado adentro cuando se abre.
 
                 La separación entre letras baja de 0.19em a 0.15em porque a
                 este tamaño la anterior desarma las palabras.
@@ -196,7 +190,13 @@ export function NavPanel({
                 aria-expanded={!colapsado}
                 className="flex w-full items-center justify-between gap-2 rounded-lg px-3 pb-2 text-[0.75rem] font-bold uppercase tracking-[0.15em] text-azul-oscuro hover:text-brand"
               >
-                <span className="flex-1 text-left">{grupo.titulo}</span>
+                <span className="flex flex-1 items-center gap-2 text-left">
+                  {grupo.titulo}
+                  {colapsado && grupo.titulo === grupoActivo && (
+                    // Cerrado pero con la pantalla actual adentro: el puntito avisa dónde estás.
+                    <span aria-label="Acá estás" title="Acá estás" className="h-1.5 w-1.5 flex-none rounded-full bg-brand" />
+                  )}
+                </span>
                 <IconoPlegar
                   className={`flex-none transition-transform duration-150 ${
                     colapsado ? "rotate-180" : "-rotate-90"
@@ -343,8 +343,8 @@ export function NavPanel({
                 <div className="border-b border-linea px-4 py-3">{extra}</div>
               )}
 
-              {/* En el cajón siempre desplegado: hay lugar de sobra y ahí lo que
-                  importa es leer los nombres. */}
+              {/* En el cajón se ven los nombres completos (no el menú de solo iconos); los grupos
+                  arrancan cerrados igual que en la columna y cada uno abre el suyo. */}
               {lista(false)}
             </div>
           </div>,

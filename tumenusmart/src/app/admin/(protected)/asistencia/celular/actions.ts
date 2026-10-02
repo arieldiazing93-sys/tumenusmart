@@ -3,6 +3,7 @@
 import { randomBytes } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { exigirPermiso } from "@/lib/auth";
+import { MINUTOS_ENTRE_MARCAS_MAXIMO } from "@/lib/asistencia";
 import { registrarBitacora } from "@/lib/bitacora";
 import { idLocalActual } from "@/lib/local-actual";
 import { prisma } from "@/lib/prisma";
@@ -31,6 +32,33 @@ export async function generarEnlaceAsistencia(): Promise<ResultadoEnlaceAsistenc
       : "Activó el celular fijo de asistencia.",
     entidad: "Store",
     entidadId: idLocal,
+  });
+
+  revalidatePath("/admin/asistencia/celular");
+  return { ok: true };
+}
+
+/**
+ * Cuántos minutos tienen que pasar entre una marcación de una persona y la siguiente suya. Evita marcar dos veces por
+ * error y que alguien marque entrada y salida seguidas. 0 = sin espera.
+ */
+export async function guardarMinutosEntreMarcas(minutos: number): Promise<ResultadoEnlaceAsistencia> {
+  const sesion = await exigirPermiso("asistencia.gestionar");
+  const idLocal = await idLocalActual();
+
+  if (!Number.isInteger(minutos) || minutos < 0 || minutos > MINUTOS_ENTRE_MARCAS_MAXIMO) {
+    return { ok: false, error: `Son minutos enteros, de 0 a ${MINUTOS_ENTRE_MARCAS_MAXIMO}.` };
+  }
+
+  await prisma.store.update({ where: { id: idLocal }, data: { minutosEntreMarcas: minutos } });
+
+  await registrarBitacora(idLocal, sesion, {
+    modulo: "asistencia",
+    accion: "minutos_entre_marcas_cambiado",
+    descripcion: `Cambió el tiempo mínimo entre una marcación y la siguiente a ${minutos} min.`,
+    entidad: "Store",
+    entidadId: idLocal,
+    detalle: { minutos },
   });
 
   revalidatePath("/admin/asistencia/celular");

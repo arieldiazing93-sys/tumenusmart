@@ -26,22 +26,20 @@ export default async function ColaboradoresPage() {
       fotoUrl: true,
       horaEntrada: true,
       toleranciaMin: true,
+      haceAlmuerzo: true,
       activo: true,
-      bloqueadoHasta: true,
+      pinClave: true,
     },
   });
 
-  const ahora = new Date();
-  const colaboradores: ColaboradorFila[] = filas.map(({ bloqueadoHasta, ...f }) => ({
-    ...f,
-    bloqueado: bloqueadoHasta !== null && bloqueadoHasta > ahora,
-  }));
+  // Del PIN solo se sabe si lo tiene o no: nunca sale su huella del servidor.
+  const colaboradores: ColaboradorFila[] = filas.map(({ pinClave, ...f }) => ({ ...f, sinPin: pinClave === null }));
 
   return (
     <div className="flex flex-col gap-3">
       <Cabecera
         titulo="Colaboradores"
-        bajada="Las personas que marcan entrada, almuerzo y salida en el celular fijo. Dalas de alta en persona: sacales la selfie y elegí su PIN."
+        bajada="Las personas que marcan entrada, almuerzo y salida en el celular fijo. Dalas de alta en persona: sacales la selfie y elegí su PIN, que es lo que las identifica (no puede repetirse)."
         acciones={
           <BotonEnlace href="/admin/asistencia/celular" tono="navegar" tam="md">
             Celular fijo

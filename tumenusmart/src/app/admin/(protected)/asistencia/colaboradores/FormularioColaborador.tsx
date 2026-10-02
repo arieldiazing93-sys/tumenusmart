@@ -36,11 +36,11 @@ function Icono({ children, tam = 16 }: { children: React.ReactNode; tam?: number
   );
 }
 
-/** Un PIN de 4 números al azar, para no tener que inventarlo. */
+/** Un PIN de 5 números al azar, para no tener que inventarlo (con muchas personas, más largo se repite menos y es más difícil de adivinar). */
 function pinAlAzar(): string {
   const valores = new Uint32Array(1);
   crypto.getRandomValues(valores);
-  return String(valores[0] % 10000).padStart(4, "0");
+  return String(valores[0] % 100000).padStart(5, "0");
 }
 
 export function FormularioColaborador({
@@ -187,11 +187,11 @@ export function FormularioColaborador({
 
         {/* ---------- PIN ---------- */}
         <Campo
-          etiqueta={editando ? "Nuevo PIN (opcional)" : "PIN"}
+          etiqueta={editando && !colaborador?.sinPin ? "Nuevo PIN (opcional)" : "PIN"}
           ayuda={
-            editando
-              ? "Dejalo vacío para no cambiarlo. Si lo cambiás, también se desbloquea si se había bloqueado."
-              : "De 4 a 6 números. Es el que va a poner en el celular fijo para marcar."
+            editando && !colaborador?.sinPin
+              ? "Dejalo vacío para no cambiarlo."
+              : "De 4 a 6 números. Es lo que identifica a la persona en el celular fijo, así que no puede repetirse. Con muchas personas conviene de 5 o 6 números."
           }
         >
           <div className="flex items-center gap-2">
@@ -203,8 +203,8 @@ export function FormularioColaborador({
                 inputMode="numeric"
                 autoComplete="off"
                 maxLength={6}
-                required={!editando}
-                placeholder="Ej: 4827"
+                required={!editando || colaborador?.sinPin}
+                placeholder="Ej: 48271"
               />
             </div>
             <button type="button" onClick={() => setPin(pinAlAzar())} className={clasesBoton("suave", "md")}>
@@ -212,6 +212,24 @@ export function FormularioColaborador({
             </button>
           </div>
         </Campo>
+
+        {/* ---------- almuerzo ---------- */}
+        <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-linea bg-papel-suave p-3">
+          <input
+            type="checkbox"
+            name="haceAlmuerzo"
+            defaultChecked={colaborador?.haceAlmuerzo ?? true}
+            className="mt-0.5 h-4 w-4 flex-none accent-azul"
+          />
+          <span>
+            <span className="block text-[0.86rem] font-semibold text-tinta">Sale a almorzar</span>
+            <span className="block text-[0.78rem] leading-snug text-tinta-suave">
+              Si lo tildás, después de la entrada la marcación que toca es la salida a almorzar, y después la vuelta. Si
+              no, después de la entrada toca directamente la salida. Quien se va sin almorzar puede cambiarlo en el
+              momento, en el celular.
+            </span>
+          </span>
+        </label>
 
         {/* ---------- horario ---------- */}
         <div className="rounded-xl border-2 border-azul/50 p-3">
@@ -249,8 +267,8 @@ export function FormularioColaborador({
             <span>
               <span className="block text-[0.86rem] font-semibold text-tinta">Activo</span>
               <span className="block text-[0.78rem] leading-snug text-tinta-suave">
-                Si lo desactivás, deja de aparecer en el celular fijo, pero sus marcaciones anteriores se conservan en
-                los reportes.
+                Si lo desactivás, su PIN deja de funcionar en el celular fijo, pero sus marcaciones anteriores se
+                conservan en los reportes.
               </span>
             </span>
           </label>

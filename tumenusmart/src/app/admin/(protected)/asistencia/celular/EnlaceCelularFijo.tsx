@@ -87,8 +87,8 @@ export function EnlaceCelularFijo({ token }: { token: string | null }) {
       <div>
         <h2 className="text-[1rem] font-semibold tracking-titular text-tinta">La dirección del celular fijo</h2>
         <p className="mt-0.5 text-[0.84rem] leading-snug text-tinta-media">
-          Abrila en el celular que va a quedar en la pared. No lleva usuario ni contraseña: quien la tenga ve la lista de
-          personas, pero para marcar necesita el PIN de cada una y que la cámara vea su cara.
+          Abrila en el celular que va a quedar en la pared. No lleva usuario ni contraseña: quien la tenga ve el botón de
+          registrar asistencia, pero para marcar necesita el PIN de una persona y que la cámara vea su cara.
         </p>
       </div>
 
