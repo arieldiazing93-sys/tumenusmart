@@ -155,7 +155,7 @@ export default async function ImprimirAsistenciaPage({
                 <th className="py-1.5">{ETIQUETA_TIPO_CORTA.vuelta_almuerzo}</th>
                 <th className="py-1.5">{ETIQUETA_TIPO_CORTA.salida}</th>
                 <th className="py-1.5 text-right">Trabajado</th>
-                <th className="py-1.5">Estado</th>
+                <th className="py-1.5 pl-6">Estado</th>
               </tr>
             </thead>
             <tbody>
@@ -168,7 +168,7 @@ export default async function ImprimirAsistenciaPage({
                   <td className="py-1.5 text-tinta">{hora(f.celdas.vuelta_almuerzo)}</td>
                   <td className="py-1.5 text-tinta">{hora(f.celdas.salida)}</td>
                   <td className="whitespace-nowrap py-1.5 text-right font-semibold text-tinta">{f.trabajado}</td>
-                  <td className="py-1.5 text-tinta-media">
+                  <td className="py-1.5 pl-6 text-tinta-media">
                     {TEXTO_ESTADO[f.estado]}
                     {f.avisos.map((a) => (
                       <span key={a} className="block text-xs text-tinta-suave">

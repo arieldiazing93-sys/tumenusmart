@@ -218,8 +218,14 @@ export type Turno<M extends MarcaDeTurno = MarcaDeTurno> = {
   avisos: string[];
 };
 
+/**
+ * Los minutos entre dos marcaciones, contados con las horas tal como se ven en pantalla (a minuto cumplido: 17:42:50 es
+ * las 17:42). Así lo que se muestra siempre cierra: de 17:42 a 18:40 son 58 minutos, y si hubo 16 de almuerzo, 42 — sin
+ * que el redondeo de los segundos de cada marcación se coma un minuto por el camino.
+ */
 function entreMinutos(desde: Date, hasta: Date): number {
-  return Math.max(0, Math.round((hasta.getTime() - desde.getTime()) / 60000));
+  const aMinuto = (d: Date) => Math.floor(d.getTime() / 60000);
+  return Math.max(0, aMinuto(hasta) - aMinuto(desde));
 }
 
 /**

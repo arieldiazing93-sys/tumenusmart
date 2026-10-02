@@ -11,7 +11,6 @@ import {
   type FilaAsistencia,
   type TipoMarcacion,
 } from "@/lib/asistencia";
-import { AvatarPersonal } from "../agenda/AvatarPersonal";
 
 const ESTADOS: Record<EstadoTurno, { texto: string; clases: string }> = {
   completo: { texto: "Completo", clases: "bg-exito-luz text-exito" },
@@ -84,14 +83,11 @@ export function ListadoMarcaciones({ filas }: { filas: FilaAsistencia[] }) {
             </tr>
           </thead>
           <tbody>
-            {filas.map((f, i) => (
+            {filas.map((f) => (
               <tr key={f.clave} className="border-t border-linea-fina transition-colors duration-100 hover:bg-papel-suave">
                 <td className="whitespace-nowrap px-2.5 py-1 font-medium text-tinta-media">{diaCorto(f)}</td>
                 <td className="px-2.5 py-1" title={f.cargo ?? undefined}>
-                  <div className="flex items-center gap-2">
-                    <AvatarPersonal nombre={f.nombre} fotoUrl={f.fotoAlta} indice={i} className="h-6 w-6 text-[0.6rem]" />
-                    <span className="max-w-[12rem] truncate font-semibold text-tinta">{f.nombre}</span>
-                  </div>
+                  <span className="block max-w-[14rem] truncate font-semibold text-tinta">{f.nombre}</span>
                 </td>
                 {TIPOS_MARCACION.map((t) => (
                   <td key={t} className="px-2.5 py-1">
@@ -122,10 +118,9 @@ export function ListadoMarcaciones({ filas }: { filas: FilaAsistencia[] }) {
 
       {/* Celular y tablet vertical: una tarjeta chica por turno. */}
       <ul className="flex flex-col gap-1.5 md:hidden">
-        {filas.map((f, i) => (
+        {filas.map((f) => (
           <li key={f.clave} className="rounded-lg border-2 border-azul/50 bg-superficie px-2.5 py-2">
             <div className="flex items-center gap-2">
-              <AvatarPersonal nombre={f.nombre} fotoUrl={f.fotoAlta} indice={i} className="h-7 w-7 text-[0.65rem]" />
               <p className="min-w-0 flex-1 truncate text-[0.86rem] font-semibold text-tinta">
                 {f.nombre} <span className="font-normal text-tinta-suave">· {diaCorto(f)}</span>
               </p>
