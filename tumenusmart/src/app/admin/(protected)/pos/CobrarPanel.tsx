@@ -271,7 +271,7 @@ export function CobrarPanel({
                         type="button"
                         onClick={() => completarConElResto(i)}
                         title="Poner lo que falta para llegar al total"
-                        className={clasesBoton("suave", "sm")}
+                        className={clasesBoton("navegar", "sm")}
                       >
                         Resto
                       </button>
@@ -422,7 +422,7 @@ export function CobrarPanel({
                     <button
                       type="button"
                       onClick={() => setMontoRecibido(String(Math.round(total)))}
-                      className={clasesBoton("suave", "sm")}
+                      className={clasesBoton("navegar", "sm")}
                     >
                       Justo
                     </button>

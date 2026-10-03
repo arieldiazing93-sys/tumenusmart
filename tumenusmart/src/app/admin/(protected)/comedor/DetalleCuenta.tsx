@@ -89,63 +89,64 @@ export function DetalleCuenta({
   for (const i of cuenta.items) rondas.set(i.ronda, [...(rondas.get(i.ronda) ?? []), i]);
 
   return (
-    <div className="flex flex-col gap-3">
-      <Tarjeta className="flex flex-col gap-3.5 !border-2 !border-azul/50">
-        <div className="flex flex-wrap items-start justify-between gap-3">
+    <div className="flex flex-col gap-2">
+      <Tarjeta padding={false} className="flex flex-col gap-2 !border-2 !border-azul/50 p-3">
+        <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <h2 className="truncate text-[1.4rem] font-semibold tracking-titular text-tinta">Mesa {cuenta.mesa}</h2>
-            <p className="text-[0.82rem] text-tinta-media">
+            <h2 className="truncate text-[1.15rem] font-semibold leading-tight tracking-titular text-tinta">Mesa {cuenta.mesa}</h2>
+            <p className="text-[0.78rem] text-tinta-media">
               Cuenta {formatearNumero(cuenta.numero)} · a cargo de {cuenta.mozo}
               {cuenta.comensales ? ` · ${cuenta.comensales} personas` : ""} · <Hace iso={cuenta.abiertaEn} />
             </p>
-            {porCobrar && cuenta.impresaEn && (
-              <p className="mt-0.5 text-[0.8rem] font-medium text-amarillo-oscuro">
-                Cuenta impresa a las <HoraDe iso={cuenta.impresaEn} />: el mozo ya no puede cargarle productos.
-              </p>
-            )}
           </div>
-          <div className="flex flex-col items-end gap-1">
+          <div className="flex flex-none flex-col items-end gap-0.5">
             <Pastilla color={porCobrar ? "amarillo" : "exito"} punto>
               {textoEstadoCuenta(cuenta.estado)}
             </Pastilla>
-            <p className="cifra text-[1.7rem] font-bold leading-none text-tinta">{formatearGuarani(t.total)}</p>
+            <p className="cifra text-[1.35rem] font-bold leading-none text-tinta">{formatearGuarani(t.total)}</p>
             {t.descuento > 0 && (
-              <p className="text-[0.76rem] text-tinta-media">
-                {formatearGuarani(t.subtotal)} − descuento {formatearGuarani(t.descuento)}
+              <p className="text-[0.72rem] text-tinta-media">
+                {formatearGuarani(t.subtotal)} − desc. {formatearGuarani(t.descuento)}
                 {t.porcentaje != null ? ` (${textoPorcentaje(t.porcentaje)}%)` : ""}
               </p>
             )}
           </div>
         </div>
 
+        {porCobrar && cuenta.impresaEn && (
+          <p className="text-[0.76rem] font-medium text-amarillo-oscuro">
+            Cuenta impresa a las <HoraDe iso={cuenta.impresaEn} />: el mozo ya no puede cargarle productos.
+          </p>
+        )}
         {cuenta.descuento && (
-          <p className="rounded-lg bg-papel-suave px-3 py-2 text-[0.8rem] text-tinta-media">
+          <p className="text-[0.76rem] text-tinta-media">
             <strong className="font-semibold text-tinta">Descuento</strong>: {cuenta.descuento.motivo}
             {cuenta.descuento.por ? ` — lo dio ${cuenta.descuento.por}` : ""}
           </p>
         )}
         {t.descuentoInvalido && (
-          <p className="rounded-lg bg-peligro-luz px-3 py-2 text-[0.8rem] font-medium text-peligro">
+          <p className="rounded-lg bg-peligro-luz px-2.5 py-1.5 text-[0.76rem] font-medium text-peligro">
             El descuento ya no corresponde a esta cuenta ({t.descuentoInvalido}) Cambialo o quitalo para poder imprimir y cobrar.
           </p>
         )}
 
         {/* ------------------------------------------------------------ lo que se puede hacer */}
         {contexto.puedeGestionar ? (
-          <div className="flex flex-col gap-2 border-t border-linea pt-3">
-            <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-col gap-1.5 border-t border-linea pt-2">
+            {/* Las funciones propias de esta pantalla van todas en el mismo celeste; solo cancelar es rojo. */}
+            <div className="flex flex-wrap items-center gap-1.5">
               {abierta && (
-                <button type="button" onClick={() => setCargando(true)} className={clasesBoton("nuevo", "md")}>
+                <button type="button" onClick={() => setCargando(true)} className={clasesBoton("navegar", "sm")}>
                   + Cargar productos
                 </button>
               )}
               {abierta && (
-                <button type="button" onClick={() => setDialogo({ tipo: "descuento" })} className={clasesBoton("navegar", "md")}>
+                <button type="button" onClick={() => setDialogo({ tipo: "descuento" })} className={clasesBoton("navegar", "sm")}>
                   {cuenta.descuento ? "Cambiar descuento" : "Descuento"}
                 </button>
               )}
               {porCobrar && (
-                <button type="button" disabled={pendiente} onClick={reabrir} className={clasesBoton("navegar", "md")}>
+                <button type="button" disabled={pendiente} onClick={reabrir} className={clasesBoton("navegar", "sm")}>
                   Reabrir cuenta
                 </button>
               )}
@@ -153,7 +154,7 @@ export function DetalleCuenta({
                 type="button"
                 disabled={pendiente || !contexto.imprimirCuenta.ok || cuenta.items.every((i) => i.anulado)}
                 onClick={imprimir}
-                className={clasesBoton("suave", "md")}
+                className={clasesBoton("navegar", "sm")}
               >
                 {porCobrar ? "Imprimir otra copia" : "Imprimir cuenta"}
               </button>
@@ -162,7 +163,7 @@ export function DetalleCuenta({
                   type="button"
                   disabled={pendiente || !contexto.cobro.ok || !!t.descuentoInvalido || t.total <= 0}
                   onClick={onCobrar}
-                  className={clasesBoton("principal", "md")}
+                  className={clasesBoton("navegar", "sm")}
                 >
                   Pagar cuenta
                 </button>
@@ -171,96 +172,100 @@ export function DetalleCuenta({
                 type="button"
                 disabled={pendiente}
                 onClick={() => setDialogo({ tipo: "cancelar" })}
-                className={clasesBoton("peligro", "md")}
+                className={clasesBoton("peligro", "sm")}
               >
                 Cancelar cuenta
               </button>
             </div>
             {!contexto.imprimirCuenta.ok && contexto.imprimirCuenta.motivo && (
-              <p className="text-[0.76rem] text-tinta-suave">No se puede imprimir desde acá: {contexto.imprimirCuenta.motivo}</p>
+              <p className="text-[0.72rem] text-tinta-suave">No se puede imprimir desde acá: {contexto.imprimirCuenta.motivo}</p>
             )}
             {contexto.puedeCobrar && !contexto.cobro.ok && contexto.cobro.motivo && (
-              <p className="text-[0.76rem] text-tinta-suave">No se puede cobrar desde acá: {contexto.cobro.motivo}</p>
+              <p className="text-[0.72rem] text-tinta-suave">No se puede cobrar desde acá: {contexto.cobro.motivo}</p>
             )}
             {porCobrar && (
-              <p className="text-[0.76rem] text-tinta-suave">
+              <p className="text-[0.72rem] text-tinta-suave">
                 Para cargar más productos, dar un descuento o cancelar un producto, primero reabrí la cuenta.
               </p>
             )}
           </div>
         ) : (
-          <p className="border-t border-linea pt-3 text-[0.8rem] text-tinta-suave">
+          <p className="border-t border-linea pt-2 text-[0.76rem] text-tinta-suave">
             Solo podés mirar esta cuenta: para operarla hace falta el permiso de la caja.
           </p>
         )}
 
-        {aviso && <p className="rounded-lg bg-exito-luz px-3 py-2 text-[0.82rem] font-medium text-exito">{aviso}</p>}
+        {aviso && <p className="rounded-lg bg-exito-luz px-2.5 py-1.5 text-[0.78rem] font-medium text-exito">{aviso}</p>}
         {error && <MensajeError>{error}</MensajeError>}
+
+        {/* ----------------------------------------------------------------------- los pedidos */}
+        <div className="flex flex-col gap-2 border-t border-linea pt-2">
+          {[...rondas.entries()].map(([ronda, items]) => (
+            <section key={ronda}>
+              <p className={ROTULO}>
+                Pedido {ronda} · <HoraDe iso={items[0].enviadoEn} /> ·{" "}
+                {items[0].cargadoPor ? `cargado en la caja por ${items[0].cargadoPor}` : items[0].mozo}
+              </p>
+              <ul className="mt-0.5 flex flex-col divide-y divide-linea-fina">
+                {items.map((i) => (
+                  <li key={i.id} className="flex items-start justify-between gap-2 py-1">
+                    <div className={`min-w-0 text-[0.86rem] leading-snug ${i.anulado ? "text-tinta-suave" : "text-tinta"}`}>
+                      <p className={i.anulado ? "line-through" : ""}>
+                        <span className="font-semibold">{i.cantidad} ×</span> {i.nombre}
+                      </p>
+                      {i.opciones && <p className="text-[0.76rem] text-tinta-media">+ {i.opciones}</p>}
+                      {i.quitados && <p className="text-[0.76rem] text-peligro">{i.quitados}</p>}
+                      {i.nota && <p className="text-[0.76rem] text-tinta-media">“{i.nota}”</p>}
+                      {i.anulado && (
+                        <p className="text-[0.72rem] font-medium text-peligro">
+                          Cancelado{i.anuladoPor ? ` por ${i.anuladoPor}` : ""}
+                          {i.motivoAnulacion ? `: ${i.motivoAnulacion}` : ""}
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex flex-none items-center gap-2">
+                      <span
+                        className={`cifra text-[0.86rem] font-medium ${i.anulado ? "text-tinta-suave line-through" : "text-tinta"}`}
+                      >
+                        {formatearGuarani(i.precioUnitario * i.cantidad)}
+                      </span>
+                      {abierta && !i.anulado && contexto.puedeGestionar && (
+                        <button
+                          type="button"
+                          disabled={pendiente}
+                          onClick={() => setDialogo({ tipo: "anular", item: i })}
+                          className="rounded-md border border-peligro/30 bg-peligro-luz px-2 py-0.5 text-[0.72rem] font-semibold text-peligro transition-colors hover:bg-peligro hover:text-white disabled:opacity-45"
+                        >
+                          Cancelar
+                        </button>
+                      )}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ))}
+        </div>
+
+        {cuenta.trabajos.length > 0 && (
+          <div className="border-t border-linea pt-2">
+            <p className={ROTULO}>Impresiones de esta cuenta</p>
+            <ul className="mt-0.5 flex flex-col gap-1">
+              {cuenta.trabajos.map((trabajo) => {
+                const estado = ESTADO_TRABAJO[trabajo.estado] ?? { texto: trabajo.estado, color: "azul" as const };
+                return (
+                  <li key={trabajo.id} className="flex flex-wrap items-center justify-between gap-2 text-[0.8rem] text-tinta">
+                    <span>
+                      {trabajo.titulo} · <HoraDe iso={trabajo.creadoEn} />
+                    </span>
+                    <Pastilla color={estado.color}>{estado.texto}</Pastilla>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        )}
       </Tarjeta>
-
-      {/* ----------------------------------------------------------------------- los pedidos */}
-      {[...rondas.entries()].map(([ronda, items]) => (
-        <section key={ronda} className="rounded-xl border-2 border-azul/50 bg-superficie p-3.5">
-          <p className={ROTULO}>
-            Pedido {ronda} · <HoraDe iso={items[0].enviadoEn} /> ·{" "}
-            {items[0].cargadoPor ? `cargado en la caja por ${items[0].cargadoPor}` : items[0].mozo}
-          </p>
-          <ul className="mt-2 flex flex-col divide-y divide-linea-fina">
-            {items.map((i) => (
-              <li key={i.id} className="flex items-start justify-between gap-3 py-2 first:pt-0 last:pb-0">
-                <div className={`min-w-0 text-[0.9rem] ${i.anulado ? "text-tinta-suave" : "text-tinta"}`}>
-                  <p className={i.anulado ? "line-through" : ""}>
-                    <span className="font-semibold">{i.cantidad} ×</span> {i.nombre}
-                  </p>
-                  {i.opciones && <p className="text-[0.8rem] text-tinta-media">+ {i.opciones}</p>}
-                  {i.quitados && <p className="text-[0.8rem] text-peligro">{i.quitados}</p>}
-                  {i.nota && <p className="text-[0.8rem] text-tinta-media">“{i.nota}”</p>}
-                  {i.anulado && (
-                    <p className="text-[0.76rem] font-medium text-peligro">
-                      Cancelado{i.anuladoPor ? ` por ${i.anuladoPor}` : ""}
-                      {i.motivoAnulacion ? `: ${i.motivoAnulacion}` : ""}
-                    </p>
-                  )}
-                </div>
-                <div className="flex flex-none flex-col items-end gap-1.5">
-                  <span className={`cifra text-[0.9rem] font-medium ${i.anulado ? "text-tinta-suave line-through" : "text-tinta"}`}>
-                    {formatearGuarani(i.precioUnitario * i.cantidad)}
-                  </span>
-                  {abierta && !i.anulado && contexto.puedeGestionar && (
-                    <button
-                      type="button"
-                      disabled={pendiente}
-                      onClick={() => setDialogo({ tipo: "anular", item: i })}
-                      className={clasesBoton("peligro", "sm")}
-                    >
-                      Cancelar
-                    </button>
-                  )}
-                </div>
-              </li>
-            ))}
-          </ul>
-        </section>
-      ))}
-
-      {cuenta.trabajos.length > 0 && (
-        <section className="rounded-xl border border-linea bg-superficie p-3.5">
-          <p className={ROTULO}>Impresiones de esta cuenta</p>
-          <ul className="mt-2 flex flex-col gap-1.5">
-            {cuenta.trabajos.map((trabajo) => {
-              const estado = ESTADO_TRABAJO[trabajo.estado] ?? { texto: trabajo.estado, color: "azul" as const };
-              return (
-                <li key={trabajo.id} className="flex flex-wrap items-center justify-between gap-2 text-[0.85rem] text-tinta">
-                  <span>
-                    {trabajo.titulo} · <HoraDe iso={trabajo.creadoEn} />
-                  </span>
-                  <Pastilla color={estado.color}>{estado.texto}</Pastilla>
-                </li>
-              );
-            })}
-          </ul>
-        </section>
-      )}
 
       {/* ------------------------------------------------------------------------ ventanas */}
       {dialogo?.tipo === "anular" && (
