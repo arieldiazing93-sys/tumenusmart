@@ -26,6 +26,8 @@ export type Permiso =
   | "pedidos.ver"
   | "pedidos.cambiarEstado"
   | "pedidos.asignarRepartidor"
+  // Cargar un pedido a mano (el cliente llamó por teléfono). Entra como cualquier otro y sigue el mismo camino.
+  | "pedidos.crear"
   | "reservas.ver"
   | "reservas.gestionar"
   | "repartidores.ver"
@@ -89,6 +91,8 @@ const PERMISOS_EMPLEADO: Permiso[] = [
   "pedidos.ver",
   "pedidos.cambiarEstado",
   "pedidos.asignarRepartidor",
+  // Quien atiende el teléfono es quien carga el pedido: es lo mismo que toma el mostrador, y queda en la bitácora.
+  "pedidos.crear",
   "reservas.ver",
   "reservas.gestionar",
   // Quien atiende el mostrador es quien anota y mueve los turnos, igual que

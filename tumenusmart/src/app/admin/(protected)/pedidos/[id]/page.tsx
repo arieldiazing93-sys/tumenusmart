@@ -1,4 +1,5 @@
 import { Volver } from "@/components/Volver";
+import { Pastilla } from "@/components/ui";
 import { notFound } from "next/navigation";
 import { pantallaConPermiso } from "@/lib/auth";
 import { prismaDelLocal } from "@/lib/prisma-local";
@@ -102,6 +103,11 @@ export default async function DetallePedidoPage({
       <div className="mb-4 rounded-lg border border-linea bg-white p-3.5">
         <p className="font-medium text-tinta">{pedido.clienteNombre}</p>
         <p className="text-sm text-tinta-media">{pedido.clienteTelefono}</p>
+        {pedido.origen === "telefono" && (
+          <div className="mt-2">
+            <Pastilla color="azul">Cargado por teléfono</Pastilla>
+          </div>
+        )}
       </div>
 
       <div className="mb-4">

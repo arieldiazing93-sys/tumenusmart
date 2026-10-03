@@ -1,7 +1,8 @@
-import { Cabecera } from "@/components/ui";
+import { BotonEnlace, Cabecera } from "@/components/ui";
 import Link from "next/link";
 import { headers } from "next/headers";
 import { pantallaConPermiso } from "@/lib/auth";
+import { puede } from "@/lib/permisos";
 import { prismaDelLocal } from "@/lib/prisma-local";
 import { formatearGuarani, formatearNumero } from "@/lib/format";
 import { ESTADOS_PEDIDO, etiquetaEstado, colorEstado } from "@/lib/estados-pedido";
@@ -60,7 +61,7 @@ export default async function AdminPedidosPage({
   // aviso sonoro de pedidos nuevos hace router.refresh() cada 15s, y ese
   // refresh es justo lo que disparaba el error cuando la sesión ya había
   // vencido con la pestaña abierta.
-  await pantallaConPermiso("pedidos.ver");
+  const sesion = await pantallaConPermiso("pedidos.ver");
 
   // Todas las consultas de acá abajo quedan atadas a este local. El id se
   // guarda aparte porque además hace falta para consultar el propio local
@@ -222,10 +223,17 @@ export default async function AdminPedidosPage({
         bajada={
           tipoActivo === "mesa"
             ? "Pedidos para comer en el local. No se mezclan con delivery ni retiro."
-            : "Lo que entró por la carta. Los nuevos aparecen arriba y avisan solos."
+            : "Lo que entró por la carta y por teléfono. Los nuevos de la carta aparecen arriba y avisan solos."
         }
         acciones={
           <>
+            {/* El cliente que llama por teléfono se carga acá y sigue el mismo circuito que los de la carta. */}
+            {puede(sesion.rol, "pedidos.crear") && (
+              <BotonEnlace href="/admin/pedidos/nuevo" tono="principal" tam="md">
+                + Nuevo pedido
+              </BotonEnlace>
+            )}
+
             {/*
               Busca por número de pedido o teléfono, siempre dentro del
               rango de fecha/estado/tipo que ya esté seleccionado — no es
@@ -545,6 +553,14 @@ export default async function AdminPedidosPage({
                         {pedido.comprobanteTipo === "factura" && pedido.facturaNumero && (
                           <span className="mt-0.5 block text-[10px] font-medium uppercase text-tinta-suave">
                             {pedido.facturaNumero}
+                          </span>
+                        )}
+                        {pedido.origen === "telefono" && (
+                          <span
+                            title="Lo cargó una persona del local porque el cliente llamó por teléfono"
+                            className="mt-0.5 block text-[10px] font-medium uppercase text-azul-oscuro"
+                          >
+                            Teléfono
                           </span>
                         )}
                       </Link>

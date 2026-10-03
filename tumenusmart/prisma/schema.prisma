@@ -773,6 +773,10 @@ model Order {
   clienteTelefono      String
   estado               String        @default("pendiente") // pendiente | confirmado | en_preparacion | en_despacho | entregado | cancelado
   tipoEntrega          String // "delivery" | "retiro" | "mesa"
+  /// Por dónde entró el pedido: "menu" (el cliente lo armó en la carta digital) o "telefono" (lo cargó una persona
+  /// del local en Pedidos → Nuevo pedido, porque el cliente llamó). Solo cambia cómo nace —ya confirmado y sin pasar
+  /// por el botón de WhatsApp—; después sigue exactamente el mismo camino que los demás.
+  origen               String        @default("menu")
   deliveryZoneId       String?
   deliveryZone         DeliveryZone? @relation(fields: [deliveryZoneId], references: [id])
   repartidorId         String? // solo aplica a pedidos "delivery" en camino
