@@ -1,8 +1,6 @@
 "use server";
 
-import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { prismaDelLocal } from "@/lib/prisma-local";
 import { MAXIMO_INTENTOS_PIN, MINUTOS_BLOQUEO_PIN, pinValido } from "@/lib/asistencia";
 import {
   abrirSesionMozo,
@@ -14,22 +12,11 @@ import {
   type LocalMozos,
   type MozoEnSesion,
 } from "@/lib/sesion-mozo";
-import { armarPedido, type LineaPedida } from "@/lib/precio-pedido";
-import { cargarCatalogoParaPedido } from "@/lib/catalogo-pedido";
-import { registrarConsumoVenta } from "@/lib/movimientos-stock";
+import type { LineaPedida } from "@/lib/precio-pedido";
 import { registrarBitacora } from "@/lib/bitacora";
 import { formatearGuarani } from "@/lib/format";
-import { ZONA_NEGOCIO } from "@/lib/timezone";
-import {
-  SEGUNDOS_LATIDO_IMPRESION,
-  agruparPorArea,
-  claveDeMesa,
-  contenidoParaGuardar,
-  normalizarMesa,
-  normalizarNota,
-  textoComanda,
-  totalDeLineas,
-} from "@/lib/comedor";
+import { ESTADOS_CUENTA_ABIERTA, SEGUNDOS_LATIDO_IMPRESION, normalizarMesa, totalDeLineas } from "@/lib/comedor";
+import { guardarRonda } from "@/lib/comedor-servidor";
 
 /**
  * Las acciones del enlace público del mozo (/mozo/[token]), sin usuario del panel.
@@ -138,6 +125,8 @@ export type CuentaAbierta = {
   abiertaEn: string;
   productos: number;
   rondas: number;
+  /** "abierta", o "por_cobrar" si la caja ya imprimió la cuenta: el mozo no puede cargarle más hasta que la reabran. */
+  estado: string;
   total: number;
 };
 
@@ -162,13 +151,14 @@ export async function estadoDelSalon(token: string): Promise<EstadoDelSalon> {
 
   const [cuentas, imprimiendo] = await Promise.all([
     prisma.cuentaMesa.findMany({
-      where: { storeId: ctx.local.id, estado: "abierta" },
+      where: { storeId: ctx.local.id, estado: { in: [...ESTADOS_CUENTA_ABIERTA] } },
       orderBy: { abiertaEn: "asc" },
       select: {
         id: true,
         numero: true,
         mesa: true,
         abiertaEn: true,
+        estado: true,
         mozo: { select: { nombre: true, apellido: true } },
         items: { where: { estado: "activo" }, select: { cantidad: true, precioUnitario: true, ronda: true } },
       },
@@ -184,6 +174,7 @@ export async function estadoDelSalon(token: string): Promise<EstadoDelSalon> {
       numero: c.numero,
       mesa: c.mesa,
       mozo: nombreDeMozo(c.mozo),
+      estado: c.estado,
       abiertaEn: c.abiertaEn.toISOString(),
       productos: c.items.reduce((s, i) => s + i.cantidad, 0),
       rondas: new Set(c.items.map((i) => i.ronda)).size,
@@ -205,7 +196,7 @@ export type ItemDeCuenta = {
 export type RondaDeCuenta = { ronda: number; enviadoEn: string; mozo: string; items: ItemDeCuenta[] };
 
 export type DetalleDeCuenta =
-  | { ok: true; id: string; numero: number; mesa: string; mozo: string; total: number; rondas: RondaDeCuenta[] }
+  | { ok: true; id: string; numero: number; mesa: string; mozo: string; estado: string; total: number; rondas: RondaDeCuenta[] }
   | FalloContexto;
 
 /** Lo que lleva una cuenta abierta, por rondas (solo para mirar: el mozo no anula ni cobra desde acá). */
@@ -214,10 +205,11 @@ export async function detalleDeCuenta(token: string, cuentaId: string): Promise<
   if (!ctx.ok) return ctx;
 
   const cuenta = await prisma.cuentaMesa.findFirst({
-    where: { id: String(cuentaId), storeId: ctx.local.id, estado: "abierta" },
+    where: { id: String(cuentaId), storeId: ctx.local.id, estado: { in: [...ESTADOS_CUENTA_ABIERTA] } },
     select: {
       id: true,
       numero: true,
+      estado: true,
       mesa: true,
       mozo: { select: { nombre: true, apellido: true } },
       items: {
@@ -264,6 +256,7 @@ export async function detalleDeCuenta(token: string, cuentaId: string): Promise<
     numero: cuenta.numero,
     mesa: cuenta.mesa,
     mozo: nombreDeMozo(cuenta.mozo),
+    estado: cuenta.estado,
     total: totalDeLineas(activos.map((i) => ({ precioUnitario: Number(i.precioUnitario), cantidad: i.cantidad }))),
     rondas: [...rondas.values()],
   };
@@ -302,55 +295,11 @@ export type ResultadoEnvio =
     }
   | FalloContexto;
 
-const FORMATO_ENVIO = /^[A-Za-z0-9_-]{8,64}$/;
-
-function codigoPrisma(e: unknown): { codigo: string; meta: string } | null {
-  if (e instanceof Prisma.PrismaClientKnownRequestError) {
-    return { codigo: e.code, meta: JSON.stringify(e.meta ?? {}) };
-  }
-  return null;
-}
-
-/**
- * Una pista corta de por qué falló algo inesperado (el código de Prisma y la última línea del mensaje, que es la que dice
- * el motivo), para mostrarla en el celular del mozo y dejarla en el log del servidor. Nunca lleva datos de la base: solo
- * el nombre del error.
- */
-function pistaDelError(e: unknown): string {
-  const codigo = e instanceof Prisma.PrismaClientKnownRequestError ? `${e.code}: ` : "";
-  const mensaje = e instanceof Error ? e.message : String(e);
-  const ultima = mensaje.split("\n").map((x) => x.trim()).filter(Boolean).pop() ?? "";
-  return `${codigo}${e instanceof Error ? e.name : "Error"} — ${ultima}`.slice(0, 220);
-}
-
-/** Lo que ya se envió con este `envioId` (si se reintenta), para devolverlo sin duplicar nada. */
-async function envioYaHecho(storeId: string, envioId: string): Promise<Extract<ResultadoEnvio, { ok: true }> | null> {
-  const items = await prisma.itemCuentaMesa.findMany({
-    where: { storeId, envioId },
-    select: {
-      ronda: true,
-      cantidad: true,
-      precioUnitario: true,
-      cuenta: { select: { numero: true, mesa: true } },
-    },
-  });
-  if (items.length === 0) return null;
-  return {
-    ok: true,
-    cuentaNumero: items[0].cuenta.numero,
-    mesa: items[0].cuenta.mesa,
-    ronda: items[0].ronda,
-    totalEnvio: totalDeLineas(items.map((i) => ({ precioUnitario: Number(i.precioUnitario), cantidad: i.cantidad }))),
-    areas: [],
-    imprimiendo: await hayEstacionImprimiendo(storeId),
-    yaEnviado: true,
-  };
-}
-
 /**
  * El mozo envía lo que cargó en una mesa. En una sola transacción: abre la cuenta de esa mesa si no estaba abierta (o la
  * continúa), guarda los productos como una ronda nueva con su precio recalculado, descuenta el stock de las recetas y deja
- * en la cola de impresión una comanda por cada área (Cocina, Barra…) — las imprime la estación de caja.
+ * en la cola de impresión una comanda por cada área (Cocina, Barra…) — las imprime la estación de caja. Lo comparte con la
+ * caja (que también puede cargar productos desde el panel): ver `guardarRonda` en src/lib/comedor-servidor.ts.
  */
 export async function enviarPedido(token: string, datos: DatosEnvio): Promise<ResultadoEnvio> {
   const ctx = await contextoDelMozo(token);
@@ -358,213 +307,49 @@ export async function enviarPedido(token: string, datos: DatosEnvio): Promise<Re
   const { local, mozo } = ctx;
   const storeId = local.id;
 
-  const envioId = String(datos?.envioId ?? "");
-  if (!FORMATO_ENVIO.test(envioId)) return { ok: false, error: "No se pudo identificar el envío. Probá de nuevo." };
-
-  // Un reintento (se tocó dos veces, se cortó el internet): se devuelve lo que ya se hizo.
-  const previo = await envioYaHecho(storeId, envioId);
-  if (previo) return previo;
-
-  const mesa = normalizarMesa(datos.mesa);
+  const mesa = normalizarMesa(datos?.mesa);
   if (!mesa) return { ok: false, error: "Escribí el número o nombre de la mesa (hasta 20 letras)." };
-  const clave = claveDeMesa(mesa);
   const comensales =
     Number.isInteger(datos.comensales) && datos.comensales! >= 1 && datos.comensales! <= 99 ? datos.comensales! : null;
 
-  if (!Array.isArray(datos.items) || datos.items.length === 0) {
-    return { ok: false, error: "No cargaste ningún producto." };
-  }
-  if (datos.items.some((i) => !i || typeof i !== "object")) {
-    return { ok: false, error: "Hay un producto mal cargado. Volvé a armarlo." };
-  }
-
-  // ---------------------------------------------------------------- el precio
-  const db = prismaDelLocal(storeId);
-  const pedidas: LineaPedida[] = datos.items.map((i) => ({
-    productId: i.productId,
-    mitadYMitad: i.mitadYMitad,
-    opcionIds: i.opcionIds,
-    ingredientesQuitados: i.ingredientesQuitados,
-    cantidad: i.cantidad,
-  }));
-  const catalogo = await cargarCatalogoParaPedido(db, storeId, pedidas);
-  const armado = armarPedido(catalogo, pedidas);
-  if (!armado.ok) return { ok: false, error: armado.motivo };
-  if (armado.subtotal <= 0) return { ok: false, error: "El total tiene que ser mayor a cero." };
-
-  // ------------------------------------------------------- a qué área sale cada producto
-  // Un combo mitad y mitad no es un único producto: sale en el área de cada una de sus mitades.
-  const idsDeProductos = new Set<string>();
-  for (const p of pedidas) {
-    if (p.productId) idsDeProductos.add(p.productId);
-    if (p.mitadYMitad) {
-      idsDeProductos.add(p.mitadYMitad.productIdA);
-      idsDeProductos.add(p.mitadYMitad.productIdB);
-    }
-  }
-  const productos = await db.product.findMany({
-    where: { id: { in: [...idsDeProductos] } },
-    select: { id: true, areaImpresionId: true },
-  });
-  const areaDeProducto = new Map(productos.map((p) => [p.id, p.areaImpresionId]));
-  const areasDeLinea: string[][] = pedidas.map((p) => {
-    const ids = p.mitadYMitad ? [p.mitadYMitad.productIdA, p.mitadYMitad.productIdB] : p.productId ? [p.productId] : [];
-    return [...new Set(ids.map((id) => areaDeProducto.get(id)).filter((a): a is string => !!a))];
-  });
-
-  const idsDeAreas = [...new Set(areasDeLinea.flat())];
-  const areas = idsDeAreas.length
-    ? await db.areaImpresion.findMany({ where: { id: { in: idsDeAreas } }, select: { id: true, nombre: true } })
-    : [];
-  const nombreDeArea = new Map(areas.map((a) => [a.id, a.nombre]));
-
-  const notas = datos.items.map((i) => normalizarNota(i.nota));
   const quien = nombreDeMozo(mozo);
-  const hora = new Date().toLocaleString("es-PY", {
-    day: "2-digit",
-    month: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-    timeZone: ZONA_NEGOCIO,
-  });
-
-  // ------------------------------------------------------------ guardar todo junto
-  // Es una función flecha y no una declaración (`async function guardar`) a propósito: TypeScript solo conserva dentro de
-  // una función flecha lo que ya se comprobó más arriba (que la mesa no es null y que el armado salió bien).
-  const guardar = async () =>
-    prisma.$transaction(async (tx) => {
-      let abierta = await tx.cuentaMesa.findFirst({ where: { storeId, mesaAbierta: clave } });
-      if (!abierta) {
-        const { contadorCuentasMesa } = await tx.store.update({
-          where: { id: storeId },
-          data: { contadorCuentasMesa: { increment: 1 } },
-          select: { contadorCuentasMesa: true },
-        });
-        abierta = await tx.cuentaMesa.create({
-          data: { storeId, numero: contadorCuentasMesa, mesa, mesaAbierta: clave, mozoId: mozo.id, comensales },
-        });
-      }
-      // Una constante (no la variable de arriba) para que las funciones de más abajo sepan que la cuenta existe.
-      const cuenta = abierta;
-
-      const { _max } = await tx.itemCuentaMesa.aggregate({ where: { cuentaId: cuenta.id }, _max: { ronda: true } });
-      const ronda = (_max.ronda ?? 0) + 1;
-
-      await tx.itemCuentaMesa.createMany({
-        data: armado.lineas.map((l, i) => ({
-          storeId,
-          cuentaId: cuenta.id,
-          ronda,
-          envioId,
-          linea: i,
-          mozoId: mozo.id,
-          productId: l.productId ?? null,
-          nombreProducto: l.nombreProducto,
-          cantidad: l.cantidad,
-          precioUnitario: l.precioUnitario,
-          iva: l.iva,
-          opcionesTexto: l.opcionesTexto ?? null,
-          ingredientesQuitadosTexto: l.ingredientesQuitadosTexto ?? null,
-          nota: notas[i],
-          costoProducto: l.costoProducto,
-          costoAgregados: l.costoAgregados,
-          precioAgregados: l.precioAgregados,
-          areaImpresionId: areasDeLinea[i][0] ?? null,
-          // Lo que descontó de cada insumo (por la cantidad), para poder devolverlo si el producto se anula.
-          consumo: l.consumo.map((c) => ({
-            insumoId: c.insumoId,
-            almacenId: c.almacenId,
-            cantidad: c.cantidad * l.cantidad,
-          })),
-        })),
-      });
-
-      await registrarConsumoVenta(tx, storeId, armado.lineas, { cuentaMesaId: cuenta.id }, quien);
-
-      // Una comanda por área, con solo lo que sale en esa área.
-      const lineasConArea = armado.lineas.flatMap((l, i) =>
-        areasDeLinea[i].map((areaId) => ({
-          areaImpresionId: areaId as string | null,
-          cantidad: l.cantidad,
-          nombre: l.nombreProducto,
-          opciones: l.opcionesTexto ?? null,
-          quitados: l.ingredientesQuitadosTexto ?? null,
-          nota: notas[i],
-        }))
-      );
-      const porArea = agruparPorArea(lineasConArea);
-      const trabajos = [...porArea.entries()].map(([areaId, lineas]) => {
-        const area = nombreDeArea.get(areaId) ?? "Comanda";
-        return {
-          storeId,
-          tipo: "comanda",
-          titulo: `Mesa ${mesa} · ${area} · pedido ${ronda}`,
-          areaImpresionId: areaId,
-          // La base no acepta el byte 0x00 que llevan los comandos de la impresora: se guarda con una marca.
-          contenido: contenidoParaGuardar(textoComanda({ mesa, mozo: quien, ronda, area, hora, lineas })),
-          cuentaMesaId: cuenta.id,
-        };
-      });
-      if (trabajos.length > 0) await tx.trabajoImpresion.createMany({ data: trabajos });
-
-      return { cuenta, ronda, areasImpresas: trabajos.map((t) => t.titulo.split(" · ")[1]) };
-    },
-    // Más tiempo que los 5 s de fábrica: desde Vercel hasta la base cada consulta tarda, y una receta con varios insumos
-    // hace varias seguidas dentro de la misma transacción.
-    { timeout: 15_000, maxWait: 10_000 });
-
-  let resultado: Awaited<ReturnType<typeof guardar>> | null = null;
-  try {
-    resultado = await guardar();
-  } catch (e) {
-    const p = codigoPrisma(e);
-    // Dos celulares abrieron la misma mesa a la vez: el segundo vuelve a intentar y se suma a la cuenta ya abierta.
-    if (p?.codigo === "P2002" && p.meta.includes("mesaAbierta")) {
-      try {
-        resultado = await guardar();
-      } catch {
-        return { ok: false, error: "No se pudo abrir la mesa. Probá de nuevo." };
-      }
-    } else if (p?.codigo === "P2002" && p.meta.includes("envioId")) {
-      // El mismo envío llegó dos veces al mismo tiempo: ya quedó guardado por el primero.
-      const hecho = await envioYaHecho(storeId, envioId);
-      if (hecho) return hecho;
-      return { ok: false, error: "No se pudo enviar. Probá de nuevo." };
-    } else {
-      // Antes este error se tragaba sin dejar rastro y no había forma de saber qué había pasado.
-      console.error("[mozo] enviarPedido falló", e);
-      return {
-        ok: false,
-        error: `No se pudo enviar el pedido. Tocá Enviar de nuevo: no se duplica. Si sigue igual, avisale al encargado. (Detalle: ${pistaDelError(e)})`,
-      };
-    }
-  }
-  if (!resultado) return { ok: false, error: "No se pudo enviar el pedido. Probá de nuevo." };
-
-  const totalEnvio = totalDeLineas(armado.lineas);
-  // Se llama DESPUÉS de guardar: un fallo de la bitácora nunca frena un pedido.
-  await registrarBitacora(
+  const r = await guardarRonda({
     storeId,
-    { nombre: quien, email: "mozo (enlace público)", rol: "mozo" },
-    {
-      modulo: "comedor",
-      accion: "pedido_enviado",
-      descripcion: `${quien} envió el pedido ${resultado.ronda} de la mesa ${mesa} (${formatearGuarani(totalEnvio)}).`,
-      entidad: "CuentaMesa",
-      entidadId: resultado.cuenta.id,
-      detalle: { cuenta: resultado.cuenta.numero, mesa, ronda: resultado.ronda, productos: armado.lineas.length, total: totalEnvio },
-    }
-  );
+    mesa,
+    comensales,
+    envioId: String(datos.envioId ?? ""),
+    items: Array.isArray(datos.items) ? datos.items : [],
+    mozoId: mozo.id,
+    quien,
+    cargadoPor: null,
+    detalleTecnico: false,
+  });
+  if (!r.ok) return r;
+
+  // Se llama DESPUÉS de guardar: un fallo de la bitácora nunca frena un pedido.
+  if (!r.yaEnviado) {
+    await registrarBitacora(
+      storeId,
+      { nombre: quien, email: "mozo (enlace público)", rol: "mozo" },
+      {
+        modulo: "comedor",
+        accion: "pedido_enviado",
+        descripcion: `${quien} envió el pedido ${r.ronda} de la mesa ${r.mesa} (${formatearGuarani(r.totalEnvio)}).`,
+        entidad: "CuentaMesa",
+        entidadId: r.cuentaId,
+        detalle: { cuenta: r.cuentaNumero, mesa: r.mesa, ronda: r.ronda, total: r.totalEnvio },
+      }
+    );
+  }
 
   return {
     ok: true,
-    cuentaNumero: resultado.cuenta.numero,
-    mesa,
-    ronda: resultado.ronda,
-    totalEnvio,
-    areas: [...new Set(resultado.areasImpresas)],
+    cuentaNumero: r.cuentaNumero,
+    mesa: r.mesa,
+    ronda: r.ronda,
+    totalEnvio: r.totalEnvio,
+    areas: r.areas,
     imprimiendo: await hayEstacionImprimiendo(storeId),
-    yaEnviado: false,
+    yaEnviado: r.yaEnviado,
   };
 }

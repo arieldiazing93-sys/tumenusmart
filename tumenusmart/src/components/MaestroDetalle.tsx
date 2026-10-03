@@ -28,6 +28,7 @@ export function MaestroDetalle<T extends { id: string; activo: boolean }>({
   textoPlaceholder,
   renderPanel,
   renderNuevo,
+  cerrarSiDesaparece = false,
 }: {
   items: T[];
   columnas: ColumnaMaestro<T>[];
@@ -39,6 +40,12 @@ export function MaestroDetalle<T extends { id: string; activo: boolean }>({
   textoPlaceholder: string;
   renderPanel: (item: T, alGuardar: () => void) => ReactNode;
   renderNuevo?: (alCrear: (id: string) => void) => ReactNode;
+  /**
+   * Para las listas cuyas filas se van solas (una mesa que se cobra): si lo que estaba abierto ya no está en la lista, el
+   * panel de la derecha vuelve a "Nada abierto" en vez de quedarse en "Abriendo…". Sin esto, una fila que todavía no
+   * aparece (recién creada, antes de refrescar) se muestra como "Abriendo…".
+   */
+  cerrarSiDesaparece?: boolean;
 }) {
   const router = useRouter();
   const [abiertoId, setAbiertoId] = useState<string | null>(null);
@@ -46,6 +53,10 @@ export function MaestroDetalle<T extends { id: string; activo: boolean }>({
   const panelRef = useRef<HTMLDivElement>(null);
 
   const abierto = abiertoId ? (items.find((i) => i.id === abiertoId) ?? null) : null;
+
+  useEffect(() => {
+    if (cerrarSiDesaparece && abiertoId && !abierto) setAbiertoId(null);
+  }, [cerrarSiDesaparece, abiertoId, abierto]);
 
   // En pantalla angosta el panel queda debajo de la lista: se lo trae a la
   // vista, si no el doble clic parecería no hacer nada.

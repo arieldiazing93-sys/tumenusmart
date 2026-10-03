@@ -6,8 +6,9 @@
  * armado del texto de la comanda.
  */
 
-import { armarDocumento, centrado, negrita, separador } from "./escpos";
-import { sinAcentos } from "./format";
+import { armarDocumento, centrado, filaTabla, negrita, separador } from "./escpos";
+import { formatearGuarani, formatearMiles, formatearNumero, sinAcentos } from "./format";
+import { calcularDescuento, textoPorcentaje, type DescuentoPedido } from "./descuento-venta";
 
 /** Hasta cuántas letras puede tener el número o nombre de una mesa ("5", "Terraza 2"). */
 export const MESA_LARGO_MAXIMO = 20;
@@ -152,3 +153,128 @@ export function agruparPorArea<T extends { areaImpresionId: string | null }>(lin
 
 /** Los insumos que descontó un producto al enviarse, tal como se guardan para poder devolverlos al anularlo. */
 export type ConsumoGuardado = { insumoId: string; almacenId: string | null; cantidad: number };
+
+// ---------------------------------------------------------------------------------------------------------------------
+//  La cuenta que opera la caja (Fase 2)
+// ---------------------------------------------------------------------------------------------------------------------
+
+/** Los estados en que una mesa sigue ocupada: la cuenta todavía no se pagó ni se canceló. */
+export const ESTADOS_CUENTA_ABIERTA = ["abierta", "por_cobrar"] as const;
+
+/** Lo que dice el estado de una cuenta, en palabras del salón. */
+export function textoEstadoCuenta(estado: string): string {
+  if (estado === "abierta") return "Abierta";
+  if (estado === "por_cobrar") return "Cuenta impresa";
+  if (estado === "pagada") return "Pagada";
+  return "Cancelada";
+}
+
+/** El descuento guardado en la cuenta, como lo entiende `calcularDescuento`; null si no tiene ninguno. */
+export function descuentoDeCuenta(cuenta: { descuentoTipo: string | null; descuentoValor: unknown }): DescuentoPedido | null {
+  if (cuenta.descuentoTipo !== "porcentaje" && cuenta.descuentoTipo !== "monto") return null;
+  const valor = Number(cuenta.descuentoValor);
+  if (!Number.isFinite(valor) || valor <= 0) return null;
+  return { tipo: cuenta.descuentoTipo, valor };
+}
+
+export type TotalesDeCuenta = {
+  subtotal: number;
+  /** Guaraníes que se restan (0 si no hay descuento). */
+  descuento: number;
+  porcentaje: number | null;
+  /** Lo que se cobra. */
+  total: number;
+  /** Si el descuento ya no corresponde (se cancelaron productos y quedó igual o mayor a la cuenta): el motivo. */
+  descuentoInvalido: string | null;
+};
+
+/**
+ * Lo que vale una cuenta con su descuento. Se calcula siempre sobre los productos que siguen activos, así que si se
+ * cancela algo el descuento por porcentaje se ajusta solo. Un descuento en monto fijo que ya no cabe en la cuenta no se
+ * aplica y se avisa (`descuentoInvalido`): no se puede cobrar así hasta que la caja lo corrija.
+ */
+export function totalesDeCuenta(
+  lineas: { precioUnitario: number; cantidad: number }[],
+  pedido: DescuentoPedido | null
+): TotalesDeCuenta {
+  const subtotal = totalDeLineas(lineas);
+  const calculado = calcularDescuento(subtotal, pedido);
+  if (!calculado.ok) {
+    return { subtotal, descuento: 0, porcentaje: null, total: subtotal, descuentoInvalido: calculado.error };
+  }
+  return {
+    subtotal,
+    descuento: calculado.monto,
+    porcentaje: calculado.porcentaje,
+    total: subtotal - calculado.monto,
+    descuentoInvalido: null,
+  };
+}
+
+/**
+ * La cuenta de la mesa para entregar al cliente (no es una factura), en texto crudo ESC/POS. Sale en la impresora del
+ * ticket de la estación de caja. Mismos helpers y mismo ancho que el resto de los comprobantes.
+ */
+export function textoCuenta(datos: {
+  local: string;
+  mesa: string;
+  numero: number;
+  mozo: string;
+  /** La hora ya formateada ("03/10 12:45"). */
+  hora: string;
+  lineas: (LineaComanda & { precioUnitario: number })[];
+  totales: TotalesDeCuenta;
+}): string {
+  const s = (texto: string) => sinControles(sinAcentos(texto));
+  const l: string[] = [separador()];
+  l.push(negrita(centrado(s(datos.local).toUpperCase())));
+  l.push(centrado("CUENTA - NO ES FACTURA"));
+  l.push(separador());
+  l.push(s(`Mesa ${datos.mesa}   Cuenta ${formatearNumero(datos.numero)}`));
+  l.push(s(`Mozo: ${datos.mozo}`));
+  l.push(datos.hora);
+  l.push(separador());
+  l.push(filaTabla("Ctd", "Descripcion", "Importe"));
+  for (const x of datos.lineas) {
+    l.push(filaTabla(String(x.cantidad), s(x.nombre), formatearMiles(x.precioUnitario * x.cantidad)));
+    if (x.opciones) l.push(s(`  + ${x.opciones}`));
+  }
+  l.push(separador());
+  const t = datos.totales;
+  if (t.descuento > 0) {
+    l.push(`SUBTOTAL: ${formatearGuarani(t.subtotal)}`);
+    l.push(`DESCUENTO${t.porcentaje != null ? ` ${textoPorcentaje(t.porcentaje)}%` : ""}: -${formatearGuarani(t.descuento)}`);
+  }
+  l.push(negrita(`TOTAL: ${formatearGuarani(t.total)}`));
+  l.push(separador());
+  l.push(centrado("Gracias por su visita"));
+  return armarDocumento(l);
+}
+
+/** El aviso para la cocina o la barra de que un producto que ya se había pedido se cancela: que no lo preparen. */
+export function textoAnulacion(datos: {
+  mesa: string;
+  area: string;
+  /** La hora ya formateada ("03/10 12:45"). */
+  hora: string;
+  quien: string;
+  cantidad: number;
+  nombre: string;
+  opciones?: string | null;
+  motivo: string;
+}): string {
+  const s = (texto: string) => sinControles(sinAcentos(texto));
+  const l: string[] = [separador()];
+  l.push(negrita(centrado("*** ANULADO ***")));
+  l.push(negrita(centrado(s(`MESA ${datos.mesa}`).toUpperCase())));
+  l.push(centrado(s(datos.area).toUpperCase()));
+  l.push(separador());
+  l.push(datos.hora);
+  l.push(s(`Anulo: ${datos.quien}`));
+  l.push(separador());
+  l.push(s(`${datos.cantidad} x ${datos.nombre}`).toUpperCase());
+  if (datos.opciones) l.push(s(`  + ${datos.opciones}`));
+  l.push(s(`Motivo: ${datos.motivo}`));
+  l.push(separador());
+  return armarDocumento(l);
+}

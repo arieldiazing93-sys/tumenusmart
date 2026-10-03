@@ -2575,12 +2575,27 @@ model CuentaMesa {
   /// El mozo a cargo de la cuenta. Cada producto guarda además quién lo envió.
   mozoId      String
   mozo        Mozo      @relation(fields: [mozoId], references: [id])
-  /// "abierta" | "pagada" | "anulada"
+  /// "abierta" | "por_cobrar" (la caja imprimió la cuenta: el mozo ya no puede cargar hasta que la reabran) | "pagada" | "anulada"
   estado      String    @default("abierta")
   comensales  Int?
   nota        String?
   abiertaEn   DateTime  @default(now())
   cerradaEn   DateTime?
+
+  /// Descuento general de la cuenta, que pone la caja: "porcentaje" o "monto", su valor y el motivo. El monto en
+  /// guaraníes se calcula siempre sobre lo que vale la cuenta en ese momento (ver calcularDescuento).
+  descuentoTipo   String?
+  descuentoValor  Decimal? @db.Decimal(10, 2)
+  descuentoMotivo String?
+  descuentoPor    String?
+  /// Cuándo y quién imprimió la cuenta por última vez (pasa a "por_cobrar").
+  impresaEn       DateTime?
+  impresaPor      String?
+  /// Quién y por qué cerró la cuenta (al pagarla o al cancelarla).
+  cerradaPor      String?
+  motivoCierre    String?
+  /// La venta del Punto de Venta que se generó al pagarla (para el cierre de turno y los reportes).
+  ventaPosId      String?
 
   items            ItemCuentaMesa[]
   trabajos         TrabajoImpresion[]
@@ -2589,6 +2604,7 @@ model CuentaMesa {
   @@unique([storeId, numero])
   @@unique([storeId, mesaAbierta])
   @@index([storeId, estado])
+  @@index([ventaPosId])
 }
 
 /// Un producto cargado en una cuenta de mesa. Guarda lo que valía y cómo se pidió en el momento de enviarse, igual
@@ -2605,9 +2621,11 @@ model ItemCuentaMesa {
   /// dos veces o se corta el internet y se reintenta, el servidor reconoce el mismo envío y no lo duplica.
   envioId  String
   linea    Int
-  /// Quién lo envió.
+  /// Quién lo envió. Si lo cargó la caja desde el panel, es el mozo a cargo de la cuenta y `cargadoPor` dice quién fue.
   mozoId   String
   mozo     Mozo       @relation(fields: [mozoId], references: [id])
+  /// El usuario de la caja que lo cargó desde el panel; null cuando lo envió el mozo.
+  cargadoPor String?
 
   /// Nulo cuando es un combo "mitad y mitad" (no es un único producto).
   productId      String?

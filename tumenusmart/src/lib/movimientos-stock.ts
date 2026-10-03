@@ -159,3 +159,41 @@ export async function revertirMovimientosVenta(
   }
   await db.movimientoStock.createMany({ data: filas });
 }
+
+/**
+ * Devuelve al stock lo que se descontó por UN producto de una cuenta de mesa que se cancela (o por todos, si se cancela la
+ * cuenta entera). `consumo` es lo que quedó guardado en el producto al enviarse (ya multiplicado por su cantidad). Cada
+ * insumo vuelve al mismo almacén de donde salió y queda un movimiento "cancelacion" con `motivo` (qué se canceló y por qué).
+ * Un consumo sin almacén vuelve al principal, igual que al descontarlo.
+ */
+export async function devolverConsumo(
+  db: Db,
+  storeId: string,
+  consumo: { insumoId: string; almacenId: string | null; cantidad: number }[],
+  ref: RefVenta,
+  motivo: string,
+  registradoPor?: string | null
+): Promise<void> {
+  const hayConsumoSinAlmacen = consumo.some((c) => !c.almacenId);
+  const almacenPorDefecto = hayConsumoSinAlmacen ? await almacenPrincipalId(db, storeId) : null;
+
+  const validos = consumo
+    .map((c) => ({ insumoId: c.insumoId, almacenId: c.almacenId ?? almacenPorDefecto, cantidad: redondear3(aNumero(c.cantidad)) }))
+    .filter((c) => c.cantidad !== 0);
+  if (validos.length === 0) return;
+
+  for (const [insumoId, cantidad] of totalPorInsumo(validos)) {
+    await db.insumo.update({ where: { id: insumoId }, data: { stockActual: { increment: redondear3(cantidad) } } });
+  }
+  const filas: Prisma.MovimientoStockCreateManyInput[] = validos.map((c) => ({
+    storeId,
+    insumoId: c.insumoId,
+    almacenId: c.almacenId,
+    tipo: "cancelacion",
+    cantidad: c.cantidad,
+    motivo,
+    registradoPor: registradoPor ?? null,
+    ...ref,
+  }));
+  await db.movimientoStock.createMany({ data: filas });
+}

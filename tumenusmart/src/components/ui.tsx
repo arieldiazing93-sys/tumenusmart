@@ -21,7 +21,7 @@ import type { ReactNode } from "react";
 type Tono = "principal" | "suave" | "navegar" | "violeta" | "exito" | "nuevo" | "peligro" | "fantasma";
 
 const TONOS: Record<Tono, string> = {
-  // Naranja: avanzar, guardar, confirmar. Uno por pantalla, no más.
+  // Naranja: avanzar y ejecutar (cobrar, continuar, enviar, filtrar). Guardar es azul (navegar) y crear es verde (nuevo).
   principal:
     "bg-brand text-white hover:bg-brand-dark focus-visible:outline-brand-dark",
   // Lo mismo pero sin gritar, para acciones secundarias frecuentes.

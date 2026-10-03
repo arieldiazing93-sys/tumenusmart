@@ -1,61 +1,172 @@
 import { pantallaConPermiso } from "@/lib/auth";
 import { puede } from "@/lib/permisos";
+import { prisma } from "@/lib/prisma";
 import { idLocalActual } from "@/lib/local-actual";
 import { prismaDelLocal } from "@/lib/prisma-local";
-import { formatearGuarani, formatearNumero } from "@/lib/format";
-import { SEGUNDOS_LATIDO_IMPRESION, totalDeLineas } from "@/lib/comedor";
-import { BotonEnlace, Cabecera, Pastilla, Vacio } from "@/components/ui";
+import { estacionActual } from "@/lib/estacion-actual";
+import { diasParaVencer } from "@/lib/factura-pos";
+import { cargarCatalogoDeVenta } from "@/lib/catalogo-venta";
+import { formatearGuarani } from "@/lib/format";
+import {
+  ESTADOS_CUENTA_ABIERTA,
+  SEGUNDOS_LATIDO_IMPRESION,
+  descuentoDeCuenta,
+  totalesDeCuenta,
+} from "@/lib/comedor";
+import { BotonEnlace, Cabecera, Pastilla } from "@/components/ui";
 import { RefrescarCada } from "@/components/RefrescarCada";
+import { turnoAbierto } from "../pos/turno-actual";
+import { ComedorCaja, type ContextoCaja, type CuentaCajaFila } from "./ComedorCaja";
 
 export const dynamic = "force-dynamic";
 
-/** "hace 5 min", "hace 1 h 20 min". */
-function hace(desde: Date): string {
-  const minutos = Math.max(0, Math.round((Date.now() - desde.getTime()) / 60000));
-  if (minutos < 1) return "recién";
-  if (minutos < 60) return `hace ${minutos} min`;
-  const h = Math.floor(minutos / 60);
-  const m = minutos % 60;
-  return m === 0 ? `hace ${h} h` : `hace ${h} h ${m} min`;
-}
-
 /**
- * Servicio comedor: las cuentas abiertas de las mesas, con lo que cargaron los mozos. Se actualiza solo. Por ahora es para
- * ver; anular productos, dar descuentos, cambiar de mozo y cobrar se suman en la próxima etapa.
+ * Servicio comedor: las cuentas de las mesas, con lo que cargaron los mozos, y desde acá la caja las opera: carga productos,
+ * cancela con motivo, da descuento, imprime la cuenta (queda por cobrar), la reabre y la cobra. A la izquierda la lista de
+ * mesas; con doble clic en una se abre su detalle a la derecha. Se actualiza solo.
  */
 export default async function ComedorPage() {
   const sesion = await pantallaConPermiso("comedor.ver");
-  const db = prismaDelLocal(await idLocalActual());
+  const storeId = await idLocalActual();
+  const db = prismaDelLocal(storeId);
+  const puedeGestionar = puede(sesion.rol, "comedor.gestionar");
+  const puedeCobrar = puedeGestionar && puede(sesion.rol, "pos.vender");
 
   const desdeLatido = new Date(Date.now() - SEGUNDOS_LATIDO_IMPRESION * 1000);
   const [cuentas, enEspera, imprimiendo] = await Promise.all([
     db.cuentaMesa.findMany({
-      where: { estado: "abierta" },
+      where: { estado: { in: [...ESTADOS_CUENTA_ABIERTA] } },
       orderBy: { abiertaEn: "asc" },
-      select: {
-        id: true,
-        numero: true,
-        mesa: true,
-        abiertaEn: true,
+      include: {
         mozo: { select: { nombre: true, apellido: true } },
-        items: { where: { estado: "activo" }, select: { cantidad: true, precioUnitario: true, ronda: true } },
+        items: {
+          orderBy: [{ ronda: "asc" }, { linea: "asc" }],
+          include: { mozo: { select: { nombre: true, apellido: true } } },
+        },
+        trabajos: { orderBy: { createdAt: "asc" }, select: { id: true, titulo: true, estado: true, createdAt: true } },
       },
     }),
     db.trabajoImpresion.count({ where: { estado: { in: ["pendiente", "imprimiendo"] } } }),
     db.estacion.findFirst({ where: { impresionVistaEn: { gte: desdeLatido } }, select: { id: true } }),
   ]);
 
-  const filas = cuentas.map((c) => ({
-    id: c.id,
-    numero: c.numero,
-    mesa: c.mesa,
-    mozo: [c.mozo.nombre, c.mozo.apellido].filter(Boolean).join(" "),
-    abiertaEn: c.abiertaEn,
-    productos: c.items.reduce((s, i) => s + i.cantidad, 0),
-    rondas: new Set(c.items.map((i) => i.ronda)).size,
-    total: totalDeLineas(c.items.map((i) => ({ precioUnitario: Number(i.precioUnitario), cantidad: i.cantidad }))),
-  }));
-  const totalAbierto = filas.reduce((s, f) => s + f.total, 0);
+  const nombre = (m: { nombre: string; apellido: string | null }) => [m.nombre, m.apellido].filter(Boolean).join(" ");
+
+  const filas = cuentas.map((c): CuentaCajaFila => {
+    const activos = c.items.filter((i) => i.estado === "activo");
+    const totales = totalesDeCuenta(
+      activos.map((i) => ({ precioUnitario: Number(i.precioUnitario), cantidad: i.cantidad })),
+      descuentoDeCuenta(c)
+    );
+    return {
+      id: c.id,
+      numero: c.numero,
+      mesa: c.mesa,
+      estado: c.estado,
+      mozo: nombre(c.mozo),
+      abiertaEn: c.abiertaEn.toISOString(),
+      comensales: c.comensales,
+      impresaEn: c.impresaEn ? c.impresaEn.toISOString() : null,
+      descuento: descuentoDeCuenta(c)
+        ? {
+            tipo: c.descuentoTipo === "porcentaje" ? "porcentaje" : "monto",
+            valor: Number(c.descuentoValor),
+            motivo: c.descuentoMotivo ?? "",
+            por: c.descuentoPor ?? "",
+          }
+        : null,
+      totales,
+      items: c.items.map((i) => ({
+        id: i.id,
+        ronda: i.ronda,
+        enviadoEn: i.enviadoEn.toISOString(),
+        cantidad: i.cantidad,
+        nombre: i.nombreProducto,
+        opciones: i.opcionesTexto,
+        quitados: i.ingredientesQuitadosTexto,
+        nota: i.nota,
+        precioUnitario: Number(i.precioUnitario),
+        anulado: i.estado === "anulado",
+        motivoAnulacion: i.motivoAnulacion,
+        anuladoPor: i.anuladoPor,
+        cargadoPor: i.cargadoPor,
+        mozo: nombre(i.mozo),
+      })),
+      trabajos: c.trabajos.map((t) => ({
+        id: t.id,
+        titulo: t.titulo,
+        estado: t.estado,
+        creadoEn: t.createdAt.toISOString(),
+      })),
+    };
+  });
+  const totalAbierto = filas.reduce((s, f) => s + f.totales.total, 0);
+
+  // ---------------------------------------------------------------- lo que hace falta para operar desde esta computadora
+  let contexto: ContextoCaja = {
+    puedeGestionar,
+    puedeCobrar,
+    categorias: [],
+    gruposMitad: [],
+    imprimirCuenta: { ok: false, motivo: "" },
+    cobro: { ok: false, motivo: "" },
+  };
+
+  if (puedeGestionar) {
+    const estacion = await estacionActual(db);
+    const catalogo = await cargarCatalogoDeVenta(db);
+    contexto = { ...contexto, categorias: catalogo.categorias, gruposMitad: catalogo.gruposMitad };
+
+    if (!estacion) {
+      const motivo = "Esta computadora no está vinculada a una estación. Vinculala en Estaciones.";
+      contexto = { ...contexto, imprimirCuenta: { ok: false, motivo }, cobro: { ok: false, motivo } };
+    } else {
+      const datos = await db.estacion.findUnique({
+        where: { id: estacion.id },
+        select: {
+          areaTicketId: true,
+          impresoras: { select: { areaImpresionId: true, nombreImpresora: true } },
+          puntoExpedicion: { select: { activo: true, timbradoHasta: true } },
+        },
+      });
+      const impresoraDelTicket = datos?.areaTicketId
+        ? (datos.impresoras.find((i) => i.areaImpresionId === datos.areaTicketId)?.nombreImpresora ?? null)
+        : null;
+      contexto = {
+        ...contexto,
+        imprimirCuenta: impresoraDelTicket
+          ? { ok: true }
+          : {
+              ok: false,
+              motivo:
+                "Esta estación no tiene impresora para el ticket. En Estaciones elegí el “Área del ticket/factura” y asignale una impresora.",
+            },
+      };
+
+      if (puedeCobrar) {
+        const turno = await turnoAbierto(db, estacion.id);
+        const punto = datos?.puntoExpedicion ?? null;
+        const store = await prisma.store.findUnique({ where: { id: storeId }, select: { facturaObligatoria: true } });
+        contexto = {
+          ...contexto,
+          cobro: turno
+            ? {
+                ok: true,
+                puedeFacturar: !!punto?.activo && punto.timbradoHasta > new Date(),
+                diasParaVencerTimbrado: punto ? diasParaVencer(punto.timbradoHasta) : null,
+                facturaObligatoria: store?.facturaObligatoria ?? false,
+                nombreImpresoraTicket: impresoraDelTicket,
+              }
+            : {
+                ok: false,
+                motivo: "No hay un turno de caja abierto en esta estación. Abrilo en Punto de venta para poder cobrar.",
+              },
+        };
+      } else {
+        contexto = { ...contexto, cobro: { ok: false, motivo: "No tenés permiso para cobrar." } };
+      }
+    }
+  }
 
   return (
     <div className="flex flex-col gap-4">
@@ -65,7 +176,7 @@ export default async function ComedorPage() {
         bajada="Las mesas abiertas y lo que cargaron los mozos. Se actualiza solo."
         acciones={
           <>
-            {puede(sesion.rol, "comedor.gestionar") && (
+            {puedeGestionar && (
               <BotonEnlace href="/admin/impresion" tono="navegar" tam="md">
                 Impresión automática
               </BotonEnlace>
@@ -99,37 +210,7 @@ export default async function ComedorPage() {
         </span>
       </div>
 
-      {filas.length === 0 ? (
-        <Vacio
-          titulo="No hay mesas abiertas"
-          detalle="Cuando un mozo abra una mesa y envíe un pedido, la cuenta aparece acá."
-        />
-      ) : (
-        <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-          {filas.map((f) => (
-            <li key={f.id} className="flex flex-col gap-2 rounded-xl border-2 border-azul/50 bg-superficie p-3.5">
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <p className="truncate text-[1.2rem] font-semibold tracking-titular text-tinta">Mesa {f.mesa}</p>
-                  <p className="text-[0.8rem] text-tinta-media">
-                    Cuenta {formatearNumero(f.numero)} · {f.mozo} · {hace(f.abiertaEn)}
-                  </p>
-                </div>
-                <p className="cifra flex-none text-[1.05rem] font-bold text-tinta">{formatearGuarani(f.total)}</p>
-              </div>
-              <p className="text-[0.8rem] text-tinta-suave">
-                {f.productos} {f.productos === 1 ? "producto" : "productos"} · {f.rondas}{" "}
-                {f.rondas === 1 ? "pedido" : "pedidos"}
-              </p>
-              <div>
-                <BotonEnlace href={`/admin/comedor/${f.id}`} tono="navegar" tam="sm">
-                  Ver cuenta
-                </BotonEnlace>
-              </div>
-            </li>
-          ))}
-        </ul>
-      )}
+      <ComedorCaja cuentas={filas} contexto={contexto} />
     </div>
   );
 }

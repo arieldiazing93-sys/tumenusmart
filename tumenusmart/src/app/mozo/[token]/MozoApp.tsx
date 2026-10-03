@@ -38,6 +38,8 @@ type ItemCarrito = { key: string; nombre: string; precio: number; cantidad: numb
 );
 
 const TODOS = "__todos__";
+/** Lo que se le dice al mozo cuando la caja ya imprimió la cuenta de la mesa. */
+const MENSAJE_POR_COBRAR = "La caja ya imprimió la cuenta de esa mesa. Pedile que la reabra si querés cargar algo más.";
 // Los mismos chips que el Punto de Venta.
 const CHIP_ACTIVO = "border-brand bg-brand text-white";
 const CHIP_INACTIVO = "border-linea text-tinta-media hover:border-brand hover:text-brand";
@@ -167,6 +169,10 @@ export function MozoApp({
     }
     // Si esa mesa ya tiene una cuenta abierta, el pedido se suma a ella.
     const existente = cuentas.find((c) => claveDeMesa(c.mesa) === claveDeMesa(texto));
+    if (existente?.estado === "por_cobrar") {
+      setError(MENSAJE_POR_COBRAR);
+      return;
+    }
     empezarPedido(existente ? existente.mesa : texto);
   }
 
@@ -491,6 +497,11 @@ export function MozoApp({
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0">
                           <p className="truncate text-[1.15rem] font-semibold tracking-titular text-tinta">Mesa {c.mesa}</p>
+                          {c.estado === "por_cobrar" && (
+                            <Pastilla color="amarillo" punto>
+                              Cuenta pedida
+                            </Pastilla>
+                          )}
                           <p className="text-[0.78rem] text-tinta-media">
                             {c.mozo} · {hace(c.abiertaEn)}
                           </p>
@@ -505,9 +516,13 @@ export function MozoApp({
                         <button type="button" onClick={() => void verCuenta(c)} className={clasesBoton("navegar", "sm")}>
                           Ver cuenta
                         </button>
-                        <button type="button" onClick={() => empezarPedido(c.mesa)} className={clasesBoton("nuevo", "sm")}>
-                          Agregar pedido
-                        </button>
+                        {c.estado === "por_cobrar" ? (
+                          <p className="self-center text-[0.76rem] text-tinta-media">Esperando que la caja la cobre.</p>
+                        ) : (
+                          <button type="button" onClick={() => empezarPedido(c.mesa)} className={clasesBoton("nuevo", "sm")}>
+                            Agregar pedido
+                          </button>
+                        )}
                       </div>
                     </li>
                   ))}
@@ -549,9 +564,15 @@ export function MozoApp({
                 <p className="rounded-lg bg-papel-suave px-3 py-2 text-[0.8rem] text-tinta-media">
                   Para anular un producto, dar un descuento o cobrar, hablá con el cajero.
                 </p>
-                <Boton tono="nuevo" tam="lg" className="w-full" onClick={() => empezarPedido(detalle.mesa)}>
-                  Agregar pedido a esta mesa
-                </Boton>
+                {detalle.estado === "por_cobrar" ? (
+                  <p className="rounded-lg bg-amarillo-luz px-3 py-2 text-[0.82rem] font-medium text-amarillo-oscuro">
+                    {MENSAJE_POR_COBRAR}
+                  </p>
+                ) : (
+                  <Boton tono="nuevo" tam="lg" className="w-full" onClick={() => empezarPedido(detalle.mesa)}>
+                    Agregar pedido a esta mesa
+                  </Boton>
+                )}
               </>
             )}
           </div>
