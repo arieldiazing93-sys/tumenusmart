@@ -658,7 +658,7 @@ export function NuevoPedidoForm({
                   <p className="text-[0.86rem] font-medium leading-snug text-tinta">{p.nombre}</p>
                   <p className="cifra mt-1.5 text-[0.9rem] font-semibold text-tinta">{formatearGuarani(p.precio)}</p>
                   {p.agregados.length > 0 && (
-                    <span className="mt-1 text-[0.68rem] font-medium uppercase tracking-rotulo text-tinta-suave">
+                    <span className="mt-2 self-center text-[0.68rem] font-semibold uppercase tracking-rotulo text-azul">
                       + agregados
                     </span>
                   )}

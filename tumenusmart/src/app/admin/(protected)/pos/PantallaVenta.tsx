@@ -670,7 +670,7 @@ export function PantallaVenta({
                     {formatearGuarani(p.precio)}
                   </p>
                   {p.agregados.length > 0 && (
-                    <span className="mt-1 text-[0.68rem] font-medium uppercase tracking-rotulo text-tinta-suave">
+                    <span className="mt-2 self-center text-[0.68rem] font-semibold uppercase tracking-rotulo text-azul">
                       + agregados
                     </span>
                   )}
