@@ -41,5 +41,7 @@ publicar.
    pintar un punto al lado de "Ideas".
 3. Revisar `connection_limit=1` en la URL de conexión. Está así para no agotar
    el pooler, pero serializa todas las consultas de una misma request.
-4. Plan Pro de Vercel y Supabase: eso resuelve arranques en frío y copias de
-   seguridad, no la latencia de red.
+4. Planes de pago. Vercel ya está en Pro (confirmado 2026-10-03). Falta
+   confirmar el plan de Supabase: de él dependen las copias de seguridad
+   diarias y el cupo de almacenamiento. Eso resuelve arranques en frío y
+   respaldos, no la latencia de red.
