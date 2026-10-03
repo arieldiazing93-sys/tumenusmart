@@ -182,7 +182,7 @@ export function GestorServicios({
       type="button"
       onClick={() => setPanel("nuevo")}
       disabled={!actual}
-      className={clasesBoton("principal", "md")}
+      className={clasesBoton("nuevo", "md")}
     >
       <span aria-hidden="true" className="text-[1.1rem] leading-none">
         +
@@ -210,7 +210,7 @@ export function GestorServicios({
         <section className="rounded-xl border-2 border-azul/50 bg-superficie p-4">
           <div className="flex items-center justify-between gap-3">
             <h2 className="text-[1rem] font-semibold tracking-titular text-tinta">Categoría de servicio</h2>
-            <button type="button" onClick={() => setVentana({ tipo: "nueva" })} className={clasesBoton("principal", "sm")}>
+            <button type="button" onClick={() => setVentana({ tipo: "nueva" })} className={clasesBoton("nuevo", "sm")}>
               <span aria-hidden="true" className="text-[1.05rem] leading-none">
                 +
               </span>
@@ -299,7 +299,7 @@ export function GestorServicios({
               titulo="Empezá creando una categoría"
               detalle="Las categorías agrupan tus servicios: Cortes, Barba, Color… Después cargás los servicios de cada una."
               accion={
-                <button type="button" onClick={() => setVentana({ tipo: "nueva" })} className={clasesBoton("principal", "md")}>
+                <button type="button" onClick={() => setVentana({ tipo: "nueva" })} className={clasesBoton("nuevo", "md")}>
                   + Añadir categoría
                 </button>
               }
@@ -548,10 +548,10 @@ function FormularioCategoria({
         {error && <MensajeError>{error}</MensajeError>}
       </Campo>
       <div className="flex justify-end gap-2">
-        <button type="button" onClick={onCerrar} className={clasesBoton("suave", "md")}>
+        <button type="button" onClick={onCerrar} className={clasesBoton("peligro", "md")}>
           Cancelar
         </button>
-        <button type="submit" disabled={pendiente || !nombre.trim()} className={clasesBoton("principal", "md")}>
+        <button type="submit" disabled={pendiente || !nombre.trim()} className={clasesBoton(id ? "navegar" : "nuevo", "md")}>
           {pendiente ? "Guardando…" : id ? "Guardar" : "Crear"}
         </button>
       </div>

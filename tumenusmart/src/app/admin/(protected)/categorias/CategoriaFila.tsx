@@ -78,7 +78,7 @@ export function CategoriaFila({
               type="button"
               disabled={pending}
               onClick={guardarNombre}
-              className={clasesBoton("principal", "sm")}
+              className={clasesBoton("navegar", "sm")}
             >
               Guardar
             </button>

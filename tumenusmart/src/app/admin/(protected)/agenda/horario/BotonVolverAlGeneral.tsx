@@ -39,7 +39,7 @@ export function BotonVolverAlGeneral({ personalId, nombre }: { personalId: strin
   return (
     <div className="flex flex-wrap items-center gap-2">
       <span className="text-[0.8rem] font-medium text-tinta">¿Quitarle el horario propio a {nombre}?</span>
-      <button type="button" onClick={() => setConfirmando(false)} disabled={pendiente} className={clasesBoton("suave", "sm")}>
+      <button type="button" onClick={() => setConfirmando(false)} disabled={pendiente} className={clasesBoton("peligro", "sm")}>
         Cancelar
       </button>
       <button type="button" onClick={volver} disabled={pendiente} className={clasesBoton("peligro", "sm")}>

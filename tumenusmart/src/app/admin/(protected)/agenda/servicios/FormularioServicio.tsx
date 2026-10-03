@@ -308,13 +308,13 @@ export function FormularioServicio({
       <div className="flex flex-none flex-col gap-2 border-t border-linea bg-superficie px-5 py-4">
         {error && <MensajeError>{error}</MensajeError>}
         <div className="flex justify-end gap-2">
-          <button type="button" onClick={onCerrar} className={clasesBoton("suave", "md")}>
+          <button type="button" onClick={onCerrar} className={clasesBoton("peligro", "md")}>
             Cancelar
           </button>
           <button
             type="submit"
             disabled={pendiente || ofrecidos.length === 0}
-            className={clasesBoton("principal", "md")}
+            className={clasesBoton(editando ? "navegar" : "nuevo", "md")}
           >
             {pendiente ? "Guardando…" : editando ? "Guardar" : "Crear"}
           </button>

@@ -526,7 +526,7 @@ export function PantallaVenta({
             <>
               <p className="text-[0.78rem] font-medium text-aviso">No existe ningún cliente con ese número.</p>
               <div>
-                <Boton tono="principal" tam="sm" onClick={() => setMostrarModalClienteFiscal(true)}>
+                <Boton tono="nuevo" tam="sm" onClick={() => setMostrarModalClienteFiscal(true)}>
                   Crear cliente
                 </Boton>
               </div>
@@ -562,7 +562,7 @@ export function PantallaVenta({
             <>
               <p className="text-[0.78rem] font-medium text-aviso">No existe ningún cliente con ese teléfono.</p>
               <div>
-                <Boton tono="principal" tam="sm" onClick={() => setMostrarModalClienteRapido(true)}>
+                <Boton tono="nuevo" tam="sm" onClick={() => setMostrarModalClienteRapido(true)}>
                   Crear cliente
                 </Boton>
               </div>

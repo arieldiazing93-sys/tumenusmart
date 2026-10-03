@@ -127,7 +127,7 @@ export function AgregadosPickerPos({
             </div>
 
             <div className="flex-1">
-              <Boton onClick={() => onAgregar(seleccionados, cantidad)} tam="lg" className="w-full">
+              <Boton tono="nuevo" onClick={() => onAgregar(seleccionados, cantidad)} tam="lg" className="w-full">
                 <span>Agregar</span>
                 <span className="cifra ml-auto">{formatearGuarani(unitario * cantidad)}</span>
               </Boton>

@@ -41,9 +41,7 @@ export function ListaMozos({ mozos }: { mozos: MozoFila[] }) {
           {mozos.map((m) => (
             <li
               key={m.id}
-              className={`flex items-center gap-3 rounded-xl border-2 p-3 ${
-                m.activo ? "border-azul/50 bg-superficie" : "border-amarillo bg-amarillo-luz"
-              }`}
+              className="flex items-center gap-3 rounded-xl border-2 border-azul/50 bg-superficie p-3"
             >
               <div className="min-w-0 flex-1">
                 <p className="truncate text-[0.95rem] font-semibold text-tinta">{nombreCompleto(m)}</p>

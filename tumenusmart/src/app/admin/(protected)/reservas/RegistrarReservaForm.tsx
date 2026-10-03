@@ -94,7 +94,7 @@ export function RegistrarReservaForm({ diaSugerido }: { diaSugerido: string }) {
       </Campo>
 
       <div>
-        <button type="submit" disabled={pendiente} className={clasesBoton("principal")}>
+        <button type="submit" disabled={pendiente} className={clasesBoton("nuevo")}>
           {pendiente ? "Guardando..." : "Registrar reserva"}
         </button>
       </div>

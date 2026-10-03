@@ -96,7 +96,7 @@ export default async function FacturasPage({
             <Link href="/admin/pos/puntos-expedicion" className={clasesBoton("navegar", "sm")}>
               Datos del emisor
             </Link>
-            <Link href="/admin/facturas/nueva" className={clasesBoton("principal", "sm")}>
+            <Link href="/admin/facturas/nueva" className={clasesBoton("nuevo", "sm")}>
               + Nueva factura
             </Link>
           </>

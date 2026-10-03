@@ -270,7 +270,7 @@ export function EditorHorario({
               type="button"
               onClick={guardar}
               disabled={pendiente || hayErrores}
-              className={clasesBoton("principal", "md")}
+              className={clasesBoton("navegar", "md")}
             >
               {pendiente ? "Guardando…" : "Guardar cambios"}
             </button>

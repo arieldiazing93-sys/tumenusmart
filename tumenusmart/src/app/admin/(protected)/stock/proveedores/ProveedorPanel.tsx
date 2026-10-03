@@ -85,7 +85,7 @@ export function ProveedorPanel({
 
         {error && <p className="text-sm font-medium text-peligro">{error}</p>}
         <div className="flex items-center gap-3">
-          <button type="submit" disabled={pendiente} className={clasesBoton("principal")}>
+          <button type="submit" disabled={pendiente} className={clasesBoton("navegar")}>
             {pendiente ? "Guardando…" : "Guardar cambios"}
           </button>
           {guardado && <span className="text-xs font-medium text-exito">✓ Guardado</span>}

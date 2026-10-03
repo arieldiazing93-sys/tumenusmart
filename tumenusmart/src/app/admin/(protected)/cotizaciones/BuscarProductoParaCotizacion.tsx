@@ -74,7 +74,7 @@ export function BuscarProductoParaCotizacion({
                   setResultados([]);
                   ultimaBusqueda.current++;
                 }}
-                className={clasesBoton("principal", "sm")}
+                className={clasesBoton("nuevo", "sm")}
               >
                 Agregar
               </button>

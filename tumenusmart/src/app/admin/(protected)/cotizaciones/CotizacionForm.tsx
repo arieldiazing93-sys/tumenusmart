@@ -192,10 +192,10 @@ export function CotizacionForm({ inicial }: { inicial?: CotizacionInicial }) {
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center gap-2">
-        <button type="button" disabled={pendiente} onClick={guardar} className={clasesBoton("principal")}>
+        <button type="button" disabled={pendiente} onClick={guardar} className={clasesBoton("navegar")}>
           {pendiente ? "Guardando…" : editando ? "Guardar cambios" : "Guardar presupuesto"}
         </button>
-        <Link href={volverA} className={clasesBoton("navegar")}>
+        <Link href={volverA} className={clasesBoton("peligro")}>
           Cancelar
         </Link>
       </div>
@@ -408,7 +408,7 @@ export function CotizacionForm({ inicial }: { inicial?: CotizacionInicial }) {
 
       {error && <p className="text-sm font-medium text-peligro">{error}</p>}
       <div>
-        <button type="button" disabled={pendiente} onClick={guardar} className={clasesBoton("principal")}>
+        <button type="button" disabled={pendiente} onClick={guardar} className={clasesBoton("navegar")}>
           {pendiente ? "Guardando…" : editando ? "Guardar cambios" : "Guardar presupuesto"}
         </button>
       </div>

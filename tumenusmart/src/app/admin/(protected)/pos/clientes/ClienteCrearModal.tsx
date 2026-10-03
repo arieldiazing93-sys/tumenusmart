@@ -126,12 +126,12 @@ export function ClienteCrearModal({
 
         <div className="mt-5 flex gap-2">
           <div className="flex-1">
-            <Boton tono="fantasma" tam="lg" onClick={onCerrar} className="w-full">
+            <Boton tono="peligro" tam="lg" onClick={onCerrar} className="w-full">
               Cancelar
             </Boton>
           </div>
           <div className="flex-[2]">
-            <Boton tam="lg" onClick={guardar} disabled={pending || !nombre.trim()} className="w-full">
+            <Boton tono="nuevo" tam="lg" onClick={guardar} disabled={pending || !nombre.trim()} className="w-full">
               {pending ? "Creando…" : "Crear cliente"}
             </Boton>
           </div>

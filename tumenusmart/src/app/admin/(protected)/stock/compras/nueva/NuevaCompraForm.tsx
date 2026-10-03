@@ -283,7 +283,7 @@ export function NuevaCompraForm({
           "Eliminar" de una línea es el Quitar de cada una, y anular una compra
           ya guardada se hace desde su detalle. */}
       <div className="flex flex-wrap items-center gap-2">
-        <button type="button" disabled={pendiente} onClick={pedirConfirmacion} className={clasesBoton("principal")}>
+        <button type="button" disabled={pendiente} onClick={pedirConfirmacion} className={clasesBoton("navegar")}>
           {pendiente ? "Guardando…" : "Guardar"}
         </button>
         <button type="button" disabled={pendiente} onClick={deshacer} className={clasesBoton("suave")}>
@@ -537,7 +537,7 @@ export function NuevaCompraForm({
 
       {error && <p className="text-sm font-medium text-peligro">{error}</p>}
       <div>
-        <button type="button" disabled={pendiente} onClick={pedirConfirmacion} className={clasesBoton("principal")}>
+        <button type="button" disabled={pendiente} onClick={pedirConfirmacion} className={clasesBoton("navegar")}>
           {pendiente ? "Guardando…" : editando ? "Guardar cambios" : "Guardar compra"}
         </button>
       </div>
@@ -581,7 +581,7 @@ export function NuevaCompraForm({
                 autoFocus
                 disabled={pendiente}
                 onClick={guardar}
-                className={clasesBoton("principal")}
+                className={clasesBoton("navegar")}
               >
                 {pendiente ? "Guardando…" : "Sí, guardar"}
               </button>

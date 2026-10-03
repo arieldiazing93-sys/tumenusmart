@@ -35,7 +35,7 @@ export function RegistrarCobroBoton({
 
   return (
     <>
-      <button type="button" onClick={() => setAbierto(true)} className={clasesBoton("principal", tam)}>
+      <button type="button" onClick={() => setAbierto(true)} className={clasesBoton("nuevo", tam)}>
         Registrar cobro
       </button>
       {abierto && (
@@ -152,10 +152,10 @@ function ModalCobro({
         {error && <p className="mt-3 text-sm font-medium text-peligro">{error}</p>}
 
         <div className="mt-5 flex justify-end gap-2">
-          <button type="button" disabled={pendiente} onClick={onCerrar} className={clasesBoton("suave")}>
+          <button type="button" disabled={pendiente} onClick={onCerrar} className={clasesBoton("peligro")}>
             Cancelar
           </button>
-          <button type="button" disabled={pendiente} onClick={guardar} className={clasesBoton("principal")}>
+          <button type="button" disabled={pendiente} onClick={guardar} className={clasesBoton("navegar")}>
             {pendiente ? "Guardando…" : "Guardar cobro"}
           </button>
         </div>

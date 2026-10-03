@@ -286,7 +286,7 @@ export function EmisorFiscalForm({ inicial }: { inicial: DatosEmisor }) {
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
-            <button type="button" onClick={guardar} disabled={pendiente} className={clasesBoton("principal")}>
+            <button type="button" onClick={guardar} disabled={pendiente} className={clasesBoton("navegar")}>
               {pendiente ? "Guardando…" : "Guardar datos del emisor"}
             </button>
             {guardado && <span className="text-xs font-medium text-exito">✓ Guardado</span>}

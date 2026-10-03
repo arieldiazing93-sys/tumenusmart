@@ -73,7 +73,7 @@ export function EnlaceCelularFijo({ token }: { token: string | null }) {
           type="button"
           onClick={() => ejecutar(generarEnlaceAsistencia)}
           disabled={pendiente}
-          className={clasesBoton("principal", "md")}
+          className={clasesBoton("nuevo", "md")}
         >
           {pendiente ? "Activando…" : "Activar el celular fijo"}
         </button>

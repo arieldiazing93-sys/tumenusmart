@@ -180,7 +180,7 @@ function ModalCaja({ turnoId, onCerrar }: { turnoId: string; onCerrar: () => voi
             }
           />
           <div>
-            <button type="button" disabled={pendiente} onClick={registrar} className={clasesBoton("principal", "sm")}>
+            <button type="button" disabled={pendiente} onClick={registrar} className={clasesBoton("nuevo", "sm")}>
               {pendiente ? "Guardando…" : tipo === "retiro" ? "Registrar retiro" : "Registrar ingreso"}
             </button>
           </div>

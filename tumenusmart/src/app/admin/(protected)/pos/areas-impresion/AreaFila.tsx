@@ -36,13 +36,9 @@ export function AreaFila({
   }
 
   return (
-    // Una área desactivada se resalta en amarillo (en vez de apagarse): no se puede elegir en Estaciones, y si se
-    // pasa de largo se pierde un buen rato buscando por qué no aparece.
-    <div
-      className={`rounded-lg border-2 px-4 py-3 ${
-        activa ? "border-azul/50 bg-white" : "border-amarillo bg-amarillo-luz"
-      }`}
-    >
+    // El estado se ve en la etiqueta (Activa / Desactivada) y en el color del botón; la fila no cambia de fondo, para que lo
+    // que resalte sean los botones.
+    <div className="rounded-lg border-2 border-azul/50 bg-white px-4 py-3">
       <div className="flex flex-wrap items-center justify-between gap-3">
         {editando ? (
           <div className="flex flex-1 flex-wrap items-center gap-2">
@@ -56,7 +52,7 @@ export function AreaFila({
               type="button"
               disabled={pending}
               onClick={guardarNombre}
-              className={clasesBoton("principal", "sm")}
+              className={clasesBoton("navegar", "sm")}
             >
               Guardar
             </button>

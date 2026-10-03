@@ -29,7 +29,7 @@ export function CrearAlmacenForm({ onCreado }: { onCreado: (almacenId: string) =
           <Entrada name="nombre" required autoFocus placeholder="Ej: Almacén Cocina" />
         </Campo>
         <div>
-          <button type="submit" disabled={pendiente} className={clasesBoton("principal")}>
+          <button type="submit" disabled={pendiente} className={clasesBoton("nuevo")}>
             {pendiente ? "Agregando…" : "Agregar"}
           </button>
         </div>

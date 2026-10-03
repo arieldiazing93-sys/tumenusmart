@@ -124,7 +124,7 @@ export function GestionEmpleados({
             />
           </Campo>
           <div className="flex items-end">
-            <Boton type="submit" disabled={pendiente} className="w-full sm:w-auto">
+            <Boton tono="nuevo" type="submit" disabled={pendiente} className="w-full sm:w-auto">
               {pendiente ? "Creando…" : "Crear empleado"}
             </Boton>
           </div>

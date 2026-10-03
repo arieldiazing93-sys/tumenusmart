@@ -196,7 +196,7 @@ export default async function AdminConfiguracionPage() {
 
           <button
             type="submit"
-            className={`self-start ${clasesBoton("principal")}`}
+            className={`self-start ${clasesBoton("navegar")}`}
           >
             Guardar
           </button>
@@ -341,7 +341,7 @@ export default async function AdminConfiguracionPage() {
               </div>
             </div>
           </div>
-          <button type="submit" className={`self-start ${clasesBoton("principal")}`}>
+          <button type="submit" className={`self-start ${clasesBoton("navegar")}`}>
             Guardar
           </button>
         </form>
@@ -364,7 +364,7 @@ export default async function AdminConfiguracionPage() {
             />
             Este local reserva mesas con anticipación
           </label>
-          <button type="submit" className={`self-start ${clasesBoton("principal")}`}>
+          <button type="submit" className={`self-start ${clasesBoton("navegar")}`}>
             Guardar
           </button>
         </form>
@@ -384,7 +384,7 @@ export default async function AdminConfiguracionPage() {
             <input type="checkbox" name="ventasACredito" defaultChecked={store?.ventasACredito ?? false} />
             Este local vende a crédito
           </label>
-          <button type="submit" className={`self-start ${clasesBoton("principal")}`}>
+          <button type="submit" className={`self-start ${clasesBoton("navegar")}`}>
             Guardar
           </button>
         </form>
@@ -451,7 +451,7 @@ export default async function AdminConfiguracionPage() {
           </div>
           <button
             type="submit"
-            className={`self-start ${clasesBoton("principal")}`}
+            className={`self-start ${clasesBoton("navegar")}`}
           >
             Guardar
           </button>
@@ -546,7 +546,7 @@ export default async function AdminConfiguracionPage() {
 
           <button
             type="submit"
-            className={`self-start ${clasesBoton("principal")}`}
+            className={`self-start ${clasesBoton("navegar")}`}
           >
             Guardar
           </button>

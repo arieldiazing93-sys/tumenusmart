@@ -35,7 +35,7 @@ export function CrearRepartidorForm() {
         placeholder="Teléfono (opcional)"
         className="min-w-[160px] flex-1 rounded-lg border border-linea px-3 py-2"
       />
-      <button type="submit" disabled={pendiente} className={clasesBoton("principal")}>
+      <button type="submit" disabled={pendiente} className={clasesBoton("nuevo")}>
         Agregar
       </button>
       {agregado && <span className="text-xs font-medium text-exito">✓ Agregado</span>}

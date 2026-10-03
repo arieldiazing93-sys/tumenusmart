@@ -128,7 +128,7 @@ export function ReglasMarcacion({
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
-          <button type="submit" disabled={pendiente} className={clasesBoton("principal", "md")}>
+          <button type="submit" disabled={pendiente} className={clasesBoton("navegar", "md")}>
             {pendiente ? "Guardando…" : "Guardar las reglas"}
           </button>
           {guardado && <span className="text-[0.84rem] font-semibold text-exito">¡Guardado!</span>}

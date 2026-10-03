@@ -90,7 +90,7 @@ export function PuntoExpedicionFila({
             <Entrada type="date" name="timbradoHasta" required defaultValue={timbradoHasta} />
           </Campo>
           <div className="col-span-2 flex items-center gap-2 sm:col-span-3">
-            <button type="submit" disabled={pending} className={clasesBoton("principal", "sm")}>
+            <button type="submit" disabled={pending} className={clasesBoton("navegar", "sm")}>
               Guardar
             </button>
             <button
@@ -111,12 +111,9 @@ export function PuntoExpedicionFila({
   }
 
   return (
-    // Un punto desactivado se resalta en amarillo (en vez de apagarse) para que se vea de un vistazo.
-    <div
-      className={`rounded-lg border-2 px-4 py-3 ${
-        activo ? "border-azul/50 bg-white" : "border-amarillo bg-amarillo-luz"
-      }`}
-    >
+    // El estado se ve en la etiqueta "Desactivado" y en el color del botón; la fila no cambia de fondo, para que lo que
+    // resalte sean los botones.
+    <div className="rounded-lg border-2 border-azul/50 bg-white px-4 py-3">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <span className="font-medium">

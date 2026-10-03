@@ -104,7 +104,7 @@ export function InsumosMaestroDetalle({
   return (
     <div>
       <div className="mb-3 flex flex-wrap items-center gap-3">
-        <button type="button" onClick={() => nuevo("insumo")} className={clasesBoton("principal")}>
+        <button type="button" onClick={() => nuevo("insumo")} className={clasesBoton("nuevo")}>
           + Nuevo insumo
         </button>
         <button type="button" onClick={() => nuevo("preparacion")} className={clasesBoton("suave")}>

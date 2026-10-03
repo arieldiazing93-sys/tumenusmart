@@ -71,7 +71,7 @@ export function MaestroDetalle<T extends { id: string; activo: boolean }>({
               setAbiertoId(null);
               setCreando(true);
             }}
-            className={clasesBoton("principal")}
+            className={clasesBoton("nuevo")}
           >
             {textoNuevo}
           </button>

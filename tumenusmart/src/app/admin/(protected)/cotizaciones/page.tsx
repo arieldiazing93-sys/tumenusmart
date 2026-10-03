@@ -56,7 +56,7 @@ export default async function CotizacionesPage({ searchParams }: { searchParams:
       <Cabecera
         titulo="Cotizaciones"
         bajada="Armá un presupuesto eligiendo los productos o servicios que vendés, y sacalo en PDF para enviárselo al cliente."
-        acciones={<BotonEnlace href="/admin/cotizaciones/nueva">+ Nueva cotización</BotonEnlace>}
+        acciones={<BotonEnlace tono="nuevo" href="/admin/cotizaciones/nueva">+ Nueva cotización</BotonEnlace>}
       />
 
       <form method="get" className="flex flex-wrap items-end gap-3">

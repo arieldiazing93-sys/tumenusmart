@@ -378,7 +378,7 @@ export function NuevoInventario({
 
       {error && <p className="text-sm font-medium text-peligro">{error}</p>}
       <div className="flex flex-wrap items-center gap-2">
-        <button type="button" disabled={pendiente} onClick={guardar} className={clasesBoton("principal")}>
+        <button type="button" disabled={pendiente} onClick={guardar} className={clasesBoton("navegar")}>
           {pendiente ? "Guardando…" : "Guardar inventario"}
         </button>
         <button

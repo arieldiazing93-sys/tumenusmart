@@ -117,7 +117,7 @@ export function SeccionCampos({ datos, cambiar }: PropsSeccion) {
               aria-label="Nombre del campo nuevo"
             />
           </div>
-          <button type="button" onClick={agregar} disabled={!nuevo.trim()} className={clasesBoton("principal", "md")}>
+          <button type="button" onClick={agregar} disabled={!nuevo.trim()} className={clasesBoton("nuevo", "md")}>
             Añadir
           </button>
           <button
@@ -126,7 +126,7 @@ export function SeccionCampos({ datos, cambiar }: PropsSeccion) {
               setAgregando(false);
               setNuevo("");
             }}
-            className={clasesBoton("suave", "md")}
+            className={clasesBoton("peligro", "md")}
           >
             Cancelar
           </button>

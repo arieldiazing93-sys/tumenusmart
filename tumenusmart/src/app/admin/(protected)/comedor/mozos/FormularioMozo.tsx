@@ -106,8 +106,8 @@ export function FormularioMozo({ mozo, onCerrar }: { mozo: MozoFila | null; onCe
         <button type="button" onClick={onCerrar} className={clasesBoton("peligro", "md")}>
           Cancelar
         </button>
-        <button type="submit" disabled={pendiente} className={clasesBoton("principal", "md")}>
-          {pendiente ? "Guardando…" : "Guardar"}
+        <button type="submit" disabled={pendiente} className={clasesBoton(editando ? "navegar" : "nuevo", "md")}>
+          {pendiente ? "Guardando…" : editando ? "Guardar" : "Crear mozo"}
         </button>
       </div>
     </form>

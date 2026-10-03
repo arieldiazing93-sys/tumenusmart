@@ -192,7 +192,7 @@ export default async function AgendaPage({
         bajada="Los turnos de tus clientes: quién viene, con quién y a qué hora. Tocá uno para ver su detalle y cobrarlo."
         compacta
         acciones={
-          <Link href={`${urlAgenda(parametros)}&cita=nueva`} scroll={false} className={clasesBoton("principal", "sm")}>
+          <Link href={`${urlAgenda(parametros)}&cita=nueva`} scroll={false} className={clasesBoton("nuevo", "sm")}>
             + Nueva cita
           </Link>
         }

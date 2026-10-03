@@ -283,7 +283,7 @@ export function FormularioColaborador({
           <button type="button" onClick={onCerrar} className={clasesBoton("peligro", "md")}>
             Cancelar
           </button>
-          <button type="submit" disabled={pendiente || subiendo || camara} className={clasesBoton("principal", "md")}>
+          <button type="submit" disabled={pendiente || subiendo || camara} className={clasesBoton(editando ? "navegar" : "nuevo", "md")}>
             {pendiente ? "Guardando…" : editando ? "Guardar" : "Crear"}
           </button>
         </div>

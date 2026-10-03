@@ -895,7 +895,7 @@ export function NuevoPedidoForm({
 
             {mensajeError}
 
-            <Boton
+            <Boton tono="nuevo"
               onClick={crear}
               disabled={guardando || carrito.length === 0 || bloqueadoSinFacturar}
               tam="lg"

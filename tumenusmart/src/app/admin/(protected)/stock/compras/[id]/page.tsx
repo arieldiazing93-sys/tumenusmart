@@ -82,7 +82,7 @@ export default async function CompraDetallePage({ params }: { params: Promise<{ 
             <Pastilla color="peligro">Cancelada</Pastilla>
           ) : puede(sesion.rol, "stock.editar") ? (
             <>
-              <BotonEnlace href={`/admin/stock/compras/${compra.id}/editar`}>Editar</BotonEnlace>
+              <BotonEnlace tono="navegar" href={`/admin/stock/compras/${compra.id}/editar`}>Editar</BotonEnlace>
               <CancelarCompraBoton compraId={compra.id} />
             </>
           ) : undefined

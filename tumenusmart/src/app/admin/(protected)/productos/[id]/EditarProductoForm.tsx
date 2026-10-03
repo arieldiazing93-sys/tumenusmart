@@ -220,7 +220,7 @@ export function EditarProductoForm({
         </p>
       </Tarjeta>
 
-      <button type="submit" disabled={pendiente} className={clasesBoton("principal")}>
+      <button type="submit" disabled={pendiente} className={clasesBoton("navegar")}>
         {pendiente ? "Guardando…" : "Guardar cambios"}
       </button>
     </form>

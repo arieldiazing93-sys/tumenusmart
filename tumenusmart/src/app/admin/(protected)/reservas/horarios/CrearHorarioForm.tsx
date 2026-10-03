@@ -44,7 +44,7 @@ export function CrearHorarioForm({ turno, turnoLabel }: { turno: string; turnoLa
         aria-label="Cupo de personas del nuevo horario"
         className="w-36 rounded-lg border border-linea px-2 py-1.5 text-sm"
       />
-      <button type="submit" disabled={pendiente} className={clasesBoton("principal", "sm")}>
+      <button type="submit" disabled={pendiente} className={clasesBoton("nuevo", "sm")}>
         Agregar horario
       </button>
       {agregado && <span className="text-xs font-medium text-exito">✓ Agregado</span>}

@@ -35,7 +35,7 @@ export function ListaColaboradores({ colaboradores }: { colaboradores: Colaborad
   const persona = panel && panel.modo === "editar" ? (colaboradores.find((c) => c.id === panel.id) ?? null) : null;
 
   const botonAnadir = (
-    <button type="button" onClick={() => setPanel({ modo: "nuevo" })} className={clasesBoton("principal", "md")}>
+    <button type="button" onClick={() => setPanel({ modo: "nuevo" })} className={clasesBoton("nuevo", "md")}>
       <span aria-hidden="true" className="text-[1.1rem] leading-none">
         +
       </span>

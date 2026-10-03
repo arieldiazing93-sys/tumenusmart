@@ -99,7 +99,7 @@ export function UrlPublicaField({ slug }: { slug: string }) {
           )}
 
           <div className="mt-3 flex gap-2">
-            <Boton onClick={guardar} disabled={!cambia || guardando} tam="sm">
+            <Boton tono="navegar" onClick={guardar} disabled={!cambia || guardando} tam="sm">
               {guardando ? "Guardando…" : "Guardar dirección"}
             </Boton>
             <Boton

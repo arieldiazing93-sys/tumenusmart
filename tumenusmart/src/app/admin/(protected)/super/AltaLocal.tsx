@@ -225,7 +225,7 @@ export function AltaLocal({
         <button
           type="submit"
           disabled={pendiente}
-          className={clasesBoton("principal")}
+          className={clasesBoton("nuevo")}
         >
           {pendiente ? "Creando..." : "Crear local"}
         </button>

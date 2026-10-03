@@ -146,7 +146,7 @@ export function RecetaElaborado({
                     type="button"
                     disabled={pendiente}
                     onClick={() => guardar(r.ingredienteId, Number(cantidadEditada), () => setEditando(null))}
-                    className={clasesBoton("principal", "sm")}
+                    className={clasesBoton("navegar", "sm")}
                   >
                     Guardar
                   </button>
@@ -240,7 +240,7 @@ export function RecetaElaborado({
                     setCantidades((c) => ({ ...c, [i.id]: "" }));
                   })
                 }
-                className={clasesBoton("principal", "sm")}
+                className={clasesBoton("nuevo", "sm")}
               >
                 Agregar
               </button>

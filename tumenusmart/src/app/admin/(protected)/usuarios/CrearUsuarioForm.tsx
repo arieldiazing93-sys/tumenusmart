@@ -77,7 +77,7 @@ export function CrearUsuarioForm({ locales }: { locales: Local[] }) {
       </label>
 
       <div className="sm:col-span-2">
-        <button type="submit" disabled={pendiente} className={clasesBoton("principal")}>
+        <button type="submit" disabled={pendiente} className={clasesBoton("nuevo")}>
           {pendiente ? "Creando…" : "Crear usuario"}
         </button>
       </div>

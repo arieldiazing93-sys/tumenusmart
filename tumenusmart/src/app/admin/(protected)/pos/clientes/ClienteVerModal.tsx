@@ -107,7 +107,7 @@ export function ClienteVerModal({
             </Boton>
           </div>
           <div className="flex-[2]">
-            <Boton tam="lg" onClick={onEditar} className="w-full">
+            <Boton tono="navegar" tam="lg" onClick={onEditar} className="w-full">
               Editar
             </Boton>
           </div>

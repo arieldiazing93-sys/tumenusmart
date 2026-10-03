@@ -391,7 +391,7 @@ export function FichaLocalModal({
                   type="button"
                   onClick={cancelarEdicion}
                   disabled={pendiente}
-                  className={clasesBoton("suave")}
+                  className={clasesBoton("peligro")}
                 >
                   Cancelar
                 </button>
@@ -400,7 +400,7 @@ export function FichaLocalModal({
                   type="submit"
                   form={idFormulario}
                   disabled={pendiente}
-                  className={clasesBoton("principal")}
+                  className={clasesBoton("navegar")}
                 >
                   {pendiente ? "Guardando…" : "Guardar"}
                 </button>
@@ -419,7 +419,7 @@ export function FichaLocalModal({
                   key="editar"
                   type="button"
                   onClick={empezarAEditar}
-                  className={clasesBoton("principal")}
+                  className={clasesBoton("navegar")}
                 >
                   Editar
                 </button>

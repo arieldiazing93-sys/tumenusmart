@@ -158,7 +158,7 @@ export function CrearGastoForm({
           </div>
         </details>
         <div className="flex items-center gap-2 sm:col-span-2">
-          <button type="submit" disabled={pendiente} className={clasesBoton("principal")}>
+          <button type="submit" disabled={pendiente} className={clasesBoton("nuevo")}>
             {pendiente ? "Agregando…" : "Agregar"}
           </button>
           {agregado && <span className="text-xs font-medium text-exito">✓ Agregado</span>}

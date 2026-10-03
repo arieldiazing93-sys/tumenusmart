@@ -135,7 +135,7 @@ export function InsumoInventarioFila({
         <div className="flex flex-wrap items-center gap-3 text-sm">
           {ajustando ? (
             <>
-              <button type="button" disabled={pendiente} onClick={guardar} className={clasesBoton("principal", "sm")}>
+              <button type="button" disabled={pendiente} onClick={guardar} className={clasesBoton("navegar", "sm")}>
                 Guardar
               </button>
               <button type="button" onClick={cancelar} className="text-tinta-media hover:underline">

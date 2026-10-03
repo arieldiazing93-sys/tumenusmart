@@ -912,7 +912,7 @@ export function FormularioCita({
                 type="button"
                 onClick={() => enviar(true)}
                 disabled={pendiente}
-                className={clasesBoton("principal", "sm")}
+                className={clasesBoton("navegar", "sm")}
               >
                 Guardar igual
               </button>
@@ -944,7 +944,7 @@ export function FormularioCita({
             )}
             <div className="flex items-center gap-2">
               {!cobrada && (
-                <button type="button" onClick={onCerrar} className={clasesBoton("suave", "md")}>
+                <button type="button" onClick={onCerrar} className={clasesBoton("peligro", "md")}>
                   Cancelar
                 </button>
               )}

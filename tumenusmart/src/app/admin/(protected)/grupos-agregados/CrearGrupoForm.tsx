@@ -32,7 +32,7 @@ export function CrearGrupoForm() {
           </Campo>
         </div>
         <div className="flex items-center gap-2">
-          <button type="submit" disabled={pendiente} className={clasesBoton("principal")}>
+          <button type="submit" disabled={pendiente} className={clasesBoton("nuevo")}>
             {pendiente ? "Creando…" : "Crear grupo"}
           </button>
           {agregado && <span className="text-xs font-medium text-exito">✓ Creado</span>}

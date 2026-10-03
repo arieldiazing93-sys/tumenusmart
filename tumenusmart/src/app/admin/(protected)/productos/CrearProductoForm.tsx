@@ -115,7 +115,7 @@ export function CrearProductoForm({
         </label>
       </div>
       <IngredientesField initial={[]} />
-      <button type="submit" disabled={pendiente} className={clasesBoton("principal")}>
+      <button type="submit" disabled={pendiente} className={clasesBoton("nuevo")}>
         {pendiente ? "Creando…" : "Crear producto"}
       </button>
     </form>

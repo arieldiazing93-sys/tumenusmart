@@ -131,7 +131,7 @@ function BloqueHorario({ miembro, horarioGeneral }: { miembro: MiembroFila; hora
               type="button"
               onClick={() => setConfirmandoQuitar(false)}
               disabled={pendiente}
-              className={clasesBoton("suave", "sm")}
+              className={clasesBoton("peligro", "sm")}
             >
               Cancelar
             </button>
@@ -223,7 +223,7 @@ export function FichaPersonal({
           <button type="button" onClick={onCerrar} className={clasesBoton("suave", "md")}>
             Cerrar
           </button>
-          <button type="button" onClick={onEditar} className={clasesBoton("principal", "md")}>
+          <button type="button" onClick={onEditar} className={clasesBoton("navegar", "md")}>
             Editar datos
           </button>
         </div>

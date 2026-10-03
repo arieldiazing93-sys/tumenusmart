@@ -98,7 +98,7 @@ export function UsuarioAcciones({
               correr(() => restablecerPassword(id, datos), "Contraseña actualizada.");
               setPassword("");
             }}
-            className={clasesBoton("principal", "sm")}
+            className={clasesBoton("navegar", "sm")}
           >
             Guardar
           </button>

@@ -178,7 +178,7 @@ export default async function MarcacionesPage({
           titulo="Todavía no cargaste a nadie"
           detalle="Primero dá de alta a las personas que van a marcar (con su selfie y su PIN) y después activá el celular fijo."
           accion={
-            <BotonEnlace href="/admin/asistencia/colaboradores" tono="principal" tam="md">
+            <BotonEnlace href="/admin/asistencia/colaboradores" tono="nuevo" tam="md">
               Cargar colaboradores
             </BotonEnlace>
           }

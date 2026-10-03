@@ -130,7 +130,7 @@ export function FormularioPassword() {
       <button
         type="submit"
         disabled={pendiente}
-        className={`mt-1 self-start ${clasesBoton("principal")}`}
+        className={`mt-1 self-start ${clasesBoton("navegar")}`}
       >
         {pendiente ? "Guardando..." : "Guardar"}
       </button>

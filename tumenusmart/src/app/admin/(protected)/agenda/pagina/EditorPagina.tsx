@@ -190,7 +190,7 @@ export function EditorPagina({ inicial, yaGuardada }: { inicial: DatosPagina; ya
               type="button"
               onClick={guardar}
               disabled={pendiente || !!errorLocal}
-              className={clasesBoton("principal", "md")}
+              className={clasesBoton("navegar", "md")}
             >
               {pendiente ? "Guardando…" : "Guardar cambios"}
             </button>

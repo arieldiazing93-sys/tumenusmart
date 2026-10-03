@@ -33,7 +33,7 @@ export default async function InventarioPage({
         bajada="Los inventarios que contaste en cada almacén, con lo que dijo el sistema, lo que había y la diferencia. Cada diferencia también queda en el historial del insumo."
         acciones={
           puede(sesion.rol, "stock.editar") && (
-            <BotonEnlace href="/admin/stock/inventario/nuevo">+ Nuevo inventario</BotonEnlace>
+            <BotonEnlace tono="nuevo" href="/admin/stock/inventario/nuevo">+ Nuevo inventario</BotonEnlace>
           )
         }
       />

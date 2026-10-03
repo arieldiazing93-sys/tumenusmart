@@ -46,7 +46,7 @@ export function CrearProveedorForm({ onCreado }: { onCreado: (proveedorId: strin
           <Entrada name="notas" placeholder="Ej: entrega los martes y viernes" />
         </Campo>
         <div className="sm:col-span-2">
-          <button type="submit" disabled={pendiente} className={clasesBoton("principal")}>
+          <button type="submit" disabled={pendiente} className={clasesBoton("nuevo")}>
             {pendiente ? "Agregando…" : "Agregar"}
           </button>
         </div>

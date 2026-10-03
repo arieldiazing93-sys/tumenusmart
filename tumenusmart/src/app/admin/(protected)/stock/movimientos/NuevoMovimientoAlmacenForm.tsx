@@ -182,7 +182,7 @@ export function NuevoMovimientoAlmacenForm({ almacenes }: { almacenes: Almacen[]
           />
         </Etiqueta>
         <div className="flex items-center gap-3">
-          <button type="button" disabled={pendiente} onClick={registrar} className={clasesBoton("principal", "sm")}>
+          <button type="button" disabled={pendiente} onClick={registrar} className={clasesBoton("nuevo", "sm")}>
             {pendiente ? "Guardando…" : tipo === "salida" ? "Registrar salida" : "Registrar entrada"}
           </button>
           {registrado && <span className="text-xs font-medium text-exito">✓ Registrado</span>}

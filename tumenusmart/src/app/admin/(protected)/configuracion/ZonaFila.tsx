@@ -110,7 +110,7 @@ export function ZonaFila({
             type="button"
             disabled={pending}
             onClick={guardar}
-            className={clasesBoton("principal", "sm")}
+            className={clasesBoton("navegar", "sm")}
           >
             Guardar
           </button>

@@ -321,7 +321,7 @@ export function NuevaFacturaForm({
 
           {errorEnvio && <MensajeError>{errorEnvio}</MensajeError>}
 
-          <Boton onClick={generar} disabled={!puedeGenerar || enviando} tam="lg">
+          <Boton tono="nuevo" onClick={generar} disabled={!puedeGenerar || enviando} tam="lg">
             {enviando ? "Generando…" : "Generar factura nueva"}
           </Boton>
         </>

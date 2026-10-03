@@ -30,7 +30,7 @@ export function CrearCategoriaForm() {
         placeholder="Nueva categoría (ej: Postres)"
         className="flex-1 rounded-lg border border-linea px-3 py-2"
       />
-      <button type="submit" disabled={pendiente} className={clasesBoton("principal")}>
+      <button type="submit" disabled={pendiente} className={clasesBoton("nuevo")}>
         Agregar
       </button>
       {agregada && <span className="text-xs font-medium text-exito">✓ Agregada</span>}
