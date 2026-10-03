@@ -12,7 +12,8 @@ import { claveDiaAsuncion } from "@/lib/timezone";
 import { formatearGuarani, formatearNumero } from "@/lib/format";
 import { registrarBitacora } from "@/lib/bitacora";
 import { armarPedido, type LineaPedida, type ProductoBase } from "@/lib/precio-pedido";
-import { registrarConsumoVenta, revertirMovimientosVenta } from "@/lib/movimientos-stock";
+import { devolverConsumo, registrarConsumoVenta, revertirMovimientosVenta } from "@/lib/movimientos-stock";
+import { leerConsumoGuardado } from "@/lib/comedor";
 import { costoDelProducto } from "@/lib/costo-receta";
 import { aplanarReceta } from "@/lib/insumo-elaborado";
 import { cargarElaborados } from "@/lib/cargar-elaborados";
@@ -1087,6 +1088,33 @@ export async function cancelarVenta(ventaId: string, motivo: string): Promise<Re
     }
 
     await revertirMovimientosVenta(tx, storeId, { ventaPosId: ventaId }, identidad);
+
+    // Si esta venta cobró la cuenta de una mesa del Servicio comedor: el stock de esa cuenta bajó al enviar cada pedido y
+    // quedó enlazado a la CUENTA, no a la venta, así que lo de arriba no lo encontró. Se devuelve lo de los productos que
+    // seguían activos (los que ya se habían cancelado devolvieron el suyo en su momento) y la cuenta queda anulada.
+    const cuentaMesa = await tx.cuentaMesa.findFirst({
+      where: { storeId, ventaPosId: ventaId },
+      select: {
+        id: true,
+        items: { where: { estado: "activo" }, select: { cantidad: true, nombreProducto: true, consumo: true } },
+      },
+    });
+    if (cuentaMesa) {
+      for (const item of cuentaMesa.items) {
+        await devolverConsumo(
+          tx,
+          storeId,
+          leerConsumoGuardado(item.consumo),
+          { cuentaMesaId: cuentaMesa.id },
+          `Cancelado: ${item.cantidad} × ${item.nombreProducto} (cobro cancelado)`,
+          identidad
+        );
+      }
+      await tx.cuentaMesa.update({
+        where: { id: cuentaMesa.id },
+        data: { estado: "anulada", motivoCierre: `Cobro cancelado: ${motivo.trim() || "sin motivo"}` },
+      });
+    }
 
     // Una venta del mostrador que se le asignó a alguien del personal creó su propia cita (ya
     // cobrada): si la venta se cancela, esa cita no tiene sentido y se borra.

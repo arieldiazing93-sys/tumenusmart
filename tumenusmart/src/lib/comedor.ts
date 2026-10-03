@@ -278,3 +278,22 @@ export function textoAnulacion(datos: {
   l.push(separador());
   return armarDocumento(l);
 }
+
+/** Lo que descontó un producto al enviarse, tal como quedó guardado (se ignora lo que no tenga la forma esperada). */
+export function leerConsumoGuardado(valor: unknown): ConsumoGuardado[] {
+  if (!Array.isArray(valor)) return [];
+  const lista: ConsumoGuardado[] = [];
+  for (const x of valor) {
+    if (x && typeof x === "object" && !Array.isArray(x)) {
+      const o = x as { insumoId?: unknown; almacenId?: unknown; cantidad?: unknown };
+      if (typeof o.insumoId === "string" && typeof o.cantidad === "number") {
+        lista.push({
+          insumoId: o.insumoId,
+          almacenId: typeof o.almacenId === "string" ? o.almacenId : null,
+          cantidad: o.cantidad,
+        });
+      }
+    }
+  }
+  return lista;
+}

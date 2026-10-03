@@ -2,18 +2,19 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Boton, Campo, MensajeError, clasesBoton } from "@/components/ui";
+import { Boton, Campo, Entrada, MensajeError, clasesBoton } from "@/components/ui";
 import { PanelLateral } from "@/components/PanelLateral";
 import { Segmentado } from "@/components/Segmentado";
 import { formatearGuarani, formatearNumero } from "@/lib/format";
 import { textoPorcentaje } from "@/lib/descuento-venta";
 import type { PagoCobro } from "@/lib/pago-venta";
+import { FORMA_PAGO_A_CREDITO } from "@/lib/turno-pos";
 import { SIN_REGISTRO_FISCAL, TIPOS_IDENTIFICACION_FISCAL, etiquetaCortaTipoIdentificacion } from "@/lib/tipo-cliente";
 import { imprimirComprobante, type ResultadoImpresion } from "@/lib/impresion-comprobantes";
 import { CobrarPanel } from "../pos/CobrarPanel";
 import { EntradaConLupa } from "../pos/EntradaConLupa";
 import { ClienteFiscalModal, type DatosClienteFiscal } from "../pos/ClienteFiscalModal";
-import { buscarClientePorIdentificacion } from "../pos/actions";
+import { buscarClientePorIdentificacion, buscarClientePorTelefono } from "../pos/actions";
 import { pagarCuenta } from "./actions";
 import type { ContextoCaja, CuentaCajaFila } from "./ComedorCaja";
 
@@ -44,7 +45,7 @@ export function PagarCuentaPanel({
   onCerrar: () => void;
 }) {
   const router = useRouter();
-  const { puedeFacturar, diasParaVencerTimbrado, facturaObligatoria, nombreImpresoraTicket } = cobro;
+  const { puedeFacturar, diasParaVencerTimbrado, facturaObligatoria, nombreImpresoraTicket, permiteCredito } = cobro;
   // Si el local factura todo y esta estación puede, no hay "Ticket" que elegir; si factura todo y no puede, no se cobra.
   const facturaForzada = facturaObligatoria && puedeFacturar;
   const bloqueadoSinFacturar = facturaObligatoria && !puedeFacturar;
@@ -60,6 +61,11 @@ export function PagarCuentaPanel({
   const [buscando, setBuscando] = useState(false);
   const [modalCliente, setModalCliente] = useState(false);
 
+  // Para una venta a crédito: a quién se le cobra después (nombre y teléfono; con factura con registro fiscal alcanza su RUC).
+  const [clienteNombre, setClienteNombre] = useState("");
+  const [clienteTelefono, setClienteTelefono] = useState("");
+  const [buscandoTelefono, setBuscandoTelefono] = useState(false);
+
   const [mostrarCobro, setMostrarCobro] = useState(false);
   const [cobrando, setCobrando] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -71,6 +77,23 @@ export function PagarCuentaPanel({
   const cantidadProductos = cuenta.items.filter((i) => !i.anulado).reduce((s, i) => s + i.cantidad, 0);
   const esFactura = comprobanteTipo === "factura";
   const conRegistro = esFactura && registroFiscal === "con";
+  // Una venta a crédito necesita saber a quién cobrarle: nombre y una forma de ubicarlo (mismo criterio que el servidor).
+  const creditoTieneNombre = !!clienteNombre.trim() || (conRegistro && !!razonSocial.trim());
+  const creditoTieneContacto = !!clienteTelefono.trim() || (conRegistro && !!numero.trim());
+  const creditoListo = creditoTieneNombre && creditoTieneContacto;
+
+  async function buscarPorTelefono() {
+    const t = clienteTelefono.trim();
+    if (!t) return;
+    setBuscandoTelefono(true);
+    try {
+      const r = await buscarClientePorTelefono(t);
+      if (r.ok) setClienteNombre(r.nombre);
+    } catch {
+      setErrorCobro("No se pudo buscar el cliente. Probá de nuevo.");
+    }
+    setBuscandoTelefono(false);
+  }
 
   async function buscarCliente() {
     const n = numero.trim();
@@ -105,7 +128,13 @@ export function PagarCuentaPanel({
     setMostrarCobro(true);
   }
 
-  async function confirmarCobro(pagos: PagoCobro[]) {
+  async function confirmarCobro(pagos: PagoCobro[], creditoDias?: number) {
+    // A crédito va sola (no se combina con otras formas): una única fila "a_credito".
+    const esCredito = pagos.length === 1 && pagos[0].forma === FORMA_PAGO_A_CREDITO;
+    if (esCredito && !creditoListo) {
+      setErrorCobro("Una venta a crédito necesita un cliente: escribí su nombre y su teléfono en el cuadro de cobro.");
+      return;
+    }
     setCobrando(true);
     setErrorCobro(null);
     const sinRegistro = esFactura && registroFiscal === "sin";
@@ -120,6 +149,12 @@ export function PagarCuentaPanel({
         facturaNumeroIdentificacion: conRegistro ? numero.trim() : undefined,
         facturaRazonSocial: conRegistro ? razonSocial : undefined,
         facturaEmail: conRegistro ? email.trim() || undefined : undefined,
+        // Solo a crédito: a quién se le cobra después y en cuántos días vence.
+        clienteNombre: esCredito ? clienteNombre : undefined,
+        clienteTelefono: esCredito ? clienteTelefono : undefined,
+        creditoDias: esCredito ? creditoDias : undefined,
+        // Para que el servidor avise si la cuenta cambió mientras se cobraba.
+        totalMostrado: total,
       });
     } catch {
       setCobrando(false);
@@ -199,6 +234,63 @@ export function PagarCuentaPanel({
       </PanelLateral>
     );
   }
+
+  // Lo que se muestra dentro del cuadro de cobro al elegir "A crédito": el cliente al que se le va a cobrar después. Con
+  // factura con registro fiscal el cliente es el del RUC o la cédula ya cargado; si no, se escribe su nombre y teléfono.
+  const bloqueClienteCredito = (
+    <div className="mt-3 rounded-lg border border-linea bg-white p-3">
+      <p className="mb-2 text-[0.72rem] font-semibold uppercase tracking-rotulo text-tinta-suave">
+        Cliente de esta venta a crédito
+      </p>
+      <p className="mb-2 rounded-md bg-papel-suave px-2.5 py-1.5 text-[0.76rem] text-tinta-media">
+        Comprobante:{" "}
+        <strong className="text-tinta">
+          {esFactura
+            ? registroFiscal === "con"
+              ? "Factura a crédito (con registro fiscal)"
+              : "Factura a crédito (Consumidor Final)"
+            : "Ticket (sin factura)"}
+        </strong>
+        {!esFactura && puedeFacturar && !facturaObligatoria && (
+          <span className="block text-tinta-suave">
+            Si querés facturarla, cerrá este cuadro y elegí Factura en &ldquo;Comprobante&rdquo; antes de cobrar.
+          </span>
+        )}
+      </p>
+      {conRegistro && razonSocial.trim() && numero.trim() && (
+        <div className="mb-2 flex flex-col items-start gap-1">
+          <DatoDelCliente etiqueta="Razón social" valor={razonSocial} />
+          <DatoDelCliente etiqueta={etiquetaCortaTipoIdentificacion(tipoId)} valor={numero.trim()} />
+        </div>
+      )}
+      <div className="flex flex-col gap-2">
+        <div className="grid grid-cols-[1fr_auto] gap-2">
+          <EntradaConLupa
+            inputMode="tel"
+            placeholder={conRegistro ? "Teléfono (opcional)" : "Teléfono del cliente"}
+            value={clienteTelefono}
+            onChange={(e) => setClienteTelefono(e.target.value)}
+            onBuscar={() => void buscarPorTelefono()}
+            buscando={buscandoTelefono}
+            etiquetaBoton="Buscar cliente por teléfono"
+          />
+        </div>
+        <Entrada
+          placeholder={conRegistro ? "Nombre (opcional)" : "Nombre del cliente"}
+          value={clienteNombre}
+          onChange={(e) => setClienteNombre(e.target.value)}
+          maxLength={80}
+        />
+        <p className="text-[0.74rem] text-tinta-suave">
+          {creditoListo
+            ? "Listo: la venta queda en Cuentas por cobrar a nombre de este cliente."
+            : conRegistro
+              ? "Falta el RUC y la razón social de la factura (en el paso anterior), o el nombre y el teléfono."
+              : "Hacen falta el nombre y el teléfono del cliente para poder cobrarle después."}
+        </p>
+      </div>
+    </div>
+  );
 
   // ------------------------------------------------------------------------------- el comprobante y a quién se factura
   return (
@@ -377,18 +469,18 @@ export function PagarCuentaPanel({
 
       {mostrarCobro && (
         <CobrarPanel
-          clienteNombre={conRegistro ? razonSocial : ""}
+          clienteNombre={(conRegistro && razonSocial.trim()) || clienteNombre}
           cantidadItems={cantidadProductos}
           total={total}
           cobrando={cobrando}
           error={errorCobro}
           personal={[]}
-          permiteCredito={false}
-          bloqueClienteCredito={null}
-          creditoListo={false}
+          permiteCredito={permiteCredito}
+          bloqueClienteCredito={bloqueClienteCredito}
+          creditoListo={creditoListo}
           hayModalEncima={false}
           onCerrar={() => setMostrarCobro(false)}
-          onCobrar={(pagos) => void confirmarCobro(pagos)}
+          onCobrar={(pagos, creditoDias) => void confirmarCobro(pagos, creditoDias)}
         />
       )}
     </>

@@ -83,9 +83,20 @@ export async function listarImpresoras(): Promise<string[]> {
  * un string simple en el array de datos ya se interpreta como
  * `{type: 'raw', format: 'command', flavor: 'plain'}`.
  */
-export async function imprimirTexto(nombreImpresora: string, texto: string): Promise<void> {
-  await conectarQz();
-  const qz = await cargarQz();
-  const config = qz.configs.create(nombreImpresora);
-  await qz.print(config, [texto]);
+export function imprimirTexto(nombreImpresora: string, texto: string): Promise<void> {
+  // Una impresión por vez en toda la pantalla: mandar varios trabajos juntos a la misma impresora física los mezcla en su
+  // buffer y salen líneas superpuestas. Pasa de verdad cuando la impresión automática de comandas (que corre en segundo
+  // plano) y el ticket de un cobro coinciden en la misma impresora. Cada trabajo espera a que termine el anterior; que uno
+  // falle no frena a los que siguen (el error le llega solo a quien lo pidió).
+  const tarea = colaDeImpresion.then(async () => {
+    await conectarQz();
+    const qz = await cargarQz();
+    const config = qz.configs.create(nombreImpresora);
+    await qz.print(config, [texto]);
+  });
+  colaDeImpresion = tarea.catch(() => {});
+  return tarea;
 }
+
+/** El último trabajo de impresión pedido: el siguiente se encadena a él. */
+let colaDeImpresion: Promise<void> = Promise.resolve();

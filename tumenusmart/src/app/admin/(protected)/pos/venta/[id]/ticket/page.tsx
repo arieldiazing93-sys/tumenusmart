@@ -259,6 +259,7 @@ export default async function TicketVentaPosPage({
             <p>Servicio rapido</p>
             <p>{fecha}</p>
             <p className="mt-1">Venta {formatearNumero(venta.numero)}</p>
+            {venta.nota?.startsWith("Mesa ") && <p>{sinAcentos(venta.nota.split(" · ")[0])}</p>}
             {venta.facturaAnulada && venta.facturaNumero && (
               <p className="mt-1">
                 Factura {venta.facturaNumero} ANULADA — no vale como comprobante fiscal.

@@ -146,7 +146,10 @@ export default async function ComedorPage() {
       if (puedeCobrar) {
         const turno = await turnoAbierto(db, estacion.id);
         const punto = datos?.puntoExpedicion ?? null;
-        const store = await prisma.store.findUnique({ where: { id: storeId }, select: { facturaObligatoria: true } });
+        const store = await prisma.store.findUnique({
+          where: { id: storeId },
+          select: { facturaObligatoria: true, ventasACredito: true },
+        });
         contexto = {
           ...contexto,
           cobro: turno
@@ -156,6 +159,7 @@ export default async function ComedorPage() {
                 diasParaVencerTimbrado: punto ? diasParaVencer(punto.timbradoHasta) : null,
                 facturaObligatoria: store?.facturaObligatoria ?? false,
                 nombreImpresoraTicket: impresoraDelTicket,
+                permiteCredito: store?.ventasACredito ?? false,
               }
             : {
                 ok: false,

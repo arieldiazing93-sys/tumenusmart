@@ -88,6 +88,8 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     l.push("Servicio rapido");
     l.push(fecha);
     l.push(`Venta ${formatearNumero(venta.numero)}`);
+    // Una cuenta de mesa del Servicio comedor guarda "Mesa 5 · Cuenta #0001" en la nota: el ticket dice de qué mesa es.
+    if (venta.nota?.startsWith("Mesa ")) l.push(sinAcentos(venta.nota.split(" · ")[0]));
     if (venta.facturaAnulada && venta.facturaNumero) {
       l.push(`Factura ${venta.facturaNumero} ANULADA - no vale como comprobante fiscal.`);
     }

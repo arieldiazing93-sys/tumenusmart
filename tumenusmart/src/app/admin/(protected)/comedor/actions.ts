@@ -15,11 +15,13 @@ import { desglosarIva, formatearNumeroFactura } from "@/lib/factura-pos";
 import { crearComprobante, descripcionDeItem } from "@/lib/comprobante";
 import { SIN_REGISTRO_FISCAL } from "@/lib/tipo-cliente";
 import { calcularDescuento, textoPorcentaje } from "@/lib/descuento-venta";
+import { claveDiaAsuncion } from "@/lib/timezone";
 import { formatearGuarani, formatearNumero } from "@/lib/format";
 import {
   ESTADOS_CUENTA_ABIERTA,
   contenidoParaGuardar,
   descuentoDeCuenta,
+  leerConsumoGuardado,
   textoAnulacion,
   totalDeLineas,
   totalesDeCuenta,
@@ -87,25 +89,6 @@ type ItemParaAnular = {
   consumo: Prisma.JsonValue;
 };
 
-/** Lo que descontó un producto al enviarse, tal como quedó guardado (se ignora lo que no tenga la forma esperada). */
-function leerConsumo(valor: Prisma.JsonValue): { insumoId: string; almacenId: string | null; cantidad: number }[] {
-  if (!Array.isArray(valor)) return [];
-  const lista: { insumoId: string; almacenId: string | null; cantidad: number }[] = [];
-  for (const x of valor) {
-    if (x && typeof x === "object" && !Array.isArray(x)) {
-      const o = x as { insumoId?: unknown; almacenId?: unknown; cantidad?: unknown };
-      if (typeof o.insumoId === "string" && typeof o.cantidad === "number") {
-        lista.push({
-          insumoId: o.insumoId,
-          almacenId: typeof o.almacenId === "string" ? o.almacenId : null,
-          cantidad: o.cantidad,
-        });
-      }
-    }
-  }
-  return lista;
-}
-
 /**
  * Cancela productos de una cuenta, dentro de la transacción de quien llama: los marca (con quién y por qué), devuelve al stock
  * lo que habían descontado y le avisa a su área (Cocina, Barra…) con un papel de "ANULADO" para que no lo preparen.
@@ -137,7 +120,7 @@ async function anularItems(
     await devolverConsumo(
       tx,
       storeId,
-      leerConsumo(item.consumo),
+      leerConsumoGuardado(item.consumo),
       { cuentaMesaId: cuenta.id },
       `Cancelado: ${item.cantidad} × ${item.nombreProducto} (${razon})`,
       quien
@@ -250,6 +233,12 @@ export async function cancelarCuenta(cuentaId: string, motivo: string): Promise<
         },
       });
       await anularItems(tx, storeId, cuenta, activos, razon, quien);
+      // Las comandas que todavía no salieron (la impresora estaba apagada) ya no tienen sentido: no se imprimen después.
+      // Quedan a la vista en la lista, con ese motivo, y se pueden reimprimir a mano si hiciera falta.
+      await tx.trabajoImpresion.updateMany({
+        where: { storeId, cuentaMesaId: cuenta.id, tipo: "comanda", estado: "pendiente" },
+        data: { estado: "error", error: "La cuenta se canceló antes de imprimirse." },
+      });
       // El estado va en la condición: si la pagaron en el mismo instante, no se pisa.
       const cerrada = await tx.cuentaMesa.updateMany({
         where: { id: cuenta.id, storeId, estado: { in: [...ESTADOS_CUENTA_ABIERTA] } },
@@ -531,6 +520,16 @@ export type DatosCobroCuenta = {
   facturaNumeroIdentificacion?: string;
   facturaRazonSocial?: string;
   facturaEmail?: string;
+  /** Solo si se paga "a_credito": a quién se le cobra después (nombre y teléfono; con factura con registro fiscal alcanza su RUC). */
+  clienteNombre?: string;
+  clienteTelefono?: string;
+  /** Solo si se paga "a_credito": en cuántos días vence lo que debe el cliente (0 a 365; por defecto 30). */
+  creditoDias?: number;
+  /**
+   * El total que la persona tenía en pantalla al cobrar. No se usa para cobrar (el total sale de la cuenta): sirve para
+   * avisar si la cuenta cambió mientras se cobraba (el mozo agregó algo) en vez de cobrar un monto distinto del que se vio.
+   */
+  totalMostrado?: number;
 };
 
 export type ResultadoPagoCuenta = { ok: true; ventaId: string; total: number } | { ok: false; error: string };
@@ -560,7 +559,10 @@ export async function pagarCuenta(cuentaId: string, datos: DatosCobroCuenta): Pr
   const puntoExpedicion = (
     await db.estacion.findUnique({ where: { id: estacion.id }, select: { puntoExpedicion: true } })
   )?.puntoExpedicion ?? null;
-  const store = await prisma.store.findUnique({ where: { id: storeId }, select: { facturaObligatoria: true } });
+  const store = await prisma.store.findUnique({
+    where: { id: storeId },
+    select: { facturaObligatoria: true, ventasACredito: true },
+  });
 
   // ------------------------------------------------------------ factura o ticket (mismas reglas que el mostrador)
   const esFactura = datos?.comprobanteTipo === "factura";
@@ -624,9 +626,36 @@ export async function pagarCuenta(cuentaId: string, datos: DatosCobroCuenta): Pr
   const total = totales.total;
   if (total <= 0) return { ok: false, error: "El total tiene que ser mayor a cero." };
 
-  // Una cuenta de mesa no se cobra a crédito (por ahora): pide un cliente al que cobrarle después, y eso no está acá.
-  if (Array.isArray(datos?.pagos) && datos.pagos.some((p) => String(p?.forma ?? "").trim().toLowerCase() === FORMA_PAGO_A_CREDITO)) {
-    return { ok: false, error: "Las cuentas de mesa todavía no se pueden cobrar a crédito. Elegí otra forma de pago." };
+  // Si la cuenta cambió mientras se cobraba (el mozo cargó algo, o la caja le dio un descuento desde otra pantalla), el
+  // monto que la persona vio ya no es el real: se avisa en vez de cobrar otra cosa.
+  if (datos?.totalMostrado != null && Math.round(Number(datos.totalMostrado)) !== Math.round(total)) {
+    return {
+      ok: false,
+      error: `La cuenta cambió mientras la cobrabas: ahora es de ${formatearGuarani(total)}. Cerrá este cuadro y volvé a abrir el cobro.`,
+    };
+  }
+
+  // Venta a crédito (mismas reglas que el mostrador): solo si el local la activó, y solo a un cliente al que se le pueda
+  // cobrar después. A crédito va sola: no se combina con otras formas de pago (validarPagosDeVenta lo vuelve a exigir).
+  const esCredito =
+    Array.isArray(datos?.pagos) &&
+    datos.pagos.length === 1 &&
+    String(datos.pagos[0]?.forma ?? "").trim().toLowerCase() === FORMA_PAGO_A_CREDITO;
+  const clienteNombre = String(datos?.clienteNombre ?? "").trim().slice(0, 80) || null;
+  const clienteTelefono = String(datos?.clienteTelefono ?? "").trim().slice(0, 30) || null;
+  let fechaVencimientoCredito: Date | null = null;
+  if (esCredito) {
+    if (!store?.ventasACredito) return { ok: false, error: "Este local no vende a crédito. Se activa en Configuración." };
+    const conRegistro = esFactura && !esSinRegistroFiscal;
+    const nombreDeudor = clienteNombre || (conRegistro ? String(datos.facturaRazonSocial ?? "").trim() : "");
+    const contactoDeudor = clienteTelefono || (conRegistro ? String(datos.facturaNumeroIdentificacion ?? "").trim() : "");
+    if (!nombreDeudor || !contactoDeudor) {
+      return { ok: false, error: "Una venta a crédito necesita el nombre del cliente y su teléfono o su RUC/cédula." };
+    }
+    const diasPedidos = Math.round(Number(datos.creditoDias ?? 30));
+    const dias = Number.isFinite(diasPedidos) ? Math.min(Math.max(diasPedidos, 0), 365) : 30;
+    // El vencimiento es un día (no una hora): se guarda a medianoche UTC, como las demás fechas de día.
+    fechaVencimientoCredito = new Date(Date.parse(claveDiaAsuncion(new Date())) + dias * 24 * 60 * 60 * 1000);
   }
   const pagosValidados = validarPagosDeVenta(datos?.pagos, total);
   if (!pagosValidados.ok) return { ok: false, error: pagosValidados.error };
@@ -641,6 +670,15 @@ export async function pagarCuenta(cuentaId: string, datos: DatosCobroCuenta): Pr
 
   const numero = await siguienteNumeroVentaPos(storeId);
   const notaVenta = `Mesa ${cuenta.mesa} · Cuenta ${formatearNumero(cuenta.numero)}`;
+
+  // Con teléfono, el cliente queda en la lista de clientes (o se le actualiza el nombre): mismo alta que el mostrador.
+  if (clienteTelefono) {
+    await prisma.customer.upsert({
+      where: { storeId_telefono: { storeId, telefono: clienteTelefono } },
+      update: clienteNombre ? { nombre: clienteNombre } : {},
+      create: { storeId, nombre: clienteNombre || "Cliente de mostrador", telefono: clienteTelefono },
+    });
+  }
 
   let ventaId = "";
   try {
@@ -708,7 +746,10 @@ export async function pagarCuenta(cuentaId: string, datos: DatosCobroCuenta): Pr
           descuento: totales.descuento,
           descuentoPorcentaje: totales.porcentaje,
           registradoPor,
-          clienteNombre: esFactura && !esSinRegistroFiscal ? datos.facturaRazonSocial!.trim() : null,
+          // Igual que el mostrador: el nombre y el teléfono que se tipearon (a crédito, para saber a quién cobrarle).
+          clienteNombre,
+          clienteTelefono,
+          fechaVencimientoCredito,
           tipoEntrega: "local",
           nota: notaVenta,
           ...datosFactura,
@@ -743,8 +784,8 @@ export async function pagarCuenta(cuentaId: string, datos: DatosCobroCuenta): Pr
             email: esSinRegistroFiscal ? null : datos.facturaEmail?.trim() || null,
           },
           presencia: "presencial",
-          condicion: "contado",
-          fechaVencimientoCredito: null,
+          condicion: esCredito ? "credito" : "contado",
+          fechaVencimientoCredito,
           items: filas.map((f) => ({
             productId: f.productId ?? null,
             descripcion: descripcionDeItem(f.nombreProducto, f.opcionesTexto ?? undefined),
@@ -777,7 +818,9 @@ export async function pagarCuenta(cuentaId: string, datos: DatosCobroCuenta): Pr
     accion: "cuenta_pagada",
     descripcion: `Cobró la cuenta ${formatearNumero(cuenta.numero)} de la mesa ${cuenta.mesa} por ${formatearGuarani(total)}${
       esFactura ? " con factura" : " con ticket"
-    }${totales.descuento > 0 ? `, con un descuento de ${formatearGuarani(totales.descuento)}` : ""}.`,
+    }${esCredito ? ", a crédito" : ""}${
+      totales.descuento > 0 ? `, con un descuento de ${formatearGuarani(totales.descuento)}` : ""
+    }.`,
     entidad: "VentaPos",
     entidadId: ventaId,
     detalle: {
@@ -787,6 +830,7 @@ export async function pagarCuenta(cuentaId: string, datos: DatosCobroCuenta): Pr
       descuento: totales.descuento,
       total,
       comprobante: esFactura ? "factura" : "ticket",
+      a_credito: esCredito,
     },
   });
 

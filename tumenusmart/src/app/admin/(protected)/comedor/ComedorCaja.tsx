@@ -62,6 +62,8 @@ export type ContextoCaja = {
         diasParaVencerTimbrado: number | null;
         facturaObligatoria: boolean;
         nombreImpresoraTicket: string | null;
+        /** Si el local vende a crédito (Configuración): el cobro ofrece "A crédito". */
+        permiteCredito: boolean;
       }
     | { ok: false; motivo: string };
 };
