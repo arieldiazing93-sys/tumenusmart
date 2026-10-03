@@ -47,7 +47,8 @@ function armarGrupos(hayIdeaSinVer: boolean, rol: string, ventasACredito: boolea
           ver: conPermiso("pos.vender") },
         // El mozo carga las mesas desde su celular o tablet (enlace público con su PIN) y la caja opera las cuentas
         // y imprime las comandas con las impresoras de su estación. Es un submenú: las pantallas de adentro son
-        // suyas (cuentas abiertas, la impresión automática y los mozos con su enlace). La fila se ve si alguna se puede ver.
+        // suyas (las cuentas abiertas y la impresión automática). Lo que se configura (mozos, mesas, reglas) vive en
+        // Ajustes → "Configuración servicio comedor". La fila se ve si alguna se puede ver.
         { href: "/admin/comedor", label: "Servicio comedor", icono: "pedidos" as const,
           subsecciones: [
             { href: "/admin/comedor", label: "Cuentas abiertas", icono: "pedidos" as const,
@@ -55,8 +56,6 @@ function armarGrupos(hayIdeaSinVer: boolean, rol: string, ventasACredito: boolea
             // La pantalla que la caja deja abierta para que salgan solas las comandas de los mozos.
             { href: "/admin/impresion", label: "Impresión automática", icono: "pos" as const,
               ver: conPermiso("comedor.gestionar") },
-            { href: "/admin/comedor/mozos", label: "Mozos y enlace", icono: "usuarios" as const,
-              ver: conPermiso("comedor.configurar") },
           ] },
         // Los pedidos de la carta (online, por teléfono): con su propio historial.
         { href: "/admin/pedidos", label: "Pedidos", icono: "pedidos" as const,
@@ -224,6 +223,17 @@ function armarGrupos(hayIdeaSinVer: boolean, rol: string, ventasACredito: boolea
       secciones: [
         { href: "/admin/configuracion", label: "Configuración", icono: "configuracion" as const,
           ver: conPermiso("configuracion.editar") },
+        // Todo lo que se configura del Servicio comedor, por bloques: los mozos con su enlace, las mesas del salón y las
+        // reglas del mozo. Cada bloque nuevo que se agregue a esta configuración se suma acá, dentro de este submenú.
+        { href: "/admin/comedor/mozos", label: "Configuración servicio comedor", icono: "configuracion" as const,
+          subsecciones: [
+            { href: "/admin/comedor/mozos", label: "Mozos y enlace", icono: "usuarios" as const,
+              ver: conPermiso("comedor.configurar") },
+            { href: "/admin/comedor/mesas", label: "Mesas del salón", icono: "pedidos" as const,
+              ver: conPermiso("comedor.configurar") },
+            { href: "/admin/comedor/reglas", label: "Reglas del mozo", icono: "configuracion" as const,
+              ver: conPermiso("comedor.configurar") },
+          ] },
         { href: "/admin/empleados", label: "Empleados", icono: "usuarios" as const,
           ver: conPermiso("empleados.gestionar") },
         // Quién hizo qué en el sistema: solo el dueño.

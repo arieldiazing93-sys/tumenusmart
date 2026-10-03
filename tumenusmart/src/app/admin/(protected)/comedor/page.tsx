@@ -183,7 +183,7 @@ export default async function ComedorPage() {
             )}
             {puede(sesion.rol, "comedor.configurar") && (
               <BotonEnlace href="/admin/comedor/mozos" tono="navegar" tam="md">
-                Mozos y enlace
+                Configuración del comedor
               </BotonEnlace>
             )}
           </>

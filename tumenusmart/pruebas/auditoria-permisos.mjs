@@ -86,6 +86,9 @@ const EXCEPCIONES = {
     salirDelSalon: "salir nunca puede requerir permiso: solo borra la cookie del mozo",
     estadoDelSalon: "solo lee las mesas abiertas del local de la llave; exige la sesión firmada del mozo",
     detalleDeCuenta: "solo lee una cuenta abierta del local de la llave; exige la sesión firmada del mozo",
+    imprimirCuentaDelMozo:
+      "imprime la cuenta de una mesa del local de la llave solo si el dueño activó la regla; exige la sesión firmada del " +
+      "mozo, respeta la regla de ver solo sus cuentas y una sola vez por cuenta",
     enviarPedido:
       "carga un pedido en una mesa del local de la llave; exige la sesión firmada del mozo, recalcula el precio en el " +
       "servidor y no duplica un envío repetido",

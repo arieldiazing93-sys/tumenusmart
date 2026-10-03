@@ -16,23 +16,28 @@ import { crearComprobante, descripcionDeItem } from "@/lib/comprobante";
 import { SIN_REGISTRO_FISCAL } from "@/lib/tipo-cliente";
 import { calcularDescuento, textoPorcentaje } from "@/lib/descuento-venta";
 import { formatearGuarani, formatearNumero } from "@/lib/format";
-import { ZONA_NEGOCIO } from "@/lib/timezone";
 import {
   ESTADOS_CUENTA_ABIERTA,
   contenidoParaGuardar,
   descuentoDeCuenta,
   textoAnulacion,
-  textoCuenta,
   totalDeLineas,
   totalesDeCuenta,
 } from "@/lib/comedor";
-import { guardarRonda, pistaDelError, type LineaDeRonda } from "@/lib/comedor-servidor";
+import {
+  ErrorDeUsuario,
+  encolarCuenta,
+  guardarRonda,
+  horaDeAhora,
+  pistaDelError,
+  type LineaDeRonda,
+} from "@/lib/comedor-servidor";
 import { turnoAbierto } from "../pos/turno-actual";
 
 /**
  * Lo que la CAJA hace con la cuenta de una mesa desde el panel (Servicio comedor): cargar productos, cancelar uno o toda la
  * cuenta (con motivo), dar un descuento, imprimir la cuenta (queda "por cobrar": el mozo ya no puede cargarle más), reabrirla
- * y pagarla. El mozo nunca hace nada de esto.
+ * y pagarla. El mozo no hace nada de esto, salvo imprimir SU cuenta si el dueño activó esa regla (ver la acción del mozo).
  *
  * Cada acción exige su permiso al empezar y busca la cuenta SOLO dentro del local de la sesión. Todas devuelven un resultado
  * en vez de lanzar, para que la pantalla pueda decir por qué no se pudo (Next.js oculta en producción el mensaje de una
@@ -40,9 +45,6 @@ import { turnoAbierto } from "../pos/turno-actual";
  */
 
 type Resultado = { ok: true } | { ok: false; error: string };
-
-/** Un fallo que se le explica a la persona tal cual (no es un error inesperado). Se lanza dentro de una transacción. */
-class ErrorDeUsuario extends Error {}
 
 /** Desde Vercel hasta la base cada consulta tarda: las transacciones largas necesitan más que los 5 s de fábrica. */
 const OPCIONES_TX = { timeout: 15_000, maxWait: 10_000 } as const;
@@ -66,17 +68,6 @@ function nombreDe(sesion: { nombre?: string | null; email: string }): string {
 function textoNoEditable(estado: string): string {
   if (estado === "por_cobrar") return "La cuenta ya está impresa. Reabrila para hacer cambios.";
   return "Esa cuenta ya está cerrada.";
-}
-
-function horaDeAhora(): string {
-  return new Date().toLocaleString("es-PY", {
-    day: "2-digit",
-    month: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-    timeZone: ZONA_NEGOCIO,
-  });
 }
 
 function refrescar() {
@@ -408,60 +399,18 @@ export async function imprimirCuenta(cuentaId: string): Promise<Resultado> {
 
   let titulo = "";
   try {
-    titulo = await prisma.$transaction(async (tx) => {
-      const cuenta = await tx.cuentaMesa.findFirst({
-        where: { id: String(cuentaId), storeId, estado: { in: [...ESTADOS_CUENTA_ABIERTA] } },
-        include: {
-          mozo: { select: { nombre: true, apellido: true } },
-          items: { where: { estado: "activo" }, orderBy: [{ ronda: "asc" }, { linea: "asc" }] },
-        },
-      });
-      if (!cuenta) throw new ErrorDeUsuario("Esa cuenta ya está cerrada.");
-      if (cuenta.items.length === 0) throw new ErrorDeUsuario("La cuenta no tiene productos para imprimir.");
-
-      const lineas = cuenta.items.map((i) => ({ precioUnitario: Number(i.precioUnitario), cantidad: i.cantidad }));
-      const totales = totalesDeCuenta(lineas, descuentoDeCuenta(cuenta));
-      if (totales.descuentoInvalido) {
-        throw new ErrorDeUsuario(`El descuento ya no corresponde a esta cuenta (${totales.descuentoInvalido}) Quitalo o cambialo.`);
-      }
-
-      const ahora = new Date();
-      const nombreMozo = [cuenta.mozo.nombre, cuenta.mozo.apellido].filter(Boolean).join(" ");
-      const reimpresion = cuenta.estado === "por_cobrar";
-      const tituloTrabajo = `Mesa ${cuenta.mesa} · Cuenta${reimpresion ? " (otra copia)" : ""}`;
-      await tx.trabajoImpresion.create({
-        data: {
+    titulo = await prisma.$transaction(
+      (tx) =>
+        encolarCuenta(tx, {
           storeId,
-          tipo: "ticket",
-          titulo: tituloTrabajo,
-          areaImpresionId: areaTicketId,
-          contenido: contenidoParaGuardar(
-            textoCuenta({
-              local: local?.nombre ?? "Cuenta",
-              mesa: cuenta.mesa,
-              numero: cuenta.numero,
-              mozo: nombreMozo,
-              hora: horaDeAhora(),
-              lineas: cuenta.items.map((i) => ({
-                cantidad: i.cantidad,
-                nombre: i.nombreProducto,
-                opciones: i.opcionesTexto,
-                precioUnitario: Number(i.precioUnitario),
-              })),
-              totales,
-            })
-          ),
-          cuentaMesaId: cuenta.id,
-        },
-      });
-      // El estado va en la condición: si la pagaron o cancelaron en el mismo instante, no se pisa.
-      const marcada = await tx.cuentaMesa.updateMany({
-        where: { id: cuenta.id, storeId, estado: { in: [...ESTADOS_CUENTA_ABIERTA] } },
-        data: { estado: "por_cobrar", impresaEn: ahora, impresaPor: quien },
-      });
-      if (marcada.count !== 1) throw new ErrorDeUsuario("Esa cuenta ya está cerrada.");
-      return `${tituloTrabajo} · ${formatearGuarani(totales.total)}`;
-    }, OPCIONES_TX);
+          cuentaId: String(cuentaId),
+          areaTicketId,
+          quien,
+          local: local?.nombre ?? "Cuenta",
+          queHacerConElDescuento: "Cambialo o quitalo.",
+        }),
+      OPCIONES_TX
+    );
   } catch (e) {
     if (e instanceof ErrorDeUsuario) return { ok: false, error: e.message };
     console.error("[comedor] imprimirCuenta falló", e);

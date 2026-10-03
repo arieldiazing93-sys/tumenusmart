@@ -10,10 +10,14 @@ import {
   agruparPorArea,
   claveDeMesa,
   contenidoParaGuardar,
+  descuentoDeCuenta,
   normalizarNota,
   textoComanda,
+  textoCuenta,
   totalDeLineas,
+  totalesDeCuenta,
 } from "@/lib/comedor";
+import { formatearGuarani } from "@/lib/format";
 
 /**
  * Lo que comparten el mozo (desde su celular) y la caja (desde el panel) al cargar productos en una cuenta de mesa: el
@@ -43,6 +47,16 @@ export type DatosRonda = {
    * entra por un enlace público, no se le muestra nada interno (el detalle igual queda en el log del servidor).
    */
   detalleTecnico: boolean;
+  /**
+   * Si está, solo se puede cargar en una cuenta que abrió ese mozo (la regla "los mozos solo ven sus cuentas"): una mesa
+   * ocupada por otro mozo se rechaza. Sin esto, cualquiera con acceso puede sumar a cualquier cuenta abierta.
+   */
+  soloCuentasDelMozoId?: string;
+  /**
+   * Si está, las mesas que el dueño cargó en Ajustes (sus claves, ver claveDeMesa): solo se puede ABRIR una mesa de esa
+   * lista (seguir cargando en una cuenta que ya existe siempre se puede). Sin esto, la mesa se escribe libremente.
+   */
+  mesasPermitidas?: string[];
   /** Con esto se suma a esa cuenta (carga desde la caja); sin esto se abre o se continúa la cuenta de la mesa. */
   cuentaId?: string;
 };
@@ -68,6 +82,20 @@ const FORMATO_ENVIO = /^[A-Za-z0-9_-]{8,64}$/;
 /** Lo que se lanza dentro de la transacción cuando la cuenta no se puede seguir cargando. */
 const CUENTA_NO_ENCONTRADA = "CUENTA_NO_ENCONTRADA";
 const CUENTA_POR_COBRAR = "CUENTA_POR_COBRAR";
+const CUENTA_AJENA = "CUENTA_AJENA";
+const MESA_NO_EXISTE = "MESA_NO_EXISTE";
+
+/** Lo que se le explica a quien carga cuando una regla de la cuenta no se cumple (null si el error es otro). */
+function mensajeDeReglaCuenta(e: unknown): string | null {
+  if (!(e instanceof Error)) return null;
+  if (e.message === CUENTA_NO_ENCONTRADA) return "Esa cuenta ya no está abierta.";
+  if (e.message === CUENTA_POR_COBRAR) {
+    return "La cuenta de esa mesa ya fue impresa y está por cobrarse. Pedile a la caja que la reabra para seguir cargando.";
+  }
+  if (e.message === CUENTA_AJENA) return "Esa mesa la atiende otro mozo: no podés cargarle productos.";
+  if (e.message === MESA_NO_EXISTE) return "Esa mesa no está en la lista del salón. Elegí una mesa de la lista.";
+  return null;
+}
 
 function codigoPrisma(e: unknown): { codigo: string; meta: string } | null {
   if (e instanceof Prisma.PrismaClientKnownRequestError) {
@@ -192,6 +220,10 @@ export async function guardarRonda(datos: DatosRonda): Promise<ResultadoRonda> {
             })
           : await tx.cuentaMesa.findFirst({ where: { storeId, mesaAbierta: clave } });
         if (datos.cuentaId && !abierta) throw new Error(CUENTA_NO_ENCONTRADA);
+        if (abierta && datos.soloCuentasDelMozoId && abierta.mozoId !== datos.soloCuentasDelMozoId) {
+          throw new Error(CUENTA_AJENA);
+        }
+        if (!abierta && datos.mesasPermitidas && !datos.mesasPermitidas.includes(clave)) throw new Error(MESA_NO_EXISTE);
         // Con la cuenta impresa nadie puede cargar más: la caja tiene que reabrirla primero.
         if (abierta && abierta.estado !== "abierta") throw new Error(CUENTA_POR_COBRAR);
         if (!abierta) {
@@ -288,27 +320,16 @@ export async function guardarRonda(datos: DatosRonda): Promise<ResultadoRonda> {
   try {
     resultado = await guardar();
   } catch (e) {
-    if (e instanceof Error && e.message === CUENTA_NO_ENCONTRADA) {
-      return { ok: false, error: "Esa cuenta ya no está abierta." };
-    }
-    if (e instanceof Error && e.message === CUENTA_POR_COBRAR) {
-      return {
-        ok: false,
-        error: "La cuenta de esa mesa ya fue impresa y está por cobrarse. Pedile a la caja que la reabra para seguir cargando.",
-      };
-    }
+    const conocido = mensajeDeReglaCuenta(e);
+    if (conocido) return { ok: false, error: conocido };
     const p = codigoPrisma(e);
     // Dos celulares abrieron la misma mesa a la vez: el segundo vuelve a intentar y se suma a la cuenta ya abierta.
     if (p?.codigo === "P2002" && p.meta.includes("mesaAbierta") && !datos.cuentaId) {
       try {
         resultado = await guardar();
       } catch (e2) {
-        if (e2 instanceof Error && e2.message === CUENTA_POR_COBRAR) {
-          return {
-            ok: false,
-            error: "La cuenta de esa mesa ya fue impresa y está por cobrarse. Pedile a la caja que la reabra para seguir cargando.",
-          };
-        }
+        const conocido2 = mensajeDeReglaCuenta(e2);
+        if (conocido2) return { ok: false, error: conocido2 };
         return { ok: false, error: "No se pudo abrir la mesa. Probá de nuevo." };
       }
     } else if (p?.codigo === "P2002" && p.meta.includes("envioId")) {
@@ -339,4 +360,108 @@ export async function guardarRonda(datos: DatosRonda): Promise<ResultadoRonda> {
     areas: [...new Set(resultado.areasImpresas)],
     yaEnviado: false,
   };
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+//  Imprimir la cuenta (la caja desde el panel, o el mozo desde su celular si el dueño lo activó)
+// ---------------------------------------------------------------------------------------------------------------------
+
+/** Un fallo que se le explica a la persona tal cual (no es un error inesperado). Se lanza dentro de una transacción. */
+export class ErrorDeUsuario extends Error {}
+
+/** "03/10 12:45", en la hora del negocio. */
+export function horaDeAhora(): string {
+  return new Date().toLocaleString("es-PY", {
+    day: "2-digit",
+    month: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+    timeZone: ZONA_NEGOCIO,
+  });
+}
+
+/**
+ * Deja la cuenta de una mesa en la cola de impresión (la imprime la estación que tiene asignada esa área) y la pasa a
+ * "por cobrar": desde ahí nadie puede cargarle más productos hasta que la caja la reabra. Va dentro de la transacción de
+ * quien llama. Si algo no corresponde (la cuenta ya se cerró, no tiene productos, tiene un descuento que ya no cabe, es de
+ * otro mozo) lanza un `ErrorDeUsuario` con la explicación. Devuelve cómo se llama el trabajo, para la bitácora.
+ */
+export async function encolarCuenta(
+  tx: Prisma.TransactionClient,
+  datos: {
+    storeId: string;
+    cuentaId: string;
+    /** El Área de Impresión del ticket, ya comprobado que tiene una impresora en la estación que la va a imprimir. */
+    areaTicketId: string;
+    /** Quién la imprime ("Ana", "Mozo Pedro (mozo)"): queda en la cuenta. */
+    quien: string;
+    local: string;
+    /** Si está, solo puede imprimir una cuenta de ese mozo. */
+    soloMozoId?: string;
+    /** El mozo imprime una vez: si la cuenta ya se imprimió, otra copia se la pide a la caja. */
+    soloSiAbierta?: boolean;
+    /** Qué hacer si el descuento ya no corresponde: "Cambialo o quitalo." (la caja) o "Avisale a la caja…" (el mozo). */
+    queHacerConElDescuento: string;
+  }
+): Promise<string> {
+  const { storeId } = datos;
+  const cuenta = await tx.cuentaMesa.findFirst({
+    where: { id: datos.cuentaId, storeId, estado: { in: [...ESTADOS_CUENTA_ABIERTA] } },
+    include: {
+      mozo: { select: { nombre: true, apellido: true } },
+      items: { where: { estado: "activo" }, orderBy: [{ ronda: "asc" }, { linea: "asc" }] },
+    },
+  });
+  if (!cuenta) throw new ErrorDeUsuario("Esa cuenta ya está cerrada.");
+  if (datos.soloMozoId && cuenta.mozoId !== datos.soloMozoId) throw new ErrorDeUsuario("Esa cuenta es de otro mozo.");
+  if (datos.soloSiAbierta && cuenta.estado !== "abierta") {
+    throw new ErrorDeUsuario("Esa cuenta ya se imprimió. Si necesitás otra copia, pedísela a la caja.");
+  }
+  if (cuenta.items.length === 0) throw new ErrorDeUsuario("La cuenta no tiene productos para imprimir.");
+
+  const lineas = cuenta.items.map((i) => ({ precioUnitario: Number(i.precioUnitario), cantidad: i.cantidad }));
+  const totales = totalesDeCuenta(lineas, descuentoDeCuenta(cuenta));
+  if (totales.descuentoInvalido) {
+    throw new ErrorDeUsuario(
+      `El descuento ya no corresponde a esta cuenta (${totales.descuentoInvalido}) ${datos.queHacerConElDescuento}`
+    );
+  }
+
+  const ahora = new Date();
+  const nombreMozo = [cuenta.mozo.nombre, cuenta.mozo.apellido].filter(Boolean).join(" ");
+  const reimpresion = cuenta.estado === "por_cobrar";
+  const titulo = `Mesa ${cuenta.mesa} · Cuenta${reimpresion ? " (otra copia)" : ""}`;
+  await tx.trabajoImpresion.create({
+    data: {
+      storeId,
+      tipo: "ticket",
+      titulo,
+      areaImpresionId: datos.areaTicketId,
+      contenido: contenidoParaGuardar(
+        textoCuenta({
+          local: datos.local,
+          mesa: cuenta.mesa,
+          numero: cuenta.numero,
+          mozo: nombreMozo,
+          hora: horaDeAhora(),
+          lineas: cuenta.items.map((i) => ({
+            cantidad: i.cantidad,
+            nombre: i.nombreProducto,
+            opciones: i.opcionesTexto,
+            precioUnitario: Number(i.precioUnitario),
+          })),
+          totales,
+        })
+      ),
+      cuentaMesaId: cuenta.id,
+    },
+  });
+  // El estado va en la condición: si la pagaron o cancelaron en el mismo instante, no se pisa.
+  const marcada = await tx.cuentaMesa.updateMany({
+    where: { id: cuenta.id, storeId, estado: { in: [...ESTADOS_CUENTA_ABIERTA] } },
+    data: { estado: "por_cobrar", impresaEn: ahora, impresaPor: datos.quien },
+  });
+  if (marcada.count !== 1) throw new ErrorDeUsuario("Esa cuenta ya está cerrada.");
+  return `${titulo} · ${formatearGuarani(totales.total)}`;
 }

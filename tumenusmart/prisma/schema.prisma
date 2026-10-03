@@ -89,6 +89,12 @@ model Store {
   bloqueoMozosHasta     DateTime?
   /// El correlativo de las cuentas de mesa del local (la próxima es este número + 1).
   contadorCuentasMesa   Int       @default(0)
+  /// Regla del Servicio comedor: si un mozo puede ver y cargar las cuentas que abrió OTRO mozo (true), o solo las suyas
+  /// (false). Con false, cada mozo ve en su pantalla únicamente las cuentas que él abrió.
+  mozosVenCuentasAjenas Boolean   @default(true)
+  /// Regla del Servicio comedor: si el mozo puede imprimir la cuenta de su mesa desde su celular (la cuenta queda "por
+  /// cobrar", igual que cuando la imprime la caja).
+  mozoImprimeCuenta     Boolean   @default(false)
 
   /// Cómo se ve la carta pública de este local.
   ///
@@ -257,6 +263,7 @@ model Store {
   cuentasMesa      CuentaMesa[]
   itemsCuentaMesa  ItemCuentaMesa[]
   trabajosImpresion TrabajoImpresion[]
+  mesasComedor     MesaComedor[]
 }
 
 /// Las direcciones que este local tuvo antes.
@@ -2687,6 +2694,26 @@ model TrabajoImpresion {
 
   @@index([storeId, estado])
   @@index([cuentaMesaId])
+}
+
+/// Una mesa del salón que el dueño cargó en Ajustes (Configuración del Servicio comedor). Con mesas cargadas el mozo elige la
+/// mesa de una lista (libre / ocupada) en vez de escribirla. La cuenta guarda el nombre de la mesa como texto, no apunta
+/// acá: borrar o renombrar una mesa nunca toca las cuentas ya hechas.
+model MesaComedor {
+  id        String   @id @default(cuid())
+  storeId   String
+  store     Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  /// Como se ve ("5", "Terraza 2").
+  nombre    String
+  /// El nombre sin mayúsculas ni acentos ni espacios repetidos (ver claveDeMesa): evita cargar dos veces la misma.
+  clave     String
+  orden     Int      @default(0)
+  /// Una mesa desactivada no se ofrece al mozo (por ejemplo, una que se saca del salón por un tiempo).
+  activa    Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  @@unique([storeId, clave])
+  @@index([storeId])
 }
 
 /// Una marcación: alguien marcó entrada, salida a almorzar, vuelta del almuerzo o salida final,

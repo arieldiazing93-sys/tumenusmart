@@ -15,8 +15,14 @@ import {
 import type { LineaPedida } from "@/lib/precio-pedido";
 import { registrarBitacora } from "@/lib/bitacora";
 import { formatearGuarani } from "@/lib/format";
-import { ESTADOS_CUENTA_ABIERTA, SEGUNDOS_LATIDO_IMPRESION, normalizarMesa, totalDeLineas } from "@/lib/comedor";
-import { guardarRonda } from "@/lib/comedor-servidor";
+import {
+  ESTADOS_CUENTA_ABIERTA,
+  SEGUNDOS_LATIDO_IMPRESION,
+  claveDeMesa,
+  normalizarMesa,
+  totalDeLineas,
+} from "@/lib/comedor";
+import { ErrorDeUsuario, encolarCuenta, guardarRonda } from "@/lib/comedor-servidor";
 
 /**
  * Las acciones del enlace público del mozo (/mozo/[token]), sin usuario del panel.
@@ -121,6 +127,8 @@ export type CuentaAbierta = {
   numero: number;
   mesa: string;
   mozo: string;
+  /** true si la cuenta la abrió este mismo mozo. */
+  mia: boolean;
   /** Cuándo se abrió, en ISO (el celular calcula "hace cuánto"). */
   abiertaEn: string;
   productos: number;
@@ -130,8 +138,31 @@ export type CuentaAbierta = {
   total: number;
 };
 
+/** Una mesa del salón que el dueño cargó en Ajustes, con su estado ahora. */
+export type MesaDelSalon = {
+  nombre: string;
+  /** "libre" | "ocupada" | "por_cobrar" */
+  estado: string;
+  /** true si la cuenta abierta en esa mesa es de este mozo. */
+  mia: boolean;
+  /** Quién la atiende (si está ocupada). */
+  mozo: string | null;
+  /** La cuenta, solo si este mozo la puede ver (con la regla "solo ven sus cuentas" las de otros mozos no). */
+  cuentaId: string | null;
+};
+
+/** Lo que el dueño configuró para los mozos (Ajustes → Configuración servicio comedor). */
+export type ReglasDelSalon = {
+  /** Si el dueño cargó las mesas del salón: el mozo ELIGE la mesa de una lista en vez de escribirla. */
+  usaMesas: boolean;
+  /** Si el mozo puede imprimir la cuenta de su mesa desde el celular. */
+  puedeImprimirCuenta: boolean;
+  /** Si el mozo ve y puede cargar las cuentas que abrió otro mozo. */
+  veCuentasAjenas: boolean;
+};
+
 export type EstadoDelSalon =
-  | { ok: true; cuentas: CuentaAbierta[]; imprimiendo: boolean }
+  | { ok: true; cuentas: CuentaAbierta[]; mesas: MesaDelSalon[]; reglas: ReglasDelSalon; imprimiendo: boolean }
   | FalloContexto;
 
 /** ¿Hay alguna estación que haya preguntado por comandas hace poco? Si no, lo que se envíe queda en espera. */
@@ -144,36 +175,72 @@ async function hayEstacionImprimiendo(storeId: string): Promise<boolean> {
   return !!estacion;
 }
 
-/** Las cuentas abiertas del local (las mesas ocupadas) y si hay una estación imprimiendo. */
+/**
+ * Las cuentas abiertas que este mozo puede ver (todas, o solo las suyas según la regla del dueño), las mesas del salón con
+ * su estado, las reglas, y si hay una estación imprimiendo.
+ */
 export async function estadoDelSalon(token: string): Promise<EstadoDelSalon> {
   const ctx = await contextoDelMozo(token);
   if (!ctx.ok) return ctx;
+  const { local, mozo } = ctx;
+  const veAjenas = local.mozosVenCuentasAjenas;
 
-  const [cuentas, imprimiendo] = await Promise.all([
+  const [todas, mesasCargadas, imprimiendo] = await Promise.all([
     prisma.cuentaMesa.findMany({
-      where: { storeId: ctx.local.id, estado: { in: [...ESTADOS_CUENTA_ABIERTA] } },
+      where: { storeId: local.id, estado: { in: [...ESTADOS_CUENTA_ABIERTA] } },
       orderBy: { abiertaEn: "asc" },
       select: {
         id: true,
         numero: true,
         mesa: true,
+        mozoId: true,
         abiertaEn: true,
         estado: true,
         mozo: { select: { nombre: true, apellido: true } },
         items: { where: { estado: "activo" }, select: { cantidad: true, precioUnitario: true, ronda: true } },
       },
     }),
-    hayEstacionImprimiendo(ctx.local.id),
+    prisma.mesaComedor.findMany({
+      where: { storeId: local.id },
+      orderBy: [{ orden: "asc" }, { createdAt: "asc" }],
+      select: { nombre: true, clave: true, activa: true },
+    }),
+    hayEstacionImprimiendo(local.id),
   ]);
+
+  // Con la regla "solo ven sus cuentas" cada mozo ve únicamente las que abrió él.
+  const visibles = veAjenas ? todas : todas.filter((c) => c.mozoId === mozo.id);
+
+  const mesas: MesaDelSalon[] = mesasCargadas
+    .filter((m) => m.activa)
+    .map((m) => {
+      const c = todas.find((x) => claveDeMesa(x.mesa) === m.clave);
+      if (!c) return { nombre: m.nombre, estado: "libre", mia: false, mozo: null, cuentaId: null };
+      const mia = c.mozoId === mozo.id;
+      return {
+        nombre: m.nombre,
+        estado: c.estado === "por_cobrar" ? "por_cobrar" : "ocupada",
+        mia,
+        mozo: nombreDeMozo(c.mozo),
+        cuentaId: veAjenas || mia ? c.id : null,
+      };
+    });
 
   return {
     ok: true,
     imprimiendo,
-    cuentas: cuentas.map((c) => ({
+    mesas,
+    reglas: {
+      usaMesas: mesasCargadas.length > 0,
+      puedeImprimirCuenta: local.mozoImprimeCuenta,
+      veCuentasAjenas: veAjenas,
+    },
+    cuentas: visibles.map((c) => ({
       id: c.id,
       numero: c.numero,
       mesa: c.mesa,
       mozo: nombreDeMozo(c.mozo),
+      mia: c.mozoId === mozo.id,
       estado: c.estado,
       abiertaEn: c.abiertaEn.toISOString(),
       productos: c.items.reduce((s, i) => s + i.cantidad, 0),
@@ -211,6 +278,7 @@ export async function detalleDeCuenta(token: string, cuentaId: string): Promise<
       numero: true,
       estado: true,
       mesa: true,
+      mozoId: true,
       mozo: { select: { nombre: true, apellido: true } },
       items: {
         orderBy: [{ ronda: "asc" }, { linea: "asc" }],
@@ -231,6 +299,10 @@ export async function detalleDeCuenta(token: string, cuentaId: string): Promise<
     },
   });
   if (!cuenta) return { ok: false, error: "Esa cuenta ya no está abierta." };
+  // Con la regla "solo ven sus cuentas", la de otro mozo no se muestra (aunque alguien arme el pedido a mano).
+  if (!ctx.local.mozosVenCuentasAjenas && cuenta.mozoId !== ctx.mozo.id) {
+    return { ok: false, error: "Esa cuenta es de otro mozo." };
+  }
 
   const rondas = new Map<number, RondaDeCuenta>();
   for (const i of cuenta.items) {
@@ -312,6 +384,10 @@ export async function enviarPedido(token: string, datos: DatosEnvio): Promise<Re
   const comensales =
     Number.isInteger(datos.comensales) && datos.comensales! >= 1 && datos.comensales! <= 99 ? datos.comensales! : null;
 
+  // Si el dueño cargó las mesas del salón, solo se puede abrir una de esa lista (seguir cargando en una cuenta que ya
+  // existe, siempre). Las reglas se comprueban acá en el servidor, no en el celular.
+  const mesasCargadas = await prisma.mesaComedor.findMany({ where: { storeId }, select: { clave: true, activa: true } });
+
   const quien = nombreDeMozo(mozo);
   const r = await guardarRonda({
     storeId,
@@ -323,6 +399,8 @@ export async function enviarPedido(token: string, datos: DatosEnvio): Promise<Re
     quien,
     cargadoPor: null,
     detalleTecnico: false,
+    soloCuentasDelMozoId: local.mozosVenCuentasAjenas ? undefined : mozo.id,
+    mesasPermitidas: mesasCargadas.length > 0 ? mesasCargadas.filter((m) => m.activa).map((m) => m.clave) : undefined,
   });
   if (!r.ok) return r;
 
@@ -352,4 +430,76 @@ export async function enviarPedido(token: string, datos: DatosEnvio): Promise<Re
     imprimiendo: await hayEstacionImprimiendo(storeId),
     yaEnviado: r.yaEnviado,
   };
+}
+
+// ---------------------------------------------------------------------------
+//  Imprimir la cuenta (solo si el dueño lo activó)
+// ---------------------------------------------------------------------------
+
+export type ResultadoImpresionDelMozo = { ok: true } | FalloContexto;
+
+/**
+ * El mozo imprime la cuenta de SU mesa desde el celular, si el dueño activó esa regla (Ajustes → Configuración servicio
+ * comedor → Reglas). Sale en la impresora del ticket de una estación de caja que esté imprimiendo ahora, y la cuenta pasa a
+ * "por cobrar": ya no se le puede cargar nada hasta que la caja la reabra. Una sola vez: otra copia se la pide a la caja.
+ */
+export async function imprimirCuentaDelMozo(token: string, cuentaId: string): Promise<ResultadoImpresionDelMozo> {
+  const ctx = await contextoDelMozo(token);
+  if (!ctx.ok) return ctx;
+  const { local, mozo } = ctx;
+  const storeId = local.id;
+
+  if (!local.mozoImprimeCuenta) {
+    return { ok: false, error: "Imprimir la cuenta desde el celular no está activado. Pedísela a la caja." };
+  }
+
+  // Una estación de caja que esté imprimiendo ahora y tenga impresora asignada al ticket: ahí sale la cuenta.
+  const desde = new Date(Date.now() - SEGUNDOS_LATIDO_IMPRESION * 1000);
+  const estaciones = await prisma.estacion.findMany({
+    where: { storeId, activa: true, impresionVistaEn: { gte: desde }, areaTicketId: { not: null } },
+    select: { areaTicketId: true, impresoras: { select: { areaImpresionId: true } } },
+  });
+  const estacion = estaciones.find((e) => e.areaTicketId && e.impresoras.some((i) => i.areaImpresionId === e.areaTicketId));
+  const areaTicketId = estacion?.areaTicketId ?? null;
+  if (!areaTicketId) {
+    return { ok: false, error: "No hay ninguna caja con impresora de ticket conectada ahora. Pedile la cuenta a la caja." };
+  }
+
+  const quien = `${nombreDeMozo(mozo)} (mozo)`;
+  let titulo = "";
+  try {
+    titulo = await prisma.$transaction(
+      (tx) =>
+        encolarCuenta(tx, {
+          storeId,
+          cuentaId: String(cuentaId),
+          areaTicketId,
+          quien,
+          local: local.nombre,
+          // Con la regla "solo ven sus cuentas", únicamente las suyas.
+          soloMozoId: local.mozosVenCuentasAjenas ? undefined : mozo.id,
+          soloSiAbierta: true,
+          queHacerConElDescuento: "Avisale a la caja para que lo cambie o lo quite.",
+        }),
+      { timeout: 15_000, maxWait: 10_000 }
+    );
+  } catch (e) {
+    if (e instanceof ErrorDeUsuario) return { ok: false, error: e.message };
+    console.error("[mozo] imprimirCuentaDelMozo falló", e);
+    return { ok: false, error: "No se pudo imprimir la cuenta. Probá de nuevo o pedísela a la caja." };
+  }
+
+  await registrarBitacora(
+    storeId,
+    { nombre: nombreDeMozo(mozo), email: "mozo (enlace público)", rol: "mozo" },
+    {
+      modulo: "comedor",
+      accion: "cuenta_impresa_por_mozo",
+      descripcion: `${nombreDeMozo(mozo)} imprimió la cuenta desde su celular: ${titulo}.`,
+      entidad: "CuentaMesa",
+      entidadId: String(cuentaId),
+      detalle: { cuenta: titulo },
+    }
+  );
+  return { ok: true };
 }

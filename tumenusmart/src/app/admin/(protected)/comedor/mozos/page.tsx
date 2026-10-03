@@ -6,6 +6,7 @@ import { Aviso, BotonEnlace, Cabecera } from "@/components/ui";
 import { EnlacePublicoLocal } from "@/components/EnlacePublicoLocal";
 import { apagarEnlaceMozos, generarEnlaceMozos } from "./actions";
 import { ListaMozos } from "./ListaMozos";
+import { PestanasConfigComedor } from "../PestanasConfigComedor";
 
 export const dynamic = "force-dynamic";
 
@@ -38,6 +39,8 @@ export default async function MozosPage() {
           </BotonEnlace>
         }
       />
+
+      <PestanasConfigComedor activa="mozos" />
 
       <EnlacePublicoLocal
         token={store?.tokenMozos ?? null}

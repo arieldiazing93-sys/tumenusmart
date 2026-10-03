@@ -18,9 +18,12 @@ import {
   detalleDeCuenta,
   enviarPedido,
   estadoDelSalon,
+  imprimirCuentaDelMozo,
   salirDelSalon,
   type CuentaAbierta,
   type DetalleDeCuenta,
+  type MesaDelSalon,
+  type ReglasDelSalon,
   type ResultadoEnvio,
 } from "./actions";
 
@@ -44,6 +47,13 @@ const MENSAJE_POR_COBRAR = "La caja ya imprimió la cuenta de esa mesa. Pedile q
 const CHIP_ACTIVO = "border-brand bg-brand text-white";
 const CHIP_INACTIVO = "border-linea text-tinta-media hover:border-brand hover:text-brand";
 const ROTULO = "text-[0.72rem] font-semibold uppercase tracking-rotulo text-tinta-suave";
+/** Cómo se ve cada mesa de la lista del dueño según su estado. */
+const CLASE_MESA: Record<"libre" | "mia" | "otra" | "por_cobrar", string> = {
+  libre: "border-azul/50 bg-white text-tinta hover:border-azul hover:bg-azul-luz",
+  mia: "border-brand bg-brand-light text-brand-texto",
+  otra: "border-linea bg-papel-suave text-tinta-media",
+  por_cobrar: "border-amarillo bg-amarillo-campo text-amarillo-oscuro",
+};
 
 function sinTildes(texto: string): string {
   return texto.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
@@ -105,6 +115,11 @@ export function MozoApp({
 
   const [vista, setVista] = useState<Vista>("salon");
   const [cuentas, setCuentas] = useState<CuentaAbierta[]>([]);
+  // Las mesas que el dueño cargó en Ajustes y las reglas que configuró (vienen del servidor al abrir el salón).
+  const [mesas, setMesas] = useState<MesaDelSalon[]>([]);
+  const [reglas, setReglas] = useState<ReglasDelSalon>({ usaMesas: false, puedeImprimirCuenta: false, veCuentasAjenas: true });
+  const [imprimiendoCuenta, setImprimiendoCuenta] = useState(false);
+  const [avisoCuenta, setAvisoCuenta] = useState<string | null>(null);
   const [imprimiendo, setImprimiendo] = useState<boolean | null>(null);
   const [cargandoSalon, setCargandoSalon] = useState(true);
   const [errorSalon, setErrorSalon] = useState<string | null>(null);
@@ -140,6 +155,8 @@ export function MozoApp({
         return;
       }
       setCuentas(r.cuentas);
+      setMesas(r.mesas);
+      setReglas(r.reglas);
       setImprimiendo(r.imprimiendo);
       setErrorSalon(null);
     } catch {
@@ -176,6 +193,47 @@ export function MozoApp({
     empezarPedido(existente ? existente.mesa : texto);
   }
 
+  /** Se toca una mesa de la lista del dueño: libre abre la cuenta; ocupada lleva a su cuenta si este mozo la puede ver. */
+  function tocarMesa(m: MesaDelSalon) {
+    setError(null);
+    if (m.estado === "libre") {
+      empezarPedido(m.nombre);
+      return;
+    }
+    const cuenta = m.cuentaId ? cuentas.find((c) => c.id === m.cuentaId) : undefined;
+    if (!cuenta) {
+      setError(`La mesa ${m.nombre} la atiende ${m.mozo ?? "otro mozo"}.`);
+      return;
+    }
+    void verCuenta(cuenta);
+  }
+
+  /** El mozo imprime la cuenta de su mesa (solo si el dueño lo activó). La cuenta queda por cobrar. */
+  async function imprimirCuenta(cuentaId: string, mesaDeLaCuenta: string) {
+    if (imprimiendoCuenta) return;
+    setImprimiendoCuenta(true);
+    setError(null);
+    setAvisoCuenta(null);
+    try {
+      const r = await imprimirCuentaDelMozo(token, cuentaId);
+      if (!r.ok) {
+        if (r.sesionVencida) {
+          router.refresh();
+          return;
+        }
+        setError(r.error);
+      } else {
+        // Se vuelve a mirar la cuenta para que se vea "por cobrar" (esto limpia el aviso, por eso el aviso va después).
+        const actualizado = cuentas.find((c) => c.id === cuentaId);
+        if (actualizado) void verCuenta({ ...actualizado, estado: "por_cobrar" });
+        setAvisoCuenta(`La cuenta de la mesa ${mesaDeLaCuenta} salió en la caja. Ya no se le puede cargar más.`);
+      }
+    } catch {
+      setError("No hay conexión. Probá de nuevo.");
+    }
+    setImprimiendoCuenta(false);
+  }
+
   function empezarPedido(nombreDeMesa: string) {
     setMesa(nombreDeMesa);
     setCarrito([]);
@@ -189,6 +247,7 @@ export function MozoApp({
     setMesa(c.mesa);
     setDetalle(null);
     setError(null);
+    setAvisoCuenta(null);
     setCargandoDetalle(true);
     setVista("cuenta");
     try {
@@ -210,6 +269,7 @@ export function MozoApp({
 
   function volverAlSalon() {
     setError(null);
+    setAvisoCuenta(null);
     setEnviado(null);
     setVista("salon");
   }
@@ -445,41 +505,92 @@ export function MozoApp({
           <div className="flex flex-col gap-4">
             <EstadoImpresion imprimiendo={imprimiendo} />
 
-            <section className="rounded-xl border-2 border-azul/50 bg-superficie p-3.5">
-              <p className={ROTULO}>1 · Abrir una mesa</p>
-              <div className="mt-2 flex flex-wrap items-end gap-2">
-                <div className="min-w-[8rem] flex-1">
-                  <Entrada
-                    value={mesaTexto}
-                    onChange={(e) => setMesaTexto(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") abrirMesa();
-                    }}
-                    placeholder="Mesa (ej: 5 o Terraza 2)"
-                    maxLength={20}
-                    aria-label="Número o nombre de la mesa"
-                  />
+            {reglas.usaMesas ? (
+              <section className="rounded-xl border-2 border-azul/50 bg-superficie p-3.5">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className={ROTULO}>1 · Elegí la mesa</p>
+                  <div className="w-24">
+                    <Entrada
+                      type="number"
+                      inputMode="numeric"
+                      min={1}
+                      max={99}
+                      value={comensalesTexto}
+                      onChange={(e) => setComensalesTexto(e.target.value)}
+                      placeholder="Personas"
+                      aria-label="Cuántas personas"
+                    />
+                  </div>
                 </div>
-                <div className="w-24">
-                  <Entrada
-                    type="number"
-                    inputMode="numeric"
-                    min={1}
-                    max={99}
-                    value={comensalesTexto}
-                    onChange={(e) => setComensalesTexto(e.target.value)}
-                    placeholder="Personas"
-                    aria-label="Cuántas personas"
-                  />
+                {mesas.length === 0 ? (
+                  <p className="mt-2 text-[0.82rem] text-tinta-suave">
+                    No hay mesas activas para elegir. Avisale al encargado.
+                  </p>
+                ) : (
+                  <ul className="mt-2.5 grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5">
+                    {mesas.map((m) => (
+                      <li key={m.nombre}>
+                        <button
+                          type="button"
+                          onClick={() => tocarMesa(m)}
+                          className={`flex h-full w-full flex-col items-center justify-center rounded-xl border-2 px-1.5 py-2.5 text-center transition-all active:scale-[0.96] ${CLASE_MESA[m.estado === "libre" ? "libre" : m.estado === "por_cobrar" ? "por_cobrar" : m.mia ? "mia" : "otra"]}`}
+                        >
+                          <span className="max-w-full truncate text-[1.05rem] font-bold leading-tight">{m.nombre}</span>
+                          <span className="max-w-full truncate text-[0.68rem] font-medium leading-tight opacity-80">
+                            {m.estado === "libre"
+                              ? "Libre"
+                              : m.estado === "por_cobrar"
+                                ? "Cuenta pedida"
+                                : m.mia
+                                  ? "Tuya"
+                                  : (m.mozo ?? "Ocupada")}
+                          </span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                <p className="mt-2 text-[0.76rem] text-tinta-suave">
+                  Tocá una mesa libre para abrirla, o una ocupada para ver su cuenta.
+                </p>
+              </section>
+            ) : (
+              <section className="rounded-xl border-2 border-azul/50 bg-superficie p-3.5">
+                <p className={ROTULO}>1 · Abrir una mesa</p>
+                <div className="mt-2 flex flex-wrap items-end gap-2">
+                  <div className="min-w-[8rem] flex-1">
+                    <Entrada
+                      value={mesaTexto}
+                      onChange={(e) => setMesaTexto(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") abrirMesa();
+                      }}
+                      placeholder="Mesa (ej: 5 o Terraza 2)"
+                      maxLength={20}
+                      aria-label="Número o nombre de la mesa"
+                    />
+                  </div>
+                  <div className="w-24">
+                    <Entrada
+                      type="number"
+                      inputMode="numeric"
+                      min={1}
+                      max={99}
+                      value={comensalesTexto}
+                      onChange={(e) => setComensalesTexto(e.target.value)}
+                      placeholder="Personas"
+                      aria-label="Cuántas personas"
+                    />
+                  </div>
+                  <Boton tono="nuevo" tam="md" onClick={abrirMesa}>
+                    Abrir mesa
+                  </Boton>
                 </div>
-                <Boton tono="nuevo" tam="md" onClick={abrirMesa}>
-                  Abrir mesa
-                </Boton>
-              </div>
-              <p className="mt-1.5 text-[0.76rem] text-tinta-suave">
-                Si la mesa ya tiene una cuenta abierta, el pedido se suma a esa cuenta.
-              </p>
-            </section>
+                <p className="mt-1.5 text-[0.76rem] text-tinta-suave">
+                  Si la mesa ya tiene una cuenta abierta, el pedido se suma a esa cuenta.
+                </p>
+              </section>
+            )}
 
             <section>
               <p className={`${ROTULO} mb-2`}>Mesas abiertas ({cuentas.length})</p>
@@ -571,6 +682,24 @@ export function MozoApp({
                 ) : (
                   <Boton tono="nuevo" tam="lg" className="w-full" onClick={() => empezarPedido(detalle.mesa)}>
                     Agregar pedido a esta mesa
+                  </Boton>
+                )}
+                {avisoCuenta && (
+                  <p className="rounded-lg bg-exito-luz px-3 py-2 text-[0.82rem] font-medium text-exito">{avisoCuenta}</p>
+                )}
+                {reglas.puedeImprimirCuenta && detalle.estado === "abierta" && (
+                  <Boton
+                    tono="navegar"
+                    tam="lg"
+                    className="w-full"
+                    disabled={imprimiendoCuenta}
+                    onClick={() => {
+                      if (confirm("Al imprimir la cuenta ya no vas a poder cargarle más productos. ¿Imprimir igual?")) {
+                        void imprimirCuenta(detalle.id, detalle.mesa);
+                      }
+                    }}
+                  >
+                    {imprimiendoCuenta ? "Imprimiendo…" : "Imprimir la cuenta"}
                   </Boton>
                 )}
               </>

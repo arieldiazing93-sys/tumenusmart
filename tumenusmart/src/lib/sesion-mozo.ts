@@ -46,6 +46,9 @@ export async function localPorTokenMozos(token: string) {
       logoUrl: true,
       intentosPinMozos: true,
       bloqueoMozosHasta: true,
+      // Las reglas que el dueño configura para los mozos (Ajustes → Configuración servicio comedor).
+      mozosVenCuentasAjenas: true,
+      mozoImprimeCuenta: true,
     },
   });
 }
