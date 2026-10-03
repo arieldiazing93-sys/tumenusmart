@@ -5,6 +5,7 @@ import {
   calcularEstadisticas,
   calcularEstadisticasReservas,
   calcularRankingProductos,
+  ETIQUETAS_CANAL,
 } from "@/lib/estadisticas";
 import { formatearGuarani } from "@/lib/format";
 import { ZONA_NEGOCIO } from "@/lib/timezone";
@@ -152,6 +153,28 @@ export default async function ImprimirEstadisticasPage({
               <td className="py-1.5 text-right font-semibold text-tinta">{fila.cantidad}</td>
               <td className="py-1.5 text-right text-tinta-media">
                 {formatearGuarani(Math.round(fila.ingresos))}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+
+      <h2 className="mb-3 mt-10 font-semibold text-tinta">Ventas por canal</h2>
+      <table className="mb-10 w-full border-collapse text-sm">
+        <thead>
+          <tr className="border-b border-linea text-left text-xs uppercase tracking-wide text-tinta-media">
+            <th className="py-1.5">Canal</th>
+            <th className="py-1.5 text-right">Ventas</th>
+            <th className="py-1.5 text-right">Ingresos</th>
+          </tr>
+        </thead>
+        <tbody>
+          {(["carta", "telefono", "mostrador", "comedor"] as const).map((canal) => (
+            <tr key={canal} className="border-b border-linea-fina">
+              <td className="py-1.5 text-tinta-media">{ETIQUETAS_CANAL[canal]}</td>
+              <td className="py-1.5 text-right font-semibold text-tinta">{stats.porCanal[canal].cantidad}</td>
+              <td className="py-1.5 text-right text-tinta-media">
+                {formatearGuarani(Math.round(stats.porCanal[canal].ingresos))}
               </td>
             </tr>
           ))}

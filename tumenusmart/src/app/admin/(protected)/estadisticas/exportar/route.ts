@@ -6,6 +6,7 @@ import {
   calcularEstadisticas,
   calcularEstadisticasReservas,
   calcularRankingProductos,
+  ETIQUETAS_CANAL,
 } from "@/lib/estadisticas";
 import { ZONA_NEGOCIO } from "@/lib/timezone";
 import { etiquetaTurno } from "@/lib/reservas";
@@ -112,6 +113,12 @@ export async function GET(request: NextRequest) {
   hoja.addRow(["Delivery", stats.porTipoEntrega.delivery.cantidad, Math.round(stats.porTipoEntrega.delivery.ingresos)]);
   hoja.addRow(["Retiro en el local", stats.porTipoEntrega.retiro.cantidad, Math.round(stats.porTipoEntrega.retiro.ingresos)]);
   hoja.addRow(["Comer en el local", stats.porTipoEntrega.mesa.cantidad, Math.round(stats.porTipoEntrega.mesa.ingresos)]);
+
+  hoja.addRow([]);
+  filaTitulo(hoja, ["Canal de venta", "Ventas", "Ingresos (Gs.)"], 3);
+  for (const canal of ["carta", "telefono", "mostrador", "comedor"] as const) {
+    hoja.addRow([ETIQUETAS_CANAL[canal], stats.porCanal[canal].cantidad, Math.round(stats.porCanal[canal].ingresos)]);
+  }
 
   hoja.addRow([]);
   filaTitulo(hoja, ["Puesto", "Producto", "Unidades", "Facturación (Gs.)", "% de unidades"], 5);

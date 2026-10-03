@@ -149,9 +149,10 @@ export function PagarCuentaPanel({
         facturaNumeroIdentificacion: conRegistro ? numero.trim() : undefined,
         facturaRazonSocial: conRegistro ? razonSocial : undefined,
         facturaEmail: conRegistro ? email.trim() || undefined : undefined,
-        // Solo a crédito: a quién se le cobra después y en cuántos días vence.
-        clienteNombre: esCredito ? clienteNombre : undefined,
-        clienteTelefono: esCredito ? clienteTelefono : undefined,
+        // El cliente (si se cargó): a crédito es a quien se le cobra después; en cualquier venta con teléfono, la venta
+        // cuenta para su ficha y su fidelización, igual que en el mostrador.
+        clienteNombre,
+        clienteTelefono,
         creditoDias: esCredito ? creditoDias : undefined,
         // Para que el servidor avise si la cuenta cambió mientras se cobraba.
         totalMostrado: total,
@@ -320,6 +321,31 @@ export function PagarCuentaPanel({
                 )}
               </div>
               <p className="cifra flex-none text-[1.7rem] font-bold leading-none text-tinta">{formatearGuarani(total)}</p>
+            </div>
+
+            {/* El cliente es opcional: con su teléfono la venta suma a su ficha y a su fidelización (y es obligatorio si se
+                cobra a crédito, que se completa en el cuadro de cobro). */}
+            <div className="flex flex-col gap-2">
+              <p className="text-[0.72rem] font-semibold uppercase tracking-rotulo text-tinta-suave">
+                Cliente (opcional)
+              </p>
+              <div className="grid grid-cols-2 gap-2">
+                <EntradaConLupa
+                  inputMode="tel"
+                  placeholder="Teléfono"
+                  value={clienteTelefono}
+                  onChange={(e) => setClienteTelefono(e.target.value)}
+                  onBuscar={() => void buscarPorTelefono()}
+                  buscando={buscandoTelefono}
+                  etiquetaBoton="Buscar cliente por teléfono"
+                />
+                <Entrada
+                  placeholder="Nombre"
+                  value={clienteNombre}
+                  onChange={(e) => setClienteNombre(e.target.value)}
+                  maxLength={80}
+                />
+              </div>
             </div>
 
             {puedeFacturar && (

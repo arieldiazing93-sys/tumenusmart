@@ -8,6 +8,7 @@ import {
   calcularEstadisticas,
   calcularEstadisticasReservas,
   calcularRankingProductos,
+  ETIQUETAS_CANAL,
 } from "@/lib/estadisticas";
 import { ZONA_NEGOCIO } from "@/lib/timezone";
 import { etiquetaTurno } from "@/lib/reservas";
@@ -243,6 +244,39 @@ export default async function AdminEstadisticasPage({
                         className="h-2 rounded-full bg-brand"
                         style={{ width: `${porcentaje}%` }}
                       />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="mb-8">
+        <h2 className="mb-3 font-semibold text-tinta">Ventas por canal</h2>
+        <div className="rounded-lg border-2 border-azul/50 bg-white p-4">
+          {stats.ventasValidas === 0 ? (
+            <p className="text-sm text-tinta-suave">Sin ventas en este período.</p>
+          ) : (
+            <div className="flex flex-col gap-3">
+              {(["carta", "telefono", "mostrador", "comedor"] as const).map((c) => {
+                const fila = stats.porCanal[c];
+                const porcentaje = stats.ingresos > 0 ? (fila.ingresos / stats.ingresos) * 100 : 0;
+                return (
+                  <div key={c}>
+                    <div className="mb-1 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5 text-sm">
+                      <span className="font-medium text-tinta">{ETIQUETAS_CANAL[c]}</span>
+                      <span className="text-tinta-media">
+                        {fila.cantidad} {fila.cantidad === 1 ? "venta" : "ventas"} ·{" "}
+                        <span className="font-semibold text-tinta">
+                          {formatearGuarani(Math.round(fila.ingresos))}
+                        </span>{" "}
+                        <span className="text-xs text-tinta-suave">({porcentaje.toFixed(0)}%)</span>
+                      </span>
+                    </div>
+                    <div className="h-2 rounded-full bg-papel-hundido">
+                      <div className="h-2 rounded-full bg-azul" style={{ width: `${porcentaje}%` }} />
                     </div>
                   </div>
                 );

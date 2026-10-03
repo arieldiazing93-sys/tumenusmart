@@ -131,6 +131,34 @@ export async function calcularEstadisticas(storeId: string, rango: RangoFecha) {
     porTipoEntrega[grupo].ingresos += Number(v.total);
   }
 
+  // Por dónde entró cada venta: la carta digital, un pedido cargado por teléfono, el mostrador (Punto de Venta) o el
+  // Servicio comedor. Un pedido sabe su origen (`Order.origen`); una venta del comedor es la que cobró una cuenta de mesa
+  // (`CuentaMesa.ventaPosId`), y el resto de las ventas del POS son del mostrador.
+  const idsVentas = validasVentas.map((v) => v.id);
+  const cuentasCobradas = idsVentas.length
+    ? await prisma.cuentaMesa.findMany({
+        where: { storeId, ventaPosId: { in: idsVentas } },
+        select: { ventaPosId: true },
+      })
+    : [];
+  const ventasDelComedor = new Set(cuentasCobradas.map((c) => c.ventaPosId));
+  const porCanal = {
+    carta: { cantidad: 0, ingresos: 0 },
+    telefono: { cantidad: 0, ingresos: 0 },
+    mostrador: { cantidad: 0, ingresos: 0 },
+    comedor: { cantidad: 0, ingresos: 0 },
+  };
+  for (const p of validosPedidos) {
+    const canal = p.origen === "telefono" ? "telefono" : "carta";
+    porCanal[canal].cantidad += 1;
+    porCanal[canal].ingresos += Number(p.total);
+  }
+  for (const v of validasVentas) {
+    const canal = ventasDelComedor.has(v.id) ? "comedor" : "mostrador";
+    porCanal[canal].cantidad += 1;
+    porCanal[canal].ingresos += Number(v.total);
+  }
+
   return {
     store,
     ventasTotales,
@@ -145,8 +173,17 @@ export async function calcularEstadisticas(storeId: string, rango: RangoFecha) {
     dias,
     totalesPorDia,
     porTipoEntrega,
+    porCanal,
   };
 }
+
+/** Cómo se llama cada canal de venta en los reportes. */
+export const ETIQUETAS_CANAL = {
+  carta: "Carta digital",
+  telefono: "Pedidos por teléfono",
+  mostrador: "Mostrador (Punto de Venta)",
+  comedor: "Servicio comedor",
+} as const;
 
 export type FilaRanking = {
   nombre: string;

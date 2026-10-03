@@ -108,6 +108,8 @@ export default async function ComprobanteTurnoPosPage({
             pagos: { orderBy: { orden: "asc" }, select: { forma: true, monto: true } },
             creadoEn: true,
             cancelada: true,
+            // Una cuenta de mesa del Servicio comedor lleva "Mesa 5 · Cuenta #0001": en el cierre se ve de qué mesa fue.
+            nota: true,
           },
         },
         // Pedidos de retiro cobrados durante este turno (ver
@@ -461,6 +463,9 @@ export default async function ComprobanteTurnoPosPage({
                   <tr key={v.id} className="break-inside-avoid align-top">
                     <td className="cifra border-b border-linea-fina py-1 text-[0.85rem] font-medium text-tinta">
                       {formatearNumero(v.numero)}
+                      {v.nota?.startsWith("Mesa ") && (
+                        <span className="ml-1.5 text-[0.72rem] font-normal text-tinta-suave">{v.nota.split(" · ")[0]}</span>
+                      )}
                     </td>
                     <td className="cifra border-b border-linea-fina py-1 text-[0.82rem] text-tinta-media">
                       {horaCorta(v.creadoEn)}

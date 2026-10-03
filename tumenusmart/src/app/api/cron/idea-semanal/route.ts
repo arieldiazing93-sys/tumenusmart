@@ -83,7 +83,8 @@ export async function GET(request: NextRequest) {
         id: p.id,
         creado: p.createdAt,
         estado: p.estado,
-        enviado: p.enviadoWhatsapp,
+        // Mismo criterio que Estadísticas (PEDIDO_REAL): un pedido cargado por teléfono nace confirmado y no pasa por WhatsApp.
+        enviado: p.enviadoWhatsapp || p.estado !== "pendiente",
         tipoEntrega: p.tipoEntrega,
         total: Number(p.total),
         costoEnvio: Number(p.costoEnvio),

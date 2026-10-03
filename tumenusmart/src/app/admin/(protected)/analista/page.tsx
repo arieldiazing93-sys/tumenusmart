@@ -79,7 +79,9 @@ export default async function AnalistaPage() {
     id: p.id,
     creado: p.createdAt,
     estado: p.estado,
-    enviado: p.enviadoWhatsapp,
+    // Mismo criterio que Estadísticas (PEDIDO_REAL): cuenta si se envió por WhatsApp o si el local ya lo tocó. Un pedido
+    // cargado por teléfono nace confirmado y nunca pasa por WhatsApp: sin esto las Ideas lo ignoraban.
+    enviado: p.enviadoWhatsapp || p.estado !== "pendiente",
     tipoEntrega: p.tipoEntrega,
     total: Number(p.total),
     costoEnvio: Number(p.costoEnvio),

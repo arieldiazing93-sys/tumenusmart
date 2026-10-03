@@ -182,6 +182,9 @@ function armarGrupos(hayIdeaSinVer: boolean, rol: string, ventasACredito: boolea
           ver: conPermiso("estadisticas.ver") },
         { href: "/admin/envios", label: "Envíos", icono: "envios" as const,
           ver: conPermiso("estadisticas.ver") },
+        // Lo que vendió cada mozo del Servicio comedor, con descuentos y cancelaciones: el control del dueño sobre el salón.
+        { href: "/admin/reporte-mozos", label: "Mozos", icono: "usuarios" as const,
+          ver: conPermiso("estadisticas.ver") },
         // A diferencia del "Historial de cuentas", esto sí queda para el
         // dueño: es la plata que cada cajero declaró al cerrar, no algo
         // operativo del día a día.
