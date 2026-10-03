@@ -3,7 +3,8 @@ import { prisma } from "@/lib/prisma";
 import { prismaDelLocal } from "@/lib/prisma-local";
 import { idLocalActual } from "@/lib/local-actual";
 import { cargarCatalogoDeVenta } from "@/lib/catalogo-venta";
-import { METODOS_PAGO_PEDIDO } from "@/lib/metodos-pago";
+import { metodosPagoHabilitados } from "@/lib/metodos-pago";
+import { puedeFacturarDesdeEstaEstacion, textoSinFactura } from "@/lib/factura-estacion";
 import { BotonEnlace, Cabecera, Vacio } from "@/components/ui";
 import { NuevoPedidoForm } from "./NuevoPedidoForm";
 
@@ -18,7 +19,7 @@ export default async function NuevoPedidoPage() {
   const storeId = await idLocalActual();
   const db = prismaDelLocal(storeId);
 
-  const [catalogo, zonas, store] = await Promise.all([
+  const [catalogo, zonas, store, facturacion] = await Promise.all([
     cargarCatalogoDeVenta(db),
     db.deliveryZone.findMany({
       where: { activo: true },
@@ -36,21 +37,12 @@ export default async function NuevoPedidoPage() {
         facturaObligatoria: true,
       },
     }),
+    // ¿Esta computadora tiene un punto de expedición vigente? Si no, no se pregunta por factura (igual que el POS).
+    puedeFacturarDesdeEstaEstacion(db),
   ]);
 
-  // Las mismas formas de pago que el local tiene habilitadas para el cliente. Si por algún motivo no hay ninguna
-  // tildada, se ofrecen todas: no tiene sentido dejar sin poder cargar el pedido.
-  const habilitados: Record<string, boolean> = {
-    efectivo: store?.aceptaEfectivo ?? true,
-    transferencia: store?.aceptaTransferencia ?? true,
-    tarjeta_debito: store?.aceptaTarjetaDebito ?? true,
-    tarjeta_credito: store?.aceptaTarjetaCredito ?? true,
-  };
-  const ofrecidos = METODOS_PAGO_PEDIDO.filter((m) => habilitados[m.value]);
-  const metodosPago = (ofrecidos.length > 0 ? ofrecidos : METODOS_PAGO_PEDIDO).map((m) => ({
-    value: m.value,
-    label: m.label,
-  }));
+  // Las mismas formas de pago que el local tiene habilitadas para el cliente (el servidor las vuelve a comprobar).
+  const metodosPago = metodosPagoHabilitados(store).map((m) => ({ value: m.value, label: m.label }));
 
   return (
     <div>
@@ -81,6 +73,9 @@ export default async function NuevoPedidoPage() {
           zonas={zonas.map((z) => ({ id: z.id, nombre: z.nombre, costoEnvio: Number(z.costoEnvio) }))}
           metodosPago={metodosPago}
           facturaObligatoria={store?.facturaObligatoria ?? false}
+          puedeFacturar={facturacion.puedeFacturar}
+          motivoSinFactura={facturacion.motivo ? textoSinFactura(facturacion.motivo) : null}
+          diasParaVencerTimbrado={facturacion.diasParaVencerTimbrado}
         />
       )}
     </div>

@@ -7,9 +7,10 @@ import { prismaDelLocal, siguienteNumeroPedido } from "@/lib/prisma-local";
 import { idLocalActual } from "@/lib/local-actual";
 import { armarPedido, type LineaPedida } from "@/lib/precio-pedido";
 import { cargarCatalogoParaPedido } from "@/lib/catalogo-pedido";
+import { puedeFacturarDesdeEstaEstacion, textoSinFactura } from "@/lib/factura-estacion";
 import { registrarConsumoVenta } from "@/lib/movimientos-stock";
 import { registrarBitacora } from "@/lib/bitacora";
-import { METODOS_PAGO_PEDIDO } from "@/lib/metodos-pago";
+import { METODOS_PAGO_PEDIDO, metodosPagoHabilitados } from "@/lib/metodos-pago";
 import { SIN_REGISTRO_FISCAL, TIPOS_IDENTIFICACION_FISCAL } from "@/lib/tipo-cliente";
 import { formatearGuarani, formatearNumero } from "@/lib/format";
 
@@ -90,31 +91,71 @@ export async function crearPedidoManual(datos: DatosPedidoManual): Promise<Resul
     return { ok: false, error: "Para delivery hace falta la dirección: es lo que ve el repartidor." };
   }
 
+  // Store no pertenece a ningún local (no está en MODELOS_POR_LOCAL): se lee con el cliente global.
+  const local = await prisma.store.findUnique({
+    where: { id: storeId },
+    select: {
+      facturaObligatoria: true,
+      aceptaEfectivo: true,
+      aceptaTransferencia: true,
+      aceptaTarjetaDebito: true,
+      aceptaTarjetaCredito: true,
+    },
+  });
+
+  // El local pudo destildar una forma de pago en Configuración: se vuelve a comprobar acá, no solo en la pantalla.
+  if (!metodosPagoHabilitados(local).some((m) => m.value === datos.metodoPago)) {
+    return { ok: false, error: "Esa forma de pago no está habilitada en este local. Elegí otra." };
+  }
+
   // ------------------------------------------------------------- comprobante
-  // Mismo criterio que el checkout público: si el local factura TODA venta y se pidió ticket, sale una factura a
-  // Consumidor Final ("Sin Nombre").
+  // Las mismas reglas que el cobro del Punto de Venta (registrarVenta). La pantalla ya las respeta, pero esto es lo
+  // que de verdad vale: una acción del servidor se puede llamar sin pasar por ella.
   const quiereFactura = datos.comprobanteTipo === "factura";
   const sinNombre = quiereFactura && datos.facturaTipoIdentificacion === SIN_REGISTRO_FISCAL.tipo;
-  if (quiereFactura && !sinNombre) {
-    if (!TIPOS_IDENTIFICACION_FISCAL.some((t) => t.valor === datos.facturaTipoIdentificacion)) {
-      return { ok: false, error: "Elegí el tipo de documento para la factura." };
+  const facturaObligatoria = local?.facturaObligatoria ?? false;
+  const facturacion = await puedeFacturarDesdeEstaEstacion(db);
+
+  // Si el local exige facturar toda venta (timbrado Autoimpresor, RG 90/2021): sin un punto de expedición vigente en
+  // esta computadora no hay forma legal de cargar el pedido, y con punto vigente no se puede colar un "ticket".
+  if (facturaObligatoria) {
+    if (!facturacion.puedeFacturar) {
+      return {
+        ok: false,
+        error:
+          "Este local exige facturar todas las ventas y esta computadora no tiene un punto de expedición vigente asignado. Pedile al dueño que lo asigne en Puntos de expedición.",
+      };
     }
-    if (!datos.facturaRuc?.trim() || !datos.facturaRazonSocial?.trim()) {
-      return { ok: false, error: "Para factura con datos hacen falta el número de documento y la razón social." };
+    if (!quiereFactura) {
+      return { ok: false, error: "Este local exige facturar todas las ventas — no se puede cargar como ticket." };
     }
   }
 
-  // Store no pertenece a ningún local (no está en MODELOS_POR_LOCAL): se lee con el cliente global.
-  const local = await prisma.store.findUnique({ where: { id: storeId }, select: { facturaObligatoria: true } });
-  const facturaComoTicket = datos.comprobanteTipo === "ticket" && !!local?.facturaObligatoria;
-  const comprobanteTipoFinal = quiereFactura || facturaComoTicket ? "factura" : "ticket";
-  const consumidorFinal = sinNombre || facturaComoTicket;
+  if (quiereFactura) {
+    if (!sinNombre) {
+      if (!TIPOS_IDENTIFICACION_FISCAL.some((t) => t.valor === datos.facturaTipoIdentificacion)) {
+        return { ok: false, error: "Elegí con o sin registro fiscal, y el tipo de documento." };
+      }
+      if (!datos.facturaRuc?.trim() || !datos.facturaRazonSocial?.trim()) {
+        return { ok: false, error: "Para factura con registro fiscal hacen falta el número y la razón social." };
+      }
+      if (datos.facturaEmail?.trim() && !datos.facturaEmail.includes("@")) {
+        return { ok: false, error: "El correo electrónico no es válido." };
+      }
+    }
+    if (!facturacion.puedeFacturar && facturacion.motivo) {
+      return { ok: false, error: `${textoSinFactura(facturacion.motivo)} Cargalo como ticket.` };
+    }
+  }
+  const comprobanteTipoFinal = quiereFactura ? "factura" : "ticket";
+  const consumidorFinal = sinNombre;
 
   // ---------------------------------------------------------------- el precio
   // La carta REAL del local: lo que mandó el navegador solo dice qué productos y cuántos.
   const catalogo = await cargarCatalogoParaPedido(db, storeId, datos.items);
   const armado = armarPedido(catalogo, datos.items);
   if (!armado.ok) return { ok: false, error: armado.motivo };
+  if (armado.subtotal <= 0) return { ok: false, error: "El total tiene que ser mayor a cero." };
 
   // ----------------------------------------------------------------- el envío
   let zonaId: string | undefined;

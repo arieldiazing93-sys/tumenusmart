@@ -41,6 +41,22 @@ const TARJETA = "flex flex-col gap-3 !border-2 !border-azul/50";
 /** El rótulo de cada sección del panel del pedido, igual que en el Punto de Venta. */
 const ROTULO = "text-[0.72rem] font-semibold uppercase tracking-rotulo text-tinta-suave";
 
+const ICONOS_PAGO: Record<string, string> = {
+  efectivo: "💵",
+  transferencia: "🏦",
+  tarjeta_debito: "💳",
+  tarjeta_credito: "💳",
+};
+
+/** Una forma de pago: blanca con borde, y en azul la elegida — igual que en el cobro del Punto de Venta. */
+function claseMetodo(elegido: boolean): string {
+  return `flex min-w-0 items-center gap-2 rounded-lg border px-3 py-2.5 text-left text-[0.85rem] font-medium leading-tight transition-colors active:scale-[0.98] ${
+    elegido
+      ? "border-azul bg-azul-luz text-azul-oscuro"
+      : "border-linea text-tinta-media hover:border-azul/40 hover:bg-papel-suave"
+  }`;
+}
+
 /** Para buscar sin que importen las mayúsculas ni los acentos. */
 function sinTildes(texto: string): string {
   return texto.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
@@ -61,13 +77,22 @@ export function NuevoPedidoForm({
   zonas,
   metodosPago,
   facturaObligatoria,
+  puedeFacturar,
+  motivoSinFactura,
+  diasParaVencerTimbrado,
 }: {
   categorias: CategoriaVenta[];
   gruposMitad: GrupoMitadVenta[];
   zonas: Zona[];
   metodosPago: MetodoPago[];
-  /** Si el local factura TODA venta: un "Ticket" sale igual como factura a Consumidor Final. */
+  /** Si el local factura TODA venta (timbrado Autoimpresor). */
   facturaObligatoria: boolean;
+  /** Si esta computadora tiene un punto de expedición vigente. Sin eso no se pregunta por factura (igual que el POS). */
+  puedeFacturar: boolean;
+  /** Por qué esta computadora no puede facturar (ya redactado), o null si puede. */
+  motivoSinFactura: string | null;
+  /** Días hasta que venza el timbrado de esta computadora, o null si no tiene punto de expedición. */
+  diasParaVencerTimbrado: number | null;
 }) {
   const router = useRouter();
 
@@ -89,7 +114,10 @@ export function NuevoPedidoForm({
   const [costoEnvioTexto, setCostoEnvioTexto] = useState("");
 
   const [metodoPago, setMetodoPago] = useState<string>(metodosPago[0]?.value ?? "efectivo");
-  const [comprobanteTipo, setComprobanteTipo] = useState<"ticket" | "factura">("ticket");
+  // Si el local factura todo y esta computadora puede hacerlo, no hay "Ticket" que elegir: arranca en factura.
+  const [comprobanteTipo, setComprobanteTipo] = useState<"ticket" | "factura">(
+    facturaObligatoria && puedeFacturar ? "factura" : "ticket"
+  );
   const [registroFiscal, setRegistroFiscal] = useState<"con" | "sin">("con");
   const [facturaTipo, setFacturaTipo] = useState<string>(TIPOS_IDENTIFICACION_FISCAL[0].valor);
   const [facturaNumero, setFacturaNumero] = useState("");
@@ -135,7 +163,16 @@ export function NuevoPedidoForm({
   const costoEnvio = tipoEntrega === "delivery" && !costoEnvioInvalido ? costoEnvioNumero : 0;
   const total = subtotal + costoEnvio;
 
-  const conRegistroFiscal = comprobanteTipo === "factura" && registroFiscal === "con";
+  // Sin un punto de expedición vigente en esta computadora no se ofrece factura: siempre se manda ticket (y si el
+  // local factura todo, el servidor lo convierte en factura a Consumidor Final).
+  const comprobanteEfectivo = puedeFacturar ? comprobanteTipo : "ticket";
+  const conRegistroFiscal = comprobanteEfectivo === "factura" && registroFiscal === "con";
+  // Si el local exige facturar todo y esta computadora no puede, no se puede cargar nada (igual que el mostrador).
+  const bloqueadoSinFacturar = facturaObligatoria && !puedeFacturar;
+  const textoBloqueo =
+    "Este local exige facturar todas las ventas y esta computadora no tiene un punto de expedición vigente asignado. " +
+    "No se puede cargar el pedido hasta que el dueño le asigne uno en Puntos de expedición." +
+    (motivoSinFactura ? ` ${motivoSinFactura}` : "");
 
   function agregarProducto(p: ProductoVenta) {
     setError(null);
@@ -266,6 +303,10 @@ export function NuevoPedidoForm({
   // Pasa a los productos solo con los datos del cliente y de la entrega bien cargados.
   function continuar() {
     setError(null);
+    if (bloqueadoSinFacturar) {
+      setError(textoBloqueo);
+      return;
+    }
     if (!telefono.trim() || !nombre.trim()) {
       setError("Cargá el teléfono y el nombre del cliente.");
       return;
@@ -298,6 +339,10 @@ export function NuevoPedidoForm({
   async function crear() {
     if (guardando) return;
     setError(null);
+    if (bloqueadoSinFacturar) {
+      setError(textoBloqueo);
+      return;
+    }
 
     if (!telefono.trim() || !nombre.trim()) {
       setError("Cargá el teléfono y el nombre del cliente.");
@@ -336,9 +381,9 @@ export function NuevoPedidoForm({
         deliveryZoneId: tipoEntrega === "delivery" && zonaId && zonaId !== COORDINAR ? zonaId : undefined,
         costoEnvio: tipoEntrega === "delivery" ? costoEnvioNumero : undefined,
         metodoPago,
-        comprobanteTipo,
+        comprobanteTipo: comprobanteEfectivo,
         facturaTipoIdentificacion:
-          comprobanteTipo === "factura" ? (registroFiscal === "sin" ? SIN_REGISTRO_FISCAL.tipo : facturaTipo) : undefined,
+          comprobanteEfectivo === "factura" ? (registroFiscal === "sin" ? SIN_REGISTRO_FISCAL.tipo : facturaTipo) : undefined,
         facturaRuc: conRegistroFiscal ? facturaNumero.trim() : undefined,
         facturaRazonSocial: conRegistroFiscal ? facturaRazon.trim() : undefined,
         facturaEmail: conRegistroFiscal ? facturaEmail.trim() || undefined : undefined,
@@ -406,6 +451,11 @@ export function NuevoPedidoForm({
       {/* Paso 1: quién es el cliente y cómo se le entrega. */}
       {paso === "cliente" && (
         <div className="mx-auto flex max-w-3xl flex-col gap-4">
+          {bloqueadoSinFacturar && (
+            <p role="alert" className="rounded-lg bg-peligro-luz px-3 py-2 text-[0.82rem] font-medium text-peligro">
+              {textoBloqueo}
+            </p>
+          )}
           <Tarjeta className={TARJETA}>
             <h2 className="text-[1rem] font-semibold tracking-titular text-tinta">Cliente y entrega</h2>
 
@@ -528,7 +578,7 @@ export function NuevoPedidoForm({
 
           {mensajeError}
           <div className="flex justify-end">
-            <Boton onClick={continuar} tam="lg">
+            <Boton onClick={continuar} disabled={bloqueadoSinFacturar} tam="lg">
               Continuar a los productos →
             </Boton>
           </div>
@@ -715,82 +765,102 @@ export function NuevoPedidoForm({
 
             <div className="flex flex-col gap-2 border-t border-linea pt-3.5">
               <p className={ROTULO}>Pago</p>
-              <Selector
-                value={metodoPago}
-                onChange={(e) => setMetodoPago(e.target.value)}
-                aria-label="Cómo va a pagar"
-              >
+              <div className="grid grid-cols-2 gap-2">
                 {metodosPago.map((m) => (
-                  <option key={m.value} value={m.value}>
+                  <button
+                    key={m.value}
+                    type="button"
+                    onClick={() => setMetodoPago(m.value)}
+                    aria-pressed={metodoPago === m.value}
+                    className={claseMetodo(metodoPago === m.value)}
+                  >
+                    <span aria-hidden="true" className="text-base leading-none">
+                      {ICONOS_PAGO[m.value] ?? "💰"}
+                    </span>
                     {m.label}
-                  </option>
+                  </button>
                 ))}
-              </Selector>
+              </div>
             </div>
 
-            <div className="flex flex-col gap-2 border-t border-linea pt-3.5">
-              <p className={ROTULO}>Comprobante</p>
-              <Segmentado<"ticket" | "factura">
-                opciones={[
-                  { value: "ticket", label: "Ticket" },
-                  { value: "factura", label: "Factura" },
-                ]}
-                valor={comprobanteTipo}
-                onChange={setComprobanteTipo}
-              />
-              {facturaObligatoria && (
-                <p className="rounded-lg bg-papel-suave px-3 py-2 text-[0.78rem] text-tinta-media">
-                  Este local factura todas las ventas: con &ldquo;Ticket&rdquo; sale una factura a Consumidor Final.
-                </p>
-              )}
-              {comprobanteTipo === "factura" && (
-                <div className="flex flex-col gap-2 rounded-lg border border-linea bg-papel-suave p-3">
-                  <Segmentado<"con" | "sin">
+            {/* Solo se pregunta por factura si esta computadora puede emitirla (tiene un punto de expedición vigente),
+                igual que en el Punto de Venta: sin folio no hay factura que ofrecer. */}
+            {puedeFacturar ? (
+              <div className="flex flex-col gap-2 border-t border-linea pt-3.5">
+                <p className={ROTULO}>Comprobante</p>
+                {diasParaVencerTimbrado != null && diasParaVencerTimbrado <= 30 && (
+                  <p className="rounded-lg bg-aviso-luz px-3 py-2 text-[0.78rem] font-medium text-aviso">
+                    El timbrado de esta estación vence en {diasParaVencerTimbrado} día
+                    {diasParaVencerTimbrado === 1 ? "" : "s"}.
+                  </p>
+                )}
+                {facturaObligatoria ? (
+                  <p className="rounded-lg bg-papel-suave px-3 py-2 text-[0.78rem] text-tinta-media">
+                    Este local factura todas las ventas — no se puede cargar como ticket.
+                  </p>
+                ) : (
+                  <Segmentado<"ticket" | "factura">
                     opciones={[
-                      { value: "con", label: "Con registro fiscal" },
-                      { value: "sin", label: "Sin registro fiscal" },
+                      { value: "ticket", label: "Ticket" },
+                      { value: "factura", label: "Factura" },
                     ]}
-                    valor={registroFiscal}
-                    onChange={setRegistroFiscal}
-                    color="tinta"
+                    valor={comprobanteTipo}
+                    onChange={setComprobanteTipo}
                   />
-                  {registroFiscal === "sin" ? (
-                    <p className="text-[0.8rem] text-tinta-media">Se factura a Consumidor Final (Sin Nombre).</p>
-                  ) : (
-                    <>
-                      <Campo etiqueta="Tipo de documento">
-                        <Selector value={facturaTipo} onChange={(e) => setFacturaTipo(e.target.value)}>
-                          {TIPOS_IDENTIFICACION_FISCAL.map((t) => (
-                            <option key={t.valor} value={t.valor}>
-                              {t.etiqueta}
-                            </option>
-                          ))}
-                        </Selector>
-                      </Campo>
-                      <Campo etiqueta="Número">
-                        <Entrada
-                          value={facturaNumero}
-                          onChange={(e) => setFacturaNumero(e.target.value)}
-                          placeholder="80012345-6"
-                          maxLength={30}
-                        />
-                      </Campo>
-                      <Campo etiqueta="Razón social">
-                        <Entrada value={facturaRazon} onChange={(e) => setFacturaRazon(e.target.value)} maxLength={120} />
-                      </Campo>
-                      <Campo etiqueta="Correo (opcional)">
-                        <Entrada
-                          type="email"
-                          value={facturaEmail}
-                          onChange={(e) => setFacturaEmail(e.target.value)}
-                          maxLength={120}
-                        />
-                      </Campo>
-                    </>
-                  )}
-                </div>
-              )}
-            </div>
+                )}
+                {comprobanteTipo === "factura" && (
+                  <div className="flex flex-col gap-2 rounded-lg border border-linea bg-papel-suave p-3">
+                    <Segmentado<"con" | "sin">
+                      opciones={[
+                        { value: "con", label: "Con registro fiscal" },
+                        { value: "sin", label: "Sin registro fiscal" },
+                      ]}
+                      valor={registroFiscal}
+                      onChange={setRegistroFiscal}
+                      color="tinta"
+                    />
+                    {registroFiscal === "sin" ? (
+                      <p className="text-[0.8rem] text-tinta-media">Se factura a Consumidor Final (Sin Nombre).</p>
+                    ) : (
+                      <>
+                        <Campo etiqueta="Tipo de documento">
+                          <Selector value={facturaTipo} onChange={(e) => setFacturaTipo(e.target.value)}>
+                            {TIPOS_IDENTIFICACION_FISCAL.map((t) => (
+                              <option key={t.valor} value={t.valor}>
+                                {t.etiqueta}
+                              </option>
+                            ))}
+                          </Selector>
+                        </Campo>
+                        <Campo etiqueta="Número">
+                          <Entrada
+                            value={facturaNumero}
+                            onChange={(e) => setFacturaNumero(e.target.value)}
+                            placeholder="80012345-6"
+                            maxLength={30}
+                          />
+                        </Campo>
+                        <Campo etiqueta="Razón social">
+                          <Entrada
+                            value={facturaRazon}
+                            onChange={(e) => setFacturaRazon(e.target.value)}
+                            maxLength={120}
+                          />
+                        </Campo>
+                        <Campo etiqueta="Correo (opcional)">
+                          <Entrada
+                            type="email"
+                            value={facturaEmail}
+                            onChange={(e) => setFacturaEmail(e.target.value)}
+                            maxLength={120}
+                          />
+                        </Campo>
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
+            ) : null}
 
             <div className="flex flex-col gap-2 border-t border-linea pt-3.5">
               <p className={ROTULO}>Notas (opcional)</p>
@@ -825,7 +895,12 @@ export function NuevoPedidoForm({
 
             {mensajeError}
 
-            <Boton onClick={crear} disabled={guardando || carrito.length === 0} tam="lg" className="w-full">
+            <Boton
+              onClick={crear}
+              disabled={guardando || carrito.length === 0 || bloqueadoSinFacturar}
+              tam="lg"
+              className="w-full"
+            >
               {guardando ? "Guardando…" : "Crear pedido"}
             </Boton>
             <p className="-mt-2 text-[0.74rem] leading-snug text-tinta-suave">
@@ -838,7 +913,7 @@ export function NuevoPedidoForm({
 
       {/* Barra fija en celular/tablet angosto (como la del Punto de Venta): el panel del pedido queda debajo de toda la
           grilla, así que sin esto habría que scrollear hasta el final cada vez. */}
-      {paso === "productos" && carrito.length > 0 && (
+      {paso === "productos" && carrito.length > 0 && !bloqueadoSinFacturar && (
         <div
           className="fixed inset-x-0 bottom-0 z-30 border-t border-linea bg-papel/95 px-4 py-3 shadow-alta backdrop-blur-sm lg:hidden"
           style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom, 0px))" }}

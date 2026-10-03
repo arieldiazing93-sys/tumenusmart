@@ -16,6 +16,29 @@ export const METODOS_PAGO_PEDIDO: { value: MetodoPagoPedido; label: string; subl
   { value: "tarjeta_credito", label: "Tarjeta crédito", sublabel: "POS al recibir" },
 ];
 
+/**
+ * Las formas de pago que el local tiene tildadas en Configuración. Si por algún motivo no hay ninguna, se ofrecen
+ * todas: no tiene sentido dejar sin poder cargar un pedido. Sirve para mostrar las opciones y para volver a
+ * comprobarlas en el servidor.
+ */
+export function metodosPagoHabilitados(
+  local: {
+    aceptaEfectivo?: boolean;
+    aceptaTransferencia?: boolean;
+    aceptaTarjetaDebito?: boolean;
+    aceptaTarjetaCredito?: boolean;
+  } | null | undefined
+): typeof METODOS_PAGO_PEDIDO {
+  const habilitados: Record<MetodoPagoPedido, boolean> = {
+    efectivo: local?.aceptaEfectivo ?? true,
+    transferencia: local?.aceptaTransferencia ?? true,
+    tarjeta_debito: local?.aceptaTarjetaDebito ?? true,
+    tarjeta_credito: local?.aceptaTarjetaCredito ?? true,
+  };
+  const ofrecidos = METODOS_PAGO_PEDIDO.filter((m) => habilitados[m.value]);
+  return ofrecidos.length > 0 ? ofrecidos : METODOS_PAGO_PEDIDO;
+}
+
 const ETIQUETAS: Record<string, string> = {
   efectivo: "Efectivo",
   transferencia: "Transferencia",
