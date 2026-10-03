@@ -24,6 +24,7 @@ import {
   SEGUNDOS_LATIDO_IMPRESION,
   agruparPorArea,
   claveDeMesa,
+  contenidoParaGuardar,
   normalizarMesa,
   normalizarNota,
   textoComanda,
@@ -500,7 +501,8 @@ export async function enviarPedido(token: string, datos: DatosEnvio): Promise<Re
           tipo: "comanda",
           titulo: `Mesa ${mesa} · ${area} · pedido ${ronda}`,
           areaImpresionId: areaId,
-          contenido: textoComanda({ mesa, mozo: quien, ronda, area, hora, lineas }),
+          // La base no acepta el byte 0x00 que llevan los comandos de la impresora: se guarda con una marca.
+          contenido: contenidoParaGuardar(textoComanda({ mesa, mozo: quien, ronda, area, hora, lineas })),
           cuentaMesaId: cuenta.id,
         };
       });

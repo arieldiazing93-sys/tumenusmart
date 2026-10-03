@@ -5,7 +5,12 @@ import { puede } from "@/lib/permisos";
 import { prismaDelLocal } from "@/lib/prisma-local";
 import { idLocalActual } from "@/lib/local-actual";
 import { estacionActual } from "@/lib/estacion-actual";
-import { REINTENTOS_MAXIMOS, SEGUNDOS_TRABAJO_COLGADO, TRABAJOS_POR_CONSULTA } from "@/lib/comedor";
+import {
+  REINTENTOS_MAXIMOS,
+  SEGUNDOS_TRABAJO_COLGADO,
+  TRABAJOS_POR_CONSULTA,
+  contenidoParaImprimir,
+} from "@/lib/comedor";
 
 export const dynamic = "force-dynamic";
 
@@ -94,7 +99,8 @@ export async function POST() {
       trabajos: trabajos.map((t) => ({
         id: t.id,
         titulo: t.titulo,
-        contenido: t.contenido,
+        // Vuelven los bytes 0x00 de los comandos de la impresora (en la base se guardan con una marca).
+        contenido: contenidoParaImprimir(t.contenido),
         impresora: t.areaImpresionId ? (impresoraDeArea.get(t.areaImpresionId) ?? null) : null,
       })),
     },

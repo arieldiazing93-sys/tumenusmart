@@ -23,11 +23,19 @@ export const SEGUNDOS_TRABAJO_COLGADO = 60;
 export const REINTENTOS_MAXIMOS = 3;
 
 /**
+ * Un texto sin caracteres de control (los de código 0 a 31 y el 127): lo que escribe el mozo no puede llevar comandos de la
+ * impresora (cortar el papel, cambiar la letra) ni bytes 0x00, que la base de datos no acepta.
+ */
+function sinControles(texto: string): string {
+  return texto.replace(/[\x00-\x1F\x7F]/g, " ");
+}
+
+/**
  * El número o nombre de la mesa como se muestra: sin espacios de más y con un largo razonable. Devuelve null si no
  * queda nada (o si es demasiado largo).
  */
 export function normalizarMesa(texto: unknown): string | null {
-  const limpio = String(texto ?? "").replace(/\s+/g, " ").trim();
+  const limpio = sinControles(String(texto ?? "")).replace(/\s+/g, " ").trim();
   if (!limpio || limpio.length > MESA_LARGO_MAXIMO) return null;
   return limpio;
 }
@@ -47,7 +55,7 @@ export function claveDeMesa(mesa: string): string {
 
 /** La nota de un producto, limpia y con tope; null si no escribió nada. */
 export function normalizarNota(texto: unknown): string | null {
-  const limpio = String(texto ?? "").replace(/\s+/g, " ").trim().slice(0, NOTA_LARGO_MAXIMO);
+  const limpio = sinControles(String(texto ?? "")).replace(/\s+/g, " ").trim().slice(0, NOTA_LARGO_MAXIMO);
   return limpio || null;
 }
 
@@ -77,7 +85,8 @@ export function textoComanda(datos: {
   hora: string;
   lineas: LineaComanda[];
 }): string {
-  const s = sinAcentos;
+  // Sin acentos y sin caracteres de control: nada de lo que viene de afuera puede colar comandos de impresora en la comanda.
+  const s = (texto: string) => sinControles(sinAcentos(texto));
   const l: string[] = [separador()];
   l.push(negrita(centrado(s(`MESA ${datos.mesa}`).toUpperCase())));
   l.push(centrado(s(datos.area).toUpperCase()));
@@ -95,12 +104,27 @@ export function textoComanda(datos: {
   return armarDocumento(l);
 }
 
+// Los comandos de la impresora (negrita apagada, corte de papel) llevan el byte 0x00, y PostgreSQL no deja guardar ese byte
+// en un campo de texto ("invalid byte sequence for encoding UTF8: 0x00"). Se guarda una marca en su lugar y se vuelve a
+// poner el byte justo antes de imprimir. U+E000 es un carácter de uso privado: no aparece en ningún texto real.
+const MARCA_NUL = String.fromCharCode(0xe000);
+
+/** El texto de una comanda tal como se guarda en la base: sin bytes 0x00. */
+export function contenidoParaGuardar(texto: string): string {
+  return texto.split(MARCA_NUL).join("").replace(/\x00/g, MARCA_NUL);
+}
+
+/** Lo que se le manda a la impresora: el texto guardado con los bytes 0x00 de vuelta en su lugar. */
+export function contenidoParaImprimir(guardado: string): string {
+  return guardado.split(MARCA_NUL).join("\x00");
+}
+
 /**
  * La comanda tal como se lee en pantalla: sin los comandos de la impresora (inicio, negrita, corte), que solo ella entiende.
  * Sirve para ver qué se va a imprimir sin gastar papel (o cuando la "impresora" es un PDF y no entiende ESC/POS).
  */
-export function comandaLegible(contenido: string): string {
-  return contenido
+export function comandaLegible(guardado: string): string {
+  return contenidoParaImprimir(guardado)
     .replace(/\x1B\x40|\x1B\x45[\x00\x01]|\x1D\x56[\x00-\x03]/g, "")
     .replace(/[\x00-\x09\x0B-\x1F]/g, "")
     .trim();
