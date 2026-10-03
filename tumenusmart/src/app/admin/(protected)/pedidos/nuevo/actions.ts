@@ -240,12 +240,16 @@ export async function crearPedidoManual(datos: DatosPedidoManual): Promise<Resul
 }
 
 export type ResultadoBuscarClienteParaPedido =
-  | { ok: true; nombre: string; direccion: string | null; deliveryZoneId: string | null }
+  | { ok: true; nombre: string; direcciones: string[] }
   | { ok: false };
 
 /**
- * Cuando se escribe el teléfono: si ya es cliente del local, devuelve su nombre y la dirección del último delivery
- * que pidió, para completarlos solos (el "lo de siempre" del que llama seguido). Solo lee; nunca crea nada.
+ * Cuando se busca el teléfono: si ya es cliente del local, devuelve su nombre y hasta tres direcciones distintas de
+ * sus últimos deliveries, para ofrecerlas como opciones. Solo lee; nunca crea nada.
+ *
+ * A propósito NO devuelve la zona ni el costo de envío de pedidos anteriores: el mismo cliente puede pedir hoy desde
+ * otro lugar (cerca del local, lejos, el trabajo) y arrastrar el envío de la vez pasada sería cobrarle mal. La zona
+ * y el costo se eligen siempre a mano, según de dónde pide hoy.
  */
 export async function buscarClienteParaPedido(telefono: string): Promise<ResultadoBuscarClienteParaPedido> {
   await exigirPermiso("pedidos.crear");
@@ -257,16 +261,25 @@ export async function buscarClienteParaPedido(telefono: string): Promise<Resulta
   const cliente = await db.customer.findFirst({ where: { telefono: numero }, select: { id: true, nombre: true } });
   if (!cliente) return { ok: false };
 
-  const ultimoDelivery = await db.order.findFirst({
+  const anteriores = await db.order.findMany({
     where: { customerId: cliente.id, tipoEntrega: "delivery", direccion: { not: null } },
     orderBy: { createdAt: "desc" },
-    select: { direccion: true, deliveryZoneId: true },
+    take: 10,
+    select: { direccion: true },
   });
 
-  return {
-    ok: true,
-    nombre: cliente.nombre,
-    direccion: ultimoDelivery?.direccion ?? null,
-    deliveryZoneId: ultimoDelivery?.deliveryZoneId ?? null,
-  };
+  // Las más recientes primero, sin repetir (aunque cambie una mayúscula), hasta tres.
+  const vistas = new Set<string>();
+  const direcciones: string[] = [];
+  for (const o of anteriores) {
+    const direccion = o.direccion?.trim();
+    if (!direccion) continue;
+    const clave = direccion.toLowerCase();
+    if (vistas.has(clave)) continue;
+    vistas.add(clave);
+    direcciones.push(direccion);
+    if (direcciones.length === 3) break;
+  }
+
+  return { ok: true, nombre: cliente.nombre, direcciones };
 }

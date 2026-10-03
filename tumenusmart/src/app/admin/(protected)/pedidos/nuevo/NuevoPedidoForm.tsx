@@ -9,6 +9,7 @@ import { SIN_REGISTRO_FISCAL, TIPOS_IDENTIFICACION_FISCAL } from "@/lib/tipo-cli
 import type { AgregadoVenta, CategoriaVenta, GrupoMitadVenta, ProductoMitadVenta, ProductoVenta } from "@/lib/catalogo-venta";
 import { AgregadosPickerPos } from "../../pos/AgregadosPickerPos";
 import { MitadYMitadPickerPos } from "../../pos/MitadYMitadPickerPos";
+import { EntradaConLupa } from "../../pos/EntradaConLupa";
 import { buscarClienteParaPedido, crearPedidoManual } from "./actions";
 
 type Zona = { id: string; nombre: string; costoEnvio: number };
@@ -25,6 +26,8 @@ type ItemCarrito = { key: string; nombre: string; precio: number; cantidad: numb
 );
 
 const TODOS = "__todos__";
+/** En la zona de envío: "todavía no se sabe". No es lo mismo que no haber elegido nada: eso no deja crear el pedido. */
+const COORDINAR = "__coordinar__";
 
 const TIPOS_ENTREGA: { value: TipoEntrega; label: string }[] = [
   { value: "delivery", label: "🛵 Delivery" },
@@ -72,6 +75,8 @@ export function NuevoPedidoForm({
   const [telefono, setTelefono] = useState("");
   const [nombre, setNombre] = useState("");
   const [estadoCliente, setEstadoCliente] = useState<"" | "conocido" | "nuevo">("");
+  // Direcciones de pedidos anteriores del cliente: son opciones para elegir, nunca se completan solas.
+  const [direccionesAnteriores, setDireccionesAnteriores] = useState<string[]>([]);
   const [buscandoCliente, setBuscandoCliente] = useState(false);
 
   const [tipoEntrega, setTipoEntrega] = useState<TipoEntrega>("delivery");
@@ -219,12 +224,13 @@ export function NuevoPedidoForm({
     setCostoEnvioTexto(zona ? String(zona.costoEnvio) : "");
   }
 
-  // Al salir del teléfono: si ya es cliente del local, completa el nombre y la dirección del último delivery. No
-  // pisa lo que ya se escribió.
+  // Al tocar la lupa, apretar Enter o salir del teléfono: si ya es cliente del local, completa el nombre (sin pisar
+  // lo que ya se escribió) y ofrece sus direcciones anteriores.
   async function buscarCliente() {
     const numero = telefono.trim();
-    if (!numero) return;
+    if (!numero || buscandoCliente) return;
     setBuscandoCliente(true);
+    setDireccionesAnteriores([]);
     let r: Awaited<ReturnType<typeof buscarClienteParaPedido>>;
     try {
       r = await buscarClienteParaPedido(numero);
@@ -239,11 +245,10 @@ export function NuevoPedidoForm({
     }
     setEstadoCliente("conocido");
     const nombreEncontrado = r.nombre;
-    const direccionEncontrada = r.direccion;
-    const zonaEncontrada = r.deliveryZoneId;
     setNombre((actual) => (actual.trim() ? actual : nombreEncontrado));
-    if (direccionEncontrada) setDireccion((actual) => (actual.trim() ? actual : direccionEncontrada));
-    if (zonaEncontrada && !zonaId && zonas.some((z) => z.id === zonaEncontrada)) elegirZona(zonaEncontrada);
+    // La dirección NO se completa sola: el cliente puede estar pidiendo desde otro lugar. Se ofrecen como opciones,
+    // y la zona y el envío se eligen siempre a mano, según de dónde pide hoy.
+    setDireccionesAnteriores(r.direcciones);
   }
 
   async function crear() {
@@ -260,6 +265,11 @@ export function NuevoPedidoForm({
     }
     if (tipoEntrega === "delivery" && !direccion.trim()) {
       setError("Para delivery hace falta la dirección: es lo que ve el repartidor.");
+      return;
+    }
+    // Sin una zona elegida (o "A coordinar" a propósito) no se crea: así el envío nunca queda en 0 por olvido.
+    if (tipoEntrega === "delivery" && !zonaId) {
+      setError("Elegí la zona de envío. Si todavía no se sabe, elegí “A coordinar”.");
       return;
     }
     if (costoEnvioInvalido) {
@@ -279,7 +289,7 @@ export function NuevoPedidoForm({
         clienteTelefono: telefono,
         tipoEntrega,
         direccion: tipoEntrega === "delivery" ? direccion : undefined,
-        deliveryZoneId: tipoEntrega === "delivery" && zonaId ? zonaId : undefined,
+        deliveryZoneId: tipoEntrega === "delivery" && zonaId && zonaId !== COORDINAR ? zonaId : undefined,
         costoEnvio: tipoEntrega === "delivery" ? costoEnvioNumero : undefined,
         metodoPago,
         comprobanteTipo,
@@ -322,22 +332,23 @@ export function NuevoPedidoForm({
             <h2 className="text-[1rem] font-semibold tracking-titular text-tinta">Cliente y entrega</h2>
 
             <div className="grid gap-3 sm:grid-cols-2">
-              <Campo etiqueta="Teléfono" ayuda={buscandoCliente ? "Buscando…" : undefined}>
-                <Entrada
+              <Campo
+                etiqueta="Teléfono"
+                ayuda={buscandoCliente ? "Buscando…" : "Tocá la lupa para ver si ya es cliente."}
+              >
+                <EntradaConLupa
                   type="tel"
                   inputMode="tel"
                   value={telefono}
                   onChange={(e) => {
                     setTelefono(e.target.value);
                     setEstadoCliente("");
+                    setDireccionesAnteriores([]);
                   }}
                   onBlur={buscarCliente}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      void buscarCliente();
-                    }
-                  }}
+                  onBuscar={buscarCliente}
+                  buscando={buscandoCliente}
+                  etiquetaBoton="Buscar cliente por teléfono"
                   placeholder="0981 123 456"
                   maxLength={30}
                   autoFocus
@@ -382,10 +393,36 @@ export function NuevoPedidoForm({
                     maxLength={200}
                   />
                 </Campo>
+
+                {direccionesAnteriores.length > 0 && (
+                  <div className="rounded-lg border-2 border-azul/50 bg-papel-suave p-2.5">
+                    <p className="mb-1.5 text-[0.78rem] font-semibold text-tinta">Direcciones anteriores de este cliente</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {direccionesAnteriores.map((d) => (
+                        <button
+                          key={d}
+                          type="button"
+                          title="Usar esta dirección"
+                          onClick={() => setDireccion(d)}
+                          className={`max-w-full rounded-lg border px-2.5 py-1.5 text-left text-[0.8rem] leading-snug transition-colors ${
+                            direccion === d ? CHIP_ACTIVO : CHIP_INACTIVO
+                          }`}
+                        >
+                          {d}
+                        </button>
+                      ))}
+                    </div>
+                    <p className="mt-1.5 text-[0.76rem] leading-snug text-tinta-suave">
+                      Preguntale desde dónde pide hoy: puede ser otro lugar. La zona y el envío se eligen a mano.
+                    </p>
+                  </div>
+                )}
+
                 <div className="grid gap-3 sm:grid-cols-2">
-                  <Campo etiqueta="Zona de envío">
+                  <Campo etiqueta="Zona de envío" ayuda="Según dónde está hoy el cliente.">
                     <Selector value={zonaId} onChange={(e) => elegirZona(e.target.value)}>
-                      <option value="">A coordinar</option>
+                      <option value="">Elegí la zona…</option>
+                      <option value={COORDINAR}>A coordinar (sin zona)</option>
                       {zonas.map((z) => (
                         <option key={z.id} value={z.id}>
                           {z.nombre} · {formatearGuarani(z.costoEnvio)}
