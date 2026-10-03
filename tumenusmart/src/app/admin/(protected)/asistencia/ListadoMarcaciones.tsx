@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Pastilla, clasesBoton } from "@/components/ui";
 import {
+  DIAS_CONSERVAR_FOTOS_MARCACION,
   ETIQUETA_TIPO,
   ETIQUETA_TIPO_CORTA,
   TIPOS_MARCACION,
@@ -208,7 +209,7 @@ function ModalFoto({ abierta, onCerrar }: { abierta: NonNullable<Abierta>; onCer
                 <img src={celda.fotoUrl} alt="Foto de la marcación" className="h-full w-full object-cover" />
               ) : (
                 <div className="flex h-full items-center justify-center p-3 text-center text-[0.8rem] text-tinta-suave">
-                  Sin foto
+                  Sin foto: se guardan {DIAS_CONSERVAR_FOTOS_MARCACION} días y después se borran. La hora queda.
                 </div>
               )}
             </div>

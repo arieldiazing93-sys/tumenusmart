@@ -2,7 +2,11 @@ import { pantallaConPermiso } from "@/lib/auth";
 import { idLocalActual } from "@/lib/local-actual";
 import { prisma } from "@/lib/prisma";
 import { Aviso, BotonEnlace, Cabecera, Tarjeta } from "@/components/ui";
-import { ALMUERZO_PREDETERMINADO, MINUTOS_ENTRE_MARCAS_PREDETERMINADO } from "@/lib/asistencia";
+import {
+  ALMUERZO_PREDETERMINADO,
+  DIAS_CONSERVAR_FOTOS_MARCACION,
+  MINUTOS_ENTRE_MARCAS_PREDETERMINADO,
+} from "@/lib/asistencia";
 import { EnlaceCelularFijo } from "./EnlaceCelularFijo";
 import { ReglasMarcacion } from "./ReglasMarcacion";
 
@@ -106,7 +110,8 @@ export default async function CelularFijoPage() {
       <Aviso titulo="Cómo se evita que marquen por otro" color="azul">
         Cada marcación pide el PIN de la persona y la cámara tiene que ver una cara de frente. Después de 5 PIN incorrectos
         seguidos el celular se bloquea 3 minutos. Queda guardada la foto de cada marcación: en <strong>Marcaciones</strong>{" "}
-        podés compararla con la selfie del alta. La cámara detecta que hay una cara, pero no reconoce de quién es: si
+        podés compararla con la selfie del alta. Las fotos se guardan {DIAS_CONSERVAR_FOTOS_MARCACION} días y después se
+        borran solas; la marcación queda para siempre, con su hora, y la selfie del alta no se borra. La cámara detecta que hay una cara, pero no reconoce de quién es: si
         alguien usa el PIN de otro, lo vas a ver en la foto. Si la cámara no llega a ver la cara, la persona puede marcar
         igual y esa marcación queda señalada para que la revises.
       </Aviso>

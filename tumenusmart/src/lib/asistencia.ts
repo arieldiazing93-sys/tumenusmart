@@ -52,6 +52,13 @@ export const MINUTOS_ENTRE_MARCAS_MAXIMO = 240;
 export const MAXIMO_INTENTOS_PIN = 5;
 export const MINUTOS_BLOQUEO_PIN = 3;
 
+/**
+ * Cuántos días se guarda la FOTO de cada marcación. Pasado ese tiempo la foto se borra sola (ver
+ * limpiar-fotos-asistencia.ts) y la marcación queda igual, con su hora: lo que importa es el registro, la foto sirve
+ * para revisar si alguien marcó por otro. La selfie del alta del colaborador no se toca.
+ */
+export const DIAS_CONSERVAR_FOTOS_MARCACION = 30;
+
 /** El horario de almuerzo del negocio (ver Store.almuerzoDesde / almuerzoHasta / almuerzoMaxMin). */
 export type ReglasAlmuerzo = {
   /** "HH:MM": desde cuándo una marcación de quien ya entró cuenta como salida a almorzar. */

@@ -86,7 +86,44 @@ export async function subirFotoCliente(archivo: File): Promise<string> {
   return subirImagen(archivo, "clientes/");
 }
 
+const CARPETA_ASISTENCIA = "asistencia/";
+
 /** La selfie del alta de un colaborador y las fotos de cada marcación, en el Registro de asistencia. */
 export async function subirFotoAsistencia(archivo: File): Promise<string> {
-  return subirImagen(archivo, "asistencia/");
+  return subirImagen(archivo, CARPETA_ASISTENCIA);
+}
+
+/**
+ * La ruta dentro del bucket de una foto de asistencia, a partir de su dirección pública. Devuelve null si la
+ * dirección no es de nuestro bucket o no está en la carpeta de asistencia: así el borrado nunca puede apuntar a una
+ * foto de producto, a un logo ni a ninguna otra cosa.
+ */
+export function rutaDeFotoAsistencia(url: string): string | null {
+  const marca = `/object/public/${NOMBRE_BUCKET}/`;
+  const desde = url.indexOf(marca);
+  if (desde === -1) return null;
+  let ruta = url.slice(desde + marca.length).split("?")[0];
+  try {
+    ruta = decodeURIComponent(ruta);
+  } catch {
+    return null;
+  }
+  if (!ruta.startsWith(CARPETA_ASISTENCIA) || ruta.includes("..")) return null;
+  return ruta;
+}
+
+/**
+ * Borra fotos de asistencia del bucket. Si alguna de las rutas no es de la carpeta de asistencia no borra NINGUNA y
+ * falla: es la última barrera para que un error de quien llama no se lleve fotos de productos. Borrar un archivo que
+ * ya no existe no da error, así que se puede repetir sin problema.
+ */
+export async function borrarFotosAsistencia(rutas: string[]): Promise<void> {
+  if (rutas.length === 0) return;
+  if (rutas.some((r) => !r.startsWith(CARPETA_ASISTENCIA) || r.includes(".."))) {
+    throw new Error("Se intentó borrar un archivo que no es una foto de asistencia");
+  }
+  const { error } = await clienteAdmin().storage.from(NOMBRE_BUCKET).remove(rutas);
+  if (error) {
+    throw new Error(`No se pudieron borrar las fotos: ${error.message}`);
+  }
 }
