@@ -3,6 +3,7 @@ import { idLocalActual } from "@/lib/local-actual";
 import { estacionActual } from "@/lib/estacion-actual";
 import { prismaDelLocal } from "@/lib/prisma-local";
 import { ZONA_NEGOCIO } from "@/lib/timezone";
+import { comandaLegible } from "@/lib/comedor";
 import { Cabecera } from "@/components/ui";
 import { RefrescarCada } from "@/components/RefrescarCada";
 import { AgenteImpresion } from "./AgenteImpresion";
@@ -29,7 +30,7 @@ export default async function ImpresionPage() {
     db.trabajoImpresion.findMany({
       orderBy: { createdAt: "desc" },
       take: 30,
-      select: { id: true, titulo: true, estado: true, createdAt: true, error: true },
+      select: { id: true, titulo: true, estado: true, createdAt: true, error: true, contenido: true },
     }),
   ]);
 
@@ -55,6 +56,7 @@ export default async function ImpresionPage() {
             titulo: t.titulo,
             estado: t.estado,
             error: t.error,
+            texto: comandaLegible(t.contenido),
             hora: t.createdAt.toLocaleString("es-PY", {
               day: "2-digit",
               month: "2-digit",

@@ -11,6 +11,8 @@ export type TrabajoFila = {
   estado: string;
   hora: string;
   error: string | null;
+  /** La comanda ya legible (sin los comandos de la impresora). */
+  texto: string;
 };
 
 const ESTADOS: Record<string, { texto: string; color: "exito" | "amarillo" | "peligro" | "azul" }> = {
@@ -25,6 +27,7 @@ export function ListaTrabajos({ trabajos }: { trabajos: TrabajoFila[] }) {
   const router = useRouter();
   const [pendiente, iniciar] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [verId, setVerId] = useState<string | null>(null);
 
   function reimprimir(id: string) {
     setError(null);
@@ -64,6 +67,13 @@ export function ListaTrabajos({ trabajos }: { trabajos: TrabajoFila[] }) {
               </div>
               <div className="flex flex-none items-center gap-2">
                 <Pastilla color={estado.color}>{estado.texto}</Pastilla>
+                <button
+                  type="button"
+                  onClick={() => setVerId(verId === t.id ? null : t.id)}
+                  className={clasesBoton("navegar", "sm")}
+                >
+                  {verId === t.id ? "Ocultar" : "Ver comanda"}
+                </button>
                 {sePuedeReimprimir && (
                   <button
                     type="button"
@@ -75,6 +85,11 @@ export function ListaTrabajos({ trabajos }: { trabajos: TrabajoFila[] }) {
                   </button>
                 )}
               </div>
+              {verId === t.id && (
+                <pre className="w-full overflow-x-auto rounded-lg bg-papel-suave p-3 font-mono text-[0.78rem] leading-snug text-tinta">
+                  {t.texto}
+                </pre>
+              )}
             </li>
           );
         })}

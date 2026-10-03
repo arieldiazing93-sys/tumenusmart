@@ -310,6 +310,18 @@ function codigoPrisma(e: unknown): { codigo: string; meta: string } | null {
   return null;
 }
 
+/**
+ * Una pista corta de por qué falló algo inesperado (el código de Prisma y la última línea del mensaje, que es la que dice
+ * el motivo), para mostrarla en el celular del mozo y dejarla en el log del servidor. Nunca lleva datos de la base: solo
+ * el nombre del error.
+ */
+function pistaDelError(e: unknown): string {
+  const codigo = e instanceof Prisma.PrismaClientKnownRequestError ? `${e.code}: ` : "";
+  const mensaje = e instanceof Error ? e.message : String(e);
+  const ultima = mensaje.split("\n").map((x) => x.trim()).filter(Boolean).pop() ?? "";
+  return `${codigo}${e instanceof Error ? e.name : "Error"} — ${ultima}`.slice(0, 220);
+}
+
 /** Lo que ya se envió con este `envioId` (si se reintenta), para devolverlo sin duplicar nada. */
 async function envioYaHecho(storeId: string, envioId: string): Promise<Extract<ResultadoEnvio, { ok: true }> | null> {
   const items = await prisma.itemCuentaMesa.findMany({
@@ -495,7 +507,10 @@ export async function enviarPedido(token: string, datos: DatosEnvio): Promise<Re
       if (trabajos.length > 0) await tx.trabajoImpresion.createMany({ data: trabajos });
 
       return { cuenta, ronda, areasImpresas: trabajos.map((t) => t.titulo.split(" · ")[1]) };
-    });
+    },
+    // Más tiempo que los 5 s de fábrica: desde Vercel hasta la base cada consulta tarda, y una receta con varios insumos
+    // hace varias seguidas dentro de la misma transacción.
+    { timeout: 15_000, maxWait: 10_000 });
 
   let resultado: Awaited<ReturnType<typeof guardar>> | null = null;
   try {
@@ -515,7 +530,12 @@ export async function enviarPedido(token: string, datos: DatosEnvio): Promise<Re
       if (hecho) return hecho;
       return { ok: false, error: "No se pudo enviar. Probá de nuevo." };
     } else {
-      return { ok: false, error: "No se pudo enviar el pedido. Revisá la conexión y tocá Enviar de nuevo: no se duplica." };
+      // Antes este error se tragaba sin dejar rastro y no había forma de saber qué había pasado.
+      console.error("[mozo] enviarPedido falló", e);
+      return {
+        ok: false,
+        error: `No se pudo enviar el pedido. Tocá Enviar de nuevo: no se duplica. Si sigue igual, avisale al encargado. (Detalle: ${pistaDelError(e)})`,
+      };
     }
   }
   if (!resultado) return { ok: false, error: "No se pudo enviar el pedido. Probá de nuevo." };

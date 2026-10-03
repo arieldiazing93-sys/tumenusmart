@@ -95,6 +95,17 @@ export function textoComanda(datos: {
   return armarDocumento(l);
 }
 
+/**
+ * La comanda tal como se lee en pantalla: sin los comandos de la impresora (inicio, negrita, corte), que solo ella entiende.
+ * Sirve para ver qué se va a imprimir sin gastar papel (o cuando la "impresora" es un PDF y no entiende ESC/POS).
+ */
+export function comandaLegible(contenido: string): string {
+  return contenido
+    .replace(/\x1B\x40|\x1B\x45[\x00\x01]|\x1D\x56[\x00-\x03]/g, "")
+    .replace(/[\x00-\x09\x0B-\x1F]/g, "")
+    .trim();
+}
+
 /** Lo que vale una lista de productos de una cuenta (precio de cada uno por su cantidad). */
 export function totalDeLineas(lineas: { precioUnitario: number; cantidad: number }[]): number {
   return lineas.reduce((suma, x) => suma + x.precioUnitario * x.cantidad, 0);
