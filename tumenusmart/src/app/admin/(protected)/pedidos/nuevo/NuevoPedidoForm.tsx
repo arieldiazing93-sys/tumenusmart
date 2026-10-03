@@ -95,6 +95,8 @@ export function NuevoPedidoForm({
 
   const [error, setError] = useState<string | null>(null);
   const [guardando, setGuardando] = useState(false);
+  // Primero el cliente y la entrega; recién después los productos, con la pantalla limpia como en el Punto de Venta.
+  const [paso, setPaso] = useState<"cliente" | "productos">("cliente");
 
   // Suma, no pisa: un mismo producto puede estar varias veces con distintos agregados, y el número sobre la tarjeta
   // tiene que mostrar el total.
@@ -251,6 +253,38 @@ export function NuevoPedidoForm({
     setDireccionesAnteriores(r.direcciones);
   }
 
+  // Pasa a los productos solo con los datos del cliente y de la entrega bien cargados.
+  function continuar() {
+    setError(null);
+    if (!telefono.trim() || !nombre.trim()) {
+      setError("Cargá el teléfono y el nombre del cliente.");
+      return;
+    }
+    if (tipoEntrega === "delivery") {
+      if (!direccion.trim()) {
+        setError("Para delivery hace falta la dirección: es lo que ve el repartidor.");
+        return;
+      }
+      // Sin una zona elegida (o "A coordinar" a propósito) no se sigue: así el envío nunca queda en 0 por olvido.
+      if (!zonaId) {
+        setError("Elegí la zona de envío. Si todavía no se sabe, elegí “A coordinar”.");
+        return;
+      }
+      if (costoEnvioInvalido) {
+        setError("El costo de envío no es un número válido.");
+        return;
+      }
+    }
+    setPaso("productos");
+    window.scrollTo({ top: 0 });
+  }
+
+  function volverAlCliente() {
+    setError(null);
+    setPaso("cliente");
+    window.scrollTo({ top: 0 });
+  }
+
   async function crear() {
     if (guardando) return;
     setError(null);
@@ -323,11 +357,48 @@ export function NuevoPedidoForm({
     router.push(`/admin/pedidos/${r.orderId}`);
   }
 
+  const mensajeError = error ? (
+    <p
+      role="alert"
+      className="rounded-xl border-2 border-peligro/40 bg-peligro-luz px-3.5 py-2.5 text-[0.85rem] font-medium text-peligro"
+    >
+      {error}
+    </p>
+  ) : null;
+
+  // Para el resumen del cliente en el segundo paso.
+  const zonaElegida = zonas.find((z) => z.id === zonaId);
+  const textoZona = zonaId === COORDINAR ? "zona a coordinar" : (zonaElegida?.nombre ?? "");
+
   return (
     <div className="pb-24 lg:pb-0">
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_23rem] xl:grid-cols-[minmax(0,1fr)_26rem]">
-        {/* ------------------------------------------------------ izquierda */}
-        <div className="flex min-w-0 flex-col gap-4">
+      <ol className="mb-4 flex flex-wrap items-center gap-x-2 gap-y-1 text-[0.82rem] font-semibold">
+        <li className={`flex items-center gap-2 ${paso === "cliente" ? "text-brand-texto" : "text-tinta-media"}`}>
+          <span
+            className={`cifra flex h-6 w-6 items-center justify-center rounded-full text-[0.75rem] text-white ${
+              paso === "cliente" ? "bg-brand" : "bg-exito"
+            }`}
+          >
+            {paso === "cliente" ? "1" : "✓"}
+          </span>
+          Cliente y entrega
+        </li>
+        <li aria-hidden="true" className="h-px w-6 bg-linea" />
+        <li className={`flex items-center gap-2 ${paso === "productos" ? "text-brand-texto" : "text-tinta-suave"}`}>
+          <span
+            className={`cifra flex h-6 w-6 items-center justify-center rounded-full text-[0.75rem] ${
+              paso === "productos" ? "bg-brand text-white" : "bg-papel-hundido text-tinta-suave"
+            }`}
+          >
+            2
+          </span>
+          Productos y pago
+        </li>
+      </ol>
+
+      {/* Paso 1: quién es el cliente y cómo se le entrega. */}
+      {paso === "cliente" && (
+        <div className="mx-auto flex max-w-3xl flex-col gap-4">
           <Tarjeta className={TARJETA}>
             <h2 className="text-[1rem] font-semibold tracking-titular text-tinta">Cliente y entrega</h2>
 
@@ -445,6 +516,43 @@ export function NuevoPedidoForm({
                 </div>
               </div>
             )}
+          </Tarjeta>
+
+          {mensajeError}
+          <div className="flex justify-end">
+            <Boton onClick={continuar} tam="lg">
+              Continuar a los productos →
+            </Boton>
+          </div>
+        </div>
+      )}
+
+      {/* Paso 2: los productos, el pedido y el pago. En el paso 1 queda montado pero oculto, para no perder nada. */}
+      <div
+        className={
+          paso === "productos"
+            ? "grid gap-4 lg:grid-cols-[minmax(0,1fr)_23rem] xl:grid-cols-[minmax(0,1fr)_26rem]"
+            : "hidden"
+        }
+      >
+        <div className="flex min-w-0 flex-col gap-4">
+          <Tarjeta
+            padding={false}
+            className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 px-3.5 py-2.5 !border-2 !border-azul/50"
+          >
+            <div className="min-w-0">
+              <p className="truncate text-[0.9rem] font-semibold text-tinta">
+                {nombre} · {telefono}
+              </p>
+              <p className="text-[0.8rem] leading-snug text-tinta-media">
+                {tipoEntrega === "delivery"
+                  ? `🛵 ${direccion}${textoZona ? ` · ${textoZona}` : ""} · envío ${formatearGuarani(costoEnvio)}`
+                  : "🏪 Retiro en el local"}
+              </p>
+            </div>
+            <Boton type="button" tono="navegar" tam="sm" onClick={volverAlCliente}>
+              Cambiar datos
+            </Boton>
           </Tarjeta>
 
           <Tarjeta className={TARJETA}>
@@ -685,14 +793,7 @@ export function NuevoPedidoForm({
             </Campo>
           </Tarjeta>
 
-          {error && (
-            <p
-              role="alert"
-              className="rounded-xl border-2 border-peligro/40 bg-peligro-luz px-3.5 py-2.5 text-[0.85rem] font-medium text-peligro"
-            >
-              {error}
-            </p>
-          )}
+          {mensajeError}
 
           <Boton onClick={crear} disabled={guardando || carrito.length === 0} tam="lg" className="w-full">
             {guardando ? "Guardando…" : `Crear pedido · ${formatearGuarani(total)}`}
@@ -704,18 +805,20 @@ export function NuevoPedidoForm({
         </div>
       </div>
 
-      {/* Celular y tablet vertical: el total siempre a la vista y un botón que baja al resumen. */}
-      <div className="fixed inset-x-0 bottom-0 z-30 flex items-center justify-between gap-3 border-t-2 border-azul/50 bg-superficie px-4 py-2.5 lg:hidden">
-        <div className="min-w-0">
-          <p className="text-[0.74rem] text-tinta-suave">
-            {cantidadTotal} {cantidadTotal === 1 ? "producto" : "productos"}
-          </p>
-          <p className="cifra text-[1rem] font-semibold text-tinta">{formatearGuarani(total)}</p>
+      {/* Celular y tablet vertical (solo en el paso de los productos): el total siempre a la vista y un botón que baja al resumen. */}
+      {paso === "productos" && (
+        <div className="fixed inset-x-0 bottom-0 z-30 flex items-center justify-between gap-3 border-t-2 border-azul/50 bg-superficie px-4 py-2.5 lg:hidden">
+          <div className="min-w-0">
+            <p className="text-[0.74rem] text-tinta-suave">
+              {cantidadTotal} {cantidadTotal === 1 ? "producto" : "productos"}
+            </p>
+            <p className="cifra text-[1rem] font-semibold text-tinta">{formatearGuarani(total)}</p>
+          </div>
+          <a href="#resumen-pedido" className={clasesBoton("principal", "md")}>
+            Ver pedido
+          </a>
         </div>
-        <a href="#resumen-pedido" className={clasesBoton("principal", "md")}>
-          Ver pedido
-        </a>
-      </div>
+      )}
 
       {productoEligiendo && (
         <AgregadosPickerPos

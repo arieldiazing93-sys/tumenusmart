@@ -19,3 +19,17 @@ node --input-type=module -e "$(sed 's|../src/lib/alcance-local.ts|/tmp/p/alcance
 
 Sale con código 0 si pasa todo y 1 si algo falla, así que también sirve
 para frenar un despliegue automático si alguna vez se configura.
+
+## verificar-sintaxis.ps1
+
+Revisa la sintaxis de todo `src/` (`.ts` y `.tsx`) **sin necesitar Node**: usa
+el analizador de Babel dentro de Microsoft Edge sin ventana. Encuentra lo que
+rompe un deploy en Vercel y no se ve a ojo: un `const` repetido, una llave de
+más, una etiqueta JSX sin cerrar. No revisa tipos (eso lo hace `next build`).
+
+```powershell
+powershell -ExecutionPolicy Bypass -File pruebas\verificar-sintaxis.ps1
+```
+
+Necesita Edge (viene con Windows) e internet. Conviene correrla antes de cada
+push que toque varios archivos.
