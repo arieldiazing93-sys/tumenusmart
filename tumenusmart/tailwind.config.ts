@@ -88,6 +88,19 @@ const config: Config = {
         },
 
         /**
+         * Amarillo natural: "acá falta asignar algo" (el repartidor, el personal) y "esto está apagado y conviene
+         * verlo" (un área o una estación desactivada). Es el amarillo de los campos de asignar del POS y la agenda
+         * (#FEF08A con borde #EAB308), a propósito vivo: el mostaza de `aviso` es para avisos y estados, y apagado
+         * se pasa por alto.
+         */
+        amarillo: {
+          DEFAULT: "#EAB308",
+          luz: "#FEF9C3",
+          campo: "#FEF08A",
+          oscuro: "#854D0E",
+        },
+
+        /**
          * Azul: navegación. Nada más.
          *
          * El naranja es "avanzar, pedir, gastar plata". Si volver atrás usara

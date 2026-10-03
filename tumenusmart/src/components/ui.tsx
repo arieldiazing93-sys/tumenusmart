@@ -212,7 +212,7 @@ export function Vacio({
 //  Estado
 // ===========================================================================
 
-export type ColorEstado = "neutro" | "exito" | "aviso" | "peligro" | "marca" | "azul";
+export type ColorEstado = "neutro" | "exito" | "aviso" | "peligro" | "marca" | "azul" | "amarillo";
 
 const ESTADOS: Record<ColorEstado, string> = {
   neutro: "bg-papel-hundido text-tinta-media",
@@ -221,6 +221,8 @@ const ESTADOS: Record<ColorEstado, string> = {
   peligro: "bg-peligro-luz text-peligro",
   marca: "bg-brand-light text-brand-texto",
   azul: "bg-azul-luz text-azul-oscuro",
+  // El amarillo natural de los campos de asignar: algo que falta elegir o que está apagado.
+  amarillo: "bg-amarillo-campo text-amarillo-oscuro",
 };
 
 /** Etiqueta de estado: "Pendiente", "Entregado", "Vencido". */
@@ -259,6 +261,7 @@ export function Aviso({
     peligro: "border-peligro/25 bg-peligro-luz",
     marca: "border-brand/25 bg-brand-light",
     azul: "border-azul/25 bg-azul-luz",
+    amarillo: "border-amarillo/60 bg-amarillo-luz",
   };
   const tintas: Record<string, string> = {
     exito: "text-exito",
@@ -266,6 +269,7 @@ export function Aviso({
     peligro: "text-peligro",
     marca: "text-brand-texto",
     azul: "text-azul-oscuro",
+    amarillo: "text-amarillo-oscuro",
   };
   return (
     <div className={`rounded-xl border p-4 ${bordes[color]}`}>

@@ -193,8 +193,8 @@ export function EstadoBotones({
       {error && <p className="mt-2 text-sm text-peligro">{error}</p>}
       {aviso && !error && <p className="mt-2 text-sm text-aviso">{aviso}</p>}
       {faltaRepartidor && !error && (
-        <p className="mt-2 text-xs text-tinta-suave">
-          Este pedido es delivery y todavía no tiene repartidor asignado.
+        <p className="mt-2 rounded-lg border border-amarillo/60 bg-amarillo-luz px-3 py-2 text-[0.82rem] font-medium text-amarillo-oscuro">
+          Este pedido es delivery y todavía no tiene repartidor asignado: elegilo en el cuadro amarillo de abajo.
         </p>
       )}
 

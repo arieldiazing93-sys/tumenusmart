@@ -40,7 +40,7 @@ export function AreaFila({
     // pasa de largo se pierde un buen rato buscando por qué no aparece.
     <div
       className={`rounded-lg border-2 px-4 py-3 ${
-        activa ? "border-azul/50 bg-white" : "border-aviso/50 bg-aviso-luz/40"
+        activa ? "border-azul/50 bg-white" : "border-amarillo bg-amarillo-luz"
       }`}
     >
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -80,7 +80,7 @@ export function AreaFila({
                 Activa
               </Pastilla>
             ) : (
-              <Pastilla color="aviso" punto>
+              <Pastilla color="amarillo" punto>
                 Desactivada
               </Pastilla>
             )}
@@ -106,7 +106,7 @@ export function AreaFila({
         )}
       </div>
       {!activa && !editando && (
-        <p className="mt-2 text-[0.78rem] text-aviso">
+        <p className="mt-2 text-[0.78rem] font-medium text-amarillo-oscuro">
           Desactivada: no se puede elegir en Estaciones (ni como área del ticket ni para asignarle una impresora).
           Tocá &ldquo;Reactivar&rdquo; para volver a usarla.
         </p>

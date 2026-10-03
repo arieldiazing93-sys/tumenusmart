@@ -159,7 +159,7 @@ export function EstacionFila({
     // Una estación desactivada se resalta en amarillo (en vez de apagarse) para que se vea de un vistazo.
     <div
       className={`rounded-lg border-2 px-4 py-3 ${
-        activa ? "border-azul/50 bg-white" : "border-aviso/50 bg-aviso-luz/40"
+        activa ? "border-azul/50 bg-white" : "border-amarillo bg-amarillo-luz"
       }`}
     >
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -196,7 +196,7 @@ export function EstacionFila({
             {nombre}
             {!activa && (
               <span className="ml-2 align-middle">
-                <Pastilla color="aviso" punto>
+                <Pastilla color="amarillo" punto>
                   Desactivada
                 </Pastilla>
               </span>

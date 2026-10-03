@@ -114,7 +114,7 @@ export function PuntoExpedicionFila({
     // Un punto desactivado se resalta en amarillo (en vez de apagarse) para que se vea de un vistazo.
     <div
       className={`rounded-lg border-2 px-4 py-3 ${
-        activo ? "border-azul/50 bg-white" : "border-aviso/50 bg-aviso-luz/40"
+        activo ? "border-azul/50 bg-white" : "border-amarillo bg-amarillo-luz"
       }`}
     >
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -123,7 +123,7 @@ export function PuntoExpedicionFila({
             {nombre} <span className="text-tinta-suave">({establecimiento}-{puntoExpedicion})</span>
             {!activo && (
               <span className="ml-2 align-middle">
-                <Pastilla color="aviso" punto>
+                <Pastilla color="amarillo" punto>
                   Desactivado
                 </Pastilla>
               </span>

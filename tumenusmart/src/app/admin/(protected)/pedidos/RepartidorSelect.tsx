@@ -5,6 +5,11 @@ import { asignarRepartidor } from "./actions";
 
 type Repartidor = { id: string; nombre: string };
 
+/**
+ * Elegir el repartidor de un delivery. Va en el amarillo natural de los campos de "a quién se le asigna" (igual que
+ * Personal en el POS y la agenda): es lo que falta para poder despachar, y en amarillo se ve de un vistazo en vez de
+ * mezclarse con el resto de la pantalla.
+ */
 export function RepartidorSelect({
   orderId,
   repartidorIdActual,
@@ -26,7 +31,8 @@ export function RepartidorSelect({
           asignarRepartidor(orderId, repartidorId);
         });
       }}
-      className="rounded-lg border border-linea px-2 py-1.5 text-sm disabled:opacity-50"
+      aria-label="Repartidor"
+      className="rounded-lg border-2 border-amarillo bg-amarillo-campo px-3 py-2 text-[0.88rem] font-semibold text-tinta focus:outline-none focus:ring-2 focus:ring-amarillo/40 disabled:opacity-50"
     >
       <option value="">Sin asignar</option>
       {repartidores.map((r) => (
