@@ -45,3 +45,25 @@ publicar.
    2026-10-03). El proyecto está en producción y el dominio se maneja en
    Cloudflare. Los planes resuelven arranques en frío y copias de seguridad,
    no la latencia de red.
+5. Falta `package-lock.json` en git. Sin él, cada deploy instala la última
+   versión permitida de cada dependencia (por ejemplo `next ^15.0.0`), así que
+   dos deploys del mismo código pueden construirse distinto. Hay que generarlo
+   con `npm install` en una máquina con Node y subirlo.
+
+## El build frena si una tabla queda sin aislamiento
+
+`package.json` corre `node pruebas/auditoria-aislamiento.mjs` antes de
+`prisma generate && next build`. Compara las tablas del esquema que tienen
+`storeId` contra `MODELOS_POR_LOCAL` (`src/lib/alcance-local.ts`). Si una tabla
+nueva no está anotada, el deploy FALLA con un mensaje que nombra la tabla, y la
+versión que ya está en producción sigue funcionando sin cambios.
+
+- Tabla nueva con `storeId`: agregarla a `MODELOS_POR_LOCAL`.
+- Tabla con `storeId` que a propósito no se filtra por local (hoy: `Usuario`,
+  `ErrorReportado`, `SlugAnterior`): agregarla a `EXCEPCIONES` en el propio
+  script, con el motivo escrito.
+
+Si Vercel tiene un "Build Command" propio en Settings, ese manda sobre
+`package.json` y esta prueba no corre: dejarlo vacío (o igual al de arriba).
+En el log del deploy tiene que aparecer "aislamiento entre locales: N tablas
+protegidas".

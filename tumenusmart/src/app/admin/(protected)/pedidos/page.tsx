@@ -229,7 +229,12 @@ export default async function AdminPedidosPage({
           <>
             {/* El cliente que llama por teléfono se carga acá y sigue el mismo circuito que los de la carta. */}
             {puede(sesion.rol, "pedidos.crear") && (
-              <BotonEnlace href="/admin/pedidos/nuevo" tono="principal" tam="md">
+              <BotonEnlace
+                href="/admin/pedidos/nuevo"
+                tono="exito"
+                tam="md"
+                className="!border-exito !bg-exito !text-white hover:!opacity-90"
+              >
                 + Nuevo pedido
               </BotonEnlace>
             )}
