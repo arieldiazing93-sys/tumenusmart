@@ -10,6 +10,10 @@ node pruebas/auditoria-vercel-json.mjs || FALLAS=1
 node pruebas/auditoria-esquema.mjs || FALLAS=1
 
 echo
+echo "── aislamiento entre locales ─────────────────────────"
+node pruebas/auditoria-aislamiento.mjs || FALLAS=1
+
+echo
 echo "── tipos ─────────────────────────────────────────────"
 bash pruebas/auditoria-tipos.sh || FALLAS=1
 
