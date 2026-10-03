@@ -18,7 +18,7 @@ import type { ReactNode } from "react";
 //  Botón
 // ===========================================================================
 
-type Tono = "principal" | "suave" | "navegar" | "violeta" | "exito" | "peligro" | "fantasma";
+type Tono = "principal" | "suave" | "navegar" | "violeta" | "exito" | "nuevo" | "peligro" | "fantasma";
 
 const TONOS: Record<Tono, string> = {
   // Naranja: avanzar, guardar, confirmar. Uno por pantalla, no más.
@@ -27,7 +27,7 @@ const TONOS: Record<Tono, string> = {
   // Lo mismo pero sin gritar, para acciones secundarias frecuentes.
   suave:
     "border border-linea bg-superficie text-tinta hover:border-brand hover:text-brand",
-  // Azul: volver, ir a otro lado. Nunca confirma nada.
+  // Azul: volver, ir a otro lado y editar datos que ya existen. Nunca confirma nada.
   navegar:
     "border border-azul/35 bg-azul-luz text-azul-oscuro hover:border-azul hover:bg-azul hover:text-white",
   // Violeta: una acción destacada que no es "el" botón naranja de la pantalla
@@ -37,6 +37,9 @@ const TONOS: Record<Tono, string> = {
   // Verde: sacar un archivo (descargar el Excel de un reporte).
   exito:
     "border border-exito/35 bg-exito-luz text-exito hover:border-exito hover:bg-exito hover:text-white",
+  // Verde sólido: crear algo nuevo o agregar ("+ Nuevo pedido", "Agregar producto"). Junto con el azul para editar
+  // (navegar) y el rojo para eliminar, cancelar o anular (peligro), cada tipo de acción tiene siempre su color.
+  nuevo: "bg-exito text-white hover:opacity-90 focus-visible:outline-exito",
   peligro:
     "border border-peligro/30 bg-peligro-luz text-peligro hover:bg-peligro hover:text-white",
   fantasma: "text-tinta-media hover:bg-papel-hundido hover:text-tinta",
