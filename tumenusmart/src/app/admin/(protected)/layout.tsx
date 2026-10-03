@@ -77,6 +77,20 @@ function armarGrupos(hayIdeaSinVer: boolean, rol: string, ventasACredito: boolea
       ],
     },
     {
+      // El mozo carga las mesas desde su celular o tablet (enlace público con su PIN) y la caja ve las cuentas y
+      // imprime las comandas con las impresoras de su estación. Va junto a "Día a día": se usa durante el servicio.
+      titulo: "Servicio comedor",
+      secciones: [
+        { href: "/admin/comedor", label: "Cuentas abiertas", icono: "pedidos" as const,
+          ver: conPermiso("comedor.ver") },
+        // La pantalla que la caja deja abierta para que salgan solas las comandas de los mozos.
+        { href: "/admin/impresion", label: "Impresión automática", icono: "pos" as const,
+          ver: conPermiso("comedor.gestionar") },
+        { href: "/admin/comedor/mozos", label: "Mozos", icono: "usuarios" as const,
+          ver: conPermiso("comedor.configurar") },
+      ],
+    },
+    {
       // Para los negocios que atienden con cita (peluquería, barbería, salón
       // de belleza). No es lo mismo que "Reservas" de Día a día: eso es
       // reservar mesa en un restaurante, esto es agendar a alguien con un

@@ -68,6 +68,10 @@ export const MODELOS_POR_LOCAL = new Set([
   "CitaServicio",
   "Colaborador",
   "MarcacionAsistencia",
+  "Mozo",
+  "CuentaMesa",
+  "ItemCuentaMesa",
+  "TrabajoImpresion",
 ]);
 
 /** Operaciones que leen o modifican filas existentes: se filtran por `where`. */
@@ -184,6 +188,8 @@ export const SLUGS_RESERVADOS = new Set([
   "personal",
   // /asistencia/<llave> es el celular fijo del local donde el personal marca entrada y salida.
   "asistencia",
+  // /mozo/<llave> es el enlace público del Servicio comedor, donde el mozo carga las mesas desde su celular.
+  "mozo",
   "repartidor",
   "_next",
   "favicon.ico",

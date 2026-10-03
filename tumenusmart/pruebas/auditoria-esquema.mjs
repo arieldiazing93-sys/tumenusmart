@@ -26,7 +26,10 @@ export function revisarEsquema(texto) {
 
   // 1) Comentarios de bloque: no existen en Prisma.
   lineas.forEach((l, i) => {
-    if (l.includes("/*") || l.includes("*/")) {
+    // Lo que va después de un `//` es un comentario de línea y puede decir cualquier cosa (una línea real del esquema
+    // dice "TurnoPos.calculado*/Rendicion"): solo cuenta lo que está antes.
+    const sinComentarioDeLinea = l.replace(/\/\/.*$/, "");
+    if (sinComentarioDeLinea.includes("/*") || sinComentarioDeLinea.includes("*/")) {
       problemas.push(
         `línea ${i + 1}: comentario de bloque /* */ — Prisma solo entiende // y ///`
       );

@@ -60,6 +60,14 @@ export type Permiso =
   | "agenda.configurar"
   // --- registro de asistencia: quién entró y salió, con foto. Del dueño: son datos del personal. ---
   | "asistencia.gestionar"
+  // --- servicio comedor: el mozo carga las mesas desde su celular y la caja las opera ---
+  // Ver las cuentas abiertas de las mesas.
+  | "comedor.ver"
+  // Lo de la caja: la pantalla que imprime las comandas y, más adelante, anular productos (con motivo), dar
+  // descuentos, cambiar de mozo y cobrar la cuenta.
+  | "comedor.gestionar"
+  // Dar de alta a los mozos (con su PIN) y sacar el enlace público del Servicio comedor. Del dueño.
+  | "comedor.configurar"
   // --- el negocio ---
   | "estadisticas.ver"
   | "ideas.ver"
@@ -100,6 +108,10 @@ const PERMISOS_EMPLEADO: Permiso[] = [
   "agenda.ver",
   "repartidores.ver",
   "pos.vender",
+  // El cajero ve las mesas y opera la cuenta: es quien habla con el mozo. Lo que cargó el mozo y lo que hace la caja
+  // queda en la bitácora.
+  "comedor.ver",
+  "comedor.gestionar",
   // Un presupuesto no mueve plata ni stock ni es un comprobante: quien atiende
   // al cliente puede armarlo (los precios se editan solo en ESE presupuesto,
   // nunca en el catálogo).
@@ -135,6 +147,8 @@ const PERMISOS_LOCAL: Permiso[] = [
   "stock.editar",
   "agenda.configurar",
   "asistencia.gestionar",
+  // Quién puede ser mozo y la llave de su enlace: del dueño, como el resto de la configuración del personal.
+  "comedor.configurar",
   "estadisticas.ver",
   "ideas.ver",
   "analytics.ver",

@@ -22,6 +22,8 @@ SI("empleado", "pedidos.ver");
 SI("empleado", "pedidos.cambiarEstado");
 SI("empleado", "pedidos.asignarRepartidor");
 SI("empleado", "pedidos.crear");
+SI("empleado", "comedor.ver");
+SI("empleado", "comedor.gestionar");
 SI("empleado", "reservas.ver");
 SI("empleado", "reservas.gestionar");
 SI("empleado", "agenda.ver");
@@ -31,6 +33,7 @@ SI("empleado", "productos.disponibilidad");
 SI("empleado", "categorias.ver");
 
 // Lo que NO puede es lo que importa: acá es donde un error cuesta plata.
+NO("empleado", "comedor.configurar");
 NO("empleado", "productos.editar");
 NO("empleado", "categorias.editar");
 NO("empleado", "agenda.configurar");

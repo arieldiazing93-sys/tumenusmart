@@ -81,6 +81,15 @@ model Store {
   /// es la vuelta del almuerzo sino la salida (se fue sin volver, o se olvidó de marcar la vuelta).
   almuerzoMaxMin         Int       @default(180)
 
+  /// La llave del enlace público del Servicio comedor (/mozo/<token>), donde cada mozo entra con su PIN a cargar las
+  /// mesas. Es larga y al azar, y se puede regenerar o apagar (NULL = el Servicio comedor no está habilitado).
+  tokenMozos            String?   @unique
+  /// Contra la adivinanza de PIN en ese enlace: PIN incorrectos seguidos y, al llegar al tope, hasta cuándo se bloquea.
+  intentosPinMozos      Int       @default(0)
+  bloqueoMozosHasta     DateTime?
+  /// El correlativo de las cuentas de mesa del local (la próxima es este número + 1).
+  contadorCuentasMesa   Int       @default(0)
+
   /// Cómo se ve la carta pública de este local.
   ///
   /// "lista"    — filas compactas con miniatura. Es lo mejor para el local que
@@ -242,6 +251,12 @@ model Store {
   // --- Registro de asistencia ---
   colaboradores         Colaborador[]
   marcacionesAsistencia MarcacionAsistencia[]
+
+  // --- Servicio comedor ---
+  mozos            Mozo[]
+  cuentasMesa      CuentaMesa[]
+  itemsCuentaMesa  ItemCuentaMesa[]
+  trabajosImpresion TrabajoImpresion[]
 }
 
 /// Las direcciones que este local tuvo antes.
@@ -1145,6 +1160,10 @@ model Estacion {
   // Mapeo de cada Área de Impresión a la impresora real que QZ Tray ve EN
   // ESTA notebook — una fila por área configurada (ver EstacionImpresora).
   impresoras   EstacionImpresora[]
+
+  /// La última vez que la pantalla "Impresión automática" de esta estación preguntó si había comandas para imprimir.
+  /// Sirve para avisarle al mozo si hay (o no) una estación imprimiendo ahora mismo.
+  impresionVistaEn DateTime?
 
   @@index([storeId])
 }
@@ -2147,6 +2166,9 @@ model MovimientoStock {
   ventaPos   VentaPos? @relation(fields: [ventaPosId], references: [id], onDelete: SetNull)
   compraId   String?
   compra     Compra?   @relation(fields: [compraId], references: [id], onDelete: SetNull)
+  /// El stock que baja cuando el mozo envía un pedido de mesa queda enlazado a esa cuenta.
+  cuentaMesaId String?
+  cuentaMesa   CuentaMesa? @relation(fields: [cuentaMesaId], references: [id], onDelete: SetNull)
 
   /// En qué almacén entra o de cuál sale este movimiento. Null solo en los
   /// movimientos viejos, de antes de que el stock se repartiera por almacén.
@@ -2161,6 +2183,7 @@ model MovimientoStock {
   @@index([insumoId])
   @@index([orderId])
   @@index([ventaPosId])
+  @@index([cuentaMesaId])
   @@index([almacenId])
 }
 
@@ -2510,6 +2533,142 @@ model Colaborador {
 
   @@unique([storeId, pinClave])
   @@index([storeId])
+}
+
+// ===========================================================================
+//  Servicio comedor: el mozo carga la cuenta de una mesa desde su celular o tablet
+// ===========================================================================
+
+/// Un mozo. Entra al enlace público del local (Store.tokenMozos) con su PIN, que NO se guarda: se guarda su huella
+/// (HMAC con una clave del servidor, ver src/lib/sesion-mozo.ts). El PIN es lo que identifica al mozo, así que no puede
+/// repetirse dentro del mismo local. Se desactiva en vez de borrarse: lo que cargó queda en las cuentas.
+model Mozo {
+  id        String   @id @default(cuid())
+  storeId   String
+  store     Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  nombre    String
+  apellido  String?
+  /// NULL = todavía no tiene PIN (no puede entrar).
+  pinClave  String?
+  activo    Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  cuentas CuentaMesa[]
+  items   ItemCuentaMesa[]
+
+  @@unique([storeId, pinClave])
+  @@index([storeId])
+}
+
+/// La cuenta de una mesa: la abre el mozo, se va armando en varias tandas (rondas) y se cierra al pagarse.
+model CuentaMesa {
+  id          String    @id @default(cuid())
+  storeId     String
+  store       Store     @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  /// Correlativo por local (sale de Store.contadorCuentasMesa), el número que ve el personal.
+  numero      Int
+  /// El número o nombre de la mesa, tal como lo escribió el mozo ("5", "Terraza 2").
+  mesa        String
+  /// Igual a `mesa` mientras la cuenta está abierta y NULL cuando se cierra: con la restricción única, una mesa no
+  /// puede tener dos cuentas abiertas a la vez (los NULL no chocan entre sí, así que las cerradas no molestan).
+  mesaAbierta String?
+  /// El mozo a cargo de la cuenta. Cada producto guarda además quién lo envió.
+  mozoId      String
+  mozo        Mozo      @relation(fields: [mozoId], references: [id])
+  /// "abierta" | "pagada" | "anulada"
+  estado      String    @default("abierta")
+  comensales  Int?
+  nota        String?
+  abiertaEn   DateTime  @default(now())
+  cerradaEn   DateTime?
+
+  items            ItemCuentaMesa[]
+  trabajos         TrabajoImpresion[]
+  movimientosStock MovimientoStock[]
+
+  @@unique([storeId, numero])
+  @@unique([storeId, mesaAbierta])
+  @@index([storeId, estado])
+}
+
+/// Un producto cargado en una cuenta de mesa. Guarda lo que valía y cómo se pidió en el momento de enviarse, igual
+/// que OrderItem y VentaPosItem.
+model ItemCuentaMesa {
+  id       String     @id @default(cuid())
+  storeId  String
+  store    Store      @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  cuentaId String
+  cuenta   CuentaMesa @relation(fields: [cuentaId], references: [id], onDelete: Cascade)
+  /// Cada vez que el mozo toca "Enviar" es una ronda nueva de la cuenta (1, 2, 3...).
+  ronda    Int
+  /// Lo genera el celular una vez por envío, y `linea` es el lugar de este producto dentro de él. Si se toca "Enviar"
+  /// dos veces o se corta el internet y se reintenta, el servidor reconoce el mismo envío y no lo duplica.
+  envioId  String
+  linea    Int
+  /// Quién lo envió.
+  mozoId   String
+  mozo     Mozo       @relation(fields: [mozoId], references: [id])
+
+  /// Nulo cuando es un combo "mitad y mitad" (no es un único producto).
+  productId      String?
+  nombreProducto String
+  cantidad       Int
+  precioUnitario Decimal @db.Decimal(10, 2)
+  iva            String  @default("gravado10")
+  opcionesTexto  String?
+  ingredientesQuitadosTexto String?
+  /// Una nota para la cocina ("bien cocido", "sin hielo"), escrita por el mozo en este producto.
+  nota           String?
+  costoProducto  Decimal? @db.Decimal(10, 2)
+  costoAgregados Decimal? @db.Decimal(10, 2)
+  precioAgregados Decimal @default(0) @db.Decimal(10, 2)
+  /// El Área de Impresión del producto cuando se envió (a qué impresora salió).
+  areaImpresionId String?
+  /// Los insumos que descontó al enviarse ([{insumoId, almacenId, cantidad}], ya multiplicados por la cantidad), para
+  /// poder devolverlos si el producto se anula.
+  consumo        Json    @default("[]")
+
+  /// "activo" | "anulado"
+  estado          String    @default("activo")
+  anuladoPor      String?
+  anuladoEn       DateTime?
+  motivoAnulacion String?
+  enviadoEn       DateTime  @default(now())
+
+  @@unique([storeId, envioId, linea])
+  @@index([storeId])
+  @@index([cuentaId])
+}
+
+/// Algo para imprimir: la comanda de un envío, el aviso de un producto anulado, el ticket de una cuenta. El texto ya viene
+/// armado (ESC/POS crudo, ver src/lib/escpos.ts). Lo imprime una estación con su QZ Tray: la pantalla "Impresión
+/// automática" reclama los trabajos de las áreas que esa estación tiene asignadas a una impresora, los imprime y los
+/// marca. Así el celular del mozo, que no puede imprimir, hereda las impresoras de la caja.
+model TrabajoImpresion {
+  id              String      @id @default(cuid())
+  storeId         String
+  store           Store       @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  /// "comanda" | "anulacion" | "ticket"
+  tipo            String
+  /// Lo que se ve en la lista de la cola: "Mesa 5 · Cocina · pedido 2".
+  titulo          String
+  /// A qué área va (Cocina, Barra...); null = la estación que la reclama lo manda a su impresora de ticket.
+  areaImpresionId String?
+  contenido       String
+  /// "pendiente" | "imprimiendo" | "impreso" | "error"
+  estado          String      @default("pendiente")
+  intentos        Int         @default(0)
+  /// La estación que lo reclamó.
+  estacionId      String?
+  reclamadoEn     DateTime?
+  impresoEn       DateTime?
+  error           String?
+  cuentaMesaId    String?
+  cuentaMesa      CuentaMesa? @relation(fields: [cuentaMesaId], references: [id], onDelete: SetNull)
+  createdAt       DateTime    @default(now())
+
+  @@index([storeId, estado])
+  @@index([cuentaMesaId])
 }
 
 /// Una marcación: alguien marcó entrada, salida a almorzar, vuelta del almuerzo o salida final,

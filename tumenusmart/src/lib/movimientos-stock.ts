@@ -28,7 +28,7 @@ import type { LineaArmada } from "./precio-pedido";
 import { almacenPrincipalId } from "./stock-almacen";
 
 type Db = PrismaClient | Prisma.TransactionClient;
-type RefVenta = { orderId: string } | { ventaPosId: string };
+type RefVenta = { orderId: string } | { ventaPosId: string } | { cuentaMesaId: string };
 
 function aNumero(valor: unknown): number {
   if (typeof valor === "number") return Number.isFinite(valor) ? valor : 0;

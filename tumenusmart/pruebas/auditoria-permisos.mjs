@@ -62,6 +62,34 @@ const EXCEPCIONES = {
     marcarCitaEnviada:
       "solo muestra una cita web ya creada, filtrando por id + local; el id no se puede adivinar",
   },
+  // El celular fijo del Registro de asistencia (/asistencia/<llave>): el personal no tiene cuenta del panel. El local sale
+  // de la llave de la dirección (larga y al azar, regenerable) y a la persona la identifica su PIN, con freno a la
+  // adivinanza (se bloquea el celular tras varios PIN malos). Cada acción vuelve a resolver el local y busca a la persona
+  // SOLO dentro de él; lo único que escriben es una marcación propia, con su foto.
+  "src/app/asistencia/[token]/actions.ts": {
+    identificarPin: "solo lee: dice a quién corresponde un PIN del local de la llave y qué marcación le toca",
+    registrarMarcacion:
+      "el personal no tiene cuenta: la llave lleva al local, el PIN a la persona, y lo único que crea es su propia marcación",
+  },
+  // El enlace público del personal de una agenda (/personal/<id>): sin usuario ni contraseña. El id de la persona hace de
+  // llave: cada acción confirma que sea de alguien ACTIVO y todo queda atado al local de esa persona.
+  "src/app/personal/[id]/actions.ts": {
+    buscarClientePorTelefono: "solo lee, del MISMO local de esa persona, sin datos sensibles (ni correo ni RUC)",
+    subirFotoClienteDesdeEnlace:
+      "sube la foto de un cliente del MISMO local de esa persona; valida tipo y tamaño de la imagen",
+  },
+  // El enlace público del mozo (/mozo/<llave>): el mozo no tiene cuenta del panel. El local sale SIEMPRE de la llave de la
+  // dirección y el mozo de una cookie firmada que se obtiene con su PIN (con freno a la adivinanza); cada acción vuelve a
+  // comprobar las dos cosas antes de tocar la base, y el precio lo recalcula el servidor.
+  "src/app/mozo/[token]/actions.ts": {
+    entrarConPin: "es el ingreso del mozo: todavía no hay sesión; comprueba la llave del local, el PIN y el bloqueo",
+    salirDelSalon: "salir nunca puede requerir permiso: solo borra la cookie del mozo",
+    estadoDelSalon: "solo lee las mesas abiertas del local de la llave; exige la sesión firmada del mozo",
+    detalleDeCuenta: "solo lee una cuenta abierta del local de la llave; exige la sesión firmada del mozo",
+    enviarPedido:
+      "carga un pedido en una mesa del local de la llave; exige la sesión firmada del mozo, recalcula el precio en el " +
+      "servidor y no duplica un envío repetido",
+  },
   "src/app/repartidor/[id]/actions.ts": {
     marcarPedidoEntregado:
       "el repartidor no tiene cuenta; la acción verifica que el pedido esté " +
