@@ -57,7 +57,7 @@ export function CrearPuntoExpedicionForm() {
           <Entrada type="date" name="timbradoHasta" required />
         </Campo>
         <div className="col-span-2 flex items-center gap-3 sm:col-span-3">
-          <button type="submit" disabled={pendiente} className={clasesBoton("principal")}>
+          <button type="submit" disabled={pendiente} className={clasesBoton("nuevo")}>
             {pendiente ? "Creando…" : "Crear punto de expedición"}
           </button>
           {agregado && <span className="text-xs font-medium text-exito">✓ Creado</span>}

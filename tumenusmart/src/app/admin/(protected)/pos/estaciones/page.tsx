@@ -2,7 +2,7 @@ import { pantallaConPermiso } from "@/lib/auth";
 import { prismaDelLocal } from "@/lib/prisma-local";
 import { idLocalActual } from "@/lib/local-actual";
 import { estacionActual } from "@/lib/estacion-actual";
-import { Cabecera } from "@/components/ui";
+import { Aviso, BotonEnlace, Cabecera } from "@/components/ui";
 import { CrearEstacionForm } from "./CrearEstacionForm";
 import { EstacionFila } from "./EstacionFila";
 
@@ -46,6 +46,23 @@ export default async function EstacionesPage() {
         pantalla, físicamente en esa notebook. Si se cambia de computadora o
         se borran los datos del navegador, hay que volver a vincular acá.
       </div>
+
+      {/* El "Área del ticket/factura" y las impresoras de cada estación se eligen entre las áreas de impresión
+          ACTIVAS del local: sin ninguna, esos campos quedan vacíos y no se entiende por qué. */}
+      {areasImpresion.length === 0 && (
+        <div className="mb-6 max-w-lg">
+          <Aviso titulo="Todavía no hay áreas de impresión activas">
+            Sin al menos una (por ejemplo &ldquo;Caja&rdquo; para el ticket y la factura, o &ldquo;Cocina&rdquo; para la
+            comanda) no se puede elegir el área del ticket/factura ni asignar impresoras a una estación. Creala primero
+            y volvé acá.
+            <div className="mt-3">
+              <BotonEnlace href="/admin/pos/areas-impresion" tono="navegar" tam="md">
+                Ir a Áreas de impresión
+              </BotonEnlace>
+            </div>
+          </Aviso>
+        </div>
+      )}
 
       <CrearEstacionForm />
 

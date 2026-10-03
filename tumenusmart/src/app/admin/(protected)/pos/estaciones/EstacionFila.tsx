@@ -10,7 +10,7 @@ import {
   asignarImpresoraDeArea,
   asignarAreaTicket,
 } from "./actions";
-import { Boton, Entrada, clasesBoton } from "@/components/ui";
+import { Boton, Entrada, Pastilla, clasesBoton } from "@/components/ui";
 import { listarImpresoras } from "@/lib/qz-tray";
 
 type PuntoExpedicionOpcion = {
@@ -156,8 +156,11 @@ export function EstacionFila({
   }
 
   return (
+    // Una estación desactivada se resalta en amarillo (en vez de apagarse) para que se vea de un vistazo.
     <div
-      className={`rounded-lg border-2 border-azul/50 bg-white px-4 py-3 ${activa ? "" : "opacity-60"}`}
+      className={`rounded-lg border-2 px-4 py-3 ${
+        activa ? "border-azul/50 bg-white" : "border-aviso/50 bg-aviso-luz/40"
+      }`}
     >
       <div className="flex flex-wrap items-center justify-between gap-3">
         {editando ? (
@@ -183,7 +186,7 @@ export function EstacionFila({
                 setEditando(false);
                 setError(null);
               }}
-              className="text-sm text-tinta-media hover:underline"
+              className={clasesBoton("peligro", "sm")}
             >
               Cancelar
             </button>
@@ -191,7 +194,13 @@ export function EstacionFila({
         ) : (
           <span className="font-medium">
             {nombre}
-            {!activa && <span className="ml-2 text-xs font-normal text-tinta-suave">(desactivada)</span>}
+            {!activa && (
+              <span className="ml-2 align-middle">
+                <Pastilla color="aviso" punto>
+                  Desactivada
+                </Pastilla>
+              </span>
+            )}
             {esEstaComputadora && (
               <span className="ml-2 text-xs font-semibold text-exito">✓ Esta computadora</span>
             )}
@@ -222,7 +231,8 @@ export function EstacionFila({
               Área del ticket/factura
               <select
                 value={areaTicketId ?? ""}
-                disabled={asignandoTicket}
+                disabled={asignandoTicket || areasImpresion.length === 0}
+                title={areasImpresion.length === 0 ? "Primero creá un área en Áreas de impresión" : undefined}
                 onChange={(e) => cambiarAreaTicket(e.target.value)}
                 className={clasesSelectCompacto(!!areaTicketId)}
               >
@@ -239,11 +249,11 @@ export function EstacionFila({
                 {vinculando ? "Vinculando…" : "Vincular esta computadora"}
               </Boton>
             )}
-            <Boton tono="suave" tam="sm" onClick={() => setEditando(true)}>
+            <Boton tono="navegar" tam="sm" onClick={() => setEditando(true)}>
               Renombrar
             </Boton>
             <Boton
-              tono={activa ? "peligro" : "suave"}
+              tono={activa ? "peligro" : "nuevo"}
               tam="sm"
               disabled={pending}
               onClick={() => startTransition(() => alternarActivaEstacion(id, !activa))}

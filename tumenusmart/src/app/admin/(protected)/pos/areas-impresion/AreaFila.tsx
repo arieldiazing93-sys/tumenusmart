@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { renombrarArea, alternarActivaArea } from "./actions";
-import { Entrada, clasesBoton } from "@/components/ui";
+import { Entrada, Pastilla, clasesBoton } from "@/components/ui";
 
 export function AreaFila({
   id,
@@ -36,19 +36,21 @@ export function AreaFila({
   }
 
   return (
+    // Una área desactivada se resalta en amarillo (en vez de apagarse): no se puede elegir en Estaciones, y si se
+    // pasa de largo se pierde un buen rato buscando por qué no aparece.
     <div
-      className={`rounded-lg border bg-white px-4 py-3 ${
-        activa ? "border-linea" : "border-linea opacity-60"
+      className={`rounded-lg border-2 px-4 py-3 ${
+        activa ? "border-azul/50 bg-white" : "border-aviso/50 bg-aviso-luz/40"
       }`}
     >
       <div className="flex flex-wrap items-center justify-between gap-3">
         {editando ? (
-          <div className="flex flex-1 items-center gap-2">
+          <div className="flex flex-1 flex-wrap items-center gap-2">
             <Entrada
               autoFocus
               value={nombreEditado}
               onChange={(e) => setNombreEditado(e.target.value)}
-              className="flex-1"
+              className="min-w-[10rem] flex-1"
             />
             <button
               type="button"
@@ -65,40 +67,50 @@ export function AreaFila({
                 setEditando(false);
                 setError(null);
               }}
-              className="text-sm text-tinta-media hover:underline"
+              className={clasesBoton("peligro", "sm")}
             >
               Cancelar
             </button>
           </div>
         ) : (
-          <span className="font-medium">
-            {nombre}
-            {!activa && <span className="ml-2 text-xs font-normal text-tinta-suave">(desactivada)</span>}
-            {guardado && <span className="ml-2 text-xs font-normal text-exito">✓ Guardado</span>}
-          </span>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="font-medium text-tinta">{nombre}</span>
+            {activa ? (
+              <Pastilla color="exito" punto>
+                Activa
+              </Pastilla>
+            ) : (
+              <Pastilla color="aviso" punto>
+                Desactivada
+              </Pastilla>
+            )}
+            {guardado && <span className="text-xs font-medium text-exito">✓ Guardado</span>}
+          </div>
         )}
 
         {!editando && (
-          <div className="flex flex-wrap items-center gap-3 text-sm">
+          <div className="flex flex-wrap items-center gap-2 text-sm">
             <span className="text-tinta-media">{cantidadProductos} producto(s)</span>
-            <button
-              type="button"
-              onClick={() => setEditando(true)}
-              className="text-tinta-media hover:underline"
-            >
+            <button type="button" onClick={() => setEditando(true)} className={clasesBoton("navegar", "sm")}>
               Renombrar
             </button>
             <button
               type="button"
               disabled={pending}
               onClick={() => startTransition(() => alternarActivaArea(id, !activa))}
-              className="text-tinta-media hover:underline disabled:opacity-50"
+              className={clasesBoton(activa ? "peligro" : "nuevo", "sm")}
             >
               {activa ? "Desactivar" : "Reactivar"}
             </button>
           </div>
         )}
       </div>
+      {!activa && !editando && (
+        <p className="mt-2 text-[0.78rem] text-aviso">
+          Desactivada: no se puede elegir en Estaciones (ni como área del ticket ni para asignarle una impresora).
+          Tocá &ldquo;Reactivar&rdquo; para volver a usarla.
+        </p>
+      )}
       {error && <p className="mt-1 text-xs text-peligro">{error}</p>}
     </div>
   );

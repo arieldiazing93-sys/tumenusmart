@@ -99,7 +99,7 @@ export function PuntoExpedicionFila({
                 setEditando(false);
                 setError(null);
               }}
-              className="text-sm text-tinta-media hover:underline"
+              className={clasesBoton("peligro", "sm")}
             >
               Cancelar
             </button>
@@ -111,12 +111,23 @@ export function PuntoExpedicionFila({
   }
 
   return (
-    <div className={`rounded-lg border-2 border-azul/50 bg-white px-4 py-3 ${activo ? "" : "opacity-60"}`}>
+    // Un punto desactivado se resalta en amarillo (en vez de apagarse) para que se vea de un vistazo.
+    <div
+      className={`rounded-lg border-2 px-4 py-3 ${
+        activo ? "border-azul/50 bg-white" : "border-aviso/50 bg-aviso-luz/40"
+      }`}
+    >
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <span className="font-medium">
             {nombre} <span className="text-tinta-suave">({establecimiento}-{puntoExpedicion})</span>
-            {!activo && <span className="ml-2 text-xs font-normal text-tinta-suave">(desactivado)</span>}
+            {!activo && (
+              <span className="ml-2 align-middle">
+                <Pastilla color="aviso" punto>
+                  Desactivado
+                </Pastilla>
+              </span>
+            )}
           </span>
           <p className="text-[0.8rem] text-tinta-media">
             {razonSocialEmisor} · RUC {rucEmisor}
@@ -130,14 +141,14 @@ export function PuntoExpedicionFila({
         <div className="flex flex-wrap items-center gap-3 text-sm">
           {vencido && <Pastilla color="peligro">Timbrado vencido</Pastilla>}
           {porVencer && <Pastilla color="aviso">Vence en {dias} día(s)</Pastilla>}
-          <button type="button" onClick={() => setEditando(true)} className="text-tinta-media hover:underline">
+          <button type="button" onClick={() => setEditando(true)} className={clasesBoton("navegar", "sm")}>
             Editar
           </button>
           <button
             type="button"
             disabled={pending}
             onClick={() => startTransition(() => alternarActivoPuntoExpedicion(id, !activo))}
-            className="text-tinta-media hover:underline disabled:opacity-50"
+            className={clasesBoton(activo ? "peligro" : "nuevo", "sm")}
           >
             {activo ? "Desactivar" : "Reactivar"}
           </button>
