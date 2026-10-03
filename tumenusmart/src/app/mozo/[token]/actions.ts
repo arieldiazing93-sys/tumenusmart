@@ -417,8 +417,10 @@ export async function enviarPedido(token: string, datos: DatosEnvio): Promise<Re
   });
 
   // ------------------------------------------------------------ guardar todo junto
-  async function guardar() {
-    return prisma.$transaction(async (tx) => {
+  // Es una función flecha y no una declaración (`async function guardar`) a propósito: TypeScript solo conserva dentro de
+  // una función flecha lo que ya se comprobó más arriba (que la mesa no es null y que el armado salió bien).
+  const guardar = async () =>
+    prisma.$transaction(async (tx) => {
       let abierta = await tx.cuentaMesa.findFirst({ where: { storeId, mesaAbierta: clave } });
       if (!abierta) {
         const { contadorCuentasMesa } = await tx.store.update({
@@ -494,9 +496,8 @@ export async function enviarPedido(token: string, datos: DatosEnvio): Promise<Re
 
       return { cuenta, ronda, areasImpresas: trabajos.map((t) => t.titulo.split(" · ")[1]) };
     });
-  }
 
-  let resultado: Awaited<ReturnType<typeof guardar>>;
+  let resultado: Awaited<ReturnType<typeof guardar>> | null = null;
   try {
     resultado = await guardar();
   } catch (e) {
@@ -517,6 +518,7 @@ export async function enviarPedido(token: string, datos: DatosEnvio): Promise<Re
       return { ok: false, error: "No se pudo enviar el pedido. Revisá la conexión y tocá Enviar de nuevo: no se duplica." };
     }
   }
+  if (!resultado) return { ok: false, error: "No se pudo enviar el pedido. Probá de nuevo." };
 
   const totalEnvio = totalDeLineas(armado.lineas);
   // Se llama DESPUÉS de guardar: un fallo de la bitácora nunca frena un pedido.

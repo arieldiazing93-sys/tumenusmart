@@ -21,12 +21,11 @@ export default async function ImpresionPage() {
 
   const estacion = await estacionActual(db);
   const [asignadas, trabajos] = await Promise.all([
-    estacion
-      ? db.estacionImpresora.findMany({
-          where: { estacionId: estacion.id },
-          select: { nombreImpresora: true, areaImpresion: { select: { nombre: true } } },
-        })
-      : Promise.resolve([]),
+    // Sin estación vinculada no hay impresoras que mostrar: se busca con un id que no existe y vuelve vacío.
+    db.estacionImpresora.findMany({
+      where: { estacionId: estacion?.id ?? "sin-estacion" },
+      select: { nombreImpresora: true, areaImpresion: { select: { nombre: true } } },
+    }),
     db.trabajoImpresion.findMany({
       orderBy: { createdAt: "desc" },
       take: 30,
