@@ -1,29 +1,13 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
 import { BotonEnlace, Pastilla, Tarjeta } from "@/components/ui";
-import { conectarQz, imprimirTexto } from "@/lib/qz-tray";
-
-type Trabajo = { id: string; titulo: string; contenido: string; impresora: string | null };
-type RespuestaReclamar =
-  | { ok: true; estacion: string; trabajos: Trabajo[]; sinImpresoras?: boolean }
-  | { ok: false; motivo: string };
-
-type Registro = { hora: string; texto: string; salio: boolean };
-
-/** Cada cuántos milisegundos pregunta si hay comandas nuevas. */
-const INTERVALO_MS = 4000;
-const REGISTROS_VISIBLES = 12;
-
-function horaAhora(): string {
-  return new Date().toLocaleTimeString("es-PY", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false });
-}
+import { useMotorImpresion } from "@/lib/motor-impresion";
 
 /**
- * El "motor" de la impresión automática: corre en la computadora de la caja (la que tiene QZ Tray y las impresoras
- * instaladas) y tiene que quedar abierto durante el servicio. Cada pocos segundos le pregunta al servidor si hay comandas
- * de las áreas que ESTA estación tiene asignadas a una impresora, las imprime en texto crudo con QZ Tray y le cuenta cómo
- * le fue. Si QZ no está conectado no pregunta nada: así el mozo ve "nadie está imprimiendo" en vez de creer que sí.
+ * El estado de la impresión automática de comandas. El motor que imprime vive en `src/lib/motor-impresion.ts` y el
+ * layout del panel lo mantiene andando en cualquier sección mientras esta computadora tenga el panel abierto; esta pantalla
+ * solo lo muestra (y lo pone a andar también, para el caso de que el layout no lo haya hecho todavía). Acá además se pide
+ * que la pantalla no se apague.
  */
 export function AgenteImpresion({
   estacion,
@@ -32,102 +16,7 @@ export function AgenteImpresion({
   estacion: string | null;
   asignaciones: { area: string; impresora: string }[];
 }) {
-  const [qz, setQz] = useState<"conectando" | "ok" | "error">("conectando");
-  const [fallo, setFallo] = useState<string | null>(null);
-  const [registro, setRegistro] = useState<Registro[]>([]);
-  const [impresas, setImpresas] = useState(0);
-  const funcionando = useRef(true);
-
-  useEffect(() => {
-    funcionando.current = true;
-    let temporizador: ReturnType<typeof setTimeout> | undefined;
-    let pantalla: { release: () => Promise<void> } | null = null;
-
-    function anotar(texto: string, salio: boolean) {
-      setRegistro((actual) => [{ hora: horaAhora(), texto, salio }, ...actual].slice(0, REGISTROS_VISIBLES));
-    }
-
-    async function marcar(id: string, salio: boolean, error?: string) {
-      try {
-        await fetch("/admin/api/impresion/marcar", {
-          method: "POST",
-          credentials: "include",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ id, ok: salio, error }),
-        });
-      } catch {
-        // Si no se pudo avisar, el servidor lo da por colgado a los 60 segundos y lo vuelve a poner en la fila.
-      }
-    }
-
-    async function ciclo() {
-      try {
-        // Sin QZ no se puede imprimir: no se pregunta nada (así no se reclama lo que no se va a poder imprimir).
-        try {
-          await conectarQz();
-          setQz("ok");
-        } catch {
-          setQz("error");
-          return;
-        }
-
-        const r = await fetch("/admin/api/impresion/reclamar", { method: "POST", credentials: "include" });
-        if (r.status === 401 || r.status === 403) {
-          setFallo("Se cerró la sesión o no tenés permiso. Volvé a entrar al panel.");
-          funcionando.current = false;
-          return;
-        }
-        if (!r.ok) {
-          setFallo("El servidor no respondió bien. Se vuelve a intentar solo.");
-          return;
-        }
-        setFallo(null);
-        const datos = (await r.json()) as RespuestaReclamar;
-        if (!datos.ok) return;
-
-        for (const t of datos.trabajos) {
-          if (!t.impresora) {
-            await marcar(t.id, false, "Esta estación no tiene impresora asignada a esa área.");
-            anotar(`${t.titulo}: sin impresora asignada`, false);
-            continue;
-          }
-          try {
-            await imprimirTexto(t.impresora, t.contenido);
-            await marcar(t.id, true);
-            setImpresas((n) => n + 1);
-            anotar(`${t.titulo} → ${t.impresora}`, true);
-          } catch (e) {
-            await marcar(t.id, false, e instanceof Error ? e.message : String(e));
-            anotar(`${t.titulo}: no salió (${e instanceof Error ? e.message : String(e)})`, false);
-          }
-        }
-      } catch {
-        setFallo("Sin conexión con el servidor. Se vuelve a intentar solo.");
-      } finally {
-        if (funcionando.current) temporizador = setTimeout(ciclo, INTERVALO_MS);
-      }
-    }
-
-    // Que la pantalla no se apague mientras está imprimiendo (donde el navegador lo permita).
-    async function mantenerPantalla() {
-      try {
-        const nav = navigator as unknown as {
-          wakeLock?: { request: (tipo: "screen") => Promise<{ release: () => Promise<void> }> };
-        };
-        if (nav.wakeLock) pantalla = await nav.wakeLock.request("screen");
-      } catch {
-        // No es imprescindible.
-      }
-    }
-    void mantenerPantalla();
-
-    void ciclo();
-    return () => {
-      funcionando.current = false;
-      if (temporizador) clearTimeout(temporizador);
-      void pantalla?.release();
-    };
-  }, []);
+  const { qz, fallo, registro, impresas } = useMotorImpresion({ mantenerPantalla: true });
 
   const sinEstacion = estacion === null;
   const sinImpresoras = asignaciones.length === 0;
@@ -200,9 +89,10 @@ export function AgenteImpresion({
       </Tarjeta>
 
       <p className="rounded-lg bg-papel-suave px-3 py-2 text-[0.8rem] leading-snug text-tinta-media">
-        Dejá esta pantalla <strong>abierta y a la vista</strong> durante el servicio: si la minimizás o cambiás de pestaña, el
-        navegador la puede frenar y las comandas demoran. Hoy imprimió <strong>{impresas}</strong>{" "}
-        {impresas === 1 ? "comanda" : "comandas"} desde que se abrió.
+        No hace falta quedarse en esta pantalla: mientras esta computadora tenga el panel abierto <strong>en cualquier
+        sección</strong> (Punto de venta, Pedidos…), las comandas salen solas. Dejan de salir si se cierra el navegador o
+        se apaga la computadora; en ese caso quedan en espera y salen al volver. Desde que se abrió el panel imprimió{" "}
+        <strong>{impresas}</strong> {impresas === 1 ? "comanda" : "comandas"}.
       </p>
 
       {registro.length > 0 && (

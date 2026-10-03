@@ -1,0 +1,251 @@
+"use client";
+
+/**
+ * El "motor" de la impresión automática de comandas. Corre en el navegador de la computadora de la caja (la que tiene QZ
+ * Tray y las impresoras instaladas): cada pocos segundos le pregunta al servidor si hay comandas de las áreas que ESTA
+ * estación tiene asignadas a una impresora, las imprime en texto crudo con QZ Tray y le cuenta cómo le fue. Si QZ no está
+ * conectado no pregunta nada: así el mozo ve "nadie está imprimiendo" en vez de creer que sí.
+ *
+ * Vive en este módulo (y no dentro de una pantalla) a propósito: el layout del panel lo mantiene andando mientras el
+ * operador usa cualquier otra sección —Punto de venta, Pedidos…—, y la pantalla "Impresión automática" solo muestra su
+ * estado. Hay un único motor aunque lo usen las dos cosas a la vez (se cuenta cuántos lo están usando).
+ */
+
+import { useEffect, useSyncExternalStore } from "react";
+import { conectarQz, imprimirTexto } from "./qz-tray";
+
+type Trabajo = { id: string; titulo: string; contenido: string; impresora: string | null };
+type RespuestaReclamar =
+  | { ok: true; estacion: string; trabajos: Trabajo[]; sinImpresoras?: boolean }
+  | { ok: false; motivo: string };
+
+export type RegistroMotor = { hora: string; texto: string; salio: boolean };
+
+export type EstadoMotor = {
+  qz: "conectando" | "ok" | "error";
+  fallo: string | null;
+  registro: RegistroMotor[];
+  impresas: number;
+};
+
+/** Cada cuántos milisegundos pregunta si hay comandas nuevas. */
+const INTERVALO_MS = 4000;
+const REGISTROS_VISIBLES = 12;
+
+const ESTADO_INICIAL: EstadoMotor = { qz: "conectando", fallo: null, registro: [], impresas: 0 };
+
+let estado: EstadoMotor = ESTADO_INICIAL;
+const oyentes = new Set<() => void>();
+
+function cambiar(parche: Partial<EstadoMotor>) {
+  estado = { ...estado, ...parche };
+  oyentes.forEach((o) => o());
+}
+
+function suscribir(oyente: () => void): () => void {
+  oyentes.add(oyente);
+  return () => {
+    oyentes.delete(oyente);
+  };
+}
+
+function horaAhora(): string {
+  return new Date().toLocaleTimeString("es-PY", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false });
+}
+
+function anotar(texto: string, salio: boolean) {
+  cambiar({ registro: [{ hora: horaAhora(), texto, salio }, ...estado.registro].slice(0, REGISTROS_VISIBLES) });
+}
+
+async function marcar(id: string, salio: boolean, error?: string) {
+  try {
+    await fetch("/admin/api/impresion/marcar", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, ok: salio, error }),
+    });
+  } catch {
+    // Si no se pudo avisar, el servidor lo da por colgado a los 60 segundos y lo vuelve a poner en la fila.
+  }
+}
+
+// ------------------------------------------------------------------------------------------------ el ciclo
+
+let enCiclo = false;
+
+async function ciclo() {
+  // Si el anterior todavía no terminó (una impresión lenta), no se encima otro.
+  if (enCiclo) return;
+  enCiclo = true;
+  try {
+    // Sin QZ no se puede imprimir: no se pregunta nada (así no se reclama lo que no se va a poder imprimir).
+    try {
+      await conectarQz();
+      if (estado.qz !== "ok") cambiar({ qz: "ok" });
+    } catch {
+      if (estado.qz !== "error") cambiar({ qz: "error" });
+      return;
+    }
+
+    const r = await fetch("/admin/api/impresion/reclamar", { method: "POST", credentials: "include" });
+    if (r.status === 401 || r.status === 403) {
+      cambiar({ fallo: "Se cerró la sesión o no tenés permiso. Volvé a entrar al panel." });
+      detenerReloj();
+      return;
+    }
+    if (!r.ok) {
+      cambiar({ fallo: "El servidor no respondió bien. Se vuelve a intentar solo." });
+      return;
+    }
+    if (estado.fallo) cambiar({ fallo: null });
+    const datos = (await r.json()) as RespuestaReclamar;
+    if (!datos.ok) return;
+
+    for (const t of datos.trabajos) {
+      if (!t.impresora) {
+        await marcar(t.id, false, "Esta estación no tiene impresora asignada a esa área.");
+        anotar(`${t.titulo}: sin impresora asignada`, false);
+        continue;
+      }
+      try {
+        await imprimirTexto(t.impresora, t.contenido);
+        await marcar(t.id, true);
+        cambiar({ impresas: estado.impresas + 1 });
+        anotar(`${t.titulo} → ${t.impresora}`, true);
+      } catch (e) {
+        const motivo = e instanceof Error ? e.message : String(e);
+        await marcar(t.id, false, motivo);
+        anotar(`${t.titulo}: no salió (${motivo})`, false);
+      }
+    }
+  } catch {
+    cambiar({ fallo: "Sin conexión con el servidor. Se vuelve a intentar solo." });
+  } finally {
+    enCiclo = false;
+  }
+}
+
+// ------------------------------------------------------------------------------------------------ el reloj
+
+let detenerReloj: () => void = () => {};
+
+/**
+ * Llama a `alTic` cada pocos segundos. Los temporizadores de una pestaña que no se está viendo los frena el navegador
+ * (después de unos minutos, a uno por minuto), y justo ahí es cuando el operador está en otra pestaña o ventana. Los de un
+ * Web Worker no se frenan, así que el reloj vive en uno; si el navegador no deja crearlo, se usa un temporizador común.
+ */
+function crearReloj(alTic: () => void): () => void {
+  let comun: ReturnType<typeof setInterval> | undefined;
+  let worker: Worker | null = null;
+  let url: string | null = null;
+
+  function usarTemporizadorComun() {
+    if (!comun) comun = setInterval(alTic, INTERVALO_MS);
+  }
+
+  try {
+    url = URL.createObjectURL(new Blob([`setInterval(function(){postMessage(1)},${INTERVALO_MS})`], { type: "text/javascript" }));
+    worker = new Worker(url);
+    worker.onmessage = () => alTic();
+    worker.onerror = () => {
+      worker?.terminate();
+      worker = null;
+      usarTemporizadorComun();
+    };
+  } catch {
+    usarTemporizadorComun();
+  }
+
+  return () => {
+    worker?.terminate();
+    worker = null;
+    if (url) URL.revokeObjectURL(url);
+    if (comun) clearInterval(comun);
+    comun = undefined;
+  };
+}
+
+// ------------------------------------------------------------------------------------------ pantalla encendida
+
+type Candado = { release: () => Promise<void>; addEventListener: (tipo: "release", f: () => void) => void };
+let candado: Candado | null = null;
+let pidiendoCandado = false;
+
+/** Que la pantalla no se apague mientras imprime (donde el navegador lo permita). No es imprescindible. */
+async function pedirPantalla() {
+  if (candado || pidiendoCandado) return;
+  pidiendoCandado = true;
+  try {
+    const nav = navigator as unknown as { wakeLock?: { request: (tipo: "screen") => Promise<Candado> } };
+    if (nav.wakeLock) {
+      const nuevo = await nav.wakeLock.request("screen");
+      // El navegador lo suelta solo cuando la pestaña queda oculta: así se vuelve a pedir al volver.
+      nuevo.addEventListener("release", () => {
+        if (candado === nuevo) candado = null;
+      });
+      candado = nuevo;
+    }
+  } catch {
+    // Sin permiso o sin soporte: sigue imprimiendo igual.
+  }
+  pidiendoCandado = false;
+}
+
+function soltarPantalla() {
+  const actual = candado;
+  candado = null;
+  if (actual) void actual.release().catch(() => {});
+}
+
+// ---------------------------------------------------------------------------------------------- quién lo usa
+
+let usuarios = 0;
+let usuariosDePantalla = 0;
+let andando = false;
+
+function alVolverALaPestana() {
+  if (document.visibilityState === "visible" && usuariosDePantalla > 0) void pedirPantalla();
+}
+
+function sincronizar() {
+  if (usuarios > 0 && !andando) {
+    andando = true;
+    detenerReloj = crearReloj(() => void ciclo());
+    document.addEventListener("visibilitychange", alVolverALaPestana);
+    void ciclo();
+  } else if (usuarios === 0 && andando) {
+    andando = false;
+    detenerReloj();
+    document.removeEventListener("visibilitychange", alVolverALaPestana);
+    soltarPantalla();
+  }
+  if (andando) {
+    if (usuariosDePantalla > 0) void pedirPantalla();
+    else soltarPantalla();
+  }
+}
+
+/**
+ * Pone a andar el motor mientras el componente que lo llama esté en pantalla, y devuelve su estado. `mantenerPantalla` es
+ * para la pantalla "Impresión automática": en las demás secciones no se le impide a la computadora apagar la pantalla.
+ */
+export function useMotorImpresion(opciones: { mantenerPantalla?: boolean } = {}): EstadoMotor {
+  const mantenerPantalla = opciones.mantenerPantalla === true;
+  useEffect(() => {
+    usuarios += 1;
+    if (mantenerPantalla) usuariosDePantalla += 1;
+    sincronizar();
+    return () => {
+      usuarios -= 1;
+      if (mantenerPantalla) usuariosDePantalla -= 1;
+      sincronizar();
+    };
+  }, [mantenerPantalla]);
+
+  return useSyncExternalStore(
+    suscribir,
+    () => estado,
+    () => ESTADO_INICIAL
+  );
+}

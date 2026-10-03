@@ -9,6 +9,9 @@ import { idLocalActual, listarLocales } from "@/lib/local-actual";
 import { ideaDeLaSemana } from "@/lib/idea-semanal";
 import { SelectorLocal } from "./SelectorLocal";
 import { AvisoReservasNuevas } from "./AvisoReservasNuevas";
+import { MotorImpresion } from "@/components/MotorImpresion";
+import { prismaDelLocal } from "@/lib/prisma-local";
+import { estacionActual } from "@/lib/estacion-actual";
 import { COOKIE_MENU, NavPanel, type GrupoSecciones } from "@/components/NavPanel";
 import { puede, type Permiso } from "@/lib/permisos";
 import { estadoSuscripcion, type EstadoSuscripcion } from "@/lib/suscripcion";
@@ -305,6 +308,26 @@ export default async function AdminLayout({ children }: { children: React.ReactN
       .catch(() => false);
   }
 
+  // La impresión automática de comandas (Servicio comedor) corre en el navegador de la caja, en cualquier sección del panel.
+  // Solo se pone a andar si ESTE navegador es una estación vinculada con impresoras asignadas, quien lo usa puede gestionar
+  // el comedor y el local ya tiene mozos: así los demás locales y computadoras no consultan nada cada pocos segundos.
+  let imprimirComandas = false;
+  if (localActualId && puede(sesion.rol, "comedor.gestionar")) {
+    try {
+      const db = prismaDelLocal(localActualId);
+      const estacion = await estacionActual(db);
+      if (estacion) {
+        const [conImpresora, mozos] = await Promise.all([
+          db.estacionImpresora.count({ where: { estacionId: estacion.id } }),
+          db.mozo.count({ where: { activo: true } }),
+        ]);
+        imprimirComandas = conImpresora > 0 && mozos > 0;
+      }
+    } catch {
+      imprimirComandas = false;
+    }
+  }
+
   // Aviso de idea nueva: un punto al lado de "Ideas" hasta que el dueño entre
   // a leerla. Es la única notificación del panel, así que se gana el lugar.
   let hayIdeaSinVer = false;
@@ -407,6 +430,8 @@ export default async function AdminLayout({ children }: { children: React.ReactN
       {avisoSuscripcion && (
         <BannerSuscripcion estado={avisoSuscripcion} vencimiento={vencimientoLocal} />
       )}
+
+      {imprimirComandas && <MotorImpresion />}
 
       <div className="mx-auto flex max-w-[92rem] gap-4 px-4 lg:gap-6 print:max-w-none print:block print:p-0">
         <aside className="print:hidden">
