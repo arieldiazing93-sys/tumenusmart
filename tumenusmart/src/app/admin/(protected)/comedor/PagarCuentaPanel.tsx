@@ -124,7 +124,7 @@ export function PagarCuentaPanel({
     } catch {
       setCobrando(false);
       setErrorCobro(
-        "No se pudo confirmar el cobro. Antes de volver a intentar, fijate en Cuentas del mostrador si la venta quedó registrada."
+        "No se pudo confirmar el cobro. Antes de volver a intentar, fijate en el Historial de cuentas si la venta quedó registrada."
       );
       return;
     }

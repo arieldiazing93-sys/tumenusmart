@@ -39,11 +39,33 @@ function armarGrupos(hayIdeaSinVer: boolean, rol: string, ventasACredito: boolea
         // varias veces por hora. Pedidos (online) queda debajo.
         { href: "/admin/pos", label: "Punto de venta", icono: "pos" as const,
           ver: conPermiso("pos.vender") },
-        // Vive acá y no en "Cómo va el negocio": el cajero necesita buscar
-        // una cuenta y poder cancelarla en el momento, no solo el dueño
-        // repasando el día después.
-        { href: "/admin/pos/cuentas", label: "Cuentas del mostrador", icono: "pedidos" as const,
+        // El historial de TODAS las ventas cerradas: las del mostrador y también las cuentas de mesa que se cobran
+        // desde Servicio comedor. Los pedidos de la carta tienen su propio historial en "Pedidos". Vive acá y no en
+        // "Cómo va el negocio": el cajero necesita buscar una cuenta y poder cancelarla en el momento, no solo el
+        // dueño repasando el día después.
+        { href: "/admin/pos/cuentas", label: "Historial de cuentas", icono: "pedidos" as const,
           ver: conPermiso("pos.vender") },
+        // El mozo carga las mesas desde su celular o tablet (enlace público con su PIN) y la caja opera las cuentas
+        // y imprime las comandas con las impresoras de su estación. Es un submenú: las pantallas de adentro son
+        // suyas (cuentas abiertas, la impresión automática y los mozos con su enlace). La fila se ve si alguna se puede ver.
+        { href: "/admin/comedor", label: "Servicio comedor", icono: "pedidos" as const,
+          subsecciones: [
+            { href: "/admin/comedor", label: "Cuentas abiertas", icono: "pedidos" as const,
+              ver: conPermiso("comedor.ver") },
+            // La pantalla que la caja deja abierta para que salgan solas las comandas de los mozos.
+            { href: "/admin/impresion", label: "Impresión automática", icono: "pos" as const,
+              ver: conPermiso("comedor.gestionar") },
+            { href: "/admin/comedor/mozos", label: "Mozos y enlace", icono: "usuarios" as const,
+              ver: conPermiso("comedor.configurar") },
+          ] },
+        // Los pedidos de la carta (online, por teléfono): con su propio historial.
+        { href: "/admin/pedidos", label: "Pedidos", icono: "pedidos" as const,
+          ver: conPermiso("pedidos.ver") },
+        // Mismo permiso y misma pantalla que "Pedidos" — solo entra con el
+        // filtro de tipo puesto en "mesa", para que los pedidos de comer en
+        // el local queden aparte de un clic sin duplicar toda la pantalla.
+        { href: "/admin/pedidos?tipo=mesa", label: "Mesas", icono: "pedidos" as const,
+          ver: conPermiso("pedidos.ver") },
         // Facturas de pedidos y de mostrador, juntas. Vive en "Día a día" para
         // encontrarla rápido: ahí se ve una factura recién emitida, se anula, se
         // remite y se ven sus datos para la factura electrónica. El permiso sigue
@@ -54,13 +76,6 @@ function armarGrupos(hayIdeaSinVer: boolean, rol: string, ventasACredito: boolea
         // los clientes le deben y los cobros.
         { href: "/admin/pos/cuentas-por-cobrar", label: "Cuentas por cobrar", icono: "cierre" as const,
           ver: ventasACredito && conPermiso("pos.vender") },
-        { href: "/admin/pedidos", label: "Pedidos", icono: "pedidos" as const,
-          ver: conPermiso("pedidos.ver") },
-        // Mismo permiso y misma pantalla que "Pedidos" — solo entra con el
-        // filtro de tipo puesto en "mesa", para que los pedidos de comer en
-        // el local queden aparte de un clic sin duplicar toda la pantalla.
-        { href: "/admin/pedidos?tipo=mesa", label: "Mesas", icono: "pedidos" as const,
-          ver: conPermiso("pedidos.ver") },
         { href: "/admin/reservas", label: "Reservas", icono: "reservas" as const,
           ver: conPermiso("reservas.ver") },
         // Presupuestos para clientes: se arman en el momento en que el cliente
@@ -77,20 +92,6 @@ function armarGrupos(hayIdeaSinVer: boolean, rol: string, ventasACredito: boolea
         // los marcadores que ya tenga guardados el dueño.
         { href: "/admin/cierre", label: "Rendiciones", icono: "cierre" as const,
           ver: conPermiso("rendiciones.gestionar") },
-      ],
-    },
-    {
-      // El mozo carga las mesas desde su celular o tablet (enlace público con su PIN) y la caja ve las cuentas y
-      // imprime las comandas con las impresoras de su estación. Va junto a "Día a día": se usa durante el servicio.
-      titulo: "Servicio comedor",
-      secciones: [
-        { href: "/admin/comedor", label: "Cuentas abiertas", icono: "pedidos" as const,
-          ver: conPermiso("comedor.ver") },
-        // La pantalla que la caja deja abierta para que salgan solas las comandas de los mozos.
-        { href: "/admin/impresion", label: "Impresión automática", icono: "pos" as const,
-          ver: conPermiso("comedor.gestionar") },
-        { href: "/admin/comedor/mozos", label: "Mozos", icono: "usuarios" as const,
-          ver: conPermiso("comedor.configurar") },
       ],
     },
     {
@@ -187,7 +188,7 @@ function armarGrupos(hayIdeaSinVer: boolean, rol: string, ventasACredito: boolea
           ver: conPermiso("estadisticas.ver") },
         { href: "/admin/envios", label: "Envíos", icono: "envios" as const,
           ver: conPermiso("estadisticas.ver") },
-        // A diferencia de "Cuentas del mostrador", esto sí queda para el
+        // A diferencia del "Historial de cuentas", esto sí queda para el
         // dueño: es la plata que cada cajero declaró al cerrar, no algo
         // operativo del día a día.
         { href: "/admin/pos/turnos", label: "Cierres de turno", icono: "cierre" as const,
@@ -248,9 +249,15 @@ function armarGrupos(hayIdeaSinVer: boolean, rol: string, ventasACredito: boolea
   ];
 
   // Se sacan las secciones sin permiso, y después los grupos que quedaron
-  // vacíos: un título de sección sin nada abajo se lee como algo roto.
+  // vacíos: un título de sección sin nada abajo se lee como algo roto. Un submenú se ve si alguna de sus pantallas
+  // se puede ver, y solo con esas; cada pantalla de adentro decide por su propio permiso.
   return grupos
-    .map((g) => ({ ...g, secciones: g.secciones.filter((s) => s.ver) }))
+    .map((g) => ({
+      ...g,
+      secciones: g.secciones
+        .map((s) => (s.subsecciones ? { ...s, subsecciones: s.subsecciones.filter((h) => h.ver) } : s))
+        .filter((s) => (s.subsecciones ? s.subsecciones.length > 0 : s.ver)),
+    }))
     .filter((g) => g.secciones.length > 0);
 }
 

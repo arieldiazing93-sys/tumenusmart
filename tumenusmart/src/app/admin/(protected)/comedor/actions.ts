@@ -819,7 +819,7 @@ export async function pagarCuenta(cuentaId: string, datos: DatosCobroCuenta): Pr
     console.error("[comedor] pagarCuenta falló", e);
     return {
       ok: false,
-      error: `No se pudo confirmar el cobro. Antes de volver a intentar, fijate en Cuentas del mostrador si la venta quedó registrada. (Detalle: ${pistaDelError(e)})`,
+      error: `No se pudo confirmar el cobro. Antes de volver a intentar, fijate en el Historial de cuentas si la venta quedó registrada. (Detalle: ${pistaDelError(e)})`,
     };
   }
 

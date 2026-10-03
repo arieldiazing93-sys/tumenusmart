@@ -77,6 +77,8 @@ export default async function CuentasPosPage({
       clienteNombre: true,
       comprobanteTipo: true,
       facturaNumero: true,
+      // Las cuentas de mesa del servicio comedor llevan "Mesa 5 · Cuenta #0001": acá se muestra de qué mesa vino.
+      nota: true,
       personal: { select: { nombre: true, apellido: true } },
     },
   });
@@ -97,8 +99,8 @@ export default async function CuentasPosPage({
   return (
     <div>
       <Cabecera
-        titulo="Cuentas del mostrador"
-        bajada="Histórico de ventas cerradas por Punto de Venta."
+        titulo="Historial de cuentas"
+        bajada="Todas las ventas cerradas desde la caja: las del mostrador y las cuentas de mesa del servicio comedor. Los pedidos de la carta tienen su propio historial en Pedidos."
         acciones={
           <>
             <a
@@ -225,6 +227,11 @@ export default async function CuentasPosPage({
                   >
                     {formatearNumero(v.numero)}
                   </Link>
+                  {v.nota?.startsWith("Mesa ") && (
+                    <span className="mt-0.5 block text-[10px] font-medium uppercase text-tinta-suave">
+                      {v.nota.split(" · ")[0]}
+                    </span>
+                  )}
                   {v.comprobanteTipo === "factura" && v.facturaNumero && (
                     <span className="mt-0.5 block text-[10px] font-medium uppercase text-tinta-suave">
                       {v.facturaNumero}

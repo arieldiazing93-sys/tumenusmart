@@ -19,9 +19,20 @@ export type Seccion = {
    * una sección sin haberlo pensado.
    */
   ver?: boolean;
+  /**
+   * Un submenú: las pantallas propias de esta sección (por ejemplo, las del Servicio comedor). La fila se despliega al
+   * tocarla y las muestra debajo, con sangría. En ese caso la fila no lleva a ningún lado por sí sola: quien decide si se
+   * ve es cada pantalla de adentro, y si ninguna se puede ver la fila no aparece.
+   */
+  subsecciones?: Seccion[];
 };
 
 export type GrupoSecciones = { titulo: string; secciones: Seccion[] };
+
+/** Las pantallas a las que de verdad se navega: las secciones sueltas y las de adentro de cada submenú. */
+function pantallasDe(secciones: Seccion[]): Seccion[] {
+  return secciones.flatMap((s) => s.subsecciones ?? [s]);
+}
 
 /** Nombre de la cookie donde vive la preferencia de menú plegado. */
 export const COOKIE_MENU = "menu_plegado";
@@ -83,14 +94,36 @@ export function NavPanel({
    * la coincidencia más larga.
    */
   const activa = grupos
-    .flatMap((g) => g.secciones)
+    .flatMap((g) => pantallasDe(g.secciones))
     .filter((s) => ruta === s.href || ruta.startsWith(s.href + "/"))
     .sort((a, b) => b.href.length - a.href.length)[0]?.href;
 
   // El grupo dueño de la sección activa, para marcar su título en naranja
   // aunque esté colapsado — así se sabe dónde estás sin tener que
   // desplegarlo primero.
-  const grupoActivo = grupos.find((g) => g.secciones.some((s) => s.href === activa))?.titulo;
+  const grupoActivo = grupos.find((g) => pantallasDe(g.secciones).some((s) => s.href === activa))?.titulo;
+
+  // Qué submenús están desplegados (por el nombre de su fila). Arrancan cerrados, igual que los grupos; si se entra a una
+  // pantalla que está adentro de uno (desde un botón, por ejemplo), se despliega solo para ver dónde se está parado.
+  const [submenus, setSubmenus] = useState<Set<string>>(() => new Set());
+
+  function alternarSubmenu(nombre: string) {
+    setSubmenus((actuales) => {
+      const copia = new Set(actuales);
+      if (copia.has(nombre)) copia.delete(nombre);
+      else copia.add(nombre);
+      return copia;
+    });
+  }
+
+  useEffect(() => {
+    const dueno = grupos
+      .flatMap((g) => g.secciones)
+      .find((s) => s.subsecciones?.some((h) => h.href === activa));
+    if (dueno) {
+      setSubmenus((actuales) => (actuales.has(dueno.label) ? actuales : new Set(actuales).add(dueno.label)));
+    }
+  }, [grupos, activa]);
 
   // Qué grupos están colapsados (título tocado). Al entrar o recargar la
   // página TODOS arrancan cerrados: cada persona abre solo lo que necesita
@@ -141,6 +174,92 @@ export function NavPanel({
       document.cookie = `${COOKIE_MENU}=${nuevo ? "1" : "0"}; path=/; max-age=31536000; SameSite=Lax`;
       return nuevo;
     });
+  }
+
+  /** Una fila que lleva a una pantalla. `anidada`: es una de las de adentro de un submenú (más chica y sin icono). */
+  function enlace(s: Seccion, compacta: boolean, anidada: boolean) {
+    const esActiva = activa === s.href;
+    const Icono = ICONOS[s.icono];
+    return (
+      <li key={s.href}>
+        <Link
+          href={s.href}
+          aria-current={esActiva ? "page" : undefined}
+          // Plegado, el nombre de la sección se pierde: el title lo
+          // devuelve al pasar el mouse, y aria-label al lector de
+          // pantalla.
+          title={compacta ? s.label : undefined}
+          aria-label={compacta ? s.label : undefined}
+          className={`group relative flex items-center gap-2.5 rounded-lg font-medium transition-colors duration-100 ${
+            compacta
+              ? "justify-center px-2 py-2.5 text-[0.86rem]"
+              : anidada
+                ? "px-3 py-1.5 text-[0.82rem]"
+                : "px-3 py-2 text-[0.86rem]"
+          } ${
+            esActiva
+              ? "bg-brand-light text-brand-texto"
+              : "text-tinta-media hover:bg-papel-hundido hover:text-tinta"
+          }`}
+        >
+          {/* La barrita del costado marca dónde estás sin depender
+              solo del color de fondo. */}
+          <span
+            aria-hidden="true"
+            className={`absolute left-0 top-1/2 h-4 w-[3px] -translate-y-1/2 rounded-r bg-brand transition-opacity duration-150 ${
+              esActiva ? "opacity-100" : "opacity-0"
+            }`}
+          />
+          {!anidada && <Icono />}
+          {!compacta && <span className="flex-1">{s.label}</span>}
+          {s.aviso && (
+            <span
+              className={`h-1.5 w-1.5 flex-none rounded-full bg-brand ${
+                compacta ? "absolute right-1.5 top-1.5" : ""
+              }`}
+              aria-label="Novedad sin ver"
+            />
+          )}
+        </Link>
+      </li>
+    );
+  }
+
+  /**
+   * Una fila con submenú: al tocarla se despliegan debajo, con sangría y una línea al costado, las pantallas que son
+   * suyas. Así se entiende que lo de adentro (cuentas, impresión, mozos…) pertenece a esa sección. Cerrada, si la pantalla
+   * actual está adentro, la fila queda resaltada para saber dónde se está.
+   */
+  function submenu(s: Seccion) {
+    const hijos = s.subsecciones ?? [];
+    const abierto = submenus.has(s.label);
+    const hayActivaAdentro = hijos.some((h) => h.href === activa);
+    const Icono = ICONOS[s.icono];
+    return (
+      <li key={s.label}>
+        <button
+          type="button"
+          onClick={() => alternarSubmenu(s.label)}
+          aria-expanded={abierto}
+          className={`group relative flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-[0.86rem] font-medium transition-colors duration-100 ${
+            hayActivaAdentro && !abierto
+              ? "bg-brand-light text-brand-texto"
+              : "text-tinta-media hover:bg-papel-hundido hover:text-tinta"
+          }`}
+        >
+          <Icono />
+          <span className="flex-1">{s.label}</span>
+          <IconoPlegar
+            className={`flex-none transition-transform duration-150 ${abierto ? "-rotate-90" : "rotate-180"}`}
+          />
+        </button>
+        {abierto && (
+          <ul className="ml-[1.45rem] mt-0.5 flex flex-col gap-0.5 border-l border-linea pl-2">
+            {hijos.map((h) => enlace(h, false, true))}
+          </ul>
+        )}
+      </li>
+    );
   }
 
   function lista(compacta: boolean) {
@@ -207,49 +326,14 @@ export function NavPanel({
 
             {!colapsado && (
             <ul className="flex flex-col gap-0.5">
-              {grupo.secciones.map((s) => {
-                const esActiva = activa === s.href;
-                const Icono = ICONOS[s.icono];
-                return (
-                  <li key={s.href}>
-                    <Link
-                      href={s.href}
-                      aria-current={esActiva ? "page" : undefined}
-                      // Plegado, el nombre de la sección se pierde: el title lo
-                      // devuelve al pasar el mouse, y aria-label al lector de
-                      // pantalla.
-                      title={compacta ? s.label : undefined}
-                      aria-label={compacta ? s.label : undefined}
-                      className={`group relative flex items-center gap-2.5 rounded-lg text-[0.86rem] font-medium transition-colors duration-100 ${
-                        compacta ? "justify-center px-2 py-2.5" : "px-3 py-2"
-                      } ${
-                        esActiva
-                          ? "bg-brand-light text-brand-texto"
-                          : "text-tinta-media hover:bg-papel-hundido hover:text-tinta"
-                      }`}
-                    >
-                      {/* La barrita del costado marca dónde estás sin depender
-                          solo del color de fondo. */}
-                      <span
-                        aria-hidden="true"
-                        className={`absolute left-0 top-1/2 h-4 w-[3px] -translate-y-1/2 rounded-r bg-brand transition-opacity duration-150 ${
-                          esActiva ? "opacity-100" : "opacity-0"
-                        }`}
-                      />
-                      <Icono />
-                      {!compacta && <span className="flex-1">{s.label}</span>}
-                      {s.aviso && (
-                        <span
-                          className={`h-1.5 w-1.5 flex-none rounded-full bg-brand ${
-                            compacta ? "absolute right-1.5 top-1.5" : ""
-                          }`}
-                          aria-label="Novedad sin ver"
-                        />
-                      )}
-                    </Link>
-                  </li>
-                );
-              })}
+              {grupo.secciones.map((s) =>
+                s.subsecciones && s.subsecciones.length > 0
+                  ? compacta
+                    ? // Plegado no hay lugar para un desplegable: las pantallas de adentro se ven como iconos sueltos.
+                      s.subsecciones.map((h) => enlace(h, true, false))
+                    : submenu(s)
+                  : enlace(s, compacta, false)
+              )}
             </ul>
             )}
           </div>

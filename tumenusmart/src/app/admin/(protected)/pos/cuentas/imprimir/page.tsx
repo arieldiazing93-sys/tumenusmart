@@ -74,7 +74,7 @@ export default async function ImprimirCuentasPosPage({
       </div>
 
       <div className="mb-8 border-b border-linea pb-6">
-        <h1 className="text-2xl font-bold text-tinta">Cuentas del mostrador — {local.nombre}</h1>
+        <h1 className="text-2xl font-bold text-tinta">Historial de cuentas — {local.nombre}</h1>
         <p className="mt-1 text-sm text-tinta-media">Período: {periodoTexto}</p>
       </div>
 

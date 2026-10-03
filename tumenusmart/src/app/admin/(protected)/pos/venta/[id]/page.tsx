@@ -66,7 +66,7 @@ export default async function DetalleVentaPosPage({
   return (
     <div>
       <div className="mb-4">
-        <Volver href="/admin/pos/cuentas" texto="Volver a cuentas del mostrador" />
+        <Volver href="/admin/pos/cuentas" texto="Volver al historial de cuentas" />
       </div>
 
       <Cabecera

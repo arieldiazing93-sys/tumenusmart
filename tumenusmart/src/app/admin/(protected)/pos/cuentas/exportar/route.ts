@@ -74,7 +74,7 @@ export async function GET(request: NextRequest) {
   ];
 
   filaTitulo(hoja, ["Negocio", local.nombre], 2);
-  filaTitulo(hoja, ["Reporte", "Cuentas del mostrador (POS)"], 2);
+  filaTitulo(hoja, ["Reporte", "Historial de cuentas"], 2);
   filaTitulo(hoja, ["Período", periodo], 2);
   hoja.addRow([]);
 
