@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Area, Boton, Campo, Entrada, Selector, Tarjeta, clasesBoton } from "@/components/ui";
+import { Area, Boton, Campo, Entrada, Selector, Tarjeta } from "@/components/ui";
 import { Segmentado } from "@/components/Segmentado";
 import { formatearGuarani } from "@/lib/format";
 import { SIN_REGISTRO_FISCAL, TIPOS_IDENTIFICACION_FISCAL } from "@/lib/tipo-cliente";
@@ -26,7 +26,7 @@ type ItemCarrito = { key: string; nombre: string; precio: number; cantidad: numb
 );
 
 const TODOS = "__todos__";
-/** En la zona de envío: "todavía no se sabe". No es lo mismo que no haber elegido nada: eso no deja crear el pedido. */
+/** En la zona de envío: "todavía no se sabe". No es lo mismo que no haber elegido nada: eso no deja seguir. */
 const COORDINAR = "__coordinar__";
 
 const TIPOS_ENTREGA: { value: TipoEntrega; label: string }[] = [
@@ -34,9 +34,12 @@ const TIPOS_ENTREGA: { value: TipoEntrega; label: string }[] = [
   { value: "retiro", label: "🏪 Retiro en el local" },
 ];
 
+// Los mismos chips que el Punto de Venta.
 const CHIP_ACTIVO = "border-brand bg-brand text-white";
-const CHIP_INACTIVO = "border-linea bg-superficie text-tinta-media hover:border-brand hover:text-brand";
+const CHIP_INACTIVO = "border-linea text-tinta-media hover:border-brand hover:text-brand";
 const TARJETA = "flex flex-col gap-3 !border-2 !border-azul/50";
+/** El rótulo de cada sección del panel del pedido, igual que en el Punto de Venta. */
+const ROTULO = "text-[0.72rem] font-semibold uppercase tracking-rotulo text-tinta-suave";
 
 /** Para buscar sin que importen las mayúsculas ni los acentos. */
 function sinTildes(texto: string): string {
@@ -44,10 +47,11 @@ function sinTildes(texto: string): string {
 }
 
 /**
- * La pantalla para cargar un pedido que llegó por teléfono.
+ * La pantalla para cargar un pedido que llegó por teléfono, en dos pasos.
  *
- * Izquierda: quién es el cliente, cómo se le entrega y los productos. Derecha: el resumen con el pago, el
- * comprobante y el botón de crear. En el celular todo va en una columna y una barra fija abajo lleva al resumen.
+ * Paso 1: quién es el cliente y cómo se le entrega. Paso 2: los productos y el pedido, con el mismo aspecto y los
+ * mismos efectos que el Punto de Venta (chips de categoría, tarjetas de producto, panel del pedido a un costado). En
+ * el celular el panel baja debajo de los productos y una barra fija abajo lleva hasta él.
  *
  * Lo que se ve acá es para trabajar rápido: los precios que vale son los que recalcula el servidor al guardar.
  */
@@ -120,6 +124,7 @@ export function NuevoPedidoForm({
       ? gruposMitad
       : gruposMitad.filter((g) => g.categoriaId === categoriaId);
 
+  const totalProductos = categorias.reduce((s, c) => s + c.productos.length, 0);
   const subtotal = useMemo(() => carrito.reduce((s, i) => s + i.precio * i.cantidad, 0), [carrito]);
   const cantidadTotal = useMemo(() => carrito.reduce((s, i) => s + i.cantidad, 0), [carrito]);
 
@@ -219,6 +224,11 @@ export function NuevoPedidoForm({
     setCarrito((actual) => actual.filter((i) => i.key !== key));
   }
 
+  function limpiarCarrito() {
+    setCarrito([]);
+    setError(null);
+  }
+
   /** Elegir la zona de envío: el campo del costo arranca con el precio de esa zona (sin zona, vacío = a coordinar). */
   function elegirZona(id: string) {
     setZonaId(id);
@@ -311,7 +321,7 @@ export function NuevoPedidoForm({
       return;
     }
     if (conRegistroFiscal && (!facturaNumero.trim() || !facturaRazon.trim())) {
-      setError("Para factura con datos hacen falta el número de documento y la razón social.");
+      setError("Para factura con registro fiscal hacen falta el número y la razón social.");
       return;
     }
 
@@ -358,20 +368,17 @@ export function NuevoPedidoForm({
   }
 
   const mensajeError = error ? (
-    <p
-      role="alert"
-      className="rounded-xl border-2 border-peligro/40 bg-peligro-luz px-3.5 py-2.5 text-[0.85rem] font-medium text-peligro"
-    >
+    <p role="alert" className="rounded-lg bg-peligro-luz px-3 py-2 text-[0.82rem] font-medium text-peligro">
       {error}
     </p>
   ) : null;
 
-  // Para el resumen del cliente en el segundo paso.
+  // Para el resumen de la entrega en el panel del pedido.
   const zonaElegida = zonas.find((z) => z.id === zonaId);
   const textoZona = zonaId === COORDINAR ? "zona a coordinar" : (zonaElegida?.nombre ?? "");
 
   return (
-    <div className="pb-24 lg:pb-0">
+    <div className="pb-28 lg:pb-0">
       <ol className="mb-4 flex flex-wrap items-center gap-x-2 gap-y-1 text-[0.82rem] font-semibold">
         <li className={`flex items-center gap-2 ${paso === "cliente" ? "text-brand-texto" : "text-tinta-media"}`}>
           <span
@@ -452,6 +459,7 @@ export function NuevoPedidoForm({
                 setTipoEntrega(v);
                 setError(null);
               }}
+              color="exito"
             />
 
             {tipoEntrega === "delivery" && (
@@ -527,21 +535,175 @@ export function NuevoPedidoForm({
         </div>
       )}
 
-      {/* Paso 2: los productos, el pedido y el pago. En el paso 1 queda montado pero oculto, para no perder nada. */}
-      <div
-        className={
-          paso === "productos"
-            ? "grid gap-4 lg:grid-cols-[minmax(0,1fr)_23rem] xl:grid-cols-[minmax(0,1fr)_26rem]"
-            : "hidden"
-        }
-      >
-        <div className="flex min-w-0 flex-col gap-4">
-          <Tarjeta
-            padding={false}
-            className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 px-3.5 py-2.5 !border-2 !border-azul/50"
-          >
-            <div className="min-w-0">
-              <p className="truncate text-[0.9rem] font-semibold text-tinta">
+      {/* Paso 2: los productos y el pedido, como el Punto de Venta. En el paso 1 queda montado pero oculto, para no perder nada. */}
+      <div className={paso === "productos" ? "grid grid-cols-1 gap-5 lg:grid-cols-[1fr_23rem] lg:items-start" : "hidden"}>
+        <div className="min-w-0">
+          <Entrada
+            type="search"
+            value={busqueda}
+            onChange={(e) => setBusqueda(e.target.value)}
+            placeholder="Buscar producto"
+            aria-label="Buscar producto"
+            className="mb-3 sm:!w-72"
+          />
+
+          {!textoBusqueda && (
+            <div className="-mx-0.5 mb-4 flex gap-2 overflow-x-auto px-0.5 pb-1">
+              <button
+                type="button"
+                onClick={() => setCategoriaId(TODOS)}
+                className={`flex-none rounded-full border px-3.5 py-1.5 text-[0.85rem] font-medium transition-colors ${
+                  categoriaId === TODOS ? CHIP_ACTIVO : CHIP_INACTIVO
+                }`}
+              >
+                ✨ Todos{" "}
+                <span className={categoriaId === TODOS ? "text-white/80" : "text-tinta-suave"}>{totalProductos}</span>
+              </button>
+              {categorias.map((c) => (
+                <button
+                  key={c.id}
+                  type="button"
+                  onClick={() => setCategoriaId(c.id)}
+                  className={`flex-none rounded-full border px-3.5 py-1.5 text-[0.85rem] font-medium transition-colors ${
+                    c.id === categoriaId ? CHIP_ACTIVO : CHIP_INACTIVO
+                  }`}
+                >
+                  {c.nombre}{" "}
+                  <span className={c.id === categoriaId ? "text-white/80" : "text-tinta-suave"}>
+                    {c.productos.length}
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+
+          {gruposVisibles.map((g) => (
+            <MitadYMitadPickerPos
+              key={g.nombreVisible}
+              grupoNombre={g.nombreVisible}
+              productos={g.productos}
+              onAgregar={agregarCombo}
+            />
+          ))}
+
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
+            {productosVisibles.map((p) => {
+              const cantidadEnCarrito = cantidadesPorProducto.get(p.id) ?? 0;
+              return (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => agregarProducto(p)}
+                  className={`relative flex flex-col rounded-xl border p-3.5 text-left shadow-sm transition-all active:scale-[0.96] ${
+                    cantidadEnCarrito > 0
+                      ? "border-brand/50 bg-brand-light ring-1 ring-brand/20"
+                      : "border-linea bg-brand-light/40 hover:-translate-y-0.5 hover:border-brand/40 hover:bg-brand-light/70 hover:shadow-media"
+                  }`}
+                >
+                  {cantidadEnCarrito > 0 && (
+                    <span className="absolute -right-2 -top-2 flex h-6 min-w-6 items-center justify-center rounded-full border-2 border-papel-suave bg-brand px-1.5 text-[0.74rem] font-bold text-white shadow-sm">
+                      {cantidadEnCarrito}
+                    </span>
+                  )}
+                  <p className="text-[0.86rem] font-medium leading-snug text-tinta">{p.nombre}</p>
+                  <p className="cifra mt-1.5 text-[0.9rem] font-semibold text-tinta">{formatearGuarani(p.precio)}</p>
+                  {p.agregados.length > 0 && (
+                    <span className="mt-1 text-[0.68rem] font-medium uppercase tracking-rotulo text-tinta-suave">
+                      + agregados
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+            {productosVisibles.length === 0 && (
+              <p className="col-span-full text-[0.85rem] text-tinta-suave">
+                {textoBusqueda ? "Ningún producto coincide con la búsqueda." : "Esta categoría no tiene productos disponibles."}
+              </p>
+            )}
+          </div>
+        </div>
+
+        {/* El panel del pedido: el mismo del Punto de Venta, fijo al costado en pantalla ancha. */}
+        <div id="resumen-pedido" className="min-w-0 scroll-mt-4 lg:sticky lg:top-[4.5rem]">
+          <Tarjeta className="flex flex-col gap-4 ring-2 ring-brand/60 lg:max-h-[calc(100vh-5.5rem)] lg:overflow-y-auto">
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p className="truncate text-[0.7rem] font-semibold uppercase tracking-rotulo text-tinta-suave">
+                  {nombre.trim() || "Pedido"}
+                </p>
+                <p className="text-[1rem] font-semibold tracking-titular text-tinta">
+                  {cantidadTotal} {cantidadTotal === 1 ? "item" : "items"}
+                </p>
+              </div>
+              {carrito.length > 0 && (
+                <button
+                  type="button"
+                  onClick={limpiarCarrito}
+                  className="flex-none rounded-full border border-linea bg-white px-3 py-1.5 text-[0.8rem] font-medium text-tinta-media shadow-sm transition-colors hover:border-peligro hover:bg-peligro-luz hover:text-peligro"
+                >
+                  Vaciar
+                </button>
+              )}
+            </div>
+
+            {carrito.length === 0 ? (
+              <p className="rounded-lg border border-dashed border-linea bg-papel-suave px-3 py-6 text-center text-[0.85rem] text-tinta-suave">
+                Tocá un producto para agregarlo.
+              </p>
+            ) : (
+              <div className="flex flex-col gap-2.5">
+                {carrito.map((i) => (
+                  <div
+                    key={i.key}
+                    className="flex items-center justify-between gap-2 border-b border-linea-fina pb-2.5 last:border-0 last:pb-0"
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate text-[0.85rem] font-medium text-tinta">{i.nombre}</p>
+                      {i.detalle && <p className="truncate text-[0.76rem] text-tinta-suave">+ {i.detalle}</p>}
+                      <p className="cifra text-[0.78rem] font-medium text-tinta">
+                        {formatearGuarani(i.precio)} c/u · {formatearGuarani(i.precio * i.cantidad)}
+                      </p>
+                    </div>
+                    <div className="flex flex-none items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => cambiarCantidad(i.key, -1)}
+                        aria-label={`Restar ${i.nombre}`}
+                        className="flex h-8 w-8 items-center justify-center rounded-full bg-peligro-luz text-peligro transition-all hover:bg-peligro hover:text-white active:scale-90"
+                      >
+                        −
+                      </button>
+                      <span className="cifra w-5 text-center text-[0.85rem] font-semibold text-tinta">{i.cantidad}</span>
+                      <button
+                        type="button"
+                        onClick={() => cambiarCantidad(i.key, 1)}
+                        aria-label={`Sumar ${i.nombre}`}
+                        className="flex h-8 w-8 items-center justify-center rounded-full bg-exito-luz text-exito transition-all hover:bg-exito hover:text-white active:scale-90"
+                      >
+                        +
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => quitarProducto(i.key)}
+                        aria-label={`Quitar ${i.nombre}`}
+                        className="ml-0.5 flex h-8 w-8 items-center justify-center rounded-full bg-peligro-luz text-peligro transition-all hover:bg-peligro hover:text-white active:scale-90"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="flex flex-col gap-2 border-t border-linea pt-3.5">
+              <div className="flex items-center justify-between gap-2">
+                <p className={ROTULO}>Cliente y entrega</p>
+                <Boton type="button" tono="navegar" tam="sm" onClick={volverAlCliente}>
+                  Cambiar datos
+                </Boton>
+              </div>
+              <p className="text-[0.88rem] font-semibold text-tinta">
                 {nombre} · {telefono}
               </p>
               <p className="text-[0.8rem] leading-snug text-tinta-media">
@@ -550,175 +712,24 @@ export function NuevoPedidoForm({
                   : "🏪 Retiro en el local"}
               </p>
             </div>
-            <Boton type="button" tono="navegar" tam="sm" onClick={volverAlCliente}>
-              Cambiar datos
-            </Boton>
-          </Tarjeta>
 
-          <Tarjeta className={TARJETA}>
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <h2 className="text-[1rem] font-semibold tracking-titular text-tinta">Productos</h2>
-              <Entrada
-                type="search"
-                value={busqueda}
-                onChange={(e) => setBusqueda(e.target.value)}
-                placeholder="Buscar producto"
-                aria-label="Buscar producto"
-                className="!w-full sm:!w-56"
-              />
-            </div>
-
-            {!textoBusqueda && (
-              <div className="flex flex-wrap gap-1.5">
-                <button
-                  type="button"
-                  onClick={() => setCategoriaId(TODOS)}
-                  className={`rounded-full border px-3 py-1.5 text-[0.8rem] font-semibold transition-colors ${
-                    categoriaId === TODOS ? CHIP_ACTIVO : CHIP_INACTIVO
-                  }`}
-                >
-                  Todos
-                </button>
-                {categorias.map((c) => (
-                  <button
-                    key={c.id}
-                    type="button"
-                    onClick={() => setCategoriaId(c.id)}
-                    className={`rounded-full border px-3 py-1.5 text-[0.8rem] font-semibold transition-colors ${
-                      categoriaId === c.id ? CHIP_ACTIVO : CHIP_INACTIVO
-                    }`}
-                  >
-                    {c.nombre}
-                  </button>
-                ))}
-              </div>
-            )}
-
-            {gruposVisibles.map((g) => (
-              <MitadYMitadPickerPos
-                key={g.nombreVisible}
-                grupoNombre={g.nombreVisible}
-                productos={g.productos}
-                onAgregar={agregarCombo}
-              />
-            ))}
-
-            {productosVisibles.length === 0 ? (
-              <p className="py-4 text-center text-[0.85rem] text-tinta-suave">
-                {textoBusqueda ? "Ningún producto coincide con la búsqueda." : "No hay productos en esta categoría."}
-              </p>
-            ) : (
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-4">
-                {productosVisibles.map((p) => {
-                  const enPedido = cantidadesPorProducto.get(p.id) ?? 0;
-                  return (
-                    <button
-                      key={p.id}
-                      type="button"
-                      onClick={() => agregarProducto(p)}
-                      className="relative flex min-h-[4.5rem] flex-col justify-between rounded-xl border-2 border-azul/50 bg-superficie p-2.5 text-left transition-colors hover:border-brand active:scale-[0.98]"
-                    >
-                      <span className="pr-6 text-[0.86rem] font-semibold leading-snug text-tinta">{p.nombre}</span>
-                      <span className="cifra mt-1 text-[0.82rem] text-tinta-media">{formatearGuarani(p.precio)}</span>
-                      {enPedido > 0 && (
-                        <span className="cifra absolute right-1.5 top-1.5 rounded-full bg-brand px-2 py-0.5 text-[0.7rem] font-semibold text-white">
-                          {enPedido}
-                        </span>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-          </Tarjeta>
-        </div>
-
-        {/* ------------------------------------------------------- derecha */}
-        <div id="resumen-pedido" className="flex min-w-0 scroll-mt-4 flex-col gap-4 lg:sticky lg:top-4 lg:self-start">
-          <Tarjeta className={TARJETA}>
-            <h2 className="text-[1rem] font-semibold tracking-titular text-tinta">Pedido</h2>
-
-            {carrito.length === 0 ? (
-              <p className="py-3 text-center text-[0.85rem] text-tinta-suave">Todavía no agregaste productos.</p>
-            ) : (
-              <ul className="flex flex-col">
-                {carrito.map((i) => (
-                  <li key={i.key} className="flex items-start gap-2 border-b border-linea-fina py-2 last:border-0">
-                    <div className="min-w-0 flex-1">
-                      <p className="text-[0.86rem] font-medium leading-snug text-tinta">{i.nombre}</p>
-                      {i.detalle && <p className="text-[0.76rem] leading-snug text-tinta-suave">+ {i.detalle}</p>}
-                      <p className="cifra text-[0.78rem] text-tinta-media">{formatearGuarani(i.precio)} c/u</p>
-                    </div>
-                    <div className="flex flex-none flex-col items-end gap-1">
-                      <div className="flex items-center rounded-full border border-linea">
-                        <button
-                          type="button"
-                          onClick={() => cambiarCantidad(i.key, -1)}
-                          aria-label={`Restar uno a ${i.nombre}`}
-                          className="flex h-7 w-7 items-center justify-center text-tinta-media transition-colors hover:text-brand"
-                        >
-                          −
-                        </button>
-                        <span className="cifra w-6 text-center text-[0.82rem] font-semibold text-tinta">{i.cantidad}</span>
-                        <button
-                          type="button"
-                          onClick={() => cambiarCantidad(i.key, 1)}
-                          aria-label={`Sumar uno a ${i.nombre}`}
-                          className="flex h-7 w-7 items-center justify-center text-tinta-media transition-colors hover:text-brand"
-                        >
-                          +
-                        </button>
-                      </div>
-                      <span className="cifra text-[0.82rem] font-semibold text-tinta">
-                        {formatearGuarani(i.precio * i.cantidad)}
-                      </span>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => quitarProducto(i.key)}
-                      aria-label={`Quitar ${i.nombre}`}
-                      className="flex h-7 w-7 flex-none items-center justify-center rounded-full text-tinta-suave transition-colors hover:bg-peligro-luz hover:text-peligro"
-                    >
-                      ✕
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-
-            <div className="flex flex-col gap-1 border-t border-linea pt-2.5 text-[0.86rem]">
-              <div className="flex justify-between text-tinta-media">
-                <span>Subtotal</span>
-                <span className="cifra">{formatearGuarani(subtotal)}</span>
-              </div>
-              {tipoEntrega === "delivery" && (
-                <div className="flex justify-between text-tinta-media">
-                  <span>Envío</span>
-                  <span className="cifra">{formatearGuarani(costoEnvio)}</span>
-                </div>
-              )}
-              <div className="flex justify-between text-[1.05rem] font-semibold text-tinta">
-                <span>Total</span>
-                <span className="cifra">{formatearGuarani(total)}</span>
-              </div>
-            </div>
-          </Tarjeta>
-
-          <Tarjeta className={TARJETA}>
-            <h2 className="text-[1rem] font-semibold tracking-titular text-tinta">Pago y comprobante</h2>
-
-            <Campo etiqueta="Cómo va a pagar">
-              <Selector value={metodoPago} onChange={(e) => setMetodoPago(e.target.value)}>
+            <div className="flex flex-col gap-2 border-t border-linea pt-3.5">
+              <p className={ROTULO}>Pago</p>
+              <Selector
+                value={metodoPago}
+                onChange={(e) => setMetodoPago(e.target.value)}
+                aria-label="Cómo va a pagar"
+              >
                 {metodosPago.map((m) => (
                   <option key={m.value} value={m.value}>
                     {m.label}
                   </option>
                 ))}
               </Selector>
-            </Campo>
+            </div>
 
-            <div>
-              <p className="mb-1.5 text-[0.82rem] font-semibold text-tinta">Comprobante</p>
+            <div className="flex flex-col gap-2 border-t border-linea pt-3.5">
+              <p className={ROTULO}>Comprobante</p>
               <Segmentado<"ticket" | "factura">
                 opciones={[
                   { value: "ticket", label: "Ticket" },
@@ -728,26 +739,25 @@ export function NuevoPedidoForm({
                 onChange={setComprobanteTipo}
               />
               {facturaObligatoria && (
-                <p className="mt-1.5 text-[0.76rem] leading-snug text-tinta-suave">
+                <p className="rounded-lg bg-papel-suave px-3 py-2 text-[0.78rem] text-tinta-media">
                   Este local factura todas las ventas: con &ldquo;Ticket&rdquo; sale una factura a Consumidor Final.
                 </p>
               )}
-            </div>
-
-            {comprobanteTipo === "factura" && (
-              <div className="flex flex-col gap-3">
-                <Segmentado<"con" | "sin">
-                  opciones={[
-                    { value: "con", label: "Con datos" },
-                    { value: "sin", label: "Consumidor final" },
-                  ]}
-                  valor={registroFiscal}
-                  onChange={setRegistroFiscal}
-                  color="tinta"
-                />
-                {conRegistroFiscal && (
-                  <>
-                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
+              {comprobanteTipo === "factura" && (
+                <div className="flex flex-col gap-2 rounded-lg border border-linea bg-papel-suave p-3">
+                  <Segmentado<"con" | "sin">
+                    opciones={[
+                      { value: "con", label: "Con registro fiscal" },
+                      { value: "sin", label: "Sin registro fiscal" },
+                    ]}
+                    valor={registroFiscal}
+                    onChange={setRegistroFiscal}
+                    color="tinta"
+                  />
+                  {registroFiscal === "sin" ? (
+                    <p className="text-[0.8rem] text-tinta-media">Se factura a Consumidor Final (Sin Nombre).</p>
+                  ) : (
+                    <>
                       <Campo etiqueta="Tipo de documento">
                         <Selector value={facturaTipo} onChange={(e) => setFacturaTipo(e.target.value)}>
                           {TIPOS_IDENTIFICACION_FISCAL.map((t) => (
@@ -765,57 +775,82 @@ export function NuevoPedidoForm({
                           maxLength={30}
                         />
                       </Campo>
-                    </div>
-                    <Campo etiqueta="Razón social">
-                      <Entrada value={facturaRazon} onChange={(e) => setFacturaRazon(e.target.value)} maxLength={120} />
-                    </Campo>
-                    <Campo etiqueta="Correo (opcional)">
-                      <Entrada
-                        type="email"
-                        value={facturaEmail}
-                        onChange={(e) => setFacturaEmail(e.target.value)}
-                        maxLength={120}
-                      />
-                    </Campo>
-                  </>
-                )}
-              </div>
-            )}
+                      <Campo etiqueta="Razón social">
+                        <Entrada value={facturaRazon} onChange={(e) => setFacturaRazon(e.target.value)} maxLength={120} />
+                      </Campo>
+                      <Campo etiqueta="Correo (opcional)">
+                        <Entrada
+                          type="email"
+                          value={facturaEmail}
+                          onChange={(e) => setFacturaEmail(e.target.value)}
+                          maxLength={120}
+                        />
+                      </Campo>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
 
-            <Campo etiqueta="Notas (opcional)">
+            <div className="flex flex-col gap-2 border-t border-linea pt-3.5">
+              <p className={ROTULO}>Notas (opcional)</p>
               <Area
                 value={notas}
                 onChange={(e) => setNotas(e.target.value)}
                 rows={2}
                 maxLength={500}
+                aria-label="Notas del pedido"
                 placeholder="Ej: sin cebolla, tocar timbre, cambio de 100.000"
               />
-            </Campo>
+            </div>
+
+            <div className="flex flex-col gap-1.5 border-t border-linea pt-3">
+              {tipoEntrega === "delivery" && (
+                <>
+                  <div className="flex items-center justify-between text-[0.85rem] text-tinta-media">
+                    <span>Subtotal</span>
+                    <span className="cifra">{formatearGuarani(subtotal)}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-[0.85rem] text-tinta-media">
+                    <span>Envío</span>
+                    <span className="cifra">{formatearGuarani(costoEnvio)}</span>
+                  </div>
+                </>
+              )}
+              <div className="flex items-center justify-between">
+                <span className="text-[0.85rem] text-tinta-media">Total ({cantidadTotal})</span>
+                <span className="cifra text-[1.4rem] font-bold text-tinta">{formatearGuarani(total)}</span>
+              </div>
+            </div>
+
+            {mensajeError}
+
+            <Boton onClick={crear} disabled={guardando || carrito.length === 0} tam="lg" className="w-full">
+              {guardando ? "Guardando…" : "Crear pedido"}
+            </Boton>
+            <p className="-mt-2 text-[0.74rem] leading-snug text-tinta-suave">
+              Nace confirmado. Después lo pasás a &ldquo;En preparación&rdquo; desde su detalle y sigue el circuito de
+              siempre: comanda, repartidor, despacho y entrega.
+            </p>
           </Tarjeta>
-
-          {mensajeError}
-
-          <Boton onClick={crear} disabled={guardando || carrito.length === 0} tam="lg" className="w-full">
-            {guardando ? "Guardando…" : `Crear pedido · ${formatearGuarani(total)}`}
-          </Boton>
-          <p className="-mt-2 text-[0.76rem] leading-snug text-tinta-suave">
-            Nace confirmado. Después lo pasás a &ldquo;En preparación&rdquo; desde su detalle y sigue el circuito de
-            siempre: comanda, repartidor, despacho y entrega.
-          </p>
         </div>
       </div>
 
-      {/* Celular y tablet vertical (solo en el paso de los productos): el total siempre a la vista y un botón que baja al resumen. */}
-      {paso === "productos" && (
-        <div className="fixed inset-x-0 bottom-0 z-30 flex items-center justify-between gap-3 border-t-2 border-azul/50 bg-superficie px-4 py-2.5 lg:hidden">
-          <div className="min-w-0">
-            <p className="text-[0.74rem] text-tinta-suave">
-              {cantidadTotal} {cantidadTotal === 1 ? "producto" : "productos"}
-            </p>
-            <p className="cifra text-[1rem] font-semibold text-tinta">{formatearGuarani(total)}</p>
-          </div>
-          <a href="#resumen-pedido" className={clasesBoton("principal", "md")}>
-            Ver pedido
+      {/* Barra fija en celular/tablet angosto (como la del Punto de Venta): el panel del pedido queda debajo de toda la
+          grilla, así que sin esto habría que scrollear hasta el final cada vez. */}
+      {paso === "productos" && carrito.length > 0 && (
+        <div
+          className="fixed inset-x-0 bottom-0 z-30 border-t border-linea bg-papel/95 px-4 py-3 shadow-alta backdrop-blur-sm lg:hidden"
+          style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom, 0px))" }}
+        >
+          <a
+            href="#resumen-pedido"
+            className="flex w-full items-center justify-between rounded-lg bg-brand px-4 py-3 text-white shadow-sm transition-transform active:scale-[0.98]"
+          >
+            <span className="text-[0.85rem] font-semibold">
+              {cantidadTotal} {cantidadTotal === 1 ? "item" : "items"} · Ver pedido
+            </span>
+            <span className="cifra text-[1.05rem] font-bold">{formatearGuarani(total)}</span>
           </a>
         </div>
       )}
