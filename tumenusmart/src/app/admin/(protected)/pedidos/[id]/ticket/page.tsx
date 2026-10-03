@@ -328,11 +328,7 @@ export default async function TicketPage({
               <p>Pago: {sinAcentos(etiquetaMetodoPago(pedido.metodoPagoReferencia))}</p>
               <p>
                 Entrega:{" "}
-                {esDelivery
-                  ? `Delivery - ${sinAcentos(pedido.deliveryZone?.nombre ?? "a coordinar")}`
-                  : pedido.tipoEntrega === "mesa"
-                    ? `Mesa ${pedido.mesaNumero ?? "-"}`
-                    : "Retiro en el local"}
+                {esDelivery ? `Delivery - ${sinAcentos(pedido.deliveryZone?.nombre ?? "a coordinar")}` : "Retiro en el local"}
               </p>
               {esDelivery && pedido.direccion && <p>Direccion: {sinAcentos(pedido.direccion)}</p>}
               {esDelivery && pedido.repartidor && <p>Repartidor: {sinAcentos(pedido.repartidor.nombre)}</p>}

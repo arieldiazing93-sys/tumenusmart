@@ -72,7 +72,7 @@ export function dibujarPoster(
     marcaColor = "#e05d2f",
     bajada = "NUESTRA CARTA DIGITAL",
     instruccion1 = "Apuntá la cámara de tu celular",
-    instruccion2 = "y hacé tu pedido desde la mesa",
+    instruccion2 = "y mirá la carta y hacé tu pedido",
   } = opciones;
 
   canvas.width = ANCHO_POSTER;

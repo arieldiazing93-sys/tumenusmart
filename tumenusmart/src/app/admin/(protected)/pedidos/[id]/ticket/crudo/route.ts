@@ -122,11 +122,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     l.push(`Pago: ${sinAcentos(etiquetaMetodoPago(pedido.metodoPagoReferencia))}`);
     l.push(
       `Entrega: ${
-        esDelivery
-          ? `Delivery - ${sinAcentos(pedido.deliveryZone?.nombre ?? "a coordinar")}`
-          : pedido.tipoEntrega === "mesa"
-            ? `Mesa ${pedido.mesaNumero ?? "-"}`
-            : "Retiro en el local"
+        esDelivery ? `Delivery - ${sinAcentos(pedido.deliveryZone?.nombre ?? "a coordinar")}` : "Retiro en el local"
       }`
     );
     if (esDelivery && pedido.direccion) l.push(`Direccion: ${sinAcentos(pedido.direccion)}`);

@@ -97,11 +97,7 @@ export default async function ComandaPage({
         <div>
           <p>{hora}</p>
           <p>
-            {esDelivery
-              ? "DELIVERY"
-              : pedido.tipoEntrega === "mesa"
-                ? `MESA ${pedido.mesaNumero ?? "-"}`
-                : "RETIRO"}
+            {esDelivery ? "DELIVERY" : "RETIRO"}
           </p>
         </div>
 

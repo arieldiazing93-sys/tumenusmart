@@ -57,7 +57,6 @@ export default async function SeguimientoPedidoPage({
     clienteNombre: order.clienteNombre,
     tipoEntrega: order.tipoEntrega,
     direccion: order.direccion,
-    mesaNumero: order.mesaNumero,
     zonaNombre: order.deliveryZone?.nombre,
     clienteLat: order.clienteLat,
     clienteLng: order.clienteLng,
@@ -179,11 +178,7 @@ export default async function SeguimientoPedidoPage({
           <span className="cifra">{formatearGuarani(Number(order.total))}</span>
         </div>
         <p className="mt-3 text-[0.78rem] text-tinta-suave">
-          {order.tipoEntrega === "delivery"
-            ? `Entrega a domicilio: ${order.direccion ?? "-"}`
-            : order.tipoEntrega === "mesa"
-              ? `Mesa ${order.mesaNumero ?? "-"}`
-              : "Retiro en el local"}
+          {order.tipoEntrega === "delivery" ? `Entrega a domicilio: ${order.direccion ?? "-"}` : "Retiro en el local"}
         </p>
       </Tarjeta>
 

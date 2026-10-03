@@ -43,7 +43,6 @@ export default async function CheckoutPage({
         aceptaTarjetaCredito={store.aceptaTarjetaCredito}
         aceptaDelivery={store.aceptaDelivery}
         aceptaRetiro={store.aceptaRetiro}
-        aceptaMesa={store.aceptaMesa}
         zonas={zonas.map((z) => ({
           id: z.id,
           nombre: z.nombre,

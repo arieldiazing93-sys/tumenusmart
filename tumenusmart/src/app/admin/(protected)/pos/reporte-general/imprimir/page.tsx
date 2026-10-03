@@ -53,7 +53,7 @@ export default async function ImprimirReporteGeneralPosPage({
           {finRangoInclusive.toLocaleDateString("es-PY", opcionesFecha)}
         </p>
         <p className="mt-1 text-xs text-tinta-suave">
-          Mostrador, retiro/mesa y delivery ya entregado. La forma de pago del delivery es la
+          Mostrador, retiro y delivery ya entregado. La forma de pago del delivery es la
           declarada al entregar — el control de si esa plata ya se rindió está en Rendiciones.
         </p>
       </div>

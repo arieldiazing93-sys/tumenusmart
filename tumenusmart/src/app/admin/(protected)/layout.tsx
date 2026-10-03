@@ -60,11 +60,6 @@ function armarGrupos(hayIdeaSinVer: boolean, rol: string, ventasACredito: boolea
         // Los pedidos de la carta (online, por teléfono): con su propio historial.
         { href: "/admin/pedidos", label: "Pedidos", icono: "pedidos" as const,
           ver: conPermiso("pedidos.ver") },
-        // Mismo permiso y misma pantalla que "Pedidos" — solo entra con el
-        // filtro de tipo puesto en "mesa", para que los pedidos de comer en
-        // el local queden aparte de un clic sin duplicar toda la pantalla.
-        { href: "/admin/pedidos?tipo=mesa", label: "Mesas", icono: "pedidos" as const,
-          ver: conPermiso("pedidos.ver") },
         // Facturas de pedidos y de mostrador, juntas. Vive en "Día a día" para
         // encontrarla rápido: ahí se ve una factura recién emitida, se anula, se
         // remite y se ven sus datos para la factura electrónica. El permiso sigue

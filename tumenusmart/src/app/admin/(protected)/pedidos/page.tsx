@@ -36,10 +36,9 @@ const FILTROS_FECHA: { value: FiltroFecha; label: string }[] = [
   { value: "mes", label: "Este mes" },
 ];
 
-const FILTROS_TIPO: { value: "delivery" | "retiro" | "mesa"; label: string }[] = [
+const FILTROS_TIPO: { value: "delivery" | "retiro"; label: string }[] = [
   { value: "delivery", label: "Delivery" },
   { value: "retiro", label: "Retiro" },
-  { value: "mesa", label: "Mesa" },
 ];
 
 export default async function AdminPedidosPage({
@@ -87,23 +86,10 @@ export default async function AdminPedidosPage({
   const estadoActivo = estado && estado !== "todos" ? estado : null;
   const rangoFecha = calcularRangoFecha(fecha, desde, hasta);
   const fechaActiva = rangoFecha ? fecha : null;
-  // "todos" es un valor EXPLÍCITO (pastilla "Todos" de tipo): ahí sí se
-  // mezclan los tres. Sin filtro de tipo en la URL (entrando por "Pedidos"
-  // del menú, como toda la vida) se sigue mostrando delivery + retiro nada
-  // más — los pedidos de mesa quedan afuera salvo que se pidan a propósito,
-  // que es justo lo que el dueño pidió.
-  const tipoActivo =
-    tipo === "delivery" || tipo === "retiro" || tipo === "mesa" || tipo === "todos"
-      ? tipo
-      : null;
-  // null → default (delivery+retiro, mesa afuera) · "todos" → sin filtro ·
-  // cualquier otro valor → exactamente ese tipo.
-  const filtroTipo =
-    tipoActivo == null
-      ? { tipoEntrega: { not: "mesa" } }
-      : tipoActivo === "todos"
-        ? {}
-        : { tipoEntrega: tipoActivo };
+  // Los pedidos de la carta son de delivery o de retiro (comer en el local se atiende en Servicio comedor). Sin filtro de
+  // tipo se ven los dos mezclados; cualquier otro valor de la URL (un enlace viejo con "mesa" o "todos") se ignora.
+  const tipoActivo = tipo === "delivery" || tipo === "retiro" ? tipo : null;
+  const filtroTipo = tipoActivo ? { tipoEntrega: tipoActivo } : {};
 
   const [pedidos, store, estadoTienda, pedidosEnviados] = await Promise.all([
     prisma.order.findMany({
@@ -157,7 +143,7 @@ export default async function AdminPedidosPage({
     return qs ? `/admin/pedidos?${qs}` : "/admin/pedidos";
   }
 
-  function hrefTipo(nuevoTipo: "delivery" | "retiro" | "mesa" | "todos" | null) {
+  function hrefTipo(nuevoTipo: "delivery" | "retiro" | null) {
     const params = new URLSearchParams();
     if (estadoActivo) params.set("estado", estadoActivo);
     if (fechaActiva) params.set("fecha", fechaActiva);
@@ -213,18 +199,9 @@ export default async function AdminPedidosPage({
 
   return (
     <div>
-      {/*
-        Mismo título que ve el header cuando se entra por el link "Mesas" del
-        menú: sin esto, la pantalla seguía diciendo "Pedidos" con el filtro de
-        mesa ya aplicado, y parecía que el link no había hecho nada.
-      */}
       <Cabecera
-        titulo={tipoActivo === "mesa" ? "Mesas" : "Pedidos"}
-        bajada={
-          tipoActivo === "mesa"
-            ? "Pedidos para comer en el local. No se mezclan con delivery ni retiro."
-            : "Lo que entró por la carta y por teléfono. Los nuevos de la carta aparecen arriba y avisan solos."
-        }
+        titulo="Pedidos"
+        bajada="Lo que entró por la carta y por teléfono. Los nuevos de la carta aparecen arriba y avisan solos."
         acciones={
           <>
             {/* El cliente que llama por teléfono se carga acá y sigue el mismo circuito que los de la carta. */}
@@ -443,10 +420,8 @@ export default async function AdminPedidosPage({
           línea vertical) y empujado a la derecha con "ml-auto" — es un
           filtro de otra dimensión (por dónde entró el pedido, no cuándo),
           pero comparte renglón para no ocupar una fila entera aparte.
-          Por defecto ("Delivery + Retiro" de acá sin tocar, o entrando por
-          "Pedidos" del menú) se ven delivery y retiro mezclados como
-          siempre — los de mesa quedan afuera salvo que se pidan a propósito
-          con estas pastillas o con "Mesas" del menú.
+          Por defecto ("Todos", o entrando por "Pedidos" del menú) se ven
+          delivery y retiro mezclados.
         */}
         <span aria-hidden="true" className="mx-1 h-5 w-px flex-none bg-linea" />
 
@@ -459,7 +434,7 @@ export default async function AdminPedidosPage({
                 : "border-linea bg-white text-tinta-media hover:border-brand hover:text-brand"
             }`}
           >
-            Delivery + Retiro
+            Todos
           </Link>
           {FILTROS_TIPO.map((t) => (
             <Link
@@ -474,16 +449,6 @@ export default async function AdminPedidosPage({
               {t.label}
             </Link>
           ))}
-          <Link
-            href={hrefTipo("todos")}
-            className={`rounded-full border px-3.5 py-1.5 text-[0.82rem] font-semibold transition-colors duration-100 ${
-              tipoActivo === "todos"
-                ? "border-tinta bg-tinta text-white"
-                : "border-linea bg-white text-tinta-media hover:border-brand hover:text-brand"
-            }`}
-          >
-            Todos los tipos
-          </Link>
         </div>
       </div>
 
@@ -602,11 +567,7 @@ export default async function AdminPedidosPage({
                     </td>
                     <td className="px-3 py-3">
                       <Link prefetch={false} href={`/admin/pedidos/${pedido.id}`} className="block">
-                        {pedido.tipoEntrega === "delivery"
-                          ? pedido.deliveryZone?.nombre ?? "A coordinar"
-                          : pedido.tipoEntrega === "mesa"
-                            ? `Mesa ${pedido.mesaNumero ?? "-"}`
-                            : "Retiro"}
+                        {pedido.tipoEntrega === "delivery" ? pedido.deliveryZone?.nombre ?? "A coordinar" : "Retiro"}
                       </Link>
                     </td>
                     <td className="px-3 py-3">

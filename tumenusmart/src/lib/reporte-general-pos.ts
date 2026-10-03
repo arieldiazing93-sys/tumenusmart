@@ -1,6 +1,6 @@
 /**
  * El reporte general de cuentas: ventas del Punto de Venta, pedidos de
- * mostrador (retiro/mesa) y pedidos de delivery ya entregados, mezclados en
+ * mostrador (retiro) y pedidos de delivery ya entregados, mezclados en
  * una sola lista ordenada por fecha, con el importe de cada una repartido
  * en su columna de forma de pago — mismo criterio que un libro de caja de
  * toda la vida. "General" quiere decir general: todo lo que se cobró.
@@ -81,7 +81,7 @@ export async function calcularReporteGeneralPos(
     }),
     // Delivery ya entregado — fecha por entregadoEn (cuándo se cobró de
     // verdad), no updatedAt: es el mismo campo que ya usa Rendición para su
-    // propio filtro de fecha, y retiro/mesa no lo tiene siempre cargado.
+    // propio filtro de fecha, y retiro no lo tiene siempre cargado.
     db.order.findMany({
       where: {
         tipoEntrega: "delivery",

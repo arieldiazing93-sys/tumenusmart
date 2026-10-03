@@ -137,14 +137,13 @@ export async function guardarFormasPagoEntrega(formData: FormData): Promise<void
   const aceptaTarjetaCredito = formData.get("aceptaTarjetaCredito") === "on";
   const aceptaDelivery = formData.get("aceptaDelivery") === "on";
   const aceptaRetiro = formData.get("aceptaRetiro") === "on";
-  const aceptaMesa = formData.get("aceptaMesa") === "on";
 
   // Sin al menos una opción tildada en cada grupo, el checkout público se
   // queda sin nada para ofrecerle al cliente.
   if (!aceptaEfectivo && !aceptaTransferencia && !aceptaTarjetaDebito && !aceptaTarjetaCredito) {
     redirect(`/admin/configuracion?error=${encodeURIComponent("Elegí al menos una forma de pago")}`);
   }
-  if (!aceptaDelivery && !aceptaRetiro && !aceptaMesa) {
+  if (!aceptaDelivery && !aceptaRetiro) {
     redirect(`/admin/configuracion?error=${encodeURIComponent("Elegí al menos una forma de entrega")}`);
   }
 
@@ -157,7 +156,6 @@ export async function guardarFormasPagoEntrega(formData: FormData): Promise<void
       aceptaTarjetaCredito,
       aceptaDelivery,
       aceptaRetiro,
-      aceptaMesa,
     },
   });
   refrescarPantallas();
@@ -167,8 +165,8 @@ export async function guardarFormasPagoEntrega(formData: FormData): Promise<void
 /**
  * Prende o apaga el botón "Reservar mesa" del menú público — para locales
  * que solo hacen delivery/retiro y no tienen mesas físicas que reservar.
- * Distinto de `aceptaMesa` (que es "comer en el local" al hacer un pedido
- * ahora, no una reserva con anticipación).
+ * Es una reserva con anticipación; comer en el local sin reservar se atiende
+ * por el Servicio comedor.
  */
 export async function guardarAceptaReservas(formData: FormData): Promise<void> {
   await exigirPermiso("configuracion.editar");

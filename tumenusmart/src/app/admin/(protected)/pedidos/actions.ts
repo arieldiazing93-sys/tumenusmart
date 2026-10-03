@@ -234,7 +234,7 @@ export async function cambiarEstadoPedido(
   // talonario de papel al que se le anula una hoja).
   //
   // Igual que cancelarVenta: una vez que este pedido ya quedó adentro de un
-  // cierre firmado — el turno de caja (retiro/mesa) o la rendición del
+  // cierre firmado — el turno de caja (retiro) o la rendición del
   // repartidor (delivery) — no se puede cancelar. Esos montos ya se
   // declararon en el corte ciego/la rendición; permitir cancelar después
   // abriría la puerta a "cobrar, cerrar caja, y después borrar el pedido

@@ -36,7 +36,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   if (areaImpresion) l.push(centrado(areaImpresion.nombre.toUpperCase()));
   l.push(separador());
   l.push(hora);
-  l.push(esDelivery ? "DELIVERY" : pedido.tipoEntrega === "mesa" ? `MESA ${pedido.mesaNumero ?? "-"}` : "RETIRO");
+  l.push(esDelivery ? "DELIVERY" : "RETIRO");
   l.push(separador());
 
   for (const item of items) {

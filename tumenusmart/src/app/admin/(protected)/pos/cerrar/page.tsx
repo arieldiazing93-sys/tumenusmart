@@ -49,7 +49,7 @@ export default async function CerrarTurnoPage() {
     );
   }
 
-  // Un solo cierre: ventas de mostrador + pedidos de retiro/mesa cobrados
+  // Un solo cierre: ventas de mostrador + pedidos de retiro cobrados
   // durante este turno (ver cambiarEstadoPedido en pedidos/actions.ts).
   const [ventas, pedidos] = await Promise.all([
     db.ventaPos.findMany({

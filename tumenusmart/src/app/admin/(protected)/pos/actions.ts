@@ -866,7 +866,7 @@ export async function cerrarTurno(
   }
 
   // Un solo cierre: lo cobrado en el mostrador (VentaPos) y los pedidos de
-  // retiro/mesa marcados "entregado" durante este turno (Order.turnoPosId)
+  // retiro marcados "entregado" durante este turno (Order.turnoPosId)
   // se suman juntos, no en dos cuentas separadas.
   const [ventas, pedidos] = await Promise.all([
     db.ventaPos.findMany({

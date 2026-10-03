@@ -43,12 +43,9 @@ model Store {
   aceptaTarjetaCredito Boolean @default(true)
   aceptaDelivery       Boolean @default(true)
   aceptaRetiro         Boolean @default(true)
-  aceptaMesa           Boolean @default(true)
 
-  // Si este local reserva mesas con anticipación. Es OTRA cosa que
-  // "aceptaMesa" de arriba (ese es "comer en el local" al hacer un pedido
-  // ahora); esto es el botón "Reservar mesa" del menú público, para locales
-  // que solo hacen delivery/retiro y no tienen mesas físicas que reservar.
+  // Si este local reserva mesas con anticipación: el botón "Reservar mesa" del
+  // menú público, para locales que solo hacen delivery/retiro y no tienen mesas físicas que reservar.
   aceptaReservas Boolean @default(true)
 
   /// Si este local vende a crédito (fiado / cuenta corriente): prendido, el
@@ -794,7 +791,7 @@ model Order {
   clienteNombre        String
   clienteTelefono      String
   estado               String        @default("pendiente") // pendiente | confirmado | en_preparacion | en_despacho | entregado | cancelado
-  tipoEntrega          String // "delivery" | "retiro" | "mesa"
+  tipoEntrega          String // "delivery" | "retiro"
   /// Por dónde entró el pedido: "menu" (el cliente lo armó en la carta digital) o "telefono" (lo cargó una persona
   /// del local en Pedidos → Nuevo pedido, porque el cliente llamó). Solo cambia cómo nace —ya confirmado y sin pasar
   /// por el botón de WhatsApp—; después sigue exactamente el mismo camino que los demás.
@@ -804,9 +801,6 @@ model Order {
   repartidorId         String? // solo aplica a pedidos "delivery" en camino
   repartidor           Repartidor?   @relation(fields: [repartidorId], references: [id])
   direccion            String?
-  // Solo para tipoEntrega "mesa": el número/nombre que el cliente escribió
-  // para identificar dónde está sentado. Null en delivery/retiro.
-  mesaNumero           String?
   clienteLat           Float? // pin que marcó el cliente en el mapa al hacer el pedido
   clienteLng           Float?
   metodoPagoReferencia String // "efectivo" | "transferencia" | "tarjeta" | "otro" — solo informativo, no se procesa
@@ -826,7 +820,7 @@ model Order {
   rendicionId          String?
   rendicion            Rendicion? @relation(fields: [rendicionId], references: [id])
 
-  /// Solo para retiro/mesa (nunca delivery, que sigue yendo por
+  /// Solo para retiro (nunca delivery, que sigue yendo por
   /// rendicionId/cobroMetodo): forma de pago declarada al marcar el pedido
   /// "entregado", y a qué turno de caja del Punto de Venta quedó atado —
   /// mismos 4 valores y mismo cierre que una venta de mostrador, sin un
@@ -847,7 +841,7 @@ model Order {
   facturaEmail         String?
 
   // Fiscales — se completan y se CONGELAN solo cuando se emite como
-  // factura de verdad (retiro/mesa al marcar "entregado", delivery al
+  // factura de verdad (retiro al marcar "entregado", delivery al
   // pasar a "en_despacho" — ver cambiarEstadoPedido en pedidos/actions.ts).
   // A diferencia de VentaPos (que lee el emisor en vivo vía
   // turnoPos.estacion.puntoExpedicion porque una venta de mostrador SIEMPRE
@@ -1065,7 +1059,7 @@ model Rendicion {
   pedidos      Order[]
 
   // A qué turno de caja queda atada — el mismo criterio que Order.turnoPosId
-  // para retiro/mesa: se pega sola al turno abierto en la estación desde
+  // para retiro: se pega sola al turno abierto en la estación desde
   // donde se recibió, para que el cierre general del turno pueda sumarla.
   // Sin estación/turno vinculado (un local que no usa Punto de Venta) queda
   // en null, exactamente como funcionaba antes de esto.
@@ -1126,7 +1120,7 @@ model TurnoPos {
   movimientosCaja         MovimientoCaja[]
 
   ventas  VentaPos[]
-  // Pedidos de retiro/mesa cobrados en este turno (ver Order.turnoPosId) —
+  // Pedidos de retiro cobrados en este turno (ver Order.turnoPosId) —
   // el mismo cierre que las ventas de mostrador, no uno aparte.
   pedidos Order[]
   // Rendiciones de repartidor recibidas mientras este turno estaba abierto

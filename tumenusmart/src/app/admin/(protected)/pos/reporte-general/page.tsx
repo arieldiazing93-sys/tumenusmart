@@ -64,7 +64,7 @@ export default async function ReporteGeneralPosPage({
     <div>
       <Cabecera
         titulo="Reporte general de cuentas"
-        bajada="Todo lo que se cobró — mostrador, retiro/mesa y delivery ya entregado — detallado por forma de pago."
+        bajada="Todo lo que se cobró — mostrador, retiro y delivery ya entregado — detallado por forma de pago."
         acciones={
           <>
             <a

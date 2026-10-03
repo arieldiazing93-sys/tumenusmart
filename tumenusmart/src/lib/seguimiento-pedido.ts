@@ -13,16 +13,12 @@ export function pasosSeguimiento(tipoEntrega: string): PasoSeguimiento[] {
   const pasoDespacho =
     tipoEntrega === "delivery"
       ? { titulo: "En camino", detalle: "El repartidor salió con tu pedido.", emoji: "🛵" }
-      : tipoEntrega === "mesa"
-        ? { titulo: "Casi listo", detalle: "Ya casi te lo llevamos a la mesa.", emoji: "🍽️" }
-        : { titulo: "Listo para retirar", detalle: "Ya podés pasar a buscarlo por el local.", emoji: "🛍" };
+      : { titulo: "Listo para retirar", detalle: "Ya podés pasar a buscarlo por el local.", emoji: "🛍" };
 
   const pasoFinal =
     tipoEntrega === "delivery"
       ? { titulo: "Entregado", emoji: "🎉" }
-      : tipoEntrega === "mesa"
-        ? { titulo: "Servido", emoji: "🎉" }
-        : { titulo: "Retirado", emoji: "🎉" };
+      : { titulo: "Retirado", emoji: "🎉" };
 
   return [
     {

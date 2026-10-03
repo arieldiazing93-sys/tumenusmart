@@ -110,7 +110,7 @@ export default async function ComprobanteTurnoPosPage({
             cancelada: true,
           },
         },
-        // Pedidos de retiro/mesa cobrados durante este turno (ver
+        // Pedidos de retiro cobrados durante este turno (ver
         // cambiarEstadoPedido en pedidos/actions.ts) — mismo cierre que las
         // ventas de mostrador, se listan junto a ellas.
         pedidos: {
@@ -488,7 +488,7 @@ export default async function ComprobanteTurnoPosPage({
         {turno.pedidos.length > 0 && (
           <section className="mt-4 break-inside-avoid">
             <h2 className="mb-1.5 text-[0.95rem] font-semibold tracking-titular text-tinta">
-              Pedidos de retiro/mesa cobrados en este turno
+              Pedidos de retiro cobrados en este turno
             </h2>
             <table className="w-full border-collapse text-left">
               <thead>

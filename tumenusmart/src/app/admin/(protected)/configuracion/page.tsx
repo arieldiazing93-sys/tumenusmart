@@ -330,14 +330,6 @@ export default async function AdminConfiguracionPage() {
                   />
                   Retiro en el local
                 </label>
-                <label className="flex items-center gap-2 text-sm font-medium text-tinta-media">
-                  <input
-                    type="checkbox"
-                    name="aceptaMesa"
-                    defaultChecked={store?.aceptaMesa ?? true}
-                  />
-                  Comer en el local
-                </label>
               </div>
             </div>
           </div>

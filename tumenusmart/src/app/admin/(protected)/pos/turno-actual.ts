@@ -18,7 +18,7 @@ export async function turnoAbierto(db: PrismaLocal, estacionId: string) {
 }
 
 /**
- * Pedidos de mostrador (retiro/mesa) cobrados durante este turno — el mismo
+ * Pedidos de mostrador (retiro) cobrados durante este turno — el mismo
  * cierre que las ventas de mostrador, no uno aparte. Se atan acá al marcarse
  * "entregado" (ver cambiarEstadoPedido en pedidos/actions.ts).
  */
