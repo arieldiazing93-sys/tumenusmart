@@ -37,7 +37,7 @@ function refrescar() {
  * Le paga al mozo TODAS las propinas que tiene pendientes, en efectivo, desde la caja: un retiro de caja en el turno abierto de
  * esta estación (el mismo día de cobradas o en otro turno posterior: lo único que hace falta es un turno abierto).
  */
-export async function pagarPropinasDeMozo(mozoId: string): Promise<ResultadoPropina> {
+export async function pagarPropinasDeMozo(mozoId: string, totalMostrado: number): Promise<ResultadoPropina> {
   await exigirPermiso("comedor.gestionar");
   const sesion = await exigirPermiso("pos.vender");
   const storeId = await idLocalActual();
@@ -66,6 +66,13 @@ export async function pagarPropinasDeMozo(mozoId: string): Promise<ResultadoProp
       });
       if (pendientes.length === 0) throw new ErrorDeUsuario("Ese mozo no tiene propinas pendientes.");
       const total = Math.round(pendientes.reduce((s, p) => s + Number(p.monto), 0) * 100) / 100;
+      // Se paga TODO lo pendiente, nunca una parte. Si entró (o se anuló) una propina mientras la persona miraba la pantalla, el
+      // monto que vio ya no es el real: se frena en vez de pagar uno distinto del que confirmó.
+      if (Math.round(Number(totalMostrado)) !== Math.round(total)) {
+        throw new ErrorDeUsuario(
+          `Las propinas pendientes cambiaron: ahora son ${formatearGuarani(total)}. Actualizá la pantalla y revisá el monto antes de pagar.`
+        );
+      }
 
       // Primero el retiro de caja y después se marcan las propinas con su número: si algo falla, no queda ninguna de las dos cosas.
       const movimiento = await tx.movimientoCaja.create({

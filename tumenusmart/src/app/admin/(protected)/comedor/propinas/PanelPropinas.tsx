@@ -125,7 +125,8 @@ export function PanelPropinas({
                     ) {
                       return;
                     }
-                    ejecutar(() => pagarPropinasDeMozo(m.mozoId));
+                    // Se paga todo lo pendiente; el monto que se vio viaja para que el servidor avise si cambió.
+                    ejecutar(() => pagarPropinasDeMozo(m.mozoId, m.total));
                   }}
                   className={clasesBoton("principal", "md")}
                 >

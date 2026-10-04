@@ -360,7 +360,7 @@ export function PagarCuentaPanel({
 
             {/* El cliente es opcional: con su teléfono la venta suma a su ficha y a su fidelización (y es obligatorio si se
                 cobra a crédito, que se completa en el cuadro de cobro). */}
-            <div className="flex flex-col gap-2">
+            <div className="flex flex-col gap-2 rounded-xl border-2 border-azul/50 bg-superficie p-3.5">
               <p className="text-[0.72rem] font-semibold uppercase tracking-rotulo text-tinta-suave">
                 Cliente (opcional)
               </p>
@@ -385,7 +385,7 @@ export function PagarCuentaPanel({
 
             {/* La propina del mozo: solo si el cliente la deja con tarjeta o transferencia (entra al negocio, pero es del mozo).
                 La de efectivo se la lleva el mozo y no se carga. */}
-            <div className="flex flex-col gap-2">
+            <div className="flex flex-col gap-2 rounded-xl border-2 border-azul/50 bg-superficie p-3.5">
               <label className="flex cursor-pointer items-center gap-2 text-[0.8rem] font-medium text-tinta">
                 <input
                   type="checkbox"
@@ -437,7 +437,7 @@ export function PagarCuentaPanel({
             </div>
 
             {puedeFacturar && (
-              <div className="flex flex-col gap-2">
+              <div className="flex flex-col gap-2 rounded-xl border-2 border-azul/50 bg-superficie p-3.5">
                 <p className="text-[0.72rem] font-semibold uppercase tracking-rotulo text-tinta-suave">Comprobante</p>
                 {diasParaVencerTimbrado != null && diasParaVencerTimbrado <= 30 && (
                   <p className="rounded-lg bg-aviso-luz px-3 py-2 text-[0.78rem] font-medium text-aviso">
