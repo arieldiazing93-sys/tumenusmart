@@ -9,7 +9,7 @@ import { esVentaACredito, etiquetaFormaPagoPos } from "@/lib/turno-pos";
 import { SIN_REGISTRO_FISCAL, etiquetaTipoIdentificacion } from "@/lib/tipo-cliente";
 import { ZONA_NEGOCIO } from "@/lib/timezone";
 import { armarDocumento, centrado, filaEtiqueta, filaTabla, negrita, separador } from "@/lib/escpos";
-import { copiasDeImpresion } from "@/lib/copias-impresion";
+import { cabeceraImpresoraFactura, copiasDeImpresion, impresoraParaFactura } from "@/lib/copias-impresion";
 
 export const dynamic = "force-dynamic";
 
@@ -166,7 +166,13 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
 
   // Cuántas veces sale en la estación de quien lo pide (factura y ticket tienen su propio contador; 0 = no se imprime).
   const copias = await copiasDeImpresion(db, { documento: esFactura ? "factura" : "ticket" });
+  // La factura puede tener su propia impresora (distinta de la del ticket): se la indica al navegador.
+  const impresoraFactura = esFactura ? await impresoraParaFactura(db) : undefined;
   return new NextResponse(armarDocumento(l), {
-    headers: { "Content-Type": "text/plain; charset=utf-8", "X-Copias": String(copias) },
+    headers: {
+      "Content-Type": "text/plain; charset=utf-8",
+      "X-Copias": String(copias),
+      ...cabeceraImpresoraFactura(impresoraFactura),
+    },
   });
 }

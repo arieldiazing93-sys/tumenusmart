@@ -9,6 +9,7 @@ import {
   asignarPuntoExpedicion,
   asignarImpresoraDeArea,
   asignarAreaTicket,
+  asignarAreaFactura,
   cambiarCopiasDeArea,
   cambiarCopiasFactura,
 } from "./actions";
@@ -102,6 +103,7 @@ export function EstacionFila({
   puntoExpedicionId,
   puntosExpedicion,
   areaTicketId,
+  areaFacturaId,
   impresoras,
   copiasFactura,
   areasImpresion,
@@ -115,8 +117,10 @@ export function EstacionFila({
   puntoExpedicionId: string | null;
   /** Puntos de expedición activos del local, para elegir a cuál queda atada. */
   puntosExpedicion: PuntoExpedicionOpcion[];
-  /** Qué Área de Impresión maneja el ticket/factura en esta estación. */
+  /** Qué Área de Impresión maneja el ticket en esta estación. */
   areaTicketId: string | null;
+  /** Qué Área maneja la factura. Null = la misma que el ticket (como funcionaba antes). */
+  areaFacturaId: string | null;
   /** Mapeo YA guardado de área → impresora (y cuántas copias salen), para esta estación. */
   impresoras: ImpresoraAsignada[];
   /** Cuántas copias salen de cada factura en esta estación (0 = no se imprime). */
@@ -133,6 +137,7 @@ export function EstacionFila({
   const [vinculando, setVinculando] = useState(false);
   const [asignando, setAsignando] = useState(false);
   const [asignandoTicket, setAsignandoTicket] = useState(false);
+  const [asignandoFactura, setAsignandoFactura] = useState(false);
   const [impresorasDetectadas, setImpresorasDetectadas] = useState<string[]>([]);
   const [buscandoImpresoras, setBuscandoImpresoras] = useState(false);
   const [errorQz, setErrorQz] = useState<string | null>(null);
@@ -198,6 +203,14 @@ export function EstacionFila({
     setError(null);
     const resultado = await asignarAreaTicket(id, valor || null);
     setAsignandoTicket(false);
+    if (!resultado.ok) setError(resultado.error);
+  }
+
+  async function cambiarAreaFactura(valor: string) {
+    setAsignandoFactura(true);
+    setError(null);
+    const resultado = await asignarAreaFactura(id, valor || null);
+    setAsignandoFactura(false);
     if (!resultado.ok) setError(resultado.error);
   }
 
@@ -323,7 +336,7 @@ export function EstacionFila({
               </select>
             </label>
             <label className="flex items-center gap-1.5 text-tinta-media">
-              Área del ticket/factura
+              Área del ticket
               <select
                 value={areaTicketId ?? ""}
                 disabled={asignandoTicket || areasImpresion.length === 0}
@@ -332,6 +345,24 @@ export function EstacionFila({
                 className={clasesSelectCompacto(!!areaTicketId)}
               >
                 <option value="">Sin asignar — imprime manual</option>
+                {areasImpresion.map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.nombre}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="flex items-center gap-1.5 text-tinta-media">
+              Área de la factura
+              <select
+                value={areaFacturaId ?? ""}
+                disabled={asignandoFactura || areasImpresion.length === 0}
+                title="Si la factura sale en otra impresora que el ticket, elegí su área acá"
+                onChange={(e) => cambiarAreaFactura(e.target.value)}
+                // "Igual que el ticket" es una opción válida (no falta nada): por eso siempre va en verde.
+                className={clasesSelectCompacto(true)}
+              >
+                <option value="">Igual que el ticket</option>
                 {areasImpresion.map((a) => (
                   <option key={a.id} value={a.id}>
                     {a.nombre}
@@ -395,7 +426,19 @@ export function EstacionFila({
                 {areasImpresion.map((a) => {
                   const actual = mapaImpresoras.get(a.id) ?? "";
                   const copias = mapaCopias.get(a.id) ?? 1;
-                  const esAreaDelTicket = areaTicketId === a.id;
+                  const esTicket = areaTicketId === a.id;
+                  // Sin un área propia para la factura, sale por la del ticket (como funcionaba antes).
+                  const esFactura = (areaFacturaId ?? areaTicketId) === a.id;
+                  // Una prueba por cada cosa que sale por esta impresora: ticket y factura se prueban por separado cuando
+                  // están en áreas (e impresoras) distintas; si comparten área, una sola prueba cubre las dos.
+                  const pruebas: { texto: string; etiqueta: string }[] =
+                    esTicket && esFactura
+                      ? [{ texto: "Probar impresión", etiqueta: "Ticket y factura" }]
+                      : esTicket
+                        ? [{ texto: "Probar ticket", etiqueta: "Ticket" }]
+                        : esFactura
+                          ? [{ texto: "Probar factura", etiqueta: "Factura" }]
+                          : [{ texto: "Probar impresión", etiqueta: a.nombre }];
                   return (
                     <div key={a.id} className="flex flex-col gap-1.5">
                       <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-sm text-tinta-media">
@@ -417,27 +460,31 @@ export function EstacionFila({
                             </option>
                           ))}
                         </select>
-                        {actual && (
-                          <button
-                            type="button"
-                            disabled={probando !== null}
-                            onClick={() => probarImpresion(a.id, a.nombre, actual)}
-                            className={clasesBoton("navegar", "sm")}
-                          >
-                            {probando === a.id ? "Enviando prueba…" : "Probar impresión"}
-                          </button>
-                        )}
+                        {actual &&
+                          pruebas.map((p) => (
+                            <button
+                              key={p.texto}
+                              type="button"
+                              disabled={probando !== null}
+                              onClick={() => probarImpresion(a.id, p.etiqueta, actual)}
+                              className={clasesBoton("navegar", "sm")}
+                            >
+                              {probando === a.id ? "Enviando prueba…" : p.texto}
+                            </button>
+                          ))}
                       </div>
                       {actual && (
                         <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 pl-0 sm:pl-[6.75rem]">
-                          <ContadorCopias
-                            etiqueta={esAreaDelTicket ? "Ticket" : "Copias"}
-                            valor={copias}
-                            deshabilitado={cambiandoCopias === a.id}
-                            onCambiar={(n) => cambiarCopias(a.id, n)}
-                          />
-                          {/* El área del ticket/factura imprime las dos cosas: la factura tiene su propio contador. */}
-                          {esAreaDelTicket && (
+                          {/* Las copias del ticket (o de las comandas si no es el área del ticket) y, aparte, las de la factura. */}
+                          {(esTicket || !esFactura) && (
+                            <ContadorCopias
+                              etiqueta={esTicket ? "Ticket" : "Copias"}
+                              valor={copias}
+                              deshabilitado={cambiandoCopias === a.id}
+                              onCambiar={(n) => cambiarCopias(a.id, n)}
+                            />
+                          )}
+                          {esFactura && (
                             <ContadorCopias
                               etiqueta="Factura"
                               valor={copiasFactura}
@@ -470,7 +517,9 @@ export function EstacionFila({
                       {(mapaCopias.get(a.id) ?? 1) === 0
                         ? "no imprime"
                         : `${mapaCopias.get(a.id) ?? 1} ${(mapaCopias.get(a.id) ?? 1) === 1 ? "copia" : "copias"}`}
-                      {areaTicketId === a.id && ` (ticket) · factura: ${copiasFactura === 0 ? "no imprime" : `${copiasFactura} ${copiasFactura === 1 ? "copia" : "copias"}`}`}
+                      {areaTicketId === a.id && " (ticket)"}
+                      {(areaFacturaId ?? areaTicketId) === a.id &&
+                        ` · factura: ${copiasFactura === 0 ? "no imprime" : `${copiasFactura} ${copiasFactura === 1 ? "copia" : "copias"}`}`}
                     </>
                   )}
                 </li>

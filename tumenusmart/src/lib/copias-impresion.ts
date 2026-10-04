@@ -54,3 +54,31 @@ export async function copiasDeImpresion(db: PrismaLocal, que: QueSeImprime): Pro
   });
   return fila ? copiasValidas(fila.copias) : 1;
 }
+
+/**
+ * En qué impresora sale la FACTURA en la estación de este navegador, cuando el local le asignó un área propia (distinta del
+ * ticket, para los que las sacan en impresoras diferentes):
+ *   - un nombre: esa impresora;
+ *   - `null`: eligió un área para la factura pero todavía no le asignó impresora (no se imprime sola, queda el aviso manual);
+ *   - `undefined`: no hay área de factura propia (se usa la del ticket, como antes): quien llama conserva la impresora que ya tenía.
+ */
+export async function impresoraParaFactura(db: PrismaLocal): Promise<string | null | undefined> {
+  const estacion = await estacionActual(db);
+  if (!estacion) return undefined;
+  const datos = await db.estacion.findUnique({ where: { id: estacion.id }, select: { areaFacturaId: true } });
+  if (!datos?.areaFacturaId) return undefined;
+  const fila = await db.estacionImpresora.findFirst({
+    where: { estacionId: estacion.id, areaImpresionId: datos.areaFacturaId },
+    select: { nombreImpresora: true },
+  });
+  return fila?.nombreImpresora ?? null;
+}
+
+/**
+ * La cabecera `X-Impresora` para la respuesta de una factura: el navegador la usa en lugar de la impresora del ticket. Vacía = la
+ * factura tiene un área propia sin impresora asignada. Sin cabecera (undefined) = no hay área de factura propia.
+ */
+export function cabeceraImpresoraFactura(impresora: string | null | undefined): Record<string, string> {
+  if (impresora === undefined) return {};
+  return { "X-Impresora": impresora === null ? "" : encodeURIComponent(impresora) };
+}

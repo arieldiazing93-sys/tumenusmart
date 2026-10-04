@@ -29,15 +29,19 @@ function copiasDeLaRespuesta(r: Response): number {
  */
 export async function imprimirComprobante(
   urlCrudo: string,
-  nombreImpresora: string | null
+  impresoraPorDefecto: string | null
 ): Promise<ResultadoImpresion> {
-  if (!nombreImpresora) return { ok: false, motivo: "sin_impresora" };
   try {
     const r = await fetch(urlCrudo, { credentials: "include" });
     if (!r.ok) throw new Error(`No se pudo generar el comprobante (${r.status})`);
     const copias = copiasDeLaRespuesta(r);
     // 0 copias es una decisión del local, no un error: no hace falta ni conectar con la impresora.
     if (copias === 0) return { ok: true, omitida: true };
+    // La factura puede tener su propia impresora (distinta de la del ticket): si la ruta la indica, es esa; vacía = el área de
+    // la factura todavía no tiene impresora. Sin cabecera, vale la que pasó quien llama.
+    const indicada = r.headers.get("X-Impresora");
+    const nombreImpresora = indicada !== null ? decodeURIComponent(indicada) || null : impresoraPorDefecto;
+    if (!nombreImpresora) return { ok: false, motivo: "sin_impresora" };
     const texto = await r.text();
     try {
       await conectarQz();

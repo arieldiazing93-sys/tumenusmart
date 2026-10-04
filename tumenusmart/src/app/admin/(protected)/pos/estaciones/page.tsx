@@ -78,6 +78,7 @@ export default async function EstacionesPage() {
             puntoExpedicionId={e.puntoExpedicionId}
             puntosExpedicion={puntosExpedicion}
             areaTicketId={e.areaTicketId}
+            areaFacturaId={e.areaFacturaId}
             impresoras={e.impresoras}
             copiasFactura={e.copiasFactura}
             areasImpresion={areasImpresion}

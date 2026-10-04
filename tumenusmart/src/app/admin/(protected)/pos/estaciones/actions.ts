@@ -178,6 +178,28 @@ export async function asignarAreaTicket(
 }
 
 /**
+ * Qué Área de Impresión maneja la FACTURA en esta estación, aparte del ticket: hay locales que las sacan en impresoras
+ * distintas. Sin área propia (`null`) la factura sale por la del ticket, como funcionaba antes. El área tiene que ser de este
+ * local (el filtro del local lo asegura: un id ajeno no aparece).
+ */
+export async function asignarAreaFactura(
+  estacionId: string,
+  areaImpresionId: string | null
+): Promise<ResultadoEstacion> {
+  await exigirPermiso("pos.gestionarEstaciones");
+  const prisma = prismaDelLocal(await idLocalActual());
+
+  if (areaImpresionId) {
+    const area = await prisma.areaImpresion.findFirst({ where: { id: areaImpresionId }, select: { id: true } });
+    if (!area) return { ok: false, error: "No encontré esa área de impresión." };
+  }
+  const r = await prisma.estacion.updateMany({ where: { id: estacionId }, data: { areaFacturaId: areaImpresionId } });
+  if (r.count === 0) return { ok: false, error: "No encontré esa estación." };
+  revalidatePath("/admin/pos/estaciones");
+  return { ok: true };
+}
+
+/**
  * Vincula ESTE navegador (el de la computadora física desde la que se hace
  * clic) a una estación, guardando el id en una cookie de larga duración.
  *

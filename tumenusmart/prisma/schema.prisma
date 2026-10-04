@@ -1162,7 +1162,11 @@ model Estacion {
   // EstacionImpresora (estacionId, areaTicketId). Null = ticket sin
   // impresión automática, cae al fallback manual.
   areaTicketId String?
-  areaTicket   AreaImpresion? @relation(fields: [areaTicketId], references: [id], onDelete: SetNull)
+  areaTicket   AreaImpresion? @relation("AreaTicketEstacion", fields: [areaTicketId], references: [id], onDelete: SetNull)
+  /// Qué Área de Impresión maneja la FACTURA en esta estación, aparte del ticket (hay locales que las sacan en impresoras
+  /// distintas). Null = la misma que el ticket (como funcionaba antes de existir este campo).
+  areaFacturaId String?
+  areaFactura   AreaImpresion? @relation("AreaFacturaEstacion", fields: [areaFacturaId], references: [id], onDelete: SetNull)
   /// Cuántas copias salen de cada FACTURA en la impresora del área del ticket/factura (las copias del ticket de venta están en
   /// EstacionImpresora.copias de esa misma área). 0 = no se imprime la factura desde esta estación.
   copiasFactura Int @default(1)
@@ -1193,7 +1197,8 @@ model AreaImpresion {
 
   productos          Product[]
   impresorasEstacion EstacionImpresora[]
-  estacionesTicket   Estacion[]
+  estacionesTicket   Estacion[] @relation("AreaTicketEstacion")
+  estacionesFactura  Estacion[] @relation("AreaFacturaEstacion")
 
   @@index([storeId])
 }
