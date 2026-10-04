@@ -10,11 +10,28 @@ import { useMotorImpresion } from "@/lib/motor-impresion";
  * algo impide imprimir: así el operador, que está en el Punto de venta y no mirando la cola, se entera a tiempo.
  */
 export function MotorImpresion() {
-  const { qz, fallo } = useMotorImpresion();
+  const { qz, fallo, modoPrueba } = useMotorImpresion();
   const ruta = usePathname();
 
   // La pantalla "Impresión automática" ya muestra el detalle: no se repite el aviso encima.
   if (ruta?.startsWith("/admin/impresion")) return null;
+
+  // Para que no se quede prendido sin querer: mientras el modo prueba esté activo se ve en todas las pantallas.
+  if (modoPrueba) {
+    return (
+      <div className="border-b border-amarillo/60 bg-amarillo-luz print:hidden">
+        <div className="mx-auto flex max-w-[92rem] flex-wrap items-center justify-between gap-2 px-4 py-2">
+          <p className="text-[0.84rem] text-amarillo-oscuro">
+            <strong className="font-semibold">Impresión en modo prueba.</strong> Las comandas se dan por impresas pero NO salen
+            en papel.
+          </p>
+          <BotonEnlace href="/admin/impresion" tono="navegar" tam="sm">
+            Apagar el modo prueba
+          </BotonEnlace>
+        </div>
+      </div>
+    );
+  }
 
   const problema =
     qz === "error"

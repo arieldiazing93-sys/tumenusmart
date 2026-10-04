@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { BotonEnlace, Pastilla, Tarjeta } from "@/components/ui";
-import { useMotorImpresion } from "@/lib/motor-impresion";
+import { Interruptor } from "@/components/Interruptor";
+import { cambiarModoPrueba, useMotorImpresion } from "@/lib/motor-impresion";
 
 /** Pasado este tiempo sin que el servidor conteste, o con una impresión sin terminar, se avisa que algo la trabó. */
 const SEGUNDOS_DE_ALERTA = 20;
@@ -23,7 +24,9 @@ export function AgenteImpresion({
   /** Comandas que esperan un área a la que ESTA estación no le asignó ninguna impresora (y cuántas son). */
   comandasSinImpresora: { area: string; cantidad: number }[];
 }) {
-  const { qz, fallo, registro, impresas, ultimaConsultaEn, imprimiendoAhora } = useMotorImpresion({ mantenerPantalla: true });
+  const { qz, fallo, registro, impresas, ultimaConsultaEn, imprimiendoAhora, modoPrueba } = useMotorImpresion({
+    mantenerPantalla: true,
+  });
 
   // Un reloj de un segundo, solo para que los "hace N segundos" avancen mientras se mira la pantalla.
   const [ahora, setAhora] = useState<number | null>(null);
@@ -59,7 +62,9 @@ export function AgenteImpresion({
           <li className="flex items-center gap-2">
             <span aria-hidden="true">{qz === "ok" ? "✅" : qz === "conectando" ? "⏳" : "❌"}</span>
             <span className="text-tinta">
-              {qz === "ok"
+              {modoPrueba
+                ? "Modo prueba: no se usa QZ Tray ni ninguna impresora"
+                : qz === "ok"
                 ? "QZ Tray conectado"
                 : qz === "conectando"
                   ? "Conectando con QZ Tray…"
@@ -120,6 +125,26 @@ export function AgenteImpresion({
               haber frenado la pestaña.
             </p>
           )}
+        </div>
+
+        {/* Para probar todo el recorrido (mozo → cola → cuenta → cobro) sin tener una impresora. */}
+        <div className="flex items-start gap-3 border-t border-linea pt-2.5">
+          <div className="pt-0.5">
+            <Interruptor
+              activo={modoPrueba}
+              onChange={cambiarModoPrueba}
+              etiqueta="Modo prueba: marcar las comandas como impresas sin imprimirlas"
+              tono="azul"
+            />
+          </div>
+          <div className="min-w-0">
+            <p className="text-[0.9rem] font-semibold text-tinta">Modo prueba (sin impresora)</p>
+            <p className="mt-0.5 text-[0.8rem] leading-snug text-tinta-media">
+              Las comandas se dan por impresas pero <strong>no salen en papel</strong>: sirve para probar el recorrido
+              completo sin impresora. El texto de cada una se ve con “Ver comanda”. Vale solo en esta computadora; apagalo
+              cuando tengas la impresora.
+            </p>
+          </div>
         </div>
 
         {comandasSinImpresora.length > 0 && (

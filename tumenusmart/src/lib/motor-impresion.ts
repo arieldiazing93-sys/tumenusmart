@@ -30,7 +30,33 @@ export type EstadoMotor = {
   ultimaConsultaEn: number | null;
   /** La comanda que se está mandando a la impresora ahora y desde cuándo: si pasa mucho rato, algo la trabó. */
   imprimiendoAhora: { titulo: string; desde: number } | null;
+  /**
+   * Para probar sin impresora: las comandas se marcan como impresas pero NO se mandan a ninguna impresora (ni hace falta QZ
+   * Tray). Se guarda en este navegador, así que vale solo para esta computadora.
+   */
+  modoPrueba: boolean;
 };
+
+const CLAVE_MODO_PRUEBA = "impresion_modo_prueba";
+
+function leerModoPrueba(): boolean {
+  try {
+    return localStorage.getItem(CLAVE_MODO_PRUEBA) === "1";
+  } catch {
+    return false;
+  }
+}
+
+/** Prende o apaga el modo prueba en esta computadora. */
+export function cambiarModoPrueba(activo: boolean) {
+  try {
+    if (activo) localStorage.setItem(CLAVE_MODO_PRUEBA, "1");
+    else localStorage.removeItem(CLAVE_MODO_PRUEBA);
+  } catch {
+    // Sin almacenamiento del navegador solo vale hasta que se recargue la página.
+  }
+  cambiar({ modoPrueba: activo, qz: activo ? "ok" : "conectando" });
+}
 
 /** Cada cuántos milisegundos pregunta si hay comandas nuevas. */
 const INTERVALO_MS = 4000;
@@ -43,6 +69,7 @@ const ESTADO_INICIAL: EstadoMotor = {
   impresas: 0,
   ultimaConsultaEn: null,
   imprimiendoAhora: null,
+  modoPrueba: false,
 };
 
 let estado: EstadoMotor = ESTADO_INICIAL;
@@ -110,12 +137,18 @@ async function ciclo() {
   enCiclo = true;
   try {
     // Sin QZ no se puede imprimir: no se pregunta nada (así no se reclama lo que no se va a poder imprimir).
-    try {
-      await conLimite(conectarQz(), 10_000);
+    if (estado.modoPrueba) {
+      // En modo prueba no se usa QZ Tray: se sigue consultando comandas igual, para que el celular del mozo vea que hay
+      // una caja "imprimiendo" y se pueda probar todo el recorrido sin impresora.
       if (estado.qz !== "ok") cambiar({ qz: "ok" });
-    } catch {
-      if (estado.qz !== "error") cambiar({ qz: "error" });
-      return;
+    } else {
+      try {
+        await conLimite(conectarQz(), 10_000);
+        if (estado.qz !== "ok") cambiar({ qz: "ok" });
+      } catch {
+        if (estado.qz !== "error") cambiar({ qz: "error" });
+        return;
+      }
     }
 
     const r = await conLimite(fetch("/admin/api/impresion/reclamar", { method: "POST", credentials: "include" }), 20_000);
@@ -136,6 +169,12 @@ async function ciclo() {
       if (!t.impresora) {
         await marcar(t.id, false, "Esta estación no tiene impresora asignada a esa área.");
         anotar(`${t.titulo}: sin impresora asignada`, false);
+        continue;
+      }
+      if (estado.modoPrueba) {
+        // Se da por impresa sin mandarla a ninguna impresora: el texto se puede ver en la lista con "Ver comanda".
+        await marcar(t.id, true);
+        anotar(`${t.titulo}: modo prueba, NO se imprimió en papel`, true);
         continue;
       }
       cambiar({ imprimiendoAhora: { titulo: t.titulo, desde: Date.now() } });
@@ -267,6 +306,8 @@ function alVolverALaPestana() {
 function sincronizar() {
   if (usuarios > 0 && !andando) {
     andando = true;
+    // La preferencia de esta computadora (recién acá, ya en el navegador: en el servidor no hay localStorage).
+    if (leerModoPrueba() !== estado.modoPrueba) cambiar({ modoPrueba: leerModoPrueba() });
     detenerReloj = crearReloj(alTic);
     document.addEventListener("visibilitychange", alVolverALaPestana);
     void ciclo();
