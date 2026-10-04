@@ -261,6 +261,7 @@ model Store {
   itemsCuentaMesa  ItemCuentaMesa[]
   trabajosImpresion TrabajoImpresion[]
   mesasComedor     MesaComedor[]
+  sectoresComedor  SectorComedor[]
 }
 
 /// Las direcciones que este local tuvo antes.
@@ -2704,7 +2705,28 @@ model MesaComedor {
   orden     Int      @default(0)
   /// Una mesa desactivada no se ofrece al mozo (por ejemplo, una que se saca del salón por un tiempo).
   activa    Boolean  @default(true)
+  /// El sector del restaurante donde está (Salón, Patio, Terraza). Sin sector, la mesa se ofrece igual, bajo "Otras mesas".
+  sectorId  String?
+  sector    SectorComedor? @relation(fields: [sectorId], references: [id], onDelete: SetNull)
   createdAt DateTime @default(now())
+
+  @@unique([storeId, clave])
+  @@index([storeId])
+  @@index([sectorId])
+}
+
+/// Un sector del restaurante (Salón, Patio, Terraza): agrupa las mesas para que el mozo elija primero el sector y vea solo
+/// sus mesas. Borrar un sector no borra sus mesas: quedan sin sector.
+model SectorComedor {
+  id        String   @id @default(cuid())
+  storeId   String
+  store     Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  nombre    String
+  /// El nombre sin mayúsculas ni acentos ni espacios repetidos (ver claveDeMesa): evita cargar dos veces el mismo sector.
+  clave     String
+  orden     Int      @default(0)
+  createdAt DateTime @default(now())
+  mesas     MesaComedor[]
 
   @@unique([storeId, clave])
   @@index([storeId])

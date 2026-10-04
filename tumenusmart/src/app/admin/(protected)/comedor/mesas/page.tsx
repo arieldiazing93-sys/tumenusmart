@@ -8,17 +8,22 @@ import { GestorMesas } from "./GestorMesas";
 export const dynamic = "force-dynamic";
 
 /**
- * Las mesas del salón (Ajustes → Configuración servicio comedor → Mesas del salón): el dueño carga cuántas mesas tiene y el
- * mozo las elige de una lista en vez de escribirlas. Solo del dueño (comedor.configurar).
+ * Las mesas del salón y sus sectores (Ajustes → Configuración servicio comedor → Mesas y sectores): el dueño arma los
+ * sectores del restaurante (Salón, Patio, Terraza), carga las mesas de cada uno, y el mozo elige primero el sector y después
+ * la mesa en vez de escribirla. Solo del dueño (comedor.configurar).
  */
 export default async function MesasComedorPage() {
   await pantallaConPermiso("comedor.configurar");
   const db = prismaDelLocal(await idLocalActual());
 
-  const [mesas, abiertas] = await Promise.all([
+  const [sectores, mesas, abiertas] = await Promise.all([
+    db.sectorComedor.findMany({
+      orderBy: [{ orden: "asc" }, { createdAt: "asc" }],
+      select: { id: true, nombre: true },
+    }),
     db.mesaComedor.findMany({
       orderBy: [{ orden: "asc" }, { createdAt: "asc" }],
-      select: { id: true, nombre: true, activa: true },
+      select: { id: true, nombre: true, activa: true, sectorId: true },
     }),
     // Las cuentas abiertas ahora, para avisar cuando se desactiva o se borra una mesa que está ocupada.
     db.cuentaMesa.findMany({
@@ -30,8 +35,8 @@ export default async function MesasComedorPage() {
   return (
     <div className="flex flex-col gap-4">
       <Cabecera
-        titulo="Mesas del salón"
-        bajada="Cargá las mesas que tiene el local: el mozo las elige de una lista y no tiene que escribirlas."
+        titulo="Mesas y sectores"
+        bajada="Armá los sectores del restaurante y cargá las mesas de cada uno: el mozo elige el sector y después la mesa, sin escribirla."
         acciones={
           <BotonEnlace href="/admin/comedor" tono="navegar" tam="md">
             Cuentas abiertas
@@ -39,7 +44,7 @@ export default async function MesasComedorPage() {
         }
       />
       <PestanasConfigComedor activa="mesas" />
-      <GestorMesas mesas={mesas} mesasOcupadas={abiertas.map((c) => c.mesa)} />
+      <GestorMesas sectores={sectores} mesas={mesas} mesasOcupadas={abiertas.map((c) => c.mesa)} />
     </div>
   );
 }

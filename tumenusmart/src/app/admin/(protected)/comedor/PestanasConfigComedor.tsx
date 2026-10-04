@@ -2,7 +2,7 @@ import Link from "next/link";
 
 const PANTALLAS = [
   { clave: "mozos", href: "/admin/comedor/mozos", texto: "Mozos y enlace" },
-  { clave: "mesas", href: "/admin/comedor/mesas", texto: "Mesas del salón" },
+  { clave: "mesas", href: "/admin/comedor/mesas", texto: "Mesas y sectores" },
   { clave: "reglas", href: "/admin/comedor/reglas", texto: "Reglas del mozo" },
 ] as const;
 

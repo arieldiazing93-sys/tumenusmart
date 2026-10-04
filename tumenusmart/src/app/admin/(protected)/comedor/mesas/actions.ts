@@ -4,23 +4,28 @@ import { Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { exigirPermiso } from "@/lib/auth";
 import { registrarBitacora } from "@/lib/bitacora";
-import { claveDeMesa, normalizarMesa } from "@/lib/comedor";
+import { claveDeMesa, normalizarMesa, normalizarSector } from "@/lib/comedor";
 import { idLocalActual } from "@/lib/local-actual";
 import { prismaDelLocal } from "@/lib/prisma-local";
 
 /**
- * Las mesas del salón que el dueño carga en Ajustes (Configuración servicio comedor → Mesas). Con mesas cargadas el mozo
- * elige la mesa de una lista en vez de escribirla. Todas exigen el permiso del dueño (comedor.configurar) y trabajan solo
- * dentro de su local. Devuelven un resultado en vez de lanzar, para poder explicar por qué no se pudo.
+ * Las mesas del salón y sus sectores (Salón, Patio, Terraza) que el dueño carga en Ajustes (Configuración servicio comedor
+ * → Mesas y sectores). Con mesas cargadas el mozo elige la mesa de una lista en vez de escribirla, y con sectores elige
+ * primero el sector. Todas exigen el permiso del dueño (comedor.configurar) y trabajan solo dentro de su local. Devuelven
+ * un resultado en vez de lanzar, para poder explicar por qué no se pudo.
  */
 
 export type ResultadoMesas = { ok: true; mensaje?: string } | { ok: false; error: string };
 
-/** Cuántas mesas se pueden crear de una vez, y cuántas puede tener un local en total. */
+/** Cuántas mesas se pueden crear de una vez, cuántas puede tener un local, el número más alto y cuántos sectores. */
 const MAXIMO_POR_VEZ = 200;
 const MAXIMO_TOTAL = 300;
+const MAXIMO_NUMERO = 999;
+const MAXIMO_SECTORES = 20;
 
 const YA_EXISTE = "Ya hay una mesa con ese nombre.";
+const SECTOR_YA_EXISTE = "Ya hay un sector con ese nombre.";
+const SECTOR_NO_EXISTE = "No encontré ese sector.";
 
 function refrescar() {
   revalidatePath("/admin/comedor/mesas");
@@ -32,52 +37,198 @@ function esDuplicada(err: unknown): boolean {
 }
 
 /**
- * Crea las mesas "1", "2", "3"… hasta la cantidad pedida, salteando las que ya existen (si ya hay 10 y se pide 15, se crean
- * la 11 a la 15). Es la forma rápida de cargar el salón entero.
+ * El sector que se pidió, comprobando que sea de ESTE local (una clave foránea no lo verifica: sin esto alguien podría
+ * colgarle a su mesa un sector de otro negocio). Sin id es "sin sector".
  */
-export async function crearMesasPorCantidad(cantidad: number): Promise<ResultadoMesas> {
+async function resolverSector(
+  db: ReturnType<typeof prismaDelLocal>,
+  sectorId: string | null | undefined
+): Promise<{ ok: true; sector: { id: string; nombre: string } | null } | { ok: false; error: string }> {
+  if (!sectorId) return { ok: true, sector: null };
+  const sector = await db.sectorComedor.findFirst({ where: { id: String(sectorId) }, select: { id: true, nombre: true } });
+  if (!sector) return { ok: false, error: SECTOR_NO_EXISTE };
+  return { ok: true, sector };
+}
+
+// ---------------------------------------------------------------------------
+//  Los sectores del restaurante
+// ---------------------------------------------------------------------------
+
+/** Agrega un sector ("Salón", "Patio", "Terraza"). */
+export async function crearSector(nombre: string): Promise<ResultadoMesas> {
   const sesion = await exigirPermiso("comedor.configurar");
   const idLocal = await idLocalActual();
   const db = prismaDelLocal(idLocal);
 
-  const n = Math.floor(Number(cantidad));
-  if (!Number.isFinite(n) || n < 1) return { ok: false, error: "Escribí cuántas mesas tiene el salón (un número mayor a cero)." };
-  if (n > MAXIMO_POR_VEZ) return { ok: false, error: `Como mucho ${MAXIMO_POR_VEZ} mesas de una vez.` };
+  const limpio = normalizarSector(nombre);
+  if (!limpio) return { ok: false, error: "Escribí el nombre del sector (hasta 30 letras)." };
 
-  const existentes = await db.mesaComedor.findMany({ select: { clave: true, orden: true } });
-  const claves = new Set(existentes.map((m) => m.clave));
+  const existentes = await db.sectorComedor.findMany({ select: { orden: true } });
+  if (existentes.length >= MAXIMO_SECTORES) return { ok: false, error: `Un local puede tener hasta ${MAXIMO_SECTORES} sectores.` };
+  const orden = existentes.reduce((m, x) => Math.max(m, x.orden), 0) + 1;
+
+  try {
+    await db.sectorComedor.create({ data: { storeId: idLocal, nombre: limpio, clave: claveDeMesa(limpio), orden } });
+  } catch (err) {
+    if (esDuplicada(err)) return { ok: false, error: SECTOR_YA_EXISTE };
+    throw err;
+  }
+
+  await registrarBitacora(idLocal, sesion, {
+    modulo: "comedor",
+    accion: "sector_creado",
+    descripcion: `Creó el sector ${limpio} del restaurante.`,
+    entidad: "SectorComedor",
+  });
+
+  refrescar();
+  return { ok: true };
+}
+
+/** Le cambia el nombre a un sector. Las mesas siguen en él. */
+export async function renombrarSector(id: string, nombre: string): Promise<ResultadoMesas> {
+  const sesion = await exigirPermiso("comedor.configurar");
+  const idLocal = await idLocalActual();
+  const db = prismaDelLocal(idLocal);
+
+  const limpio = normalizarSector(nombre);
+  if (!limpio) return { ok: false, error: "Escribí el nombre del sector (hasta 30 letras)." };
+
+  const anterior = await db.sectorComedor.findFirst({ where: { id: String(id) }, select: { nombre: true } });
+  if (!anterior) return { ok: false, error: SECTOR_NO_EXISTE };
+
+  try {
+    await db.sectorComedor.updateMany({ where: { id: String(id) }, data: { nombre: limpio, clave: claveDeMesa(limpio) } });
+  } catch (err) {
+    if (esDuplicada(err)) return { ok: false, error: SECTOR_YA_EXISTE };
+    throw err;
+  }
+
+  await registrarBitacora(idLocal, sesion, {
+    modulo: "comedor",
+    accion: "sector_renombrado",
+    descripcion: `Cambió el nombre del sector ${anterior.nombre} a ${limpio}.`,
+    entidad: "SectorComedor",
+    entidadId: String(id),
+  });
+
+  refrescar();
+  return { ok: true };
+}
+
+/** Borra un sector. Sus mesas NO se borran: quedan sin sector (y se siguen ofreciendo al mozo). */
+export async function eliminarSector(id: string): Promise<ResultadoMesas> {
+  const sesion = await exigirPermiso("comedor.configurar");
+  const idLocal = await idLocalActual();
+  const db = prismaDelLocal(idLocal);
+
+  const sector = await db.sectorComedor.findFirst({ where: { id: String(id) }, select: { nombre: true } });
+  if (!sector) return { ok: false, error: SECTOR_NO_EXISTE };
+
+  // Se sueltan las mesas a mano (además de la regla de la base) para poder contar cuántas quedaron sin sector.
+  const sueltas = await db.mesaComedor.updateMany({ where: { sectorId: String(id) }, data: { sectorId: null } });
+  await db.sectorComedor.deleteMany({ where: { id: String(id) } });
+
+  await registrarBitacora(idLocal, sesion, {
+    modulo: "comedor",
+    accion: "sector_eliminado",
+    descripcion: `Eliminó el sector ${sector.nombre} (${sueltas.count} ${sueltas.count === 1 ? "mesa quedó" : "mesas quedaron"} sin sector).`,
+    entidad: "SectorComedor",
+    entidadId: String(id),
+    detalle: { mesasSinSector: sueltas.count },
+  });
+
+  refrescar();
+  return {
+    ok: true,
+    mensaje: sueltas.count > 0 ? `Se eliminó el sector. ${sueltas.count} ${sueltas.count === 1 ? "mesa quedó" : "mesas quedaron"} sin sector.` : undefined,
+  };
+}
+
+// ---------------------------------------------------------------------------
+//  Las mesas
+// ---------------------------------------------------------------------------
+
+/**
+ * Carga las mesas "desde" … "hasta" (por ejemplo del 1 al 10) en un sector. Las que todavía no existen se crean; las que ya
+ * existían se pasan a ese sector (así se acomodan las mesas que se habían cargado antes de tener sectores). Los nombres de
+ * las mesas son únicos en todo el local —la cuenta se reconoce por el nombre—, por eso el Patio sigue la numeración del
+ * Salón (del 11 al 15) en vez de repetir el 1.
+ */
+export async function crearMesasPorRango(desde: number, hasta: number, sectorId: string | null): Promise<ResultadoMesas> {
+  const sesion = await exigirPermiso("comedor.configurar");
+  const idLocal = await idLocalActual();
+  const db = prismaDelLocal(idLocal);
+
+  const d = Math.floor(Number(desde));
+  const h = Math.floor(Number(hasta));
+  if (!Number.isFinite(d) || !Number.isFinite(h) || d < 1 || h < 1) {
+    return { ok: false, error: "Escribí desde qué mesa y hasta cuál (números mayores a cero)." };
+  }
+  if (h < d) return { ok: false, error: "El “hasta” no puede ser menor que el “desde”." };
+  if (h > MAXIMO_NUMERO) return { ok: false, error: `El número de mesa más alto es ${MAXIMO_NUMERO}.` };
+  if (h - d + 1 > MAXIMO_POR_VEZ) return { ok: false, error: `Como mucho ${MAXIMO_POR_VEZ} mesas de una vez.` };
+
+  const elegido = await resolverSector(db, sectorId);
+  if (!elegido.ok) return elegido;
+  const sector = elegido.sector;
+
+  const existentes = await db.mesaComedor.findMany({ select: { id: true, clave: true, orden: true, sectorId: true } });
+  const porClave = new Map(existentes.map((m) => [m.clave, m]));
   const nuevas: { nombre: string; clave: string }[] = [];
-  for (let i = 1; i <= n; i++) {
+  const aMover: string[] = [];
+  for (let i = d; i <= h; i++) {
     const nombre = String(i);
     const clave = claveDeMesa(nombre);
-    if (!claves.has(clave)) nuevas.push({ nombre, clave });
+    const ya = porClave.get(clave);
+    if (!ya) nuevas.push({ nombre, clave });
+    else if ((ya.sectorId ?? null) !== (sector?.id ?? null)) aMover.push(ya.id);
   }
-  if (nuevas.length === 0) return { ok: true, mensaje: `Ya tenías las mesas del 1 al ${n}: no se creó ninguna.` };
+  if (nuevas.length === 0 && aMover.length === 0) {
+    return { ok: true, mensaje: `Las mesas del ${d} al ${h} ya estaban cargadas${sector ? ` en ${sector.nombre}` : ""}: no se cambió nada.` };
+  }
   if (existentes.length + nuevas.length > MAXIMO_TOTAL) {
     return { ok: false, error: `Un local puede tener hasta ${MAXIMO_TOTAL} mesas.` };
   }
 
-  const primerOrden = existentes.reduce((m, x) => Math.max(m, x.orden), 0) + 1;
-  // skipDuplicates: si dos personas cargan a la vez, la segunda no falla por las que ya creó la primera.
-  await db.mesaComedor.createMany({
-    data: nuevas.map((m, i) => ({ storeId: idLocal, nombre: m.nombre, clave: m.clave, orden: primerOrden + i })),
-    skipDuplicates: true,
-  });
+  if (nuevas.length > 0) {
+    const primerOrden = existentes.reduce((m, x) => Math.max(m, x.orden), 0) + 1;
+    // skipDuplicates: si dos personas cargan a la vez, la segunda no falla por las que ya creó la primera.
+    await db.mesaComedor.createMany({
+      data: nuevas.map((m, i) => ({
+        storeId: idLocal,
+        nombre: m.nombre,
+        clave: m.clave,
+        orden: primerOrden + i,
+        sectorId: sector?.id ?? null,
+      })),
+      skipDuplicates: true,
+    });
+  }
+  if (aMover.length > 0) {
+    await db.mesaComedor.updateMany({ where: { id: { in: aMover } }, data: { sectorId: sector?.id ?? null } });
+  }
 
+  const donde = sector ? ` en ${sector.nombre}` : "";
   await registrarBitacora(idLocal, sesion, {
     modulo: "comedor",
     accion: "mesas_creadas",
-    descripcion: `Cargó ${nuevas.length} ${nuevas.length === 1 ? "mesa" : "mesas"} del salón (hasta la ${n}).`,
+    descripcion: `Cargó las mesas del ${d} al ${h}${donde}: ${nuevas.length} nuevas y ${aMover.length} que ya existían pasaron al sector.`,
     entidad: "MesaComedor",
-    detalle: { creadas: nuevas.length, hasta: n },
+    detalle: { desde: d, hasta: h, sector: sector?.nombre ?? null, creadas: nuevas.length, movidas: aMover.length },
   });
 
   refrescar();
-  return { ok: true, mensaje: `Se crearon ${nuevas.length} ${nuevas.length === 1 ? "mesa" : "mesas"}.` };
+  const partes: string[] = [];
+  if (nuevas.length > 0) partes.push(`Se ${nuevas.length === 1 ? "creó 1 mesa" : `crearon ${nuevas.length} mesas`}${donde}`);
+  if (aMover.length > 0) {
+    partes.push(`${aMover.length} ${aMover.length === 1 ? "mesa que ya existía pasó" : "mesas que ya existían pasaron"} ${sector ? `a ${sector.nombre}` : "a “sin sector”"}`);
+  }
+  return { ok: true, mensaje: `${partes.join(". ")}.` };
 }
 
-/** Agrega una mesa con el nombre que se le quiera dar ("Terraza 2", "Barra"). */
-export async function agregarMesa(nombre: string): Promise<ResultadoMesas> {
+/** Agrega una mesa con el nombre que se le quiera dar ("Terraza 2", "Barra"), en un sector si se elige. */
+export async function agregarMesa(nombre: string, sectorId: string | null): Promise<ResultadoMesas> {
   const sesion = await exigirPermiso("comedor.configurar");
   const idLocal = await idLocalActual();
   const db = prismaDelLocal(idLocal);
@@ -85,12 +236,17 @@ export async function agregarMesa(nombre: string): Promise<ResultadoMesas> {
   const limpio = normalizarMesa(nombre);
   if (!limpio) return { ok: false, error: "Escribí el nombre de la mesa (hasta 20 letras)." };
 
+  const elegido = await resolverSector(db, sectorId);
+  if (!elegido.ok) return elegido;
+
   const existentes = await db.mesaComedor.findMany({ select: { orden: true } });
   if (existentes.length >= MAXIMO_TOTAL) return { ok: false, error: `Un local puede tener hasta ${MAXIMO_TOTAL} mesas.` };
   const orden = existentes.reduce((m, x) => Math.max(m, x.orden), 0) + 1;
 
   try {
-    await db.mesaComedor.create({ data: { storeId: idLocal, nombre: limpio, clave: claveDeMesa(limpio), orden } });
+    await db.mesaComedor.create({
+      data: { storeId: idLocal, nombre: limpio, clave: claveDeMesa(limpio), orden, sectorId: elegido.sector?.id ?? null },
+    });
   } catch (err) {
     if (esDuplicada(err)) return { ok: false, error: YA_EXISTE };
     throw err;
@@ -99,8 +255,33 @@ export async function agregarMesa(nombre: string): Promise<ResultadoMesas> {
   await registrarBitacora(idLocal, sesion, {
     modulo: "comedor",
     accion: "mesa_creada",
-    descripcion: `Agregó la mesa ${limpio} al salón.`,
+    descripcion: `Agregó la mesa ${limpio} al salón${elegido.sector ? ` (sector ${elegido.sector.nombre})` : ""}.`,
     entidad: "MesaComedor",
+  });
+
+  refrescar();
+  return { ok: true };
+}
+
+/** Pasa una mesa a otro sector (o la deja sin sector). Las cuentas abiertas no se tocan. */
+export async function moverMesaASector(id: string, sectorId: string | null): Promise<ResultadoMesas> {
+  const sesion = await exigirPermiso("comedor.configurar");
+  const idLocal = await idLocalActual();
+  const db = prismaDelLocal(idLocal);
+
+  const mesa = await db.mesaComedor.findFirst({ where: { id: String(id) }, select: { nombre: true } });
+  if (!mesa) return { ok: false, error: "No encontré esa mesa." };
+  const elegido = await resolverSector(db, sectorId);
+  if (!elegido.ok) return elegido;
+
+  await db.mesaComedor.updateMany({ where: { id: String(id) }, data: { sectorId: elegido.sector?.id ?? null } });
+
+  await registrarBitacora(idLocal, sesion, {
+    modulo: "comedor",
+    accion: "mesa_movida_de_sector",
+    descripcion: `Pasó la mesa ${mesa.nombre} ${elegido.sector ? `al sector ${elegido.sector.nombre}` : "a “sin sector”"}.`,
+    entidad: "MesaComedor",
+    entidadId: String(id),
   });
 
   refrescar();

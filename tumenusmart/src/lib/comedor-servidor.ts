@@ -59,6 +59,12 @@ export type DatosRonda = {
   mesasPermitidas?: string[];
   /** Con esto se suma a esa cuenta (carga desde la caja); sin esto se abre o se continúa la cuenta de la mesa. */
   cuentaId?: string;
+  /**
+   * true cuando quien carga está ABRIENDO la mesa (la tocó libre, o escribió su número): si ya tiene una cuenta abierta se
+   * rechaza, en vez de sumarle los productos en silencio y dar la impresión de que se abrió otra mesa. Para seguir cargando
+   * en una cuenta que ya existe se usa "Agregar pedido", que no lo pide.
+   */
+  soloAbrirNueva?: boolean;
 };
 
 export type ResultadoRonda =
@@ -84,6 +90,7 @@ const CUENTA_NO_ENCONTRADA = "CUENTA_NO_ENCONTRADA";
 const CUENTA_POR_COBRAR = "CUENTA_POR_COBRAR";
 const CUENTA_AJENA = "CUENTA_AJENA";
 const MESA_NO_EXISTE = "MESA_NO_EXISTE";
+const MESA_YA_ABIERTA = "MESA_YA_ABIERTA";
 
 /** Lo que se le explica a quien carga cuando una regla de la cuenta no se cumple (null si el error es otro). */
 function mensajeDeReglaCuenta(e: unknown): string | null {
@@ -94,6 +101,9 @@ function mensajeDeReglaCuenta(e: unknown): string | null {
   }
   if (e.message === CUENTA_AJENA) return "Esa mesa la atiende otro mozo: no podés cargarle productos.";
   if (e.message === MESA_NO_EXISTE) return "Esa mesa no está en la lista del salón. Elegí una mesa de la lista.";
+  if (e.message === MESA_YA_ABIERTA) {
+    return "Esa mesa ya está abierta (la abrieron hace un momento). No se abre otra: volvé a las mesas y tocá “Agregar pedido” en su cuenta.";
+  }
   return null;
 }
 
@@ -226,6 +236,8 @@ export async function guardarRonda(datos: DatosRonda): Promise<ResultadoRonda> {
         if (!abierta && datos.mesasPermitidas && !datos.mesasPermitidas.includes(clave)) throw new Error(MESA_NO_EXISTE);
         // Con la cuenta impresa nadie puede cargar más: la caja tiene que reabrirla primero.
         if (abierta && abierta.estado !== "abierta") throw new Error(CUENTA_POR_COBRAR);
+        // Abrir una mesa que ya tiene su cuenta no abre otra: se rechaza (después de las reglas de arriba, que explican más).
+        if (abierta && datos.soloAbrirNueva && !datos.cuentaId) throw new Error(MESA_YA_ABIERTA);
         if (!abierta) {
           const { contadorCuentasMesa } = await tx.store.update({
             where: { id: storeId },
@@ -325,6 +337,9 @@ export async function guardarRonda(datos: DatosRonda): Promise<ResultadoRonda> {
     const p = codigoPrisma(e);
     // Dos celulares abrieron la misma mesa a la vez: el segundo vuelve a intentar y se suma a la cuenta ya abierta.
     if (p?.codigo === "P2002" && p.meta.includes("mesaAbierta") && !datos.cuentaId) {
+      // Puede ser el MISMO envío llegando dos veces a la vez (un reintento): si el primero ya quedó guardado, se devuelve eso.
+      const hecho = await envioYaHecho(storeId, envioId);
+      if (hecho) return hecho;
       try {
         resultado = await guardar();
       } catch (e2) {

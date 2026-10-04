@@ -227,7 +227,7 @@ function armarGrupos(hayIdeaSinVer: boolean, rol: string, ventasACredito: boolea
           subsecciones: [
             { href: "/admin/comedor/mozos", label: "Mozos y enlace", icono: "usuarios" as const,
               ver: conPermiso("comedor.configurar") },
-            { href: "/admin/comedor/mesas", label: "Mesas del salón", icono: "pedidos" as const,
+            { href: "/admin/comedor/mesas", label: "Mesas y sectores", icono: "pedidos" as const,
               ver: conPermiso("comedor.configurar") },
             { href: "/admin/comedor/reglas", label: "Reglas del mozo", icono: "configuracion" as const,
               ver: conPermiso("comedor.configurar") },

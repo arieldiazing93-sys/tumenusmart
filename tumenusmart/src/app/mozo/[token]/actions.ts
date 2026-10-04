@@ -136,11 +136,18 @@ export type CuentaAbierta = {
   /** "abierta", o "por_cobrar" si la caja ya imprimió la cuenta: el mozo no puede cargarle más hasta que la reabran. */
   estado: string;
   total: number;
+  /** El sector del restaurante de esa mesa ("Salón", "Patio"), si el dueño la asignó a uno. */
+  sector: string | null;
 };
+
+/** Un sector del restaurante con al menos una mesa activa (el mozo elige primero el sector). */
+export type SectorDelSalon = { id: string; nombre: string };
 
 /** Una mesa del salón que el dueño cargó en Ajustes, con su estado ahora. */
 export type MesaDelSalon = {
   nombre: string;
+  /** El sector al que pertenece, o null si no tiene (se muestra bajo "Otras mesas"). */
+  sectorId: string | null;
   /** "libre" | "ocupada" | "por_cobrar" */
   estado: string;
   /** true si la cuenta abierta en esa mesa es de este mozo. */
@@ -162,7 +169,14 @@ export type ReglasDelSalon = {
 };
 
 export type EstadoDelSalon =
-  | { ok: true; cuentas: CuentaAbierta[]; mesas: MesaDelSalon[]; reglas: ReglasDelSalon; imprimiendo: boolean }
+  | {
+      ok: true;
+      cuentas: CuentaAbierta[];
+      sectores: SectorDelSalon[];
+      mesas: MesaDelSalon[];
+      reglas: ReglasDelSalon;
+      imprimiendo: boolean;
+    }
   | FalloContexto;
 
 /** ¿Hay alguna estación que haya preguntado por comandas hace poco? Si no, lo que se envíe queda en espera. */
@@ -185,7 +199,7 @@ export async function estadoDelSalon(token: string): Promise<EstadoDelSalon> {
   const { local, mozo } = ctx;
   const veAjenas = local.mozosVenCuentasAjenas;
 
-  const [todas, mesasCargadas, imprimiendo] = await Promise.all([
+  const [todas, mesasCargadas, sectoresCargados, imprimiendo] = await Promise.all([
     prisma.cuentaMesa.findMany({
       where: { storeId: local.id, estado: { in: [...ESTADOS_CUENTA_ABIERTA] } },
       orderBy: { abiertaEn: "asc" },
@@ -203,7 +217,12 @@ export async function estadoDelSalon(token: string): Promise<EstadoDelSalon> {
     prisma.mesaComedor.findMany({
       where: { storeId: local.id },
       orderBy: [{ orden: "asc" }, { createdAt: "asc" }],
-      select: { nombre: true, clave: true, activa: true },
+      select: { nombre: true, clave: true, activa: true, sectorId: true },
+    }),
+    prisma.sectorComedor.findMany({
+      where: { storeId: local.id },
+      orderBy: [{ orden: "asc" }, { createdAt: "asc" }],
+      select: { id: true, nombre: true },
     }),
     hayEstacionImprimiendo(local.id),
   ]);
@@ -211,14 +230,22 @@ export async function estadoDelSalon(token: string): Promise<EstadoDelSalon> {
   // Con la regla "solo ven sus cuentas" cada mozo ve únicamente las que abrió él.
   const visibles = veAjenas ? todas : todas.filter((c) => c.mozoId === mozo.id);
 
+  // El sector de cada mesa (por su clave) y el nombre de cada sector, para etiquetar las cuentas abiertas.
+  const sectorDeClave = new Map(mesasCargadas.map((m) => [m.clave, m.sectorId]));
+  const nombreDeSector = new Map(sectoresCargados.map((s) => [s.id, s.nombre]));
+  // Solo los sectores que tienen alguna mesa activa para elegir.
+  const sectoresConMesas = new Set(mesasCargadas.filter((m) => m.activa).map((m) => m.sectorId));
+  const sectores: SectorDelSalon[] = sectoresCargados.filter((s) => sectoresConMesas.has(s.id));
+
   const mesas: MesaDelSalon[] = mesasCargadas
     .filter((m) => m.activa)
     .map((m) => {
       const c = todas.find((x) => claveDeMesa(x.mesa) === m.clave);
-      if (!c) return { nombre: m.nombre, estado: "libre", mia: false, mozo: null, cuentaId: null };
+      if (!c) return { nombre: m.nombre, sectorId: m.sectorId, estado: "libre", mia: false, mozo: null, cuentaId: null };
       const mia = c.mozoId === mozo.id;
       return {
         nombre: m.nombre,
+        sectorId: m.sectorId,
         estado: c.estado === "por_cobrar" ? "por_cobrar" : "ocupada",
         mia,
         mozo: nombreDeMozo(c.mozo),
@@ -229,6 +256,7 @@ export async function estadoDelSalon(token: string): Promise<EstadoDelSalon> {
   return {
     ok: true,
     imprimiendo,
+    sectores,
     mesas,
     reglas: {
       usaMesas: mesasCargadas.length > 0,
@@ -242,6 +270,7 @@ export async function estadoDelSalon(token: string): Promise<EstadoDelSalon> {
       mozo: nombreDeMozo(c.mozo),
       mia: c.mozoId === mozo.id,
       estado: c.estado,
+      sector: nombreDeSector.get(sectorDeClave.get(claveDeMesa(c.mesa)) ?? "") ?? null,
       abiertaEn: c.abiertaEn.toISOString(),
       productos: c.items.reduce((s, i) => s + i.cantidad, 0),
       rondas: new Set(c.items.map((i) => i.ronda)).size,
@@ -348,6 +377,11 @@ export type DatosEnvio = {
   mesa: string;
   comensales?: number;
   items: LineaDelMozo[];
+  /**
+   * true cuando el mozo está ABRIENDO la mesa (la tocó libre o escribió su número): si ya tiene cuenta abierta el servidor lo
+   * rechaza en vez de sumarle los productos. Con false (o sin esto) es "Agregar pedido" a una cuenta que ya existe.
+   */
+  abrirNueva?: boolean;
 };
 
 export type ResultadoEnvio =
@@ -401,6 +435,7 @@ export async function enviarPedido(token: string, datos: DatosEnvio): Promise<Re
     detalleTecnico: false,
     soloCuentasDelMozoId: local.mozosVenCuentasAjenas ? undefined : mozo.id,
     mesasPermitidas: mesasCargadas.length > 0 ? mesasCargadas.filter((m) => m.activa).map((m) => m.clave) : undefined,
+    soloAbrirNueva: datos.abrirNueva === true,
   });
   if (!r.ok) return r;
 

@@ -25,6 +25,7 @@ import {
   type MesaDelSalon,
   type ReglasDelSalon,
   type ResultadoEnvio,
+  type SectorDelSalon,
 } from "./actions";
 
 type Vista = "salon" | "cuenta" | "productos" | "revision" | "enviado";
@@ -41,6 +42,9 @@ type ItemCarrito = { key: string; nombre: string; precio: number; cantidad: numb
 );
 
 const TODOS = "__todos__";
+/** Las opciones del selector de sectores que no son un sector del dueño. */
+const TODAS_LAS_MESAS = "__todas_las_mesas__";
+const SIN_SECTOR = "__sin_sector__";
 /** Lo que se le dice al mozo cuando la caja ya imprimió la cuenta de la mesa. */
 const MENSAJE_POR_COBRAR = "La caja ya imprimió la cuenta de esa mesa. Pedile que la reabra si querés cargar algo más.";
 // Los mismos chips que el Punto de Venta.
@@ -117,6 +121,9 @@ export function MozoApp({
   const [cuentas, setCuentas] = useState<CuentaAbierta[]>([]);
   // Las mesas que el dueño cargó en Ajustes y las reglas que configuró (vienen del servidor al abrir el salón).
   const [mesas, setMesas] = useState<MesaDelSalon[]>([]);
+  // Los sectores del restaurante y cuál está mirando el mozo (null = todavía no eligió: se muestra el primero).
+  const [sectores, setSectores] = useState<SectorDelSalon[]>([]);
+  const [sectorElegido, setSectorElegido] = useState<string | null>(null);
   const [reglas, setReglas] = useState<ReglasDelSalon>({ usaMesas: false, puedeImprimirCuenta: false, veCuentasAjenas: true });
   const [imprimiendoCuenta, setImprimiendoCuenta] = useState(false);
   const [avisoCuenta, setAvisoCuenta] = useState<string | null>(null);
@@ -127,6 +134,8 @@ export function MozoApp({
   const [mesaTexto, setMesaTexto] = useState("");
   const [comensalesTexto, setComensalesTexto] = useState("");
   const [mesa, setMesa] = useState("");
+  // true mientras se está ABRIENDO la mesa (la tocó libre o escribió su número); false al "Agregar pedido" a una que ya existe.
+  const [abriendoMesa, setAbriendoMesa] = useState(false);
   const [detalle, setDetalle] = useState<DetalleOk | null>(null);
   const [cargandoDetalle, setCargandoDetalle] = useState(false);
 
@@ -156,6 +165,7 @@ export function MozoApp({
       }
       setCuentas(r.cuentas);
       setMesas(r.mesas);
+      setSectores(r.sectores);
       setReglas(r.reglas);
       setImprimiendo(r.imprimiendo);
       setErrorSalon(null);
@@ -184,20 +194,26 @@ export function MozoApp({
       setError("Escribí el número o nombre de la mesa.");
       return;
     }
-    // Si esa mesa ya tiene una cuenta abierta, el pedido se suma a ella.
+    // Si esa mesa ya tiene una cuenta abierta NO se abre otra: se avisa, y para sumarle productos se usa "Agregar pedido".
     const existente = cuentas.find((c) => claveDeMesa(c.mesa) === claveDeMesa(texto));
     if (existente?.estado === "por_cobrar") {
       setError(MENSAJE_POR_COBRAR);
       return;
     }
-    empezarPedido(existente ? existente.mesa : texto);
+    if (existente) {
+      setError(
+        `La mesa ${existente.mesa} ya está abierta (${existente.mia ? "la tenés vos" : `la atiende ${existente.mozo}`}). No se abre otra: tocá “Agregar pedido” en su cuenta, más abajo.`
+      );
+      return;
+    }
+    empezarPedido(texto, true);
   }
 
   /** Se toca una mesa de la lista del dueño: libre abre la cuenta; ocupada lleva a su cuenta si este mozo la puede ver. */
   function tocarMesa(m: MesaDelSalon) {
     setError(null);
     if (m.estado === "libre") {
-      empezarPedido(m.nombre);
+      empezarPedido(m.nombre, true);
       return;
     }
     const cuenta = m.cuentaId ? cuentas.find((c) => c.id === m.cuentaId) : undefined;
@@ -234,8 +250,10 @@ export function MozoApp({
     setImprimiendoCuenta(false);
   }
 
-  function empezarPedido(nombreDeMesa: string) {
+  /** `abrir` es true cuando se está abriendo la mesa; sin eso es "Agregar pedido" a una cuenta que ya existe. */
+  function empezarPedido(nombreDeMesa: string, abrir = false) {
     setMesa(nombreDeMesa);
+    setAbriendoMesa(abrir);
     setCarrito([]);
     setBusqueda("");
     setError(null);
@@ -422,6 +440,7 @@ export function MozoApp({
         envioId,
         mesa,
         comensales: Number.isInteger(comensales) && comensales > 0 ? comensales : undefined,
+        abrirNueva: abriendoMesa,
         items: carrito.map((i) =>
           i.tipo === "combo"
             ? {
@@ -450,12 +469,36 @@ export function MozoApp({
     }
     setEnviado(r);
     setImprimiendo(r.imprimiendo);
+    // La cuenta ya existe: el próximo pedido a esta mesa es "agregar", no "abrir".
+    setAbriendoMesa(false);
     setCarrito([]);
     setComensalesTexto("");
     setMesaTexto("");
     setEnvioId(nuevoEnvioId());
     setVista("enviado");
   }
+
+  // ------------------------------------------------------------- los sectores
+  // Con sectores cargados, el mozo elige primero el sector (o "Todas") y ve solo las mesas que le corresponden.
+  const conSectores = sectores.length > 0;
+  const hayMesasSinSector = mesas.some((m) => !m.sectorId);
+  const opcionesDeSector = [
+    ...sectores.map((s) => ({ id: s.id, nombre: s.nombre })),
+    ...(hayMesasSinSector ? [{ id: SIN_SECTOR, nombre: "Otras mesas" }] : []),
+    { id: TODAS_LAS_MESAS, nombre: "Todas" },
+  ];
+  // Sin haber elegido (o si el elegido ya no existe) se muestra el primer sector.
+  const sectorActivo = opcionesDeSector.some((o) => o.id === sectorElegido)
+    ? (sectorElegido ?? TODAS_LAS_MESAS)
+    : opcionesDeSector[0].id;
+  const mesasDe = (sectorId: string) =>
+    sectorId === TODAS_LAS_MESAS
+      ? mesas
+      : sectorId === SIN_SECTOR
+        ? mesas.filter((m) => !m.sectorId)
+        : mesas.filter((m) => m.sectorId === sectorId);
+  const mesasDelSector = conSectores ? mesasDe(sectorActivo) : mesas;
+  const libresDe = (lista: MesaDelSalon[]) => lista.filter((m) => m.estado === "libre").length;
 
   // ---------------------------------------------------------------- pantallas
   const hayBarraAbajo = vista === "productos" && carrito.length > 0;
@@ -508,7 +551,7 @@ export function MozoApp({
             {reglas.usaMesas ? (
               <section className="rounded-xl border-2 border-azul/50 bg-superficie p-3.5">
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <p className={ROTULO}>1 · Elegí la mesa</p>
+                  <p className={ROTULO}>{conSectores ? "1 · Elegí el sector y la mesa" : "1 · Elegí la mesa"}</p>
                   <div className="w-24">
                     <Entrada
                       type="number"
@@ -522,13 +565,44 @@ export function MozoApp({
                     />
                   </div>
                 </div>
+                {conSectores && mesas.length > 0 && (
+                  <div
+                    role="tablist"
+                    aria-label="Sectores del restaurante"
+                    className="-mx-0.5 mt-2.5 flex gap-2 overflow-x-auto px-0.5 pb-1"
+                  >
+                    {opcionesDeSector.map((o) => {
+                      const activo = o.id === sectorActivo;
+                      const libres = libresDe(mesasDe(o.id));
+                      return (
+                        <button
+                          key={o.id}
+                          type="button"
+                          role="tab"
+                          aria-selected={activo}
+                          onClick={() => setSectorElegido(o.id)}
+                          className={`flex-none rounded-full border px-3.5 py-1.5 text-[0.85rem] font-medium transition-colors ${
+                            activo ? CHIP_ACTIVO : CHIP_INACTIVO
+                          }`}
+                        >
+                          {o.nombre}{" "}
+                          <span className={activo ? "text-white/80" : "text-tinta-suave"}>
+                            {libres} {libres === 1 ? "libre" : "libres"}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
                 {mesas.length === 0 ? (
                   <p className="mt-2 text-[0.82rem] text-tinta-suave">
                     No hay mesas activas para elegir. Avisale al encargado.
                   </p>
+                ) : mesasDelSector.length === 0 ? (
+                  <p className="mt-2 text-[0.82rem] text-tinta-suave">Este sector no tiene mesas para elegir.</p>
                 ) : (
                   <ul className="mt-2.5 grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5">
-                    {mesas.map((m) => (
+                    {mesasDelSector.map((m) => (
                       <li key={m.nombre}>
                         <button
                           type="button"
@@ -614,6 +688,7 @@ export function MozoApp({
                             </Pastilla>
                           )}
                           <p className="text-[0.78rem] text-tinta-media">
+                            {c.sector ? `${c.sector} · ` : ""}
                             {c.mozo} · {hace(c.abiertaEn)}
                           </p>
                         </div>

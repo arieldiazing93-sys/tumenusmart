@@ -41,6 +41,15 @@ export function normalizarMesa(texto: unknown): string | null {
   return limpio;
 }
 
+export const SECTOR_LARGO_MAXIMO = 30;
+
+/** El nombre de un sector del restaurante ("Salón", "Terraza"), limpio y con tope; null si no queda nada o es muy largo. */
+export function normalizarSector(texto: unknown): string | null {
+  const limpio = sinControles(String(texto ?? "")).replace(/\s+/g, " ").trim();
+  if (!limpio || limpio.length > SECTOR_LARGO_MAXIMO) return null;
+  return limpio;
+}
+
 /**
  * La clave con la que se reconoce a una mesa: sin mayúsculas, acentos ni espacios repetidos, para que "Mesa 5", "mesa 5"
  * y "MESA  5" sean la misma mesa y no se puedan abrir dos cuentas a la vez en ella.
