@@ -55,7 +55,7 @@ export function CargarProductosPanel({
   /** La cuenta a la que se le carga. Sin esto, tiene que venir `nuevaCuenta`. */
   cuentaId?: string;
   /** Para abrir la cuenta de una mesa que todavía no la tiene: la mesa, el mozo a cargo (simbólico) y cuántas personas. */
-  nuevaCuenta?: { mesa: string; mozoId: string; mozoNombre: string; comensales: number | null };
+  nuevaCuenta?: { mesa: string; mozoId: string; mozoNombre: string; comensales: number | null; manual?: boolean };
   mesa: string;
   categorias: CategoriaVenta[];
   gruposMitad: GrupoMitadVenta[];
@@ -210,6 +210,7 @@ export function CargarProductosPanel({
           comensales: nuevaCuenta.comensales ?? undefined,
           envioId,
           items,
+          mesaManual: nuevaCuenta.manual === true,
         });
       } else if (cuentaId) {
         r = await cargarProductosCaja(cuentaId, { envioId, items });

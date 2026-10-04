@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Boton, Campo, Entrada, MensajeError, Selector } from "@/components/ui";
+import { Boton, Campo, Entrada, MensajeError, Selector, clasesBoton } from "@/components/ui";
 import { PanelLateral } from "@/components/PanelLateral";
 import { claveDeMesa, normalizarMesa } from "@/lib/comedor";
 import type { ContextoCaja } from "./ComedorCaja";
@@ -37,6 +37,8 @@ export function AbrirCuentaPanel({
   const [paso, setPaso] = useState<"datos" | "productos">("datos");
   const [mesaElegida, setMesaElegida] = useState("");
   const [mesaTexto, setMesaTexto] = useState("");
+  // true cuando la caja escribe la mesa a mano aunque el local tenga mesas cargadas ("mesa auxiliar").
+  const [manual, setManual] = useState(false);
   const [sectorElegido, setSectorElegido] = useState<string | null>(null);
   const [mozoId, setMozoId] = useState(() => {
     try {
@@ -70,7 +72,9 @@ export function AbrirCuentaPanel({
         ? mesas.filter((m) => !m.sectorId)
         : mesas.filter((m) => m.sectorId === sectorActivo);
 
-  const mesa = usaMesas ? mesaElegida : (normalizarMesa(mesaTexto) ?? "");
+  // Se escribe a mano si el local no cargó mesas, o si la caja eligió "otra mesa" (una auxiliar o el nombre de un cliente).
+  const escribe = !usaMesas || manual;
+  const mesa = escribe ? (normalizarMesa(mesaTexto) ?? "") : mesaElegida;
   const mozoNombre = mozos.find((m) => m.id === mozoId)?.nombre ?? "";
   const comensales = (() => {
     const n = Number(personas);
@@ -79,7 +83,11 @@ export function AbrirCuentaPanel({
 
   function continuar() {
     if (!mesa) {
-      setError(usaMesas ? "Elegí la mesa." : "Escribí el número o nombre de la mesa (hasta 20 letras).");
+      setError(
+        escribe
+          ? "Escribí el número de mesa o el nombre del cliente (hasta 20 letras)."
+          : "Elegí la mesa."
+      );
       return;
     }
     if (mesasOcupadas.some((o) => claveDeMesa(o) === claveDeMesa(mesa))) {
@@ -103,7 +111,7 @@ export function AbrirCuentaPanel({
   if (paso === "productos") {
     return (
       <CargarProductosPanel
-        nuevaCuenta={{ mesa, mozoId, mozoNombre, comensales }}
+        nuevaCuenta={{ mesa, mozoId, mozoNombre, comensales, manual: usaMesas && manual }}
         mesa={mesa}
         categorias={contexto.categorias}
         gruposMitad={contexto.gruposMitad}
@@ -121,7 +129,7 @@ export function AbrirCuentaPanel({
         <div className="flex flex-1 flex-col gap-4 overflow-y-auto px-4 py-4">
           <section>
             <p className={ROTULO}>1 · La mesa</p>
-            {usaMesas ? (
+            {!escribe ? (
               <>
                 {conSectores && (
                   <div role="tablist" aria-label="Sectores del restaurante" className="-mx-0.5 mt-2 flex gap-2 overflow-x-auto px-0.5 pb-1">
@@ -187,13 +195,45 @@ export function AbrirCuentaPanel({
                     setError(null);
                   }}
                   maxLength={20}
-                  placeholder="Mesa (ej: 5 o Terraza 2)"
-                  aria-label="Número o nombre de la mesa"
+                  placeholder={usaMesas ? "Mesa o nombre del cliente (ej: Barra, Sr. Gómez)" : "Mesa (ej: 5 o Terraza 2)"}
+                  aria-label="Número de mesa o nombre del cliente"
                   autoFocus
                 />
                 <p className="mt-1 text-[0.76rem] text-tinta-suave">
-                  El local todavía no cargó sus mesas: escribila. (Se cargan en Ajustes → Configuración servicio comedor.)
+                  {usaMesas
+                    ? "Para una mesa que no está en el mapa, o para un cliente que pide en la barra. Hasta 20 letras."
+                    : "El local todavía no cargó sus mesas: escribila. (Las carga el encargado en Ajustes.)"}
                 </p>
+              </div>
+            )}
+
+            {/* La mesa auxiliar: con las mesas del local cargadas, la caja igual puede escribir una a mano. */}
+            {usaMesas && (
+              <div className="mt-2">
+                {manual ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setManual(false);
+                      setError(null);
+                    }}
+                    className={clasesBoton("suave", "sm")}
+                  >
+                    ← Volver a elegir de las mesas
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setManual(true);
+                      setMesaElegida("");
+                      setError(null);
+                    }}
+                    className="flex w-full items-center justify-center rounded-xl border-2 border-dashed border-azul/50 bg-white px-3 py-2.5 text-[0.85rem] font-semibold text-azul-oscuro transition-colors hover:bg-azul-luz"
+                  >
+                    + Otra mesa (escribir a mano)
+                  </button>
+                )}
               </div>
             )}
           </section>

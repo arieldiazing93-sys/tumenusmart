@@ -546,6 +546,11 @@ export async function abrirCuentaEnCaja(datos: {
   comensales?: number;
   envioId: string;
   items: LineaDeRonda[];
+  /**
+   * La caja escribió la mesa a mano ("mesa auxiliar": una que no está en el mapa, o el nombre de un cliente que pide en la
+   * barra). Solo la caja puede: el mozo, aunque el local tenga mesas cargadas, sigue limitado a las de la lista.
+   */
+  mesaManual?: boolean;
 }): Promise<ResultadoAbrirCuenta> {
   const sesion = await exigirPermiso("comedor.gestionar");
   const storeId = await idLocalActual();
@@ -564,6 +569,7 @@ export async function abrirCuentaEnCaja(datos: {
 
   const comensales =
     Number.isInteger(datos?.comensales) && datos.comensales! >= 1 && datos.comensales! <= 99 ? datos.comensales! : null;
+  const manual = datos?.mesaManual === true;
   const mesasCargadas = await db.mesaComedor.findMany({ select: { clave: true, activa: true } });
 
   const r = await guardarRonda({
@@ -576,7 +582,9 @@ export async function abrirCuentaEnCaja(datos: {
     quien: `Caja - ${quien}`,
     cargadoPor: quien,
     detalleTecnico: true,
-    mesasPermitidas: mesasCargadas.length > 0 ? mesasCargadas.filter((m) => m.activa).map((m) => m.clave) : undefined,
+    // Con la mesa escrita a mano no se exige que esté en la lista (la caja puede); si no, rige la lista del local.
+    mesasPermitidas:
+      !manual && mesasCargadas.length > 0 ? mesasCargadas.filter((m) => m.activa).map((m) => m.clave) : undefined,
     soloAbrirNueva: true,
   });
   if (!r.ok) return r;
@@ -586,10 +594,10 @@ export async function abrirCuentaEnCaja(datos: {
     await registrarBitacora(storeId, sesion, {
       modulo: "comedor",
       accion: "cuenta_abierta_en_caja",
-      descripcion: `Abrió desde la caja la cuenta ${formatearNumero(r.cuentaNumero)} de la mesa ${r.mesa}, a cargo de ${aCargoDe}, y cargó el pedido 1 (${formatearGuarani(r.totalEnvio)}).`,
+      descripcion: `Abrió desde la caja la cuenta ${formatearNumero(r.cuentaNumero)} de la mesa ${r.mesa}${manual ? " (mesa escrita a mano)" : ""}, a cargo de ${aCargoDe}, y cargó el pedido 1 (${formatearGuarani(r.totalEnvio)}).`,
       entidad: "CuentaMesa",
       entidadId: r.cuentaId,
-      detalle: { cuenta: r.cuentaNumero, mesa: r.mesa, mozo: aCargoDe, total: r.totalEnvio },
+      detalle: { cuenta: r.cuentaNumero, mesa: r.mesa, mozo: aCargoDe, total: r.totalEnvio, mesaManual: manual },
     });
   }
   refrescar();
