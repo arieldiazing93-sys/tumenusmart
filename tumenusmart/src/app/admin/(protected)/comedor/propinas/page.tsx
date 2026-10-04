@@ -137,6 +137,18 @@ export default async function PropinasPage() {
     motivoNoPuede = "No hay un turno de caja abierto en esta estación. Abrilo en Punto de venta: el pago de propinas sale de la caja.";
   }
 
+  // La impresora del ticket de esta estación: ahí sale el comprobante del pago (el mozo lo firma). Sin ella no se imprime solo.
+  let nombreImpresoraTicket: string | null = null;
+  if (estacion) {
+    const datos = await db.estacion.findUnique({
+      where: { id: estacion.id },
+      select: { areaTicketId: true, impresoras: { select: { areaImpresionId: true, nombreImpresora: true } } },
+    });
+    nombreImpresoraTicket = datos?.areaTicketId
+      ? (datos.impresoras.find((i) => i.areaImpresionId === datos.areaTicketId)?.nombreImpresora ?? null)
+      : null;
+  }
+
   return (
     <div className="flex flex-col gap-4">
       <Cabecera
@@ -149,6 +161,7 @@ export default async function PropinasPage() {
         pagos={pagos}
         puedePagar={motivoNoPuede === null}
         motivoNoPuede={motivoNoPuede}
+        nombreImpresoraTicket={nombreImpresoraTicket}
       />
     </div>
   );

@@ -20,7 +20,9 @@ import { turnoAbierto } from "../../pos/turno-actual";
  * de la sesión y deja su rastro en la Bitácora. Devuelven un resultado en vez de lanzar, para poder decir por qué no se pudo.
  */
 
-export type ResultadoPropina = { ok: true; mensaje?: string } | { ok: false; error: string };
+export type ResultadoPropina =
+  | { ok: true; mensaje?: string; /** El retiro de caja de un pago de propinas: con él se imprime el comprobante. */ movimientoId?: string }
+  | { ok: false; error: string };
 
 const OPCIONES_TX = { timeout: 15_000, maxWait: 10_000 } as const;
 
@@ -111,7 +113,11 @@ export async function pagarPropinasDeMozo(mozoId: string, totalMostrado: number)
     detalle: { mozo: nombreMozo, total: resumen.total, propinas: resumen.cantidad },
   });
   refrescar();
-  return { ok: true, mensaje: `Le pagaste ${formatearGuarani(resumen.total)} a ${nombreMozo}. Quedó como retiro de caja en el turno abierto.` };
+  return {
+    ok: true,
+    mensaje: `Le pagaste ${formatearGuarani(resumen.total)} a ${nombreMozo}. Quedó como retiro de caja en el turno abierto.`,
+    movimientoId: resumen.movimientoId,
+  };
 }
 
 /**

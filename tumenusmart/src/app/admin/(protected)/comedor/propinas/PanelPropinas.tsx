@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Entrada, MensajeError, Pastilla, Tarjeta, Vacio, clasesBoton } from "@/components/ui";
 import { formatearGuarani } from "@/lib/format";
 import { etiquetaFormaPropina } from "@/lib/propinas";
+import { imprimirComprobante, type ResultadoImpresion } from "@/lib/impresion-comprobantes";
 import { anularPropina, deshacerPagoDePropinas, pagarPropinasDeMozo, type ResultadoPropina } from "./actions";
 
 export type MozoConPropinas = { mozoId: string; nombre: string; cantidad: number; total: number };
@@ -42,6 +43,20 @@ const ESTADO: Record<string, { texto: string; color: "amarillo" | "exito" | "pel
 
 const ROTULO = "text-[0.72rem] font-semibold uppercase tracking-rotulo text-tinta-suave";
 
+/** Lo que se le dice a la persona sobre el comprobante del pago (que sale solo en la impresora del ticket de esta estación). */
+function textoDelComprobante(r: ResultadoImpresion): string {
+  if (r.ok) return "El comprobante salió en la impresora para que el mozo firme.";
+  if (r.motivo === "sin_impresora") {
+    return "Esta estación no tiene impresora asignada al ticket, así que no se imprimió el comprobante (se puede reimprimir desde “Pagos a los mozos”).";
+  }
+  if (r.motivo === "sin_qz") {
+    return "No se pudo imprimir el comprobante: QZ Tray no está conectado en esta computadora (se puede reimprimir desde “Pagos a los mozos”).";
+  }
+  return "No se pudo imprimir el comprobante (se puede reimprimir desde “Pagos a los mozos”).";
+}
+
+const urlDelComprobante = (movimientoId: string) => `/admin/comedor/propinas/pago/${movimientoId}/crudo`;
+
 /**
  * Las propinas de los mozos: lo que se le debe a cada uno (con tarjeta o transferencia; la de efectivo no se carga), el botón para
  * pagárselas desde la caja (queda como retiro de caja en el turno abierto), los pagos ya hechos (que se pueden deshacer mientras el
@@ -53,6 +68,7 @@ export function PanelPropinas({
   pagos,
   puedePagar,
   motivoNoPuede,
+  nombreImpresoraTicket,
 }: {
   mozos: MozoConPropinas[];
   propinas: PropinaFila[];
@@ -60,6 +76,8 @@ export function PanelPropinas({
   /** Si desde esta computadora se puede pagar (estación con turno abierto y permiso de vender). */
   puedePagar: boolean;
   motivoNoPuede: string | null;
+  /** La impresora del ticket de esta estación (donde sale el comprobante del pago), o null si no tiene. */
+  nombreImpresoraTicket: string | null;
 }) {
   const router = useRouter();
   const [pendiente, iniciar] = useTransition();
@@ -88,9 +106,44 @@ export function PanelPropinas({
     });
   }
 
+  /** Le paga al mozo y, si salió bien, imprime el comprobante para que firme (si esta estación tiene impresora del ticket). */
+  function pagar(mozoId: string, totalMostrado: number) {
+    setError(null);
+    setAviso(null);
+    iniciar(async () => {
+      try {
+        const r = await pagarPropinasDeMozo(mozoId, totalMostrado);
+        if (!r.ok) {
+          setError(r.error);
+          return;
+        }
+        let texto = r.mensaje ?? "";
+        if (r.movimientoId) {
+          const impresion = await imprimirComprobante(urlDelComprobante(r.movimientoId), nombreImpresoraTicket);
+          texto = `${texto} ${textoDelComprobante(impresion)}`.trim();
+        }
+        setAviso(texto);
+        router.refresh();
+      } catch {
+        setError("No se pudo completar la acción. Revisá la conexión y probá de nuevo.");
+      }
+    });
+  }
+
+  /** Vuelve a imprimir el comprobante de un pago ya hecho. */
+  function reimprimir(movimientoId: string) {
+    setError(null);
+    setAviso(null);
+    iniciar(async () => {
+      const impresion = await imprimirComprobante(urlDelComprobante(movimientoId), nombreImpresoraTicket);
+      if (impresion.ok) setAviso("El comprobante salió en la impresora.");
+      else setError(textoDelComprobante(impresion));
+    });
+  }
+
   return (
     <div className="flex flex-col gap-5">
-      {aviso && <p className="rounded-lg bg-exito-luz px-3 py-2 text-[0.84rem] font-medium text-exito">{aviso}</p>}
+      {aviso &&<p className="rounded-lg bg-exito-luz px-3 py-2 text-[0.84rem] font-medium text-exito">{aviso}</p>}
       {error && <MensajeError>{error}</MensajeError>}
 
       {/* ------------------------------------------------------------------- lo que se le debe a cada mozo */}
@@ -126,7 +179,7 @@ export function PanelPropinas({
                       return;
                     }
                     // Se paga todo lo pendiente; el monto que se vio viaja para que el servidor avise si cambió.
-                    ejecutar(() => pagarPropinasDeMozo(m.mozoId, m.total));
+                    pagar(m.mozoId, m.total);
                   }}
                   className={clasesBoton("principal", "md")}
                 >
@@ -155,6 +208,15 @@ export function PanelPropinas({
                     {p.fecha} · pagó {p.pagadoPor} · retiro de caja
                   </span>
                 </p>
+                <div className="flex flex-none flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    disabled={pendiente}
+                    onClick={() => reimprimir(p.movimientoId)}
+                    className={clasesBoton("navegar", "sm")}
+                  >
+                    Imprimir comprobante
+                  </button>
                 {p.sePuedeDeshacer && (
                   <button
                     type="button"
@@ -174,6 +236,7 @@ export function PanelPropinas({
                     Deshacer pago
                   </button>
                 )}
+                </div>
               </li>
             ))}
           </ul>

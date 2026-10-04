@@ -10,7 +10,10 @@ export type ResultadoImpresion =
 
 /** Las copias que el servidor dice que salen (cabecera `X-Copias`): de 0 a 9; si falta o es rara, una (lo normal). */
 function copiasDeLaRespuesta(r: Response): number {
-  const n = Number(r.headers.get("X-Copias"));
+  const crudo = r.headers.get("X-Copias");
+  // Sin la cabecera (una ruta que no la manda) es una copia: `Number(null)` daría 0 y no saldría nada.
+  if (crudo === null) return 1;
+  const n = Number(crudo);
   return Number.isInteger(n) && n >= 0 && n <= 9 ? n : 1;
 }
 
