@@ -21,18 +21,23 @@ const ANCHOS = {
   normal: "sm:max-w-[26rem]",
   // Para los paneles con más contenido, como el detalle de una cita que también cobra.
   ancho: "sm:max-w-[31rem]",
+  // Para elegir entre muchas tarjetas, como la carta de productos al cargar una mesa: entran tres columnas.
+  amplio: "sm:max-w-[46rem]",
 } as const;
 
 export function PanelLateral({
   titulo,
   onCerrar,
   ancho = "normal",
+  compacto = false,
   encabezado,
   children,
 }: {
   titulo: string;
   onCerrar: () => void;
   ancho?: keyof typeof ANCHOS;
+  /** La barra de arriba más baja y con letra más chica, para dejarle más lugar al contenido. */
+  compacto?: boolean;
   /**
    * Lo que va en la barra de arriba en lugar del título (por ejemplo unas pestañas), para no gastar
    * una fila más. Tiene que ocupar el alto de la barra: la X queda a la derecha. `titulo` sigue
@@ -78,18 +83,24 @@ export function PanelLateral({
         className={`absolute inset-y-0 right-0 flex w-full animate-[entrarDerecha_0.2s_ease-out] flex-col bg-superficie shadow-alta sm:border-l sm:border-linea ${ANCHOS[ancho]}`}
       >
         <div
-          className={`flex flex-none justify-between border-b border-linea px-5 ${
-            encabezado ? "items-stretch" : "items-center py-4"
+          className={`flex flex-none justify-between border-b border-linea ${compacto ? "px-4" : "px-5"} ${
+            encabezado ? "items-stretch" : compacto ? "items-center py-1.5" : "items-center py-4"
           }`}
         >
-          {encabezado ?? <h2 className="text-[1.05rem] font-semibold tracking-titular text-tinta">{titulo}</h2>}
+          {encabezado ?? (
+            <h2
+              className={`font-semibold tracking-titular text-tinta ${compacto ? "truncate text-[0.95rem]" : "text-[1.05rem]"}`}
+            >
+              {titulo}
+            </h2>
+          )}
           <button
             type="button"
             onClick={onCerrar}
             aria-label="Cerrar"
-            className={`flex h-9 w-9 flex-none items-center justify-center rounded-lg text-tinta-media transition-colors hover:bg-papel-hundido hover:text-tinta ${
-              encabezado ? "self-center" : ""
-            }`}
+            className={`flex flex-none items-center justify-center rounded-lg text-tinta-media transition-colors hover:bg-papel-hundido hover:text-tinta ${
+              compacto ? "h-8 w-8" : "h-9 w-9"
+            } ${encabezado ? "self-center" : ""}`}
           >
             <svg
               viewBox="0 0 24 24"

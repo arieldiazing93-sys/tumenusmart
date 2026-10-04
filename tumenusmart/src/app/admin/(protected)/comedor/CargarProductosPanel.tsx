@@ -235,33 +235,39 @@ export function CargarProductosPanel({
 
   return (
     <PanelLateral
-      titulo={nuevaCuenta ? `Abrir la cuenta de la mesa ${mesa}` : `Cargar productos a la mesa ${mesa}`}
+      // El título lleva todo lo que importa en UNA línea (mesa y mozo a cargo) y la barra va compacta, para dejarle el lugar a
+      // los productos.
+      titulo={
+        nuevaCuenta
+          ? `Abrir cuenta · Mesa ${mesa} · ${nuevaCuenta.mozoNombre}`
+          : `Cargar productos · Mesa ${mesa}`
+      }
       // Escape cierra el selector de agregados si está abierto, no este panel.
       onCerrar={() => {
         if (!productoEligiendo) onCerrar();
       }}
-      ancho="ancho"
+      ancho="amplio"
+      compacto
     >
       <div className="flex min-h-0 flex-1 flex-col">
-        <div className="flex flex-1 flex-col gap-3 overflow-y-auto px-4 py-4">
-          <p className="text-[0.72rem] font-semibold uppercase tracking-rotulo text-tinta-suave">
-            Mesa {mesa}
-            {nuevaCuenta ? ` · a cargo de ${nuevaCuenta.mozoNombre}` : ""} · lo que cargues sale a cocina
-          </p>
+        <div className="flex flex-1 flex-col gap-2 overflow-y-auto px-3 py-2.5">
           <Entrada
             type="search"
             value={busqueda}
             onChange={(e) => setBusqueda(e.target.value)}
             placeholder="Buscar producto"
             aria-label="Buscar producto"
+            className="!py-1.5"
           />
 
+          {/* Las pastillas de grupo se acomodan en hasta DOS filas (en vez de una sola fila que se corre hacia el costado);
+              si hay más grupos de los que entran, esa zona se desliza hacia abajo. */}
           {!textoBusqueda && (
-            <div className="-mx-0.5 flex gap-2 overflow-x-auto px-0.5 pb-1">
+            <div className="flex max-h-[4.4rem] flex-none flex-wrap content-start gap-1.5 overflow-y-auto pb-0.5">
               <button
                 type="button"
                 onClick={() => setCategoriaId(TODOS)}
-                className={`flex-none rounded-full border px-3.5 py-1.5 text-[0.85rem] font-medium transition-colors ${
+                className={`rounded-full border px-3 py-1 text-[0.8rem] font-medium transition-colors ${
                   categoriaId === TODOS ? CHIP_ACTIVO : CHIP_INACTIVO
                 }`}
               >
@@ -272,7 +278,7 @@ export function CargarProductosPanel({
                   key={c.id}
                   type="button"
                   onClick={() => setCategoriaId(c.id)}
-                  className={`flex-none rounded-full border px-3.5 py-1.5 text-[0.85rem] font-medium transition-colors ${
+                  className={`rounded-full border px-3 py-1 text-[0.8rem] font-medium transition-colors ${
                     c.id === categoriaId ? CHIP_ACTIVO : CHIP_INACTIVO
                   }`}
                 >
@@ -287,7 +293,7 @@ export function CargarProductosPanel({
             <MitadYMitadPickerPos key={g.nombreVisible} grupoNombre={g.nombreVisible} productos={g.productos} onAgregar={agregarCombo} />
           ))}
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
             {productosVisibles.map((p) => {
               const enCarrito = cantidadesPorProducto.get(p.id) ?? 0;
               return (
@@ -295,7 +301,7 @@ export function CargarProductosPanel({
                   key={p.id}
                   type="button"
                   onClick={() => agregarProducto(p)}
-                  className={`relative flex flex-col rounded-xl border p-3 text-left shadow-sm transition-all active:scale-[0.96] ${
+                  className={`relative flex flex-col rounded-xl border p-2.5 text-left shadow-sm transition-all active:scale-[0.96] ${
                     enCarrito > 0
                       ? "border-brand/50 bg-brand-light ring-1 ring-brand/20"
                       : "border-linea bg-brand-light/40 hover:-translate-y-0.5 hover:border-brand/40 hover:bg-brand-light/70"
@@ -323,7 +329,7 @@ export function CargarProductosPanel({
         </div>
 
         {/* ---------------------------------------------------------- lo cargado, siempre a la vista */}
-        <div className="flex flex-none flex-col gap-2 border-t border-linea bg-superficie px-4 py-3">
+        <div className="flex flex-none flex-col gap-1.5 border-t border-linea bg-superficie px-3 py-2">
           {carrito.length > 0 && (
             <ul className="flex max-h-44 flex-col gap-2 overflow-y-auto">
               {carrito.map((i) => (

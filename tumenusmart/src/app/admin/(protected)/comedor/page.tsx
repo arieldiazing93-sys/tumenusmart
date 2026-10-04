@@ -206,11 +206,8 @@ export default async function ComedorPage() {
                 Impresión automática
               </BotonEnlace>
             )}
-            {puede(sesion.rol, "comedor.configurar") && (
-              <BotonEnlace href="/admin/comedor/mozos" tono="navegar" tam="md">
-                Configuración del comedor
-              </BotonEnlace>
-            )}
+            {/* Sin acceso directo a la configuración del comedor: es de administración y se llega desde Ajustes, no desde la
+                pantalla donde trabaja el personal. */}
           </>
         }
       />

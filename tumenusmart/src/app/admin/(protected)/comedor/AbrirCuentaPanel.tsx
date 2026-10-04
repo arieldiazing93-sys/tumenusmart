@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Boton, BotonEnlace, Campo, Entrada, MensajeError, Selector } from "@/components/ui";
+import { Boton, Campo, Entrada, MensajeError, Selector } from "@/components/ui";
 import { PanelLateral } from "@/components/PanelLateral";
 import { claveDeMesa, normalizarMesa } from "@/lib/comedor";
 import type { ContextoCaja } from "./ComedorCaja";
@@ -201,13 +201,11 @@ export function AbrirCuentaPanel({
           <section>
             <p className={ROTULO}>2 · El mozo a cargo</p>
             {mozos.length === 0 ? (
-              <div className="mt-2 flex flex-col gap-2 rounded-lg border border-amarillo/60 bg-amarillo-luz p-3 text-[0.82rem] text-amarillo-oscuro">
-                <p>No hay mozos activos. Para abrir una cuenta hace falta al menos uno: crealo en la configuración del comedor.</p>
-                <div>
-                  <BotonEnlace href="/admin/comedor/mozos" tono="navegar" tam="sm">
-                    Ir a Mozos
-                  </BotonEnlace>
-                </div>
+              <div className="mt-2 rounded-lg border border-amarillo/60 bg-amarillo-luz p-3 text-[0.82rem] text-amarillo-oscuro">
+                <p>
+                  No hay mozos activos. Para abrir una cuenta hace falta al menos uno: pedile al encargado que lo cree en
+                  Ajustes → Configuración servicio comedor → Mozos.
+                </p>
               </div>
             ) : (
               <div className="mt-2 flex flex-col gap-1.5">
