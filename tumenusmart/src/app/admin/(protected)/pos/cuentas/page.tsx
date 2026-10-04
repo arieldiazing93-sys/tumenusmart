@@ -309,7 +309,8 @@ export default async function CuentasPosPage({
                   </Link>
                   {v.nota?.startsWith("Mesa ") && (
                     <span className="mt-0.5 block text-[10px] font-medium uppercase text-tinta-suave">
-                      {v.nota.split(" · ")[0]}
+                      {/* "Mesa 1 · Cuenta de mesa #0004": la venta tiene su número (el de arriba) y acá se ve de qué cuenta de mesa salió. */}
+                      {v.nota.replace(" · Cuenta #", " · Cuenta de mesa #")}
                     </span>
                   )}
                   {v.comprobanteTipo === "factura" && v.facturaNumero && (
