@@ -20,10 +20,11 @@ import {
 
 /**
  * El amarillo de "asignar" (el mismo del repartidor en Pedidos): todo desplegable de sector va así, para que se vea de un
- * vistazo en qué sector quedan las mesas. El `!` le gana al borde y al fondo comunes de los campos.
+ * vistazo en qué sector quedan las mesas. El `!` le gana al borde y al fondo comunes de los campos. Es CORTO a propósito:
+ * `!w-auto` le saca el ancho completo que traen los campos y mide lo que dice su texto (con un mínimo y un tope).
  */
 const CAMPO_SECTOR =
-  "!border-2 !border-amarillo !bg-amarillo-campo font-semibold !text-tinta focus:!border-amarillo focus:!ring-amarillo/40";
+  "!w-auto min-w-[9rem] max-w-full !border-2 !border-amarillo !bg-amarillo-campo !py-1.5 font-semibold !text-tinta focus:!border-amarillo focus:!ring-amarillo/40";
 
 type SectorFila = { id: string; nombre: string };
 type MesaFila = { id: string; nombre: string; activa: boolean; sectorId: string | null };
@@ -187,7 +188,7 @@ export function GestorMesas({
                   value={m.sectorId ?? ""}
                   disabled={pendiente}
                   onChange={(e) => ejecutar(() => moverMesaASector(m.id, e.target.value || null))}
-                  className={`flex-1 ${CAMPO_SECTOR}`}
+                  className={CAMPO_SECTOR}
                 >
                   <option value="">Sin sector</option>
                   {sectores.map((s) => (
@@ -380,7 +381,7 @@ export function GestorMesas({
           </p>
           <div className="mt-3 flex flex-wrap items-end gap-2">
             {sectores.length > 0 && (
-              <div className="min-w-[8rem] flex-1">
+              <div>
                 <Campo etiqueta="Sector" ayuda="Acá quedan las mesas">
                   <Selector value={sectorDelRango} onChange={(e) => setSectorRango(e.target.value)} className={CAMPO_SECTOR}>
                     <option value="">Sin sector</option>
@@ -467,7 +468,7 @@ export function GestorMesas({
               </Campo>
             </div>
             {sectores.length > 0 && (
-              <div className="min-w-[8rem]">
+              <div>
                 <Campo etiqueta="Sector" ayuda="Acá queda la mesa">
                   <Selector value={sectorDeLaNueva} onChange={(e) => setSectorNueva(e.target.value)} className={CAMPO_SECTOR}>
                     <option value="">Sin sector</option>
@@ -522,7 +523,7 @@ export function GestorMesas({
                 sector”. También podés cambiar el sector de una sola mesa con su desplegable “Sector”.
               </p>
               <div className="flex flex-wrap items-end gap-2">
-                <div className="min-w-[9rem] flex-1">
+                <div>
                   <Campo etiqueta="Pasar las marcadas a">
                     <Selector value={sectorDelMasivo} onChange={(e) => setSectorMasivo(e.target.value)} className={CAMPO_SECTOR}>
                       <option value="">Sin sector</option>
