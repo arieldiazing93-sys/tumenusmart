@@ -56,6 +56,9 @@ function armarGrupos(hayIdeaSinVer: boolean, rol: string, ventasACredito: boolea
             // La pantalla que la caja deja abierta para que salgan solas las comandas de los mozos.
             { href: "/admin/impresion", label: "Impresión automática", icono: "pos" as const,
               ver: conPermiso("comedor.gestionar") },
+            // Las propinas que los clientes dejan con tarjeta o transferencia: se acumulan por mozo y se les pagan desde la caja.
+            { href: "/admin/comedor/propinas", label: "Propinas", icono: "usuarios" as const,
+              ver: conPermiso("comedor.gestionar") },
           ] },
         // Los pedidos de la carta (online, por teléfono): con su propio historial.
         { href: "/admin/pedidos", label: "Pedidos", icono: "pedidos" as const,

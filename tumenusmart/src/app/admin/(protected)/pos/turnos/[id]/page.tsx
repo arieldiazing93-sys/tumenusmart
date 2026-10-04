@@ -215,11 +215,22 @@ export default async function ComprobanteTurnoPosPage({
   // Ventas a crédito del turno: se vendieron pero no entraron plata (no cuentan en el corte).
   const ventasACredito = turno.ventas.filter((v) => !v.cancelada && esVentaACredito(v.formaPago));
   const totalVentasACredito = ventasACredito.reduce((s, v) => s + Number(v.total), 0);
+  // Las propinas que los clientes dejaron con tarjeta o transferencia en este turno (Servicio comedor): no son ventas, pero
+  // entran por la terminal de tarjetas o a la cuenta, así que el lote que el cajero declara las incluye. Sin sumarlas acá, el
+  // declarado se vería como un sobrante que nunca existió. (Las anuladas no entraron: no cuentan.)
+  const propinasDelTurno = await db.propinaMozo.groupBy({
+    by: ["forma"],
+    where: { turnoPosId: turno.id, estado: { in: ["pendiente", "pagada"] } },
+    _sum: { monto: true },
+    _count: { _all: true },
+  });
+  const propinaPorForma = (forma: string) => Number(propinasDelTurno.find((p) => p.forma === forma)?._sum.monto ?? 0);
+  const totalPropinasDelTurno = propinasDelTurno.reduce((s, p) => s + Number(p._sum.monto ?? 0), 0);
   const calculado: Record<FormaPagoPos, number> = {
     efectivo: calculadoBase.efectivo + totalRendicionesEfectivo + montoInicial + movimientosNeto,
-    transferencia: calculadoBase.transferencia + totalRendicionesTransferencia,
-    tarjeta_debito: calculadoBase.tarjeta_debito + totalRendicionesTarjetaDebito,
-    tarjeta_credito: calculadoBase.tarjeta_credito + totalRendicionesTarjetaCredito,
+    transferencia: calculadoBase.transferencia + totalRendicionesTransferencia + propinaPorForma("transferencia"),
+    tarjeta_debito: calculadoBase.tarjeta_debito + totalRendicionesTarjetaDebito + propinaPorForma("tarjeta_debito"),
+    tarjeta_credito: calculadoBase.tarjeta_credito + totalRendicionesTarjetaCredito + propinaPorForma("tarjeta_credito"),
   };
 
   const totalCalculadoCongelado =
@@ -393,6 +404,13 @@ export default async function ComprobanteTurnoPosPage({
             <p className="mt-1 text-[0.78rem] text-tinta-suave">
               El Efectivo también suma los ingresos de caja ({formatearGuarani(totalIngresosCaja)}) y resta los
               retiros ({formatearGuarani(totalRetirosCaja)}) de este turno — el detalle está más abajo.
+            </p>
+          )}
+          {totalPropinasDelTurno > 0 && (
+            <p className="mt-1 text-[0.78rem] text-tinta-suave">
+              Las tarjetas y la transferencia de acá arriba incluyen {formatearGuarani(totalPropinasDelTurno)} de propinas de
+              los mozos cobradas en este turno: no son ventas, pero entran por la terminal o la cuenta. Se les pagan en
+              efectivo desde Servicio comedor → Propinas (queda como retiro de caja).
             </p>
           )}
           {ventasACredito.length > 0 && (

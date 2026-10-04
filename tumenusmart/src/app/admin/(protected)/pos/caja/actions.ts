@@ -147,6 +147,15 @@ export async function eliminarMovimientoCaja(movimientoId: string): Promise<Resu
       error: "Este ingreso es el cobro de una venta a crédito: eliminá el cobro desde Cuentas por cobrar.",
     };
   }
+  // El retiro con el que se le pagaron las propinas a un mozo no se borra a mano: las propinas quedarían pagadas sin retiro.
+  // Se deshace desde Servicio comedor → Propinas, que las vuelve a dejar pendientes.
+  const esPagoDePropinas = await db.propinaMozo.count({ where: { pagoMovimientoId: movimientoId } });
+  if (esPagoDePropinas > 0) {
+    return {
+      ok: false,
+      error: "Este retiro es un pago de propinas a un mozo: deshacelo desde Servicio comedor → Propinas.",
+    };
+  }
 
   await db.movimientoCaja.delete({ where: { id: movimientoId } });
 

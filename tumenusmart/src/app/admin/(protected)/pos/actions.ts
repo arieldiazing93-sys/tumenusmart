@@ -1116,6 +1116,13 @@ export async function cancelarVenta(ventaId: string, motivo: string): Promise<Re
       });
     }
 
+    // La propina que se cargó con esta venta (tarjeta o transferencia) ya no corresponde si se cancela el cobro: si todavía está
+    // pendiente de pagarle al mozo, se anula. Una que ya se le pagó no se toca (el retiro de caja ya salió): se ve en Propinas.
+    await tx.propinaMozo.updateMany({
+      where: { storeId, ventaPosId: ventaId, estado: "pendiente" },
+      data: { estado: "anulada", motivoAnulacion: `Cobro cancelado: ${motivo.trim() || "sin motivo"}` },
+    });
+
     // Una venta del mostrador que se le asignó a alguien del personal creó su propia cita (ya
     // cobrada): si la venta se cancela, esa cita no tiene sentido y se borra.
     await tx.cita.deleteMany({ where: { storeId, ventaPosId: ventaId, origen: "mostrador" } });

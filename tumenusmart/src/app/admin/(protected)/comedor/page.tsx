@@ -64,6 +64,7 @@ export default async function ComedorPage() {
       mesa: c.mesa,
       estado: c.estado,
       mozo: nombre(c.mozo),
+      mozoId: c.mozoId,
       abiertaEn: c.abiertaEn.toISOString(),
       comensales: c.comensales,
       impresaEn: c.impresaEn ? c.impresaEn.toISOString() : null,

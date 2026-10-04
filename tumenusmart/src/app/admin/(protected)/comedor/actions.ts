@@ -36,6 +36,7 @@ import {
   type LineaDeRonda,
 } from "@/lib/comedor-servidor";
 import { turnoAbierto } from "../pos/turno-actual";
+import { etiquetaFormaPropina, validarPropina, type DatosPropina, type PropinaValida } from "@/lib/propinas";
 
 /**
  * Lo que la CAJA hace con la cuenta de una mesa desde el panel (Servicio comedor): cargar productos, cancelar uno o toda la
@@ -635,6 +636,11 @@ export type DatosCobroCuenta = {
    * avisar si la cuenta cambió mientras se cobraba (el mozo agregó algo) en vez de cobrar un monto distinto del que se vio.
    */
   totalMostrado?: number;
+  /**
+   * La propina que el cliente dejó con tarjeta o transferencia (la de efectivo no se carga). NO es parte de la venta ni de su
+   * total: se anota aparte, a nombre del mozo que corresponda, y el negocio se la paga después desde la caja (ver Propinas).
+   */
+  propina?: DatosPropina;
 };
 
 export type ResultadoPagoCuenta = { ok: true; ventaId: string; total: number } | { ok: false; error: string };
@@ -743,6 +749,22 @@ export async function pagarCuenta(cuentaId: string, datos: DatosCobroCuenta): Pr
       ok: false,
       error: `La cuenta cambió mientras la cobrabas: ahora es de ${formatearGuarani(total)}. Cerrá este cuadro y volvé a abrir el cobro.`,
     };
+  }
+
+  // La propina (si el cliente dejó una con tarjeta o transferencia): se comprueba acá, antes de tocar nada, y el mozo tiene que
+  // ser de ESTE local y estar activo. Va aparte de la venta: no suma a su total.
+  let propina: PropinaValida | null = null;
+  let nombreDelMozoDePropina = "";
+  if (datos?.propina != null) {
+    const v = validarPropina(datos.propina, total);
+    if (!v.ok) return { ok: false, error: v.error };
+    const mozoDePropina = await db.mozo.findFirst({
+      where: { id: v.propina.mozoId, activo: true },
+      select: { nombre: true, apellido: true },
+    });
+    if (!mozoDePropina) return { ok: false, error: "Ese mozo ya no está activo: elegí otro para la propina." };
+    propina = v.propina;
+    nombreDelMozoDePropina = [mozoDePropina.nombre, mozoDePropina.apellido].filter(Boolean).join(" ");
   }
 
   // Venta a crédito (mismas reglas que el mostrador): solo si el local la activó, y solo a un cliente al que se le pueda
@@ -915,6 +937,22 @@ export async function pagarCuenta(cuentaId: string, datos: DatosCobroCuenta): Pr
       }
 
       await tx.cuentaMesa.update({ where: { id: cuenta.id }, data: { ventaPosId: venta.id } });
+
+      // La propina queda anotada en el mismo instante que el cobro (o no queda ninguna de las dos): pendiente de pagarle al mozo.
+      if (propina) {
+        await tx.propinaMozo.create({
+          data: {
+            storeId,
+            mozoId: propina.mozoId,
+            cuentaMesaId: cuenta.id,
+            ventaPosId: venta.id,
+            turnoPosId: turno.id,
+            monto: propina.monto,
+            forma: propina.forma,
+            registradoPor,
+          },
+        });
+      }
       return venta.id;
     }, OPCIONES_TX);
   } catch (e) {
@@ -946,6 +984,16 @@ export async function pagarCuenta(cuentaId: string, datos: DatosCobroCuenta): Pr
       a_credito: esCredito,
     },
   });
+  if (propina) {
+    await registrarBitacora(storeId, sesion, {
+      modulo: "comedor",
+      accion: "propina_registrada",
+      descripcion: `Cargó una propina de ${formatearGuarani(propina.monto)} (${etiquetaFormaPropina(propina.forma)}) para ${nombreDelMozoDePropina}, al cobrar la cuenta ${formatearNumero(cuenta.numero)} de la mesa ${cuenta.mesa}.`,
+      entidad: "VentaPos",
+      entidadId: ventaId,
+      detalle: { mozo: nombreDelMozoDePropina, monto: propina.monto, forma: propina.forma, cuenta: formatearNumero(cuenta.numero) },
+    });
+  }
 
   revalidatePath("/admin/comedor");
   revalidatePath("/admin/pos");

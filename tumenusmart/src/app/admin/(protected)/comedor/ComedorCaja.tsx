@@ -38,6 +38,8 @@ export type CuentaCajaFila = {
   /** "abierta" | "por_cobrar" */
   estado: string;
   mozo: string;
+  /** El mozo a cargo (su id): la propina que se deja al cobrar se le anota a él por defecto. */
+  mozoId: string;
   abiertaEn: string;
   comensales: number | null;
   impresaEn: string | null;
@@ -147,7 +149,12 @@ export function ComedorCaja({ cuentas, contexto }: { cuentas: CuentaCajaFila[]; 
       />
 
       {cobrando && contexto.cobro.ok && (
-        <PagarCuentaPanel cuenta={cobrando} cobro={contexto.cobro} onCerrar={() => setCobrando(null)} />
+        <PagarCuentaPanel
+          cuenta={cobrando}
+          cobro={contexto.cobro}
+          mozos={contexto.apertura.mozos}
+          onCerrar={() => setCobrando(null)}
+        />
       )}
 
       {abriendo && (

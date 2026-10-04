@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Boton, Campo, Entrada, MensajeError, clasesBoton } from "@/components/ui";
+import { Boton, Campo, Entrada, MensajeError, Selector, clasesBoton } from "@/components/ui";
+import { FORMAS_PROPINA, type DatosPropina } from "@/lib/propinas";
 import { PanelLateral } from "@/components/PanelLateral";
 import { Segmentado } from "@/components/Segmentado";
 import { formatearGuarani, formatearNumero } from "@/lib/format";
@@ -42,10 +43,13 @@ function textoImpresion(r: ResultadoImpresion): string {
 export function PagarCuentaPanel({
   cuenta,
   cobro,
+  mozos,
   onCerrar,
 }: {
   cuenta: CuentaCajaFila;
   cobro: Cobro;
+  /** Los mozos activos: la propina se le anota a uno (por defecto, el que tiene la cuenta). */
+  mozos: { id: string; nombre: string }[];
   onCerrar: () => void;
 }) {
   const router = useRouter();
@@ -69,6 +73,13 @@ export function PagarCuentaPanel({
   const [clienteNombre, setClienteNombre] = useState("");
   const [clienteTelefono, setClienteTelefono] = useState("");
   const [buscandoTelefono, setBuscandoTelefono] = useState(false);
+
+  // La propina que el cliente deja con tarjeta o transferencia (la de efectivo no se carga): aparte de la cuenta, a nombre de un mozo.
+  const [conPropina, setConPropina] = useState(false);
+  const [propinaMonto, setPropinaMonto] = useState("");
+  const [propinaForma, setPropinaForma] = useState<string>(FORMAS_PROPINA[0].valor);
+  const [propinaMozoId, setPropinaMozoId] = useState(() => (mozos.some((m) => m.id === cuenta.mozoId) ? cuenta.mozoId : ""));
+  const [propinaAnotada, setPropinaAnotada] = useState<{ monto: number; mozo: string } | null>(null);
 
   const [mostrarCobro, setMostrarCobro] = useState(false);
   const [cobrando, setCobrando] = useState(false);
@@ -122,10 +133,21 @@ export function PagarCuentaPanel({
     setBuscando(false);
   }
 
+  // La propina lista para mandar (null si no hay, o si falta algo: eso se avisa antes de pasar al cobro).
+  const montoPropina = Math.round(Number(propinaMonto));
+  const propinaValida = conPropina && Number.isFinite(montoPropina) && montoPropina > 0 && !!propinaMozoId;
+  const propina: DatosPropina | undefined = propinaValida
+    ? { monto: montoPropina, forma: propinaForma, mozoId: propinaMozoId }
+    : undefined;
+
   function continuarAlCobro() {
     setError(null);
     if (conRegistro && (!numero.trim() || !razonSocial.trim())) {
       setError("Para factura con registro fiscal hacen falta el número y la razón social.");
+      return;
+    }
+    if (conPropina && !propinaValida) {
+      setError("Para anotar la propina escribí el monto y elegí el mozo (o destildá “El cliente deja propina”).");
       return;
     }
     setErrorCobro(null);
@@ -160,6 +182,8 @@ export function PagarCuentaPanel({
         creditoDias: esCredito ? creditoDias : undefined,
         // Para que el servidor avise si la cuenta cambió mientras se cobraba.
         totalMostrado: total,
+        // La propina va aparte de la venta: no suma a su total.
+        propina,
       });
     } catch {
       setCobrando(false);
@@ -174,6 +198,7 @@ export function PagarCuentaPanel({
       return;
     }
     setMostrarCobro(false);
+    if (propina) setPropinaAnotada({ monto: propina.monto, mozo: mozos.find((m) => m.id === propina.mozoId)?.nombre ?? "el mozo" });
     setHecho({ ventaId: r.ventaId, total: r.total, impresion: null });
     // El ticket sale solo en la impresora de esta estación; si no se puede, se avisa y queda para verlo e imprimirlo a mano.
     const impresion = await imprimirComprobante(`/admin/pos/venta/${r.ventaId}/ticket/crudo`, nombreImpresoraTicket);
@@ -207,6 +232,12 @@ export function PagarCuentaPanel({
                 {esFactura ? "Con factura" : "Con ticket"} · la mesa quedó libre
               </p>
             </div>
+            {propinaAnotada && (
+              <p className="max-w-xs rounded-lg bg-exito-luz px-3 py-2 text-[0.85rem] font-medium leading-snug text-exito">
+                Propina de {formatearGuarani(propinaAnotada.monto)} anotada para {propinaAnotada.mozo}. Queda pendiente de
+                pagarle desde Servicio comedor → Propinas.
+              </p>
+            )}
             <p className="max-w-xs text-[0.85rem] leading-snug text-tinta-media">
               {hecho.impresion === null ? "Imprimiendo el ticket…" : textoImpresion(hecho.impresion)}
               {hecho.impresion && !hecho.impresion.ok && " Podés verlo e imprimirlo a mano desde el botón de abajo."}
@@ -350,6 +381,59 @@ export function PagarCuentaPanel({
                   maxLength={80}
                 />
               </div>
+            </div>
+
+            {/* La propina del mozo: solo si el cliente la deja con tarjeta o transferencia (entra al negocio, pero es del mozo).
+                La de efectivo se la lleva el mozo y no se carga. */}
+            <div className="flex flex-col gap-2">
+              <label className="flex cursor-pointer items-center gap-2 text-[0.8rem] font-medium text-tinta">
+                <input
+                  type="checkbox"
+                  checked={conPropina}
+                  onChange={(e) => setConPropina(e.target.checked)}
+                  className="h-4 w-4 accent-azul"
+                />
+                El cliente deja propina con tarjeta o transferencia
+              </label>
+              {conPropina && (
+                <div className="flex flex-col gap-2 rounded-lg border border-linea bg-papel-suave p-3">
+                  <div className="grid grid-cols-2 gap-2">
+                    <Campo etiqueta="Monto de la propina (Gs.)">
+                      <Entrada
+                        type="number"
+                        inputMode="numeric"
+                        min={1}
+                        value={propinaMonto}
+                        onChange={(e) => setPropinaMonto(e.target.value)}
+                        placeholder="Ej: 20000"
+                      />
+                    </Campo>
+                    <Campo etiqueta="Cómo la pagó">
+                      <Selector value={propinaForma} onChange={(e) => setPropinaForma(e.target.value)}>
+                        {FORMAS_PROPINA.map((f) => (
+                          <option key={f.valor} value={f.valor}>
+                            {f.etiqueta}
+                          </option>
+                        ))}
+                      </Selector>
+                    </Campo>
+                  </div>
+                  <Campo etiqueta="Para el mozo">
+                    <Selector value={propinaMozoId} onChange={(e) => setPropinaMozoId(e.target.value)}>
+                      <option value="">Elegí el mozo…</option>
+                      {mozos.map((m) => (
+                        <option key={m.id} value={m.id}>
+                          {m.nombre}
+                        </option>
+                      ))}
+                    </Selector>
+                  </Campo>
+                  <p className="text-[0.74rem] leading-snug text-tinta-suave">
+                    La propina es aparte de la cuenta: no suma a lo vendido. Cobrala en la tarjeta (o transferencia) por ese
+                    monto; queda a nombre del mozo y se la pagan desde Servicio comedor → Propinas.
+                  </p>
+                </div>
+              )}
             </div>
 
             {puedeFacturar && (

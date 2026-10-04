@@ -266,6 +266,7 @@ model Store {
   trabajosImpresion TrabajoImpresion[]
   mesasComedor     MesaComedor[]
   sectoresComedor  SectorComedor[]
+  propinasMozo     PropinaMozo[]
 }
 
 /// Las direcciones que este local tuvo antes.
@@ -2571,11 +2572,47 @@ model Mozo {
   activo    Boolean  @default(true)
   createdAt DateTime @default(now())
 
-  cuentas CuentaMesa[]
-  items   ItemCuentaMesa[]
+  cuentas  CuentaMesa[]
+  items    ItemCuentaMesa[]
+  propinas PropinaMozo[]
 
   @@unique([storeId, pinClave])
   @@index([storeId])
+}
+
+/// Una propina que el cliente dejó al pagar la cuenta de una mesa con tarjeta o transferencia (las propinas en efectivo no se
+/// cargan: se las lleva el mozo). Esa plata entró al negocio pero NO es una venta: es del mozo, y el negocio se la debe hasta que
+/// se la paga en efectivo desde la caja (un retiro de caja, ver MovimientoCaja).
+model PropinaMozo {
+  id           String   @id @default(cuid())
+  storeId      String
+  store        Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  mozoId       String
+  mozo         Mozo     @relation(fields: [mozoId], references: [id])
+  /// La cuenta de mesa y la venta con las que se cobró.
+  cuentaMesaId String?
+  ventaPosId   String?
+  /// El turno de caja en el que entró (para conciliar las tarjetas del cierre).
+  turnoPosId   String?
+  monto        Decimal  @db.Decimal(12, 2)
+  /// Cómo la pagó el cliente: "tarjeta_debito" | "tarjeta_credito" | "transferencia".
+  forma        String
+  registradoPor String
+  createdAt    DateTime @default(now())
+
+  /// "pendiente" (el negocio se la debe al mozo) | "pagada" (se le pagó) | "anulada" (se canceló: por ejemplo la venta).
+  estado       String   @default("pendiente")
+  motivoAnulacion String?
+  /// Cuándo, quién y con qué retiro de caja (MovimientoCaja, sin clave foránea a propósito) se le pagó al mozo.
+  pagadaEn         DateTime?
+  pagadaPor        String?
+  pagoMovimientoId String?
+
+  @@index([storeId, estado])
+  @@index([mozoId])
+  @@index([turnoPosId])
+  @@index([ventaPosId])
+  @@index([pagoMovimientoId])
 }
 
 /// La cuenta de una mesa: la abre el mozo, se va armando en varias tandas (rondas) y se cierra al pagarse.
