@@ -229,8 +229,9 @@ export default async function ComedorPage() {
         <span className="text-[0.82rem] text-tinta-media">
           {filas.length} {filas.length === 1 ? "mesa abierta" : "mesas abiertas"} · {formatearGuarani(totalAbierto)} en cuentas
         </span>
-        {/* Se actualiza sola cada 15 s mientras la pantalla está a la vista, y en el acto al volver a ella. */}
-        <RefrescarCada segundos={15} generadoEn={new Date().toISOString()} />
+        {/* Se actualiza sola cada 15 s mientras la pantalla está a la vista, y en el acto al volver a ella. No muestra nada: sin
+            `generadoEn` no dibuja el contador "Actualizado hace N s" (ese se activa pasándole `generadoEn`, si hiciera falta). */}
+        <RefrescarCada segundos={15} />
       </div>
 
       <ComedorCaja cuentas={filas} contexto={contexto} />
