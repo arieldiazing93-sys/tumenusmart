@@ -45,16 +45,24 @@ export async function crearReserva(datos: DatosReserva): Promise<ResultadoReserv
     return { ok: false, error: "Este local no reserva mesas con anticipación." };
   }
 
-  if (!datos.clienteNombre?.trim() || !datos.clienteTelefono?.trim()) {
+  // Esto se puede llamar sin pasar por el formulario: cada dato se comprueba y se le pone un largo máximo (sin tope, alguien
+  // podía guardar textos enormes en la ficha de la reserva).
+  const clienteNombre = typeof datos.clienteNombre === "string" ? datos.clienteNombre.trim().slice(0, 80) : "";
+  const clienteTelefono = typeof datos.clienteTelefono === "string" ? datos.clienteTelefono.trim().slice(0, 30) : "";
+  const clienteEmail = typeof datos.clienteEmail === "string" ? datos.clienteEmail.trim().slice(0, 120) : "";
+  if (!clienteNombre || !clienteTelefono) {
     return { ok: false, error: "Faltan datos de contacto" };
+  }
+  if (clienteEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(clienteEmail)) {
+    return { ok: false, error: "El correo no parece válido" };
   }
   if (!TURNOS.some((t) => t.value === datos.turno)) {
     return { ok: false, error: "Turno inválido" };
   }
-  if (!datos.horario?.trim()) {
+  if (typeof datos.horario !== "string" || !/^\d{2}:\d{2}$/.test(datos.horario.trim())) {
     return { ok: false, error: "Falta seleccionar el horario" };
   }
-  if (!datos.personas || datos.personas < 1) {
+  if (!Number.isInteger(datos.personas) || datos.personas < 1 || datos.personas > 100) {
     return { ok: false, error: "Cantidad de personas inválida" };
   }
   if (!MOTIVOS_RESERVA.some((m) => m.value === datos.motivo)) {
@@ -105,9 +113,9 @@ export async function crearReserva(datos: DatosReserva): Promise<ResultadoReserv
       horario: datos.horario,
       personas: datos.personas,
       motivo: datos.motivo,
-      clienteNombre: datos.clienteNombre,
-      clienteTelefono: datos.clienteTelefono,
-      clienteEmail: datos.clienteEmail || null,
+      clienteNombre,
+      clienteTelefono,
+      clienteEmail: clienteEmail || null,
     },
   });
 

@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Campo, Entrada, MensajeError, clasesBoton } from "@/components/ui";
+import { pinDemasiadoFacil } from "@/lib/asistencia";
 import { actualizarMozo, crearMozo } from "./actions";
 
 export type MozoFila = {
@@ -13,9 +14,18 @@ export type MozoFila = {
   sinPin: boolean;
 };
 
-/** Un PIN de 5 números al azar, para no tener que inventarlo (más largo se repite menos y es más difícil de adivinar). */
+/**
+ * Un PIN de 6 números al azar, para no tener que inventarlo (más largo es más difícil de adivinar). Con el generador seguro
+ * del navegador, no con Math.random, que es predecible; si sale uno demasiado fácil (111111, 123456) se tira de nuevo.
+ */
 function pinAlAzar(): string {
-  return String(Math.floor(10000 + Math.random() * 90000));
+  for (let intento = 0; intento < 20; intento++) {
+    const n = new Uint32Array(1);
+    crypto.getRandomValues(n);
+    const pin = String(100000 + (n[0] % 900000));
+    if (!pinDemasiadoFacil(pin)) return pin;
+  }
+  return "739204";
 }
 
 /**

@@ -1,7 +1,8 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
-import { MAXIMO_INTENTOS_PIN, MINUTOS_BLOQUEO_PIN, pinValido } from "@/lib/asistencia";
+import { MINUTOS_BLOQUEO_PIN, pinValido } from "@/lib/asistencia";
+import { pedirIntentoDePin, resolverIntentoDePin } from "@/lib/limite-pin";
 import {
   abrirSesionMozo,
   cerrarSesionMozo,
@@ -64,47 +65,30 @@ export async function entrarConPin(token: string, pin: string): Promise<Resultad
   const local = await localPorTokenMozos(token);
   if (!local) return { ok: false, error: "Este enlace ya no está activo." };
 
-  const ahora = new Date();
-  if (local.bloqueoMozosHasta && local.bloqueoMozosHasta > ahora) {
-    const minutos = Math.max(1, Math.ceil((local.bloqueoMozosHasta.getTime() - ahora.getTime()) / 60000));
-    return { ok: false, error: `Demasiados PIN incorrectos. Probá de nuevo en ${minutos} min.` };
-  }
   if (!pinValido(pin)) return { ok: false, error: "El PIN tiene entre 4 y 6 números." };
+
+  // El intento se cuenta ANTES de mirar el PIN (ver src/lib/limite-pin.ts): así una ráfaga de pedidos simultáneos no puede
+  // probar más PIN que el tope, y acertar con un PIN propio no borra los errores seguidos.
+  const intento = await pedirIntentoDePin("mozos", local.id);
+  if (!intento.ok) {
+    return { ok: false, error: `Demasiados PIN incorrectos. Probá de nuevo en ${intento.minutos} min.` };
+  }
 
   const mozo = await prisma.mozo.findFirst({
     where: { storeId: local.id, pinClave: claveDePinMozo(local.id, pin), activo: true },
     select: { id: true },
   });
 
+  const resultado = await resolverIntentoDePin("mozos", local.id, !!mozo, intento.n);
   if (!mozo) {
-    // El incremento es atómico: dos intentos a la vez no se pisan el conteo.
-    const { intentosPinMozos } = await prisma.store.update({
-      where: { id: local.id },
-      data: { intentosPinMozos: { increment: 1 } },
-      select: { intentosPinMozos: true },
-    });
-    if (intentosPinMozos >= MAXIMO_INTENTOS_PIN) {
-      await prisma.store.update({
-        where: { id: local.id },
-        data: {
-          intentosPinMozos: 0,
-          bloqueoMozosHasta: new Date(ahora.getTime() + MINUTOS_BLOQUEO_PIN * 60000),
-        },
-      });
+    if (resultado.bloqueado) {
       return { ok: false, error: `PIN incorrecto. El enlace se bloquea ${MINUTOS_BLOQUEO_PIN} minutos.` };
     }
-    const quedan = MAXIMO_INTENTOS_PIN - intentosPinMozos;
+    const quedan = resultado.quedan;
     return {
       ok: false,
       error: `PIN incorrecto. ${quedan === 1 ? "Te queda 1 intento" : `Te quedan ${quedan} intentos`}.`,
     };
-  }
-
-  if (local.intentosPinMozos > 0 || local.bloqueoMozosHasta) {
-    await prisma.store.update({
-      where: { id: local.id },
-      data: { intentosPinMozos: 0, bloqueoMozosHasta: null },
-    });
   }
 
   await abrirSesionMozo(local.id, mozo.id);

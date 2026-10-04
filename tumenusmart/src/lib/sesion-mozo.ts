@@ -19,12 +19,25 @@ const COOKIE_MOZO = "mozo_sesion";
 /** Cuánto dura la sesión de un mozo: un turno largo. Pasado ese tiempo vuelve a pedir el PIN. */
 const HORAS_SESION = 12;
 
+/**
+ * Sin ninguna clave configurada, en producción NO se usa un valor de ejemplo (está escrito en el código y cualquiera lo
+ * conoce: podría armarse una sesión de mozo o sacar los PIN de la base): se corta. En desarrollo sí se permite, para
+ * poder probar sin configurar nada.
+ */
+function claveObligatoria(valor: string | undefined): string {
+  if (valor) return valor;
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("Falta configurar SESSION_SECRET en las variables de entorno.");
+  }
+  return "dev-secret-cambiar";
+}
+
 function secretoDePin(): string {
-  return process.env.ASISTENCIA_PIN_SECRET || process.env.SESSION_SECRET || "dev-secret-cambiar";
+  return claveObligatoria(process.env.ASISTENCIA_PIN_SECRET || process.env.SESSION_SECRET);
 }
 
 function secretoDeSesion(): string {
-  return process.env.SESSION_SECRET ?? "dev-secret-cambiar";
+  return claveObligatoria(process.env.SESSION_SECRET);
 }
 
 /**

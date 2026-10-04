@@ -67,6 +67,8 @@ model Store {
   /// buena en el medio) y, al llegar al tope, hasta cuándo queda bloqueado el celular.
   intentosPinAsistencia  Int       @default(0)
   bloqueoAsistenciaHasta DateTime?
+  /// Cuándo fue el último intento de PIN: pasado un rato sin intentos el conteo arranca de cero (ver src/lib/limite-pin.ts).
+  ultimoIntentoPinAsistenciaEn DateTime?
   /// Cuántos minutos tienen que pasar entre una marcación de una persona y la siguiente suya.
   minutosEntreMarcas     Int       @default(5)
   /// El horario de almuerzo del negocio ("HH:MM"): una marcación dentro de esta ventana, para quien ya entró y sale
@@ -84,6 +86,8 @@ model Store {
   /// Contra la adivinanza de PIN en ese enlace: PIN incorrectos seguidos y, al llegar al tope, hasta cuándo se bloquea.
   intentosPinMozos      Int       @default(0)
   bloqueoMozosHasta     DateTime?
+  /// Cuándo fue el último intento de PIN: pasado un rato sin intentos el conteo arranca de cero (ver src/lib/limite-pin.ts).
+  ultimoIntentoPinMozosEn DateTime?
   /// El correlativo de las cuentas de mesa del local (la próxima es este número + 1).
   contadorCuentasMesa   Int       @default(0)
   /// Regla del Servicio comedor: si un mozo puede ver y cargar las cuentas que abrió OTRO mozo (true), o solo las suyas

@@ -33,9 +33,12 @@ const CSP = [
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // El optimizador de imágenes de Next (/_next/image) baja y reduce cualquier imagen que le pidan de los dominios de acá: con
+  // "**" cualquiera podía usar este sitio de proxy gratis y gastar el cupo (y el ancho de banda) del plan. La app no usa
+  // next/image en ninguna pantalla; se deja solo el Storage de Supabase por si se usa más adelante.
   images: {
     remotePatterns: [
-      { protocol: "https", hostname: "**" },
+      { protocol: "https", hostname: "*.supabase.co" },
     ],
   },
   // La librería qz-tray (impresión silenciosa) trae un `require('lna')`

@@ -4,7 +4,7 @@ import { randomBytes } from "node:crypto";
 import { Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { exigirPermiso } from "@/lib/auth";
-import { pinValido } from "@/lib/asistencia";
+import { AVISO_PIN_FACIL, pinDemasiadoFacil, pinValido } from "@/lib/asistencia";
 import { registrarBitacora } from "@/lib/bitacora";
 import { idLocalActual } from "@/lib/local-actual";
 import { prisma } from "@/lib/prisma";
@@ -91,6 +91,7 @@ function leerDatos(formData: FormData): { ok: true; datos: DatosMozo } | { ok: f
   }
   const pin = texto(formData.get("pin"));
   if (pin && !pinValido(pin)) return { ok: false, error: "El PIN tiene que ser de 4 a 6 números." };
+  if (pin && pinDemasiadoFacil(pin)) return { ok: false, error: AVISO_PIN_FACIL };
   return { ok: true, datos: { nombre, apellido: apellido || null, pin: pin || null } };
 }
 

@@ -29,8 +29,12 @@ const FORMATO_TOKEN = /^[A-Za-z0-9_-]{16,64}$/;
  * SESSION_SECRET: no hay que cambiar ninguna de las dos una vez en uso, o todos los PIN dejarían de andar.
  */
 export function claveDePin(storeId: string, pin: string): string {
-  const secreto = process.env.ASISTENCIA_PIN_SECRET || process.env.SESSION_SECRET || "dev-secret-cambiar";
-  return createHmac("sha256", secreto).update(`${storeId}:${pin}`).digest("hex");
+  const secreto = process.env.ASISTENCIA_PIN_SECRET || process.env.SESSION_SECRET;
+  // Sin clave en producción no se usa un valor de ejemplo (público en el código): se corta, igual que con las sesiones.
+  if (!secreto && process.env.NODE_ENV === "production") {
+    throw new Error("Falta configurar SESSION_SECRET (o ASISTENCIA_PIN_SECRET) en las variables de entorno.");
+  }
+  return createHmac("sha256", secreto || "dev-secret-cambiar").update(`${storeId}:${pin}`).digest("hex");
 }
 
 /** El local al que lleva esta llave, o null si no existe o ya se apagó/regeneró. */

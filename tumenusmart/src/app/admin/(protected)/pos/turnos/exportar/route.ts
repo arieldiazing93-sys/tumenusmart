@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { haySesionAdminValida } from "@/lib/auth";
+import { negarSiNoPuede } from "@/lib/auth";
 import { prismaDelLocal } from "@/lib/prisma-local";
 import { idLocalActual, localActual } from "@/lib/local-actual";
 import { calcularRangoFecha } from "@/lib/rango-fecha";
@@ -9,9 +9,8 @@ import { nuevoLibro, filaTitulo, respuestaXlsx } from "@/lib/excel-reporte";
 export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
-  if (!(await haySesionAdminValida())) {
-    return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-  }
+  const negado = await negarSiNoPuede("pos.verHistorico");
+  if (negado) return negado;
 
   const { searchParams } = new URL(request.url);
   const fecha = searchParams.get("fecha") ?? "7dias";

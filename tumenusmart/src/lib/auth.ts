@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { NextResponse } from "next/server";
 import { puede, type Permiso } from "./permisos";
 import { cookies } from "next/headers";
 import { cache } from "react";
@@ -238,6 +239,21 @@ export async function pantallaConPermiso(permiso: Permiso): Promise<SesionUsuari
 
 export async function haySesionAdminValida(): Promise<boolean> {
   return (await sesionActual()) !== null;
+}
+
+/**
+ * Para las rutas de API y las descargas (Excel, PDF): corta con 401 si no hay sesión y con 403 si quien entró no tiene ese
+ * permiso, o devuelve null si puede seguir. Una ruta de API no pasa por el layout del panel ni por `pantallaConPermiso`, así
+ * que sin esto cualquiera con sesión —aunque su rol no vea esa pantalla— bajaría el reporte si conoce la dirección.
+ *
+ *   const negado = await negarSiNoPuede("estadisticas.ver");
+ *   if (negado) return negado;
+ */
+export async function negarSiNoPuede(permiso: Permiso): Promise<NextResponse | null> {
+  const sesion = await sesionActual();
+  if (!sesion) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+  if (!puede(sesion.rol, permiso)) return NextResponse.json({ error: "Sin permiso" }, { status: 403 });
+  return null;
 }
 
 // ---------------------------------------------------------------------------

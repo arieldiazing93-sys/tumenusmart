@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prismaDelLocal } from "@/lib/prisma-local";
 import { idLocalActual } from "@/lib/local-actual";
-import { haySesionAdminValida } from "@/lib/auth";
+import { negarSiNoPuede } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -32,9 +32,8 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   // La sesión se verifica ANTES de tocar la base: así, sin sesión, la
   // respuesta es un 401 limpio y no un error de servidor.
-  if (!(await haySesionAdminValida())) {
-    return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-  }
+  const negado = await negarSiNoPuede("pedidos.ver");
+  if (negado) return negado;
 
   // Todas las consultas de acá abajo quedan atadas a este local.
   const prisma = prismaDelLocal(await idLocalActual());

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { haySesionAdminValida } from "@/lib/auth";
+import { negarSiNoPuede } from "@/lib/auth";
 import { idLocalActual, localActual } from "@/lib/local-actual";
 import { calcularRangoFecha } from "@/lib/rango-fecha";
 import { formatearNumero } from "@/lib/format";
@@ -12,9 +12,8 @@ export const dynamic = "force-dynamic";
 export async function GET(request: NextRequest) {
   // Ruta de API: no pasa por el layout del panel, así que valida la sesión
   // por su cuenta.
-  if (!(await haySesionAdminValida())) {
-    return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-  }
+  const negado = await negarSiNoPuede("pos.verHistorico");
+  if (negado) return negado;
 
   const { searchParams } = new URL(request.url);
   const fecha = searchParams.get("fecha") ?? "hoy";

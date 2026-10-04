@@ -85,16 +85,21 @@ export async function crearPedido(datos: DatosCheckout): Promise<ResultadoPedido
     tarjeta_debito: local.aceptaTarjetaDebito,
     tarjeta_credito: local.aceptaTarjetaCredito,
   };
-  // "otro" no lo ofrece el checkout público — no está en este objeto, así
-  // que pasa sin bloquearse (queda fuera del alcance de este control).
-  if (
-    datos.metodoPagoReferencia in metodosHabilitados &&
-    !metodosHabilitados[datos.metodoPagoReferencia]
-  ) {
+  // Solo los cuatro métodos que ofrece el checkout público: "otro" no se ofrece, y cualquier texto raro (esto se puede llamar
+  // sin pasar por el formulario) se rechaza en vez de guardarse tal cual. `hasOwnProperty` y no `in`: con `in`, un valor
+  // como "constructor" figuraría como método válido por herencia del objeto.
+  const metodoPago = typeof datos.metodoPagoReferencia === "string" ? datos.metodoPagoReferencia : "";
+  if (!Object.prototype.hasOwnProperty.call(metodosHabilitados, metodoPago)) {
+    return { ok: false, error: "Elegí cómo vas a pagar. Recargá la página si no ves las opciones." };
+  }
+  if (!metodosHabilitados[metodoPago]) {
     return {
       ok: false,
       error: "Ese método de pago ya no está disponible en este local. Recargá la página.",
     };
+  }
+  if (datos.comprobanteTipo !== "ticket" && datos.comprobanteTipo !== "factura") {
+    return { ok: false, error: "Elegí si querés ticket o factura." };
   }
 
   // Los pedidos de la carta son solo de delivery o de retiro: comer en el local se atiende por el Servicio comedor. Un
@@ -103,7 +108,11 @@ export async function crearPedido(datos: DatosCheckout): Promise<ResultadoPedido
     delivery: local.aceptaDelivery,
     retiro: local.aceptaRetiro,
   };
-  if (!entregasHabilitadas[datos.tipoEntrega]) {
+  if (
+    typeof datos.tipoEntrega !== "string" ||
+    !Object.prototype.hasOwnProperty.call(entregasHabilitadas, datos.tipoEntrega) ||
+    !entregasHabilitadas[datos.tipoEntrega]
+  ) {
     return {
       ok: false,
       error: "Esa forma de entrega ya no está disponible en este local. Recargá la página.",
@@ -137,10 +146,18 @@ export async function crearPedido(datos: DatosCheckout): Promise<ResultadoPedido
   //
   // El formulario ya lo exige del lado del navegador. Esta comprobación es la
   // que vale: una acción del servidor se puede llamar sin pasar por él.
-  if (
-    datos.tipoEntrega === "delivery" &&
-    (datos.clienteLat == null || datos.clienteLng == null)
-  ) {
+  // Las coordenadas tienen que ser números de verdad y caer en el planeta: llegan del navegador y se usan para calcular el
+  // envío y armar el enlace al mapa del repartidor. Unas inválidas en un retiro simplemente se ignoran.
+  const coordenadasValidas =
+    typeof datos.clienteLat === "number" &&
+    typeof datos.clienteLng === "number" &&
+    Number.isFinite(datos.clienteLat) &&
+    Number.isFinite(datos.clienteLng) &&
+    Math.abs(datos.clienteLat) <= 90 &&
+    Math.abs(datos.clienteLng) <= 180;
+  const clienteLat = coordenadasValidas ? datos.clienteLat : undefined;
+  const clienteLng = coordenadasValidas ? datos.clienteLng : undefined;
+  if (datos.tipoEntrega === "delivery" && (clienteLat == null || clienteLng == null)) {
     return { ok: false, error: "Marcá tu ubicación en el mapa para poder entregarte el pedido" };
   }
   if (
@@ -286,12 +303,12 @@ export async function crearPedido(datos: DatosCheckout): Promise<ResultadoPedido
   let costoEnvio = 0;
   let zonaId: string | undefined;
 
-  if (datos.tipoEntrega === "delivery" && datos.clienteLat != null && datos.clienteLng != null) {
+  if (datos.tipoEntrega === "delivery" && clienteLat != null && clienteLng != null) {
     if (local.envioModo === "zonas" && local.lat != null && local.lng != null) {
       const zonas = await prisma.deliveryZone.findMany({
         where: { storeId, activo: true },
       });
-      const distancia = distanciaKm(local.lat, local.lng, datos.clienteLat, datos.clienteLng);
+      const distancia = distanciaKm(local.lat, local.lng, clienteLat, clienteLng);
       const zona = encontrarZonaPorDistancia(
         zonas.map((z) => ({
           id: z.id,
@@ -363,9 +380,9 @@ export async function crearPedido(datos: DatosCheckout): Promise<ResultadoPedido
         tipoEntrega: datos.tipoEntrega,
         deliveryZoneId: zonaId,
         direccion: datos.tipoEntrega === "delivery" ? recortar(datos.direccion, LARGO.direccion) : undefined,
-        clienteLat: datos.clienteLat,
-        clienteLng: datos.clienteLng,
-        metodoPagoReferencia: datos.metodoPagoReferencia,
+        clienteLat,
+        clienteLng,
+        metodoPagoReferencia: metodoPago,
         comprobanteTipo: comprobanteTipoFinal,
         // Con RUC real el checkout público no pide tipo — se guarda "ruc" fijo,
         // solo para que el ticket sepa qué etiqueta imprimir después (ver

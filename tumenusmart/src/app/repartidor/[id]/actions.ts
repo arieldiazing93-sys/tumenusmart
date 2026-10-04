@@ -33,7 +33,7 @@ export async function marcarPedidoEntregado(
   const [repartidor, pedido] = await Promise.all([
     prisma.repartidor.findUnique({
       where: { id: repartidorId },
-      select: { storeId: true },
+      select: { storeId: true, activo: true },
     }),
     prisma.order.findUnique({
       where: { id: orderId },
@@ -46,6 +46,7 @@ export async function marcarPedidoEntregado(
   // deja de sobrar el día que alguien reasigne repartidores entre negocios.
   if (
     !repartidor ||
+    !repartidor.activo ||
     !pedido ||
     pedido.repartidorId !== repartidorId ||
     pedido.storeId !== repartidor.storeId

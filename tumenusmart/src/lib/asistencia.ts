@@ -139,6 +139,22 @@ export function pinValido(pin: string): boolean {
   return /^\d{4,6}$/.test(pin);
 }
 
+/**
+ * Un PIN que cualquiera probaría primero: todos los números iguales (0000, 111111) o seguidos (1234, 654321). Solo se usa al
+ * CREAR o CAMBIAR un PIN (no al entrar: a quien ya tiene uno así no se le corta el acceso de golpe).
+ */
+export function pinDemasiadoFacil(pin: string): boolean {
+  if (!/^\d{4,6}$/.test(pin)) return false;
+  if (/^(\d)\1+$/.test(pin)) return true;
+  const digitos = [...pin].map(Number);
+  const sube = digitos.every((d, i) => i === 0 || d === digitos[i - 1] + 1);
+  const baja = digitos.every((d, i) => i === 0 || d === digitos[i - 1] - 1);
+  return sube || baja;
+}
+
+/** El aviso que se le da a quien intenta guardar un PIN demasiado fácil. */
+export const AVISO_PIN_FACIL = "Ese PIN es demasiado fácil de adivinar (como 1234 o 1111). Elegí otro.";
+
 /** "HH:MM" de 24 horas. */
 export function horaValida(hora: string): boolean {
   return /^([01]\d|2[0-3]):[0-5]\d$/.test(hora);

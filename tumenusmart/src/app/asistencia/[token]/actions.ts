@@ -2,7 +2,6 @@
 
 import { prisma } from "@/lib/prisma";
 import {
-  MAXIMO_INTENTOS_PIN,
   MINUTOS_BLOQUEO_PIN,
   calcularTardanza,
   mensajeDeEspera,
@@ -15,6 +14,7 @@ import {
   localPorToken,
   type LocalAsistencia,
 } from "@/lib/asistencia-servidor";
+import { pedirIntentoDePin, resolverIntentoDePin } from "@/lib/limite-pin";
 import { subirFotoAsistencia } from "@/lib/supabase-storage";
 import { claveDiaAsuncion, horaAsuncion } from "@/lib/timezone";
 
@@ -49,48 +49,30 @@ async function identificarPorPin(
   local: LocalAsistencia,
   pin: string
 ): Promise<{ ok: true; colaborador: ColaboradorIdentificado } | { ok: false; error: string }> {
-  const ahora = new Date();
-  if (local.bloqueoAsistenciaHasta && local.bloqueoAsistenciaHasta > ahora) {
-    const minutos = Math.max(1, Math.ceil((local.bloqueoAsistenciaHasta.getTime() - ahora.getTime()) / 60000));
-    return { ok: false, error: `Demasiados PIN incorrectos. Probá de nuevo en ${minutos} min.` };
-  }
-
   if (!pinValido(pin)) return { ok: false, error: "El PIN tiene entre 4 y 6 números." };
+
+  // El intento se cuenta ANTES de mirar el PIN (ver src/lib/limite-pin.ts): una ráfaga de pedidos simultáneos no puede
+  // probar más PIN que el tope, y acertar con el PIN propio no borra los errores seguidos de los demás.
+  const intento = await pedirIntentoDePin("asistencia", local.id);
+  if (!intento.ok) {
+    return { ok: false, error: `Demasiados PIN incorrectos. Probá de nuevo en ${intento.minutos} min.` };
+  }
 
   const colaborador = await prisma.colaborador.findFirst({
     where: { storeId: local.id, pinClave: claveDePin(local.id, pin), activo: true },
     select: { id: true, nombre: true, haceAlmuerzo: true, horaEntrada: true, toleranciaMin: true },
   });
 
+  const resultado = await resolverIntentoDePin("asistencia", local.id, !!colaborador, intento.n);
   if (!colaborador) {
-    // El incremento es atómico: dos intentos a la vez no se pisan el conteo.
-    const { intentosPinAsistencia } = await prisma.store.update({
-      where: { id: local.id },
-      data: { intentosPinAsistencia: { increment: 1 } },
-      select: { intentosPinAsistencia: true },
-    });
-    if (intentosPinAsistencia >= MAXIMO_INTENTOS_PIN) {
-      await prisma.store.update({
-        where: { id: local.id },
-        data: {
-          intentosPinAsistencia: 0,
-          bloqueoAsistenciaHasta: new Date(ahora.getTime() + MINUTOS_BLOQUEO_PIN * 60000),
-        },
-      });
+    if (resultado.bloqueado) {
       return { ok: false, error: `PIN incorrecto. El celular se bloquea ${MINUTOS_BLOQUEO_PIN} minutos.` };
     }
-    const quedan = MAXIMO_INTENTOS_PIN - intentosPinAsistencia;
+    const quedan = resultado.quedan;
     return {
       ok: false,
       error: `PIN incorrecto. ${quedan === 1 ? "Te queda 1 intento" : `Te quedan ${quedan} intentos`}.`,
     };
-  }
-
-  if (local.intentosPinAsistencia > 0 || local.bloqueoAsistenciaHasta) {
-    await prisma.store.update({
-      where: { id: local.id },
-      data: { intentosPinAsistencia: 0, bloqueoAsistenciaHasta: null },
-    });
   }
 
   return { ok: true, colaborador };

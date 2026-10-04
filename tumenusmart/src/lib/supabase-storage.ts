@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto";
 import { createClient } from "@supabase/supabase-js";
 
 const NOMBRE_BUCKET = "productos";
@@ -16,6 +17,20 @@ const TIPOS_PERMITIDOS: Record<string, string[]> = {
   png: ["image/png"],
   webp: ["image/webp"],
 };
+
+/** ¿Los primeros bytes del archivo son los de ese formato de imagen? */
+function firmaDeImagenValida(bytes: Buffer, extension: string): boolean {
+  if (extension === "jpg" || extension === "jpeg") {
+    return bytes.length > 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
+  }
+  if (extension === "png") {
+    return bytes.length > 8 && bytes.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]));
+  }
+  if (extension === "webp") {
+    return bytes.length > 12 && bytes.toString("ascii", 0, 4) === "RIFF" && bytes.toString("ascii", 8, 12) === "WEBP";
+  }
+  return false;
+}
 
 function clienteAdmin() {
   const url = process.env.SUPABASE_URL;
@@ -48,10 +63,18 @@ async function subirImagen(archivo: File, carpeta = ""): Promise<string> {
     throw new Error("La imagen tiene que ser JPG, PNG o WEBP");
   }
 
-  const supabase = clienteAdmin();
-  const nombreArchivo = `${carpeta}${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${extension}`;
-
   const buffer = Buffer.from(await archivo.arrayBuffer());
+  // El nombre y el tipo que declara el navegador los pone quien sube el archivo: lo único confiable es el contenido. Se
+  // comprueba que de verdad empiece como un JPG, PNG o WEBP (no un HTML, un ejecutable o un SVG con otro nombre).
+  if (!firmaDeImagenValida(buffer, extension)) {
+    throw new Error("El archivo no es una imagen JPG, PNG o WEBP válida");
+  }
+
+  const supabase = clienteAdmin();
+  // El nombre es la única "contraseña" de una foto en un bucket público (las de asistencia son caras de personas): al azar de
+  // verdad (96 bits), no con Math.random, que se puede predecir.
+  const nombreArchivo = `${carpeta}${Date.now()}-${randomBytes(12).toString("hex")}.${extension}`;
+
   const { error } = await supabase.storage
     .from(NOMBRE_BUCKET)
     .upload(nombreArchivo, buffer, { contentType: archivo.type, upsert: false });

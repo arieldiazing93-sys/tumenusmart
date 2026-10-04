@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { haySesionAdminValida } from "@/lib/auth";
+import { negarSiNoPuede } from "@/lib/auth";
 import { idLocalActual } from "@/lib/local-actual";
 import { prisma } from "@/lib/prisma";
 import { calcularRangoFecha } from "@/lib/rango-fecha";
@@ -16,9 +16,8 @@ export const dynamic = "force-dynamic";
  * dudas de que la planilla y el panel dicen lo mismo.
  */
 export async function GET(request: NextRequest) {
-  if (!(await haySesionAdminValida())) {
-    return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-  }
+  const negado = await negarSiNoPuede("analytics.ver");
+  if (negado) return negado;
 
   const { searchParams } = new URL(request.url);
   const fecha = searchParams.get("fecha") ?? "30dias";

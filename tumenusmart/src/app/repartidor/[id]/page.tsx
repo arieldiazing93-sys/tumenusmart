@@ -15,7 +15,9 @@ export default async function RepartidorPage({
   const { id } = await params;
 
   const repartidor = await prisma.repartidor.findUnique({ where: { id } });
-  if (!repartidor) notFound();
+  // Quien ya no trabaja como repartidor (dado de baja) deja de ver los pedidos con el mismo enlace: el enlace no se puede
+  // cambiar, así que dar de baja es la forma de cortarlo.
+  if (!repartidor || !repartidor.activo) notFound();
 
   // Todo lo que sigue queda atado al local de ESTE repartidor: aunque su
   // enlace circule, nunca muestra pedidos de otro negocio.

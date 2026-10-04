@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { Prisma } from "@prisma/client";
 import { exigirPermiso } from "@/lib/auth";
-import { horaValida, pinValido } from "@/lib/asistencia";
+import { AVISO_PIN_FACIL, horaValida, pinDemasiadoFacil, pinValido } from "@/lib/asistencia";
 import { claveDePin } from "@/lib/asistencia-servidor";
 import { registrarBitacora } from "@/lib/bitacora";
 import { idLocalActual } from "@/lib/local-actual";
@@ -49,6 +49,7 @@ function leerDatos(formData: FormData): { ok: true; datos: DatosColaborador } | 
 
   const pin = texto(formData.get("pin"));
   if (pin && !pinValido(pin)) return { ok: false, error: "El PIN tiene que ser de 4 a 6 números." };
+  if (pin && pinDemasiadoFacil(pin)) return { ok: false, error: AVISO_PIN_FACIL };
 
   const horaEntrada = texto(formData.get("horaEntrada"));
   if (horaEntrada && !horaValida(horaEntrada)) return { ok: false, error: "La hora de entrada no es válida." };

@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Campo, Entrada, MensajeError, clasesBoton } from "@/components/ui";
 import { VerificadorPersona, type ResultadoVerificacion } from "@/components/VerificadorPersona";
 import { comprimirImagen, PARA_LOGO } from "@/lib/comprimir-imagen";
-import type { ColaboradorFila } from "@/lib/asistencia";
+import { pinDemasiadoFacil, type ColaboradorFila } from "@/lib/asistencia";
 import { actualizarColaborador, crearColaborador, subirFotoDelColaborador } from "./actions";
 
 /**
@@ -36,11 +36,18 @@ function Icono({ children, tam = 16 }: { children: React.ReactNode; tam?: number
   );
 }
 
-/** Un PIN de 5 números al azar, para no tener que inventarlo (con muchas personas, más largo se repite menos y es más difícil de adivinar). */
+/**
+ * Un PIN de 6 números al azar, para no tener que inventarlo (con muchas personas, más largo se repite menos y es más difícil
+ * de adivinar). Si sale uno demasiado fácil (111111, 123456) se tira de nuevo, porque el panel no lo aceptaría.
+ */
 function pinAlAzar(): string {
-  const valores = new Uint32Array(1);
-  crypto.getRandomValues(valores);
-  return String(valores[0] % 100000).padStart(5, "0");
+  for (let intento = 0; intento < 20; intento++) {
+    const valores = new Uint32Array(1);
+    crypto.getRandomValues(valores);
+    const pin = String(100000 + (valores[0] % 900000));
+    if (!pinDemasiadoFacil(pin)) return pin;
+  }
+  return "739204";
 }
 
 export function FormularioColaborador({
