@@ -310,9 +310,23 @@ export default async function ComprobanteTurnoPosPage({
           </dl>
         </header>
 
-        <div className="mb-4 rounded-xl border border-exito/25 bg-exito-luz p-3.5 print:rounded-none print:border print:border-linea print:bg-transparent">
+        {/* El color dice cómo cerró la caja: verde si cuadró, ROJO si faltó plata, amarillo si sobró. (Antes era siempre verde, y un
+            faltante se veía igual que un cierre perfecto.) */}
+        <div
+          className={`mb-4 rounded-xl border p-3.5 print:rounded-none print:border print:border-linea print:bg-transparent ${
+            diferenciaTotal === 0
+              ? "border-exito/25 bg-exito-luz"
+              : diferenciaTotal < 0
+                ? "border-peligro/30 bg-peligro-luz"
+                : "border-aviso/25 bg-aviso-luz"
+          }`}
+        >
           <p className="text-[0.85rem] text-tinta-media">Total declarado</p>
-          <p className="cifra mt-0.5 text-[1.9rem] font-semibold leading-tight text-exito print:text-[20pt] print:text-tinta">
+          <p
+            className={`cifra mt-0.5 text-[1.9rem] font-semibold leading-tight print:text-[20pt] print:text-tinta ${
+              diferenciaTotal === 0 ? "text-exito" : diferenciaTotal < 0 ? "text-peligro" : "text-aviso"
+            }`}
+          >
             {formatearGuarani(totalDeclarado)}
           </p>
           {diferenciaTotal !== 0 && (
