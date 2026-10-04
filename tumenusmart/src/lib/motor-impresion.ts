@@ -114,6 +114,12 @@ async function marcar(id: string, salio: boolean, error?: string) {
 // ------------------------------------------------------------------------------------------------ el ciclo
 
 let enCiclo = false;
+/** Cuántos ciclos se iniciaron: un ciclo dado por perdido no puede liberar el "en curso" de uno más nuevo. */
+let generacion = 0;
+/** Última señal de vida del ciclo en curso (empezó, o terminó un paso). */
+let ultimaActividad = Date.now();
+/** Un ciclo sin señales de vida por tanto tiempo está colgado: se lo da por perdido y se empieza de nuevo. */
+const MS_CICLO_COLGADO = 90_000;
 
 /**
  * Espera a una promesa, pero no para siempre: si QZ Tray o la red se quedan colgados, el ciclo seguiría "en curso" para
@@ -135,6 +141,8 @@ async function ciclo() {
   // Si el anterior todavía no terminó (una impresión lenta), no se encima otro.
   if (enCiclo) return;
   enCiclo = true;
+  const miGeneracion = ++generacion;
+  ultimaActividad = Date.now();
   try {
     // Sin QZ no se puede imprimir: no se pregunta nada (así no se reclama lo que no se va a poder imprimir).
     if (estado.modoPrueba) {
@@ -162,10 +170,12 @@ async function ciclo() {
       return;
     }
     cambiar({ fallo: null, ultimaConsultaEn: Date.now() });
-    const datos = (await r.json()) as RespuestaReclamar;
+    // También acotada: si la conexión se corta a mitad de la respuesta, esta espera no termina nunca por sí sola.
+    const datos = (await conLimite(r.json(), 15_000)) as RespuestaReclamar;
     if (!datos.ok) return;
 
     for (const t of datos.trabajos) {
+      ultimaActividad = Date.now();
       if (!t.impresora) {
         await marcar(t.id, false, "Esta estación no tiene impresora asignada a esa área.");
         anotar(`${t.titulo}: sin impresora asignada`, false);
@@ -179,7 +189,8 @@ async function ciclo() {
       }
       cambiar({ imprimiendoAhora: { titulo: t.titulo, desde: Date.now() } });
       try {
-        await imprimirTexto(t.impresora, t.contenido);
+        // 60 s alcanzan para la espera en la fila de QZ más el límite de 25 s de esta impresión.
+        await conLimite(imprimirTexto(t.impresora, t.contenido), 60_000);
         await marcar(t.id, true);
         cambiar({ impresas: estado.impresas + 1 });
         anotar(`${t.titulo} → ${t.impresora}`, true);
@@ -194,7 +205,8 @@ async function ciclo() {
   } catch {
     cambiar({ fallo: "Sin conexión con el servidor. Se vuelve a intentar solo." });
   } finally {
-    enCiclo = false;
+    // Si este ciclo ya se dio por perdido, el "en curso" es de otro más nuevo: no se toca.
+    if (miGeneracion === generacion) enCiclo = false;
   }
 }
 
@@ -217,6 +229,13 @@ async function latir() {
 
 /** Lo que se hace en cada tic del reloj: consultar comandas, o solo latir si todavía hay una impresión en curso. */
 function alTic() {
+  if (enCiclo && Date.now() - ultimaActividad > MS_CICLO_COLGADO) {
+    // Algo lo colgó (una respuesta que nunca termina, un navegador que frenó la pestaña): se empieza de nuevo en vez de
+    // quedar "avisando que está vivo" sin imprimir nada.
+    enCiclo = false;
+    cambiar({ imprimiendoAhora: null });
+    anotar("La consulta anterior se colgó: se vuelve a empezar.", false);
+  }
   if (enCiclo) void latir();
   else void ciclo();
 }
@@ -230,19 +249,25 @@ let detenerReloj: () => void = () => {};
  * (después de unos minutos, a uno por minuto), y justo ahí es cuando el operador está en otra pestaña o ventana. Los de un
  * Web Worker no se frenan, así que el reloj vive en uno; si el navegador no deja crearlo, se usa un temporizador común.
  */
-function crearReloj(alTic: () => void): () => void {
+function crearReloj(aCadaTic: () => void): () => void {
   let comun: ReturnType<typeof setInterval> | undefined;
   let worker: Worker | null = null;
   let url: string | null = null;
+  let ultimoTic = Date.now();
+
+  const tic = () => {
+    ultimoTic = Date.now();
+    aCadaTic();
+  };
 
   function usarTemporizadorComun() {
-    if (!comun) comun = setInterval(alTic, INTERVALO_MS);
+    if (!comun) comun = setInterval(tic, INTERVALO_MS);
   }
 
   try {
     url = URL.createObjectURL(new Blob([`setInterval(function(){postMessage(1)},${INTERVALO_MS})`], { type: "text/javascript" }));
     worker = new Worker(url);
-    worker.onmessage = () => alTic();
+    worker.onmessage = tic;
     worker.onerror = () => {
       worker?.terminate();
       worker = null;
@@ -252,12 +277,19 @@ function crearReloj(alTic: () => void): () => void {
     usarTemporizadorComun();
   }
 
+  // Respaldo: si el reloj del Worker dejó de avisar sin dar error (no se lo ve, pero pasa), este temporizador común, que
+  // solo actúa cuando pasó demasiado sin un tic, lo reemplaza.
+  const respaldo = setInterval(() => {
+    if (Date.now() - ultimoTic > INTERVALO_MS * 3) tic();
+  }, INTERVALO_MS);
+
   return () => {
     worker?.terminate();
     worker = null;
     if (url) URL.revokeObjectURL(url);
     if (comun) clearInterval(comun);
     comun = undefined;
+    clearInterval(respaldo);
   };
 }
 
@@ -300,7 +332,10 @@ let usuariosDePantalla = 0;
 let andando = false;
 
 function alVolverALaPestana() {
-  if (document.visibilityState === "visible" && usuariosDePantalla > 0) void pedirPantalla();
+  if (document.visibilityState !== "visible") return;
+  if (usuariosDePantalla > 0) void pedirPantalla();
+  // Si el navegador tuvo frenada la pestaña, se consulta ya, sin esperar al próximo tic del reloj.
+  alTic();
 }
 
 function sincronizar() {

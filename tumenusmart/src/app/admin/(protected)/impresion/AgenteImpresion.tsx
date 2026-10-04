@@ -121,8 +121,8 @@ export function AgenteImpresion({
           )}
           {motorParado && (
             <p className="font-medium text-peligro">
-              El motor no está consultando al servidor. Si este aviso sigue, recargá la página (F5): el navegador puede
-              haber frenado la pestaña.
+              El motor no está consultando al servidor. Se reinicia solo en un momento; si este aviso sigue, recargá la
+              página (F5): el navegador puede haber frenado la pestaña.
             </p>
           )}
         </div>
