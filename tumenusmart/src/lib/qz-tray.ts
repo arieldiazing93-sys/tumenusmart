@@ -88,14 +88,45 @@ export function imprimirTexto(nombreImpresora: string, texto: string): Promise<v
   // buffer y salen líneas superpuestas. Pasa de verdad cuando la impresión automática de comandas (que corre en segundo
   // plano) y el ticket de un cobro coinciden en la misma impresora. Cada trabajo espera a que termine el anterior; que uno
   // falle no frena a los que siguen (el error le llega solo a quien lo pidió).
-  const tarea = colaDeImpresion.then(async () => {
+  const tarea = colaDeImpresion.then(() => imprimirConLimite(nombreImpresora, texto));
+  colaDeImpresion = tarea.catch(() => {});
+  return tarea;
+}
+
+/** Cuánto se espera a que una impresora acepte un trabajo antes de darlo por fallado. */
+const LIMITE_IMPRESION_MS = 25_000;
+
+/**
+ * Manda el trabajo a la impresora, pero no espera para siempre: una impresora en pausa, apagada o que abre una ventana
+ * pidiendo dónde guardar un archivo (las impresoras "PDF" lo hacen) dejaría el trabajo colgado, y como las impresiones van de
+ * a una, también a todas las que vienen detrás. Pasado el límite se da por fallado y sigue lo que viene.
+ */
+async function imprimirConLimite(nombreImpresora: string, texto: string): Promise<void> {
+  let reloj: ReturnType<typeof setTimeout> | undefined;
+  const limite = new Promise<never>((_, rechazar) => {
+    reloj = setTimeout(
+      () =>
+        rechazar(
+          new Error(
+            "La impresora no respondió en 25 segundos. Revisá que no esté en pausa ni pidiendo guardar un archivo (las impresoras PDF lo piden)."
+          )
+        ),
+      LIMITE_IMPRESION_MS
+    );
+  });
+  const enviar = (async () => {
     await conectarQz();
     const qz = await cargarQz();
     const config = qz.configs.create(nombreImpresora);
     await qz.print(config, [texto]);
-  });
-  colaDeImpresion = tarea.catch(() => {});
-  return tarea;
+  })();
+  // Si el límite gana, el envío sigue por su cuenta: su error (si lo hay) ya no le importa a nadie y no debe quedar sin atender.
+  enviar.catch(() => {});
+  try {
+    await Promise.race([enviar, limite]);
+  } finally {
+    if (reloj) clearTimeout(reloj);
+  }
 }
 
 /** El último trabajo de impresión pedido: el siguiente se encadena a él. */

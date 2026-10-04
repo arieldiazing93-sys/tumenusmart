@@ -21,18 +21,37 @@ export default async function ImpresionPage() {
   const db = prismaDelLocal(await idLocalActual());
 
   const estacion = await estacionActual(db);
-  const [asignadas, trabajos] = await Promise.all([
+  const [asignadas, trabajos, enEspera] = await Promise.all([
     // Sin estación vinculada no hay impresoras que mostrar: se busca con un id que no existe y vuelve vacío.
     db.estacionImpresora.findMany({
       where: { estacionId: estacion?.id ?? "sin-estacion" },
-      select: { nombreImpresora: true, areaImpresion: { select: { nombre: true } } },
+      select: { areaImpresionId: true, nombreImpresora: true, areaImpresion: { select: { nombre: true } } },
     }),
     db.trabajoImpresion.findMany({
       orderBy: { createdAt: "desc" },
       take: 30,
       select: { id: true, titulo: true, estado: true, createdAt: true, error: true, contenido: true },
     }),
+    // Lo que está esperando, por área: si hay comandas esperando un área que ESTA estación no tiene asignada a ninguna
+    // impresora, nunca van a salir por más que todo lo demás esté en verde. Es la causa más fácil de pasar por alto.
+    db.trabajoImpresion.groupBy({
+      by: ["areaImpresionId"],
+      where: { estado: "pendiente" },
+      _count: { _all: true },
+    }),
   ]);
+
+  const areasConImpresora = new Set(asignadas.map((a) => a.areaImpresionId));
+  const idsSinImpresora = enEspera
+    .filter((g): g is typeof g & { areaImpresionId: string } => !!g.areaImpresionId && !areasConImpresora.has(g.areaImpresionId))
+    .map((g) => g.areaImpresionId);
+  const nombresDeAreas = idsSinImpresora.length
+    ? await db.areaImpresion.findMany({ where: { id: { in: idsSinImpresora } }, select: { id: true, nombre: true } })
+    : [];
+  const nombreDeArea = new Map(nombresDeAreas.map((a) => [a.id, a.nombre]));
+  const comandasSinImpresora = enEspera
+    .filter((g): g is typeof g & { areaImpresionId: string } => !!g.areaImpresionId && idsSinImpresora.includes(g.areaImpresionId))
+    .map((g) => ({ area: nombreDeArea.get(g.areaImpresionId) ?? "un área", cantidad: g._count._all }));
 
   return (
     <div className="flex flex-col gap-4">
@@ -46,6 +65,7 @@ export default async function ImpresionPage() {
       <AgenteImpresion
         estacion={estacion?.nombre ?? null}
         asignaciones={asignadas.map((a) => ({ area: a.areaImpresion.nombre, impresora: a.nombreImpresora }))}
+        comandasSinImpresora={comandasSinImpresora}
       />
 
       <section className="flex flex-col gap-2">

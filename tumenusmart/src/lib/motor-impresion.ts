@@ -26,13 +26,24 @@ export type EstadoMotor = {
   fallo: string | null;
   registro: RegistroMotor[];
   impresas: number;
+  /** Cuándo (reloj de este navegador) el servidor contestó por última vez a la consulta de comandas; null si todavía no. */
+  ultimaConsultaEn: number | null;
+  /** La comanda que se está mandando a la impresora ahora y desde cuándo: si pasa mucho rato, algo la trabó. */
+  imprimiendoAhora: { titulo: string; desde: number } | null;
 };
 
 /** Cada cuántos milisegundos pregunta si hay comandas nuevas. */
 const INTERVALO_MS = 4000;
 const REGISTROS_VISIBLES = 12;
 
-const ESTADO_INICIAL: EstadoMotor = { qz: "conectando", fallo: null, registro: [], impresas: 0 };
+const ESTADO_INICIAL: EstadoMotor = {
+  qz: "conectando",
+  fallo: null,
+  registro: [],
+  impresas: 0,
+  ultimaConsultaEn: null,
+  imprimiendoAhora: null,
+};
 
 let estado: EstadoMotor = ESTADO_INICIAL;
 const oyentes = new Set<() => void>();
@@ -59,12 +70,15 @@ function anotar(texto: string, salio: boolean) {
 
 async function marcar(id: string, salio: boolean, error?: string) {
   try {
-    await fetch("/admin/api/impresion/marcar", {
-      method: "POST",
-      credentials: "include",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id, ok: salio, error }),
-    });
+    await conLimite(
+      fetch("/admin/api/impresion/marcar", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, ok: salio, error }),
+      }),
+      15_000
+    );
   } catch {
     // Si no se pudo avisar, el servidor lo da por colgado a los 60 segundos y lo vuelve a poner en la fila.
   }
@@ -74,6 +88,22 @@ async function marcar(id: string, salio: boolean, error?: string) {
 
 let enCiclo = false;
 
+/**
+ * Espera a una promesa, pero no para siempre: si QZ Tray o la red se quedan colgados, el ciclo seguiría "en curso" para
+ * siempre y no volvería a consultar ni a avisar que está vivo. Pasado el límite se la da por fallada (la promesa original
+ * sigue su camino, pero su resultado ya no le importa a nadie).
+ */
+function conLimite<T>(promesa: Promise<T>, milisegundos: number): Promise<T> {
+  promesa.catch(() => {});
+  let reloj: ReturnType<typeof setTimeout> | undefined;
+  const limite = new Promise<never>((_, rechazar) => {
+    reloj = setTimeout(() => rechazar(new Error("Se agotó el tiempo de espera.")), milisegundos);
+  });
+  return Promise.race([promesa, limite]).finally(() => {
+    if (reloj) clearTimeout(reloj);
+  });
+}
+
 async function ciclo() {
   // Si el anterior todavía no terminó (una impresión lenta), no se encima otro.
   if (enCiclo) return;
@@ -81,14 +111,14 @@ async function ciclo() {
   try {
     // Sin QZ no se puede imprimir: no se pregunta nada (así no se reclama lo que no se va a poder imprimir).
     try {
-      await conectarQz();
+      await conLimite(conectarQz(), 10_000);
       if (estado.qz !== "ok") cambiar({ qz: "ok" });
     } catch {
       if (estado.qz !== "error") cambiar({ qz: "error" });
       return;
     }
 
-    const r = await fetch("/admin/api/impresion/reclamar", { method: "POST", credentials: "include" });
+    const r = await conLimite(fetch("/admin/api/impresion/reclamar", { method: "POST", credentials: "include" }), 20_000);
     if (r.status === 401 || r.status === 403) {
       cambiar({ fallo: "Se cerró la sesión o no tenés permiso. Volvé a entrar al panel." });
       detenerReloj();
@@ -98,7 +128,7 @@ async function ciclo() {
       cambiar({ fallo: "El servidor no respondió bien. Se vuelve a intentar solo." });
       return;
     }
-    if (estado.fallo) cambiar({ fallo: null });
+    cambiar({ fallo: null, ultimaConsultaEn: Date.now() });
     const datos = (await r.json()) as RespuestaReclamar;
     if (!datos.ok) return;
 
@@ -108,6 +138,7 @@ async function ciclo() {
         anotar(`${t.titulo}: sin impresora asignada`, false);
         continue;
       }
+      cambiar({ imprimiendoAhora: { titulo: t.titulo, desde: Date.now() } });
       try {
         await imprimirTexto(t.impresora, t.contenido);
         await marcar(t.id, true);
@@ -117,6 +148,8 @@ async function ciclo() {
         const motivo = e instanceof Error ? e.message : String(e);
         await marcar(t.id, false, motivo);
         anotar(`${t.titulo}: no salió (${motivo})`, false);
+      } finally {
+        cambiar({ imprimiendoAhora: null });
       }
     }
   } catch {
@@ -124,6 +157,29 @@ async function ciclo() {
   } finally {
     enCiclo = false;
   }
+}
+
+let enLatido = false;
+
+/**
+ * Mientras hay una impresión en curso el ciclo no consulta (no se encima otro), pero la estación tiene que seguir avisando que
+ * está viva: si no, el mozo ve "nadie está imprimiendo" por una sola impresión lenta. Esto solo renueva el latido.
+ */
+async function latir() {
+  if (enLatido || estado.qz !== "ok") return;
+  enLatido = true;
+  try {
+    await fetch("/admin/api/impresion/latido", { method: "POST", credentials: "include" });
+  } catch {
+    // Si falla, el próximo tic lo vuelve a intentar.
+  }
+  enLatido = false;
+}
+
+/** Lo que se hace en cada tic del reloj: consultar comandas, o solo latir si todavía hay una impresión en curso. */
+function alTic() {
+  if (enCiclo) void latir();
+  else void ciclo();
 }
 
 // ------------------------------------------------------------------------------------------------ el reloj
@@ -211,7 +267,7 @@ function alVolverALaPestana() {
 function sincronizar() {
   if (usuarios > 0 && !andando) {
     andando = true;
-    detenerReloj = crearReloj(() => void ciclo());
+    detenerReloj = crearReloj(alTic);
     document.addEventListener("visibilitychange", alVolverALaPestana);
     void ciclo();
   } else if (usuarios === 0 && andando) {
