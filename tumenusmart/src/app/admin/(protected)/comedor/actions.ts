@@ -22,6 +22,7 @@ import {
   contenidoParaGuardar,
   descuentoDeCuenta,
   leerConsumoGuardado,
+  normalizarMesa,
   textoAnulacion,
   totalDeLineas,
   totalesDeCuenta,
@@ -519,6 +520,88 @@ export async function cargarProductosCaja(
   }
   refrescar();
   return { ok: true, ronda: r.ronda, totalEnvio: r.totalEnvio, areas: r.areas, yaEnviado: r.yaEnviado };
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+//  Abrir una cuenta desde la caja
+// ---------------------------------------------------------------------------------------------------------------------
+
+export type ResultadoAbrirCuenta =
+  | { ok: true; cuentaId: string; cuentaNumero: number; mesa: string; areas: string[]; totalEnvio: number; yaEnviado: boolean }
+  | { ok: false; error: string };
+
+/**
+ * La caja abre la cuenta de una mesa desde el panel (cuando el mozo no está o el cliente pide en la caja): elige la mesa y el
+ * mozo a cargo —que es simbólico: es quien figura en la cuenta y en los reportes— y le carga el primer pedido. Igual que
+ * cuando abre el mozo, la cuenta nace al enviar el primer pedido (no existen cuentas vacías) y hace lo mismo: precio
+ * recalculado en el servidor, stock descontado y comanda en la cola de impresión. Lo cargado queda marcado como "cargado por
+ * la caja" con el nombre de quien lo hizo.
+ *
+ * Mismas reglas que el mozo: si el local cargó sus mesas hay que elegir una de la lista, y una mesa que ya tiene cuenta
+ * abierta NO se abre otra vez (se le agrega el pedido a la que tiene).
+ */
+export async function abrirCuentaEnCaja(datos: {
+  mesa: string;
+  mozoId: string;
+  comensales?: number;
+  envioId: string;
+  items: LineaDeRonda[];
+}): Promise<ResultadoAbrirCuenta> {
+  const sesion = await exigirPermiso("comedor.gestionar");
+  const storeId = await idLocalActual();
+  const db = prismaDelLocal(storeId);
+  const quien = nombreDe(sesion);
+
+  const mesa = normalizarMesa(datos?.mesa);
+  if (!mesa) return { ok: false, error: "Elegí la mesa (hasta 20 letras)." };
+
+  // El mozo se busca dentro de ESTE local y tiene que estar activo: un id de otro negocio no aparece.
+  const mozo = await db.mozo.findFirst({
+    where: { id: String(datos?.mozoId ?? ""), activo: true },
+    select: { id: true, nombre: true, apellido: true },
+  });
+  if (!mozo) return { ok: false, error: "Elegí el mozo a cargo de la cuenta." };
+
+  const comensales =
+    Number.isInteger(datos?.comensales) && datos.comensales! >= 1 && datos.comensales! <= 99 ? datos.comensales! : null;
+  const mesasCargadas = await db.mesaComedor.findMany({ select: { clave: true, activa: true } });
+
+  const r = await guardarRonda({
+    storeId,
+    mesa,
+    comensales,
+    envioId: String(datos?.envioId ?? ""),
+    items: Array.isArray(datos?.items) ? datos.items : [],
+    mozoId: mozo.id,
+    quien: `Caja - ${quien}`,
+    cargadoPor: quien,
+    detalleTecnico: true,
+    mesasPermitidas: mesasCargadas.length > 0 ? mesasCargadas.filter((m) => m.activa).map((m) => m.clave) : undefined,
+    soloAbrirNueva: true,
+  });
+  if (!r.ok) return r;
+
+  if (!r.yaEnviado) {
+    const aCargoDe = [mozo.nombre, mozo.apellido].filter(Boolean).join(" ");
+    await registrarBitacora(storeId, sesion, {
+      modulo: "comedor",
+      accion: "cuenta_abierta_en_caja",
+      descripcion: `Abrió desde la caja la cuenta ${formatearNumero(r.cuentaNumero)} de la mesa ${r.mesa}, a cargo de ${aCargoDe}, y cargó el pedido 1 (${formatearGuarani(r.totalEnvio)}).`,
+      entidad: "CuentaMesa",
+      entidadId: r.cuentaId,
+      detalle: { cuenta: r.cuentaNumero, mesa: r.mesa, mozo: aCargoDe, total: r.totalEnvio },
+    });
+  }
+  refrescar();
+  return {
+    ok: true,
+    cuentaId: r.cuentaId,
+    cuentaNumero: r.cuentaNumero,
+    mesa: r.mesa,
+    areas: r.areas,
+    totalEnvio: r.totalEnvio,
+    yaEnviado: r.yaEnviado,
+  };
 }
 
 // ---------------------------------------------------------------------------------------------------------------------

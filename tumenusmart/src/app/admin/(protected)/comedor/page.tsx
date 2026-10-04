@@ -10,6 +10,7 @@ import { formatearGuarani } from "@/lib/format";
 import {
   ESTADOS_CUENTA_ABIERTA,
   SEGUNDOS_LATIDO_IMPRESION,
+  claveDeMesa,
   descuentoDeCuenta,
   totalesDeCuenta,
 } from "@/lib/comedor";
@@ -101,6 +102,7 @@ export default async function ComedorPage() {
     puedeCobrar,
     categorias: [],
     gruposMitad: [],
+    apertura: { mozos: [], mesas: [], sectores: [], mesasOcupadas: [] },
     imprimirCuenta: { ok: false, motivo: "" },
     cobro: { ok: false, motivo: "" },
   };
@@ -108,7 +110,33 @@ export default async function ComedorPage() {
   if (puedeGestionar) {
     const estacion = await estacionActual(db);
     const catalogo = await cargarCatalogoDeVenta(db);
-    contexto = { ...contexto, categorias: catalogo.categorias, gruposMitad: catalogo.gruposMitad };
+
+    // Para abrir una cuenta desde la caja: los mozos (el que se elige es simbólico), las mesas del salón y cuáles están ocupadas.
+    const [mozos, mesasCargadas, sectores] = await Promise.all([
+      db.mozo.findMany({
+        where: { activo: true },
+        orderBy: [{ nombre: "asc" }, { apellido: "asc" }],
+        select: { id: true, nombre: true, apellido: true },
+      }),
+      db.mesaComedor.findMany({
+        where: { activa: true },
+        orderBy: [{ orden: "asc" }, { createdAt: "asc" }],
+        select: { nombre: true, clave: true, sectorId: true },
+      }),
+      db.sectorComedor.findMany({ orderBy: [{ orden: "asc" }, { createdAt: "asc" }], select: { id: true, nombre: true } }),
+    ]);
+    const ocupadas = new Set(cuentas.map((c) => claveDeMesa(c.mesa)));
+    contexto = {
+      ...contexto,
+      categorias: catalogo.categorias,
+      gruposMitad: catalogo.gruposMitad,
+      apertura: {
+        mozos: mozos.map((m) => ({ id: m.id, nombre: nombre(m) })),
+        mesas: mesasCargadas.map((m) => ({ nombre: m.nombre, sectorId: m.sectorId, ocupada: ocupadas.has(m.clave) })),
+        sectores,
+        mesasOcupadas: cuentas.map((c) => c.mesa),
+      },
+    };
 
     if (!estacion) {
       const motivo = "Esta computadora no está vinculada a una estación. Vinculala en Estaciones.";

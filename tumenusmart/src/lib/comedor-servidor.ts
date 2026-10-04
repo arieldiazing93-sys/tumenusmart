@@ -102,7 +102,7 @@ function mensajeDeReglaCuenta(e: unknown): string | null {
   if (e.message === CUENTA_AJENA) return "Esa mesa la atiende otro mozo: no podés cargarle productos.";
   if (e.message === MESA_NO_EXISTE) return "Esa mesa no está en la lista del salón. Elegí una mesa de la lista.";
   if (e.message === MESA_YA_ABIERTA) {
-    return "Esa mesa ya está abierta (la abrieron hace un momento). No se abre otra: volvé a las mesas y tocá “Agregar pedido” en su cuenta.";
+    return "Esa mesa ya tiene una cuenta abierta: no se abre otra. Agregale el pedido a esa cuenta (“Agregar pedido”).";
   }
   return null;
 }

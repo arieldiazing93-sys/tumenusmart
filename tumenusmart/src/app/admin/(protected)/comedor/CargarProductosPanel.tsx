@@ -13,7 +13,7 @@ import type {
 } from "@/lib/catalogo-venta";
 import { AgregadosPickerPos } from "../pos/AgregadosPickerPos";
 import { MitadYMitadPickerPos } from "../pos/MitadYMitadPickerPos";
-import { cargarProductosCaja } from "./actions";
+import { abrirCuentaEnCaja, cargarProductosCaja } from "./actions";
 
 /** Un producto (con o sin agregados) o un combo mitad y mitad ya armado, con su nota para la cocina. */
 type ItemCarrito = { key: string; nombre: string; precio: number; cantidad: number; detalle?: string; nota: string } & (
@@ -39,16 +39,23 @@ function nuevoEnvioId(): string {
  * La caja le carga productos a la cuenta de una mesa desde el panel: la misma carta que ve el mozo, a la derecha de la
  * pantalla. Al enviar hace lo mismo que cuando envía el mozo: el servidor recalcula el precio, descuenta el stock y manda
  * la comanda al área (Cocina, Barra…).
+ *
+ * También sirve para ABRIR una cuenta nueva desde la caja (`nuevaCuenta`): es la misma carta y el mismo envío, pero en vez de
+ * sumar a una cuenta que ya existe, el primer envío la abre con la mesa y el mozo a cargo que se eligieron antes.
  */
 export function CargarProductosPanel({
   cuentaId,
+  nuevaCuenta,
   mesa,
   categorias,
   gruposMitad,
   onCerrar,
   onEnviado,
 }: {
-  cuentaId: string;
+  /** La cuenta a la que se le carga. Sin esto, tiene que venir `nuevaCuenta`. */
+  cuentaId?: string;
+  /** Para abrir la cuenta de una mesa que todavía no la tiene: la mesa, el mozo a cargo (simbólico) y cuántas personas. */
+  nuevaCuenta?: { mesa: string; mozoId: string; mozoNombre: string; comensales: number | null };
   mesa: string;
   categorias: CategoriaVenta[];
   gruposMitad: GrupoMitadVenta[];
@@ -185,19 +192,30 @@ export function CargarProductosPanel({
     setEnviando(true);
     setError(null);
     try {
-      const r = await cargarProductosCaja(cuentaId, {
-        envioId,
-        items: carrito.map((i) =>
-          i.tipo === "combo"
-            ? {
-                mitadYMitad: { productIdA: i.productIdA, productIdB: i.productIdB },
-                opcionIds: i.agregadoIds,
-                cantidad: i.cantidad,
-                nota: i.nota,
-              }
-            : { productId: i.productId, opcionIds: i.agregadoIds, cantidad: i.cantidad, nota: i.nota }
-        ),
-      });
+      const items = carrito.map((i) =>
+        i.tipo === "combo"
+          ? {
+              mitadYMitad: { productIdA: i.productIdA, productIdB: i.productIdB },
+              opcionIds: i.agregadoIds,
+              cantidad: i.cantidad,
+              nota: i.nota,
+            }
+          : { productId: i.productId, opcionIds: i.agregadoIds, cantidad: i.cantidad, nota: i.nota }
+      );
+      let r: { ok: true; areas: string[] } | { ok: false; error: string };
+      if (nuevaCuenta) {
+        r = await abrirCuentaEnCaja({
+          mesa: nuevaCuenta.mesa,
+          mozoId: nuevaCuenta.mozoId,
+          comensales: nuevaCuenta.comensales ?? undefined,
+          envioId,
+          items,
+        });
+      } else if (cuentaId) {
+        r = await cargarProductosCaja(cuentaId, { envioId, items });
+      } else {
+        r = { ok: false, error: "No se sabe a qué cuenta cargarle los productos." };
+      }
       setEnviando(false);
       if (!r.ok) {
         setError(r.error);
@@ -217,7 +235,7 @@ export function CargarProductosPanel({
 
   return (
     <PanelLateral
-      titulo={`Cargar productos a la mesa ${mesa}`}
+      titulo={nuevaCuenta ? `Abrir la cuenta de la mesa ${mesa}` : `Cargar productos a la mesa ${mesa}`}
       // Escape cierra el selector de agregados si está abierto, no este panel.
       onCerrar={() => {
         if (!productoEligiendo) onCerrar();
@@ -226,7 +244,10 @@ export function CargarProductosPanel({
     >
       <div className="flex min-h-0 flex-1 flex-col">
         <div className="flex flex-1 flex-col gap-3 overflow-y-auto px-4 py-4">
-          <p className="text-[0.72rem] font-semibold uppercase tracking-rotulo text-tinta-suave">Mesa {mesa} · lo que cargues sale a cocina</p>
+          <p className="text-[0.72rem] font-semibold uppercase tracking-rotulo text-tinta-suave">
+            Mesa {mesa}
+            {nuevaCuenta ? ` · a cargo de ${nuevaCuenta.mozoNombre}` : ""} · lo que cargues sale a cocina
+          </p>
           <Entrada
             type="search"
             value={busqueda}
@@ -358,7 +379,7 @@ export function CargarProductosPanel({
             <span className="cifra text-[1.3rem] font-bold text-tinta">{formatearGuarani(total)}</span>
           </div>
           <Boton tono="principal" tam="lg" className="w-full" disabled={enviando || carrito.length === 0} onClick={() => void enviar()}>
-            {enviando ? "Enviando…" : "Enviar a cocina"}
+            {enviando ? "Enviando…" : nuevaCuenta ? "Abrir la cuenta y enviar a cocina" : "Enviar a cocina"}
           </Boton>
         </div>
       </div>
