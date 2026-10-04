@@ -401,6 +401,10 @@ export async function enviarPedido(token: string, datos: DatosEnvio): Promise<Re
   if (!mesa) return { ok: false, error: "Escribí el número o nombre de la mesa (hasta 20 letras)." };
   const comensales =
     Number.isInteger(datos.comensales) && datos.comensales! >= 1 && datos.comensales! <= 99 ? datos.comensales! : null;
+  // Al ABRIR una mesa nueva hay que decir cuántas personas son (al menos 1). Se exige acá, en el servidor, no solo en el celular.
+  if (datos.abrirNueva === true && comensales === null) {
+    return { ok: false, error: "Indicá cuántas personas son (al menos 1)." };
+  }
 
   // Si el dueño cargó las mesas del salón, solo se puede abrir una de esa lista (seguir cargando en una cuenta que ya
   // existe, siempre). Las reglas se comprueban acá en el servidor, no en el celular.

@@ -130,7 +130,8 @@ export function MaestroDetalle<T extends { id: string; activo: boolean }>({
                         </td>
                       ))}
                       <td className="px-2 py-1 text-right">
-                        <button type="button" onClick={() => abrir(item.id)} className={clasesBoton("suave", "sm")}>
+                        {/* "Ver" abre los datos a la derecha: es navegar, así que va en azul (igual que Ver en los historiales). */}
+                        <button type="button" onClick={() => abrir(item.id)} className={clasesBoton("navegar", "sm")}>
                           Ver
                         </button>
                       </td>

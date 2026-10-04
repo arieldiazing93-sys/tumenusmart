@@ -28,7 +28,7 @@ import {
   type SectorDelSalon,
 } from "./actions";
 
-type Vista = "salon" | "cuenta" | "productos" | "revision" | "enviado";
+type Vista = "salon" | "cuenta" | "personas" | "productos" | "revision" | "enviado";
 type DetalleOk = Extract<DetalleDeCuenta, { ok: true }>;
 type EnvioOk = Extract<ResultadoEnvio, { ok: true }>;
 
@@ -133,6 +133,10 @@ export function MozoApp({
 
   const [mesaTexto, setMesaTexto] = useState("");
   const [comensalesTexto, setComensalesTexto] = useState("");
+  // Cuántas personas son: obligatorio al abrir una mesa nueva (de 1 a 99).
+  const personasNumero = Number(comensalesTexto);
+  const personasValidas =
+    comensalesTexto.trim() !== "" && Number.isInteger(personasNumero) && personasNumero >= 1 && personasNumero <= 99;
   const [mesa, setMesa] = useState("");
   // true mientras se está ABRIENDO la mesa (la tocó libre o escribió su número); false al "Agregar pedido" a una que ya existe.
   const [abriendoMesa, setAbriendoMesa] = useState(false);
@@ -206,14 +210,35 @@ export function MozoApp({
       );
       return;
     }
-    empezarPedido(texto, true);
+    pedirPersonas(texto);
+  }
+
+  /**
+   * Antes de cargar productos en una mesa NUEVA se pregunta cuántas personas son, y es obligatorio (al menos 1): sirve para los
+   * reportes y para que el salón sepa cuánta gente hay. Para sumarle un pedido a una cuenta que ya existe no se pregunta.
+   */
+  function pedirPersonas(nombreDeMesa: string) {
+    setMesa(nombreDeMesa);
+    setAbriendoMesa(true);
+    setComensalesTexto("");
+    setError(null);
+    setVista("personas");
+  }
+
+  /** Con las personas ya dichas, sigue la carga de productos de la mesa que se está abriendo. */
+  function continuarConPersonas() {
+    if (!personasValidas) {
+      setError("Indicá cuántas personas son (al menos 1).");
+      return;
+    }
+    empezarPedido(mesa, true);
   }
 
   /** Se toca una mesa de la lista del dueño: libre abre la cuenta; ocupada lleva a su cuenta si este mozo la puede ver. */
   function tocarMesa(m: MesaDelSalon) {
     setError(null);
     if (m.estado === "libre") {
-      empezarPedido(m.nombre, true);
+      pedirPersonas(m.nombre);
       return;
     }
     const cuenta = m.cuentaId ? cuentas.find((c) => c.id === m.cuentaId) : undefined;
@@ -431,6 +456,12 @@ export function MozoApp({
   // ------------------------------------------------------------------- enviar
   async function enviar() {
     if (enviando || carrito.length === 0) return;
+    // Una mesa nueva no se abre sin decir cuántas personas son (el servidor también lo exige).
+    if (abriendoMesa && !personasValidas) {
+      setError("Indicá cuántas personas son (al menos 1).");
+      setVista("personas");
+      return;
+    }
     setEnviando(true);
     setError(null);
     const comensales = Number(comensalesTexto);
@@ -563,18 +594,6 @@ export function MozoApp({
               <section className="rounded-xl border-2 border-azul/50 bg-superficie p-3.5">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <p className={ROTULO}>{conSectores ? "1 · Elegí el sector y la mesa" : "1 · Elegí la mesa"}</p>
-                  <div className="w-24">
-                    <Entrada
-                      type="number"
-                      inputMode="numeric"
-                      min={1}
-                      max={99}
-                      value={comensalesTexto}
-                      onChange={(e) => setComensalesTexto(e.target.value)}
-                      placeholder="Personas"
-                      aria-label="Cuántas personas"
-                    />
-                  </div>
                 </div>
                 {conSectores && mesas.length > 0 && (
                   <div
@@ -655,18 +674,6 @@ export function MozoApp({
                       aria-label="Número o nombre de la mesa"
                     />
                   </div>
-                  <div className="w-24">
-                    <Entrada
-                      type="number"
-                      inputMode="numeric"
-                      min={1}
-                      max={99}
-                      value={comensalesTexto}
-                      onChange={(e) => setComensalesTexto(e.target.value)}
-                      placeholder="Personas"
-                      aria-label="Cuántas personas"
-                    />
-                  </div>
                   <Boton tono="nuevo" tam="md" onClick={abrirMesa}>
                     Abrir mesa
                   </Boton>
@@ -727,6 +734,59 @@ export function MozoApp({
               )}
             </section>
             )}
+          </div>
+        )}
+
+        {/* ------------------------------------- cuántas personas (obligatorio para abrir la mesa) */}
+        {vista === "personas" && (
+          <div className="flex flex-col gap-4">
+            <section className="rounded-xl border-2 border-azul/50 bg-superficie p-3.5">
+              <p className={ROTULO}>2 · ¿Cuántas personas son?</p>
+              <p className="mt-1 text-[0.82rem] text-tinta-media">
+                Hace falta para abrir la mesa. Tocá la cantidad (o escribila abajo si son más).
+              </p>
+              <div className="mt-3 grid grid-cols-4 gap-2">
+                {[1, 2, 3, 4, 5, 6, 7, 8].map((n) => (
+                  <button
+                    key={n}
+                    type="button"
+                    onClick={() => {
+                      setComensalesTexto(String(n));
+                      setError(null);
+                    }}
+                    aria-pressed={comensalesTexto === String(n)}
+                    className={`rounded-xl border-2 py-3 text-[1.25rem] font-bold transition-all active:scale-[0.96] ${
+                      comensalesTexto === String(n)
+                        ? "border-brand bg-brand text-white"
+                        : "border-azul/50 bg-white text-tinta hover:border-azul hover:bg-azul-luz"
+                    }`}
+                  >
+                    {n}
+                  </button>
+                ))}
+              </div>
+              <div className="mt-3 flex items-center gap-2">
+                <span className="text-[0.85rem] text-tinta-media">Otra cantidad</span>
+                <div className="w-24">
+                  <Entrada
+                    type="number"
+                    inputMode="numeric"
+                    min={1}
+                    max={99}
+                    value={comensalesTexto}
+                    onChange={(e) => {
+                      setComensalesTexto(e.target.value);
+                      setError(null);
+                    }}
+                    placeholder="Ej: 12"
+                    aria-label="Cantidad de personas"
+                  />
+                </div>
+              </div>
+            </section>
+            <Boton tono="principal" tam="lg" className="w-full" disabled={!personasValidas} onClick={continuarConPersonas}>
+              Continuar y cargar productos
+            </Boton>
           </div>
         )}
 
@@ -798,7 +858,7 @@ export function MozoApp({
         {/* ------------------------------------------------ cargar productos */}
         {vista === "productos" && (
           <div>
-            <p className={`${ROTULO} mb-2`}>2 · Cargá los productos</p>
+            <p className={`${ROTULO} mb-2`}>{abriendoMesa ? "3" : "2"} · Cargá los productos</p>
             <Entrada
               type="search"
               value={busqueda}
@@ -886,7 +946,7 @@ export function MozoApp({
         {/* ------------------------------------------------- vista previa */}
         {vista === "revision" && (
           <div className="flex flex-col gap-3">
-            <p className={ROTULO}>3 · Revisá antes de enviar</p>
+            <p className={ROTULO}>{abriendoMesa ? "4" : "3"} · Revisá antes de enviar</p>
             <EstadoImpresion imprimiendo={imprimiendo} />
             <ul className="flex flex-col gap-2.5 rounded-xl border-2 border-azul/50 bg-superficie p-3">
               {carrito.map((i) => (
@@ -958,7 +1018,7 @@ export function MozoApp({
 
             <div className="flex flex-col gap-2">
               <Boton tono="principal" tam="lg" className="w-full" disabled={enviando || carrito.length === 0} onClick={() => void enviar()}>
-                {enviando ? "Enviando…" : "4 · Enviar a cocina"}
+                {enviando ? "Enviando…" : `${abriendoMesa ? "5" : "4"} · Enviar a cocina`}
               </Boton>
               <button type="button" onClick={() => setVista("productos")} className={clasesBoton("navegar", "md")}>
                 ← Seguir cargando
