@@ -15,17 +15,17 @@ export type MozoFila = {
 };
 
 /**
- * Un PIN de 6 números al azar, para no tener que inventarlo (más largo es más difícil de adivinar). Con el generador seguro
- * del navegador, no con Math.random, que es predecible; si sale uno demasiado fácil (111111, 123456) se tira de nuevo.
+ * Un PIN de 5 números al azar (el máximo que se acepta), para no tener que inventarlo. Con el generador seguro del navegador,
+ * no con Math.random, que es predecible; si sale uno demasiado fácil (11111, 12345) se tira de nuevo.
  */
 function pinAlAzar(): string {
   for (let intento = 0; intento < 20; intento++) {
     const n = new Uint32Array(1);
     crypto.getRandomValues(n);
-    const pin = String(100000 + (n[0] % 900000));
+    const pin = String(10000 + (n[0] % 90000));
     if (!pinDemasiadoFacil(pin)) return pin;
   }
-  return "739204";
+  return "73920";
 }
 
 /**
@@ -71,7 +71,7 @@ export function FormularioMozo({ mozo, onCerrar }: { mozo: MozoFila | null; onCe
           etiqueta={pedirPin ? "PIN" : "Nuevo PIN (opcional)"}
           ayuda={
             pedirPin
-              ? "De 4 a 6 números. Es lo que el mozo pone en su celular o tablet para entrar: no puede repetirse."
+              ? "De 3 a 5 números (solo números). Es lo que el mozo pone en su celular o tablet para entrar: no puede repetirse. Una forma fácil: los últimos 3 de su cédula o de su teléfono."
               : "Si lo dejás vacío, el mozo sigue entrando con el que ya tiene."
           }
         >
@@ -79,12 +79,12 @@ export function FormularioMozo({ mozo, onCerrar }: { mozo: MozoFila | null; onCe
             <Entrada
               name="pin"
               value={pin}
-              onChange={(e) => setPin(e.target.value.replace(/\D/g, "").slice(0, 6))}
+              onChange={(e) => setPin(e.target.value.replace(/\D/g, "").slice(0, 5))}
               inputMode="numeric"
               autoComplete="off"
-              placeholder="12345"
+              placeholder="Ej: 482"
               required={pedirPin}
-              maxLength={6}
+              maxLength={5}
             />
             <button type="button" onClick={() => setPin(pinAlAzar())} className={clasesBoton("suave", "md")}>
               Generar

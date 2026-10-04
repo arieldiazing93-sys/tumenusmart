@@ -2,10 +2,12 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { PIN_MOZO_MAXIMO_AL_ENTRAR, PIN_MOZO_MINIMO } from "@/lib/comedor";
 import { entrarConPin } from "./actions";
 
 const TECLAS = ["1", "2", "3", "4", "5", "6", "7", "8", "9"] as const;
-const LARGO_MAXIMO = 6;
+// Se puede teclear hasta 6 (los PIN de 6 que ya existían siguen sirviendo); los nuevos son de 3 a 5.
+const LARGO_MAXIMO = PIN_MOZO_MAXIMO_AL_ENTRAR;
 
 /**
  * La puerta del mozo: su PIN. Teclado grande para tablet y celular. Con el PIN correcto se abre la sesión y la página se
@@ -23,7 +25,7 @@ export function PinMozo({ token, nombreLocal }: { token: string; nombreLocal: st
   }
 
   function entrar() {
-    if (pin.length < 4 || entrando) return;
+    if (pin.length < PIN_MOZO_MINIMO || entrando) return;
     setError(null);
     iniciar(async () => {
       const r = await entrarConPin(token, pin);
@@ -86,7 +88,7 @@ export function PinMozo({ token, nombreLocal }: { token: string; nombreLocal: st
         <button
           type="button"
           onClick={entrar}
-          disabled={entrando || pin.length < 4}
+          disabled={entrando || pin.length < PIN_MOZO_MINIMO}
           className="flex h-16 items-center justify-center rounded-xl bg-brand text-[1rem] font-semibold text-white transition-all active:scale-95 disabled:opacity-50"
         >
           {entrando ? "…" : "Entrar"}

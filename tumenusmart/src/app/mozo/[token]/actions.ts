@@ -1,7 +1,7 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
-import { MINUTOS_BLOQUEO_PIN, pinValido } from "@/lib/asistencia";
+import { MINUTOS_BLOQUEO_PIN } from "@/lib/asistencia";
 import { pedirIntentoDePin, resolverIntentoDePin } from "@/lib/limite-pin";
 import {
   abrirSesionMozo,
@@ -21,6 +21,7 @@ import {
   SEGUNDOS_LATIDO_IMPRESION,
   claveDeMesa,
   normalizarMesa,
+  pinDeMozoAceptadoAlEntrar,
   totalDeLineas,
 } from "@/lib/comedor";
 import { ErrorDeUsuario, encolarCuenta, guardarRonda } from "@/lib/comedor-servidor";
@@ -65,7 +66,8 @@ export async function entrarConPin(token: string, pin: string): Promise<Resultad
   const local = await localPorTokenMozos(token);
   if (!local) return { ok: false, error: "Este enlace ya no está activo." };
 
-  if (!pinValido(pin)) return { ok: false, error: "El PIN tiene entre 4 y 6 números." };
+  // Al entrar se aceptan hasta 6 números (hubo PIN de 6 creados antes de fijar el tope en 5); al crearlos, hasta 5.
+  if (!pinDeMozoAceptadoAlEntrar(pin)) return { ok: false, error: "El PIN son entre 3 y 5 números." };
 
   // El intento se cuenta ANTES de mirar el PIN (ver src/lib/limite-pin.ts): así una ráfaga de pedidos simultáneos no puede
   // probar más PIN que el tope, y acertar con un PIN propio no borra los errores seguidos.

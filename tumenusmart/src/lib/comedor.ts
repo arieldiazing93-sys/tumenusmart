@@ -306,3 +306,28 @@ export function leerConsumoGuardado(valor: unknown): ConsumoGuardado[] {
   }
   return lista;
 }
+
+// ---------------------------------------------------------------------------------------------------------------------
+//  El PIN del mozo
+// ---------------------------------------------------------------------------------------------------------------------
+
+/**
+ * El PIN con el que el mozo entra a su celular o tablet: SOLO NÚMEROS, de 3 a 5. Es más corto que el de asistencia (4 a 6) a
+ * propósito: el mozo entra muchas veces por turno y le sirve algo fácil de recordar, como los últimos 3 de su cédula o de su
+ * teléfono. Lo que puede hacer un mozo con su PIN es cargar pedidos: no cancela, no da descuentos ni cobra. Por eso el freno a los
+ * intentos incorrectos (src/lib/limite-pin.ts) y el enlace secreto del local son lo que lo protege.
+ */
+export const PIN_MOZO_MINIMO = 3;
+export const PIN_MOZO_MAXIMO = 5;
+/** Al ENTRAR se siguen aceptando 6 (los PIN de 6 que ya se habían creado no se quedan afuera); al crear o cambiar, el tope es 5. */
+export const PIN_MOZO_MAXIMO_AL_ENTRAR = 6;
+
+/** ¿Sirve como PIN nuevo de un mozo? Solo números, de 3 a 5. */
+export function pinDeMozoValido(pin: string): boolean {
+  return /^\d{3,5}$/.test(pin);
+}
+
+/** ¿Es un PIN que se puede probar al entrar? Solo números, de 3 a 6 (por los PIN de 6 que ya existían). */
+export function pinDeMozoAceptadoAlEntrar(pin: string): boolean {
+  return /^\d{3,6}$/.test(pin);
+}

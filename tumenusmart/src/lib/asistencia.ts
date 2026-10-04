@@ -144,7 +144,8 @@ export function pinValido(pin: string): boolean {
  * CREAR o CAMBIAR un PIN (no al entrar: a quien ya tiene uno así no se le corta el acceso de golpe).
  */
 export function pinDemasiadoFacil(pin: string): boolean {
-  if (!/^\d{4,6}$/.test(pin)) return false;
+  // De 3 a 6 números: el PIN del mozo puede ser de 3 (el de asistencia ya se exige de 4 a 6 antes de llegar acá).
+  if (!/^\d{3,6}$/.test(pin)) return false;
   if (/^(\d)\1+$/.test(pin)) return true;
   const digitos = [...pin].map(Number);
   const sube = digitos.every((d, i) => i === 0 || d === digitos[i - 1] + 1);
