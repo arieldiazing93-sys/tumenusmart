@@ -18,6 +18,13 @@ import {
   type ResultadoMesas,
 } from "./actions";
 
+/**
+ * El amarillo de "asignar" (el mismo del repartidor en Pedidos): todo desplegable de sector va así, para que se vea de un
+ * vistazo en qué sector quedan las mesas. El `!` le gana al borde y al fondo comunes de los campos.
+ */
+const CAMPO_SECTOR =
+  "!border-2 !border-amarillo !bg-amarillo-campo font-semibold !text-tinta focus:!border-amarillo focus:!ring-amarillo/40";
+
 type SectorFila = { id: string; nombre: string };
 type MesaFila = { id: string; nombre: string; activa: boolean; sectorId: string | null };
 
@@ -71,6 +78,8 @@ export function GestorMesas({
   const sectorDelRango = sectorEfectivo(sectorRango);
   const sectorDeLaNueva = sectorEfectivo(sectorNueva);
   const sectorDelMasivo = sectorEfectivo(sectorMasivo);
+  /** El nombre del sector elegido, para decir con todas las letras a dónde van las mesas. */
+  const nombreDeSector = (id: string) => sectores.find((s) => s.id === id)?.nombre ?? null;
 
   // Solo cuentan las marcadas que todavía existen (una mesa borrada o ya movida no debe quedar marcada).
   const marcadasVigentes = marcadas.filter((id) => mesas.some((m) => m.id === id));
@@ -178,7 +187,7 @@ export function GestorMesas({
                   value={m.sectorId ?? ""}
                   disabled={pendiente}
                   onChange={(e) => ejecutar(() => moverMesaASector(m.id, e.target.value || null))}
-                  className="flex-1"
+                  className={`flex-1 ${CAMPO_SECTOR}`}
                 >
                   <option value="">Sin sector</option>
                   {sectores.map((s) => (
@@ -372,8 +381,8 @@ export function GestorMesas({
           <div className="mt-3 flex flex-wrap items-end gap-2">
             {sectores.length > 0 && (
               <div className="min-w-[8rem] flex-1">
-                <Campo etiqueta="Sector">
-                  <Selector value={sectorDelRango} onChange={(e) => setSectorRango(e.target.value)}>
+                <Campo etiqueta="Sector" ayuda="Acá quedan las mesas">
+                  <Selector value={sectorDelRango} onChange={(e) => setSectorRango(e.target.value)} className={CAMPO_SECTOR}>
                     <option value="">Sin sector</option>
                     {sectores.map((s) => (
                       <option key={s.id} value={s.id}>
@@ -427,6 +436,12 @@ export function GestorMesas({
               Crear mesas
             </button>
           </div>
+          {sectores.length > 0 && hasta.trim() && (
+            <p className="mt-2.5 rounded-lg border border-amarillo bg-amarillo-luz px-3 py-1.5 text-[0.8rem] font-medium text-amarillo-oscuro">
+              Se van a cargar las mesas del {desdeEfectivo} al {hasta.trim()}{" "}
+              {sectorDelRango ? `en el sector ${nombreDeSector(sectorDelRango)}` : "sin sector"}.
+            </p>
+          )}
         </section>
 
         {/* ------------------------------------------------------- bloque 3: con nombre */}
@@ -453,8 +468,8 @@ export function GestorMesas({
             </div>
             {sectores.length > 0 && (
               <div className="min-w-[8rem]">
-                <Campo etiqueta="Sector">
-                  <Selector value={sectorDeLaNueva} onChange={(e) => setSectorNueva(e.target.value)}>
+                <Campo etiqueta="Sector" ayuda="Acá queda la mesa">
+                  <Selector value={sectorDeLaNueva} onChange={(e) => setSectorNueva(e.target.value)} className={CAMPO_SECTOR}>
                     <option value="">Sin sector</option>
                     {sectores.map((s) => (
                       <option key={s.id} value={s.id}>
@@ -474,6 +489,12 @@ export function GestorMesas({
               Agregar
             </button>
           </div>
+          {sectores.length > 0 && nombreNueva.trim() && (
+            <p className="mt-2.5 rounded-lg border border-amarillo bg-amarillo-luz px-3 py-1.5 text-[0.8rem] font-medium text-amarillo-oscuro">
+              La mesa “{nombreNueva.trim()}” va{" "}
+              {sectorDeLaNueva ? `al sector ${nombreDeSector(sectorDeLaNueva)}` : "sin sector"}.
+            </p>
+          )}
         </section>
       </div>
 
@@ -503,7 +524,7 @@ export function GestorMesas({
               <div className="flex flex-wrap items-end gap-2">
                 <div className="min-w-[9rem] flex-1">
                   <Campo etiqueta="Pasar las marcadas a">
-                    <Selector value={sectorDelMasivo} onChange={(e) => setSectorMasivo(e.target.value)}>
+                    <Selector value={sectorDelMasivo} onChange={(e) => setSectorMasivo(e.target.value)} className={CAMPO_SECTOR}>
                       <option value="">Sin sector</option>
                       {sectores.map((s) => (
                         <option key={s.id} value={s.id}>

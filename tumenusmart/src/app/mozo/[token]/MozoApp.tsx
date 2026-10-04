@@ -500,6 +500,14 @@ export function MozoApp({
   const mesasDelSector = conSectores ? mesasDe(sectorActivo) : mesas;
   const libresDe = (lista: MesaDelSalon[]) => lista.filter((m) => m.estado === "libre").length;
 
+  // Con las mesas del dueño cargadas, cada cuenta abierta se ve en su tarjeta de mesa (al tocarla se abre la cuenta), así que
+  // no se repite la lista de abajo. Solo quedan en ella las cuentas cuya mesa ya no está para elegir (una desactivada o
+  // borrada con la cuenta todavía abierta): sin esto el mozo no llegaría a ellas.
+  const clavesDeMesas = new Set(mesas.map((m) => claveDeMesa(m.nombre)));
+  const cuentasEnLista = reglas.usaMesas ? cuentas.filter((c) => !clavesDeMesas.has(claveDeMesa(c.mesa))) : cuentas;
+  // De la cuenta que se está mirando, lo que ya se sabe del salón (sector y desde cuándo está abierta).
+  const cuentaVista = detalle ? cuentas.find((c) => c.id === detalle.id) : undefined;
+
   // ---------------------------------------------------------------- pantallas
   const hayBarraAbajo = vista === "productos" && carrito.length > 0;
 
@@ -547,8 +555,11 @@ export function MozoApp({
         {vista === "salon" && (
           <div className="flex flex-col gap-4">
             <EstadoImpresion imprimiendo={imprimiendo} />
+            {errorSalon && <p className="text-[0.8rem] text-aviso">{errorSalon}</p>}
 
-            {reglas.usaMesas ? (
+            {cargandoSalon ? (
+              <p className="text-[0.85rem] text-tinta-suave">Cargando las mesas…</p>
+            ) : reglas.usaMesas ? (
               <section className="rounded-xl border-2 border-azul/50 bg-superficie p-3.5">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <p className={ROTULO}>{conSectores ? "1 · Elegí el sector y la mesa" : "1 · Elegí la mesa"}</p>
@@ -666,18 +677,18 @@ export function MozoApp({
               </section>
             )}
 
+            {!cargandoSalon && (!reglas.usaMesas || cuentasEnLista.length > 0) && (
             <section>
-              <p className={`${ROTULO} mb-2`}>Mesas abiertas ({cuentas.length})</p>
-              {errorSalon && <p className="mb-2 text-[0.8rem] text-aviso">{errorSalon}</p>}
-              {cargandoSalon ? (
-                <p className="text-[0.85rem] text-tinta-suave">Cargando…</p>
-              ) : cuentas.length === 0 ? (
+              <p className={`${ROTULO} mb-2`}>
+                {reglas.usaMesas ? "Otras cuentas abiertas" : "Mesas abiertas"} ({cuentasEnLista.length})
+              </p>
+              {cuentasEnLista.length === 0 ? (
                 <p className="rounded-lg border border-dashed border-linea bg-papel-suave px-3 py-6 text-center text-[0.85rem] text-tinta-suave">
                   No hay mesas abiertas. Abrí una arriba.
                 </p>
               ) : (
                 <ul className="grid gap-2 sm:grid-cols-2">
-                  {cuentas.map((c) => (
+                  {cuentasEnLista.map((c) => (
                     <li key={c.id} className="rounded-xl border-2 border-azul/50 bg-superficie p-3">
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0">
@@ -715,6 +726,7 @@ export function MozoApp({
                 </ul>
               )}
             </section>
+            )}
           </div>
         )}
 
@@ -727,6 +739,7 @@ export function MozoApp({
                 <div className="flex items-baseline justify-between gap-2">
                   <p className="text-[0.85rem] text-tinta-media">
                     Cuenta #{detalle.numero} · {detalle.mozo}
+                    {cuentaVista ? ` · ${cuentaVista.sector ? `${cuentaVista.sector} · ` : ""}abierta ${hace(cuentaVista.abiertaEn)}` : ""}
                   </p>
                   <p className="cifra text-[1.3rem] font-bold text-tinta">{formatearGuarani(detalle.total)}</p>
                 </div>
