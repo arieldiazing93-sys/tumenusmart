@@ -47,9 +47,9 @@ export type IntentoDePin = { ok: true; n: number } | { ok: false; minutos: numbe
 async function minutosDeBloqueo(c: Columnas, storeId: string): Promise<number> {
   const fila = await prisma.store.findUnique({
     where: { id: storeId },
-    select: { [c.bloqueo]: true } as Prisma.StoreSelect,
+    select: { [c.bloqueo]: true } as unknown as Prisma.StoreSelect,
   });
-  const hasta = (fila as Record<string, Date | null> | null)?.[c.bloqueo] ?? null;
+  const hasta = (fila as unknown as Record<string, Date | null> | null)?.[c.bloqueo] ?? null;
   if (!hasta) return MINUTOS_BLOQUEO_PIN;
   return Math.max(1, Math.ceil((hasta.getTime() - Date.now()) / 60000));
 }
@@ -61,7 +61,7 @@ async function bloquear(c: Columnas, storeId: string): Promise<void> {
       [c.bloqueo]: new Date(Date.now() + MINUTOS_BLOQUEO_PIN * 60000),
       [c.intentos]: 0,
       [c.ultimo]: null,
-    } as Prisma.StoreUpdateManyMutationInput,
+    } as unknown as Prisma.StoreUpdateManyMutationInput,
   });
 }
 
@@ -80,8 +80,8 @@ export async function pedirIntentoDePin(espacio: EspacioDePin, storeId: string):
     where: {
       id: storeId,
       AND: [sinBloqueoVigente(c, ahora), { OR: [{ [c.ultimo]: null }, { [c.ultimo]: { lt: limiteDeVentana } }] }],
-    } as Prisma.StoreWhereInput,
-    data: { [c.intentos]: 1, [c.ultimo]: ahora } as Prisma.StoreUpdateManyMutationInput,
+    } as unknown as Prisma.StoreWhereInput,
+    data: { [c.intentos]: 1, [c.ultimo]: ahora } as unknown as Prisma.StoreUpdateManyMutationInput,
   });
 
   let n: number;
@@ -91,9 +91,9 @@ export async function pedirIntentoDePin(espacio: EspacioDePin, storeId: string):
     try {
       // `update` devuelve el valor ya incrementado, en la misma operación: cada pedido recibe un número distinto.
       const fila = await prisma.store.update({
-        where: { id: storeId, ...sinBloqueoVigente(c, ahora) } as Prisma.StoreWhereUniqueInput,
-        data: { [c.intentos]: { increment: 1 }, [c.ultimo]: ahora } as Prisma.StoreUpdateInput,
-        select: { [c.intentos]: true } as Prisma.StoreSelect,
+        where: { id: storeId, ...sinBloqueoVigente(c, ahora) } as unknown as Prisma.StoreWhereUniqueInput,
+        data: { [c.intentos]: { increment: 1 }, [c.ultimo]: ahora } as unknown as Prisma.StoreUpdateInput,
+        select: { [c.intentos]: true } as unknown as Prisma.StoreSelect,
       });
       n = (fila as unknown as Record<string, number>)[c.intentos];
     } catch (e) {
@@ -128,8 +128,8 @@ export async function resolverIntentoDePin(
 
   if (acerto) {
     await prisma.store.updateMany({
-      where: { id: storeId, [c.intentos]: { gt: 0 } } as Prisma.StoreWhereInput,
-      data: { [c.intentos]: { decrement: 1 } } as Prisma.StoreUpdateManyMutationInput,
+      where: { id: storeId, [c.intentos]: { gt: 0 } } as unknown as Prisma.StoreWhereInput,
+      data: { [c.intentos]: { decrement: 1 } } as unknown as Prisma.StoreUpdateManyMutationInput,
     });
     return { bloqueado: false, quedan: MAXIMO_INTENTOS_PIN };
   }
