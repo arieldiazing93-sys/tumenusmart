@@ -711,6 +711,11 @@ export async function pagarCuenta(cuentaId: string, datos: DatosCobroCuenta): Pr
     include: { items: { where: { estado: "activo" }, orderBy: [{ ronda: "asc" }, { linea: "asc" }] } },
   });
   if (!cuenta) return { ok: false, error: "Esa cuenta ya está cerrada." };
+  // Una cuenta se cobra DESPUÉS de imprimirse (queda "por cobrar"): el cliente tiene que haber recibido su cuenta, y la
+  // impresión deja constancia de lo que se cobra. Se exige acá, en el servidor: que el botón esté apagado no alcanza.
+  if (cuenta.estado !== "por_cobrar") {
+    return { ok: false, error: "Primero imprimí la cuenta: se cobra después de imprimirla." };
+  }
   if (cuenta.items.length === 0) return { ok: false, error: "La cuenta no tiene productos para cobrar." };
 
   const filas = cuenta.items.map((i) => ({
@@ -791,10 +796,13 @@ export async function pagarCuenta(cuentaId: string, datos: DatosCobroCuenta): Pr
       // Primero se cierra la cuenta, con el estado en la condición: si otra caja la cobró (o se canceló) en el mismo
       // instante, acá no encuentra nada, se deshace todo y no queda una factura de más.
       const cerrada = await tx.cuentaMesa.updateMany({
-        where: { id: cuenta.id, storeId, estado: { in: [...ESTADOS_CUENTA_ABIERTA] } },
+        // "por_cobrar" en la condición: si la reabrieron (o la cobraron) mientras se armaba el cobro, no se cobra.
+        where: { id: cuenta.id, storeId, estado: "por_cobrar" },
         data: { estado: "pagada", mesaAbierta: null, cerradaEn: new Date(), cerradaPor: registradoPor },
       });
-      if (cerrada.count !== 1) throw new ErrorDeUsuario("Esa cuenta ya fue cobrada o cancelada. Actualizá la pantalla.");
+      if (cerrada.count !== 1) {
+        throw new ErrorDeUsuario("Esa cuenta ya fue cobrada, cancelada o reabierta. Actualizá la pantalla.");
+      }
 
       let datosFactura: Record<string, unknown> = { comprobanteTipo: "ticket" };
       let correlativoFactura: number | null = null;

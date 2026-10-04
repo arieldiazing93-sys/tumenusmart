@@ -157,7 +157,9 @@ export function DetalleCuenta({
               {contexto.puedeCobrar && (
                 <button
                   type="button"
-                  disabled={pendiente || !contexto.cobro.ok || !!t.descuentoInvalido || t.total <= 0}
+                  // Se cobra recién después de imprimir la cuenta (queda "por cobrar").
+                  disabled={pendiente || !porCobrar || !contexto.cobro.ok || !!t.descuentoInvalido || t.total <= 0}
+                  title={!porCobrar ? "Primero imprimí la cuenta" : undefined}
                   onClick={onCobrar}
                   className={clasesBoton("navegar", "sm")}
                 >
@@ -185,6 +187,11 @@ export function DetalleCuenta({
             )}
             {!contexto.imprimirCuenta.ok && contexto.imprimirCuenta.motivo && (
               <p className="text-[0.72rem] text-tinta-suave">No se puede imprimir desde acá: {contexto.imprimirCuenta.motivo}</p>
+            )}
+            {contexto.puedeCobrar && abierta && (
+              <p className="text-[0.72rem] font-medium text-amarillo-oscuro">
+                Para cobrar, primero imprimí la cuenta: “Pagar cuenta” se habilita cuando la cuenta ya está impresa.
+              </p>
             )}
             {contexto.puedeCobrar && !contexto.cobro.ok && contexto.cobro.motivo && (
               <p className="text-[0.72rem] text-tinta-suave">No se puede cobrar desde acá: {contexto.cobro.motivo}</p>

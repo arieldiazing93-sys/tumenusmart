@@ -195,7 +195,6 @@ export default async function ComedorPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <RefrescarCada segundos={15} />
       <Cabecera
         titulo="Servicio comedor"
         bajada="Las mesas abiertas y lo que cargaron los mozos. Se actualiza solo."
@@ -230,6 +229,8 @@ export default async function ComedorPage() {
         <span className="text-[0.82rem] text-tinta-media">
           {filas.length} {filas.length === 1 ? "mesa abierta" : "mesas abiertas"} · {formatearGuarani(totalAbierto)} en cuentas
         </span>
+        {/* Se actualiza sola cada 15 s mientras la pantalla está a la vista, y en el acto al volver a ella. */}
+        <RefrescarCada segundos={15} generadoEn={new Date().toISOString()} />
       </div>
 
       <ComedorCaja cuentas={filas} contexto={contexto} />
