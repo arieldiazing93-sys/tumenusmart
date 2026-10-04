@@ -416,8 +416,14 @@ function DialogoDescuento({
   const valor = parseFloat(valorTexto.replace(",", "."));
   const subtotal = cuenta.totales.subtotal;
   const calculado = Number.isFinite(valor) && valor > 0 ? calcularDescuento(subtotal, { tipo, valor }) : null;
+  // Un 0 es "sin descuento": reemplaza al que ya tenía la cuenta y la deja en su monto original (para corregir uno mal puesto).
+  const esCero = Number.isFinite(valor) && valor === 0;
 
   function guardar() {
+    if (esCero) {
+      quitar();
+      return;
+    }
     if (!calculado || !calculado.ok || calculado.monto <= 0) {
       setError(calculado && !calculado.ok ? calculado.error : "Escribí un descuento mayor a cero.");
       return;
@@ -469,7 +475,14 @@ function DialogoDescuento({
           onChange={setTipo}
           color="tinta"
         />
-        <Campo etiqueta={tipo === "porcentaje" ? "Porcentaje de descuento *" : "Monto a descontar *"}>
+        <Campo
+          etiqueta={tipo === "porcentaje" ? "Porcentaje de descuento *" : "Monto a descontar *"}
+          ayuda={
+            cuenta.descuento
+              ? "Escribí el nuevo valor y se reemplaza el descuento anterior. Con 0 la cuenta vuelve a su monto original."
+              : undefined
+          }
+        >
           <Entrada
             autoFocus
             inputMode="decimal"
@@ -478,14 +491,20 @@ function DialogoDescuento({
             placeholder={tipo === "porcentaje" ? "10" : "5000"}
           />
         </Campo>
-        <Campo etiqueta="Motivo *">
-          <Entrada
-            value={motivo}
-            onChange={(e) => setMotivo(e.target.value)}
-            maxLength={200}
-            placeholder="Ej: cliente frecuente, demora en la cocina"
-          />
-        </Campo>
+        {esCero ? (
+          <p className="rounded-lg bg-papel-suave px-3 py-2 text-[0.8rem] text-tinta-media">
+            Con 0 la cuenta queda sin descuento, en su monto original. No hace falta motivo.
+          </p>
+        ) : (
+          <Campo etiqueta="Motivo *">
+            <Entrada
+              value={motivo}
+              onChange={(e) => setMotivo(e.target.value)}
+              maxLength={200}
+              placeholder="Ej: cliente frecuente, demora en la cocina"
+            />
+          </Campo>
+        )}
 
         <div className="flex items-center justify-between rounded-lg bg-papel-suave px-3.5 py-3 text-[0.85rem] text-tinta-media">
           <span>
@@ -508,7 +527,7 @@ function DialogoDescuento({
             Volver
           </button>
           <button type="button" disabled={pendiente} onClick={guardar} className={clasesBoton("navegar", "md")}>
-            {pendiente ? "Guardando…" : "Guardar descuento"}
+            {pendiente ? "Guardando…" : esCero ? "Dejar sin descuento" : "Guardar descuento"}
           </button>
         </div>
       </div>

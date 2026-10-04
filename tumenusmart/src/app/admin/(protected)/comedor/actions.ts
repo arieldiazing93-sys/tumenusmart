@@ -284,8 +284,11 @@ export async function aplicarDescuento(
   const storeId = await idLocalActual();
   const quien = nombreDe(sesion);
 
-  const razon = descuento ? limpiarMotivo(motivo) : null;
-  if (descuento) {
+  // Un descuento de 0 es "sin descuento": reemplaza al que la cuenta tenía y la deja en su monto original (sirve para
+  // corregir uno mal puesto: se escribe 0 y se guarda). No pide motivo, igual que quitarlo.
+  const sinDescuento = !descuento || Number(descuento.valor) === 0;
+  const razon = sinDescuento ? null : limpiarMotivo(motivo);
+  if (descuento && Number(descuento.valor) !== 0) {
     if (descuento.tipo !== "porcentaje" && descuento.tipo !== "monto") {
       return { ok: false, error: "El descuento no es válido." };
     }
@@ -302,12 +305,12 @@ export async function aplicarDescuento(
       if (!cuenta) throw new ErrorDeUsuario("No encontré esa cuenta.");
       if (cuenta.estado !== "abierta") throw new ErrorDeUsuario(textoNoEditable(cuenta.estado));
 
-      if (!descuento) {
+      if (!descuento || Number(descuento.valor) === 0) {
         await tx.cuentaMesa.update({
           where: { id: cuenta.id },
           data: { descuentoTipo: null, descuentoValor: null, descuentoMotivo: null, descuentoPor: null },
         });
-        return `Quitó el descuento de la mesa ${cuenta.mesa}.`;
+        return `Quitó el descuento de la mesa ${cuenta.mesa}: la cuenta vuelve a su monto original.`;
       }
 
       const activos = await tx.itemCuentaMesa.findMany({
@@ -342,11 +345,11 @@ export async function aplicarDescuento(
 
   await registrarBitacora(storeId, sesion, {
     modulo: "comedor",
-    accion: descuento ? "descuento_aplicado" : "descuento_quitado",
+    accion: sinDescuento ? "descuento_quitado" : "descuento_aplicado",
     descripcion: descripcion,
     entidad: "CuentaMesa",
     entidadId: String(cuentaId),
-    detalle: descuento ? { tipo: descuento.tipo, valor: descuento.valor, motivo: razon } : {},
+    detalle: descuento && !sinDescuento ? { tipo: descuento.tipo, valor: descuento.valor, motivo: razon } : {},
   });
   refrescar();
   return { ok: true };
