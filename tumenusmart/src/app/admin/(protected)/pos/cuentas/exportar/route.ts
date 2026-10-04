@@ -5,9 +5,11 @@ import { idLocalActual, localActual } from "@/lib/local-actual";
 import { calcularRangoFecha } from "@/lib/rango-fecha";
 import { etiquetaFormaPagoPos, FORMA_PAGO_MIXTO } from "@/lib/turno-pos";
 import { detallePagos, filtroPorFormaPago, montoCobradoConForma } from "@/lib/pago-venta";
+import { formatearNumero } from "@/lib/format";
 import { ZONA_NEGOCIO } from "@/lib/timezone";
 import { nuevoLibro, filaTitulo, respuestaXlsx } from "@/lib/excel-reporte";
 import { nombreCompleto } from "@/lib/agenda-personal";
+import { cargarCuentasMesaCanceladas, type CuentaMesaCancelada } from "@/lib/cuentas-canceladas";
 
 export const dynamic = "force-dynamic";
 
@@ -27,8 +29,11 @@ export async function GET(request: NextRequest) {
 
   const storeId = await idLocalActual();
   const db = prismaDelLocal(storeId);
-  const [local, ventas] = await Promise.all([
+  const [local, canceladasMesa, ventas] = await Promise.all([
     localActual(),
+    // Las cuentas de mesa que se cerraron sin cobrar también van en el reporte (una cuenta sin cobrar no tiene forma de pago:
+    // al filtrar por una, no entran). Es la misma función que usa la pantalla.
+    formaPago ? Promise.resolve<CuentaMesaCancelada[]>([]) : cargarCuentasMesaCanceladas(db, rango),
     db.ventaPos.findMany({
       where: { creadoEn: { gte: rango.gte, lt: rango.lt }, ...filtroPorFormaPago(formaPago) },
       orderBy: { creadoEn: "asc" },
@@ -68,8 +73,9 @@ export async function GET(request: NextRequest) {
     { width: 40 },
     { width: 20 },
     { width: 20 },
-    { width: 14 },
+    { width: 22 },
     { width: 16 },
+    { width: 46 },
   ];
 
   filaTitulo(hoja, ["Negocio", local.nombre], 2);
@@ -77,14 +83,54 @@ export async function GET(request: NextRequest) {
   filaTitulo(hoja, ["Período", periodo], 2);
   hoja.addRow([]);
 
-  filaTitulo(hoja, ["Cuenta", "Fecha", "Hora", "Forma de pago", "Cajero", "Personal", "Estado", "Total (Gs.)"], 8);
+  filaTitulo(hoja, ["Cuenta", "Fecha", "Hora", "Forma de pago", "Cajero", "Personal", "Estado", "Total (Gs.)", "Motivo"], 9);
   // Las canceladas quedan en la planilla para que no desaparezcan del
   // registro, pero no suman al total: no es plata que haya entrado a la caja.
   // Filtrando por una forma concreta se suma solo lo cobrado CON esa forma (de
   // una venta dividida, la parte y no la cuenta entera).
   const filtraPorUnaForma = !!formaPago && formaPago !== FORMA_PAGO_MIXTO;
   let total = 0;
-  for (const v of ventas) {
+  let totalCanceladasMesa = 0;
+  // Ventas y cuentas de mesa canceladas sin cobrar, juntas y en orden de fecha (de la más vieja a la más nueva).
+  const lineas = [
+    ...ventas.map((v) => ({ fecha: v.creadoEn, venta: v, mesa: null as CuentaMesaCancelada | null })),
+    ...canceladasMesa.map((c) => ({
+      fecha: c.cerradaEn ?? new Date(0),
+      venta: null,
+      mesa: c as CuentaMesaCancelada | null,
+    })),
+  ].sort((a, b) => a.fecha.getTime() - b.fecha.getTime());
+
+  for (const linea of lineas) {
+    const v = linea.venta;
+    if (!v) {
+      // Una cuenta de mesa cerrada SIN cobrar: no suma al total (no entró plata) pero queda en la planilla, con quién la
+      // canceló, cuándo y por qué.
+      const c = linea.mesa;
+      if (!c) continue;
+      totalCanceladasMesa += c.total;
+      const motivo = [
+        c.motivoCierre ? `Motivo: ${c.motivoCierre}` : "",
+        c.unoPorUno ? "Productos cancelados de a uno" : "",
+      ]
+        .filter(Boolean)
+        .join(" · ");
+      const filaMesa = hoja.addRow([
+        `Mesa ${c.mesa} · Cuenta de mesa ${formatearNumero(c.numero)}`,
+        c.cerradaEn ? c.cerradaEn.toLocaleDateString("es-PY", opcionesFecha) : "—",
+        c.cerradaEn
+          ? c.cerradaEn.toLocaleTimeString("es-PY", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: ZONA_NEGOCIO })
+          : "—",
+        "Sin cobrar",
+        c.cerradaPor ? `${c.cerradaPor} (la canceló)` : "—",
+        `${[c.mozo.nombre, c.mozo.apellido].filter(Boolean).join(" ")} (mozo)`,
+        "Cancelada sin cobrar",
+        Math.round(c.total),
+        motivo,
+      ]);
+      filaMesa.getCell(8).numFmt = "#,##0";
+      continue;
+    }
     if (!v.cancelada) {
       total += filtraPorUnaForma ? montoCobradoConForma(v.pagos, formaPago ?? "") : Number(v.total);
     }
@@ -104,6 +150,7 @@ export async function GET(request: NextRequest) {
       v.personal ? nombreCompleto(v.personal) : "—",
       v.cancelada ? "Cancelada" : "Activa",
       Math.round(Number(v.total)),
+      "",
     ]);
     fila.getCell(8).numFmt = "#,##0";
   }
@@ -122,12 +169,23 @@ export async function GET(request: NextRequest) {
         ? `TOTAL cobrado en ${etiquetaFormaPagoPos(formaPago ?? "").toLowerCase()}, sin canceladas (Gs.)`
         : "TOTAL GENERAL, sin canceladas (Gs.)",
       Math.round(total),
+      "",
     ],
-    8
+    9
   );
   filaTotal.getCell(8).numFmt = "#,##0";
 
-  if (ventas.length === 0) {
+  // Lo que se cerró sin cobrar, aparte y a la vista: no es plata que entró, pero es plata de la que hay que poder dar cuenta.
+  if (canceladasMesa.length > 0) {
+    const filaSinCobrar = filaTitulo(
+      hoja,
+      ["", "", "", "", "", "", `CUENTAS DE MESA CANCELADAS SIN COBRAR: ${canceladasMesa.length} (Gs.)`, Math.round(totalCanceladasMesa), ""],
+      9
+    );
+    filaSinCobrar.getCell(8).numFmt = "#,##0";
+  }
+
+  if (ventas.length === 0 && canceladasMesa.length === 0) {
     hoja.addRow([]);
     hoja.addRow(["No se registraron cuentas en este período."]);
   }

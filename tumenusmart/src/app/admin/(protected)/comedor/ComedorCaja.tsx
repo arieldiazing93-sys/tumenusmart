@@ -28,7 +28,6 @@ export type ItemCuentaFila = {
   mozo: string;
 };
 
-export type TrabajoCuentaFila = { id: string; titulo: string; estado: string; creadoEn: string };
 
 export type CuentaCajaFila = {
   id: string;
@@ -43,7 +42,6 @@ export type CuentaCajaFila = {
   descuento: { tipo: "porcentaje" | "monto"; valor: number; motivo: string; por: string } | null;
   totales: TotalesDeCuenta;
   items: ItemCuentaFila[];
-  trabajos: TrabajoCuentaFila[];
 };
 
 /** Lo que hace falta saber de esta computadora y de esta persona para operar las cuentas. */

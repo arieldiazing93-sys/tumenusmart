@@ -205,7 +205,14 @@ export async function anularProducto(cuentaId: string, itemId: string, motivo: s
   return { ok: true };
 }
 
-/** Cancela la cuenta entera (la mesa queda libre): devuelve el stock de todo lo que tenía y avisa a las áreas. */
+/**
+ * Cierra una cuenta que quedó SIN productos activos (se cancelaron todos, o se abrió por error) para liberar la mesa.
+ *
+ * Una cuenta con productos NO se cancela mientras se atiende: si ya se imprimió o se cobró, cancelarla en pleno servicio es
+ * justo la forma de que una cuenta desaparezca sin dejar plata en la caja. Se cobra, y si hace falta se cancela la venta
+ * desde el Historial de cuentas (que devuelve el stock y deja el rastro). Esto se exige acá, en el servidor: que la pantalla
+ * no muestre el botón no alcanza. Los productos de la cuenta se cancelan de a uno (con motivo) con `anularProducto`.
+ */
 export async function cancelarCuenta(cuentaId: string, motivo: string): Promise<Resultado> {
   const sesion = await exigirPermiso("comedor.gestionar");
   const storeId = await idLocalActual();
@@ -218,21 +225,21 @@ export async function cancelarCuenta(cuentaId: string, motivo: string): Promise<
     resumen = await prisma.$transaction(async (tx) => {
       const cuenta = await tx.cuentaMesa.findFirst({
         where: { id: String(cuentaId), storeId, estado: { in: [...ESTADOS_CUENTA_ABIERTA] } },
-        select: { id: true, numero: true, mesa: true },
+        select: { id: true, numero: true, mesa: true, impresaEn: true },
       });
       if (!cuenta) throw new ErrorDeUsuario("Esa cuenta ya está cerrada.");
-      const activos = await tx.itemCuentaMesa.findMany({
-        where: { cuentaId: cuenta.id, storeId, estado: "activo" },
-        select: {
-          id: true,
-          cantidad: true,
-          nombreProducto: true,
-          opcionesTexto: true,
-          areaImpresionId: true,
-          consumo: true,
-        },
+      const productos = await tx.itemCuentaMesa.findMany({
+        where: { cuentaId: cuenta.id, storeId },
+        select: { cantidad: true, precioUnitario: true, estado: true },
       });
-      await anularItems(tx, storeId, cuenta, activos, razon, quien);
+      if (productos.some((p) => p.estado === "activo")) {
+        throw new ErrorDeUsuario(
+          "Una cuenta con productos no se cancela mientras se atiende. Cobrala y, si hace falta, cancelá la venta desde el Historial de cuentas."
+        );
+      }
+      // Lo que se había cargado queda en el rastro: si alguien cancela de a uno todos los productos y cierra la cuenta, la
+      // Bitácora y el Historial muestran de cuánta plata se trataba.
+      const cargado = totalDeLineas(productos.map((p) => ({ precioUnitario: Number(p.precioUnitario), cantidad: p.cantidad })));
       // Las comandas que todavía no salieron (la impresora estaba apagada) ya no tienen sentido: no se imprimen después.
       // Quedan a la vista en la lista, con ese motivo, y se pueden reimprimir a mano si hiciera falta.
       await tx.trabajoImpresion.updateMany({
@@ -245,18 +252,22 @@ export async function cancelarCuenta(cuentaId: string, motivo: string): Promise<
         data: { estado: "anulada", mesaAbierta: null, cerradaEn: new Date(), cerradaPor: quien, motivoCierre: razon },
       });
       if (cerrada.count !== 1) throw new ErrorDeUsuario("Esa cuenta ya está cerrada.");
-      return `la cuenta ${formatearNumero(cuenta.numero)} de la mesa ${cuenta.mesa}`;
+      return (
+        `la cuenta vacía ${formatearNumero(cuenta.numero)} de la mesa ${cuenta.mesa} ` +
+        `(se habían cargado ${formatearGuarani(cargado)}, todo cancelado producto por producto` +
+        `${cuenta.impresaEn ? "; la cuenta había llegado a imprimirse" : ""})`
+      );
     }, OPCIONES_TX);
   } catch (e) {
     if (e instanceof ErrorDeUsuario) return { ok: false, error: e.message };
     console.error("[comedor] cancelarCuenta falló", e);
-    return { ok: false, error: `No se pudo cancelar la cuenta. (Detalle: ${pistaDelError(e)})` };
+    return { ok: false, error: `No se pudo cerrar la cuenta. (Detalle: ${pistaDelError(e)})` };
   }
 
   await registrarBitacora(storeId, sesion, {
     modulo: "comedor",
     accion: "cuenta_cancelada",
-    descripcion: `Canceló ${resumen}. Motivo: ${razon}.`,
+    descripcion: `Cerró ${resumen}. Motivo: ${razon}.`,
     entidad: "CuentaMesa",
     entidadId: String(cuentaId),
     detalle: { cuenta: resumen, motivo: razon },

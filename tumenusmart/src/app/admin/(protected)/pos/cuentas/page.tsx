@@ -8,9 +8,68 @@ import { formatearGuarani, formatearNumero } from "@/lib/format";
 import { nombreCompleto } from "@/lib/agenda-personal";
 import { etiquetaFormaPagoPos, FORMAS_PAGO_POS, FORMA_PAGO_MIXTO } from "@/lib/turno-pos";
 import { detallePagos, filtroPorFormaPago, montoCobradoConForma } from "@/lib/pago-venta";
+import { cargarCuentasMesaCanceladas, type CuentaMesaCancelada } from "@/lib/cuentas-canceladas";
 import { ZONA_NEGOCIO } from "@/lib/timezone";
 
 export const dynamic = "force-dynamic";
+
+function FilaCuentaMesaCancelada({ c }: { c: CuentaMesaCancelada }) {
+  return (
+    <Tr>
+      <Td>
+        <Link href={`/admin/pos/cuentas/mesa/${c.id}`} className="font-medium text-azul-oscuro hover:underline">
+          Mesa {c.mesa}
+        </Link>
+        <span className="mt-0.5 block text-[10px] font-medium uppercase text-tinta-suave">
+          Cuenta de mesa {formatearNumero(c.numero)}
+        </span>
+      </Td>
+      <Td>
+        {c.cerradaEn
+          ? c.cerradaEn.toLocaleString("es-PY", {
+              day: "2-digit",
+              month: "2-digit",
+              hour: "2-digit",
+              minute: "2-digit",
+              hour12: false,
+              timeZone: ZONA_NEGOCIO,
+            })
+          : "—"}
+      </Td>
+      <Td>—</Td>
+      <Td>
+        <span className="text-tinta-suave">Sin cobrar</span>
+      </Td>
+      <Td>
+        {c.cerradaPor ?? "—"}
+        <span className="mt-0.5 block text-[10px] text-tinta-suave">la canceló</span>
+      </Td>
+      <Td>
+        {[c.mozo.nombre, c.mozo.apellido].filter(Boolean).join(" ")}
+        <span className="mt-0.5 block text-[10px] text-tinta-suave">mozo</span>
+      </Td>
+      <Td>
+        <Pastilla color="peligro">Cancelada</Pastilla>
+        {c.motivoCierre && (
+          <span className="mt-0.5 block max-w-[14rem] text-[10px] leading-snug text-tinta-media">
+            Motivo: {c.motivoCierre}
+          </span>
+        )}
+        {c.unoPorUno && (
+          <span className="mt-0.5 block max-w-[14rem] text-[10px] leading-snug text-tinta-media">
+            Productos cancelados de a uno
+          </span>
+        )}
+      </Td>
+      <Td className="cifra text-right font-medium text-tinta-suave line-through">{formatearGuarani(c.total)}</Td>
+      <Td className="text-right">
+        <BotonEnlace href={`/admin/pos/cuentas/mesa/${c.id}`} tono="navegar" tam="sm">
+          Ver
+        </BotonEnlace>
+      </Td>
+    </Tr>
+  );
+}
 
 const FILTROS_FECHA: { value: FiltroFecha; label: string }[] = [
   { value: "hoy", label: "Hoy" },
@@ -83,6 +142,23 @@ export default async function CuentasPosPage({
     },
   });
 
+  // Las cuentas de mesa que se cancelaron antes de cobrarse no son ventas, pero NO pueden desaparecer: si alguien imprimió la
+  // cuenta, el cliente pagó y después la cancelaron, esa plata no está en ninguna venta. Se muestran acá, con quién la
+  // canceló y por qué. Solo cuando no se filtra por forma de pago (una cuenta sin cobrar no tiene forma de pago).
+  // (La misma función la usan el Excel y el PDF de este historial, para que los tres muestren lo mismo.)
+  const canceladasMesa = formaPago ? [] : await cargarCuentasMesaCanceladas(db, rango);
+
+  // Todo junto, de la más reciente a la más vieja.
+  const filas = [
+    ...ventas.map((v) => ({ clave: v.id, fecha: v.creadoEn, venta: v, mesa: null as CuentaMesaCancelada | null })),
+    ...canceladasMesa.map((c) => ({
+      clave: `mesa-${c.id}`,
+      fecha: c.cerradaEn ?? new Date(0),
+      venta: null,
+      mesa: c as CuentaMesaCancelada | null,
+    })),
+  ].sort((a, b) => b.fecha.getTime() - a.fecha.getTime());
+
   // Las canceladas no suman: no son plata que haya entrado a la caja. Filtrando
   // por una forma concreta se suma solo lo que se cobró CON esa forma (de una
   // venta dividida cuenta la parte, no la cuenta entera).
@@ -100,7 +176,7 @@ export default async function CuentasPosPage({
     <div>
       <Cabecera
         titulo="Historial de cuentas"
-        bajada="Todas las ventas cerradas desde la caja: las del mostrador y las cuentas de mesa del servicio comedor. Los pedidos de la carta tienen su propio historial en Pedidos."
+        bajada="Todas las ventas cerradas desde la caja: las del mostrador y las cuentas de mesa del servicio comedor, más las cuentas de mesa que se cancelaron sin cobrar (con quién y por qué). Los pedidos de la carta tienen su propio historial en Pedidos."
         acciones={
           <>
             <a
@@ -195,10 +271,10 @@ export default async function CuentasPosPage({
         ))}
       </div>
 
-      {ventas.length === 0 ? (
+      {filas.length === 0 ? (
         <Vacio
           titulo="No hay cuentas en este período"
-          detalle="Las ventas cerradas por Punto de Venta van a aparecer acá."
+          detalle="Las ventas cerradas por Punto de Venta y las cuentas de mesa canceladas van a aparecer acá."
         />
       ) : (
         <Tabla>
@@ -218,7 +294,11 @@ export default async function CuentasPosPage({
             </tr>
           </thead>
           <tbody>
-            {ventas.map((v) => (
+            {filas.map((fila) => {
+              const v = fila.venta;
+              // Una cuenta de mesa cancelada sin cobrar: no es una venta, pero tiene que verse (con quién la canceló y por qué).
+              if (!v) return fila.mesa ? <FilaCuentaMesaCancelada key={fila.clave} c={fila.mesa} /> : null;
+              return (
               <Tr key={v.id}>
                 <Td>
                   <Link
@@ -277,7 +357,8 @@ export default async function CuentasPosPage({
                   </BotonEnlace>
                 </Td>
               </Tr>
-            ))}
+              );
+            })}
           </tbody>
           <tfoot>
             <tr>

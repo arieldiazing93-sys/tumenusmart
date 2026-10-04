@@ -13,13 +13,6 @@ import type { ContextoCaja, CuentaCajaFila, ItemCuentaFila } from "./ComedorCaja
 import { CargarProductosPanel } from "./CargarProductosPanel";
 import { Hace, HoraDe } from "./tiempo";
 
-const ESTADO_TRABAJO: Record<string, { texto: string; color: "exito" | "amarillo" | "peligro" | "azul" }> = {
-  impreso: { texto: "Impresa", color: "exito" },
-  pendiente: { texto: "En espera", color: "amarillo" },
-  imprimiendo: { texto: "Imprimiendo", color: "azul" },
-  error: { texto: "Con error", color: "peligro" },
-};
-
 const ROTULO = "text-[0.72rem] font-semibold uppercase tracking-rotulo text-tinta-suave";
 
 type Dialogo = { tipo: "anular"; item: ItemCuentaFila } | { tipo: "cancelar" } | { tipo: "descuento" } | null;
@@ -27,7 +20,8 @@ type Dialogo = { tipo: "anular"; item: ItemCuentaFila } | { tipo: "cancelar" } |
 /**
  * Todo lo que compone la cuenta de una mesa (los pedidos que cargó cada mozo, producto por producto, con su descuento y su
  * total) y, arriba, lo que la caja puede hacer con ella: cargar productos, dar un descuento, imprimir la cuenta, reabrirla,
- * cobrarla o cancelarla. Cancelar siempre pide un motivo.
+ * cobrarla, y cerrarla solo si quedó vacía. Cancelar un producto o cerrar la cuenta siempre pide un motivo. Una cuenta con
+ * productos NO se cancela acá: se cobra y, si hace falta, se cancela la venta desde el Historial de cuentas.
  *
  * Una cuenta impresa (por cobrar) no admite cambios: el mozo ya no puede cargarle más y la caja tampoco, hasta reabrirla.
  */
@@ -49,6 +43,8 @@ export function DetalleCuenta({
 
   const abierta = cuenta.estado === "abierta";
   const porCobrar = cuenta.estado === "por_cobrar";
+  /** Todos sus productos se cancelaron: ya no hay nada que cobrar y la mesa se puede liberar. */
+  const sinProductos = cuenta.items.every((i) => i.anulado);
   const t = cuenta.totales;
 
   /** Corre una acción del servidor y, si salió bien, actualiza la pantalla. Un fallo inesperado se explica igual. */
@@ -168,15 +164,25 @@ export function DetalleCuenta({
                   Pagar cuenta
                 </button>
               )}
-              <button
-                type="button"
-                disabled={pendiente}
-                onClick={() => setDialogo({ tipo: "cancelar" })}
-                className={clasesBoton("peligro", "sm")}
-              >
-                Cancelar cuenta
-              </button>
+              {/* Una cuenta CON productos no se cancela mientras se atiende (se cobra y, si hace falta, se cancela la venta desde
+                  el Historial de cuentas). Solo se puede cerrar una cuenta que ya quedó vacía, para liberar la mesa. */}
+              {sinProductos && (
+                <button
+                  type="button"
+                  disabled={pendiente}
+                  onClick={() => setDialogo({ tipo: "cancelar" })}
+                  className={clasesBoton("peligro", "sm")}
+                >
+                  Cerrar cuenta vacía
+                </button>
+              )}
             </div>
+            {!sinProductos && (
+              <p className="text-[0.72rem] text-tinta-suave">
+                Una cuenta con productos no se cancela mientras se atiende: se cobra y, si hace falta, se cancela la venta
+                desde el Historial de cuentas.
+              </p>
+            )}
             {!contexto.imprimirCuenta.ok && contexto.imprimirCuenta.motivo && (
               <p className="text-[0.72rem] text-tinta-suave">No se puede imprimir desde acá: {contexto.imprimirCuenta.motivo}</p>
             )}
@@ -247,24 +253,6 @@ export function DetalleCuenta({
           ))}
         </div>
 
-        {cuenta.trabajos.length > 0 && (
-          <div className="border-t border-linea pt-2">
-            <p className={ROTULO}>Impresiones de esta cuenta</p>
-            <ul className="mt-0.5 flex flex-col gap-1">
-              {cuenta.trabajos.map((trabajo) => {
-                const estado = ESTADO_TRABAJO[trabajo.estado] ?? { texto: trabajo.estado, color: "azul" as const };
-                return (
-                  <li key={trabajo.id} className="flex flex-wrap items-center justify-between gap-2 text-[0.8rem] text-tinta">
-                    <span>
-                      {trabajo.titulo} · <HoraDe iso={trabajo.creadoEn} />
-                    </span>
-                    <Pastilla color={estado.color}>{estado.texto}</Pastilla>
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
-        )}
       </Tarjeta>
 
       {/* ------------------------------------------------------------------------ ventanas */}
@@ -283,9 +271,9 @@ export function DetalleCuenta({
       )}
       {dialogo?.tipo === "cancelar" && (
         <DialogoMotivo
-          titulo={`Cancelar la cuenta de la mesa ${cuenta.mesa}`}
-          texto="Se cancelan todos sus productos, vuelve el stock y la mesa queda libre. Esto no se puede deshacer."
-          confirmar="Cancelar cuenta"
+          titulo={`Cerrar la cuenta vacía de la mesa ${cuenta.mesa}`}
+          texto="La cuenta no tiene productos activos: se cierra y la mesa queda libre. Esto no se puede deshacer. Queda en el Historial de cuentas, con tu nombre y el motivo."
+          confirmar="Cerrar cuenta"
           onCerrar={() => setDialogo(null)}
           onConfirmar={async (motivo) => {
             const r = await cancelarCuenta(cuenta.id, motivo);

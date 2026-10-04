@@ -43,7 +43,6 @@ export default async function ComedorPage() {
           orderBy: [{ ronda: "asc" }, { linea: "asc" }],
           include: { mozo: { select: { nombre: true, apellido: true } } },
         },
-        trabajos: { orderBy: { createdAt: "asc" }, select: { id: true, titulo: true, estado: true, createdAt: true } },
       },
     }),
     db.trabajoImpresion.count({ where: { estado: { in: ["pendiente", "imprimiendo"] } } }),
@@ -91,12 +90,6 @@ export default async function ComedorPage() {
         anuladoPor: i.anuladoPor,
         cargadoPor: i.cargadoPor,
         mozo: nombre(i.mozo),
-      })),
-      trabajos: c.trabajos.map((t) => ({
-        id: t.id,
-        titulo: t.titulo,
-        estado: t.estado,
-        creadoEn: t.createdAt.toISOString(),
       })),
     };
   });
