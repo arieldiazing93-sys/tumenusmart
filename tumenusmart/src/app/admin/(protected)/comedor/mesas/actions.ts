@@ -263,6 +263,42 @@ export async function agregarMesa(nombre: string, sectorId: string | null): Prom
   return { ok: true };
 }
 
+/** Pasa varias mesas de una vez a un sector (o las deja sin sector): para acomodar las que ya estaban cargadas. */
+export async function moverMesasASector(ids: string[], sectorId: string | null): Promise<ResultadoMesas> {
+  const sesion = await exigirPermiso("comedor.configurar");
+  const idLocal = await idLocalActual();
+  const db = prismaDelLocal(idLocal);
+
+  const pedidas = Array.isArray(ids) ? [...new Set(ids.map((i) => String(i)))].slice(0, MAXIMO_TOTAL) : [];
+  if (pedidas.length === 0) return { ok: false, error: "Marcá al menos una mesa." };
+
+  const elegido = await resolverSector(db, sectorId);
+  if (!elegido.ok) return elegido;
+
+  // Solo las que son de este local (el filtro del local va solo): un id ajeno simplemente no aparece.
+  const propias = await db.mesaComedor.findMany({ where: { id: { in: pedidas } }, select: { id: true } });
+  if (propias.length === 0) return { ok: false, error: "No encontré esas mesas." };
+
+  await db.mesaComedor.updateMany({
+    where: { id: { in: propias.map((m) => m.id) } },
+    data: { sectorId: elegido.sector?.id ?? null },
+  });
+
+  await registrarBitacora(idLocal, sesion, {
+    modulo: "comedor",
+    accion: "mesas_movidas_de_sector",
+    descripcion: `Pasó ${propias.length} ${propias.length === 1 ? "mesa" : "mesas"} ${elegido.sector ? `al sector ${elegido.sector.nombre}` : "a “sin sector”"}.`,
+    entidad: "MesaComedor",
+    detalle: { mesas: propias.length, sector: elegido.sector?.nombre ?? null },
+  });
+
+  refrescar();
+  return {
+    ok: true,
+    mensaje: `${propias.length} ${propias.length === 1 ? "mesa pasó" : "mesas pasaron"} ${elegido.sector ? `a ${elegido.sector.nombre}` : "a “sin sector”"}.`,
+  };
+}
+
 /** Pasa una mesa a otro sector (o la deja sin sector). Las cuentas abiertas no se tocan. */
 export async function moverMesaASector(id: string, sectorId: string | null): Promise<ResultadoMesas> {
   const sesion = await exigirPermiso("comedor.configurar");

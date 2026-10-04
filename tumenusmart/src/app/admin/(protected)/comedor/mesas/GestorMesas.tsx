@@ -12,6 +12,7 @@ import {
   eliminarMesa,
   eliminarSector,
   moverMesaASector,
+  moverMesasASector,
   renombrarMesa,
   renombrarSector,
   type ResultadoMesas,
@@ -57,6 +58,10 @@ export function GestorMesas({
   const [editando, setEditando] = useState<string | null>(null);
   const [nombreEditado, setNombreEditado] = useState("");
 
+  // pasar varias mesas ya creadas a un sector: las marcadas y el sector de destino
+  const [marcadas, setMarcadas] = useState<string[]>([]);
+  const [sectorMasivo, setSectorMasivo] = useState<string | null>(null);
+
   const clavesOcupadas = new Set(mesasOcupadas.map((m) => claveDeMesa(m)));
   const ocupada = (m: MesaFila) => clavesOcupadas.has(claveDeMesa(m.nombre));
 
@@ -65,6 +70,12 @@ export function GestorMesas({
     elegido === null ? (sectores[0]?.id ?? "") : sectores.some((s) => s.id === elegido) ? elegido : "";
   const sectorDelRango = sectorEfectivo(sectorRango);
   const sectorDeLaNueva = sectorEfectivo(sectorNueva);
+  const sectorDelMasivo = sectorEfectivo(sectorMasivo);
+
+  // Solo cuentan las marcadas que todavía existen (una mesa borrada o ya movida no debe quedar marcada).
+  const marcadasVigentes = marcadas.filter((id) => mesas.some((m) => m.id === id));
+  const alternarMarca = (id: string) =>
+    setMarcadas((actual) => (actual.includes(id) ? actual.filter((x) => x !== id) : [...actual, id]));
 
   /** El número que sigue al más alto de las mesas que se llaman con un número ("1", "2"…), para ofrecerlo como "desde". */
   const siguienteNumero = useMemo(() => {
@@ -131,7 +142,18 @@ export function GestorMesas({
         ) : (
           <>
             <div className="flex items-center justify-between gap-2">
-              <span className="truncate text-[1rem] font-semibold text-tinta">Mesa {m.nombre}</span>
+              <label className="flex min-w-0 items-center gap-2">
+                {sectores.length > 0 && (
+                  <input
+                    type="checkbox"
+                    checked={marcadas.includes(m.id)}
+                    onChange={() => alternarMarca(m.id)}
+                    aria-label={`Marcar la mesa ${m.nombre}`}
+                    className="h-4 w-4 flex-none accent-azul"
+                  />
+                )}
+                <span className="truncate text-[1rem] font-semibold text-tinta">Mesa {m.nombre}</span>
+              </label>
               <div className="flex flex-none items-center gap-1.5">
                 {ocupada(m) && (
                   <Pastilla color="azul" punto>
@@ -150,19 +172,22 @@ export function GestorMesas({
               </div>
             </div>
             {sectores.length > 0 && (
-              <Selector
-                value={m.sectorId ?? ""}
-                disabled={pendiente}
-                onChange={(e) => ejecutar(() => moverMesaASector(m.id, e.target.value || null))}
-                aria-label={`Sector de la mesa ${m.nombre}`}
-              >
-                <option value="">Sin sector</option>
-                {sectores.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.nombre}
-                  </option>
-                ))}
-              </Selector>
+              <label className="flex items-center gap-2 text-[0.78rem] font-semibold text-tinta-media">
+                Sector
+                <Selector
+                  value={m.sectorId ?? ""}
+                  disabled={pendiente}
+                  onChange={(e) => ejecutar(() => moverMesaASector(m.id, e.target.value || null))}
+                  className="flex-1"
+                >
+                  <option value="">Sin sector</option>
+                  {sectores.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.nombre}
+                    </option>
+                  ))}
+                </Selector>
+              </label>
             )}
             <div className="flex flex-wrap items-center gap-1.5">
               <button
@@ -216,9 +241,15 @@ export function GestorMesas({
             {titulo} · {lista.length} {lista.length === 1 ? "mesa" : "mesas"}
           </p>
         )}
+        {clave === "__sin_sector__" && lista.length > 0 && (
+          <p className="text-[0.8rem] leading-snug text-tinta-media">
+            Estas mesas todavía no tienen sector: el mozo las ve en “Otras mesas”. Elegí el sector en cada una, o marcalas y
+            pasalas juntas con la barra de arriba.
+          </p>
+        )}
         {lista.length === 0 ? (
           <p className="rounded-lg border border-dashed border-linea bg-papel-suave px-3 py-3 text-[0.82rem] text-tinta-suave">
-            Este sector todavía no tiene mesas. Cargalas arriba con “Cargar mesas”.
+            Este sector todavía no tiene mesas. Cargalas con “Cargar mesas” o pasale las que ya tenés desde la lista.
           </p>
         ) : (
           <ul className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">{lista.map((m) => tarjetaMesa(m))}</ul>
@@ -234,7 +265,8 @@ export function GestorMesas({
         <h2 className="text-[0.95rem] font-semibold text-tinta">Sectores del restaurante</h2>
         <p className="mt-0.5 text-[0.8rem] leading-snug text-tinta-media">
           Por ejemplo Salón, Patio y Terraza. El mozo elige primero el sector y ve solo las mesas que le corresponden. Si no
-          creás ningún sector, el mozo ve todas las mesas juntas.
+          creás ningún sector, el mozo ve todas las mesas juntas. <strong>Después de crear los sectores, asignales las
+          mesas</strong>: en la lista de abajo marcá las mesas y pasalas al sector, o elegí el sector en cada una.
         </p>
         <div className="mt-3 flex flex-wrap items-end gap-2">
           <div className="min-w-[10rem] flex-1">
@@ -331,11 +363,11 @@ export function GestorMesas({
       <div className="grid gap-3 lg:grid-cols-2">
         {/* ------------------------------------------------------- bloque 2: por rango */}
         <section className="rounded-xl border-2 border-azul/50 bg-superficie p-4">
-          <h2 className="text-[0.95rem] font-semibold text-tinta">Cargar mesas</h2>
+          <h2 className="text-[0.95rem] font-semibold text-tinta">Cargar mesas nuevas</h2>
           <p className="mt-0.5 text-[0.8rem] leading-snug text-tinta-media">
             Elegí el sector y de qué mesa a qué mesa: por ejemplo Salón del 1 al 10 y Patio del 11 al 15. Los números no se
             repiten entre sectores para que no se confundan en la cocina y en la caja (para repetirlos, usá un nombre como
-            “Patio 1”). Si una mesa ya existe, solo se pasa a ese sector.
+            “Patio 1”). Si una mesa de ese rango ya existe, no se duplica: solo se pasa a ese sector.
           </p>
           <div className="mt-3 flex flex-wrap items-end gap-2">
             {sectores.length > 0 && (
@@ -459,6 +491,57 @@ export function GestorMesas({
           <p className="text-[0.72rem] font-semibold uppercase tracking-rotulo text-tinta-suave">
             {mesas.length} {mesas.length === 1 ? "mesa" : "mesas"} · {mesas.filter((m) => m.activa).length} activas
           </p>
+
+          {/* Pasar varias mesas ya creadas a un sector de una sola vez. */}
+          {sectores.length > 0 && mesas.length > 0 && (
+            <div className="flex flex-col gap-2 rounded-lg border-2 border-azul/50 bg-azul-luz/40 p-3">
+              <p className="text-[0.84rem] font-semibold text-tinta">Asignar mesas a un sector</p>
+              <p className="text-[0.78rem] leading-snug text-tinta-media">
+                Marcá con la casilla las mesas que quieras (a la izquierda de cada “Mesa”), elegí el sector y tocá “Pasar al
+                sector”. También podés cambiar el sector de una sola mesa con su desplegable “Sector”.
+              </p>
+              <div className="flex flex-wrap items-end gap-2">
+                <div className="min-w-[9rem] flex-1">
+                  <Campo etiqueta="Pasar las marcadas a">
+                    <Selector value={sectorDelMasivo} onChange={(e) => setSectorMasivo(e.target.value)}>
+                      <option value="">Sin sector</option>
+                      {sectores.map((s) => (
+                        <option key={s.id} value={s.id}>
+                          {s.nombre}
+                        </option>
+                      ))}
+                    </Selector>
+                  </Campo>
+                </div>
+                <button
+                  type="button"
+                  disabled={pendiente || marcadasVigentes.length === 0}
+                  onClick={() =>
+                    ejecutar(() => moverMesasASector(marcadasVigentes, sectorDelMasivo || null), () => setMarcadas([]))
+                  }
+                  className={clasesBoton("navegar", "md")}
+                >
+                  {marcadasVigentes.length === 0
+                    ? "Pasar al sector"
+                    : `Pasar ${marcadasVigentes.length} ${marcadasVigentes.length === 1 ? "mesa" : "mesas"} al sector`}
+                </button>
+                {sinSector.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setMarcadas(sinSector.map((m) => m.id))}
+                    className={clasesBoton("suave", "md")}
+                  >
+                    Marcar las {sinSector.length} sin sector
+                  </button>
+                )}
+                {marcadasVigentes.length > 0 && (
+                  <button type="button" onClick={() => setMarcadas([])} className={clasesBoton("suave", "md")}>
+                    Desmarcar todas
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
           {sectores.map((s) => grupo(s.id, s.nombre, mesasDe(s.id)))}
           {grupo("__sin_sector__", sectores.length > 0 ? "Sin sector" : null, sinSector)}
         </section>
