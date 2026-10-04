@@ -9,6 +9,7 @@ import { esVentaACredito, etiquetaFormaPagoPos } from "@/lib/turno-pos";
 import { SIN_REGISTRO_FISCAL, etiquetaTipoIdentificacion } from "@/lib/tipo-cliente";
 import { ZONA_NEGOCIO } from "@/lib/timezone";
 import { armarDocumento, centrado, filaEtiqueta, filaTabla, negrita, separador } from "@/lib/escpos";
+import { copiasDeImpresion } from "@/lib/copias-impresion";
 
 export const dynamic = "force-dynamic";
 
@@ -163,5 +164,9 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     l.push("Venta cancelada - no es un comprobante valido.");
   }
 
-  return new NextResponse(armarDocumento(l), { headers: { "Content-Type": "text/plain; charset=utf-8" } });
+  // Cuántas veces sale en la estación de quien lo pide (factura y ticket tienen su propio contador; 0 = no se imprime).
+  const copias = await copiasDeImpresion(db, { documento: esFactura ? "factura" : "ticket" });
+  return new NextResponse(armarDocumento(l), {
+    headers: { "Content-Type": "text/plain; charset=utf-8", "X-Copias": String(copias) },
+  });
 }

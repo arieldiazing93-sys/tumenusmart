@@ -14,7 +14,7 @@
 import { useEffect, useSyncExternalStore } from "react";
 import { conectarQz, imprimirTexto } from "./qz-tray";
 
-type Trabajo = { id: string; titulo: string; contenido: string; impresora: string | null };
+type Trabajo = { id: string; titulo: string; contenido: string; impresora: string | null; /** 0 = no se imprime; 2 = sale dos veces. */ copias: number };
 type RespuestaReclamar =
   | { ok: true; estacion: string; trabajos: Trabajo[]; sinImpresoras?: boolean }
   | { ok: false; motivo: string };
@@ -95,14 +95,14 @@ function anotar(texto: string, salio: boolean) {
   cambiar({ registro: [{ hora: horaAhora(), texto, salio }, ...estado.registro].slice(0, REGISTROS_VISIBLES) });
 }
 
-async function marcar(id: string, salio: boolean, error?: string) {
+async function marcar(id: string, salio: boolean, error?: string, omitido = false) {
   try {
     await conLimite(
       fetch("/admin/api/impresion/marcar", {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id, ok: salio, error }),
+        body: JSON.stringify({ id, ok: salio, error, omitido }),
       }),
       15_000
     );
@@ -181,6 +181,12 @@ async function ciclo() {
         anotar(`${t.titulo}: sin impresora asignada`, false);
         continue;
       }
+      // 0 copias es una decisión del local (esta estación no imprime esto): se cierra sin imprimir y queda a la vista como tal.
+      if (t.copias === 0) {
+        await marcar(t.id, true, undefined, true);
+        anotar(`${t.titulo}: 0 copias en esta estación, no se imprime`, true);
+        continue;
+      }
       if (estado.modoPrueba) {
         // Se da por impresa sin mandarla a ninguna impresora: el texto se puede ver en la lista con "Ver comanda".
         await marcar(t.id, true);
@@ -189,8 +195,11 @@ async function ciclo() {
       }
       cambiar({ imprimiendoAhora: { titulo: t.titulo, desde: Date.now() } });
       try {
-        // 60 s alcanzan para la espera en la fila de QZ más el límite de 25 s de esta impresión.
-        await conLimite(imprimirTexto(t.impresora, t.contenido), 60_000);
+        // Una tras otra (las copias): 60 s alcanzan para la espera en la fila de QZ más el límite de 25 s de cada impresión.
+        for (let copia = 0; copia < Math.max(1, t.copias); copia++) {
+          ultimaActividad = Date.now();
+          await conLimite(imprimirTexto(t.impresora, t.contenido), 60_000);
+        }
         await marcar(t.id, true);
         cambiar({ impresas: estado.impresas + 1 });
         anotar(`${t.titulo} → ${t.impresora}`, true);

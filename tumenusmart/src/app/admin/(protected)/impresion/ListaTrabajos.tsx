@@ -20,6 +20,8 @@ const ESTADOS: Record<string, { texto: string; color: "exito" | "amarillo" | "pe
   pendiente: { texto: "En espera", color: "amarillo" },
   imprimiendo: { texto: "Imprimiendo", color: "azul" },
   error: { texto: "Con error", color: "peligro" },
+  // La estación tiene 0 copias para esa área: se cerró a propósito sin imprimir.
+  omitido: { texto: "No se imprime (0 copias)", color: "azul" },
 };
 
 /** Las últimas comandas de la cola, con su estado y el botón para reimprimir las que ya salieron o fallaron. */

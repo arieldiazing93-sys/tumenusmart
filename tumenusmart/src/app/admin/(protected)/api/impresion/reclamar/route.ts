@@ -5,6 +5,7 @@ import { puede } from "@/lib/permisos";
 import { prismaDelLocal } from "@/lib/prisma-local";
 import { idLocalActual } from "@/lib/local-actual";
 import { estacionActual } from "@/lib/estacion-actual";
+import { copiasValidas } from "@/lib/copias-impresion";
 import {
   REINTENTOS_MAXIMOS,
   SEGUNDOS_TRABAJO_COLGADO,
@@ -41,9 +42,10 @@ export async function POST() {
 
   const mapeo = await db.estacionImpresora.findMany({
     where: { estacionId: estacion.id },
-    select: { areaImpresionId: true, nombreImpresora: true },
+    select: { areaImpresionId: true, nombreImpresora: true, copias: true },
   });
   const impresoraDeArea = new Map(mapeo.map((m) => [m.areaImpresionId, m.nombreImpresora]));
+  const copiasDeArea = new Map(mapeo.map((m) => [m.areaImpresionId, copiasValidas(m.copias)]));
   const areaIds = [...impresoraDeArea.keys()];
   if (areaIds.length === 0) {
     return NextResponse.json(
@@ -88,7 +90,7 @@ export async function POST() {
     ? await db.trabajoImpresion.findMany({
         where: { id: { in: reclamados } },
         orderBy: { createdAt: "asc" },
-        select: { id: true, titulo: true, areaImpresionId: true, contenido: true },
+        select: { id: true, titulo: true, tipo: true, areaImpresionId: true, contenido: true },
       })
     : [];
 
@@ -102,6 +104,9 @@ export async function POST() {
         // Vuelven los bytes 0x00 de los comandos de la impresora (en la base se guardan con una marca).
         contenido: contenidoParaImprimir(t.contenido),
         impresora: t.areaImpresionId ? (impresoraDeArea.get(t.areaImpresionId) ?? null) : null,
+        // Cuántas veces sale en ESTA estación (0 = no se imprime). La cuenta que se le entrega al cliente antes de cobrar
+        // ("ticket") sale siempre una vez: es un paso obligatorio de cobrar, no se apaga con las copias del ticket de venta.
+        copias: t.tipo === "ticket" ? 1 : t.areaImpresionId ? (copiasDeArea.get(t.areaImpresionId) ?? 1) : 1,
       })),
     },
     { headers: { "Cache-Control": "no-store" } }

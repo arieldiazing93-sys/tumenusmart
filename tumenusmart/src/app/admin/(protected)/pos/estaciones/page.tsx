@@ -17,7 +17,7 @@ export default async function EstacionesPage() {
       orderBy: { createdAt: "asc" },
       include: {
         _count: { select: { turnos: true } },
-        impresoras: { select: { areaImpresionId: true, nombreImpresora: true } },
+        impresoras: { select: { areaImpresionId: true, nombreImpresora: true, copias: true } },
       },
     }),
     estacionActual(prisma),
@@ -79,6 +79,7 @@ export default async function EstacionesPage() {
             puntosExpedicion={puntosExpedicion}
             areaTicketId={e.areaTicketId}
             impresoras={e.impresoras}
+            copiasFactura={e.copiasFactura}
             areasImpresion={areasImpresion}
           />
         ))}

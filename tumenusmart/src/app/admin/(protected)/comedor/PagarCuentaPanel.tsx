@@ -21,7 +21,11 @@ import type { ContextoCaja, CuentaCajaFila } from "./ComedorCaja";
 type Cobro = Extract<ContextoCaja["cobro"], { ok: true }>;
 
 function textoImpresion(r: ResultadoImpresion): string {
-  if (r.ok) return "El ticket salió en la impresora.";
+  if (r.ok) {
+    return r.omitida
+      ? "Esta estación está configurada para no imprimir este comprobante (0 copias)."
+      : "El ticket salió en la impresora.";
+  }
   if (r.motivo === "sin_impresora") return "Esta estación no tiene una impresora asignada al ticket.";
   if (r.motivo === "sin_qz") return "QZ Tray no está conectado en esta computadora.";
   return "No se pudo imprimir solo.";

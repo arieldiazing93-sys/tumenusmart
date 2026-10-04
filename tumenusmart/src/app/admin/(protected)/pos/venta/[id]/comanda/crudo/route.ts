@@ -5,6 +5,7 @@ import { idLocalActual } from "@/lib/local-actual";
 import { formatearNumero } from "@/lib/format";
 import { ZONA_NEGOCIO } from "@/lib/timezone";
 import { armarDocumento, centrado, separador } from "@/lib/escpos";
+import { copiasDeImpresion } from "@/lib/copias-impresion";
 
 export const dynamic = "force-dynamic";
 
@@ -56,5 +57,9 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
   l.push(separador());
 
-  return new NextResponse(armarDocumento(l), { headers: { "Content-Type": "text/plain; charset=utf-8" } });
+  // Cuántas veces sale en el área que se pidió, en la estación de quien lo pide (0 = no se imprime).
+  const copias = area ? await copiasDeImpresion(db, { area }) : 1;
+  return new NextResponse(armarDocumento(l), {
+    headers: { "Content-Type": "text/plain; charset=utf-8", "X-Copias": String(copias) },
+  });
 }

@@ -1163,6 +1163,9 @@ model Estacion {
   // impresión automática, cae al fallback manual.
   areaTicketId String?
   areaTicket   AreaImpresion? @relation(fields: [areaTicketId], references: [id], onDelete: SetNull)
+  /// Cuántas copias salen de cada FACTURA en la impresora del área del ticket/factura (las copias del ticket de venta están en
+  /// EstacionImpresora.copias de esa misma área). 0 = no se imprime la factura desde esta estación.
+  copiasFactura Int @default(1)
   // Mapeo de cada Área de Impresión a la impresora real que QZ Tray ve EN
   // ESTA notebook — una fila por área configurada (ver EstacionImpresora).
   impresoras   EstacionImpresora[]
@@ -1210,6 +1213,10 @@ model EstacionImpresora {
   areaImpresionId String
   areaImpresion   AreaImpresion @relation(fields: [areaImpresionId], references: [id], onDelete: Cascade)
   nombreImpresora String
+  /// Cuántas veces sale cada impresión en esta área y estación (comandas, anulaciones; en el área del ticket, el ticket de
+  /// venta). 1 = una copia (lo normal), 2 = sale dos veces (la cocina que la quiere doble), 0 = no se imprime (un local que
+  /// solo quiere la factura). Ver src/lib/copias-impresion.ts.
+  copias          Int      @default(1)
 
   @@unique([estacionId, areaImpresionId])
   @@index([storeId])

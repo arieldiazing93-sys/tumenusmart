@@ -9,9 +9,12 @@ import {
   asignarPuntoExpedicion,
   asignarImpresoraDeArea,
   asignarAreaTicket,
+  cambiarCopiasDeArea,
+  cambiarCopiasFactura,
 } from "./actions";
 import { Boton, Entrada, Pastilla, clasesBoton } from "@/components/ui";
 import { listarImpresoras } from "@/lib/qz-tray";
+import { imprimirPrueba } from "@/lib/impresion-comprobantes";
 
 type PuntoExpedicionOpcion = {
   id: string;
@@ -21,7 +24,54 @@ type PuntoExpedicionOpcion = {
 };
 
 type AreaImpresionOpcion = { id: string; nombre: string };
-type ImpresoraAsignada = { areaImpresionId: string; nombreImpresora: string };
+type ImpresoraAsignada = { areaImpresionId: string; nombreImpresora: string; copias: number };
+
+const COPIAS_MAXIMAS = 9;
+
+/**
+ * El contador de copias de una impresión: − N +. "1 copia" es lo normal, 2 sale dos veces, y 0 es "No imprime" (en rojo, para que
+ * se note que ese comprobante no sale en esta estación). Va fuera del componente de la fila para no re-armarse en cada cambio.
+ */
+function ContadorCopias({
+  etiqueta,
+  valor,
+  deshabilitado,
+  onCambiar,
+}: {
+  etiqueta: string;
+  valor: number;
+  deshabilitado: boolean;
+  onCambiar: (nuevo: number) => void;
+}) {
+  const boton =
+    "flex h-7 w-7 flex-none items-center justify-center rounded-md border border-azul/40 bg-azul-luz text-[1rem] font-bold leading-none text-azul-oscuro transition-colors hover:bg-azul hover:text-white disabled:opacity-40";
+  return (
+    <span className="inline-flex items-center gap-1.5 text-xs text-tinta-media">
+      <span className="font-semibold">{etiqueta}</span>
+      <button
+        type="button"
+        aria-label={`Una copia menos de ${etiqueta}`}
+        disabled={deshabilitado || valor <= 0}
+        onClick={() => onCambiar(valor - 1)}
+        className={boton}
+      >
+        −
+      </button>
+      <span className={`min-w-[4.6rem] text-center text-[0.8rem] font-semibold ${valor === 0 ? "text-peligro" : "text-tinta"}`}>
+        {valor === 0 ? "No imprime" : valor === 1 ? "1 copia" : `${valor} copias`}
+      </span>
+      <button
+        type="button"
+        aria-label={`Una copia más de ${etiqueta}`}
+        disabled={deshabilitado || valor >= COPIAS_MAXIMAS}
+        onClick={() => onCambiar(valor + 1)}
+        className={boton}
+      >
+        +
+      </button>
+    </span>
+  );
+}
 
 // Mismo lenguaje visual que clasesDeCampo() (foco, transición) pero sin el
 // w-full de un campo de formulario normal — estos <select> viven dentro de
@@ -53,6 +103,7 @@ export function EstacionFila({
   puntosExpedicion,
   areaTicketId,
   impresoras,
+  copiasFactura,
   areasImpresion,
 }: {
   id: string;
@@ -66,8 +117,10 @@ export function EstacionFila({
   puntosExpedicion: PuntoExpedicionOpcion[];
   /** Qué Área de Impresión maneja el ticket/factura en esta estación. */
   areaTicketId: string | null;
-  /** Mapeo YA guardado de área → impresora, para esta estación. */
+  /** Mapeo YA guardado de área → impresora (y cuántas copias salen), para esta estación. */
   impresoras: ImpresoraAsignada[];
+  /** Cuántas copias salen de cada factura en esta estación (0 = no se imprime). */
+  copiasFactura: number;
   /** Áreas de impresión activas del local (catálogo). */
   areasImpresion: AreaImpresionOpcion[];
 }) {
@@ -84,8 +137,53 @@ export function EstacionFila({
   const [buscandoImpresoras, setBuscandoImpresoras] = useState(false);
   const [errorQz, setErrorQz] = useState<string | null>(null);
   const [asignandoArea, setAsignandoArea] = useState<string | null>(null);
+  // Cambiando copias ("factura" o el id de un área) y la prueba de impresión que se está mandando o su resultado.
+  const [cambiandoCopias, setCambiandoCopias] = useState<string | null>(null);
+  const [probando, setProbando] = useState<string | null>(null);
+  const [resultadoPrueba, setResultadoPrueba] = useState<{ areaId: string; ok: boolean; texto: string } | null>(null);
 
   const mapaImpresoras = new Map(impresoras.map((i) => [i.areaImpresionId, i.nombreImpresora]));
+  const mapaCopias = new Map(impresoras.map((i) => [i.areaImpresionId, i.copias]));
+
+  async function cambiarCopias(areaImpresionId: string, copias: number) {
+    setCambiandoCopias(areaImpresionId);
+    setErrorQz(null);
+    const resultado = await cambiarCopiasDeArea(id, areaImpresionId, copias);
+    setCambiandoCopias(null);
+    if (!resultado.ok) setErrorQz(resultado.error);
+  }
+
+  async function cambiarCopiasDeLaFactura(copias: number) {
+    setCambiandoCopias("factura");
+    setErrorQz(null);
+    const resultado = await cambiarCopiasFactura(id, copias);
+    setCambiandoCopias(null);
+    if (!resultado.ok) setErrorQz(resultado.error);
+  }
+
+  /** Manda una prueba cortita a la impresora de esa área, para ver que sale antes de usarla con un pedido de verdad. */
+  async function probarImpresion(areaImpresionId: string, nombreArea: string, impresora: string) {
+    setProbando(areaImpresionId);
+    setResultadoPrueba(null);
+    const r = await imprimirPrueba(impresora, `${nombre} - ${nombreArea}`);
+    setProbando(null);
+    if (r.ok) {
+      setResultadoPrueba({
+        areaId: areaImpresionId,
+        ok: true,
+        texto: `Se mandó la prueba a “${impresora}”. Si no salió, revisá que esté encendida, con papel y conectada.`,
+      });
+    } else {
+      setResultadoPrueba({
+        areaId: areaImpresionId,
+        ok: false,
+        texto:
+          r.motivo === "sin_qz"
+            ? "No se pudo conectar con QZ Tray en esta computadora. ¿Está instalado y corriendo?"
+            : `No se pudo mandar la prueba: ${r.detalle ?? "error desconocido"}`,
+      });
+    }
+  }
 
   async function cambiarPuntoExpedicion(valor: string) {
     setAsignando(true);
@@ -287,29 +385,76 @@ export function EstacionFila({
                 </button>
                 {errorQz && <span className="text-xs text-peligro">{errorQz}</span>}
               </div>
-              <div className="flex flex-col gap-2">
+              <p className="mb-2 text-xs text-tinta-suave">
+                <strong className="font-semibold text-tinta-media">Copias:</strong> cuántas veces sale cada impresión en esta
+                estación. 1 es lo normal; 2 sale dos veces (por ejemplo la comanda de la cocina); “No imprime” (0) hace que
+                ese comprobante no salga acá (por ejemplo el ticket de un local que solo quiere la factura). Con “Probar
+                impresión” sale una prueba cortita para ver que funciona antes de usarla con un pedido.
+              </p>
+              <div className="flex flex-col gap-3">
                 {areasImpresion.map((a) => {
                   const actual = mapaImpresoras.get(a.id) ?? "";
+                  const copias = mapaCopias.get(a.id) ?? 1;
+                  const esAreaDelTicket = areaTicketId === a.id;
                   return (
-                    <label key={a.id} className="flex items-center gap-2 text-sm text-tinta-media">
-                      <span className="w-24 flex-none">{a.nombre}</span>
-                      <select
-                        value={actual}
-                        disabled={asignandoArea === a.id}
-                        onChange={(e) => cambiarImpresoraDeArea(a.id, e.target.value)}
-                        className={clasesSelectCompacto(!!actual)}
-                      >
-                        <option value="">Sin asignar — imprime manual</option>
-                        {actual && !impresorasDetectadas.includes(actual) && (
-                          <option value={actual}>{actual} (guardada)</option>
+                    <div key={a.id} className="flex flex-col gap-1.5">
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-sm text-tinta-media">
+                        <span className="w-24 flex-none font-medium">{a.nombre}</span>
+                        <select
+                          value={actual}
+                          disabled={asignandoArea === a.id}
+                          onChange={(e) => cambiarImpresoraDeArea(a.id, e.target.value)}
+                          aria-label={`Impresora del área ${a.nombre}`}
+                          className={clasesSelectCompacto(!!actual)}
+                        >
+                          <option value="">Sin asignar — imprime manual</option>
+                          {actual && !impresorasDetectadas.includes(actual) && (
+                            <option value={actual}>{actual} (guardada)</option>
+                          )}
+                          {impresorasDetectadas.map((n) => (
+                            <option key={n} value={n}>
+                              {n}
+                            </option>
+                          ))}
+                        </select>
+                        {actual && (
+                          <button
+                            type="button"
+                            disabled={probando !== null}
+                            onClick={() => probarImpresion(a.id, a.nombre, actual)}
+                            className={clasesBoton("navegar", "sm")}
+                          >
+                            {probando === a.id ? "Enviando prueba…" : "Probar impresión"}
+                          </button>
                         )}
-                        {impresorasDetectadas.map((n) => (
-                          <option key={n} value={n}>
-                            {n}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
+                      </div>
+                      {actual && (
+                        <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 pl-0 sm:pl-[6.75rem]">
+                          <ContadorCopias
+                            etiqueta={esAreaDelTicket ? "Ticket" : "Copias"}
+                            valor={copias}
+                            deshabilitado={cambiandoCopias === a.id}
+                            onCambiar={(n) => cambiarCopias(a.id, n)}
+                          />
+                          {/* El área del ticket/factura imprime las dos cosas: la factura tiene su propio contador. */}
+                          {esAreaDelTicket && (
+                            <ContadorCopias
+                              etiqueta="Factura"
+                              valor={copiasFactura}
+                              deshabilitado={cambiandoCopias === "factura"}
+                              onCambiar={cambiarCopiasDeLaFactura}
+                            />
+                          )}
+                        </div>
+                      )}
+                      {resultadoPrueba?.areaId === a.id && (
+                        <p
+                          className={`text-xs font-medium sm:pl-[6.75rem] ${resultadoPrueba.ok ? "text-exito" : "text-peligro"}`}
+                        >
+                          {resultadoPrueba.texto}
+                        </p>
+                      )}
+                    </div>
                   );
                 })}
               </div>
@@ -319,6 +464,15 @@ export function EstacionFila({
               {areasImpresion.map((a) => (
                 <li key={a.id}>
                   {a.nombre}: {mapaImpresoras.get(a.id) ?? "sin asignar"}
+                  {mapaImpresoras.has(a.id) && (
+                    <>
+                      {" · "}
+                      {(mapaCopias.get(a.id) ?? 1) === 0
+                        ? "no imprime"
+                        : `${mapaCopias.get(a.id) ?? 1} ${(mapaCopias.get(a.id) ?? 1) === 1 ? "copia" : "copias"}`}
+                      {areaTicketId === a.id && ` (ticket) · factura: ${copiasFactura === 0 ? "no imprime" : `${copiasFactura} ${copiasFactura === 1 ? "copia" : "copias"}`}`}
+                    </>
+                  )}
                 </li>
               ))}
               <li className="mt-1 text-tinta-suave">

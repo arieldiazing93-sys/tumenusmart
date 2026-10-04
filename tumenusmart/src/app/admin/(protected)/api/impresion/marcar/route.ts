@@ -26,6 +26,8 @@ export async function POST(request: Request) {
   const datos = (cuerpo && typeof cuerpo === "object" ? cuerpo : {}) as Record<string, unknown>;
   const id = typeof datos.id === "string" ? datos.id : "";
   const salio = datos.ok === true;
+  // La estación lo da por cerrado SIN imprimir porque tiene 0 copias para esa área (una decisión del local, no un error).
+  const omitido = datos.omitido === true;
   const motivo = typeof datos.error === "string" ? datos.error.slice(0, 300) : null;
   if (!id) return NextResponse.json({ error: "Falta el trabajo" }, { status: 400 });
 
@@ -42,9 +44,11 @@ export async function POST(request: Request) {
 
   await db.trabajoImpresion.updateMany({
     where: { id: trabajo.id, estacionId: estacion.id, estado: "imprimiendo" },
-    data: salio
-      ? { estado: "impreso", impresoEn: new Date(), error: null }
-      : { estado: trabajo.intentos >= REINTENTOS_MAXIMOS ? "error" : "pendiente", error: motivo ?? "No se pudo imprimir." },
+    data: omitido
+      ? { estado: "omitido", impresoEn: new Date(), error: "No se imprimió: esta estación tiene 0 copias para esta área." }
+      : salio
+        ? { estado: "impreso", impresoEn: new Date(), error: null }
+        : { estado: trabajo.intentos >= REINTENTOS_MAXIMOS ? "error" : "pendiente", error: motivo ?? "No se pudo imprimir." },
   });
 
   return NextResponse.json({ ok: true }, { headers: { "Cache-Control": "no-store" } });

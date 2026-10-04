@@ -6,6 +6,8 @@ import { revalidatePath } from "next/cache";
 import { idLocalActual } from "@/lib/local-actual";
 import { prismaDelLocal } from "@/lib/prisma-local";
 import { COOKIE_ESTACION } from "@/lib/estacion-actual";
+import { COPIAS_MAXIMAS } from "@/lib/copias-impresion";
+import { registrarBitacora } from "@/lib/bitacora";
 
 export type ResultadoEstacion = { ok: true } | { ok: false; error: string };
 
@@ -88,6 +90,72 @@ export async function asignarImpresoraDeArea(
       create: { estacionId, areaImpresionId, nombreImpresora, storeId: idLocal },
     });
   }
+  revalidatePath("/admin/pos/estaciones");
+  return { ok: true };
+}
+
+/**
+ * Cuántas veces sale cada impresión de un área EN ESTA estación: 1 es lo normal, 2 la cocina que quiere la comanda doble, 0 que
+ * esa área no imprima (por ejemplo el ticket de un local que solo quiere la factura). En el área del ticket/factura son las
+ * copias del TICKET de venta; las de la factura van aparte (`cambiarCopiasFactura`). El área tiene que tener ya una impresora
+ * asignada. Queda en la bitácora: apagar una impresión es algo que conviene poder rastrear.
+ */
+export async function cambiarCopiasDeArea(
+  estacionId: string,
+  areaImpresionId: string,
+  copias: number
+): Promise<ResultadoEstacion> {
+  const sesion = await exigirPermiso("pos.gestionarEstaciones");
+  const idLocal = await idLocalActual();
+  const prisma = prismaDelLocal(idLocal);
+
+  const n = Number(copias);
+  if (!Number.isInteger(n) || n < 0 || n > COPIAS_MAXIMAS) {
+    return { ok: false, error: `Las copias van de 0 a ${COPIAS_MAXIMAS}.` };
+  }
+  const fila = await prisma.estacionImpresora.findFirst({
+    where: { estacionId, areaImpresionId },
+    select: { id: true, copias: true, estacion: { select: { nombre: true } }, areaImpresion: { select: { nombre: true } } },
+  });
+  if (!fila) return { ok: false, error: "Primero asignale una impresora a esa área." };
+  if (fila.copias === n) return { ok: true };
+
+  await prisma.estacionImpresora.updateMany({ where: { id: fila.id }, data: { copias: n } });
+  await registrarBitacora(idLocal, sesion, {
+    modulo: "caja",
+    accion: "copias_impresion_cambiadas",
+    descripcion: `Cambió las copias de ${fila.areaImpresion.nombre} en la estación ${fila.estacion.nombre}: de ${fila.copias} a ${n}${n === 0 ? " (no se imprime)" : ""}.`,
+    entidad: "EstacionImpresora",
+    entidadId: fila.id,
+    detalle: { area: fila.areaImpresion.nombre, estacion: fila.estacion.nombre, antes: fila.copias, ahora: n },
+  });
+  revalidatePath("/admin/pos/estaciones");
+  return { ok: true };
+}
+
+/** Cuántas copias salen de cada FACTURA en esta estación (0 = no se imprime la factura desde acá). */
+export async function cambiarCopiasFactura(estacionId: string, copias: number): Promise<ResultadoEstacion> {
+  const sesion = await exigirPermiso("pos.gestionarEstaciones");
+  const idLocal = await idLocalActual();
+  const prisma = prismaDelLocal(idLocal);
+
+  const n = Number(copias);
+  if (!Number.isInteger(n) || n < 0 || n > COPIAS_MAXIMAS) {
+    return { ok: false, error: `Las copias van de 0 a ${COPIAS_MAXIMAS}.` };
+  }
+  const estacion = await prisma.estacion.findFirst({ where: { id: estacionId }, select: { id: true, nombre: true, copiasFactura: true } });
+  if (!estacion) return { ok: false, error: "No encontré esa estación." };
+  if (estacion.copiasFactura === n) return { ok: true };
+
+  await prisma.estacion.updateMany({ where: { id: estacion.id }, data: { copiasFactura: n } });
+  await registrarBitacora(idLocal, sesion, {
+    modulo: "caja",
+    accion: "copias_impresion_cambiadas",
+    descripcion: `Cambió las copias de la factura en la estación ${estacion.nombre}: de ${estacion.copiasFactura} a ${n}${n === 0 ? " (no se imprime)" : ""}.`,
+    entidad: "Estacion",
+    entidadId: estacion.id,
+    detalle: { estacion: estacion.nombre, documento: "factura", antes: estacion.copiasFactura, ahora: n },
+  });
   revalidatePath("/admin/pos/estaciones");
   return { ok: true };
 }
