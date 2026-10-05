@@ -33,7 +33,8 @@ const ESTADOS_VALIDOS = [
 
 export type ResultadoPedidoAccion =
   | { ok: true; aviso?: string; areasImpresion?: string[] }
-  | { ok: false; error: string };
+  /** `sinTurno`: cobrar el pedido exige el turno de caja abierto; la pantalla manda directo a abrirlo (src/lib/turno-requerido.ts). */
+  | { ok: false; error: string; sinTurno?: true };
 
 /**
  * Lo que hace falta leer de un pedido para emitirle factura (intentarEmitirFactura)
@@ -356,21 +357,31 @@ export async function cambiarEstadoPedido(
         }
         datosExtra = { cobroMetodo: normalizarCobro(formaPagoPos), entregadoEn: new Date() };
       } else {
-        // Se ata al turno de la MISMA computadora desde la que se marca
-        // entregado — misma cookie de estación que usa el Punto de Venta
-        // (ver src/lib/estacion-actual.ts). Sin estación vinculada, o sin
-        // turno abierto en esa estación, no hay a qué cierre atarlo: se
-        // marca entregado igual, sin pedir forma de pago — no romper el
-        // flujo de todos los días para quien mira Pedidos desde un
-        // dispositivo que no es una caja.
+        // Entregar un retiro/mesa es cobrarlo en el mostrador: se ata al
+        // turno de la MISMA computadora desde la que se marca entregado —
+        // misma cookie de estación que usa el Punto de Venta (ver
+        // src/lib/estacion-actual.ts). SIN turno abierto no se vende: no
+        // habría a qué cierre atar el cobro y la plata quedaría fuera de la
+        // caja. Se frena y la pantalla manda directo a abrir el turno.
         const estacion = await estacionActual(prisma);
-        const turno = estacion ? await turnoAbierto(prisma, estacion.id) : null;
-        if (turno) {
-          if (!formaPagoPos) {
-            return { ok: false, error: "Declará con qué se cobró antes de marcarlo entregado." };
-          }
-          datosExtra = { formaPagoPos: normalizarFormaPagoPos(formaPagoPos), turnoPosId: turno.id };
+        if (!estacion) {
+          return {
+            ok: false,
+            error: "Esta computadora no está vinculada a una caja. Vinculala en Estaciones (punto de venta) para poder cobrar el pedido.",
+          };
         }
+        const turno = await turnoAbierto(prisma, estacion.id);
+        if (!turno) {
+          return {
+            ok: false,
+            error: "No hay un turno de caja abierto en esta computadora. Abrilo y volvé a marcar el pedido como entregado.",
+            sinTurno: true,
+          };
+        }
+        if (!formaPagoPos) {
+          return { ok: false, error: "Declará con qué se cobró antes de marcarlo entregado." };
+        }
+        datosExtra = { formaPagoPos: normalizarFormaPagoPos(formaPagoPos), turnoPosId: turno.id };
       }
 
       const resultado = await intentarEmitirFactura(prisma, pedido);

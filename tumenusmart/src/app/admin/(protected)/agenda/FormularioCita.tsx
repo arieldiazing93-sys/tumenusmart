@@ -21,6 +21,7 @@ import {
 } from "@/lib/agenda-cita";
 import { formatearTelefonoPersonal, normalizarTelefonoCliente } from "@/lib/agenda-personal";
 import { formatearGuarani } from "@/lib/format";
+import { rutaParaAbrirTurno } from "@/lib/turno-requerido";
 import { imprimirComprobante } from "@/lib/impresion-comprobantes";
 import { instanteAsuncionDesdeTexto } from "@/lib/timezone";
 import { TIPOS_IDENTIFICACION_FISCAL } from "@/lib/tipo-cliente";
@@ -164,6 +165,12 @@ export function FormularioCita({
         ? datosCobro.comprobanteTipo
         : "ticket";
   const cajaImpide = cobrando && (!caja.listo || (caja.facturaObligatoria && !caja.puedeFacturar));
+  // Lo único que falta es abrir el turno de caja: no se cobra sin él, así que "Cobrar" lleva directo a abrirlo y, al abrirlo,
+  // se vuelve a esta misma cita (ver src/lib/turno-requerido.ts).
+  const faltaSoloElTurno = cobrando && !caja.listo && caja.motivo === "sin_turno";
+  function irAAbrirTurno() {
+    router.push(rutaParaAbrirTurno(`${window.location.pathname}${window.location.search}`));
+  }
 
   // ¿Se eligió a alguien que no realiza alguno de los servicios? Solo se avisa: el dueño manda.
   const catalogoPorId = new Map(servicios.map((s) => [s.id, s] as const));
@@ -242,6 +249,10 @@ export function FormularioCita({
   function enviar(forzar: boolean) {
     setError(null);
     setChoque(null);
+    if (faltaSoloElTurno) {
+      irAAbrirTurno();
+      return;
+    }
     const mensaje = errorLocal();
     if (mensaje) {
       setError(mensaje);
@@ -263,7 +274,9 @@ export function FormularioCita({
         if (cobrando) {
           const r = await cobrarCita(cita.id, armarDatos(forzar), { ...datosCobro, comprobanteTipo: comprobanteFinal });
           if (!r.ok) {
-            setError(r.error);
+            // El turno se cerró mientras tanto: sin turno no se cobra, se va a abrir uno.
+            if (r.sinTurno) irAAbrirTurno();
+            else setError(r.error);
             return;
           }
           setCobradoAhora({ ventaId: r.ventaId });
@@ -398,7 +411,9 @@ export function FormularioCita({
     : esNueva
       ? "Crear cita"
       : cobrando
-        ? `Cobrar ${formatearGuarani(total)}`
+        ? faltaSoloElTurno
+          ? "Abrir el turno de caja para cobrar"
+          : `Cobrar ${formatearGuarani(total)}`
         : "Guardar";
 
   return (
@@ -957,7 +972,7 @@ export function FormularioCita({
                 ) : (
                   <button
                     type="submit"
-                    disabled={pendiente || cajaImpide || (cobrando && total <= 0)}
+                    disabled={pendiente || (cajaImpide && !faltaSoloElTurno) || (cobrando && total <= 0)}
                     className={`${clasesBoton("exito", "md")} w-full`}
                   >
                     {textoBotonPrincipal}

@@ -29,7 +29,10 @@ import { turnoAbierto } from "../pos/turno-actual";
 
 /** `conflicto`: el horario se pisa con otra cita; la pantalla puede ofrecer "Guardar igual". */
 export type ResultadoCita = { ok: true; citaId: string } | { ok: false; error: string; conflicto?: boolean };
-export type ResultadoCobroCita = { ok: true; ventaId: string; total: number } | { ok: false; error: string };
+export type ResultadoCobroCita =
+  | { ok: true; ventaId: string; total: number }
+  /** `sinTurno`: no hay turno de caja abierto; la pantalla manda directo a abrirlo (ver src/lib/turno-requerido.ts). */
+  | { ok: false; error: string; sinTurno?: true };
 export type ResultadoSimple = { ok: true } | { ok: false; error: string };
 
 const LARGO_MAXIMO_NOMBRE = 80;
@@ -513,7 +516,7 @@ export async function cobrarCita(citaId: string, datos: DatosCita, cobro: DatosC
   }
   const turno = await turnoAbierto(db, estacion.id);
   if (!turno) {
-    return { ok: false, error: "No hay un turno de caja abierto en esta computadora. Abrilo y volvé a cobrar." };
+    return { ok: false, error: "No hay un turno de caja abierto en esta computadora. Abrilo y volvé a cobrar.", sinTurno: true };
   }
 
   // Para venderse, cada servicio tiene que seguir en el catálogo (es un producto del punto de venta).

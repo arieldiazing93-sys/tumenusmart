@@ -8,6 +8,7 @@ import { Segmentado } from "@/components/Segmentado";
 import { formatearGuarani } from "@/lib/format";
 import { calcularDescuento, textoPorcentaje } from "@/lib/descuento-venta";
 import { FORMA_PAGO_A_CREDITO } from "@/lib/turno-pos";
+import { rutaParaAbrirTurno } from "@/lib/turno-requerido";
 import type { PagoCobro } from "@/lib/pago-venta";
 import { SIN_REGISTRO_FISCAL, TIPOS_IDENTIFICACION_FISCAL, etiquetaCortaTipoIdentificacion } from "@/lib/tipo-cliente";
 import { buscarClientePorIdentificacion, buscarClientePorTelefono, registrarVenta } from "./actions";
@@ -399,6 +400,11 @@ export function PantallaVenta({
     }
     setCobrando(false);
     if (!r.ok) {
+      // El turno se cerró mientras se armaba la venta (otra pestaña, otro cajero): sin turno no se vende, se va a abrir uno.
+      if (r.sinTurno) {
+        router.push(rutaParaAbrirTurno("/admin/pos"));
+        return;
+      }
       setError(r.error);
       return;
     }

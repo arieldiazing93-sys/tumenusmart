@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Campo, Entrada, Selector, clasesBoton } from "@/components/ui";
 import { formatearGuarani } from "@/lib/format";
 import { FORMAS_PAGO_POS } from "@/lib/turno-pos";
+import { rutaParaAbrirTurno } from "@/lib/turno-requerido";
 import { registrarCobroVenta } from "./actions";
 
 /** El día de hoy en la zona del navegador (toISOString daría el de UTC, y de noche ya es "mañana"). */
@@ -87,6 +88,11 @@ function ModalCobro({
         notas: notas.trim() || null,
       });
       if (!resultado.ok) {
+        // Cobrar en efectivo sin turno abierto: se va directo a abrirlo y se vuelve a esta lista.
+        if (resultado.sinTurno) {
+          router.push(rutaParaAbrirTurno("/admin/pos/cuentas-por-cobrar"));
+          return;
+        }
         setError(resultado.error);
         return;
       }

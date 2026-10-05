@@ -6,7 +6,7 @@ import { Boton } from "@/components/ui";
 import { EntradaMonto } from "@/components/EntradaMonto";
 import { abrirTurno } from "../actions";
 
-export function AbrirTurnoForm({ estacionId }: { estacionId: string }) {
+export function AbrirTurnoForm({ estacionId, volverA }: { estacionId: string; volverA: string }) {
   const router = useRouter();
   const [monto, setMonto] = useState("0");
   const [error, setError] = useState<string | null>(null);
@@ -21,7 +21,8 @@ export function AbrirTurnoForm({ estacionId }: { estacionId: string }) {
       setError(r.error);
       return;
     }
-    router.push("/admin/pos");
+    // Vuelve a donde estaba (el pedido, la cuenta de la mesa…) o, si venía a abrir el turno sin más, al mostrador.
+    router.push(volverA);
   }
 
   return (

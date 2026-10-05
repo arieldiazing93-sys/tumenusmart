@@ -2,9 +2,11 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Campo, Entrada, Selector, clasesBoton } from "@/components/ui";
 import type { DatosCobro, EstadoCaja } from "@/lib/agenda-cita";
 import { formatearGuarani } from "@/lib/format";
+import { rutaParaAbrirTurno } from "@/lib/turno-requerido";
 import { TIPOS_IDENTIFICACION_FISCAL } from "@/lib/tipo-cliente";
 import { FORMAS_PAGO_POS, type FormaPagoPos } from "@/lib/turno-pos";
 import { buscarClientePorIdentificacion } from "../pos/actions";
@@ -47,6 +49,7 @@ export function SeccionCobro({
   /** Milisegundos que espera para entrar (las tarjetas del detalle entran una tras otra). */
   retraso?: number;
 }) {
+  const router = useRouter();
   const [pagaCon, setPagaCon] = useState("");
   const [buscando, setBuscando] = useState(false);
   const [avisoBusqueda, setAvisoBusqueda] = useState<string | null>(null);
@@ -102,12 +105,20 @@ export function SeccionCobro({
               : "Abrí el turno de caja para poder cobrar: lo que se cobra acá entra en esa caja."}
           </p>
           <div className="mt-2.5">
-            <Link
-              href={caja.motivo === "sin_estacion" ? "/admin/pos/estaciones" : "/admin/pos/abrir"}
-              className={clasesBoton("navegar", "sm")}
-            >
-              {caja.motivo === "sin_estacion" ? "Ir a Estaciones" : "Abrir turno de caja"}
-            </Link>
+            {caja.motivo === "sin_estacion" ? (
+              <Link href="/admin/pos/estaciones" className={clasesBoton("navegar", "sm")}>
+                Ir a Estaciones
+              </Link>
+            ) : (
+              // Al abrir el turno se vuelve a esta misma cita (ver src/lib/turno-requerido.ts).
+              <button
+                type="button"
+                onClick={() => router.push(rutaParaAbrirTurno(`${window.location.pathname}${window.location.search}`))}
+                className={clasesBoton("navegar", "sm")}
+              >
+                Abrir turno de caja
+              </button>
+            )}
           </div>
         </div>
       )}

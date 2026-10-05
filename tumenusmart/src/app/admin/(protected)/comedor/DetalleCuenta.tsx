@@ -8,6 +8,7 @@ import { Segmentado } from "@/components/Segmentado";
 import { formatearGuarani, formatearNumero } from "@/lib/format";
 import { textoEstadoCuenta } from "@/lib/comedor";
 import { calcularDescuento, textoPorcentaje } from "@/lib/descuento-venta";
+import { rutaParaAbrirTurno } from "@/lib/turno-requerido";
 import { anularProducto, aplicarDescuento, cancelarCuenta, imprimirCuenta, reabrirCuenta } from "./actions";
 import type { ContextoCaja, CuentaCajaFila, ItemCuentaFila } from "./ComedorCaja";
 import { CargarProductosPanel } from "./CargarProductosPanel";
@@ -157,10 +158,11 @@ export function DetalleCuenta({
               {contexto.puedeCobrar && (
                 <button
                   type="button"
-                  // Se cobra recién después de imprimir la cuenta (queda "por cobrar").
-                  disabled={pendiente || !porCobrar || !contexto.cobro.ok || !!t.descuentoInvalido || t.total <= 0}
+                  // Se cobra recién después de imprimir la cuenta (queda "por cobrar"). Sin turno de caja abierto no se cobra: el
+                  // botón lleva directo a abrirlo y, al abrirlo, se vuelve acá.
+                  disabled={pendiente || !porCobrar || (!contexto.cobro.ok && !contexto.cobro.sinTurno) || !!t.descuentoInvalido || t.total <= 0}
                   title={!porCobrar ? "Primero imprimí la cuenta" : undefined}
-                  onClick={onCobrar}
+                  onClick={() => (contexto.cobro.ok ? onCobrar() : router.push(rutaParaAbrirTurno("/admin/comedor")))}
                   className={clasesBoton("navegar", "sm")}
                 >
                   Pagar cuenta
@@ -193,7 +195,12 @@ export function DetalleCuenta({
                 Para cobrar, primero imprimí la cuenta: “Pagar cuenta” se habilita cuando la cuenta ya está impresa.
               </p>
             )}
-            {contexto.puedeCobrar && !contexto.cobro.ok && contexto.cobro.motivo && (
+            {contexto.puedeCobrar && !contexto.cobro.ok && contexto.cobro.sinTurno && (
+              <p className="text-[0.72rem] font-medium text-amarillo-oscuro">
+                No hay un turno de caja abierto: al tocar “Pagar cuenta” te llevo a abrirlo, y después volvés acá para cobrar.
+              </p>
+            )}
+            {contexto.puedeCobrar && !contexto.cobro.ok && !contexto.cobro.sinTurno && contexto.cobro.motivo && (
               <p className="text-[0.72rem] text-tinta-suave">No se puede cobrar desde acá: {contexto.cobro.motivo}</p>
             )}
             {porCobrar && (

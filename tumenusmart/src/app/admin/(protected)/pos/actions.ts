@@ -84,7 +84,8 @@ export async function abrirTurno(
 
 export type ResultadoVenta =
   | { ok: true; ventaId: string; total: number; areasImpresion: string[] }
-  | { ok: false; error: string };
+  /** `sinTurno`: el turno de caja ya no está abierto; la pantalla manda directo a abrirlo (ver src/lib/turno-requerido.ts). */
+  | { ok: false; error: string; sinTurno?: true };
 
 export type ItemVentaInput =
   | {
@@ -179,7 +180,7 @@ export async function registrarVenta(turnoId: string, datos: DatosVenta): Promis
   ]);
   if (!turno) return { ok: false, error: "Ese turno no existe." };
   if (turno.estado !== "abierto") {
-    return { ok: false, error: "Ese turno ya está cerrado. Abrí uno nuevo para seguir vendiendo." };
+    return { ok: false, error: "Ese turno ya está cerrado. Abrí uno nuevo para seguir vendiendo.", sinTurno: true };
   }
 
   if (!Array.isArray(datos.items) || datos.items.length === 0) {

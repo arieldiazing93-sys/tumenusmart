@@ -10,6 +10,7 @@ import { formatearGuarani, formatearNumero } from "@/lib/format";
 import { textoPorcentaje } from "@/lib/descuento-venta";
 import type { PagoCobro } from "@/lib/pago-venta";
 import { FORMA_PAGO_A_CREDITO } from "@/lib/turno-pos";
+import { rutaParaAbrirTurno } from "@/lib/turno-requerido";
 import { SIN_REGISTRO_FISCAL, TIPOS_IDENTIFICACION_FISCAL, etiquetaCortaTipoIdentificacion } from "@/lib/tipo-cliente";
 import { imprimirComprobante, type ResultadoImpresion } from "@/lib/impresion-comprobantes";
 import { CobrarPanel } from "../pos/CobrarPanel";
@@ -194,6 +195,11 @@ export function PagarCuentaPanel({
     }
     setCobrando(false);
     if (!r.ok) {
+      // El turno se cerró mientras se cobraba: sin turno no se cobra, se va a abrir uno (la cuenta sigue por cobrar).
+      if (r.sinTurno) {
+        router.push(rutaParaAbrirTurno("/admin/comedor"));
+        return;
+      }
       setErrorCobro(r.error);
       return;
     }

@@ -21,7 +21,10 @@ export type DatosCobro = {
   notas: string | null;
 };
 
-export type ResultadoCobro = { ok: true } | { ok: false; error: string };
+export type ResultadoCobro =
+  | { ok: true }
+  /** `sinTurno`: cobrar en efectivo exige el turno de caja abierto; la pantalla manda directo a abrirlo (src/lib/turno-requerido.ts). */
+  | { ok: false; error: string; sinTurno?: true };
 
 function refrescar(ventaId: string) {
   revalidatePath("/admin/pos/cuentas-por-cobrar");
@@ -88,6 +91,8 @@ export async function registrarCobroVenta(ventaId: string, datos: DatosCobro): P
       return {
         ok: false,
         error: "Para cobrar en efectivo hace falta un turno de caja abierto en esta computadora: la plata tiene que entrar a una caja.",
+        // Con estación vinculada lo único que falta es abrir el turno; sin estación, abrirlo no alcanza.
+        ...(estacion ? { sinTurno: true as const } : {}),
       };
     }
     turnoId = turno.id;

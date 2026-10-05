@@ -185,7 +185,8 @@ export default async function ComedorPage() {
               }
             : {
                 ok: false,
-                motivo: "No hay un turno de caja abierto en esta estación. Abrilo en Punto de venta para poder cobrar.",
+                motivo: "No hay un turno de caja abierto en esta estación.",
+                sinTurno: true,
               },
         };
       } else {

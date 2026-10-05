@@ -643,7 +643,10 @@ export type DatosCobroCuenta = {
   propina?: DatosPropina;
 };
 
-export type ResultadoPagoCuenta = { ok: true; ventaId: string; total: number } | { ok: false; error: string };
+export type ResultadoPagoCuenta =
+  | { ok: true; ventaId: string; total: number }
+  /** `sinTurno`: no hay turno de caja abierto; la pantalla manda directo a abrirlo (ver src/lib/turno-requerido.ts). */
+  | { ok: false; error: string; sinTurno?: true };
 
 /**
  * Cobra la cuenta y la cierra: genera una venta del Punto de Venta (entra en el turno de caja de ESTA estación, en el cierre
@@ -665,7 +668,7 @@ export async function pagarCuenta(cuentaId: string, datos: DatosCobroCuenta): Pr
   }
   const turno = await turnoAbierto(db, estacion.id);
   if (!turno) {
-    return { ok: false, error: "No hay un turno de caja abierto en esta estación. Abrilo en Punto de venta y volvé a cobrar." };
+    return { ok: false, error: "No hay un turno de caja abierto en esta estación. Abrilo y volvé a cobrar.", sinTurno: true };
   }
   const puntoExpedicion = (
     await db.estacion.findUnique({ where: { id: estacion.id }, select: { puntoExpedicion: true } })

@@ -2,10 +2,12 @@
 
 import { useState, useTransition } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { clasesBoton } from "@/components/ui";
 import { cambiarEstadoPedido, type ResultadoPedidoAccion } from "./actions";
 import { ESTADOS_PEDIDO } from "@/lib/estados-pedido";
 import { FORMAS_PAGO_POS, type FormaPagoPos } from "@/lib/turno-pos";
+import { rutaParaAbrirTurno } from "@/lib/turno-requerido";
 import { imprimirComprobante } from "@/lib/impresion-comprobantes";
 
 export function EstadoBotones({
@@ -34,6 +36,7 @@ export function EstadoBotones({
   /** Mapa Área de Impresión → impresora QZ Tray, en esta estación. */
   impresorasPorArea: Record<string, string>;
 }) {
+  const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
@@ -52,14 +55,18 @@ export function EstadoBotones({
   const [fallback, setFallback] = useState<{ label: string; url: string }[]>([]);
 
   const faltaRepartidor = tipoEntrega === "delivery" && !repartidorId;
-  // Retiro/mesa se cobra en el mostrador: si hay un turno de caja abierto,
-  // marcarlo "entregado" tiene que decir con qué se cobró para que entre en
-  // ese mismo cierre. Delivery pregunta SIEMPRE, aunque lo normal sea
-  // confirmarlo desde la pantalla del repartidor (/repartidor/[id]) — si el
-  // cajero lo marca entregado desde acá (por ejemplo porque el repartidor
-  // no tiene el teléfono a mano), igual tiene que quedar con qué se cobró:
-  // si no, el pedido queda invisible en Rendición (ver cambiarEstadoPedido).
+  // Retiro/mesa se cobra en el mostrador: marcarlo "entregado" es una venta, y
+  // sin turno de caja abierto no se vende — en ese caso se manda directo a
+  // abrir el turno (ver handleClick) y al abrirlo se vuelve a este pedido. Con
+  // turno, tiene que decir con qué se cobró para que entre en ese mismo cierre.
+  // Delivery pregunta SIEMPRE, aunque lo normal sea confirmarlo desde la
+  // pantalla del repartidor (/repartidor/[id]) — si el cajero lo marca entregado
+  // desde acá (por ejemplo porque el repartidor no tiene el teléfono a mano),
+  // igual tiene que quedar con qué se cobró: si no, el pedido queda invisible
+  // en Rendición (ver cambiarEstadoPedido).
   const pideFormaPago = tipoEntrega === "delivery" || turnoAbiertoId != null;
+  const faltaTurno = tipoEntrega !== "delivery" && turnoAbiertoId == null;
+  const irAAbrirTurno = () => router.push(rutaParaAbrirTurno(`/admin/pedidos/${orderId}`));
   // Si la factura ya está anulada, cancelar el pedido no le hace nada de
   // yapa a un número que ya está muerto — se trata como cualquier
   // cancelación común. Solo bloquea si TODAVÍA hay una factura viva.
@@ -113,8 +120,11 @@ export function EstadoBotones({
     setAviso(null);
     startTransition(async () => {
       const resultado = await cambiarEstadoPedido(orderId, "entregado", formaPago);
-      if (!resultado.ok) setError(resultado.error);
-      else {
+      if (!resultado.ok) {
+        // El turno se cerró mientras tanto: sin turno no se cobra, se va a abrir uno.
+        if (resultado.sinTurno) irAAbrirTurno();
+        else setError(resultado.error);
+      } else {
         setPidiendoPago(false);
         if (resultado.aviso) setAviso(resultado.aviso);
         imprimirSegunEstado("entregado", resultado);
@@ -145,6 +155,11 @@ export function EstadoBotones({
       setError("Asigná un repartidor antes de pasar el pedido a \"En despacho\".");
       return;
     }
+    if (estado === "entregado" && estadoActual !== "entregado" && faltaTurno) {
+      // Entregar un retiro/mesa es venderlo: antes hace falta el turno de caja abierto, que es el primer movimiento.
+      irAAbrirTurno();
+      return;
+    }
     if (estado === "entregado" && estadoActual !== "entregado" && pideFormaPago) {
       setPidiendoPago(true);
       return;
@@ -155,8 +170,10 @@ export function EstadoBotones({
     }
     startTransition(async () => {
       const resultado = await cambiarEstadoPedido(orderId, estado);
-      if (!resultado.ok) setError(resultado.error);
-      else {
+      if (!resultado.ok) {
+        if (resultado.sinTurno) irAAbrirTurno();
+        else setError(resultado.error);
+      } else {
         if (resultado.aviso) setAviso(resultado.aviso);
         imprimirSegunEstado(estado, resultado);
         if (estado === "en_despacho" && tipoEntrega === "delivery") setAvisoDespacho(true);

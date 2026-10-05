@@ -76,7 +76,8 @@ export type ContextoCaja = {
         /** Si el local vende a crédito (Configuración): el cobro ofrece "A crédito". */
         permiteCredito: boolean;
       }
-    | { ok: false; motivo: string };
+    /** `sinTurno`: lo único que falta es abrir el turno de caja: "Pagar cuenta" lleva directo a abrirlo (src/lib/turno-requerido.ts). */
+    | { ok: false; motivo: string; sinTurno?: boolean };
 };
 
 /**
