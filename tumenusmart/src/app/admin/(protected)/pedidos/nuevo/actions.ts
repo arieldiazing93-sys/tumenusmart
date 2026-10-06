@@ -43,6 +43,11 @@ export type DatosPedidoManual = {
   facturaRuc?: string;
   facturaRazonSocial?: string;
   facturaEmail?: string;
+  /**
+   * La ficha fiscal del cliente cargada en el paso 1 (número, tipo, razón social y correo), aunque el comprobante sea ticket: el
+   * cliente queda creado o actualizado en el sistema. Si el comprobante es factura con registro fiscal, usa los mismos datos.
+   */
+  clienteFiscal?: { tipoIdentificacion: string; numeroIdentificacion: string; razonSocial: string; email?: string };
   notas?: string;
   items: LineaPedida[];
 };
@@ -196,6 +201,22 @@ export async function crearPedidoManual(datos: DatosPedidoManual): Promise<Resul
   const comprobanteTipoFinal = quiereFactura ? "factura" : "ticket";
   const consumidorFinal = sinNombre;
 
+  // La ficha fiscal del cliente que se cargó en el paso 1: si es la misma de la factura, no se repite; si el comprobante es ticket (o
+  // "sin registro fiscal") igual se guarda el cliente. Solo si trae algo escrito, y revisada con la misma validación mínima.
+  let fichaFiscal = comprador && !consumidorFinal && comprador.razonSocial ? comprador : null;
+  const cf = datos.clienteFiscal;
+  if (!fichaFiscal && cf && (limpiarTexto(cf.numeroIdentificacion) || limpiarTexto(cf.razonSocial))) {
+    const revisada = validarDatosFiscales({
+      modo: "con_registro",
+      tipoIdentificacion: cf.tipoIdentificacion,
+      numeroIdentificacion: cf.numeroIdentificacion,
+      razonSocial: cf.razonSocial,
+      email: cf.email,
+    });
+    if (!revisada.ok) return { ok: false, error: `Datos de factura del cliente: ${revisada.error}` };
+    fichaFiscal = revisada.datos;
+  }
+
   // El punto de expedición de esta computadora, para emitir la factura en el acto (con el número consumido dentro de la
   // transacción del cobro).
   let punto: (PuntoParaComprobante & { activo: boolean }) | null = null;
@@ -312,18 +333,20 @@ export async function crearPedidoManual(datos: DatosPedidoManual): Promise<Resul
 
         await registrarConsumoVenta(tx, storeId, armado.lineas, { orderId: nuevoPedido.id }, quien);
 
+        // El cliente con datos fiscales (de la factura o de la ficha del paso 1) queda guardado, o se le actualiza el nombre y el
+        // correo, para la próxima vez.
+        if (fichaFiscal?.razonSocial) {
+          await upsertClienteFiscal(tx, storeId, {
+            tipoIdentificacion: fichaFiscal.tipoIdentificacion,
+            numeroIdentificacion: fichaFiscal.numeroIdentificacion,
+            razonSocial: fichaFiscal.razonSocial,
+            email: fichaFiscal.email ?? "",
+          });
+        }
+
         // La factura se emite en el acto, con el punto de expedición de esta computadora.
         let facturaNumero: string | null = null;
         if (punto && comprador) {
-          // Un cliente con datos fiscales queda guardado (o se le actualiza el nombre y el correo) para la próxima vez.
-          if (!consumidorFinal && comprador.razonSocial) {
-            await upsertClienteFiscal(tx, storeId, {
-              tipoIdentificacion: comprador.tipoIdentificacion,
-              numeroIdentificacion: comprador.numeroIdentificacion,
-              razonSocial: comprador.razonSocial,
-              email: comprador.email ?? "",
-            });
-          }
           const paraEmitir = await tx.order.findUniqueOrThrow({
             where: { id: nuevoPedido.id },
             select: SELECT_PEDIDO_PARA_EMISION,

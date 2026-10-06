@@ -351,7 +351,7 @@ export function NuevoPedidoForm({
     // Un cliente recurrente trae los datos de su última factura: si ya se eligió "Factura" se completan en el acto; si no, se
     // completan cuando se elija.
     setFacturaAnterior(r.facturaAnterior);
-    if (comprobanteTipo === "factura") prellenarFactura(r.facturaAnterior);
+    prellenarFactura(r.facturaAnterior);
   }
 
   /** Completa la factura con los datos de la última que tuvo este cliente, solo si todavía no se escribió nada. */
@@ -387,6 +387,12 @@ export function NuevoPedidoForm({
         setError("El costo de envío no es un número válido.");
         return;
       }
+    }
+    // Si ya se cargó la ficha fiscal del cliente (número y razón social), el comprobante arranca en "Factura · con registro
+    // fiscal" con esos datos; se puede cambiar en el cobro.
+    if (puedeFacturar && facturaNumero.trim() && facturaRazon.trim()) {
+      setComprobanteTipo("factura");
+      setRegistroFiscal("con");
     }
     setPaso("productos");
     window.scrollTo({ top: 0 });
@@ -463,6 +469,17 @@ export function NuevoPedidoForm({
         facturaRuc: conRegistroFiscal ? facturaNumero.trim() : undefined,
         facturaRazonSocial: conRegistroFiscal ? facturaRazon.trim() : undefined,
         facturaEmail: conRegistroFiscal ? facturaEmail.trim() || undefined : undefined,
+        // La ficha fiscal cargada en el paso 1 (aunque el comprobante termine siendo ticket): el cliente queda creado o
+        // actualizado en el sistema para la próxima vez.
+        clienteFiscal:
+          facturaNumero.trim() || facturaRazon.trim()
+            ? {
+                tipoIdentificacion: facturaTipo,
+                numeroIdentificacion: facturaNumero.trim(),
+                razonSocial: facturaRazon.trim(),
+                email: facturaEmail.trim() || undefined,
+              }
+            : undefined,
         notas: notas.trim() || undefined,
         items: carrito.map((i) =>
           i.tipo === "combo"
@@ -487,6 +504,125 @@ export function NuevoPedidoForm({
     // Se queda en "guardando" hasta cambiar de pantalla, para que un segundo clic no cargue el pedido dos veces. Va al detalle del
     // pedido ya cobrado y, si es con factura, ya emitida.
     router.push(`/admin/pedidos/${r.orderId}`);
+  }
+
+  // Los campos de la ficha fiscal del cliente (número con lupa, tipo, razón social y correo): se usan en el paso 1 y en el cobro,
+  // con los mismos datos (lo que se carga en uno aparece en el otro).
+  function camposFiscales(idBase: string) {
+    return (
+      <>
+                        {datosDeFacturaAnterior && (
+                          <p className="rounded-lg border border-exito/40 bg-exito-luz px-2.5 py-1.5 text-[0.78rem] font-medium text-exito">
+                            Cliente recurrente: se cargaron los datos de su última factura. Revisalos.
+                          </p>
+                        )}
+                        {/* Primero el número, con la lupa: si el cliente ya está en el sistema se traen sus datos; si no, se crea
+                            al cobrar el pedido. */}
+                        <div>
+                          <label htmlFor={idBase} className="mb-1.5 block text-[0.82rem] font-semibold text-tinta">
+                            Número de documento
+                          </label>
+                          <span className="mb-1.5 block text-[0.78rem] text-tinta-suave">
+                            {facturaTipo === "ruc" ? "Con su dígito verificador: 80012345-6" : "Tocá la lupa para ver si ya está en el sistema"}
+                          </span>
+                          <div className="flex items-center gap-2">
+                            <Entrada
+                              id={idBase}
+                              value={facturaNumero}
+                              onChange={(e) => {
+                                setFacturaNumero(e.target.value);
+                                setBusquedaFiscal(null);
+                              }}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                  e.preventDefault();
+                                  buscarFiscal();
+                                }
+                              }}
+                              placeholder="80012345-6"
+                              maxLength={30}
+                              autoComplete="off"
+                              className="min-w-0 flex-1"
+                            />
+                            <button
+                              type="button"
+                              onClick={buscarFiscal}
+                              disabled={buscandoFiscal || limpiarTexto(facturaNumero).length < 3}
+                              aria-label="Buscar en el sistema si ya existe"
+                              title="Buscar en el sistema si ya existe"
+                              className={`${clasesBoton("navegar", "md")} flex-none !px-3`}
+                            >
+                              {buscandoFiscal ? (
+                                "…"
+                              ) : (
+                                <svg viewBox="0 0 24 24" width={18} height={18} fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                                  <circle cx="11" cy="11" r="7" />
+                                  <path d="m20 20-3.5-3.5" />
+                                </svg>
+                              )}
+                            </button>
+                          </div>
+                          {busquedaFiscal?.estado === "existe" && (
+                            <p className="mt-1.5 rounded-lg border border-exito/40 bg-exito-luz px-2.5 py-1.5 text-[0.78rem] font-medium text-exito">
+                              Ya existe en el sistema: se cargaron su tipo de documento, razón social y correo. Revisalos.
+                            </p>
+                          )}
+                          {busquedaFiscal?.estado === "nuevo" && (
+                            <p className="mt-1.5 rounded-lg border border-amarillo/60 bg-amarillo-luz px-2.5 py-1.5 text-[0.78rem] font-medium text-amarillo-oscuro">
+                              No existe en el sistema: cargá la razón social y se crea al cobrar el pedido.
+                            </p>
+                          )}
+                          {busquedaFiscal?.estado === "varios" && (
+                            <div className="mt-1.5 flex flex-col gap-1.5">
+                              <p className="text-[0.78rem] font-medium text-tinta-media">Hay varios parecidos: elegí el que corresponde.</p>
+                              {busquedaFiscal.resultados.map((c) => (
+                                <button
+                                  key={`${c.tipoIdentificacion}-${c.numeroIdentificacion}`}
+                                  type="button"
+                                  onClick={() => {
+                                    aplicarClienteFiscal(c);
+                                    setBusquedaFiscal({ estado: "existe", resultados: [c] });
+                                  }}
+                                  className="rounded-lg border-2 border-azul/50 bg-azul-luz/40 px-2.5 py-1.5 text-left hover:bg-azul-luz"
+                                >
+                                  <span className="cifra block text-[0.86rem] font-semibold text-tinta">{c.numeroIdentificacion}</span>
+                                  <span className="block text-[0.8rem] text-tinta-media">
+                                    {c.razonSocial} · {etiquetaTipoIdentificacion(c.tipoIdentificacion)}
+                                  </span>
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                          {busquedaFiscal?.estado === "error" && (
+                            <p className="mt-1.5 text-[0.78rem] font-medium text-peligro">{busquedaFiscal.mensaje}</p>
+                          )}
+                        </div>
+                        <Campo etiqueta="Tipo de documento">
+                          <Selector value={facturaTipo} onChange={(e) => setFacturaTipo(e.target.value)}>
+                            {TIPOS_IDENTIFICACION_FISCAL.map((t) => (
+                              <option key={t.valor} value={t.valor}>
+                                {t.etiqueta}
+                              </option>
+                            ))}
+                          </Selector>
+                        </Campo>
+                        <Campo etiqueta="Razón social">
+                          <Entrada
+                            value={facturaRazon}
+                            onChange={(e) => setFacturaRazon(e.target.value)}
+                            maxLength={120}
+                          />
+                        </Campo>
+                        <Campo etiqueta="Correo (opcional)">
+                          <Entrada
+                            type="email"
+                            value={facturaEmail}
+                            onChange={(e) => setFacturaEmail(e.target.value)}
+                            maxLength={120}
+                          />
+                        </Campo>
+      </>
+    );
   }
 
   const mensajeError = error ? (
@@ -670,6 +806,16 @@ export function NuevoPedidoForm({
                 </div>
               </div>
             )}
+            <div className="flex flex-col gap-3 border-t border-linea pt-3.5">
+              <div>
+                <p className={ROTULO}>Datos de factura del cliente (opcional)</p>
+                <p className="mt-0.5 text-[0.78rem] leading-snug text-tinta-suave">
+                  Si el cliente pide factura, cargá acá su ficha: número de documento, tipo, razón social y correo. Si ya existe,
+                  buscalo con la lupa; si no, se crea al cobrar el pedido. Estos datos se completan solos en el cobro.
+                </p>
+              </div>
+              {camposFiscales("pedido-factura-numero-cliente")}
+            </div>
           </Tarjeta>
 
           {mensajeError}
@@ -1007,116 +1153,7 @@ export function NuevoPedidoForm({
                       <p className="text-[0.8rem] text-tinta-media">Se factura a Consumidor Final (Sin Nombre).</p>
                     ) : (
                       <>
-                        {datosDeFacturaAnterior && (
-                          <p className="rounded-lg border border-exito/40 bg-exito-luz px-2.5 py-1.5 text-[0.78rem] font-medium text-exito">
-                            Cliente recurrente: se cargaron los datos de su última factura. Revisalos.
-                          </p>
-                        )}
-                        {/* Primero el número, con la lupa: si el cliente ya está en el sistema se traen sus datos; si no, se crea
-                            al cobrar el pedido. */}
-                        <div>
-                          <label htmlFor="pedido-factura-numero" className="mb-1.5 block text-[0.82rem] font-semibold text-tinta">
-                            Número de documento
-                          </label>
-                          <span className="mb-1.5 block text-[0.78rem] text-tinta-suave">
-                            {facturaTipo === "ruc" ? "Con su dígito verificador: 80012345-6" : "Tocá la lupa para ver si ya está en el sistema"}
-                          </span>
-                          <div className="flex items-center gap-2">
-                            <Entrada
-                              id="pedido-factura-numero"
-                              value={facturaNumero}
-                              onChange={(e) => {
-                                setFacturaNumero(e.target.value);
-                                setBusquedaFiscal(null);
-                              }}
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter") {
-                                  e.preventDefault();
-                                  buscarFiscal();
-                                }
-                              }}
-                              placeholder="80012345-6"
-                              maxLength={30}
-                              autoComplete="off"
-                              className="min-w-0 flex-1"
-                            />
-                            <button
-                              type="button"
-                              onClick={buscarFiscal}
-                              disabled={buscandoFiscal || limpiarTexto(facturaNumero).length < 3}
-                              aria-label="Buscar en el sistema si ya existe"
-                              title="Buscar en el sistema si ya existe"
-                              className={`${clasesBoton("navegar", "md")} flex-none !px-3`}
-                            >
-                              {buscandoFiscal ? (
-                                "…"
-                              ) : (
-                                <svg viewBox="0 0 24 24" width={18} height={18} fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                                  <circle cx="11" cy="11" r="7" />
-                                  <path d="m20 20-3.5-3.5" />
-                                </svg>
-                              )}
-                            </button>
-                          </div>
-                          {busquedaFiscal?.estado === "existe" && (
-                            <p className="mt-1.5 rounded-lg border border-exito/40 bg-exito-luz px-2.5 py-1.5 text-[0.78rem] font-medium text-exito">
-                              Ya existe en el sistema: se cargaron su tipo de documento, razón social y correo. Revisalos.
-                            </p>
-                          )}
-                          {busquedaFiscal?.estado === "nuevo" && (
-                            <p className="mt-1.5 rounded-lg border border-amarillo/60 bg-amarillo-luz px-2.5 py-1.5 text-[0.78rem] font-medium text-amarillo-oscuro">
-                              No existe en el sistema: cargá la razón social y se crea al cobrar el pedido.
-                            </p>
-                          )}
-                          {busquedaFiscal?.estado === "varios" && (
-                            <div className="mt-1.5 flex flex-col gap-1.5">
-                              <p className="text-[0.78rem] font-medium text-tinta-media">Hay varios parecidos: elegí el que corresponde.</p>
-                              {busquedaFiscal.resultados.map((c) => (
-                                <button
-                                  key={`${c.tipoIdentificacion}-${c.numeroIdentificacion}`}
-                                  type="button"
-                                  onClick={() => {
-                                    aplicarClienteFiscal(c);
-                                    setBusquedaFiscal({ estado: "existe", resultados: [c] });
-                                  }}
-                                  className="rounded-lg border-2 border-azul/50 bg-azul-luz/40 px-2.5 py-1.5 text-left hover:bg-azul-luz"
-                                >
-                                  <span className="cifra block text-[0.86rem] font-semibold text-tinta">{c.numeroIdentificacion}</span>
-                                  <span className="block text-[0.8rem] text-tinta-media">
-                                    {c.razonSocial} · {etiquetaTipoIdentificacion(c.tipoIdentificacion)}
-                                  </span>
-                                </button>
-                              ))}
-                            </div>
-                          )}
-                          {busquedaFiscal?.estado === "error" && (
-                            <p className="mt-1.5 text-[0.78rem] font-medium text-peligro">{busquedaFiscal.mensaje}</p>
-                          )}
-                        </div>
-                        <Campo etiqueta="Tipo de documento">
-                          <Selector value={facturaTipo} onChange={(e) => setFacturaTipo(e.target.value)}>
-                            {TIPOS_IDENTIFICACION_FISCAL.map((t) => (
-                              <option key={t.valor} value={t.valor}>
-                                {t.etiqueta}
-                              </option>
-                            ))}
-                          </Selector>
-                        </Campo>
-                        <Campo etiqueta="Razón social">
-                          <Entrada
-                            value={facturaRazon}
-                            onChange={(e) => setFacturaRazon(e.target.value)}
-                            maxLength={120}
-                          />
-                        </Campo>
-                        <Campo etiqueta="Correo (opcional)">
-                          <Entrada
-                            type="email"
-                            value={facturaEmail}
-                            onChange={(e) => setFacturaEmail(e.target.value)}
-                            maxLength={120}
-                          />
-                        </Campo>
+                        {camposFiscales("pedido-factura-numero-cobro")}
                       </>
                     )}
                   </div>
