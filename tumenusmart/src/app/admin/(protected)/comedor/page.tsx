@@ -12,6 +12,8 @@ import {
   SEGUNDOS_LATIDO_IMPRESION,
   claveDeMesa,
   descuentoDeCuenta,
+  impuestosDeCuenta,
+  lineasDeCobro,
   totalesDeCuenta,
 } from "@/lib/comedor";
 import { BotonEnlace, Cabecera, Pastilla } from "@/components/ui";
@@ -58,6 +60,23 @@ export default async function ComedorPage() {
       activos.map((i) => ({ precioUnitario: Number(i.precioUnitario), cantidad: i.cantidad })),
       descuentoDeCuenta(c)
     );
+    // El IVA que lleva la cuenta, con las mismas líneas y la misma cuenta que después usa la factura.
+    const impuestos = impuestosDeCuenta(
+      lineasDeCobro(
+        activos.map((i) => ({
+          productId: i.productId,
+          nombreProducto: i.nombreProducto,
+          cantidad: i.cantidad,
+          precioUnitario: Number(i.precioUnitario),
+          iva: i.iva,
+          opcionesTexto: i.opcionesTexto,
+          costoProducto: i.costoProducto == null ? null : Number(i.costoProducto),
+          costoAgregados: i.costoAgregados == null ? null : Number(i.costoAgregados),
+          precioAgregados: Number(i.precioAgregados),
+        }))
+      ),
+      totales.descuento
+    );
     return {
       id: c.id,
       numero: c.numero,
@@ -78,6 +97,7 @@ export default async function ComedorPage() {
           }
         : null,
       totales,
+      impuestos,
       items: c.items.map((i) => ({
         id: i.id,
         ronda: i.ronda,

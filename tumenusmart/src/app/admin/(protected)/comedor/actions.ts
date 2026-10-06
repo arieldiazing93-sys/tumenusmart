@@ -21,11 +21,10 @@ import { formatearCantidad, formatearGuarani, formatearNumero } from "@/lib/form
 import { repartirConsumo } from "@/lib/division-cuenta";
 import {
   ESTADOS_CUENTA_ABIERTA,
-  claveDeLinea,
-  sumarLineasIguales,
   contenidoParaGuardar,
   descuentoDeCuenta,
   leerConsumoGuardado,
+  lineasDeCobro,
   normalizarMesa,
   textoAnulacion,
   totalDeLineas,
@@ -876,7 +875,7 @@ export async function pagarCuenta(cuentaId: string, datos: DatosCobroCuenta): Pr
 
   // Lo que se cobra y se factura: el mismo producto cargado en varios pedidos va en UNA línea con la cantidad sumada (la nota
   // de cocina no cuenta: no sale en la venta ni en la factura). El total no cambia: es la suma de los totales de cada línea.
-  const filas = sumarLineasIguales(
+  const filas = lineasDeCobro(
     cuenta.items.map((i) => ({
       productId: i.productId,
       nombreProducto: i.nombreProducto,
@@ -887,21 +886,7 @@ export async function pagarCuenta(cuentaId: string, datos: DatosCobroCuenta): Pr
       costoProducto: i.costoProducto == null ? null : Number(i.costoProducto),
       costoAgregados: i.costoAgregados == null ? null : Number(i.costoAgregados),
       precioAgregados: Number(i.precioAgregados),
-    })),
-    (l) =>
-      claveDeLinea(
-        {
-          productId: l.productId,
-          nombre: l.nombreProducto,
-          opciones: l.opcionesTexto,
-          precioUnitario: l.precioUnitario,
-          iva: l.iva,
-          costoProducto: l.costoProducto,
-          costoAgregados: l.costoAgregados,
-          precioAgregados: l.precioAgregados,
-        },
-        false
-      )
+    }))
   );
   const totales = totalesDeCuenta(filas, descuentoDeCuenta(cuenta));
   if (totales.descuentoInvalido) {

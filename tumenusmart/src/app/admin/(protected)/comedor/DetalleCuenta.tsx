@@ -156,12 +156,6 @@ export function DetalleCuenta({
               {textoEstadoCuenta(cuenta.estado)}
             </Pastilla>
             <p className="cifra text-[1.35rem] font-bold leading-none text-tinta">{formatearGuarani(t.total)}</p>
-            {t.descuento > 0 && (
-              <p className="text-[0.72rem] text-tinta-media">
-                {formatearGuarani(t.subtotal)} − desc. {formatearGuarani(t.descuento)}
-                {t.porcentaje != null ? ` (${textoPorcentaje(t.porcentaje)}%)` : ""}
-              </p>
-            )}
           </div>
         </div>
 
@@ -397,6 +391,8 @@ export function DetalleCuenta({
           </table>
         </div>
 
+        {/* ------------------------------------------------------------------ el pie: subtotal, descuento, impuestos y total */}
+        <PieDeCuenta cuenta={cuenta} />
       </Tarjeta>
 
       {/* ------------------------------------------------------------------------ ventanas */}
@@ -482,6 +478,65 @@ export function DetalleCuenta({
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
+
+/**
+ * El pie de la cuenta, como en cualquier caja: subtotal, descuento (con su tipo: general en porcentaje o por importe), impuestos
+ * y el total que se cobra. Los precios de la carta ya traen el IVA adentro: "Impuestos" dice cuánto de lo que se cobra es IVA y
+ * no suma al total. Es la misma cuenta que después sale en la factura.
+ */
+function PieDeCuenta({ cuenta }: { cuenta: CuentaCajaFila }) {
+  const t = cuenta.totales;
+  const im = cuenta.impuestos;
+  const descuento = cuenta.descuento;
+  const hayDescuento = t.descuento > 0;
+  const detalleIva = [
+    im.iva10 > 0 ? `IVA 10 %: ${formatearGuarani(im.iva10)}` : null,
+    im.iva5 > 0 ? `IVA 5 %: ${formatearGuarani(im.iva5)}` : null,
+    im.exento > 0 ? `Exento: ${formatearGuarani(im.exento)}` : null,
+  ].filter(Boolean);
+
+  return (
+    <div className="rounded-xl border-2 border-azul/50 bg-azul-luz/30 p-3 sm:ml-auto sm:w-full sm:max-w-sm">
+      <dl className="flex flex-col gap-1.5">
+        <div className="flex items-baseline justify-between gap-3">
+          <dt className={ROTULO}>Subtotal</dt>
+          <dd className="cifra text-[0.92rem] font-medium text-tinta">{formatearGuarani(t.subtotal)}</dd>
+        </div>
+
+        <div className="flex items-baseline justify-between gap-3">
+          <dt className="flex flex-wrap items-center gap-1.5">
+            <span className={ROTULO}>Descuento</span>
+            {hayDescuento && descuento && (
+              <Pastilla color={descuento.tipo === "porcentaje" ? "azul" : "amarillo"}>
+                {descuento.tipo === "porcentaje" && t.porcentaje != null
+                  ? `General ${textoPorcentaje(t.porcentaje)} %`
+                  : "Por importe"}
+              </Pastilla>
+            )}
+          </dt>
+          <dd className={`cifra text-[0.92rem] font-medium ${hayDescuento ? "text-amarillo-oscuro" : "text-tinta-suave"}`}>
+            {hayDescuento ? `− ${formatearGuarani(t.descuento)}` : formatearGuarani(0)}
+          </dd>
+        </div>
+
+        <div>
+          <div className="flex items-baseline justify-between gap-3">
+            <dt className={ROTULO}>Impuestos (IVA)</dt>
+            <dd className="cifra text-[0.92rem] font-medium text-tinta">{formatearGuarani(im.total)}</dd>
+          </div>
+          <p className="text-[0.7rem] leading-snug text-tinta-suave">
+            {detalleIva.length > 0 ? `${detalleIva.join(" · ")} · ya incluidos en el precio` : "Ya incluidos en el precio"}
+          </p>
+        </div>
+
+        <div className="mt-0.5 flex items-baseline justify-between gap-3 border-t-2 border-azul/50 pt-2">
+          <dt className="text-[0.9rem] font-bold uppercase tracking-rotulo text-tinta">Total</dt>
+          <dd className="cifra text-[1.5rem] font-bold leading-none text-tinta">{formatearGuarani(t.total)}</dd>
+        </div>
+      </dl>
+    </div>
+  );
+}
 
 /**
  * Cancelar un producto de la cuenta: todo, o solo algunas unidades (el mozo comandó 5 empanadas y eran 4: se cancela 1 y quedan

@@ -9,6 +9,7 @@
 import { armarDocumento, centrado, filaTabla, negrita, separador } from "./escpos";
 import { formatearCantidad, formatearGuarani, formatearMiles, formatearNumero, sinAcentos } from "./format";
 import { calcularDescuento, textoPorcentaje, type DescuentoPedido } from "./descuento-venta";
+import { desglosarIva } from "./factura-pos";
 
 /** Hasta cuántas letras puede tener el número o nombre de una mesa ("5", "Terraza 2"). */
 export const MESA_LARGO_MAXIMO = 20;
@@ -226,6 +227,65 @@ export function sumarLineasIguales<T extends { cantidad: number }>(lineas: T[], 
     ...grupo[0],
     cantidad: Math.round(grupo.reduce((s, l) => s + l.cantidad, 0) * 10000) / 10000,
   }));
+}
+
+/** Una línea de la cuenta con lo que hace falta para cobrarla y facturarla. */
+export type LineaDeCobro = {
+  productId: string | null;
+  nombreProducto: string;
+  cantidad: number;
+  precioUnitario: number;
+  iva: string;
+  opcionesTexto: string | null;
+  costoProducto: number | null;
+  costoAgregados: number | null;
+  precioAgregados: number;
+};
+
+/**
+ * Las líneas tal como se cobran y se facturan: el mismo producto cargado en varios pedidos va en UNA línea con la cantidad
+ * sumada (la nota de cocina no cuenta: no sale en la venta ni en la factura). Lo usan el cobro y la pantalla de la caja, así lo
+ * que se ve en el pie de la cuenta (impuestos incluidos) es lo que después sale en la factura.
+ */
+export function lineasDeCobro<T extends LineaDeCobro>(items: T[]): T[] {
+  return sumarLineasIguales(items, (l) =>
+    claveDeLinea(
+      {
+        productId: l.productId,
+        nombre: l.nombreProducto,
+        opciones: l.opcionesTexto,
+        precioUnitario: l.precioUnitario,
+        iva: l.iva,
+        costoProducto: l.costoProducto,
+        costoAgregados: l.costoAgregados,
+        precioAgregados: l.precioAgregados,
+      },
+      false
+    )
+  );
+}
+
+/** El IVA que lleva una cuenta, en guaraníes enteros (ya sobre lo que se cobra, con el descuento aplicado). */
+export type ImpuestosDeCuenta = {
+  /** IVA contenido en las ventas gravadas al 10 %. */
+  iva10: number;
+  /** IVA contenido en las ventas gravadas al 5 %. */
+  iva5: number;
+  /** Lo que se vende exento (sin IVA). */
+  exento: number;
+  /** iva10 + iva5: lo que va en "Impuestos" al pie de la cuenta. */
+  total: number;
+};
+
+/**
+ * Los impuestos de la cuenta, con la misma cuenta que la factura (`desglosarIva`: el precio ya incluye el IVA, se saca ÷11 al 10 %
+ * y ÷21 al 5 %, con el descuento repartido línea por línea). El precio de la carta ya lo trae adentro: no suma al total.
+ */
+export function impuestosDeCuenta(lineas: LineaDeCobro[], descuento: number): ImpuestosDeCuenta {
+  const d = desglosarIva(lineas, descuento);
+  const iva10 = Math.round(d.iva10);
+  const iva5 = Math.round(d.iva5);
+  return { iva10, iva5, exento: Math.round(d.exento), total: iva10 + iva5 };
 }
 
 /**

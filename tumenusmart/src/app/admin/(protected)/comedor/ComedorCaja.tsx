@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { MaestroDetalle } from "@/components/MaestroDetalle";
 import { Boton, Pastilla } from "@/components/ui";
 import { formatearGuarani } from "@/lib/format";
-import { textoEstadoCuenta, type TotalesDeCuenta } from "@/lib/comedor";
+import { textoEstadoCuenta, type ImpuestosDeCuenta, type TotalesDeCuenta } from "@/lib/comedor";
 import type { CategoriaVenta, GrupoMitadVenta } from "@/lib/catalogo-venta";
 import { AbrirCuentaPanel } from "./AbrirCuentaPanel";
 import { DetalleCuenta } from "./DetalleCuenta";
@@ -47,6 +47,8 @@ export type CuentaCajaFila = {
   impresaEn: string | null;
   descuento: { tipo: "porcentaje" | "monto"; valor: number; motivo: string; por: string } | null;
   totales: TotalesDeCuenta;
+  /** El IVA que lleva (ya sobre lo que se cobra): sale de las mismas líneas y la misma cuenta que la factura. */
+  impuestos: ImpuestosDeCuenta;
   items: ItemCuentaFila[];
 };
 
