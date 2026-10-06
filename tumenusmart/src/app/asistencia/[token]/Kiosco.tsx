@@ -4,6 +4,8 @@ import { useCallback, useEffect, useState } from "react";
 import { VerificadorPersona, type ResultadoVerificacion } from "@/components/VerificadorPersona";
 import { clasesBoton } from "@/components/ui";
 import { ETIQUETA_TIPO, type TipoMarcacion } from "@/lib/asistencia";
+import { INTENTOS_DE_ROSTRO } from "@/lib/reconocimiento-facial";
+import { cargarReconocedor, rostroDeFoto } from "@/lib/reconocimiento-cliente";
 import { identificarPin, registrarMarcacion, type ResultadoMarcacion } from "./actions";
 
 type Exito = Extract<ResultadoMarcacion, { ok: true }>;
@@ -11,8 +13,19 @@ type Exito = Extract<ResultadoMarcacion, { ok: true }>;
 type Paso =
   | { paso: "inicio" }
   | { paso: "pin" }
-  | { paso: "camara"; pin: string; nombre: string; tipo: TipoMarcacion }
-  | { paso: "guardando"; nombre: string; tipo: TipoMarcacion }
+  | {
+      paso: "camara";
+      pin: string;
+      nombre: string;
+      tipo: TipoMarcacion;
+      /** La persona ya tiene su rostro registrado: la selfie se comprueba contra él y, si es otra cara, no marca. */
+      tieneRostro: boolean;
+      /** Cuántas selfies rechazadas lleva (0 a INTENTOS_DE_ROSTRO - 1); también reinicia la cámara en cada intento. */
+      intento: number;
+      /** Por qué se rechazó la selfie anterior, si fue así. */
+      aviso: string | null;
+    }
+  | { paso: "guardando"; nombre: string; tipo: TipoMarcacion; comprobando: boolean }
   | { paso: "listo"; resultado: Exito }
   | { paso: "error"; mensaje: string };
 
@@ -98,6 +111,12 @@ export function Kiosco({ token, nombreNegocio }: { token: string; nombreNegocio:
     };
   }, []);
 
+  // El reconocimiento de la cara se descarga de antemano (la primera vez son unos 8 MB que el celular guarda): así, cuando alguien
+  // se saca la selfie, ya está listo y no hace esperar. Si no se puede (sin internet), se reintenta cuando haga falta.
+  useEffect(() => {
+    void cargarReconocedor().catch(() => undefined);
+  }, []);
+
   // Si nadie toca nada, vuelve al inicio.
   useEffect(() => {
     const ms = INACTIVIDAD_MS[estado.paso];
@@ -129,7 +148,7 @@ export function Kiosco({ token, nombreNegocio }: { token: string; nombreNegocio:
         setPin("");
         return;
       }
-      setEstado({ paso: "camara", pin, nombre: r.nombre, tipo: r.tipo });
+      setEstado({ paso: "camara", pin, nombre: r.nombre, tipo: r.tipo, tieneRostro: r.tieneRostro, intento: 0, aviso: null });
     } catch {
       setErrorPin("No se pudo conectar. Revisá el internet y probá de nuevo.");
     } finally {
@@ -137,10 +156,28 @@ export function Kiosco({ token, nombreNegocio }: { token: string; nombreNegocio:
     }
   }
 
+  /**
+   * La selfie no sirvió (no se pudo sacar el rostro, o la cara no era la de esa persona): vuelve a la cámara con el motivo, hasta
+   * `INTENTOS_DE_ROSTRO` veces seguidas; después, al error: ya no se puede seguir probando caras en este celular.
+   */
+  function volverASacarSelfie(actual: Extract<Paso, { paso: "camara" }>, motivo: string) {
+    const siguiente = actual.intento + 1;
+    if (siguiente >= INTENTOS_DE_ROSTRO) {
+      setPin("");
+      setEstado({
+        paso: "error",
+        mensaje: `${motivo} Ya fueron ${INTENTOS_DE_ROSTRO} intentos: avisale al encargado.`,
+      });
+      return;
+    }
+    setEstado({ ...actual, intento: siguiente, aviso: motivo });
+  }
+
   async function alVerificar(r: ResultadoVerificacion) {
     if (estado.paso !== "camara") return;
-    const { pin: pinPuesto, nombre, tipo } = estado;
-    setEstado({ paso: "guardando", nombre, tipo });
+    const actual = estado;
+    const { pin: pinPuesto, nombre, tipo, tieneRostro } = actual;
+    setEstado({ paso: "guardando", nombre, tipo, comprobando: tieneRostro });
 
     const datos = new FormData();
     datos.set("token", token);
@@ -148,10 +185,27 @@ export function Kiosco({ token, nombreNegocio }: { token: string; nombreNegocio:
     datos.set("verificada", r.verificada ? "1" : "0");
     datos.set("archivo", r.foto, "marcacion.jpg");
 
+    // Si la persona ya tiene su rostro registrado, el celular saca los 128 números de la selfie y los manda: el que compara es el
+    // servidor (el rostro guardado nunca sale de ahí). Si no se ve ninguna cara en la foto, ni siquiera hace falta preguntarle.
+    if (tieneRostro) {
+      let rostro: number[] | null = null;
+      try {
+        rostro = await rostroDeFoto(r.foto);
+      } catch {
+        rostro = null;
+      }
+      if (!rostro) {
+        volverASacarSelfie(actual, "No pudimos comprobar tu cara. Mirá de frente a la cámara, con buena luz, y probá de nuevo.");
+        return;
+      }
+      datos.set("rostro", JSON.stringify(rostro));
+    }
+
     try {
       const resultado = await registrarMarcacion(datos);
       if (!resultado.ok) {
-        setEstado({ paso: "error", mensaje: resultado.error });
+        if (resultado.reintentar) volverASacarSelfie(actual, resultado.error);
+        else setEstado({ paso: "error", mensaje: resultado.error });
         return;
       }
       setPin("");
@@ -260,14 +314,22 @@ export function Kiosco({ token, nombreNegocio }: { token: string; nombreNegocio:
                 Vas a marcar: <strong className="text-tinta">{ETIQUETA_TIPO[estado.tipo].toLowerCase()}</strong>
               </p>
             </div>
-            <VerificadorPersona modo="marcacion" onResultado={alVerificar} onCancelar={reiniciar} />
+            {estado.aviso && (
+              <p className="rounded-lg bg-peligro-luz px-3 py-2 text-center text-[0.9rem] font-semibold text-peligro">
+                {estado.aviso}
+              </p>
+            )}
+            {/* Con `key` cada intento arranca la cámara de cero. */}
+            <VerificadorPersona key={estado.intento} modo="marcacion" onResultado={alVerificar} onCancelar={reiniciar} />
           </>
         )}
 
         {estado.paso === "guardando" && (
           <div className="flex flex-1 flex-col items-center justify-center gap-3 py-16 text-center">
             <span className="h-10 w-10 animate-spin rounded-full border-4 border-linea border-t-azul" aria-hidden="true" />
-            <p className="text-[1.05rem] font-semibold text-tinta">Guardando tu marcación…</p>
+            <p className="text-[1.05rem] font-semibold text-tinta">
+              {estado.comprobando ? "Comprobando que sos vos…" : "Guardando tu marcación…"}
+            </p>
           </div>
         )}
 

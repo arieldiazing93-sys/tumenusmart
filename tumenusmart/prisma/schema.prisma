@@ -2538,6 +2538,13 @@ model Colaborador {
   /// "Registrar asistencia", pone su PIN y listo), así que no puede repetirse dentro del mismo local.
   /// NULL = todavía no tiene PIN (no puede marcar).
   pinClave String?
+  /// El "rostro" de la persona: 128 números que saca el navegador de su selfie del alta (NO es la imagen; ver
+  /// src/lib/reconocimiento-facial.ts). Al marcar, el servidor compara con él el rostro de la selfie de ese momento y rechaza
+  /// la marcación si es otra cara. Lista vacía = todavía no tiene rostro registrado (marca sin esa comprobación hasta que el
+  /// dueño lo registre). Dato biométrico: se borra con la persona y nunca sale del servidor.
+  rostro Float[] @default([])
+  /// Cuándo se registró ese rostro.
+  rostroRegistradoEn DateTime?
   /// false = no sale a almorzar: después de la entrada, la próxima marcación es la salida.
   haceAlmuerzo Boolean @default(true)
   /// "HH:MM": a qué hora tiene que entrar. NULL = no se controla la tardanza.
@@ -2809,6 +2816,9 @@ model MarcacionAsistencia {
   /// Solo en la entrada, y solo si tiene hora de entrada: los minutos que pasó de la tolerancia
   /// (0 = llegó a tiempo). NULL = no se controla.
   tardanzaMin   Int?
+  /// Qué tan lejos quedó el rostro de la selfie de esta marcación del rostro guardado de la persona (0 = idéntico; pasa si es
+  /// 0,5 o menos). NULL = no se comparó (todavía no tenía rostro registrado). Sirve para ajustar el umbral con datos reales.
+  distanciaRostro Float?
   nota          String?
   createdAt     DateTime    @default(now())
 

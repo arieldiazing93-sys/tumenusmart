@@ -91,6 +91,11 @@ export function ListaColaboradores({ colaboradores }: { colaboradores: Colaborad
                   )}
                   {!c.activo && <Pastilla>Inactivo</Pastilla>}
                   {c.sinPin && <Pastilla color="peligro">Sin PIN: no puede marcar</Pastilla>}
+                  {c.sinRostro ? (
+                    <Pastilla color="amarillo">Sin rostro registrado</Pastilla>
+                  ) : (
+                    <Pastilla color="exito">Rostro registrado</Pastilla>
+                  )}
                   {!c.haceAlmuerzo && <Pastilla>No almuerza</Pastilla>}
                 </div>
               </div>

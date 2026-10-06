@@ -231,7 +231,11 @@ function ModalFoto({ abierta, onCerrar }: { abierta: NonNullable<Abierta>; onCer
         </div>
 
         <div className="mt-3 flex flex-wrap items-center gap-2">
-          {celda.verificada ? (
+          {celda.distanciaRostro !== null ? (
+            <Pastilla color="exito" punto>
+              Su cara coincide con la del alta
+            </Pastilla>
+          ) : celda.verificada ? (
             <Pastilla color="exito" punto>
               La cámara vio su cara
             </Pastilla>

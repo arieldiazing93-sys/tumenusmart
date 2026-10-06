@@ -6,6 +6,7 @@ import { Campo, Entrada, MensajeError, clasesBoton } from "@/components/ui";
 import { VerificadorPersona, type ResultadoVerificacion } from "@/components/VerificadorPersona";
 import { comprimirImagen, PARA_LOGO } from "@/lib/comprimir-imagen";
 import { pinDemasiadoFacil, type ColaboradorFila } from "@/lib/asistencia";
+import { rostroDeFoto, rostroDeFotoGuardada } from "@/lib/reconocimiento-cliente";
 import { actualizarColaborador, crearColaborador, subirFotoDelColaborador } from "./actions";
 
 /**
@@ -13,8 +14,10 @@ import { actualizarColaborador, crearColaborador, subirFotoDelColaborador } from
  * desliza y el pie con "Cancelar" y "Crear" queda fijo abajo, también en el celular.
  *
  * El alta se hace EN PERSONA: el dueño le saca la selfie ahí mismo (es la foto de referencia con la que después
- * compara a ojo las fotos de cada marcación) y le elige un PIN. No usa `action={...}` del formulario a propósito:
- * React vacía los campos al terminar una acción, y con un error de validación habría que volver a escribir todo.
+ * compara a ojo las fotos de cada marcación) y le elige un PIN. De esa selfie el navegador saca además el "rostro" de la persona
+ * (128 números, ver src/lib/reconocimiento-facial.ts): con él el celular fijo comprueba, al marcar, que la cara sea la suya.
+ * No usa `action={...}` del formulario a propósito: React vacía los campos al terminar una acción, y con un error de validación
+ * habría que volver a escribir todo.
  */
 
 function Icono({ children, tam = 16 }: { children: React.ReactNode; tam?: number }) {
@@ -66,11 +69,16 @@ export function FormularioColaborador({
   const [errorFoto, setErrorFoto] = useState<string | null>(null);
   const [camara, setCamara] = useState(false);
   const [pin, setPin] = useState("");
+  // El rostro NUEVO (de la selfie que se acaba de sacar o de la foto actual), que se guarda con el formulario. null = no hay uno
+  // nuevo: se conserva el que ya tenía la persona (si tenía).
+  const [rostro, setRostro] = useState<number[] | null>(null);
+  const [leyendoRostro, setLeyendoRostro] = useState(false);
   const archivo = useRef<HTMLInputElement>(null);
 
   const editando = colaborador !== null;
+  const rostroYaGuardado = colaborador !== null && !colaborador.sinRostro;
 
-  async function subir(foto: File) {
+  async function subir(foto: File, rostroDeLaFoto: number[]) {
     setErrorFoto(null);
     setSubiendo(true);
     try {
@@ -81,7 +89,9 @@ export function FormularioColaborador({
         setErrorFoto(subida.error);
         return;
       }
+      // La foto y su rostro cambian juntos: nunca queda un rostro de una foto distinta de la que se ve.
       setFotoUrl(subida.url);
+      setRostro(rostroDeLaFoto);
     } catch (err) {
       setErrorFoto(err instanceof Error ? err.message : "No se pudo subir la foto");
     } finally {
@@ -89,27 +99,64 @@ export function FormularioColaborador({
     }
   }
 
+  /** Saca el rostro de una foto en este navegador. Si no se ve ninguna cara o no se puede leer, lo dice y devuelve null. */
+  async function leerRostro(sacar: () => Promise<number[] | null>, sinCara: string): Promise<number[] | null> {
+    setErrorFoto(null);
+    setLeyendoRostro(true);
+    try {
+      const r = await sacar();
+      if (!r) setErrorFoto(sinCara);
+      return r;
+    } catch {
+      setErrorFoto("No se pudo leer la cara de la foto. Revisá el internet y probá de nuevo.");
+      return null;
+    } finally {
+      setLeyendoRostro(false);
+    }
+  }
+
+  const SIN_CARA = "No se vio ninguna cara en esa foto. Sacala de nuevo, de frente, sin anteojos oscuros y con buena luz.";
+
   async function alSacarSelfie(r: ResultadoVerificacion) {
     setCamara(false);
-    await subir(new File([r.foto], "selfie.jpg", { type: "image/jpeg" }));
+    const rostroDeLaSelfie = await leerRostro(() => rostroDeFoto(r.foto), SIN_CARA);
+    if (!rostroDeLaSelfie) return;
+    await subir(new File([r.foto], "selfie.jpg", { type: "image/jpeg" }), rostroDeLaSelfie);
   }
 
   async function alElegirArchivo(e: React.ChangeEvent<HTMLInputElement>) {
     const elegido = e.target.files?.[0];
     if (!elegido) return;
     try {
+      // El rostro se saca de la foto original (más nítida que la achicada que se sube).
+      const rostroDelArchivo = await leerRostro(() => rostroDeFoto(elegido), SIN_CARA);
+      if (!rostroDelArchivo) return;
       // Se achica en el propio dispositivo antes de subirla: una foto de cámara pesa varios MB.
       const { archivo: liviano } = await comprimirImagen(elegido, PARA_LOGO);
-      await subir(liviano);
+      await subir(liviano, rostroDelArchivo);
     } finally {
       if (archivo.current) archivo.current.value = "";
     }
+  }
+
+  /** Para quien ya tenía foto pero no rostro (se dio de alta antes de que existiera): lo saca de la foto que ya está guardada. */
+  async function registrarRostroDeLaFotoActual() {
+    if (!fotoUrl) return;
+    const r = await leerRostro(
+      () => rostroDeFotoGuardada(fotoUrl),
+      "No se vio ninguna cara en la foto guardada. Sacá una selfie nueva, de frente y con buena luz."
+    );
+    if (r) setRostro(r);
   }
 
   function alEnviar(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const datos = new FormData(e.currentTarget);
     setError(null);
+    if (!editando && !rostro) {
+      setError("Sacale la selfie para registrar su rostro: con él el celular comprueba que sea esa persona al marcar.");
+      return;
+    }
     iniciar(async () => {
       const resultado = colaborador ? await actualizarColaborador(colaborador.id, datos) : await crearColaborador(datos);
       if (!resultado.ok) {
@@ -145,14 +192,14 @@ export function FormularioColaborador({
                 <button
                   type="button"
                   onClick={() => setCamara(true)}
-                  disabled={subiendo}
+                  disabled={subiendo || leyendoRostro}
                   className={clasesBoton("navegar", "md")}
                 >
                   <Icono>
                     <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
                     <circle cx="12" cy="13" r="4" />
                   </Icono>
-                  {subiendo ? "Subiendo…" : fotoUrl ? "Sacar otra selfie" : "Sacar selfie"}
+                  {subiendo ? "Subiendo…" : leyendoRostro ? "Leyendo la cara…" : fotoUrl ? "Sacar otra selfie" : "Sacar selfie"}
                 </button>
                 <label className={`${clasesBoton("suave", "md")} cursor-pointer`}>
                   <Icono>
@@ -164,19 +211,50 @@ export function FormularioColaborador({
                     type="file"
                     accept="image/*"
                     onChange={alElegirArchivo}
-                    disabled={subiendo}
+                    disabled={subiendo || leyendoRostro}
                     className="hidden"
                   />
                 </label>
               </div>
               <p className="max-w-xs text-center text-[0.78rem] leading-snug text-tinta-suave">
                 Sacala con la persona delante, de frente y con buena luz. Es la foto de referencia para revisar sus
-                marcaciones.
+                marcaciones, y de ella se registra su rostro: el celular fijo lo usa para comprobar que sea esa persona al
+                marcar.
               </p>
+
+              {/* Si ya hay un rostro registrado (o uno nuevo listo para guardar), o falta registrarlo. */}
+              {leyendoRostro ? (
+                <p className="text-center text-[0.8rem] font-semibold text-tinta-media">Leyendo la cara… la primera vez tarda unos segundos.</p>
+              ) : rostro ? (
+                <p className="text-center text-[0.8rem] font-semibold text-exito">
+                  ✓ Rostro listo: se guarda al tocar {editando ? "Guardar" : "Crear"}.
+                </p>
+              ) : rostroYaGuardado ? (
+                <p className="text-center text-[0.8rem] font-semibold text-exito">✓ Rostro registrado.</p>
+              ) : (
+                <div className="flex flex-col items-center gap-2">
+                  <p className="text-center text-[0.8rem] font-semibold text-aviso">
+                    {editando
+                      ? "Todavía no tiene rostro registrado: marca sin que el celular compruebe que sea esta persona."
+                      : "Falta el rostro: sacá la selfie o subí una foto de frente."}
+                  </p>
+                  {editando && fotoUrl && (
+                    <button
+                      type="button"
+                      onClick={() => void registrarRostroDeLaFotoActual()}
+                      disabled={subiendo}
+                      className={clasesBoton("navegar", "sm")}
+                    >
+                      Registrar el rostro con la foto actual
+                    </button>
+                  )}
+                </div>
+              )}
             </>
           )}
           {errorFoto && <MensajeError>{errorFoto}</MensajeError>}
           <input type="hidden" name="fotoUrl" value={fotoUrl} />
+          <input type="hidden" name="rostro" value={rostro ? JSON.stringify(rostro) : ""} />
         </div>
 
         {/* ---------- datos ---------- */}
@@ -290,7 +368,11 @@ export function FormularioColaborador({
           <button type="button" onClick={onCerrar} className={clasesBoton("peligro", "md")}>
             Cancelar
           </button>
-          <button type="submit" disabled={pendiente || subiendo || camara} className={clasesBoton(editando ? "navegar" : "nuevo", "md")}>
+          <button
+            type="submit"
+            disabled={pendiente || subiendo || leyendoRostro || camara}
+            className={clasesBoton(editando ? "navegar" : "nuevo", "md")}
+          >
             {pendiente ? "Guardando…" : editando ? "Guardar" : "Crear"}
           </button>
         </div>

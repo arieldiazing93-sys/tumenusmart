@@ -15,6 +15,8 @@ import {
   type LocalAsistencia,
 } from "@/lib/asistencia-servidor";
 import { pedirIntentoDePin, resolverIntentoDePin } from "@/lib/limite-pin";
+import { compararRostros, rostroValido, tieneRostro } from "@/lib/reconocimiento-facial";
+import { registrarBitacora } from "@/lib/bitacora";
 import { subirFotoAsistencia } from "@/lib/supabase-storage";
 import { claveDiaAsuncion, horaAsuncion } from "@/lib/timezone";
 
@@ -27,9 +29,14 @@ import { claveDiaAsuncion, horaAsuncion } from "@/lib/timezone";
  * persona SOLO dentro de ese local: aunque alguien arme un dato a mano, nunca toca a otro negocio.
  *
  * Como el PIN identifica, no se puede bloquear "a esa persona" por errarle: se bloquea el celular unos minutos tras
- * varios PIN incorrectos seguidos (cualquier marcación buena vuelve el conteo a cero). Y que la cámara haya visto una
+ * varios PIN incorrectos seguidos (cualquier marcación buena vuelve el conteo a cero). Que la cámara haya visto una
  * cara de frente lo comprueba el propio celular: el servidor no puede verlo, por eso cada marcación guarda la foto,
  * que es la prueba que el dueño revisa contra la selfie del alta.
+ *
+ * Que la cara sea LA DE ESA PERSONA sí lo comprueba el servidor: el celular manda los 128 números del rostro de la selfie
+ * (src/lib/reconocimiento-facial.ts) y acá se comparan con el rostro guardado en el alta. Si es otra cara, la marcación se
+ * rechaza, no se guarda la foto, se anota en la Bitácora y cuenta como un error más para el freno del celular. Quien todavía
+ * no tiene rostro registrado marca como antes (con el aviso en el panel para que el dueño se lo registre).
  */
 
 type ColaboradorIdentificado = {
@@ -38,7 +45,20 @@ type ColaboradorIdentificado = {
   haceAlmuerzo: boolean;
   horaEntrada: string | null;
   toleranciaMin: number;
+  /** Su rostro del alta (128 números), o vacío si todavía no se lo registraron. */
+  rostro: number[];
 };
+
+const QUIEN_MARCA = { email: "celular fijo de asistencia", rol: "colaborador" } as const;
+
+/**
+ * Una cara que no coincidió (o que no se pudo comprobar) cuenta como un error más del celular: sin esto, alguien con el PIN de otro
+ * podría probar caras sin límite. Es el mismo contador de los PIN incorrectos, así que también se llega al bloqueo de unos minutos.
+ */
+async function contarFalloDeRostro(storeId: string): Promise<void> {
+  const intento = await pedirIntentoDePin("asistencia", storeId);
+  if (intento.ok) await resolverIntentoDePin("asistencia", storeId, false, intento.n);
+}
 
 function texto(valor: FormDataEntryValue | null): string {
   return String(valor ?? "").trim();
@@ -60,7 +80,7 @@ async function identificarPorPin(
 
   const colaborador = await prisma.colaborador.findFirst({
     where: { storeId: local.id, pinClave: claveDePin(local.id, pin), activo: true },
-    select: { id: true, nombre: true, haceAlmuerzo: true, horaEntrada: true, toleranciaMin: true },
+    select: { id: true, nombre: true, haceAlmuerzo: true, horaEntrada: true, toleranciaMin: true, rostro: true },
   });
 
   const resultado = await resolverIntentoDePin("asistencia", local.id, !!colaborador, intento.n);
@@ -84,6 +104,8 @@ export type ResultadoIdentificacion =
       nombre: string;
       /** La marcación que le toca, la que se registra sola (la decide el sistema, no la persona). */
       tipo: TipoMarcacion;
+      /** Si ya tiene rostro registrado: la selfie se comprueba contra él (el celular saca los 128 números y los manda). */
+      tieneRostro: boolean;
     }
   | { ok: false; error: string };
 
@@ -105,7 +127,7 @@ export async function identificarPin(token: string, pin: string): Promise<Result
   const espera = mensajeDeEspera(estado.ultima, local.minutosEntreMarcas, ahora);
   if (espera) return { ok: false, error: espera };
 
-  return { ok: true, nombre: colaborador.nombre, tipo: estado.proxima };
+  return { ok: true, nombre: colaborador.nombre, tipo: estado.proxima, tieneRostro: tieneRostro(colaborador.rostro) };
 }
 
 export type ResultadoMarcacion =
@@ -118,7 +140,12 @@ export type ResultadoMarcacion =
       tardanzaMin: number | null;
       verificada: boolean;
     }
-  | { ok: false; error: string };
+  | {
+      ok: false;
+      error: string;
+      /** La cara no se pudo comprobar o no coincidió: el celular le deja volver a sacarse la selfie (unas pocas veces). */
+      reintentar?: true;
+    };
 
 /**
  * Segundo paso: guarda la marcación. Llega todo junto en el formulario (token, PIN, si la cámara vio su cara y la
@@ -144,6 +171,43 @@ export async function registrarMarcacion(formData: FormData): Promise<ResultadoM
   const archivo = formData.get("archivo");
   if (!(archivo instanceof File)) return { ok: false, error: "Falta la foto. Probá de nuevo." };
 
+  // ¿Es la cara de esa persona? Se compara el rostro de la selfie con el que se guardó en el alta. Si todavía no tiene rostro
+  // registrado, marca como antes. Va ANTES de guardar la foto: una cara rechazada no deja nada en el almacenamiento.
+  let distanciaRostro: number | null = null;
+  if (tieneRostro(colaborador.rostro)) {
+    const enviado = rostroValido(formData.get("rostro"));
+    if (!enviado) {
+      await contarFalloDeRostro(local.id);
+      return {
+        ok: false,
+        error: "No pudimos comprobar tu cara. Mirá de frente a la cámara, con buena luz, y probá de nuevo.",
+        reintentar: true,
+      };
+    }
+    const comparacion = compararRostros(colaborador.rostro, enviado);
+    if (!comparacion.coincide) {
+      await contarFalloDeRostro(local.id);
+      await registrarBitacora(
+        local.id,
+        { nombre: colaborador.nombre, ...QUIEN_MARCA },
+        {
+          modulo: "asistencia",
+          accion: "marcacion_rechazada_cara",
+          descripcion: `Rechazó una marcación hecha con el PIN de ${colaborador.nombre}: la cara de la selfie no coincidió con la del alta.`,
+          entidad: "Colaborador",
+          entidadId: colaborador.id,
+          detalle: { distancia: comparacion.distancia, tipoQueLeTocaba: tipo },
+        }
+      );
+      return {
+        ok: false,
+        error: `La cara no coincide con la de ${colaborador.nombre}. Si sos vos, probá de nuevo, de frente y con buena luz.`,
+        reintentar: true,
+      };
+    }
+    distanciaRostro = comparacion.distancia;
+  }
+
   let fotoUrl: string;
   try {
     fotoUrl = await subirFotoAsistencia(archivo);
@@ -151,8 +215,9 @@ export async function registrarMarcacion(formData: FormData): Promise<ResultadoM
     return { ok: false, error: err instanceof Error ? err.message : "No se pudo guardar la foto." };
   }
 
-  // El celular dice si su cámara llegó a ver una cara de frente; si no, la marcación queda para revisar.
-  const verificada = texto(formData.get("verificada")) === "1";
+  // Con rostro comparado y coincidente la persona queda verificada por el servidor. Sin rostro registrado, el celular dice si su
+  // cámara llegó a ver una cara de frente; si no, la marcación queda para revisar.
+  const verificada = distanciaRostro !== null || texto(formData.get("verificada")) === "1";
 
   const hora = horaAsuncion(ahora);
   // La salida, el almuerzo y la vuelta son del turno que ya está abierto (su jornada es la de la entrada);
@@ -170,6 +235,7 @@ export async function registrarMarcacion(formData: FormData): Promise<ResultadoM
       dia,
       fotoUrl,
       verificada,
+      distanciaRostro,
       tardanzaMin,
     },
   });

@@ -91,6 +91,7 @@ function celdaDe(m: {
   fecha: Date;
   fotoUrl: string | null;
   verificada: boolean;
+  distanciaRostro: number | null;
   tardanzaMin: number | null;
 }): CeldaMarca {
   return {
@@ -98,6 +99,7 @@ function celdaDe(m: {
     hora: horaAsuncion(m.fecha),
     fotoUrl: m.fotoUrl,
     verificada: m.verificada,
+    distanciaRostro: m.distanciaRostro,
     tardanzaMin: m.tardanzaMin,
   };
 }
@@ -140,6 +142,7 @@ export async function cargarReporteAsistencia(
       fecha: true,
       fotoUrl: true,
       verificada: true,
+      distanciaRostro: true,
       tardanzaMin: true,
     },
   });

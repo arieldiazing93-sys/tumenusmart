@@ -5,6 +5,7 @@ import { Prisma } from "@prisma/client";
 import { exigirPermiso } from "@/lib/auth";
 import { AVISO_PIN_FACIL, horaValida, pinDemasiadoFacil, pinValido } from "@/lib/asistencia";
 import { claveDePin } from "@/lib/asistencia-servidor";
+import { rostroValido } from "@/lib/reconocimiento-facial";
 import { registrarBitacora } from "@/lib/bitacora";
 import { idLocalActual } from "@/lib/local-actual";
 import { prismaDelLocal } from "@/lib/prisma-local";
@@ -31,6 +32,8 @@ type DatosColaborador = {
   toleranciaMin: number;
   /** El PIN nuevo, en claro, solo si se escribió uno (se guarda su huella, nunca el PIN). */
   pin: string | null;
+  /** El rostro (128 números) que sacó el navegador de la selfie nueva, solo si se sacó una. */
+  rostro: number[] | null;
 };
 
 /** Lee y valida lo que mandó el formulario. Nunca se guarda lo que llega tal cual. */
@@ -46,6 +49,11 @@ function leerDatos(formData: FormData): { ok: true; datos: DatosColaborador } | 
   // La foto se sube aparte (subirFotoDelColaborador) y acá solo llega su dirección.
   const fotoUrl = texto(formData.get("fotoUrl"));
   if (fotoUrl && !/^https:\/\//i.test(fotoUrl)) return { ok: false, error: "La foto no es válida. Sacala de nuevo." };
+
+  // El rostro lo calcula el navegador al sacar la selfie; acá solo se comprueba que sea un rostro posible (128 números razonables).
+  const rostroTexto = texto(formData.get("rostro"));
+  const rostro = rostroTexto ? rostroValido(rostroTexto) : null;
+  if (rostroTexto && !rostro) return { ok: false, error: "El rostro de la selfie no es válido. Sacala de nuevo." };
 
   const pin = texto(formData.get("pin"));
   if (pin && !pinValido(pin)) return { ok: false, error: "El PIN tiene que ser de 4 a 6 números." };
@@ -71,6 +79,7 @@ function leerDatos(formData: FormData): { ok: true; datos: DatosColaborador } | 
       horaEntrada: horaEntrada || null,
       toleranciaMin: tolerancia,
       pin: pin || null,
+      rostro,
     },
   };
 }
@@ -110,14 +119,24 @@ export async function crearColaborador(formData: FormData): Promise<ResultadoCol
 
   const leido = leerDatos(formData);
   if (!leido.ok) return leido;
-  const { pin, ...datos } = leido.datos;
+  const { pin, rostro, ...datos } = leido.datos;
   if (!pin) return { ok: false, error: "Elegí un PIN de 4 a 6 números para esta persona." };
   if (!datos.fotoUrl) return { ok: false, error: "Sacale una selfie: es la foto de referencia para revisar sus marcaciones." };
+  // Sin rostro el celular no podría comprobar que sea esta persona: se registra desde la selfie del alta.
+  if (!rostro) {
+    return { ok: false, error: "No se registró el rostro de esta persona. Sacale la selfie de nuevo, de frente y con buena luz." };
+  }
 
   let creado: { id: string };
   try {
     creado = await prisma.colaborador.create({
-      data: { storeId: idLocal, ...datos, pinClave: claveDePin(idLocal, pin) },
+      data: {
+        storeId: idLocal,
+        ...datos,
+        pinClave: claveDePin(idLocal, pin),
+        rostro: { set: rostro },
+        rostroRegistradoEn: new Date(),
+      },
       select: { id: true },
     });
   } catch (err) {
@@ -131,7 +150,7 @@ export async function crearColaborador(formData: FormData): Promise<ResultadoCol
     descripcion: `Dio de alta a ${nombreDe(datos)} en el registro de asistencia.`,
     entidad: "Colaborador",
     entidadId: creado.id,
-    detalle: { cargo: datos.cargo, horaEntrada: datos.horaEntrada, haceAlmuerzo: datos.haceAlmuerzo },
+    detalle: { cargo: datos.cargo, horaEntrada: datos.horaEntrada, haceAlmuerzo: datos.haceAlmuerzo, rostroRegistrado: true },
   });
 
   refrescarPantallas();
@@ -145,7 +164,7 @@ export async function actualizarColaborador(id: string, formData: FormData): Pro
 
   const leido = leerDatos(formData);
   if (!leido.ok) return leido;
-  const { pin, ...datos } = leido.datos;
+  const { pin, rostro, ...datos } = leido.datos;
   const activo = formData.get("activo") === "on";
 
   // Se lee primero (filtrado por local) para saber si existe y si cambió el estado.
@@ -157,6 +176,11 @@ export async function actualizarColaborador(id: string, formData: FormData): Pro
   if (!pin && anterior.pinClave === null) {
     return { ok: false, error: "Esta persona todavía no tiene PIN: elegile uno para que pueda marcar." };
   }
+  // Una selfie nueva trae su rostro nuevo: si cambió la foto de referencia y no llegó el rostro, el guardado quedaría de otra
+  // foto (de otra cara, si se cambió a otra persona) y el celular compararía contra eso.
+  if (datos.fotoUrl && datos.fotoUrl !== anterior.fotoUrl && !rostro) {
+    return { ok: false, error: "Cambiaste la foto: hace falta registrar el rostro de la nueva. Sacala de nuevo, de frente y con buena luz." };
+  }
 
   try {
     await prisma.colaborador.updateMany({
@@ -167,6 +191,7 @@ export async function actualizarColaborador(id: string, formData: FormData): Pro
         fotoUrl: datos.fotoUrl ?? anterior.fotoUrl,
         activo,
         ...(pin ? { pinClave: claveDePin(idLocal, pin) } : {}),
+        ...(rostro ? { rostro: { set: rostro }, rostroRegistradoEn: new Date() } : {}),
       },
     });
   } catch (err) {
@@ -193,6 +218,15 @@ export async function actualizarColaborador(id: string, formData: FormData): Pro
     entidad: "Colaborador",
     entidadId: id,
   });
+  if (rostro) {
+    await registrarBitacora(idLocal, sesion, {
+      modulo: "asistencia",
+      accion: "colaborador_rostro_registrado",
+      descripcion: `Registró el rostro de ${nombre} (con el que el celular fijo comprueba que sea esa persona al marcar).`,
+      entidad: "Colaborador",
+      entidadId: id,
+    });
+  }
 
   refrescarPantallas();
   return { ok: true };

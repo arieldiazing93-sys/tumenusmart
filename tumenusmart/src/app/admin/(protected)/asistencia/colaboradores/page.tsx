@@ -3,13 +3,14 @@ import { idLocalActual } from "@/lib/local-actual";
 import { prismaDelLocal } from "@/lib/prisma-local";
 import { BotonEnlace, Cabecera } from "@/components/ui";
 import type { ColaboradorFila } from "@/lib/asistencia";
+import { tieneRostro } from "@/lib/reconocimiento-facial";
 import { ListaColaboradores } from "./ListaColaboradores";
 
 export const dynamic = "force-dynamic";
 
 /**
  * Las personas que marcan su asistencia en el celular fijo del local. El dueño las da de alta EN PERSONA:
- * les saca la selfie de referencia y les elige un PIN de 4 a 6 números.
+ * les saca la selfie de referencia (de ahí se guarda su rostro, que el celular compara al marcar) y les elige un PIN de 4 a 6 números.
  */
 export default async function ColaboradoresPage() {
   await pantallaConPermiso("asistencia.gestionar");
@@ -29,11 +30,16 @@ export default async function ColaboradoresPage() {
       haceAlmuerzo: true,
       activo: true,
       pinClave: true,
+      rostro: true,
     },
   });
 
-  // Del PIN solo se sabe si lo tiene o no: nunca sale su huella del servidor.
-  const colaboradores: ColaboradorFila[] = filas.map(({ pinClave, ...f }) => ({ ...f, sinPin: pinClave === null }));
+  // Del PIN y del rostro solo se sabe si lo tienen o no: ni la huella del PIN ni los números del rostro salen del servidor.
+  const colaboradores: ColaboradorFila[] = filas.map(({ pinClave, rostro, ...f }) => ({
+    ...f,
+    sinPin: pinClave === null,
+    sinRostro: !tieneRostro(rostro),
+  }));
 
   return (
     <div className="flex flex-col gap-3">

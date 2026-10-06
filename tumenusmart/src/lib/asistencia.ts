@@ -209,6 +209,8 @@ export type ColaboradorFila = {
   activo: boolean;
   /** true = todavía no tiene PIN (no puede marcar hasta que el dueño le ponga uno). */
   sinPin: boolean;
+  /** true = todavía no tiene rostro registrado: marca sin que el celular compruebe que sea esa persona (nunca sale el rostro en sí). */
+  sinRostro: boolean;
 };
 
 export function nombreDeColaborador(c: { nombre: string; apellido: string | null }): string {
@@ -331,6 +333,8 @@ export type CeldaMarca = {
   fotoUrl: string | null;
   /** La cámara vio su cara de frente al sacar la foto. false = marcó igual sin que la viera (revisar la foto). */
   verificada: boolean;
+  /** Qué tan lejos quedó su cara de la del alta (0 = idéntica; pasa hasta 0,5). NULL = no se comparó (no tenía rostro registrado). */
+  distanciaRostro: number | null;
   tardanzaMin: number | null;
 };
 
