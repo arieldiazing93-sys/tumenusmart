@@ -13,7 +13,7 @@
  */
 
 import type { Prisma, PrismaClient } from "@prisma/client";
-import { formatearNumeroFactura } from "./factura-pos";
+import { formatearNumeroFactura, repartirDescuentoEnLineas } from "./factura-pos";
 import { emisorDesdeFila } from "./emisor-fiscal";
 
 type Db = PrismaClient | Prisma.TransactionClient;
@@ -79,25 +79,20 @@ export function descripcionDeItem(nombreProducto: string, opcionesTexto: string 
 
 /**
  * Reparte el descuento general de la cuenta entre las líneas, en proporción a
- * lo que vale cada una. La última se lleva el resto, para que la suma dé
- * EXACTAMENTE el descuento (sin un centavo perdido por el redondeo).
+ * lo que vale cada una y en guaraníes ENTEROS (ver `repartirDescuentoEnLineas`):
+ * la suma da EXACTAMENTE el descuento y cada línea queda con un total entero,
+ * así la factura electrónica —que redondea línea por línea— suma justo lo que
+ * se cobró.
  */
 export function repartirDescuento(items: ItemFuente[], descuentoTotal: number): ItemCalculado[] {
   const brutos = items.map((i) => redondear2(i.cantidad * i.precioUnitario));
-  const totalBruto = brutos.reduce((s, b) => s + b, 0);
-  const descuento = Math.min(Math.max(descuentoTotal, 0), totalBruto);
-
-  let repartido = 0;
-  return items.map((it, idx) => {
-    const esUltimo = idx === items.length - 1;
-    let d = 0;
-    if (descuento > 0 && totalBruto > 0) {
-      d = esUltimo ? redondear2(descuento - repartido) : redondear2((descuento * brutos[idx]) / totalBruto);
-    }
-    d = Math.min(Math.max(d, 0), brutos[idx]);
-    repartido += d;
-    return { ...it, unidadMedida: it.unidadMedida ?? "unidad", descuento: d, total: redondear2(brutos[idx] - d) };
-  });
+  const descuentos = repartirDescuentoEnLineas(brutos, descuentoTotal);
+  return items.map((it, idx) => ({
+    ...it,
+    unidadMedida: it.unidadMedida ?? "unidad",
+    descuento: descuentos[idx],
+    total: redondear2(brutos[idx] - descuentos[idx]),
+  }));
 }
 
 /**
