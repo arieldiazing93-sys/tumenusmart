@@ -35,6 +35,8 @@ export type CuentaCajaFila = {
   id: string;
   numero: number;
   mesa: string;
+  /** Si la cuenta nació de dividir otra: la mesa original ("1" para la cuenta "1-A"). */
+  mesaBase: string | null;
   /** "abierta" | "por_cobrar" */
   estado: string;
   mozo: string;

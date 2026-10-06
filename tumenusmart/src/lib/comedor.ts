@@ -7,7 +7,7 @@
  */
 
 import { armarDocumento, centrado, filaTabla, negrita, separador } from "./escpos";
-import { formatearGuarani, formatearMiles, formatearNumero, sinAcentos } from "./format";
+import { formatearCantidad, formatearGuarani, formatearMiles, formatearNumero, sinAcentos } from "./format";
 import { calcularDescuento, textoPorcentaje, type DescuentoPedido } from "./descuento-venta";
 
 /** Hasta cuántas letras puede tener el número o nombre de una mesa ("5", "Terraza 2"). */
@@ -140,9 +140,18 @@ export function comandaLegible(guardado: string): string {
     .trim();
 }
 
-/** Lo que vale una lista de productos de una cuenta (precio de cada uno por su cantidad). */
+/**
+ * Lo que vale UNA línea de la cuenta (precio por cantidad), en guaraníes enteros: lo que se muestra en la cuenta y lo que se
+ * cobra. Con cantidades enteras no cambia nada; con cantidades con decimales (la parte de una cuenta dividida en partes iguales,
+ * ver src/lib/division-cuenta.ts) se redondea AL GUARANÍ, y esas líneas se arman para que el producto dé justo un entero.
+ */
+export function importeDeLinea(x: { precioUnitario: number; cantidad: number }): number {
+  return Math.round(x.precioUnitario * x.cantidad);
+}
+
+/** Lo que vale una lista de productos de una cuenta (el importe entero de cada línea, sumado). */
 export function totalDeLineas(lineas: { precioUnitario: number; cantidad: number }[]): number {
-  return lineas.reduce((suma, x) => suma + x.precioUnitario * x.cantidad, 0);
+  return lineas.reduce((suma, x) => suma + importeDeLinea(x), 0);
 }
 
 /**
@@ -233,6 +242,8 @@ export function textoCuenta(datos: {
   hora: string;
   lineas: (LineaComanda & { precioUnitario: number })[];
   totales: TotalesDeCuenta;
+  /** Si la cuenta salió de dividir otra: la mesa original ("1" para la cuenta "1-A"). */
+  divididaDe?: string | null;
 }): string {
   const s = (texto: string) => sinControles(sinAcentos(texto));
   const l: string[] = [separador()];
@@ -240,12 +251,13 @@ export function textoCuenta(datos: {
   l.push(centrado("CUENTA - NO ES FACTURA"));
   l.push(separador());
   l.push(s(`Mesa ${datos.mesa}   Cuenta ${formatearNumero(datos.numero)}`));
+  if (datos.divididaDe) l.push(s(`Cuenta dividida de la mesa ${datos.divididaDe}`));
   l.push(s(`Mozo: ${datos.mozo}`));
   l.push(datos.hora);
   l.push(separador());
   l.push(filaTabla("Ctd", "Descripcion", "Importe"));
   for (const x of datos.lineas) {
-    l.push(filaTabla(String(x.cantidad), s(x.nombre), formatearMiles(x.precioUnitario * x.cantidad)));
+    l.push(filaTabla(formatearCantidad(x.cantidad), s(x.nombre), formatearMiles(importeDeLinea(x))));
     if (x.opciones) l.push(s(`  + ${x.opciones}`));
   }
   l.push(separador());
@@ -281,7 +293,7 @@ export function textoAnulacion(datos: {
   l.push(datos.hora);
   l.push(s(`Anulo: ${datos.quien}`));
   l.push(separador());
-  l.push(s(`${datos.cantidad} x ${datos.nombre}`).toUpperCase());
+  l.push(s(`${formatearCantidad(datos.cantidad)} x ${datos.nombre}`).toUpperCase());
   if (datos.opciones) l.push(s(`  + ${datos.opciones}`));
   l.push(s(`Motivo: ${datos.motivo}`));
   l.push(separador());

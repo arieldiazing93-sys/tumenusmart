@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { pantallaConPermiso } from "@/lib/auth";
 import { prismaDelLocal } from "@/lib/prisma-local";
 import { idLocalActual } from "@/lib/local-actual";
-import { formatearGuarani, formatearMiles, formatearNumero, formatearTelefonoLocal, sinAcentos } from "@/lib/format";
+import { formatearCantidad, formatearGuarani, formatearMiles, formatearNumero, formatearTelefonoLocal, sinAcentos } from "@/lib/format";
 import { numeroALetras } from "@/lib/numero-a-letras";
 import { textoPorcentaje } from "@/lib/descuento-venta";
 import { esVentaACredito, etiquetaFormaPagoPos } from "@/lib/turno-pos";
@@ -110,7 +110,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     l.push(filaTabla("Ctd", "Descripcion", "Importe"));
   }
   for (const item of venta.items) {
-    l.push(filaTabla(String(item.cantidad), sinAcentos(item.nombreProducto), formatearMiles(item.cantidad * Number(item.precioUnitario))));
+    l.push(filaTabla(formatearCantidad(item.cantidad), sinAcentos(item.nombreProducto), formatearMiles(item.cantidad * Number(item.precioUnitario))));
     if (item.opcionesTexto) l.push(`  + ${sinAcentos(item.opcionesTexto)}`);
   }
   l.push(sep());

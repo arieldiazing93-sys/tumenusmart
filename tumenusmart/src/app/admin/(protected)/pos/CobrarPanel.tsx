@@ -3,7 +3,7 @@
 import { useState, type ReactNode } from "react";
 import { PanelLateral } from "@/components/PanelLateral";
 import { clasesBoton } from "@/components/ui";
-import { formatearGuarani } from "@/lib/format";
+import { formatearCantidad, formatearGuarani } from "@/lib/format";
 import { FORMAS_PAGO_POS, FORMA_PAGO_A_CREDITO, type FormaPagoPos } from "@/lib/turno-pos";
 import { MAX_PAGOS_POR_VENTA, type PagoCobro } from "@/lib/pago-venta";
 
@@ -187,7 +187,7 @@ export function CobrarPanel({
             <div className="min-w-0">
               <p className="text-[0.7rem] font-semibold uppercase tracking-rotulo text-tinta-suave">A cobrar</p>
               <p className="truncate text-[0.85rem] text-tinta-media">
-                {clienteNombre.trim() || "Cliente sin nombre"} · {cantidadItems}{" "}
+                {clienteNombre.trim() || "Cliente sin nombre"} · {formatearCantidad(cantidadItems)}{" "}
                 {cantidadItems === 1 ? "producto" : "productos"}
               </p>
             </div>

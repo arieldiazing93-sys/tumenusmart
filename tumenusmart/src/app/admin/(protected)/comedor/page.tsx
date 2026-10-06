@@ -62,6 +62,7 @@ export default async function ComedorPage() {
       id: c.id,
       numero: c.numero,
       mesa: c.mesa,
+      mesaBase: c.mesaBase,
       estado: c.estado,
       mozo: nombre(c.mozo),
       mozoId: c.mozoId,

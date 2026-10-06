@@ -460,6 +460,7 @@ export async function encolarCuenta(
           numero: cuenta.numero,
           mozo: nombreMozo,
           hora: horaDeAhora(),
+          divididaDe: cuenta.mesaBase,
           lineas: cuenta.items.map((i) => ({
             cantidad: i.cantidad,
             nombre: i.nombreProducto,

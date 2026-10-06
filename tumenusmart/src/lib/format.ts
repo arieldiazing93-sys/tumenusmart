@@ -37,6 +37,19 @@ export function formatearMiles(valor: number | string): string {
   return new Intl.NumberFormat("es-PY", { maximumFractionDigits: 0 }).format(Math.round(numero));
 }
 
+/**
+ * Una cantidad de producto como se lee: "2" si es entera y con coma si no ("0,5", "1,25"), con hasta 4 decimales y sin ceros
+ * de más. Las cantidades con decimales aparecen cuando una cuenta de mesa se divide en partes iguales (cada parte lleva, por
+ * ejemplo, media pizza). Una cantidad entera sale igual que siempre.
+ */
+export function formatearCantidad(valor: number | string): string {
+  const numero = typeof valor === "string" ? parseFloat(valor) : valor;
+  if (!Number.isFinite(numero)) return "0";
+  const redondeado = Math.round(numero * 10000) / 10000;
+  if (Number.isInteger(redondeado)) return String(redondeado);
+  return String(redondeado).replace(".", ",");
+}
+
 // Número correlativo simple para mostrarle al cliente (ej: "#0042") en vez
 // del id interno (cuid, con letras) — mucho más fácil de leer por teléfono.
 export function formatearNumero(numero: number): string {

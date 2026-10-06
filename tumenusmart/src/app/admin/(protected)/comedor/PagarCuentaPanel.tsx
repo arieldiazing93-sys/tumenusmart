@@ -6,7 +6,7 @@ import { Boton, Campo, Entrada, MensajeError, Selector, clasesBoton } from "@/co
 import { FORMAS_PROPINA, type DatosPropina } from "@/lib/propinas";
 import { PanelLateral } from "@/components/PanelLateral";
 import { Segmentado } from "@/components/Segmentado";
-import { formatearGuarani, formatearNumero } from "@/lib/format";
+import { formatearCantidad, formatearGuarani, formatearNumero } from "@/lib/format";
 import { textoPorcentaje } from "@/lib/descuento-venta";
 import type { PagoCobro } from "@/lib/pago-venta";
 import { FORMA_PAGO_A_CREDITO } from "@/lib/turno-pos";
@@ -355,7 +355,7 @@ export function PagarCuentaPanel({
               <div className="min-w-0">
                 <p className="text-[0.7rem] font-semibold uppercase tracking-rotulo text-tinta-suave">A cobrar</p>
                 <p className="text-[0.85rem] text-tinta-media">
-                  Mesa {cuenta.mesa} · Cuenta {formatearNumero(cuenta.numero)} · {cantidadProductos}{" "}
+                  Mesa {cuenta.mesa} · Cuenta {formatearNumero(cuenta.numero)} · {formatearCantidad(cantidadProductos)}{" "}
                   {cantidadProductos === 1 ? "producto" : "productos"}
                 </p>
                 {cuenta.totales.descuento > 0 && (

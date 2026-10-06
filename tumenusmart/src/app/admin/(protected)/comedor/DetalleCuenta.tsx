@@ -5,13 +5,14 @@ import { useRouter } from "next/navigation";
 import { Campo, Entrada, MensajeError, Pastilla, Tarjeta, clasesBoton } from "@/components/ui";
 import { Modal } from "@/components/Modal";
 import { Segmentado } from "@/components/Segmentado";
-import { formatearGuarani, formatearNumero } from "@/lib/format";
-import { textoEstadoCuenta } from "@/lib/comedor";
+import { formatearCantidad, formatearGuarani, formatearNumero } from "@/lib/format";
+import { importeDeLinea, textoEstadoCuenta } from "@/lib/comedor";
 import { calcularDescuento, textoPorcentaje } from "@/lib/descuento-venta";
 import { rutaParaAbrirTurno } from "@/lib/turno-requerido";
 import { anularProducto, aplicarDescuento, cancelarCuenta, imprimirCuenta, reabrirCuenta } from "./actions";
 import type { ContextoCaja, CuentaCajaFila, ItemCuentaFila } from "./ComedorCaja";
 import { CargarProductosPanel } from "./CargarProductosPanel";
+import { DividirCuentaPanel } from "./DividirCuentaPanel";
 import { Hace, HoraDe } from "./tiempo";
 
 const ROTULO = "text-[0.72rem] font-semibold uppercase tracking-rotulo text-tinta-suave";
@@ -41,6 +42,7 @@ export function DetalleCuenta({
   const [aviso, setAviso] = useState<string | null>(null);
   const [dialogo, setDialogo] = useState<Dialogo>(null);
   const [cargando, setCargando] = useState(false);
+  const [dividiendo, setDividiendo] = useState(false);
 
   const abierta = cuenta.estado === "abierta";
   const porCobrar = cuenta.estado === "por_cobrar";
@@ -95,6 +97,9 @@ export function DetalleCuenta({
               Cuenta {formatearNumero(cuenta.numero)} · a cargo de {cuenta.mozo}
               {cuenta.comensales ? ` · ${cuenta.comensales} personas` : ""} · <Hace iso={cuenta.abiertaEn} />
             </p>
+            {cuenta.mesaBase && (
+              <p className="text-[0.74rem] font-medium text-tinta-media">Cuenta dividida de la mesa {cuenta.mesaBase}.</p>
+            )}
           </div>
           <div className="flex flex-none flex-col items-end gap-0.5">
             <Pastilla color={porCobrar ? "amarillo" : "exito"} punto>
@@ -155,6 +160,18 @@ export function DetalleCuenta({
               >
                 {porCobrar ? "Imprimir otra copia" : "Imprimir cuenta"}
               </button>
+              {/* Cada uno quiere su factura: en partes iguales o por producto, cada parte es una cuenta que se cobra aparte. */}
+              {!sinProductos && (
+                <button
+                  type="button"
+                  disabled={pendiente || !!t.descuentoInvalido}
+                  title={t.descuentoInvalido ? "Corregí el descuento antes de dividir" : undefined}
+                  onClick={() => setDividiendo(true)}
+                  className={clasesBoton("navegar", "sm")}
+                >
+                  Dividir cuenta
+                </button>
+              )}
               {contexto.puedeCobrar && (
                 <button
                   type="button"
@@ -231,7 +248,7 @@ export function DetalleCuenta({
                   <li key={i.id} className="flex items-start justify-between gap-2 py-1">
                     <div className={`min-w-0 text-[0.86rem] leading-snug ${i.anulado ? "text-tinta-suave" : "text-tinta"}`}>
                       <p className={i.anulado ? "line-through" : ""}>
-                        <span className="font-semibold">{i.cantidad} ×</span> {i.nombre}
+                        <span className="font-semibold">{formatearCantidad(i.cantidad)} ×</span> {i.nombre}
                       </p>
                       {i.opciones && <p className="text-[0.76rem] text-tinta-media">+ {i.opciones}</p>}
                       {i.quitados && <p className="text-[0.76rem] text-peligro">{i.quitados}</p>}
@@ -247,7 +264,7 @@ export function DetalleCuenta({
                       <span
                         className={`cifra text-[0.86rem] font-medium ${i.anulado ? "text-tinta-suave line-through" : "text-tinta"}`}
                       >
-                        {formatearGuarani(i.precioUnitario * i.cantidad)}
+                        {formatearGuarani(importeDeLinea(i))}
                       </span>
                       {abierta && !i.anulado && contexto.puedeGestionar && (
                         <button
@@ -273,7 +290,7 @@ export function DetalleCuenta({
       {dialogo?.tipo === "anular" && (
         <DialogoMotivo
           titulo="Cancelar un producto"
-          texto={`${dialogo.item.cantidad} × ${dialogo.item.nombre}. Se devuelve al stock y se le avisa a la cocina o la barra para que no lo preparen.`}
+          texto={`${formatearCantidad(dialogo.item.cantidad)} × ${dialogo.item.nombre}. Se devuelve al stock y se le avisa a la cocina o la barra para que no lo preparen.`}
           confirmar="Cancelar producto"
           onCerrar={() => setDialogo(null)}
           onConfirmar={async (motivo) => {
@@ -321,6 +338,20 @@ export function DetalleCuenta({
                 ? `Pedido enviado: la comanda salió a ${areas.join(" y ")}.`
                 : "Pedido enviado. Ningún producto tiene un área de impresión asignada, así que no salió ninguna comanda."
             );
+            router.refresh();
+          }}
+        />
+      )}
+
+      {dividiendo && (
+        <DividirCuentaPanel
+          cuenta={cuenta}
+          mesasOcupadas={contexto.apertura.mesasOcupadas}
+          onCerrar={() => setDividiendo(false)}
+          onHecho={(mensaje) => {
+            setDividiendo(false);
+            setError(null);
+            setAviso(mensaje);
             router.refresh();
           }}
         />

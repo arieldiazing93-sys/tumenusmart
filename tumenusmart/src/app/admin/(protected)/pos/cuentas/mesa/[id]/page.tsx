@@ -5,7 +5,7 @@ import { prismaDelLocal } from "@/lib/prisma-local";
 import { idLocalActual } from "@/lib/local-actual";
 import { Cabecera, Pastilla, Tabla, Tarjeta, Td, Th, Tr, BotonEnlace } from "@/components/ui";
 import { Volver } from "@/components/Volver";
-import { formatearGuarani, formatearNumero } from "@/lib/format";
+import { formatearCantidad, formatearGuarani, formatearNumero } from "@/lib/format";
 import { textoPorcentaje } from "@/lib/descuento-venta";
 import { descuentoDeCuenta, textoEstadoCuenta } from "@/lib/comedor";
 import { totalAlCancelar, totalCargado } from "@/lib/cuentas-canceladas";
@@ -231,7 +231,7 @@ export default async function DetalleCuentaMesaPage({ params }: { params: Promis
                     {i.opcionesTexto && <span className="block text-[11px] text-tinta-suave">+ {i.opcionesTexto}</span>}
                     {i.nota && <span className="block text-[11px] text-tinta-media">“{i.nota}”</span>}
                   </Td>
-                  <Td className="cifra text-right">{i.cantidad}</Td>
+                  <Td className="cifra text-right">{formatearCantidad(i.cantidad)}</Td>
                   <Td className="cifra text-right">{formatearGuarani(Number(i.precioUnitario) * i.cantidad)}</Td>
                   <Td>
                     {i.estado === "anulado" ? (

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Boton, Entrada, Pastilla, clasesBoton } from "@/components/ui";
-import { formatearGuarani } from "@/lib/format";
+import { formatearCantidad, formatearGuarani } from "@/lib/format";
 import { claveDeMesa } from "@/lib/comedor";
 import type {
   AgregadoVenta,
@@ -811,7 +811,7 @@ export function MozoApp({
                     <ul className="mt-2 flex flex-col gap-1.5">
                       {r.items.map((i) => (
                         <li key={i.id} className={`text-[0.88rem] ${i.anulado ? "text-tinta-suave line-through" : "text-tinta"}`}>
-                          <span className="font-semibold">{i.cantidad} ×</span> {i.nombre}
+                          <span className="font-semibold">{formatearCantidad(i.cantidad)} ×</span> {i.nombre}
                           {i.detalle && <span className="block pl-5 text-[0.78rem] text-tinta-suave">+ {i.detalle}</span>}
                           {i.nota && <span className="block pl-5 text-[0.78rem] text-tinta-media">“{i.nota}”</span>}
                           {i.anulado && <span className="ml-1 text-[0.72rem] font-semibold text-peligro">ANULADO</span>}

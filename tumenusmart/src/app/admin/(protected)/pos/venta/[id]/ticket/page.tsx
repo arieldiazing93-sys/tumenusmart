@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { pantallaConPermiso } from "@/lib/auth";
 import { prismaDelLocal } from "@/lib/prisma-local";
 import { idLocalActual } from "@/lib/local-actual";
-import { formatearGuarani, formatearMiles, formatearNumero, formatearTelefonoLocal, sinAcentos } from "@/lib/format";
+import { formatearCantidad, formatearGuarani, formatearMiles, formatearNumero, formatearTelefonoLocal, sinAcentos } from "@/lib/format";
 import { numeroALetras } from "@/lib/numero-a-letras";
 import { textoPorcentaje } from "@/lib/descuento-venta";
 import { esVentaACredito, etiquetaFormaPagoPos } from "@/lib/turno-pos";
@@ -305,7 +305,7 @@ export default async function TicketVentaPosPage({
             <div key={item.id} className="mb-1.5 last:mb-0">
               <p className="whitespace-pre-wrap">
                 {filaTabla(
-                  String(item.cantidad),
+                  formatearCantidad(item.cantidad),
                   sinAcentos(item.nombreProducto),
                   formatearMiles(item.cantidad * Number(item.precioUnitario))
                 )}

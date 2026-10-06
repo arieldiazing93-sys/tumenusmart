@@ -1415,7 +1415,8 @@ model VentaPosItem {
   productId      String?
   product        Product? @relation(fields: [productId], references: [id])
   nombreProducto String   // snapshot: el nombre al momento de la venta
-  cantidad       Int
+  /// Entera en casi todas las ventas; con decimales (0,5) cuando se cobra la parte de una cuenta de mesa dividida en partes iguales.
+  cantidad       Float
   precioUnitario Decimal  @db.Decimal(10, 2)
   // Snapshot de la tasa de IVA al momento de la venta — igual que
   // nombreProducto/precioUnitario: si el producto cambia de tasa después,
@@ -2658,6 +2659,10 @@ model CuentaMesa {
   motivoCierre    String?
   /// La venta del Punto de Venta que se generó al pagarla (para el cierre de turno y los reportes).
   ventaPosId      String?
+  /// Si la cuenta nació de DIVIDIR otra (cada uno quiere su factura): la cuenta de la que salió, y el nombre de la mesa original
+  /// ("1" para "1-A" y "1-B"). Sin ellos, la cuenta es una común. Sin clave foránea a propósito: es solo el rastro.
+  cuentaOrigenId  String?
+  mesaBase        String?
 
   items            ItemCuentaMesa[]
   trabajos         TrabajoImpresion[]
@@ -2692,7 +2697,9 @@ model ItemCuentaMesa {
   /// Nulo cuando es un combo "mitad y mitad" (no es un único producto).
   productId      String?
   nombreProducto String
-  cantidad       Int
+  /// Entera al cargarla; puede quedar con decimales (0,5) si la cuenta se divide en partes iguales (ver src/lib/division-cuenta.ts):
+  /// cada parte lleva, por ejemplo, media pizza. Por eso es un decimal de doble precisión y no un entero.
+  cantidad       Float
   precioUnitario Decimal @db.Decimal(10, 2)
   iva            String  @default("gravado10")
   opcionesTexto  String?

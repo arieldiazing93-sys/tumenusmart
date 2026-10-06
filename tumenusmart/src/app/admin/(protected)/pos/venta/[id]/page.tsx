@@ -4,7 +4,7 @@ import { prismaDelLocal } from "@/lib/prisma-local";
 import { idLocalActual } from "@/lib/local-actual";
 import { Cabecera, Pastilla, Tabla, Tarjeta, Td, Th, Tr, clasesBoton } from "@/components/ui";
 import { Volver } from "@/components/Volver";
-import { formatearGuarani, formatearNumero } from "@/lib/format";
+import { formatearCantidad, formatearGuarani, formatearNumero } from "@/lib/format";
 import { textoPorcentaje } from "@/lib/descuento-venta";
 import { esVentaACredito, etiquetaFormaPagoPos } from "@/lib/turno-pos";
 import { detallePagos } from "@/lib/pago-venta";
@@ -186,7 +186,7 @@ export default async function DetalleVentaPosPage({
               <div key={item.id} className="text-[0.85rem]">
                 <div className="flex items-center justify-between">
                   <span className="text-tinta">
-                    {item.cantidad}x {item.nombreProducto}
+                    {formatearCantidad(item.cantidad)}x {item.nombreProducto}
                   </span>
                   <span className="cifra text-tinta-media">
                     {formatearGuarani(item.cantidad * Number(item.precioUnitario))}
