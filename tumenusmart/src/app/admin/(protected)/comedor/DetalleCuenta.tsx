@@ -43,12 +43,18 @@ export function DetalleCuenta({
   const [dialogo, setDialogo] = useState<Dialogo>(null);
   const [cargando, setCargando] = useState(false);
   const [dividiendo, setDividiendo] = useState(false);
+  // El producto marcado en la lista (para cancelarlo con el botón de arriba).
+  const [seleccionadoId, setSeleccionadoId] = useState<string | null>(null);
 
   const abierta = cuenta.estado === "abierta";
   const porCobrar = cuenta.estado === "por_cobrar";
   /** Todos sus productos se cancelaron: ya no hay nada que cobrar y la mesa se puede liberar. */
   const sinProductos = cuenta.items.every((i) => i.anulado);
   const t = cuenta.totales;
+  /** Los productos se marcan para cancelarlos solo con la cuenta abierta y con el permiso de la caja. */
+  const puedeMarcar = abierta && contexto.puedeGestionar;
+  // Si el producto marcado ya no está (se canceló, o la lista se actualizó), no hay ninguno marcado.
+  const seleccionado = cuenta.items.find((i) => i.id === seleccionadoId && !i.anulado) ?? null;
 
   /** Corre una acción del servidor y, si salió bien, actualiza la pantalla. Un fallo inesperado se explica igual. */
   function ejecutar(accion: () => Promise<{ ok: true } | { ok: false; error: string }>, alTerminar?: () => void) {
@@ -160,8 +166,9 @@ export function DetalleCuenta({
               >
                 {porCobrar ? "Imprimir otra copia" : "Imprimir cuenta"}
               </button>
-              {/* Cada uno quiere su factura: en partes iguales o por producto, cada parte es una cuenta que se cobra aparte. */}
-              {!sinProductos && (
+              {/* Cada uno quiere su factura: en partes iguales o por producto, cada parte es una cuenta que se cobra aparte. Solo con
+                  la cuenta abierta: una vez impresa ya no se divide (hay que reabrirla). */}
+              {abierta && !sinProductos && (
                 <button
                   type="button"
                   disabled={pendiente || !!t.descuentoInvalido}
@@ -185,6 +192,18 @@ export function DetalleCuenta({
                   Pagar cuenta
                 </button>
               )}
+              {/* Cancelar un producto (o algunas de sus unidades): se marca en la lista de abajo y se toca acá. */}
+              {abierta && !sinProductos && (
+                <button
+                  type="button"
+                  disabled={pendiente || !seleccionado}
+                  title={seleccionado ? undefined : "Primero marcá un producto de la lista"}
+                  onClick={() => seleccionado && setDialogo({ tipo: "anular", item: seleccionado })}
+                  className={clasesBoton("peligro", "sm")}
+                >
+                  Cancelar producto
+                </button>
+              )}
               {/* Una cuenta CON productos no se cancela mientras se atiende (se cobra y, si hace falta, se cancela la venta desde
                   el Historial de cuentas). Solo se puede cerrar una cuenta que ya quedó vacía, para liberar la mesa. */}
               {sinProductos && (
@@ -198,6 +217,11 @@ export function DetalleCuenta({
                 </button>
               )}
             </div>
+            {puedeMarcar && !sinProductos && (
+              <p className="text-[0.72rem] text-tinta-suave">
+                Para cancelar un producto (o solo algunas unidades), marcalo en la lista y tocá “Cancelar producto”.
+              </p>
+            )}
             {!sinProductos && (
               <p className="text-[0.72rem] text-tinta-suave">
                 Una cuenta con productos no se cancela mientras se atiende: se cobra y, si hace falta, se cancela la venta
@@ -222,7 +246,7 @@ export function DetalleCuenta({
             )}
             {porCobrar && (
               <p className="text-[0.72rem] text-tinta-suave">
-                Para cargar más productos, dar un descuento o cancelar un producto, primero reabrí la cuenta.
+                Para cargar más productos, dar un descuento, cancelar un producto o dividir la cuenta, primero reabrí la cuenta.
               </p>
             )}
           </div>
@@ -236,66 +260,100 @@ export function DetalleCuenta({
         {error && <MensajeError>{error}</MensajeError>}
 
         {/* ----------------------------------------------------------------------- los pedidos */}
-        <div className="flex flex-col gap-2 border-t border-linea pt-2">
-          {[...rondas.entries()].map(([ronda, items]) => (
-            <section key={ronda}>
-              <p className={ROTULO}>
-                Pedido {ronda} · <HoraDe iso={items[0].enviadoEn} /> ·{" "}
-                {items[0].cargadoPor ? `cargado en la caja por ${items[0].cargadoPor}` : items[0].mozo}
-              </p>
-              <ul className="mt-0.5 flex flex-col divide-y divide-linea-fina">
-                {items.map((i) => (
-                  <li key={i.id} className="flex items-start justify-between gap-2 py-1">
-                    <div className={`min-w-0 text-[0.86rem] leading-snug ${i.anulado ? "text-tinta-suave" : "text-tinta"}`}>
-                      <p className={i.anulado ? "line-through" : ""}>
-                        <span className="font-semibold">{formatearCantidad(i.cantidad)} ×</span> {i.nombre}
-                      </p>
-                      {i.opciones && <p className="text-[0.76rem] text-tinta-media">+ {i.opciones}</p>}
-                      {i.quitados && <p className="text-[0.76rem] text-peligro">{i.quitados}</p>}
-                      {i.nota && <p className="text-[0.76rem] text-tinta-media">“{i.nota}”</p>}
-                      {i.anulado && (
-                        <p className="text-[0.72rem] font-medium text-peligro">
-                          Cancelado{i.anuladoPor ? ` por ${i.anuladoPor}` : ""}
-                          {i.motivoAnulacion ? `: ${i.motivoAnulacion}` : ""}
-                        </p>
+        {/* Una tabla con tres columnas —cantidad, descripción y monto—; los pedidos van en el orden en que entraron. Con la cuenta
+            abierta se marca un producto (casilla o clic en la fila) y se cancela con el botón de arriba. */}
+        <div className="border-t border-linea pt-2">
+          <table className="w-full border-collapse text-left">
+            <thead>
+              <tr className={`${ROTULO} border-b border-linea`}>
+                {puedeMarcar && <th scope="col" className="w-7 pb-1" aria-label="Marcar" />}
+                <th scope="col" className="w-12 pb-1 pr-2 font-semibold">
+                  Cant.
+                </th>
+                <th scope="col" className="pb-1 pr-2 font-semibold">
+                  Descripción
+                </th>
+                <th scope="col" className="w-24 pb-1 text-right font-semibold">
+                  Monto
+                </th>
+              </tr>
+            </thead>
+            {[...rondas.entries()].map(([ronda, items]) => (
+              <tbody key={ronda} className="divide-y divide-linea-fina">
+                <tr>
+                  <td colSpan={puedeMarcar ? 4 : 3} className="pb-0.5 pt-2">
+                    <p className={ROTULO}>
+                      Pedido {ronda} · <HoraDe iso={items[0].enviadoEn} /> ·{" "}
+                      {items[0].cargadoPor ? `cargado en la caja por ${items[0].cargadoPor}` : items[0].mozo}
+                    </p>
+                  </td>
+                </tr>
+                {items.map((i) => {
+                  const marcable = puedeMarcar && !i.anulado;
+                  const marcado = seleccionado?.id === i.id;
+                  return (
+                    <tr
+                      key={i.id}
+                      onClick={(e) => {
+                        // Un clic en la fila marca el producto; el de la casilla ya lo marca por su cuenta.
+                        if (marcable && (e.target as HTMLElement).tagName !== "INPUT") setSeleccionadoId(marcado ? null : i.id);
+                      }}
+                      className={`align-top ${marcable ? "cursor-pointer" : ""} ${marcado ? "bg-azul-luz/50" : ""} ${
+                        i.anulado ? "text-tinta-suave" : "text-tinta"
+                      }`}
+                    >
+                      {puedeMarcar && (
+                        <td className="py-1 pr-1">
+                          {marcable && (
+                            <input
+                              type="checkbox"
+                              checked={marcado}
+                              onChange={() => setSeleccionadoId(marcado ? null : i.id)}
+                              aria-label={`Marcar ${formatearCantidad(i.cantidad)} × ${i.nombre}`}
+                              className="mt-0.5 h-4 w-4 accent-peligro"
+                            />
+                          )}
+                        </td>
                       )}
-                    </div>
-                    <div className="flex flex-none items-center gap-2">
-                      <span
-                        className={`cifra text-[0.86rem] font-medium ${i.anulado ? "text-tinta-suave line-through" : "text-tinta"}`}
-                      >
+                      <td className={`cifra py-1 pr-2 text-[0.86rem] font-semibold ${i.anulado ? "line-through" : ""}`}>
+                        {formatearCantidad(i.cantidad)}
+                      </td>
+                      <td className="py-1 pr-2 text-[0.86rem] leading-snug">
+                        <p className={i.anulado ? "line-through" : ""}>{i.nombre}</p>
+                        {i.opciones && <p className="text-[0.76rem] text-tinta-media">+ {i.opciones}</p>}
+                        {i.quitados && <p className="text-[0.76rem] text-peligro">{i.quitados}</p>}
+                        {i.nota && <p className="text-[0.76rem] text-tinta-media">“{i.nota}”</p>}
+                        {i.anulado && (
+                          <p className="text-[0.72rem] font-medium text-peligro">
+                            Cancelado{i.anuladoPor ? ` por ${i.anuladoPor}` : ""}
+                            {i.motivoAnulacion ? `: ${i.motivoAnulacion}` : ""}
+                          </p>
+                        )}
+                      </td>
+                      <td className={`cifra py-1 text-right text-[0.86rem] font-medium ${i.anulado ? "line-through" : ""}`}>
                         {formatearGuarani(importeDeLinea(i))}
-                      </span>
-                      {abierta && !i.anulado && contexto.puedeGestionar && (
-                        <button
-                          type="button"
-                          disabled={pendiente}
-                          onClick={() => setDialogo({ tipo: "anular", item: i })}
-                          className="rounded-md border border-peligro/30 bg-peligro-luz px-2 py-0.5 text-[0.72rem] font-semibold text-peligro transition-colors hover:bg-peligro hover:text-white disabled:opacity-45"
-                        >
-                          Cancelar
-                        </button>
-                      )}
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            </section>
-          ))}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            ))}
+          </table>
         </div>
 
       </Tarjeta>
 
       {/* ------------------------------------------------------------------------ ventanas */}
       {dialogo?.tipo === "anular" && (
-        <DialogoMotivo
-          titulo="Cancelar un producto"
-          texto={`${formatearCantidad(dialogo.item.cantidad)} × ${dialogo.item.nombre}. Se devuelve al stock y se le avisa a la cocina o la barra para que no lo preparen.`}
-          confirmar="Cancelar producto"
+        <DialogoCancelarProducto
+          item={dialogo.item}
           onCerrar={() => setDialogo(null)}
-          onConfirmar={async (motivo) => {
-            const r = await anularProducto(cuenta.id, dialogo.item.id, motivo);
-            if (r.ok) router.refresh();
+          onConfirmar={async (motivo, cuantas) => {
+            const r = await anularProducto(cuenta.id, dialogo.item.id, motivo, cuantas);
+            if (r.ok) {
+              setSeleccionadoId(null);
+              router.refresh();
+            }
             return r;
           }}
         />
@@ -361,6 +419,127 @@ export function DetalleCuenta({
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
+
+/**
+ * Cancelar un producto de la cuenta: todo, o solo algunas unidades (el mozo comandó 5 empanadas y eran 4: se cancela 1 y quedan
+ * 4). Pide cuántas y el motivo (obligatorio). Un producto de una sola unidad, o que quedó con una fracción por haber dividido la
+ * cuenta en partes iguales, se cancela entero. Por defecto propone cancelar UNA unidad (lo menos destructivo): para cancelar todo
+ * está el botón "Todas".
+ */
+function DialogoCancelarProducto({
+  item,
+  onCerrar,
+  onConfirmar,
+}: {
+  item: ItemCuentaFila;
+  onCerrar: () => void;
+  onConfirmar: (motivo: string, cantidad: number) => Promise<{ ok: true } | { ok: false; error: string }>;
+}) {
+  const puedeParcial = Number.isInteger(item.cantidad) && item.cantidad > 1;
+  const [cuantas, setCuantas] = useState(puedeParcial ? 1 : item.cantidad);
+  const [motivo, setMotivo] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [pendiente, iniciar] = useTransition();
+
+  const cancelaTodo = cuantas === item.cantidad;
+  const quedan = item.cantidad - cuantas;
+
+  function confirmarAhora() {
+    if (motivo.trim().length < 3) {
+      setError("Escribí el motivo (al menos 3 letras).");
+      return;
+    }
+    setError(null);
+    iniciar(async () => {
+      try {
+        const r = await onConfirmar(motivo, cuantas);
+        if (!r.ok) {
+          setError(r.error);
+          return;
+        }
+        onCerrar();
+      } catch {
+        setError("No se pudo completar la acción. Revisá la conexión y probá de nuevo.");
+      }
+    });
+  }
+
+  return (
+    <Modal titulo="Cancelar un producto" onCerrar={onCerrar}>
+      <div className="flex flex-col gap-3">
+        <p className="text-[0.95rem] font-semibold text-tinta">
+          {formatearCantidad(item.cantidad)} × {item.nombre}
+        </p>
+
+        {puedeParcial && (
+          <div className="flex flex-col gap-1.5 rounded-xl border-2 border-azul/50 bg-superficie p-3">
+            <p className="text-[0.85rem] font-semibold text-tinta">¿Cuántas cancelás?</p>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                aria-label="Cancelar una unidad menos"
+                disabled={cuantas <= 1}
+                onClick={() => setCuantas((c) => Math.max(1, c - 1))}
+                className={`${clasesBoton("suave", "md")} w-10 justify-center`}
+              >
+                −
+              </button>
+              <span className="cifra w-10 text-center text-[1.3rem] font-semibold text-tinta">{cuantas}</span>
+              <button
+                type="button"
+                aria-label="Cancelar una unidad más"
+                disabled={cuantas >= item.cantidad}
+                onClick={() => setCuantas((c) => Math.min(item.cantidad, c + 1))}
+                className={`${clasesBoton("suave", "md")} w-10 justify-center`}
+              >
+                +
+              </button>
+              <button
+                type="button"
+                disabled={cancelaTodo}
+                onClick={() => setCuantas(item.cantidad)}
+                className={clasesBoton("suave", "md")}
+              >
+                Todas ({item.cantidad})
+              </button>
+            </div>
+            <p className="text-[0.8rem] text-tinta-media">
+              {cancelaTodo
+                ? "Se cancela todo el producto."
+                : `Se cancela${cuantas === 1 ? " 1" : `n ${cuantas}`} y quedan ${quedan} en la cuenta.`}
+            </p>
+          </div>
+        )}
+
+        <p className="text-[0.85rem] leading-snug text-tinta-media">
+          {puedeParcial && !cancelaTodo ? "Lo cancelado" : "Se cancela y"} se devuelve al stock y se le avisa a la cocina o la barra
+          para que no lo preparen.
+        </p>
+        <Campo etiqueta="Motivo *">
+          <Entrada
+            autoFocus
+            value={motivo}
+            onChange={(e) => setMotivo(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") confirmarAhora();
+            }}
+            maxLength={200}
+            placeholder="Ej: el mozo cargó una de más, el cliente se arrepintió"
+          />
+        </Campo>
+        {error && <MensajeError>{error}</MensajeError>}
+        <div className="flex justify-end gap-2">
+          <button type="button" onClick={onCerrar} className={clasesBoton("suave", "md")}>
+            No, volver
+          </button>
+          <button type="button" disabled={pendiente} onClick={confirmarAhora} className={clasesBoton("peligro", "md")}>
+            {pendiente ? "Cancelando…" : cancelaTodo ? "Cancelar producto" : `Cancelar ${cuantas}`}
+          </button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
 
 /** Pide el motivo de una cancelación: sin motivo (al menos 3 letras) no se hace nada. */
 function DialogoMotivo({

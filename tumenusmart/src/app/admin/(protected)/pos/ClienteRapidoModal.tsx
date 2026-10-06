@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { Boton, Campo, Entrada, MensajeError } from "@/components/ui";
 
 export type DatosClienteRapido = {
@@ -51,7 +52,12 @@ export function ClienteRapidoModal({
     onGuardar({ nombre: nombre.trim(), telefono: telefono.trim() });
   }
 
-  return (
+  // Sin document (render en el servidor) no hay dónde dibujarlo; el cuadro solo se abre con un clic, ya en el navegador.
+  if (typeof document === "undefined") return null;
+
+  // Portal directo en <body> (como el panel lateral): si se abre desde un panel y se queda adentro de la pantalla, el velo del
+  // panel lo tapa y no responde a los clics (ver ClienteFiscalModal).
+  return createPortal(
     <div
       className="fixed inset-0 z-[60] flex items-end justify-center bg-tinta/45 sm:items-center sm:p-4"
       onClick={onCerrar}
@@ -109,6 +115,7 @@ export function ClienteRapidoModal({
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

@@ -425,9 +425,7 @@ export function DividirCuentaPanel({
                 </p>
               )}
               <p className="text-[0.76rem] leading-snug text-tinta-suave">
-                {cuenta.estado === "por_cobrar"
-                  ? "Esta cuenta ya estaba impresa: al dividirla cambian los totales, así que quedan todas abiertas y hay que imprimir cada una antes de cobrarla."
-                  : "Las cuentas quedan abiertas: imprimí cada una antes de cobrarla."}
+                Las cuentas quedan abiertas: imprimí cada una antes de cobrarla.
               </p>
             </div>
           )}

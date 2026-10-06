@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { Boton, Campo, Entrada, Selector, MensajeError } from "@/components/ui";
 import { TIPOS_IDENTIFICACION_FISCAL } from "@/lib/tipo-cliente";
 
@@ -66,9 +67,14 @@ export function ClienteFiscalModal({
     });
   }
 
-  return (
+  // Sin document (render en el servidor) no hay dónde dibujarlo; el cuadro solo se abre con un clic, ya en el navegador.
+  if (typeof document === "undefined") return null;
+
+  // Se dibuja con un portal directo en <body>, igual que el panel lateral del cobro desde el que se abre: si se quedara adentro
+  // de la pantalla, el z-index no alcanza —queda dentro del contexto de apilado de la página, por debajo del velo del panel— y
+  // el cuadro se ve opaco y no responde a los clics. En el body los dos compiten de igual a igual y gana el z-[60].
+  return createPortal(
     <div
-      // z-[60]: se abre desde el panel de cobro (que va en un portal con z-50) y tiene que quedar por encima.
       className="fixed inset-0 z-[60] flex items-end justify-center bg-tinta/45 sm:items-center sm:p-4"
       onClick={onCerrar}
     >
@@ -156,6 +162,7 @@ export function ClienteFiscalModal({
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

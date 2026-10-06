@@ -151,8 +151,11 @@ export function repartirProporcional(monto: number, pesos: number[]): number[] {
   return resultado;
 }
 
-/** Reparte lo que descontó una línea (de cada insumo) en proporción a `factores` (que suman 1): la última parte se lleva el resto. */
-function repartirConsumo(consumo: ConsumoGuardado[], factores: number[]): ConsumoGuardado[][] {
+/**
+ * Reparte lo que descontó una línea (de cada insumo) en proporción a `factores` (que suman 1): la última parte se lleva el resto.
+ * También lo usa la cancelación de ALGUNAS unidades de un producto (4 se quedan, 1 se cancela y se devuelve su parte al stock).
+ */
+export function repartirConsumo(consumo: ConsumoGuardado[], factores: number[]): ConsumoGuardado[][] {
   const n = factores.length;
   const salida: ConsumoGuardado[][] = Array.from({ length: n }, () => []);
   for (const c of consumo) {

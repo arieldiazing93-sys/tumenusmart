@@ -1,7 +1,8 @@
 "use server";
 
+import { randomUUID } from "crypto";
 import { revalidatePath } from "next/cache";
-import type { Prisma } from "@prisma/client";
+import type { ItemCuentaMesa, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { prismaDelLocal, siguienteNumeroVentaPos, upsertClienteFiscal } from "@/lib/prisma-local";
 import { idLocalActual } from "@/lib/local-actual";
@@ -16,7 +17,8 @@ import { crearComprobante, descripcionDeItem } from "@/lib/comprobante";
 import { SIN_REGISTRO_FISCAL } from "@/lib/tipo-cliente";
 import { calcularDescuento, textoPorcentaje } from "@/lib/descuento-venta";
 import { claveDiaAsuncion } from "@/lib/timezone";
-import { formatearGuarani, formatearNumero } from "@/lib/format";
+import { formatearCantidad, formatearGuarani, formatearNumero } from "@/lib/format";
+import { repartirConsumo } from "@/lib/division-cuenta";
 import {
   ESTADOS_CUENTA_ABIERTA,
   contenidoParaGuardar,
@@ -155,15 +157,120 @@ async function anularItems(
   }
 }
 
-/** Cancela UN producto de una cuenta abierta, con motivo. */
-export async function anularProducto(cuentaId: string, itemId: string, motivo: string): Promise<Resultado> {
+/**
+ * Cancela ALGUNAS unidades de un producto: el mozo comandó 5 empanadas y eran 4. La línea se queda con las que siguen (4: su
+ * cantidad y lo que descontó del stock bajan en proporción) y las canceladas pasan a una fila propia, marcada como cancelada
+ * (con quién y por qué), de modo que el rastro de la cuenta muestra las dos cosas. Se devuelve al stock solo lo de las unidades
+ * canceladas y se le avisa a la cocina o la barra de que no preparen esas. Va dentro de la transacción de quien llama.
+ */
+async function anularParteDeItem(
+  tx: Prisma.TransactionClient,
+  storeId: string,
+  cuenta: { id: string; mesa: string },
+  item: ItemCuentaMesa,
+  cantidad: number,
+  razon: string,
+  quien: string
+): Promise<void> {
+  const ahora = new Date();
+  const quedan = item.cantidad - cantidad;
+  const [consumoQueda, consumoAnulado] = repartirConsumo(leerConsumoGuardado(item.consumo), [
+    quedan / item.cantidad,
+    cantidad / item.cantidad,
+  ]);
+
+  // La cantidad que se leyó va en la condición: si otra caja la cambió (o la canceló) en el mismo instante, acá no encuentra nada.
+  const reducida = await tx.itemCuentaMesa.updateMany({
+    where: { id: item.id, storeId, cuentaId: cuenta.id, estado: "activo", cantidad: item.cantidad },
+    data: { cantidad: quedan, consumo: consumoQueda as unknown as Prisma.InputJsonValue },
+  });
+  if (reducida.count !== 1) throw new ErrorDeUsuario("Ese producto cambió mientras lo cancelabas. Actualizá la pantalla.");
+
+  await tx.itemCuentaMesa.create({
+    data: {
+      storeId,
+      cuentaId: cuenta.id,
+      ronda: item.ronda,
+      // Una fila nueva necesita su propio par envío/línea (es único): este "envío" es la cancelación.
+      envioId: `anulacion-${randomUUID()}`,
+      linea: item.linea,
+      mozoId: item.mozoId,
+      cargadoPor: item.cargadoPor,
+      productId: item.productId,
+      nombreProducto: item.nombreProducto,
+      cantidad,
+      precioUnitario: item.precioUnitario,
+      iva: item.iva,
+      opcionesTexto: item.opcionesTexto,
+      ingredientesQuitadosTexto: item.ingredientesQuitadosTexto,
+      nota: item.nota,
+      costoProducto: item.costoProducto,
+      costoAgregados: item.costoAgregados,
+      precioAgregados: item.precioAgregados,
+      areaImpresionId: item.areaImpresionId,
+      consumo: consumoAnulado as unknown as Prisma.InputJsonValue,
+      estado: "anulado",
+      anuladoPor: quien,
+      anuladoEn: ahora,
+      motivoAnulacion: razon,
+      enviadoEn: item.enviadoEn,
+    },
+  });
+
+  await devolverConsumo(
+    tx,
+    storeId,
+    consumoAnulado,
+    { cuentaMesaId: cuenta.id },
+    `Cancelado: ${formatearCantidad(cantidad)} de ${formatearCantidad(item.cantidad)} × ${item.nombreProducto} (${razon})`,
+    quien
+  );
+
+  if (item.areaImpresionId) {
+    const area = await tx.areaImpresion.findFirst({ where: { id: item.areaImpresionId, storeId }, select: { nombre: true } });
+    const nombreDeArea = area?.nombre ?? "Comanda";
+    await tx.trabajoImpresion.create({
+      data: {
+        storeId,
+        tipo: "anulacion",
+        titulo: `Mesa ${cuenta.mesa} · ${nombreDeArea} · anulado`,
+        areaImpresionId: item.areaImpresionId,
+        contenido: contenidoParaGuardar(
+          textoAnulacion({
+            mesa: cuenta.mesa,
+            area: nombreDeArea,
+            hora: horaDeAhora(),
+            quien,
+            cantidad,
+            nombre: item.nombreProducto,
+            opciones: item.opcionesTexto,
+            motivo: razon,
+          })
+        ),
+        cuentaMesaId: cuenta.id,
+      },
+    });
+  }
+}
+
+/**
+ * Cancela un producto de una cuenta abierta, con motivo: todo, o solo ALGUNAS de sus unidades si se pasa `cantidad` (5
+ * empanadas comandadas de más: se cancela 1 y quedan 4). Sin `cantidad` se cancela todo, como siempre. Solo se cancelan
+ * unidades enteras; un producto que quedó con una fracción (0,5, por haber dividido la cuenta en partes iguales) se cancela entero.
+ */
+export async function anularProducto(cuentaId: string, itemId: string, motivo: string, cantidad?: number): Promise<Resultado> {
   const sesion = await exigirPermiso("comedor.gestionar");
   const storeId = await idLocalActual();
   const razon = limpiarMotivo(motivo);
   if (!razon) return { ok: false, error: MENSAJE_MOTIVO };
   const quien = nombreDe(sesion);
+  if (cantidad !== undefined && (typeof cantidad !== "number" || !Number.isFinite(cantidad) || cantidad <= 0)) {
+    return { ok: false, error: "La cantidad a cancelar tiene que ser mayor a cero." };
+  }
 
   let resumen = "";
+  let cancelada = 0;
+  let habia = 0;
   try {
     resumen = await prisma.$transaction(async (tx) => {
       const cuenta = await tx.cuentaMesa.findFirst({
@@ -172,22 +279,28 @@ export async function anularProducto(cuentaId: string, itemId: string, motivo: s
       });
       if (!cuenta) throw new ErrorDeUsuario("No encontré esa cuenta.");
       if (cuenta.estado !== "abierta") throw new ErrorDeUsuario(textoNoEditable(cuenta.estado));
-      const item = await tx.itemCuentaMesa.findFirst({
-        where: { id: String(itemId), cuentaId: cuenta.id, storeId },
-        select: {
-          id: true,
-          cantidad: true,
-          nombreProducto: true,
-          opcionesTexto: true,
-          areaImpresionId: true,
-          consumo: true,
-          estado: true,
-        },
-      });
+      const item = await tx.itemCuentaMesa.findFirst({ where: { id: String(itemId), cuentaId: cuenta.id, storeId } });
       if (!item) throw new ErrorDeUsuario("No encontré ese producto.");
       if (item.estado !== "activo") throw new ErrorDeUsuario("Ese producto ya estaba cancelado.");
-      await anularItems(tx, storeId, cuenta, [item], razon, quien);
-      return `${item.cantidad} × ${item.nombreProducto} de la mesa ${cuenta.mesa}`;
+
+      habia = item.cantidad;
+      const pedida = cantidad ?? item.cantidad;
+      if (pedida > item.cantidad + 1e-9) {
+        throw new ErrorDeUsuario(`Solo hay ${formatearCantidad(item.cantidad)} de ese producto en la cuenta.`);
+      }
+      // Todo el producto: se marca cancelado tal cual, como siempre.
+      if (Math.abs(pedida - item.cantidad) < 1e-9) {
+        cancelada = item.cantidad;
+        await anularItems(tx, storeId, cuenta, [item], razon, quien);
+        return `${formatearCantidad(item.cantidad)} × ${item.nombreProducto} de la mesa ${cuenta.mesa}`;
+      }
+      // Solo algunas unidades: tienen que ser enteras, de un producto de unidades enteras.
+      if (!Number.isInteger(item.cantidad) || !Number.isInteger(pedida)) {
+        throw new ErrorDeUsuario("Ese producto se cancela entero: ya se había dividido la cuenta y quedó con una fracción.");
+      }
+      cancelada = pedida;
+      await anularParteDeItem(tx, storeId, cuenta, item, pedida, razon, quien);
+      return `${pedida} de ${item.cantidad} × ${item.nombreProducto} de la mesa ${cuenta.mesa} (quedan ${item.cantidad - pedida})`;
     }, OPCIONES_TX);
   } catch (e) {
     if (e instanceof ErrorDeUsuario) return { ok: false, error: e.message };
@@ -201,7 +314,7 @@ export async function anularProducto(cuentaId: string, itemId: string, motivo: s
     descripcion: `Canceló ${resumen}. Motivo: ${razon}.`,
     entidad: "CuentaMesa",
     entidadId: String(cuentaId),
-    detalle: { producto: resumen, motivo: razon },
+    detalle: { producto: resumen, motivo: razon, cancelada, habia },
   });
   refrescar();
   return { ok: true };

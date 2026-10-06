@@ -25,8 +25,10 @@ import {
  *
  *  - La cuenta original conserva su nombre ("Mesa 1") y su número; las nuevas se llaman "1-A", "1-B"… (cuenta propia, con su
  *    propio número correlativo, su descuento y, más adelante, su venta y su comprobante).
- *  - Todas quedan "abiertas", sin imprimir: sus totales cambiaron, así que hay que imprimir cada una antes de cobrarla (la
- *    regla de siempre: se cobra después de imprimir). Lo que quedó en la cola sin imprimir de la cuenta original se descarta.
+ *  - Solo se divide una cuenta ABIERTA: una vez impresa (por cobrar) ya se le entregó al cliente con su total y hay que
+ *    reabrirla primero. Todas las cuentas resultantes quedan "abiertas", sin imprimir: sus totales cambiaron, así que hay que
+ *    imprimir cada una antes de cobrarla (la regla de siempre). Un ticket de la cuenta original que quedó sin imprimir en la
+ *    cola (de antes de reabrirla) se descarta.
  *  - El stock no se toca: ya bajó cuando se envió cada pedido. Lo que descontó cada línea (`consumo`) se reparte junto con
  *    ella, para que cancelar después una parte devuelva solo lo que le corresponde.
  *
@@ -97,14 +99,17 @@ export async function dividirCuenta(cuentaId: string, datos: DatosDivision): Pro
         where: { id: String(cuentaId), storeId, estado: { in: [...ESTADOS_CUENTA_ABIERTA] } },
       });
       if (!cuenta) throw new ErrorDeUsuario("Esa cuenta ya está cerrada.");
+      // Una cuenta impresa ya se le entregó al cliente con su total: no se divide. Para dividirla hay que reabrirla.
+      if (cuenta.estado !== "abierta") {
+        throw new ErrorDeUsuario("La cuenta ya está impresa: no se puede dividir. Reabrila y volvé a dividirla.");
+      }
 
-      // La cuenta vuelve a "abierta" y sin imprimir: su total cambia, así que hay que imprimirla de nuevo antes de cobrarla. Se hace
-      // primero y con el estado en la condición: toma la fila y, si la cobraron en el mismo instante, acá no encuentra nada.
+      // Se toma la fila con el estado en la condición: si la imprimieron o la cobraron en el mismo instante, acá no encuentra nada.
       const tomada = await tx.cuentaMesa.updateMany({
-        where: { id: cuenta.id, storeId, estado: { in: [...ESTADOS_CUENTA_ABIERTA] } },
-        data: { estado: "abierta", impresaEn: null, impresaPor: null },
+        where: { id: cuenta.id, storeId, estado: "abierta" },
+        data: { estado: "abierta" },
       });
-      if (tomada.count !== 1) throw new ErrorDeUsuario("Esa cuenta ya está cerrada.");
+      if (tomada.count !== 1) throw new ErrorDeUsuario("La cuenta cambió mientras la dividías (se imprimió o se cerró). Actualizá la pantalla.");
 
       const filas = await tx.itemCuentaMesa.findMany({
         where: { cuentaId: cuenta.id, storeId, estado: "activo" },
