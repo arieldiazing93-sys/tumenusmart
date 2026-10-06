@@ -12,6 +12,7 @@ import { BotonEnviar } from "@/components/BotonEnviar";
 import { IconoWhatsapp } from "@/components/iconos";
 import { METODOS_PAGO_PEDIDO, type MetodoPagoPedido } from "@/lib/metodos-pago";
 import { crearPedido } from "./actions";
+import { guardarDatosFacturaCliente } from "@/lib/factura-cliente-sesion";
 
 // Leaflet usa `window`, así que el mapa se carga solo en el navegador.
 const MapPicker = dynamic(
@@ -190,10 +191,9 @@ export function CheckoutForm({
         clienteLng: tipoEntrega === "delivery" ? clienteLng ?? undefined : undefined,
         direccion: tipoEntrega === "delivery" ? direccion : undefined,
         metodoPagoReferencia: metodoPago,
+        // Solo "ticket" o "factura": la razón social, el RUC y el correo NO se mandan al servidor (no se guardan): van en el
+        // mensaje de WhatsApp y la caja los carga a mano.
         comprobanteTipo,
-        facturaRazonSocial: comprobanteTipo === "factura" ? facturaRazonSocial : undefined,
-        facturaRuc: comprobanteTipo === "factura" ? facturaRuc : undefined,
-        facturaEmail: comprobanteTipo === "factura" ? facturaEmail || undefined : undefined,
         // Solo qué eligió el cliente. El precio, el nombre y los textos de
         // la comanda los arma el servidor leyendo la carta: si viajaran desde
         // acá, cualquiera los cambia antes de que salgan.
@@ -214,6 +214,15 @@ export function CheckoutForm({
         fallar(resultado.error);
         setEnviando(false);
         return;
+      }
+      // Los datos de factura se quedan en ESTE navegador (no se guardaron) para que la pantalla siguiente los agregue al
+      // mensaje de WhatsApp.
+      if (comprobanteTipo === "factura") {
+        guardarDatosFacturaCliente(resultado.orderId, {
+          razonSocial: facturaRazonSocial.trim(),
+          ruc: facturaRuc.trim(),
+          email: facturaEmail.trim() || undefined,
+        });
       }
       vaciarCarrito();
       router.push(`/${slug}/pedido/${resultado.orderId}`);
@@ -290,6 +299,10 @@ export function CheckoutForm({
                   placeholder="nombre@correo.com"
                 />
               </Campo>
+              <p className="text-[0.78rem] leading-snug text-tinta-media">
+                Estos datos no se guardan en el sistema: van en el mensaje de WhatsApp que vas a enviar al local, y ahí los
+                revisan y cargan uno por uno para que la factura salga sin errores. Revisalos bien antes de enviar.
+              </p>
             </div>
           )}
         </Tarjeta>

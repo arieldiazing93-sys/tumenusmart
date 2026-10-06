@@ -520,6 +520,14 @@ export default async function AdminPedidosPage({
                             {pedido.facturaNumero}
                           </span>
                         )}
+                        {pedido.facturaPedida && !pedido.facturaNumero && pedido.estado !== "cancelado" && (
+                          <span
+                            title="El cliente pidió factura: falta cargar sus datos a mano y emitirla"
+                            className="mt-0.5 block text-[10px] font-bold uppercase text-amarillo-oscuro"
+                          >
+                            Factura pendiente
+                          </span>
+                        )}
                         {pedido.origen === "telefono" && (
                           <span
                             title="Lo cargó una persona del local porque el cliente llamó por teléfono"

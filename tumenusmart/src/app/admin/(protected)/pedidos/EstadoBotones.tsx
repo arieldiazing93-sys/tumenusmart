@@ -19,6 +19,7 @@ export function EstadoBotones({
   comprobanteTipo,
   facturaNumero,
   facturaAnulada,
+  facturaPendiente,
   nombreImpresoraTicket,
   impresorasPorArea,
 }: {
@@ -31,6 +32,8 @@ export function EstadoBotones({
   comprobanteTipo: string;
   facturaNumero: string | null;
   facturaAnulada: boolean;
+  /** El cliente pidió factura en la carta y todavía no se emitió: no se despacha ni se entrega hasta emitirla (o dejarla sin factura). */
+  facturaPendiente: boolean;
   /** Impresora QZ Tray para el ticket/factura, en esta estación — null = sin configurar, cae al manual. */
   nombreImpresoraTicket: string | null;
   /** Mapa Área de Impresión → impresora QZ Tray, en esta estación. */
@@ -148,9 +151,19 @@ export function EstadoBotones({
     });
   }
 
+  // Con la factura pedida y sin emitir, el delivery no sale y nada se entrega (el servidor lo exige igual).
+  const bloqueadoPorFactura = (estado: string) =>
+    facturaPendiente &&
+    estadoActual !== estado &&
+    (estado === "entregado" || (estado === "en_despacho" && tipoEntrega === "delivery"));
+
   function handleClick(estado: string) {
     setError(null);
     setAviso(null);
+    if (bloqueadoPorFactura(estado)) {
+      setError("El cliente pidió factura: emitila con “Emitir factura” (en el cuadro amarillo de abajo) o entregá el pedido sin factura.");
+      return;
+    }
     if (estado === "en_despacho" && faltaRepartidor) {
       setError("Asigná un repartidor antes de pasar el pedido a \"En despacho\".");
       return;
@@ -186,13 +199,20 @@ export function EstadoBotones({
       <div className="flex flex-wrap gap-2">
         {ESTADOS_PEDIDO.map((e) => {
           const activo = estadoActual === e.value;
-          const bloqueado = e.value === "en_despacho" && faltaRepartidor;
+          const sinFactura = bloqueadoPorFactura(e.value);
+          const bloqueado = (e.value === "en_despacho" && faltaRepartidor) || sinFactura;
           return (
             <button
               key={e.value}
               type="button"
               disabled={pending}
-              title={bloqueado ? "Asigná un repartidor primero" : undefined}
+              title={
+                sinFactura
+                  ? "Primero emití la factura que pidió el cliente"
+                  : bloqueado
+                    ? "Asigná un repartidor primero"
+                    : undefined
+              }
               onClick={() => handleClick(e.value)}
               className={`rounded-full border px-3 py-1.5 text-sm font-medium disabled:opacity-50 ${
                 activo
@@ -209,6 +229,12 @@ export function EstadoBotones({
       </div>
       {error && <p className="mt-2 text-sm text-peligro">{error}</p>}
       {aviso && !error && <p className="mt-2 text-sm text-aviso">{aviso}</p>}
+      {facturaPendiente && !error && (
+        <p className="mt-2 rounded-lg border border-amarillo/60 bg-amarillo-luz px-3 py-2 text-[0.82rem] font-medium text-amarillo-oscuro">
+          El cliente pidió factura y todavía no se emitió: cargá sus datos a mano con “Emitir factura” (cuadro amarillo de abajo) antes
+          de {tipoEntrega === "delivery" ? "despachar" : "entregar"} el pedido.
+        </p>
+      )}
       {faltaRepartidor && !error && (
         <p className="mt-2 rounded-lg border border-amarillo/60 bg-amarillo-luz px-3 py-2 text-[0.82rem] font-medium text-amarillo-oscuro">
           Este pedido es delivery y todavía no tiene repartidor asignado: elegilo en el cuadro amarillo de abajo.

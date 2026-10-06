@@ -20,6 +20,11 @@ type DatosMensaje = {
   clienteLng?: number | null;
   metodoPagoReferencia: string;
   comprobanteTipo?: string | null;
+  /**
+   * El cliente pidió factura desde la carta: el mensaje dice "Comprobante: Factura" y los datos (razón social, RUC, correo)
+   * los agrega el navegador del cliente, que es el único que los tiene (no se guardan en el pedido). Ver `factura-cliente-sesion.ts`.
+   */
+  facturaPedida?: boolean;
   facturaRazonSocial?: string | null;
   facturaRuc?: string | null;
   facturaEmail?: string | null;
@@ -31,6 +36,9 @@ type DatosMensaje = {
   /** link público donde el cliente sigue el estado del pedido en vivo */
   linkSeguimiento?: string | null;
 };
+
+/** La línea del mensaje que anuncia que el cliente quiere factura; justo debajo van sus datos, si el navegador los tiene. */
+export const MARCA_FACTURA_PEDIDA = "Comprobante: Factura";
 
 /**
  * Arma el texto del pedido, prolijo y legible, tal como lo va a
@@ -49,6 +57,8 @@ export function construirMensajePedido(datos: DatosMensaje): string {
     if (datos.facturaRazonSocial) lineas.push(`Razón social: ${datos.facturaRazonSocial}`);
     if (datos.facturaRuc) lineas.push(`RUC: ${datos.facturaRuc}`);
     if (datos.facturaEmail) lineas.push(`Correo: ${datos.facturaEmail}`);
+  } else if (datos.facturaPedida) {
+    lineas.push(MARCA_FACTURA_PEDIDA);
   }
   lineas.push(`Método de pago: ${etiquetaMetodoPago(datos.metodoPagoReferencia)}`);
 

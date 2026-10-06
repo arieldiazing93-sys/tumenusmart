@@ -2,12 +2,14 @@ import { Volver } from "@/components/Volver";
 import { Pastilla } from "@/components/ui";
 import { notFound } from "next/navigation";
 import { pantallaConPermiso } from "@/lib/auth";
+import { prisma as prismaGlobal } from "@/lib/prisma";
 import { prismaDelLocal } from "@/lib/prisma-local";
 import { idLocalActual } from "@/lib/local-actual";
 import { formatearGuarani, formatearNumero } from "@/lib/format";
 import { etiquetaMetodoPago } from "@/lib/metodos-pago";
 import { SIN_REGISTRO_FISCAL, etiquetaTipoIdentificacion } from "@/lib/tipo-cliente";
 import { EstadoBotones } from "../EstadoBotones";
+import { FacturaPedida } from "../FacturaPedida";
 import { RepartidorSelect } from "../RepartidorSelect";
 import { ZONA_NEGOCIO } from "@/lib/timezone";
 import { estacionActual } from "@/lib/estacion-actual";
@@ -26,7 +28,8 @@ export default async function DetallePedidoPage({
   await pantallaConPermiso("pedidos.ver");
 
   // Todas las consultas de acá abajo quedan atadas a este local.
-  const prisma = prismaDelLocal(await idLocalActual());
+  const storeId = await idLocalActual();
+  const prisma = prismaDelLocal(storeId);
 
   const { id } = await params;
 
@@ -34,7 +37,7 @@ export default async function DetallePedidoPage({
   // — misma cookie de estación que usa el Punto de Venta.
   const estacion = await estacionActual(prisma);
 
-  const [pedido, repartidores, turno, estacionConImpresoras] = await Promise.all([
+  const [pedido, repartidores, turno, estacionConImpresoras, local] = await Promise.all([
     prisma.order.findUnique({
       where: { id },
       include: { items: true, deliveryZone: true, repartidor: true },
@@ -50,6 +53,8 @@ export default async function DetallePedidoPage({
           },
         })
       : Promise.resolve(null),
+    // Store no pertenece a ningún local (no está en MODELOS_POR_LOCAL): se lee con el cliente global.
+    prismaGlobal.store.findUnique({ where: { id: storeId }, select: { facturaObligatoria: true } }),
   ]);
 
   // Impresión automática (QZ Tray) — ver src/lib/impresion-comprobantes.ts.
@@ -61,6 +66,9 @@ export default async function DetallePedidoPage({
     : null;
 
   if (!pedido) notFound();
+
+  // El cliente pidió factura en la carta y la caja todavía no la emitió (sus datos están solo en el WhatsApp).
+  const facturaPendiente = pedido.facturaPedida && !pedido.facturaNumero && pedido.estado !== "cancelado";
 
   return (
     <div>
@@ -121,6 +129,7 @@ export default async function DetallePedidoPage({
           comprobanteTipo={pedido.comprobanteTipo}
           facturaNumero={pedido.facturaNumero}
           facturaAnulada={pedido.facturaAnulada}
+          facturaPendiente={facturaPendiente}
           nombreImpresoraTicket={nombreImpresoraTicket}
           impresorasPorArea={impresorasPorArea}
         />
@@ -171,6 +180,17 @@ export default async function DetallePedidoPage({
             Pago
           </p>
           <p className="text-sm text-tinta">{etiquetaMetodoPago(pedido.metodoPagoReferencia)}</p>
+
+          {/* La factura que pidió el cliente desde la carta: se cargan sus datos a mano y se emite (ver FacturaPedida). */}
+          {pedido.facturaPedida && (
+            <FacturaPedida
+              orderId={pedido.id}
+              numeroPedido={formatearNumero(pedido.numero)}
+              tipoEntrega={pedido.tipoEntrega}
+              facturaObligatoria={local?.facturaObligatoria ?? false}
+              pendiente={facturaPendiente}
+            />
+          )}
 
           {pedido.comprobanteTipo === "factura" && (
             <div className="mt-2.5 rounded bg-aviso-luz px-2 py-1.5 text-sm text-aviso">

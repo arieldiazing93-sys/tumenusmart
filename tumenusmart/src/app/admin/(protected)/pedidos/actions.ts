@@ -2,7 +2,7 @@
 
 import { exigirPermiso } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
-import { prismaDelLocal, type PrismaLocal } from "@/lib/prisma-local";
+import { prismaDelLocal, upsertClienteFiscal, type PrismaLocal } from "@/lib/prisma-local";
 import { prisma as prismaCliente } from "@/lib/prisma";
 import { idLocalActual } from "@/lib/local-actual";
 import { normalizarFormaPagoPos } from "@/lib/turno-pos";
@@ -15,8 +15,10 @@ import {
   descripcionDeItem,
   type DatosNuevoComprobante,
   type ItemFuente,
+  type PuntoParaComprobante,
 } from "@/lib/comprobante";
 import { SIN_REGISTRO_FISCAL } from "@/lib/tipo-cliente";
+import { validarDatosFiscales, type DatosFiscalesManuales } from "@/lib/datos-fiscales";
 import { revertirMovimientosVenta } from "@/lib/movimientos-stock";
 import { registrarBitacora } from "@/lib/bitacora";
 import { formatearGuarani } from "@/lib/format";
@@ -31,6 +33,10 @@ const ESTADOS_VALIDOS = [
   "cancelado",
 ];
 
+/** Lo que se le dice a la caja cuando intenta despachar o entregar un pedido cuya factura pidió el cliente y no se emitió. */
+const TEXTO_FACTURA_PENDIENTE =
+  "El cliente pidió factura: antes de seguir, emitila con “Emitir factura” (cargando a mano los datos que mandó por WhatsApp) o resolvé el pedido sin factura.";
+
 export type ResultadoPedidoAccion =
   | { ok: true; aviso?: string; areasImpresion?: string[] }
   /** `sinTurno`: cobrar el pedido exige el turno de caja abierto; la pantalla manda directo a abrirlo (src/lib/turno-requerido.ts). */
@@ -44,6 +50,8 @@ export type ResultadoPedidoAccion =
 const SELECT_PEDIDO_PARA_FACTURA = {
   tipoEntrega: true,
   comprobanteTipo: true,
+  /** El cliente pidió factura en la carta y la caja todavía no la emitió (ver Order.facturaPedida). */
+  facturaPedida: true,
   facturaNumero: true,
   facturaTipoIdentificacion: true,
   facturaRuc: true,
@@ -66,67 +74,40 @@ const SELECT_PEDIDO_PARA_FACTURA = {
 /** El comprobante listo para guardar; solo falta decir de qué pedido es y quién lo emitió. */
 type ComprobanteAEmitir = Omit<DatosNuevoComprobante, "storeId" | "origen" | "emitidoPor">;
 
+/** Un pedido con lo necesario para armarle la factura (los datos del comprador y las líneas). */
+type PedidoParaEmision = {
+  comprobanteTipo: string;
+  facturaNumero: string | null;
+  tipoEntrega: string;
+  facturaTipoIdentificacion: string | null;
+  facturaRuc: string | null;
+  facturaRazonSocial: string | null;
+  facturaEmail: string | null;
+  items: {
+    productId: string | null;
+    nombreProducto: string;
+    opcionesTexto: string | null;
+    precioUnitario: unknown;
+    cantidad: number;
+    iva: string;
+    product: { unidadMedida: string; esServicio: boolean } | null;
+  }[];
+  /** Costo de envío (delivery), gravado al 10% igual que cualquier
+   *  servicio — si no se suma acá, Gravadas+Exentas queda por debajo del
+   *  total real del pedido en la factura impresa. */
+  costoEnvio?: unknown;
+};
+
 /**
- * Si este pedido pidió factura y todavía no se le emitió número, intenta
- * emitirlo con el punto de expedición de la estación vinculada a ESTA
- * computadora (mismo mecanismo de cookie que usa el Punto de Venta — sin
- * turno de caja de por medio, acá solo hace falta el punto de expedición
- * para numerar).
- *
- * Nunca lanza ni bloquea el cambio de estado: si no hay estación vinculada,
- * o su punto de expedición no está asignado o está vencido, el pedido sigue
- * avanzando igual como comprobante informal — pero devuelve un aviso para
- * que quien hizo el cambio sepa que no salió una factura de verdad.
+ * Lo que sale de emitir la factura de un pedido con el número de factura ya tomado: los datos que se guardan en el pedido y su
+ * Comprobante (la foto fiscal). Lo comparten la emisión al cambiar de estado (`intentarEmitirFactura`) y la que hace la caja con
+ * "Emitir factura" (`emitirFacturaPedido`), así las dos dan exactamente la misma factura.
  */
-async function intentarEmitirFactura(
-  prisma: PrismaLocal,
-  pedido: {
-    comprobanteTipo: string;
-    facturaNumero: string | null;
-    tipoEntrega: string;
-    facturaTipoIdentificacion: string | null;
-    facturaRuc: string | null;
-    facturaRazonSocial: string | null;
-    facturaEmail: string | null;
-    items: {
-      productId: string | null;
-      nombreProducto: string;
-      opcionesTexto: string | null;
-      precioUnitario: unknown;
-      cantidad: number;
-      iva: string;
-      product: { unidadMedida: string; esServicio: boolean } | null;
-    }[];
-    /** Costo de envío (delivery), gravado al 10% igual que cualquier
-     *  servicio — si no se suma acá, Gravadas+Exentas queda por debajo del
-     *  total real del pedido en la factura impresa. */
-    costoEnvio?: unknown;
-  }
-): Promise<{ datos: Record<string, unknown>; aviso?: string; comprobante?: ComprobanteAEmitir }> {
-  if (pedido.comprobanteTipo !== "factura" || pedido.facturaNumero) {
-    // No pidió factura, o ya se emitió antes (idempotencia: nunca quema un
-    // segundo número para el mismo pedido).
-    return { datos: {} };
-  }
-
-  const estacion = await estacionActual(prisma);
-  const conPunto = estacion
-    ? await prisma.estacion.findUnique({ where: { id: estacion.id }, select: { puntoExpedicion: true } })
-    : null;
-  const pe = conPunto?.puntoExpedicion;
-  if (!pe || !pe.activo || pe.timbradoHasta < new Date()) {
-    return {
-      datos: {},
-      aviso:
-        "El cliente pidió factura, pero esta computadora no tiene un punto de expedición vigente — se imprime como comprobante informal, no como factura.",
-    };
-  }
-
-  const peActualizado = await prisma.puntoExpedicion.update({
-    where: { id: pe.id },
-    data: { ultimoNumeroFactura: { increment: 1 } },
-    select: { ultimoNumeroFactura: true },
-  });
+function armarEmisionDePedido(
+  pedido: PedidoParaEmision,
+  pe: PuntoParaComprobante,
+  correlativo: number
+): { datos: Record<string, unknown>; comprobante: ComprobanteAEmitir } {
   // pedido.items.precioUnitario llega como Decimal de Prisma — desglosarIva
   // pide number. El envío entra como una línea más, gravada al 10%.
   const lineas = pedido.items.map((i) => ({
@@ -167,7 +148,7 @@ async function intentarEmitirFactura(
   return {
     comprobante: {
       punto: pe,
-      correlativo: peActualizado.ultimoNumeroFactura,
+      correlativo,
       receptor: {
         tipoIdentificacion: pedido.facturaTipoIdentificacion ?? "ruc",
         numeroIdentificacion: pedido.facturaRuc ?? SIN_REGISTRO_FISCAL.numero,
@@ -181,7 +162,7 @@ async function intentarEmitirFactura(
       descuento: 0,
     },
     datos: {
-      facturaNumero: formatearNumeroFactura(pe.establecimiento, pe.puntoExpedicion, peActualizado.ultimoNumeroFactura),
+      facturaNumero: formatearNumeroFactura(pe.establecimiento, pe.puntoExpedicion, correlativo),
       facturaTimbrado: pe.numeroTimbrado,
       facturaVencimiento: pe.timbradoHasta,
       facturaGravado10: desglose.gravado10,
@@ -193,6 +174,49 @@ async function intentarEmitirFactura(
       facturaRucEmisor: pe.rucEmisor,
     },
   };
+}
+
+/**
+ * Si este pedido pidió factura y todavía no se le emitió número, intenta
+ * emitirlo con el punto de expedición de la estación vinculada a ESTA
+ * computadora (mismo mecanismo de cookie que usa el Punto de Venta — sin
+ * turno de caja de por medio, acá solo hace falta el punto de expedición
+ * para numerar).
+ *
+ * Nunca lanza ni bloquea el cambio de estado: si no hay estación vinculada,
+ * o su punto de expedición no está asignado o está vencido, el pedido sigue
+ * avanzando igual como comprobante informal — pero devuelve un aviso para
+ * que quien hizo el cambio sepa que no salió una factura de verdad.
+ */
+async function intentarEmitirFactura(
+  prisma: PrismaLocal,
+  pedido: PedidoParaEmision
+): Promise<{ datos: Record<string, unknown>; aviso?: string; comprobante?: ComprobanteAEmitir }> {
+  if (pedido.comprobanteTipo !== "factura" || pedido.facturaNumero) {
+    // No pidió factura, o ya se emitió antes (idempotencia: nunca quema un
+    // segundo número para el mismo pedido).
+    return { datos: {} };
+  }
+
+  const estacion = await estacionActual(prisma);
+  const conPunto = estacion
+    ? await prisma.estacion.findUnique({ where: { id: estacion.id }, select: { puntoExpedicion: true } })
+    : null;
+  const pe = conPunto?.puntoExpedicion;
+  if (!pe || !pe.activo || pe.timbradoHasta < new Date()) {
+    return {
+      datos: {},
+      aviso:
+        "El cliente pidió factura, pero esta computadora no tiene un punto de expedición vigente — se imprime como comprobante informal, no como factura.",
+    };
+  }
+
+  const peActualizado = await prisma.puntoExpedicion.update({
+    where: { id: pe.id },
+    data: { ultimoNumeroFactura: { increment: 1 } },
+    select: { ultimoNumeroFactura: true },
+  });
+  return armarEmisionDePedido(pedido, pe, peActualizado.ultimoNumeroFactura);
 }
 
 /**
@@ -313,6 +337,11 @@ export async function cambiarEstadoPedido(
         error: 'Asigná un repartidor antes de pasar el pedido a "En despacho".',
       };
     }
+    // Si el cliente pidió factura en la carta, sus datos los carga la caja a mano (ver emitirFacturaPedido): sin factura
+    // emitida el repartidor no sale — la de un delivery tiene que estar lista antes de que se vaya.
+    if (pedido?.tipoEntrega === "delivery" && pedido.facturaPedida && !pedido.facturaNumero) {
+      return { ok: false, error: TEXTO_FACTURA_PENDIENTE };
+    }
     // La factura de un delivery tiene que estar impresa ANTES de que el
     // repartidor se vaya — a "entregado" ya llega tarde, para entonces se
     // fue sin el papel. Retiro/mesa se numera más abajo, al entregar.
@@ -342,6 +371,10 @@ export async function cambiarEstadoPedido(
       },
     });
     if (pedido && pedido.estado !== "entregado") {
+      // Igual que al despachar: con factura pedida por el cliente y todavía sin emitir, no se entrega ni se cobra.
+      if (pedido.facturaPedida && !pedido.facturaNumero) {
+        return { ok: false, error: TEXTO_FACTURA_PENDIENTE };
+      }
       if (pedido.tipoEntrega === "delivery") {
         // Lo normal es que esto lo confirme el repartidor desde su propia
         // pantalla (marcarPedidoEntregado, src/app/repartidor/[id]/actions.ts).
@@ -475,5 +508,209 @@ export async function asignarRepartidor(
   });
   revalidatePath("/admin/pedidos");
   revalidatePath(`/admin/pedidos/${orderId}`);
+  return { ok: true };
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+// Factura de los pedidos de la carta digital: se carga y se emite A MANO.
+//
+// El cliente escribe su razón social y su RUC en el checkout, pero esos datos NO se guardan: van solo en el mensaje de
+// WhatsApp. La caja los consulta en la DNIT, los tipea acá y emite la factura (el único error posible es de tipeo de la
+// caja, no del cliente apurado). Mientras el pedido siga con la factura pedida y sin emitir, no pasa a despacho ni a entregado.
+
+/** Lo que manda la pantalla "Emitir factura": los datos del comprador tal como los tipeó la caja. */
+export type DatosEmitirFactura = DatosFiscalesManuales & {
+  /** La persona confirmó que revisó la razón social y el RUC en la consulta de la DNIT. */
+  verificadoEnDnit?: boolean;
+};
+
+export type ResultadoEmitirFactura =
+  | { ok: true; numero: string }
+  | { ok: false; error: string; dvDistinto?: { esperado: number } };
+
+/** Un motivo para frenar la emisión que la persona puede entender (se muestra tal cual). */
+class ErrorDeEmision extends Error {}
+
+/**
+ * Emite la factura de un pedido con los datos que cargó la caja. Todo en una sola transacción: se toma el pedido (si otra
+ * persona lo emitió o se canceló en el mismo instante, acá no se emite nada), se consume el número del punto de expedición de
+ * ESTA computadora, se guardan el comprador y el Comprobante. Valida todo de nuevo en el servidor: lo que llega de la pantalla
+ * nunca se da por bueno.
+ */
+export async function emitirFacturaPedido(orderId: string, datos: DatosEmitirFactura): Promise<ResultadoEmitirFactura> {
+  const sesion = await exigirPermiso("pedidos.cambiarEstado");
+  const storeId = await idLocalActual();
+  const prisma = prismaDelLocal(storeId);
+  const id = String(orderId);
+
+  if (!datos || typeof datos !== "object") return { ok: false, error: "Faltan los datos de la factura." };
+  if (datos.modo === "con_registro" && datos.verificadoEnDnit !== true) {
+    return { ok: false, error: "Marcá que revisaste la razón social y el RUC en la consulta de la DNIT." };
+  }
+  const v = validarDatosFiscales(datos);
+  if (!v.ok) return { ok: false, error: v.error, dvDistinto: v.dvDistinto };
+
+  const pedido = await prisma.order.findUnique({
+    where: { id },
+    select: { numero: true, estado: true, ...SELECT_PEDIDO_PARA_FACTURA },
+  });
+  if (!pedido) return { ok: false, error: "No encontré ese pedido." };
+  if (pedido.estado === "cancelado") return { ok: false, error: "Ese pedido está cancelado: no se le emite factura." };
+  if (pedido.facturaNumero) return { ok: false, error: `Ese pedido ya tiene la factura N° ${pedido.facturaNumero}.` };
+  if (!pedido.facturaPedida && pedido.comprobanteTipo !== "factura") {
+    return { ok: false, error: "Ese pedido no pidió factura." };
+  }
+
+  // La factura sale con el punto de expedición de la estación vinculada a ESTA computadora. Acá no hay "comprobante informal"
+  // de salida: si la caja pidió emitir, tiene que salir un número real.
+  const estacion = await estacionActual(prisma);
+  const conPunto = estacion
+    ? await prisma.estacion.findUnique({ where: { id: estacion.id }, select: { puntoExpedicion: true } })
+    : null;
+  const pe = conPunto?.puntoExpedicion;
+  if (!pe || !pe.activo || pe.timbradoHasta < new Date()) {
+    return {
+      ok: false,
+      error:
+        "Esta computadora no tiene un punto de expedición vigente: la factura se emite desde la caja con su estación vinculada (Estaciones del punto de venta).",
+    };
+  }
+
+  const identidad = sesion.nombre?.trim() || sesion.email;
+  const comprador = v.datos;
+  let numeroFactura = "";
+  try {
+    numeroFactura = await prismaCliente.$transaction(
+      async (tx) => {
+        // Se toma el pedido primero, con la condición en el WHERE: dos cajas emitiendo a la vez, o un pedido cancelado en el
+        // mismo instante, no generan una segunda factura ni queman un número.
+        const tomado = await tx.order.updateMany({
+          where: { id, storeId, facturaNumero: null, estado: { not: "cancelado" } },
+          data: { comprobanteTipo: "factura" },
+        });
+        if (tomado.count !== 1) {
+          throw new ErrorDeEmision("Ese pedido ya tiene factura o se canceló mientras la cargabas. Actualizá la pantalla.");
+        }
+        if (comprador.razonSocial) {
+          await upsertClienteFiscal(tx, storeId, {
+            tipoIdentificacion: comprador.tipoIdentificacion,
+            numeroIdentificacion: comprador.numeroIdentificacion,
+            razonSocial: comprador.razonSocial,
+            email: comprador.email ?? "",
+          });
+        }
+        // Atómico: se incrementa PRIMERO y se usa el valor ya incrementado.
+        const peActualizado = await tx.puntoExpedicion.update({
+          where: { id: pe.id },
+          data: { ultimoNumeroFactura: { increment: 1 } },
+          select: { ultimoNumeroFactura: true },
+        });
+        const emision = armarEmisionDePedido(
+          {
+            ...pedido,
+            comprobanteTipo: "factura",
+            facturaTipoIdentificacion: comprador.tipoIdentificacion,
+            facturaRuc: comprador.numeroIdentificacion,
+            facturaRazonSocial: comprador.razonSocial,
+            facturaEmail: comprador.email,
+          },
+          pe,
+          peActualizado.ultimoNumeroFactura
+        );
+        await tx.order.update({
+          where: { id, storeId },
+          data: {
+            comprobanteTipo: "factura",
+            facturaTipoIdentificacion: comprador.tipoIdentificacion,
+            facturaRuc: comprador.numeroIdentificacion,
+            facturaRazonSocial: comprador.razonSocial,
+            facturaEmail: comprador.email,
+            ...emision.datos,
+          },
+        });
+        await crearComprobante(tx, { ...emision.comprobante, storeId, origen: { orderId: id }, emitidoPor: identidad });
+        return String(emision.datos.facturaNumero);
+      },
+      { timeout: 15_000, maxWait: 10_000 }
+    );
+  } catch (e) {
+    if (e instanceof ErrorDeEmision) return { ok: false, error: e.message };
+    console.error("[pedidos] emitirFacturaPedido falló", e);
+    return { ok: false, error: "No se pudo emitir la factura. No se consumió ningún número: probá de nuevo." };
+  }
+
+  await registrarBitacora(storeId, sesion, {
+    modulo: "pedidos",
+    accion: "factura_emitida_a_mano",
+    descripcion: `Emitió la factura N° ${numeroFactura} del pedido #${String(pedido.numero).padStart(4, "0")} a ${
+      comprador.razonSocial ?? SIN_REGISTRO_FISCAL.etiquetaDisplay
+    } (${comprador.tipoIdentificacion} ${comprador.numeroIdentificacion}), con los datos cargados a mano${
+      datos.modo === "con_registro" ? " y revisados en la DNIT" : ""
+    }.`,
+    entidad: "Order",
+    entidadId: id,
+    detalle: {
+      pedido: pedido.numero,
+      factura: numeroFactura,
+      tipoIdentificacion: comprador.tipoIdentificacion,
+      numeroIdentificacion: comprador.numeroIdentificacion,
+      razonSocial: comprador.razonSocial,
+      verificadoEnDnit: datos.modo === "con_registro",
+      dvConfirmadoALaMano: datos.dvConfirmado === true,
+    },
+  });
+  revalidatePath("/admin/pedidos");
+  revalidatePath(`/admin/pedidos/${id}`);
+  revalidatePath("/admin/facturas");
+  return { ok: true, numero: numeroFactura };
+}
+
+/**
+ * La alternativa a emitir: el cliente pidió factura pero no la quiere o no se la puede hacer (se arrepintió, no tiene los datos).
+ * El pedido sigue como ticket. Pide motivo y queda en la bitácora. En un local que factura TODAS las ventas no se puede: ahí
+ * la salida es emitirla "sin nombre".
+ */
+export async function resolverPedidoSinFactura(orderId: string, motivo: string): Promise<ResultadoPedidoAccion> {
+  const sesion = await exigirPermiso("pedidos.cambiarEstado");
+  const storeId = await idLocalActual();
+  const prisma = prismaDelLocal(storeId);
+  const id = String(orderId);
+
+  const razon = String(motivo ?? "").trim();
+  if (razon.length < 3) return { ok: false, error: "Decí por qué se entrega sin factura (al menos 3 letras): queda en el historial." };
+
+  // Store no pertenece a ningún local (no está en MODELOS_POR_LOCAL): se lee con el cliente global.
+  const local = await prismaCliente.store.findUnique({ where: { id: storeId }, select: { facturaObligatoria: true } });
+  if (local?.facturaObligatoria) {
+    return {
+      ok: false,
+      error: "Este local factura todas las ventas: no puede quedar sin factura. Emitila con los datos del cliente o “sin nombre”.",
+    };
+  }
+
+  const pedido = await prisma.order.findUnique({
+    where: { id },
+    select: { numero: true, facturaPedida: true, facturaNumero: true },
+  });
+  if (!pedido) return { ok: false, error: "No encontré ese pedido." };
+  if (pedido.facturaNumero) return { ok: false, error: `Ese pedido ya tiene la factura N° ${pedido.facturaNumero}.` };
+  if (!pedido.facturaPedida) return { ok: false, error: "Ese pedido no tenía una factura pendiente." };
+
+  const cambiado = await prismaCliente.order.updateMany({
+    where: { id, storeId, facturaNumero: null, facturaPedida: true },
+    data: { facturaPedida: false, comprobanteTipo: "ticket" },
+  });
+  if (cambiado.count !== 1) return { ok: false, error: "El pedido cambió mientras tanto. Actualizá la pantalla." };
+
+  await registrarBitacora(storeId, sesion, {
+    modulo: "pedidos",
+    accion: "factura_pedida_descartada",
+    descripcion: `Dejó el pedido #${String(pedido.numero).padStart(4, "0")} sin factura aunque el cliente la había pedido. Motivo: ${razon}.`,
+    entidad: "Order",
+    entidadId: id,
+    detalle: { pedido: pedido.numero, motivo: razon },
+  });
+  revalidatePath("/admin/pedidos");
+  revalidatePath(`/admin/pedidos/${id}`);
   return { ok: true };
 }

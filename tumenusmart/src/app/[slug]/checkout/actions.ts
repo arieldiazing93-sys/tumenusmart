@@ -27,10 +27,12 @@ export type DatosCheckout = {
   clienteLng?: number;
   direccion?: string;
   metodoPagoReferencia: string;
+  /**
+   * Si el cliente quiere ticket o factura. Para factura el formulario le pide razón social y RUC, pero esos datos NO viajan al
+   * servidor ni se guardan: van solo en el mensaje de WhatsApp, y la caja los carga a mano (tras consultarlos en la DNIT) con
+   * "Emitir factura". Así un dato mal escrito por apuro nunca llega a una factura.
+   */
   comprobanteTipo: "ticket" | "factura";
-  facturaRazonSocial?: string;
-  facturaRuc?: string;
-  facturaEmail?: string;
   notas?: string;
   /**
    * Qué eligió el cliente: identificadores y cantidades, nada más. Los
@@ -50,7 +52,7 @@ export type DatosCheckout = {
 export type ResultadoPedido = { ok: true; orderId: string } | { ok: false; error: string };
 
 /** Largos máximos de los textos libres, para que no entre una novela en la comanda. */
-const LARGO = { nombre: 80, telefono: 30, direccion: 200, notas: 500, razonSocial: 120, ruc: 30, email: 120 };
+const LARGO = { nombre: 80, telefono: 30, direccion: 200, notas: 500 };
 
 function recortar(valor: string | undefined, max: number): string | undefined {
   const limpio = valor?.trim();
@@ -159,12 +161,6 @@ export async function crearPedido(datos: DatosCheckout): Promise<ResultadoPedido
   const clienteLng = coordenadasValidas ? datos.clienteLng : undefined;
   if (datos.tipoEntrega === "delivery" && (clienteLat == null || clienteLng == null)) {
     return { ok: false, error: "Marcá tu ubicación en el mapa para poder entregarte el pedido" };
-  }
-  if (
-    datos.comprobanteTipo === "factura" &&
-    (!datos.facturaRazonSocial?.trim() || !datos.facturaRuc?.trim())
-  ) {
-    return { ok: false, error: "Para factura hacen falta la razón social y el RUC" };
   }
 
   // ---------------------------------------------------------------- el precio
@@ -365,7 +361,10 @@ export async function crearPedido(datos: DatosCheckout): Promise<ResultadoPedido
   // src/app/[slug]/pedido/[id]/page.tsx, que tiene que seguir pareciendo un
   // ticket para que esta transparencia sea real).
   const facturaComoTicket = datos.comprobanteTipo === "ticket" && local.facturaObligatoria;
-  const comprobanteTipoFinal = facturaComoTicket ? "factura" : datos.comprobanteTipo;
+  // Si el cliente pidió factura NO se emite sola ni se guardan sus datos: el pedido nace como ticket con la marca
+  // `facturaPedida`, y la caja carga los datos a mano y la emite (ver emitirFacturaPedido). Hasta entonces no se despacha.
+  const pideFactura = datos.comprobanteTipo === "factura";
+  const comprobanteTipoFinal = facturaComoTicket ? "factura" : "ticket";
 
   // En una transacción a partir de acá: si el pedido se crea, el descuento
   // de stock de su receta tiene que quedar creado de yapa, nunca a medias.
@@ -384,22 +383,12 @@ export async function crearPedido(datos: DatosCheckout): Promise<ResultadoPedido
         clienteLng,
         metodoPagoReferencia: metodoPago,
         comprobanteTipo: comprobanteTipoFinal,
-        // Con RUC real el checkout público no pide tipo — se guarda "ruc" fijo,
-        // solo para que el ticket sepa qué etiqueta imprimir después (ver
-        // src/lib/tipo-cliente.ts).
-        facturaTipoIdentificacion:
-          comprobanteTipoFinal === "factura" ? (facturaComoTicket ? SIN_REGISTRO_FISCAL.tipo : "ruc") : undefined,
-        facturaRazonSocial: facturaComoTicket
-          ? null
-          : datos.comprobanteTipo === "factura"
-            ? recortar(datos.facturaRazonSocial, LARGO.razonSocial)
-            : undefined,
-        facturaRuc: facturaComoTicket
-          ? SIN_REGISTRO_FISCAL.numero
-          : datos.comprobanteTipo === "factura"
-            ? recortar(datos.facturaRuc, LARGO.ruc)
-            : undefined,
-        facturaEmail: datos.comprobanteTipo === "factura" ? recortar(datos.facturaEmail, LARGO.email) : undefined,
+        facturaPedida: pideFactura,
+        // Solo la conversión a "Sin Nombre" (el local factura todo y el cliente eligió ticket) lleva datos fiscales: no hay
+        // nada que tipear. Los datos de un cliente que pidió factura no se guardan (ver arriba).
+        facturaTipoIdentificacion: facturaComoTicket ? SIN_REGISTRO_FISCAL.tipo : undefined,
+        facturaRazonSocial: facturaComoTicket ? null : undefined,
+        facturaRuc: facturaComoTicket ? SIN_REGISTRO_FISCAL.numero : undefined,
         notas: recortar(datos.notas, LARGO.notas),
         subtotal,
         costoEnvio,

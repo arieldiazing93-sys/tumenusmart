@@ -62,6 +62,8 @@ export default async function SeguimientoPedidoPage({
     clienteLng: order.clienteLng,
     metodoPagoReferencia: order.metodoPagoReferencia,
     comprobanteTipo: esConversionTransparente ? "ticket" : order.comprobanteTipo,
+    // Pidió factura desde la carta: el mensaje lo dice y el navegador del cliente le agrega sus datos (no se guardan acá).
+    facturaPedida: order.facturaPedida,
     facturaRazonSocial: order.facturaRazonSocial,
     facturaRuc: order.facturaRuc,
     facturaEmail: order.facturaEmail,
