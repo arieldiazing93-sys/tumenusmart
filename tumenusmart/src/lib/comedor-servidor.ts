@@ -8,10 +8,12 @@ import { ZONA_NEGOCIO } from "@/lib/timezone";
 import {
   ESTADOS_CUENTA_ABIERTA,
   agruparPorArea,
+  claveDeLinea,
   claveDeMesa,
   contenidoParaGuardar,
   descuentoDeCuenta,
   normalizarNota,
+  sumarLineasIguales,
   textoComanda,
   textoCuenta,
   totalDeLineas,
@@ -461,12 +463,16 @@ export async function encolarCuenta(
           mozo: nombreMozo,
           hora: horaDeAhora(),
           divididaDe: cuenta.mesaBase,
-          lineas: cuenta.items.map((i) => ({
-            cantidad: i.cantidad,
-            nombre: i.nombreProducto,
-            opciones: i.opcionesTexto,
-            precioUnitario: Number(i.precioUnitario),
-          })),
+          // El mismo producto cargado en varios pedidos sale en una sola línea (lo mismo que se cobra y se factura).
+          lineas: sumarLineasIguales(
+            cuenta.items.map((i) => ({
+              cantidad: i.cantidad,
+              nombre: i.nombreProducto,
+              opciones: i.opcionesTexto,
+              precioUnitario: Number(i.precioUnitario),
+            })),
+            (l) => claveDeLinea({ nombre: l.nombre, opciones: l.opciones, precioUnitario: l.precioUnitario }, false)
+          ),
           totales,
         })
       ),

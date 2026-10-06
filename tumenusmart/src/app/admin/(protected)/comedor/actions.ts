@@ -21,6 +21,8 @@ import { formatearCantidad, formatearGuarani, formatearNumero } from "@/lib/form
 import { repartirConsumo } from "@/lib/division-cuenta";
 import {
   ESTADOS_CUENTA_ABIERTA,
+  claveDeLinea,
+  sumarLineasIguales,
   contenidoParaGuardar,
   descuentoDeCuenta,
   leerConsumoGuardado,
@@ -259,18 +261,45 @@ async function anularParteDeItem(
  * unidades enteras; un producto que quedó con una fracción (0,5, por haber dividido la cuenta en partes iguales) se cancela entero.
  */
 export async function anularProducto(cuentaId: string, itemId: string, motivo: string, cantidad?: number): Promise<Resultado> {
+  // El permiso se pide acá también (aunque `anularProductos` lo vuelve a pedir): cada acción del servidor se protege a sí misma.
+  await exigirPermiso("comedor.gestionar");
+  return anularProductos(cuentaId, [{ itemId, cantidad }], motivo);
+}
+
+/**
+ * Cancela de una sola vez varias partes de la cuenta, con UN motivo: lo que pasa cuando el mismo producto se cargó en varios
+ * pedidos y la pantalla lo muestra en una sola fila (3 parrilladas = 1 del pedido 1 + 2 del pedido 2). Cada parte es un producto
+ * de la cuenta y cuántas unidades se cancelan de él (sin `cantidad`, todo). Todo ocurre en una transacción: si una parte falla,
+ * no se cancela ninguna. Mismas reglas que `anularProducto`: solo unidades enteras, salvo un producto con fracción (se cancela entero).
+ */
+export async function anularProductos(
+  cuentaId: string,
+  partes: { itemId: string; cantidad?: number }[],
+  motivo: string
+): Promise<Resultado> {
   const sesion = await exigirPermiso("comedor.gestionar");
   const storeId = await idLocalActual();
   const razon = limpiarMotivo(motivo);
   if (!razon) return { ok: false, error: MENSAJE_MOTIVO };
   const quien = nombreDe(sesion);
-  if (cantidad !== undefined && (typeof cantidad !== "number" || !Number.isFinite(cantidad) || cantidad <= 0)) {
-    return { ok: false, error: "La cantidad a cancelar tiene que ser mayor a cero." };
+
+  // Lo que llega del navegador se comprueba antes de tocar nada.
+  if (!Array.isArray(partes) || partes.length === 0 || partes.length > 100) {
+    return { ok: false, error: "No hay nada para cancelar. Actualizá la pantalla." };
+  }
+  const vistos = new Set<string>();
+  for (const p of partes) {
+    if (!p || typeof p.itemId !== "string" || vistos.has(p.itemId)) {
+      return { ok: false, error: "El producto elegido no es válido. Actualizá la pantalla." };
+    }
+    vistos.add(p.itemId);
+    if (p.cantidad !== undefined && (typeof p.cantidad !== "number" || !Number.isFinite(p.cantidad) || p.cantidad <= 0)) {
+      return { ok: false, error: "La cantidad a cancelar tiene que ser mayor a cero." };
+    }
   }
 
   let resumen = "";
-  let cancelada = 0;
-  let habia = 0;
+  let canceladas = 0;
   try {
     resumen = await prisma.$transaction(async (tx) => {
       const cuenta = await tx.cuentaMesa.findFirst({
@@ -279,32 +308,37 @@ export async function anularProducto(cuentaId: string, itemId: string, motivo: s
       });
       if (!cuenta) throw new ErrorDeUsuario("No encontré esa cuenta.");
       if (cuenta.estado !== "abierta") throw new ErrorDeUsuario(textoNoEditable(cuenta.estado));
-      const item = await tx.itemCuentaMesa.findFirst({ where: { id: String(itemId), cuentaId: cuenta.id, storeId } });
-      if (!item) throw new ErrorDeUsuario("No encontré ese producto.");
-      if (item.estado !== "activo") throw new ErrorDeUsuario("Ese producto ya estaba cancelado.");
 
-      habia = item.cantidad;
-      const pedida = cantidad ?? item.cantidad;
-      if (pedida > item.cantidad + 1e-9) {
-        throw new ErrorDeUsuario(`Solo hay ${formatearCantidad(item.cantidad)} de ese producto en la cuenta.`);
+      const detalles: string[] = [];
+      for (const p of partes) {
+        const item = await tx.itemCuentaMesa.findFirst({ where: { id: p.itemId, cuentaId: cuenta.id, storeId } });
+        if (!item) throw new ErrorDeUsuario("No encontré ese producto. Actualizá la pantalla.");
+        if (item.estado !== "activo") throw new ErrorDeUsuario("Ese producto ya estaba cancelado. Actualizá la pantalla.");
+
+        const pedida = p.cantidad ?? item.cantidad;
+        if (pedida > item.cantidad + 1e-9) {
+          throw new ErrorDeUsuario(`Solo hay ${formatearCantidad(item.cantidad)} de ese producto en la cuenta.`);
+        }
+        // Todo el producto: se marca cancelado tal cual, como siempre.
+        if (Math.abs(pedida - item.cantidad) < 1e-9) {
+          canceladas += item.cantidad;
+          await anularItems(tx, storeId, cuenta, [item], razon, quien);
+          detalles.push(`${formatearCantidad(item.cantidad)} × ${item.nombreProducto}`);
+          continue;
+        }
+        // Solo algunas unidades: tienen que ser enteras, de un producto de unidades enteras.
+        if (!Number.isInteger(item.cantidad) || !Number.isInteger(pedida)) {
+          throw new ErrorDeUsuario("Ese producto se cancela entero: ya se había dividido la cuenta y quedó con una fracción.");
+        }
+        canceladas += pedida;
+        await anularParteDeItem(tx, storeId, cuenta, item, pedida, razon, quien);
+        detalles.push(`${pedida} de ${item.cantidad} × ${item.nombreProducto} (quedan ${item.cantidad - pedida})`);
       }
-      // Todo el producto: se marca cancelado tal cual, como siempre.
-      if (Math.abs(pedida - item.cantidad) < 1e-9) {
-        cancelada = item.cantidad;
-        await anularItems(tx, storeId, cuenta, [item], razon, quien);
-        return `${formatearCantidad(item.cantidad)} × ${item.nombreProducto} de la mesa ${cuenta.mesa}`;
-      }
-      // Solo algunas unidades: tienen que ser enteras, de un producto de unidades enteras.
-      if (!Number.isInteger(item.cantidad) || !Number.isInteger(pedida)) {
-        throw new ErrorDeUsuario("Ese producto se cancela entero: ya se había dividido la cuenta y quedó con una fracción.");
-      }
-      cancelada = pedida;
-      await anularParteDeItem(tx, storeId, cuenta, item, pedida, razon, quien);
-      return `${pedida} de ${item.cantidad} × ${item.nombreProducto} de la mesa ${cuenta.mesa} (quedan ${item.cantidad - pedida})`;
+      return `${detalles.join(" y ")} de la mesa ${cuenta.mesa}`;
     }, OPCIONES_TX);
   } catch (e) {
     if (e instanceof ErrorDeUsuario) return { ok: false, error: e.message };
-    console.error("[comedor] anularProducto falló", e);
+    console.error("[comedor] anularProductos falló", e);
     return { ok: false, error: `No se pudo cancelar el producto. (Detalle: ${pistaDelError(e)})` };
   }
 
@@ -314,7 +348,7 @@ export async function anularProducto(cuentaId: string, itemId: string, motivo: s
     descripcion: `Canceló ${resumen}. Motivo: ${razon}.`,
     entidad: "CuentaMesa",
     entidadId: String(cuentaId),
-    detalle: { producto: resumen, motivo: razon, cancelada, habia },
+    detalle: { producto: resumen, motivo: razon, canceladas },
   });
   refrescar();
   return { ok: true };
@@ -840,17 +874,35 @@ export async function pagarCuenta(cuentaId: string, datos: DatosCobroCuenta): Pr
   }
   if (cuenta.items.length === 0) return { ok: false, error: "La cuenta no tiene productos para cobrar." };
 
-  const filas = cuenta.items.map((i) => ({
-    productId: i.productId,
-    nombreProducto: i.nombreProducto,
-    cantidad: i.cantidad,
-    precioUnitario: Number(i.precioUnitario),
-    iva: i.iva,
-    opcionesTexto: i.opcionesTexto,
-    costoProducto: i.costoProducto == null ? null : Number(i.costoProducto),
-    costoAgregados: i.costoAgregados == null ? null : Number(i.costoAgregados),
-    precioAgregados: Number(i.precioAgregados),
-  }));
+  // Lo que se cobra y se factura: el mismo producto cargado en varios pedidos va en UNA línea con la cantidad sumada (la nota
+  // de cocina no cuenta: no sale en la venta ni en la factura). El total no cambia: es la suma de los totales de cada línea.
+  const filas = sumarLineasIguales(
+    cuenta.items.map((i) => ({
+      productId: i.productId,
+      nombreProducto: i.nombreProducto,
+      cantidad: i.cantidad,
+      precioUnitario: Number(i.precioUnitario),
+      iva: i.iva,
+      opcionesTexto: i.opcionesTexto,
+      costoProducto: i.costoProducto == null ? null : Number(i.costoProducto),
+      costoAgregados: i.costoAgregados == null ? null : Number(i.costoAgregados),
+      precioAgregados: Number(i.precioAgregados),
+    })),
+    (l) =>
+      claveDeLinea(
+        {
+          productId: l.productId,
+          nombre: l.nombreProducto,
+          opciones: l.opcionesTexto,
+          precioUnitario: l.precioUnitario,
+          iva: l.iva,
+          costoProducto: l.costoProducto,
+          costoAgregados: l.costoAgregados,
+          precioAgregados: l.precioAgregados,
+        },
+        false
+      )
+  );
   const totales = totalesDeCuenta(filas, descuentoDeCuenta(cuenta));
   if (totales.descuentoInvalido) {
     return { ok: false, error: `El descuento ya no corresponde a esta cuenta (${totales.descuentoInvalido}) Quitalo o cambialo.` };

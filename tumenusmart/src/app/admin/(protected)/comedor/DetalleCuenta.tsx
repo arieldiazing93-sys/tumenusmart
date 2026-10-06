@@ -6,10 +6,10 @@ import { Campo, Entrada, MensajeError, Pastilla, Tarjeta, clasesBoton } from "@/
 import { Modal } from "@/components/Modal";
 import { Segmentado } from "@/components/Segmentado";
 import { formatearCantidad, formatearGuarani, formatearNumero } from "@/lib/format";
-import { importeDeLinea, textoEstadoCuenta } from "@/lib/comedor";
+import { agruparPorClave, claveDeLinea, importeDeLinea, repartirEnFilas, textoEstadoCuenta } from "@/lib/comedor";
 import { calcularDescuento, textoPorcentaje } from "@/lib/descuento-venta";
 import { rutaParaAbrirTurno } from "@/lib/turno-requerido";
-import { anularProducto, aplicarDescuento, cancelarCuenta, imprimirCuenta, reabrirCuenta } from "./actions";
+import { anularProductos, aplicarDescuento, cancelarCuenta, imprimirCuenta, reabrirCuenta } from "./actions";
 import type { ContextoCaja, CuentaCajaFila, ItemCuentaFila } from "./ComedorCaja";
 import { CargarProductosPanel } from "./CargarProductosPanel";
 import { DividirCuentaPanel } from "./DividirCuentaPanel";
@@ -17,7 +17,33 @@ import { Hace, HoraDe } from "./tiempo";
 
 const ROTULO = "text-[0.72rem] font-semibold uppercase tracking-rotulo text-tinta-suave";
 
-type Dialogo = { tipo: "anular"; item: ItemCuentaFila } | { tipo: "cancelar" } | { tipo: "descuento" } | null;
+/**
+ * El mismo producto cargado en varios pedidos, junto en UNA fila (10 parrilladas, no 10 filas de 1): misma descripción, mismas
+ * opciones, misma nota de cocina y mismo precio. Guarda las filas de la cuenta de las que sale (de la más vieja a la más nueva)
+ * para saber de cuál cancelar si hace falta.
+ */
+type GrupoDeCuenta = {
+  clave: string;
+  nombre: string;
+  opciones: string | null;
+  quitados: string | null;
+  nota: string | null;
+  cantidad: number;
+  /** Lo que vale la fila: la suma de lo que valía cada una (enteros de guaraníes, no se redondea nada). */
+  importe: number;
+  filas: ItemCuentaFila[];
+  rondas: number[];
+  /** Todas las unidades son enteras (si no, el producto se cancela completo). */
+  enteras: boolean;
+};
+
+type Dialogo = { tipo: "anular"; grupo: GrupoDeCuenta } | { tipo: "cancelar" } | { tipo: "descuento" } | null;
+
+/** "Pedido 1", "Pedidos 1 y 2", "Pedidos 1, 2 y 3". */
+function textoDePedidos(rondas: number[]): string {
+  if (rondas.length === 1) return `Pedido ${rondas[0]}`;
+  return `Pedidos ${rondas.slice(0, -1).join(", ")} y ${rondas[rondas.length - 1]}`;
+}
 
 /**
  * Todo lo que compone la cuenta de una mesa (los pedidos que cargó cada mozo, producto por producto, con su descuento y su
@@ -44,7 +70,7 @@ export function DetalleCuenta({
   const [cargando, setCargando] = useState(false);
   const [dividiendo, setDividiendo] = useState(false);
   // El producto marcado en la lista (para cancelarlo con el botón de arriba).
-  const [seleccionadoId, setSeleccionadoId] = useState<string | null>(null);
+  const [seleccionadaClave, setSeleccionadaClave] = useState<string | null>(null);
 
   const abierta = cuenta.estado === "abierta";
   const porCobrar = cuenta.estado === "por_cobrar";
@@ -53,8 +79,30 @@ export function DetalleCuenta({
   const t = cuenta.totales;
   /** Los productos se marcan para cancelarlos solo con la cuenta abierta y con el permiso de la caja. */
   const puedeMarcar = abierta && contexto.puedeGestionar;
+
+  // Lo que sigue en la cuenta, con el mismo producto de varios pedidos junto en una fila; lo cancelado va aparte, tal cual (cada
+  // cancelación tiene su motivo y su responsable).
+  const grupos: GrupoDeCuenta[] = agruparPorClave(
+    cuenta.items.filter((i) => !i.anulado),
+    (i) => claveDeLinea({ nombre: i.nombre, opciones: i.opciones, quitados: i.quitados, nota: i.nota, precioUnitario: i.precioUnitario }, true)
+  ).map((filas) => ({
+    clave: claveDeLinea(
+      { nombre: filas[0].nombre, opciones: filas[0].opciones, quitados: filas[0].quitados, nota: filas[0].nota, precioUnitario: filas[0].precioUnitario },
+      true
+    ),
+    nombre: filas[0].nombre,
+    opciones: filas[0].opciones,
+    quitados: filas[0].quitados,
+    nota: filas[0].nota,
+    cantidad: Math.round(filas.reduce((s, f) => s + f.cantidad, 0) * 10000) / 10000,
+    importe: filas.reduce((s, f) => s + importeDeLinea(f), 0),
+    filas,
+    rondas: [...new Set(filas.map((f) => f.ronda))].sort((a, b) => a - b),
+    enteras: filas.every((f) => Number.isInteger(f.cantidad)),
+  }));
+  const cancelados = cuenta.items.filter((i) => i.anulado);
   // Si el producto marcado ya no está (se canceló, o la lista se actualizó), no hay ninguno marcado.
-  const seleccionado = cuenta.items.find((i) => i.id === seleccionadoId && !i.anulado) ?? null;
+  const seleccionado = grupos.find((g) => g.clave === seleccionadaClave) ?? null;
 
   /** Corre una acción del servidor y, si salió bien, actualiza la pantalla. Un fallo inesperado se explica igual. */
   function ejecutar(accion: () => Promise<{ ok: true } | { ok: false; error: string }>, alTerminar?: () => void) {
@@ -88,10 +136,6 @@ export function DetalleCuenta({
       () => setAviso("La cuenta se reabrió: ya se le pueden cargar más productos.")
     );
   }
-
-  // Los pedidos, en el orden en que entraron.
-  const rondas = new Map<number, ItemCuentaFila[]>();
-  for (const i of cuenta.items) rondas.set(i.ronda, [...(rondas.get(i.ronda) ?? []), i]);
 
   return (
     <div className="flex flex-col gap-2">
@@ -198,7 +242,7 @@ export function DetalleCuenta({
                   type="button"
                   disabled={pendiente || !seleccionado}
                   title={seleccionado ? undefined : "Primero marcá un producto de la lista"}
-                  onClick={() => seleccionado && setDialogo({ tipo: "anular", item: seleccionado })}
+                  onClick={() => seleccionado && setDialogo({ tipo: "anular", grupo: seleccionado })}
                   className={clasesBoton("peligro", "sm")}
                 >
                   Cancelar producto
@@ -278,66 +322,78 @@ export function DetalleCuenta({
                 </th>
               </tr>
             </thead>
-            {[...rondas.entries()].map(([ronda, items]) => (
-              <tbody key={ronda} className="divide-y divide-linea-fina">
+            <tbody className="divide-y divide-linea-fina">
+              {grupos.map((g) => {
+                const marcable = puedeMarcar;
+                const marcado = seleccionado?.clave === g.clave;
+                // Un producto de un solo pedido dice quién y cuándo lo cargó; el de varios, solo en cuáles está.
+                const primera = g.filas[0];
+                return (
+                  <tr
+                    key={g.clave}
+                    onClick={(e) => {
+                      // Un clic en la fila marca el producto; el de la casilla ya lo marca por su cuenta.
+                      if (marcable && (e.target as HTMLElement).tagName !== "INPUT") setSeleccionadaClave(marcado ? null : g.clave);
+                    }}
+                    className={`align-top text-tinta ${marcable ? "cursor-pointer" : ""} ${marcado ? "bg-azul-luz/50" : ""}`}
+                  >
+                    {puedeMarcar && (
+                      <td className="py-1 pr-1">
+                        <input
+                          type="checkbox"
+                          checked={marcado}
+                          onChange={() => setSeleccionadaClave(marcado ? null : g.clave)}
+                          aria-label={`Marcar ${formatearCantidad(g.cantidad)} × ${g.nombre}`}
+                          className="mt-0.5 h-4 w-4 accent-peligro"
+                        />
+                      </td>
+                    )}
+                    <td className="cifra py-1 pr-2 text-[0.86rem] font-semibold">{formatearCantidad(g.cantidad)}</td>
+                    <td className="py-1 pr-2 text-[0.86rem] leading-snug">
+                      <p>{g.nombre}</p>
+                      {g.opciones && <p className="text-[0.76rem] text-tinta-media">+ {g.opciones}</p>}
+                      {g.quitados && <p className="text-[0.76rem] text-peligro">{g.quitados}</p>}
+                      {g.nota && <p className="text-[0.76rem] text-tinta-media">“{g.nota}”</p>}
+                      <p className="text-[0.7rem] text-tinta-suave">
+                        {textoDePedidos(g.rondas)}
+                        {g.rondas.length === 1 && (
+                          <>
+                            {" "}
+                            · <HoraDe iso={primera.enviadoEn} /> · {primera.cargadoPor ? `cargado en la caja por ${primera.cargadoPor}` : primera.mozo}
+                          </>
+                        )}
+                      </p>
+                    </td>
+                    <td className="cifra py-1 text-right text-[0.86rem] font-medium">{formatearGuarani(g.importe)}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+            {/* Lo cancelado queda a la vista aparte, sin juntarse con nada: cada uno con quién lo canceló y por qué. */}
+            {cancelados.length > 0 && (
+              <tbody className="divide-y divide-linea-fina">
                 <tr>
-                  <td colSpan={puedeMarcar ? 4 : 3} className="pb-0.5 pt-2">
-                    <p className={ROTULO}>
-                      Pedido {ronda} · <HoraDe iso={items[0].enviadoEn} /> ·{" "}
-                      {items[0].cargadoPor ? `cargado en la caja por ${items[0].cargadoPor}` : items[0].mozo}
-                    </p>
+                  <td colSpan={puedeMarcar ? 4 : 3} className="pb-0.5 pt-3">
+                    <p className={ROTULO}>Cancelados</p>
                   </td>
                 </tr>
-                {items.map((i) => {
-                  const marcable = puedeMarcar && !i.anulado;
-                  const marcado = seleccionado?.id === i.id;
-                  return (
-                    <tr
-                      key={i.id}
-                      onClick={(e) => {
-                        // Un clic en la fila marca el producto; el de la casilla ya lo marca por su cuenta.
-                        if (marcable && (e.target as HTMLElement).tagName !== "INPUT") setSeleccionadoId(marcado ? null : i.id);
-                      }}
-                      className={`align-top ${marcable ? "cursor-pointer" : ""} ${marcado ? "bg-azul-luz/50" : ""} ${
-                        i.anulado ? "text-tinta-suave" : "text-tinta"
-                      }`}
-                    >
-                      {puedeMarcar && (
-                        <td className="py-1 pr-1">
-                          {marcable && (
-                            <input
-                              type="checkbox"
-                              checked={marcado}
-                              onChange={() => setSeleccionadoId(marcado ? null : i.id)}
-                              aria-label={`Marcar ${formatearCantidad(i.cantidad)} × ${i.nombre}`}
-                              className="mt-0.5 h-4 w-4 accent-peligro"
-                            />
-                          )}
-                        </td>
-                      )}
-                      <td className={`cifra py-1 pr-2 text-[0.86rem] font-semibold ${i.anulado ? "line-through" : ""}`}>
-                        {formatearCantidad(i.cantidad)}
-                      </td>
-                      <td className="py-1 pr-2 text-[0.86rem] leading-snug">
-                        <p className={i.anulado ? "line-through" : ""}>{i.nombre}</p>
-                        {i.opciones && <p className="text-[0.76rem] text-tinta-media">+ {i.opciones}</p>}
-                        {i.quitados && <p className="text-[0.76rem] text-peligro">{i.quitados}</p>}
-                        {i.nota && <p className="text-[0.76rem] text-tinta-media">“{i.nota}”</p>}
-                        {i.anulado && (
-                          <p className="text-[0.72rem] font-medium text-peligro">
-                            Cancelado{i.anuladoPor ? ` por ${i.anuladoPor}` : ""}
-                            {i.motivoAnulacion ? `: ${i.motivoAnulacion}` : ""}
-                          </p>
-                        )}
-                      </td>
-                      <td className={`cifra py-1 text-right text-[0.86rem] font-medium ${i.anulado ? "line-through" : ""}`}>
-                        {formatearGuarani(importeDeLinea(i))}
-                      </td>
-                    </tr>
-                  );
-                })}
+                {cancelados.map((i) => (
+                  <tr key={i.id} className="align-top text-tinta-suave">
+                    {puedeMarcar && <td className="py-1 pr-1" />}
+                    <td className="cifra py-1 pr-2 text-[0.86rem] font-semibold line-through">{formatearCantidad(i.cantidad)}</td>
+                    <td className="py-1 pr-2 text-[0.86rem] leading-snug">
+                      <p className="line-through">{i.nombre}</p>
+                      {i.opciones && <p className="text-[0.76rem]">+ {i.opciones}</p>}
+                      <p className="text-[0.72rem] font-medium text-peligro">
+                        Cancelado{i.anuladoPor ? ` por ${i.anuladoPor}` : ""}
+                        {i.motivoAnulacion ? `: ${i.motivoAnulacion}` : ""}
+                      </p>
+                    </td>
+                    <td className="cifra py-1 text-right text-[0.86rem] font-medium line-through">{formatearGuarani(importeDeLinea(i))}</td>
+                  </tr>
+                ))}
               </tbody>
-            ))}
+            )}
           </table>
         </div>
 
@@ -346,12 +402,19 @@ export function DetalleCuenta({
       {/* ------------------------------------------------------------------------ ventanas */}
       {dialogo?.tipo === "anular" && (
         <DialogoCancelarProducto
-          item={dialogo.item}
+          nombre={dialogo.grupo.nombre}
+          cantidad={dialogo.grupo.cantidad}
+          enteras={dialogo.grupo.enteras}
           onCerrar={() => setDialogo(null)}
           onConfirmar={async (motivo, cuantas) => {
-            const r = await anularProducto(cuenta.id, dialogo.item.id, motivo, cuantas);
+            // Se cancela de las filas de más abajo (lo último que se cargó) hacia arriba; si se cancela todo, salen todas completas.
+            const partes =
+              cuantas === dialogo.grupo.cantidad
+                ? dialogo.grupo.filas.map((f) => ({ itemId: f.id, cantidad: f.cantidad }))
+                : repartirEnFilas(dialogo.grupo.filas, cuantas);
+            const r = await anularProductos(cuenta.id, partes, motivo);
             if (r.ok) {
-              setSeleccionadoId(null);
+              setSeleccionadaClave(null);
               router.refresh();
             }
             return r;
@@ -427,22 +490,28 @@ export function DetalleCuenta({
  * está el botón "Todas".
  */
 function DialogoCancelarProducto({
-  item,
+  nombre,
+  cantidad,
+  enteras,
   onCerrar,
   onConfirmar,
 }: {
-  item: ItemCuentaFila;
+  nombre: string;
+  /** Cuántas hay en la cuenta (todas las filas de ese producto juntas). */
+  cantidad: number;
+  /** Todas sus unidades son enteras: solo así se pueden cancelar algunas. */
+  enteras: boolean;
   onCerrar: () => void;
   onConfirmar: (motivo: string, cantidad: number) => Promise<{ ok: true } | { ok: false; error: string }>;
 }) {
-  const puedeParcial = Number.isInteger(item.cantidad) && item.cantidad > 1;
-  const [cuantas, setCuantas] = useState(puedeParcial ? 1 : item.cantidad);
+  const puedeParcial = enteras && Number.isInteger(cantidad) && cantidad > 1;
+  const [cuantas, setCuantas] = useState(puedeParcial ? 1 : cantidad);
   const [motivo, setMotivo] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pendiente, iniciar] = useTransition();
 
-  const cancelaTodo = cuantas === item.cantidad;
-  const quedan = item.cantidad - cuantas;
+  const cancelaTodo = cuantas === cantidad;
+  const quedan = cantidad - cuantas;
 
   function confirmarAhora() {
     if (motivo.trim().length < 3) {
@@ -468,7 +537,7 @@ function DialogoCancelarProducto({
     <Modal titulo="Cancelar un producto" onCerrar={onCerrar}>
       <div className="flex flex-col gap-3">
         <p className="text-[0.95rem] font-semibold text-tinta">
-          {formatearCantidad(item.cantidad)} × {item.nombre}
+          {formatearCantidad(cantidad)} × {nombre}
         </p>
 
         {puedeParcial && (
@@ -488,8 +557,8 @@ function DialogoCancelarProducto({
               <button
                 type="button"
                 aria-label="Cancelar una unidad más"
-                disabled={cuantas >= item.cantidad}
-                onClick={() => setCuantas((c) => Math.min(item.cantidad, c + 1))}
+                disabled={cuantas >= cantidad}
+                onClick={() => setCuantas((c) => Math.min(cantidad, c + 1))}
                 className={`${clasesBoton("suave", "md")} w-10 justify-center`}
               >
                 +
@@ -497,10 +566,10 @@ function DialogoCancelarProducto({
               <button
                 type="button"
                 disabled={cancelaTodo}
-                onClick={() => setCuantas(item.cantidad)}
+                onClick={() => setCuantas(cantidad)}
                 className={clasesBoton("suave", "md")}
               >
-                Todas ({item.cantidad})
+                Todas ({formatearCantidad(cantidad)})
               </button>
             </div>
             <p className="text-[0.8rem] text-tinta-media">

@@ -155,6 +155,80 @@ export function totalDeLineas(lineas: { precioUnitario: number; cantidad: number
 }
 
 /**
+ * La clave con la que dos líneas de una cuenta cuentan como "el mismo producto": mismo nombre, mismas opciones y mismo precio
+ * (y, si `conNotas`, la misma nota de cocina y los mismos ingredientes quitados: dos papas, una "sin sal" y otra normal, siguen
+ * siendo dos filas en la pantalla de la caja). Para el papel de la cuenta y para la factura las notas de cocina no cuentan.
+ */
+export function claveDeLinea(
+  l: {
+    productId?: string | null;
+    nombre: string;
+    opciones?: string | null;
+    quitados?: string | null;
+    nota?: string | null;
+    precioUnitario: number;
+    iva?: string | null;
+    costoProducto?: number | null;
+    costoAgregados?: number | null;
+    precioAgregados?: number | null;
+  },
+  conNotas: boolean
+): string {
+  return [
+    l.productId ?? "",
+    l.nombre,
+    l.opciones ?? "",
+    conNotas ? (l.quitados ?? "") : "",
+    conNotas ? (l.nota ?? "") : "",
+    l.precioUnitario,
+    l.iva ?? "",
+    l.costoProducto ?? "",
+    l.costoAgregados ?? "",
+    l.precioAgregados ?? "",
+  ].join("\u0001");
+}
+
+/** Junta las líneas por clave, en el orden en que aparece por primera vez cada una. */
+export function agruparPorClave<T>(lineas: T[], clave: (l: T) => string): T[][] {
+  const grupos = new Map<string, T[]>();
+  for (const l of lineas) {
+    const k = clave(l);
+    const grupo = grupos.get(k);
+    if (grupo) grupo.push(l);
+    else grupos.set(k, [l]);
+  }
+  return [...grupos.values()];
+}
+
+/**
+ * Reparte `cantidad` unidades entre las filas de un producto que se muestra en una sola línea (las filas van de la más vieja
+ * a la más nueva): se toma primero de la más nueva —lo último que se cargó, que es lo que suele sobrar— y, si no alcanza, de la
+ * anterior. Devuelve cuántas unidades salen de cada fila (solo las que aportan). Si se pide todo, salen todas completas.
+ */
+export function repartirEnFilas(filas: { id: string; cantidad: number }[], cantidad: number): { itemId: string; cantidad: number }[] {
+  const partes: { itemId: string; cantidad: number }[] = [];
+  let faltan = cantidad;
+  for (let i = filas.length - 1; i >= 0 && faltan > 1e-9; i--) {
+    const toma = Math.min(faltan, filas[i].cantidad);
+    partes.push({ itemId: filas[i].id, cantidad: toma });
+    faltan -= toma;
+  }
+  return partes;
+}
+
+/**
+ * Une las líneas iguales en una sola con la cantidad sumada (la primera de cada grupo, con su cantidad cambiada). Lo que se
+ * cobra no cambia: el total de las líneas unidas es la suma de los totales de las originales (cada una es un entero de
+ * guaraníes y comparten el precio).
+ */
+export function sumarLineasIguales<T extends { cantidad: number }>(lineas: T[], clave: (l: T) => string): T[] {
+  return agruparPorClave(lineas, clave).map((grupo) => ({
+    ...grupo[0],
+    cantidad: Math.round(grupo.reduce((s, l) => s + l.cantidad, 0) * 10000) / 10000,
+  }));
+}
+
+/**
  * Agrupa por Área de Impresión. Los productos sin área quedan afuera a propósito: no salen en ninguna comanda, igual que
  * en los pedidos de la carta y el Punto de Venta.
  */

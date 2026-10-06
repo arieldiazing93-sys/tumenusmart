@@ -5,7 +5,7 @@ import { MensajeError, Pastilla, Selector, clasesBoton, type ColorEstado } from 
 import { PanelLateral } from "@/components/PanelLateral";
 import { Segmentado } from "@/components/Segmentado";
 import { formatearCantidad, formatearGuarani, formatearNumero } from "@/lib/format";
-import { claveDeMesa } from "@/lib/comedor";
+import { agruparPorClave, claveDeLinea, claveDeMesa, importeDeLinea, repartirEnFilas } from "@/lib/comedor";
 import {
   PARTES_MAXIMAS,
   dividirEnPartesIguales,
@@ -14,10 +14,35 @@ import {
   type AsignacionDeLinea,
   type LineaBase,
 } from "@/lib/division-cuenta";
-import type { CuentaCajaFila } from "./ComedorCaja";
+import type { CuentaCajaFila, ItemCuentaFila } from "./ComedorCaja";
 import { dividirCuenta } from "./division-actions";
 
 type Modo = "iguales" | "producto";
+
+/** El mismo producto de varios pedidos, junto en una fila para elegirlo (las filas reales de la cuenta, de la más vieja a la más nueva). */
+type GrupoParaDividir = {
+  clave: string;
+  nombre: string;
+  opciones: string | null;
+  precioUnitario: number;
+  cantidad: number;
+  importe: number;
+  filas: ItemCuentaFila[];
+  /** Todas sus unidades son enteras: solo así pasan algunas (si no, pasa completo). */
+  enteras: boolean;
+};
+
+/** Para mostrar: las líneas de una cuenta resultante con el mismo producto junto (suma de cantidad y de importe). */
+function juntarParaMostrar<L extends { nombreProducto: string; cantidad: number; precioUnitario: number; importe: number }>(
+  lineas: L[]
+): { clave: string; nombre: string; cantidad: number; importe: number }[] {
+  return agruparPorClave(lineas, (l) => `${l.nombreProducto}\u0001${l.precioUnitario}`).map((grupo) => ({
+    clave: `${grupo[0].nombreProducto}\u0001${grupo[0].precioUnitario}`,
+    nombre: grupo[0].nombreProducto,
+    cantidad: Math.round(grupo.reduce((s, l) => s + l.cantidad, 0) * 10000) / 10000,
+    importe: grupo.reduce((s, l) => s + l.importe, 0),
+  }));
+}
 
 /** A qué cuenta nueva pasa un producto (1 = la primera, "1-A") y cuántas de sus unidades. */
 type Elegido = { destino: number; cantidad: number };
@@ -120,13 +145,36 @@ export function DividirCuentaPanel({
   }));
   const pedido = cuenta.descuento ? { tipo: cuenta.descuento.tipo, valor: cuenta.descuento.valor } : null;
 
-  // Por producto: cuántas cuentas nuevas hay ahora (las usadas son 1..k) y las marcas que siguen valiendo.
-  const idsActivos = new Set(activos.map((i) => i.id));
-  const asignaciones: AsignacionDeLinea[] = Object.entries(elegido)
-    .filter(([id]) => idsActivos.has(id))
-    .map(([itemId, e]) => ({ itemId, destino: e.destino, cantidad: e.cantidad }));
-  const cuentasNuevasPorProducto = asignaciones.reduce((m, a) => Math.max(m, a.destino), 0);
-  const cantidadMarcados = activos.filter((i) => marcados[i.id]).length;
+  // Por producto: el mismo producto cargado en varios pedidos va junto en UNA fila (10 parrilladas, no 10 filas de 1), igual que
+  // en el detalle de la cuenta. Lo que se elige es por fila; al dividir se reparte entre los pedidos de los que sale.
+  const grupos: GrupoParaDividir[] = agruparPorClave(activos, (i) =>
+    claveDeLinea({ nombre: i.nombre, opciones: i.opciones, precioUnitario: i.precioUnitario }, false)
+  ).map((filas) => ({
+    clave: claveDeLinea({ nombre: filas[0].nombre, opciones: filas[0].opciones, precioUnitario: filas[0].precioUnitario }, false),
+    nombre: filas[0].nombre,
+    opciones: filas[0].opciones,
+    precioUnitario: filas[0].precioUnitario,
+    cantidad: Math.round(filas.reduce((s, f) => s + f.cantidad, 0) * 10000) / 10000,
+    importe: filas.reduce((s, f) => s + importeDeLinea(f), 0),
+    filas,
+    enteras: filas.every((f) => Number.isInteger(f.cantidad)),
+  }));
+
+  // Lo elegido, de fila agrupada a las filas reales de la cuenta (el servidor y la función de dividir trabajan con las reales): si
+  // pasa todo, cada fila completa; si pasan algunas unidades, se toman de las últimas que se cargaron.
+  const asignaciones: AsignacionDeLinea[] = grupos.flatMap((g) => {
+    const e = elegido[g.clave];
+    if (!e || e.destino < 1) return [];
+    const partes =
+      e.cantidad === g.cantidad ? g.filas.map((f) => ({ itemId: f.id, cantidad: f.cantidad })) : repartirEnFilas(g.filas, e.cantidad);
+    return partes.map((p) => ({ itemId: p.itemId, destino: e.destino, cantidad: p.cantidad }));
+  });
+  // Cuántas cuentas nuevas hay ahora (las usadas son 1..k) y las marcas que siguen valiendo.
+  const clavesActivas = new Set(grupos.map((g) => g.clave));
+  const cuentasNuevasPorProducto = Object.entries(elegido)
+    .filter(([clave]) => clavesActivas.has(clave))
+    .reduce((m, [, e]) => Math.max(m, e.destino), 0);
+  const cantidadMarcados = grupos.filter((g) => marcados[g.clave]).length;
 
   const base = cuenta.mesaBase ?? cuenta.mesa;
   const ocupadas = new Set(mesasOcupadas.map(claveDeMesa));
@@ -150,31 +198,31 @@ export function DividirCuentaPanel({
   }
 
   function marcarTodos(valor: boolean) {
-    setMarcados(valor ? Object.fromEntries(activos.map((i) => [i.id, true])) : {});
+    setMarcados(valor ? Object.fromEntries(grupos.map((g) => [g.clave, true])) : {});
   }
 
   /** Mueve los productos marcados a la cuenta nueva `destino` (la siguiente libre crea una cuenta nueva). */
   function moverMarcados(destino: number) {
-    const ids = activos.filter((i) => marcados[i.id]);
-    if (ids.length === 0) return;
+    const elegidos = grupos.filter((g) => marcados[g.clave]);
+    if (elegidos.length === 0) return;
     setError(null);
     setElegido((actual) =>
-      compactar({ ...actual, ...Object.fromEntries(ids.map((i) => [i.id, { destino, cantidad: i.cantidad }])) })
+      compactar({ ...actual, ...Object.fromEntries(elegidos.map((g) => [g.clave, { destino, cantidad: g.cantidad }])) })
     );
     setMarcados({});
   }
 
   /** Devuelve los productos marcados a la cuenta original. */
   function devolverMarcados() {
-    const ids = new Set(activos.filter((i) => marcados[i.id]).map((i) => i.id));
-    if (ids.size === 0) return;
+    const claves = new Set(grupos.filter((g) => marcados[g.clave]).map((g) => g.clave));
+    if (claves.size === 0) return;
     setError(null);
-    setElegido((actual) => compactar(Object.fromEntries(Object.entries(actual).filter(([id]) => !ids.has(id)))));
+    setElegido((actual) => compactar(Object.fromEntries(Object.entries(actual).filter(([clave]) => !claves.has(clave)))));
     setMarcados({});
   }
 
-  function elegirCantidad(itemId: string, cantidad: number) {
-    setElegido((actual) => (actual[itemId] ? { ...actual, [itemId]: { ...actual[itemId], cantidad } } : actual));
+  function elegirCantidad(clave: string, cantidad: number) {
+    setElegido((actual) => (actual[clave] ? { ...actual, [clave]: { ...actual[clave], cantidad } } : actual));
   }
 
   async function dividir() {
@@ -263,7 +311,7 @@ export function DividirCuentaPanel({
                   <label className="flex cursor-pointer items-center gap-2 text-[0.82rem] font-medium text-tinta">
                     <input
                       type="checkbox"
-                      checked={cantidadMarcados === activos.length && activos.length > 0}
+                      checked={cantidadMarcados === grupos.length && grupos.length > 0}
                       onChange={(e) => marcarTodos(e.target.checked)}
                       className="h-5 w-5 accent-azul"
                     />
@@ -308,28 +356,26 @@ export function DividirCuentaPanel({
               </div>
 
               <ul className="flex flex-col divide-y divide-linea-fina">
-                {activos.map((i) => {
-                  const e = elegido[i.id];
+                {grupos.map((g) => {
+                  const e = elegido[g.clave];
                   const destino = e ? e.destino : 0;
-                  const puedeParcial = destino >= 1 && Number.isInteger(i.cantidad) && i.cantidad > 1;
+                  const puedeParcial = destino >= 1 && g.enteras && Number.isInteger(g.cantidad) && g.cantidad > 1;
                   return (
-                    <li key={i.id} className={`flex flex-col gap-1 py-2 ${marcados[i.id] ? "bg-azul-luz/40" : ""}`}>
+                    <li key={g.clave} className={`flex flex-col gap-1 py-2 ${marcados[g.clave] ? "bg-azul-luz/40" : ""}`}>
                       <label className="flex cursor-pointer items-start gap-2.5 px-1">
                         <input
                           type="checkbox"
-                          checked={!!marcados[i.id]}
-                          onChange={(ev) => marcar(i.id, ev.target.checked)}
+                          checked={!!marcados[g.clave]}
+                          onChange={(ev) => marcar(g.clave, ev.target.checked)}
                           className="mt-0.5 h-5 w-5 flex-none accent-azul"
-                          aria-label={`Marcar ${i.nombre}`}
+                          aria-label={`Marcar ${g.nombre}`}
                         />
                         <span className="min-w-0 flex-1 text-[0.86rem] leading-snug text-tinta">
-                          <span className="font-semibold">{formatearCantidad(i.cantidad)} ×</span> {i.nombre}
-                          {i.opciones && <span className="block text-[0.74rem] text-tinta-suave">+ {i.opciones}</span>}
+                          <span className="font-semibold">{formatearCantidad(g.cantidad)} ×</span> {g.nombre}
+                          {g.opciones && <span className="block text-[0.74rem] text-tinta-suave">+ {g.opciones}</span>}
                         </span>
                         <span className="flex flex-none flex-col items-end gap-1">
-                          <span className="cifra text-[0.86rem] font-semibold text-tinta">
-                            {formatearGuarani(i.precioUnitario * i.cantidad)}
-                          </span>
+                          <span className="cifra text-[0.86rem] font-semibold text-tinta">{formatearGuarani(g.importe)}</span>
                           {destino >= 1 ? (
                             <Pastilla color={COLORES_DE_CUENTA[(destino - 1) % COLORES_DE_CUENTA.length]}>
                               → Mesa {nombres?.[destino - 1] ?? "…"}
@@ -344,18 +390,18 @@ export function DividirCuentaPanel({
                           <span className="text-[0.76rem] text-tinta-suave">Pasan</span>
                           <Selector
                             value={String(e.cantidad)}
-                            onChange={(ev) => elegirCantidad(i.id, Number(ev.target.value))}
-                            aria-label={`Cuántas unidades de ${i.nombre} pasan`}
+                            onChange={(ev) => elegirCantidad(g.clave, Number(ev.target.value))}
+                            aria-label={`Cuántas unidades de ${g.nombre} pasan`}
                             className="!w-auto"
                           >
-                            {Array.from({ length: i.cantidad }, (_, k) => (
+                            {Array.from({ length: g.cantidad }, (_, k) => (
                               <option key={k + 1} value={k + 1}>
                                 {k + 1}
-                                {k + 1 === i.cantidad ? " (todas)" : ""}
+                                {k + 1 === g.cantidad ? " (todas)" : ""}
                               </option>
                             ))}
                           </Selector>
-                          <span className="text-[0.76rem] text-tinta-suave">de {formatearCantidad(i.cantidad)}</span>
+                          <span className="text-[0.76rem] text-tinta-suave">de {formatearCantidad(g.cantidad)}</span>
                         </div>
                       )}
                     </li>
@@ -384,7 +430,7 @@ export function DividirCuentaPanel({
                           {modo === "producto" && (
                             <span className="font-normal text-tinta-suave">
                               {" "}
-                              · {p.lineas.length} {p.lineas.length === 1 ? "producto" : "productos"}
+                              · {juntarParaMostrar(p.lineas).length} {juntarParaMostrar(p.lineas).length === 1 ? "producto" : "productos"}
                             </span>
                           )}
                         </p>
@@ -393,10 +439,10 @@ export function DividirCuentaPanel({
                       {/* En partes iguales se ve el detalle (las fracciones); por producto la lista de arriba ya lo muestra. */}
                       {modo === "iguales" && (
                         <ul className="mt-1.5 flex flex-col gap-0.5 text-[0.8rem] text-tinta-media">
-                          {p.lineas.map((l) => (
-                            <li key={`${l.origenId}-${l.accion}`} className="flex justify-between gap-2">
+                          {juntarParaMostrar(p.lineas).map((l) => (
+                            <li key={l.clave} className="flex justify-between gap-2">
                               <span className="min-w-0">
-                                <strong className="font-semibold text-tinta">{formatearCantidad(l.cantidad)} ×</strong> {l.nombreProducto}
+                                <strong className="font-semibold text-tinta">{formatearCantidad(l.cantidad)} ×</strong> {l.nombre}
                               </span>
                               <span className="cifra flex-none">{formatearGuarani(l.importe)}</span>
                             </li>
