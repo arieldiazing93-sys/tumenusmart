@@ -16,6 +16,8 @@ import { DividirCuentaPanel } from "./DividirCuentaPanel";
 import { Hace, HoraDe } from "./tiempo";
 
 const ROTULO = "text-[0.72rem] font-semibold uppercase tracking-rotulo text-tinta-suave";
+/** Los rótulos del pie de la cuenta (Subtotal, Descuento, Impuestos, Total): en negrita. */
+const ROTULO_PIE = "text-[0.7rem] font-bold uppercase tracking-rotulo text-tinta";
 
 /**
  * El mismo producto cargado en varios pedidos, junto en UNA fila (10 parrilladas, no 10 filas de 1): misma descripción, mismas
@@ -496,16 +498,17 @@ function PieDeCuenta({ cuenta }: { cuenta: CuentaCajaFila }) {
   ].filter(Boolean);
 
   return (
-    <div className="rounded-xl border-2 border-azul/50 bg-azul-luz/30 p-3 sm:ml-auto sm:w-full sm:max-w-sm">
-      <dl className="flex flex-col gap-1.5">
+    <div className="rounded-lg border-2 border-azul/50 bg-azul-luz/30 px-2.5 py-1.5 sm:ml-auto sm:w-full sm:max-w-[16rem]">
+      {/* Los rótulos van en negrita y los valores en peso normal, sin destacar ninguno. */}
+      <dl className="flex flex-col gap-0.5 text-[0.78rem] leading-tight">
         <div className="flex items-baseline justify-between gap-3">
-          <dt className={ROTULO}>Subtotal</dt>
-          <dd className="cifra text-[0.92rem] font-medium text-tinta">{formatearGuarani(t.subtotal)}</dd>
+          <dt className={ROTULO_PIE}>Subtotal</dt>
+          <dd className="cifra font-normal text-tinta">{formatearGuarani(t.subtotal)}</dd>
         </div>
 
         <div className="flex items-baseline justify-between gap-3">
-          <dt className="flex flex-wrap items-center gap-1.5">
-            <span className={ROTULO}>Descuento</span>
+          <dt className="flex flex-wrap items-center gap-1">
+            <span className={ROTULO_PIE}>Descuento</span>
             {hayDescuento && descuento && (
               <Pastilla color={descuento.tipo === "porcentaje" ? "azul" : "amarillo"}>
                 {descuento.tipo === "porcentaje" && t.porcentaje != null
@@ -514,24 +517,24 @@ function PieDeCuenta({ cuenta }: { cuenta: CuentaCajaFila }) {
               </Pastilla>
             )}
           </dt>
-          <dd className={`cifra text-[0.92rem] font-medium ${hayDescuento ? "text-amarillo-oscuro" : "text-tinta-suave"}`}>
+          <dd className={`cifra font-normal ${hayDescuento ? "text-amarillo-oscuro" : "text-tinta-suave"}`}>
             {hayDescuento ? `− ${formatearGuarani(t.descuento)}` : formatearGuarani(0)}
           </dd>
         </div>
 
         <div>
           <div className="flex items-baseline justify-between gap-3">
-            <dt className={ROTULO}>Impuestos (IVA)</dt>
-            <dd className="cifra text-[0.92rem] font-medium text-tinta">{formatearGuarani(im.total)}</dd>
+            <dt className={ROTULO_PIE}>Impuestos (IVA)</dt>
+            <dd className="cifra font-normal text-tinta">{formatearGuarani(im.total)}</dd>
           </div>
-          <p className="text-[0.7rem] leading-snug text-tinta-suave">
-            {detalleIva.length > 0 ? `${detalleIva.join(" · ")} · ya incluidos en el precio` : "Ya incluidos en el precio"}
+          <p className="text-[0.66rem] leading-tight text-tinta-suave">
+            {detalleIva.length > 0 ? `${detalleIva.join(" · ")} · incluidos en el precio` : "Incluidos en el precio"}
           </p>
         </div>
 
-        <div className="mt-0.5 flex items-baseline justify-between gap-3 border-t-2 border-azul/50 pt-2">
-          <dt className="text-[0.9rem] font-bold uppercase tracking-rotulo text-tinta">Total</dt>
-          <dd className="cifra text-[1.5rem] font-bold leading-none text-tinta">{formatearGuarani(t.total)}</dd>
+        <div className="mt-0.5 flex items-baseline justify-between gap-3 border-t border-azul/40 pt-1">
+          <dt className={ROTULO_PIE}>Total</dt>
+          <dd className="cifra text-[0.9rem] font-normal text-tinta">{formatearGuarani(t.total)}</dd>
         </div>
       </dl>
     </div>
