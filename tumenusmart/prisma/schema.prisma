@@ -90,6 +90,8 @@ model Store {
   ultimoIntentoPinMozosEn DateTime?
   /// El correlativo de las cuentas de mesa del local (la próxima es este número + 1).
   contadorCuentasMesa   Int       @default(0)
+  /// El correlativo de las cuentas de delivery del local (la próxima es este número + 1).
+  contadorCuentasDelivery Int     @default(0)
   /// Regla del Servicio comedor: si un mozo puede ver y cargar las cuentas que abrió OTRO mozo (true), o solo las suyas
   /// (false). Con false, cada mozo ve en su pantalla únicamente las cuentas que él abrió.
   mozosVenCuentasAjenas Boolean   @default(true)
@@ -263,6 +265,8 @@ model Store {
   mozos            Mozo[]
   cuentasMesa      CuentaMesa[]
   itemsCuentaMesa  ItemCuentaMesa[]
+  cuentasDelivery  CuentaDelivery[]
+  itemsCuentaDelivery ItemCuentaDelivery[]
   trabajosImpresion TrabajoImpresion[]
   mesasComedor     MesaComedor[]
   sectoresComedor  SectorComedor[]
@@ -706,6 +710,7 @@ model DeliveryZone {
   costoEnvio Decimal @db.Decimal(10, 2)
   activo     Boolean @default(true)
   orders     Order[]
+  cuentasDelivery CuentaDelivery[]
 
   @@index([storeId])
 }
@@ -721,6 +726,7 @@ model Customer {
   // fidelización por teléfono.
   telefono  String?
   orders    Order[]
+  cuentasDelivery CuentaDelivery[]
   createdAt DateTime @default(now())
 
   // Pedidos entregados de este cliente ya "gastados" en un premio anterior.
@@ -772,6 +778,7 @@ model Repartidor {
   telefono  String?
   activo    Boolean  @default(true)
   orders    Order[]
+  cuentasDelivery CuentaDelivery[]
   rendiciones Rendicion[]
   createdAt DateTime @default(now())
 
@@ -1443,6 +1450,9 @@ model VentaPosItem {
   /// OrderItem.precioAgregados, para que Rentabilidad separe producto y
   /// agregados también en el mostrador.
   precioAgregados Decimal @db.Decimal(10, 2) @default(0)
+  /// true en la línea "Costo de envío" de una venta de delivery: suma al total y a la factura, pero no es un producto (los reportes
+  /// por producto la muestran aparte y el ranking la deja afuera).
+  esEnvio        Boolean  @default(false)
 
   @@index([storeId])
   @@index([ventaPosId])
@@ -2194,6 +2204,9 @@ model MovimientoStock {
   /// El stock que baja cuando el mozo envía un pedido de mesa queda enlazado a esa cuenta.
   cuentaMesaId String?
   cuentaMesa   CuentaMesa? @relation(fields: [cuentaMesaId], references: [id], onDelete: SetNull)
+  /// Igual, para el stock que baja al cargar un producto en una cuenta de delivery.
+  cuentaDeliveryId String?
+  cuentaDelivery   CuentaDelivery? @relation(fields: [cuentaDeliveryId], references: [id], onDelete: SetNull)
 
   /// En qué almacén entra o de cuál sale este movimiento. Null solo en los
   /// movimientos viejos, de antes de que el stock se repartiera por almacén.
@@ -2209,6 +2222,7 @@ model MovimientoStock {
   @@index([orderId])
   @@index([ventaPosId])
   @@index([cuentaMesaId])
+  @@index([cuentaDeliveryId])
   @@index([almacenId])
 }
 
@@ -2757,10 +2771,134 @@ model TrabajoImpresion {
   error           String?
   cuentaMesaId    String?
   cuentaMesa      CuentaMesa? @relation(fields: [cuentaMesaId], references: [id], onDelete: SetNull)
+  /// Si el trabajo es de una cuenta de delivery (su comanda, el aviso de un producto anulado o su cuenta).
+  cuentaDeliveryId String?
+  cuentaDelivery   CuentaDelivery? @relation(fields: [cuentaDeliveryId], references: [id], onDelete: SetNull)
   createdAt       DateTime    @default(now())
 
   @@index([storeId, estado])
   @@index([cuentaMesaId])
+  @@index([cuentaDeliveryId])
+}
+
+/// La cuenta de un pedido de DELIVERY (canal "Servicio delivery"). La abre la caja con los datos del cliente y su dirección, se va
+/// armando con productos en varias tandas (como las cuentas del comedor), se imprime, sale con un repartidor y se cobra; al cobrarla
+/// se genera la venta del Punto de Venta (entra en el turno de caja, en el cierre y en los reportes) y la cuenta se cierra. Pueden
+/// estar abiertas varias a la vez. Tiene sus propias tablas: no comparte nada con las cuentas de mesa.
+model CuentaDelivery {
+  id      String @id @default(cuid())
+  storeId String
+  store   Store  @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  /// Correlativo por local (sale de Store.contadorCuentasDelivery), el número que ve el personal.
+  numero  Int
+  /// "abierta" | "por_cobrar" (la caja imprimió la cuenta: no se le carga nada hasta reabrirla) | "pagada" | "anulada"
+  estado  String @default("abierta")
+
+  // ------------------------------------------------------------------------------------------------------------- el cliente
+  customerId      String?
+  customer        Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  clienteNombre   String
+  clienteTelefono String
+  /// Los datos de factura que el cliente dio al pedir (opcionales): el cobro arranca con ellos. Se pueden cambiar al cobrar.
+  facturaTipoIdentificacion String?
+  facturaRuc                String?
+  facturaRazonSocial        String?
+  facturaEmail              String?
+
+  // ------------------------------------------------------------------------------------------------------------- la entrega
+  /// La dirección escrita, o el enlace de Google Maps que mandó el cliente (se pega tal cual).
+  direccion       String?
+  /// Las coordenadas leídas del enlace pegado (si las trae): el repartidor abre el mapa con un toque.
+  clienteLat      Float?
+  clienteLng      Float?
+  deliveryZoneId  String?
+  deliveryZone    DeliveryZone? @relation(fields: [deliveryZoneId], references: [id], onDelete: SetNull)
+  /// El nombre de la zona al abrir (o "A coordinar"): se guarda como texto para que borrar la zona no cambie la cuenta.
+  zonaNombre      String?
+  /// Lo que se le cobra de envío (el de la zona o el que se arregló con el cliente). Se suma al total y no se descuenta.
+  costoEnvio      Decimal @default(0) @db.Decimal(10, 2)
+  notas           String?
+  repartidorId    String?
+  repartidor      Repartidor? @relation(fields: [repartidorId], references: [id], onDelete: SetNull)
+  /// "pendiente" (todavía no salió) | "en_ruta" | "entregada". Va aparte del cobro: se puede cobrar antes o después de entregar.
+  entrega         String @default("pendiente")
+  salioEn         DateTime?
+  entregadaEn     DateTime?
+
+  abiertaEn  DateTime  @default(now())
+  cerradaEn  DateTime?
+  /// Quién y por qué cerró la cuenta (al pagarla o al cancelarla).
+  cerradaPor   String?
+  motivoCierre String?
+
+  /// Descuento general de la cuenta, que pone la caja: "porcentaje" o "monto", su valor y el motivo. Se calcula sobre los productos
+  /// (el envío no se descuenta) y siempre sobre lo que vale la cuenta en ese momento (ver calcularDescuento).
+  descuentoTipo   String?
+  descuentoValor  Decimal? @db.Decimal(10, 2)
+  descuentoMotivo String?
+  descuentoPor    String?
+  /// Cuándo y quién imprimió la cuenta por última vez (pasa a "por_cobrar").
+  impresaEn  DateTime?
+  impresaPor String?
+  /// La venta del Punto de Venta que se generó al pagarla (para el cierre de turno y los reportes).
+  ventaPosId String?
+
+  items            ItemCuentaDelivery[]
+  trabajos         TrabajoImpresion[]
+  movimientosStock MovimientoStock[]
+
+  @@unique([storeId, numero])
+  @@index([storeId, estado])
+  @@index([ventaPosId])
+  @@index([repartidorId])
+}
+
+/// Un producto cargado en una cuenta de delivery. Guarda lo que valía y cómo se pidió en el momento de cargarlo, igual que
+/// ItemCuentaMesa y VentaPosItem.
+model ItemCuentaDelivery {
+  id       String         @id @default(cuid())
+  storeId  String
+  store    Store          @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  cuentaId String
+  cuenta   CuentaDelivery @relation(fields: [cuentaId], references: [id], onDelete: Cascade)
+  /// Cada vez que la caja carga productos es un pedido (ronda) nuevo de la cuenta (1, 2, 3...).
+  ronda    Int
+  /// Lo genera la pantalla una vez por envío, y `linea` es el lugar de este producto dentro de él. Si se toca el botón dos veces o
+  /// se corta el internet y se reintenta, el servidor reconoce el mismo envío y no lo duplica.
+  envioId  String
+  linea    Int
+  /// El usuario de la caja que lo cargó.
+  cargadoPor String?
+
+  /// Nulo cuando es un combo "mitad y mitad" (no es un único producto).
+  productId      String?
+  nombreProducto String
+  cantidad       Int
+  precioUnitario Decimal @db.Decimal(10, 2)
+  iva            String  @default("gravado10")
+  opcionesTexto  String?
+  ingredientesQuitadosTexto String?
+  /// Una nota para la cocina ("bien cocido", "sin hielo").
+  nota           String?
+  costoProducto  Decimal? @db.Decimal(10, 2)
+  costoAgregados Decimal? @db.Decimal(10, 2)
+  precioAgregados Decimal @default(0) @db.Decimal(10, 2)
+  /// El Área de Impresión del producto cuando se cargó (a qué impresora salió).
+  areaImpresionId String?
+  /// Los insumos que descontó al cargarse ([{insumoId, almacenId, cantidad}], ya multiplicados por la cantidad), para poder
+  /// devolverlos si el producto se anula.
+  consumo        Json    @default("[]")
+
+  /// "activo" | "anulado"
+  estado          String    @default("activo")
+  anuladoPor      String?
+  anuladoEn       DateTime?
+  motivoAnulacion String?
+  enviadoEn       DateTime  @default(now())
+
+  @@unique([storeId, envioId, linea])
+  @@index([storeId])
+  @@index([cuentaId])
 }
 
 /// Una mesa del salón que el dueño cargó en Ajustes (Configuración del Servicio comedor). Con mesas cargadas el mozo elige la

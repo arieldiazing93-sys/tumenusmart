@@ -130,7 +130,7 @@ export default async function DetalleVentaPosPage({
             <div>
               <dt className="text-tinta-suave">Entrega</dt>
               <dd className="font-semibold text-tinta">
-                {venta.tipoEntrega === "llevar" ? "Para llevar" : "En el local"}
+                {venta.tipoEntrega === "llevar" ? "Para llevar" : venta.tipoEntrega === "delivery" ? "Delivery" : "En el local"}
               </dd>
             </div>
             <div>

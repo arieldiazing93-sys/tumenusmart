@@ -169,7 +169,7 @@ export default async function ImprimirEstadisticasPage({
           </tr>
         </thead>
         <tbody>
-          {(["carta", "telefono", "mostrador", "comedor"] as const).map((canal) => (
+          {(["mostrador", "comedor", "delivery"] as const).map((canal) => (
             <tr key={canal} className="border-b border-linea-fina">
               <td className="py-1.5 text-tinta-media">{ETIQUETAS_CANAL[canal]}</td>
               <td className="py-1.5 text-right font-semibold text-tinta">{stats.porCanal[canal].cantidad}</td>

@@ -21,6 +21,8 @@ console.log("\n— el empleado —");
 SI("empleado", "pos.vender");
 SI("empleado", "comedor.ver");
 SI("empleado", "comedor.gestionar");
+SI("empleado", "delivery.ver");
+SI("empleado", "delivery.gestionar");
 SI("empleado", "reservas.ver");
 SI("empleado", "reservas.gestionar");
 SI("empleado", "agenda.ver");

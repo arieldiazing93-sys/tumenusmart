@@ -63,6 +63,12 @@ export type Permiso =
   | "comedor.gestionar"
   // Dar de alta a los mozos (con su PIN) y sacar el enlace público del Servicio comedor. Del dueño.
   | "comedor.configurar"
+  // --- servicio delivery: la caja abre las cuentas de los pedidos a domicilio, las arma, las manda con un repartidor y las cobra ---
+  // Ver las cuentas de delivery abiertas.
+  | "delivery.ver"
+  // Abrir cuentas, cargarles productos, cancelar, dar descuentos, imprimirlas, asignar repartidor y cobrarlas (el cobro pide además
+  // `pos.vender`, igual que el comedor).
+  | "delivery.gestionar"
   // --- el negocio ---
   | "estadisticas.ver"
   | "ideas.ver"
@@ -102,6 +108,9 @@ const PERMISOS_EMPLEADO: Permiso[] = [
   // queda en la bitácora.
   "comedor.ver",
   "comedor.gestionar",
+  // Quien atiende el teléfono abre y opera las cuentas de delivery: lo que hace queda en la bitácora.
+  "delivery.ver",
+  "delivery.gestionar",
   // Un presupuesto no mueve plata ni stock ni es un comprobante: quien atiende
   // al cliente puede armarlo (los precios se editan solo en ESE presupuesto,
   // nunca en el catálogo).

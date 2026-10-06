@@ -260,7 +260,7 @@ export default async function AdminEstadisticasPage({
             <p className="text-sm text-tinta-suave">Sin ventas en este período.</p>
           ) : (
             <div className="flex flex-col gap-3">
-              {(["carta", "telefono", "mostrador", "comedor"] as const).map((c) => {
+              {(["mostrador", "comedor", "delivery"] as const).map((c) => {
                 const fila = stats.porCanal[c];
                 const porcentaje = stats.ingresos > 0 ? (fila.ingresos / stats.ingresos) * 100 : 0;
                 return (

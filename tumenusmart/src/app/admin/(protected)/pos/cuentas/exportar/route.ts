@@ -5,11 +5,10 @@ import { idLocalActual, localActual } from "@/lib/local-actual";
 import { calcularRangoFecha } from "@/lib/rango-fecha";
 import { etiquetaFormaPagoPos, FORMA_PAGO_MIXTO } from "@/lib/turno-pos";
 import { detallePagos, filtroPorFormaPago, montoCobradoConForma } from "@/lib/pago-venta";
-import { formatearNumero } from "@/lib/format";
 import { ZONA_NEGOCIO } from "@/lib/timezone";
 import { nuevoLibro, filaTitulo, respuestaXlsx } from "@/lib/excel-reporte";
 import { nombreCompleto } from "@/lib/agenda-personal";
-import { cargarCuentasMesaCanceladas, type CuentaMesaCancelada } from "@/lib/cuentas-canceladas";
+import { cargarCuentasCanceladas, type CuentaCancelada } from "@/lib/cuentas-canceladas";
 
 export const dynamic = "force-dynamic";
 
@@ -31,9 +30,9 @@ export async function GET(request: NextRequest) {
   const db = prismaDelLocal(storeId);
   const [local, canceladasMesa, ventas] = await Promise.all([
     localActual(),
-    // Las cuentas de mesa que se cerraron sin cobrar también van en el reporte (una cuenta sin cobrar no tiene forma de pago:
-    // al filtrar por una, no entran). Es la misma función que usa la pantalla.
-    formaPago ? Promise.resolve<CuentaMesaCancelada[]>([]) : cargarCuentasMesaCanceladas(db, rango),
+    // Las cuentas (de mesa y de delivery) que se cerraron sin cobrar también van en el reporte (una cuenta sin cobrar no tiene
+    // forma de pago: al filtrar por una, no entran). Es la misma función que usa la pantalla.
+    formaPago ? Promise.resolve<CuentaCancelada[]>([]) : cargarCuentasCanceladas(db, rango),
     db.ventaPos.findMany({
       where: { creadoEn: { gte: rango.gte, lt: rango.lt }, ...filtroPorFormaPago(formaPago) },
       orderBy: { creadoEn: "asc" },
@@ -91,22 +90,22 @@ export async function GET(request: NextRequest) {
   const filtraPorUnaForma = !!formaPago && formaPago !== FORMA_PAGO_MIXTO;
   let total = 0;
   let totalCanceladasMesa = 0;
-  // Ventas y cuentas de mesa canceladas sin cobrar, juntas y en orden de fecha (de la más vieja a la más nueva).
+  // Ventas y cuentas canceladas sin cobrar, juntas y en orden de fecha (de la más vieja a la más nueva).
   const lineas = [
-    ...ventas.map((v) => ({ fecha: v.creadoEn, venta: v, mesa: null as CuentaMesaCancelada | null })),
+    ...ventas.map((v) => ({ fecha: v.creadoEn, venta: v, cuenta: null as CuentaCancelada | null })),
     ...canceladasMesa.map((c) => ({
       fecha: c.cerradaEn ?? new Date(0),
       venta: null,
-      mesa: c as CuentaMesaCancelada | null,
+      cuenta: c as CuentaCancelada | null,
     })),
   ].sort((a, b) => a.fecha.getTime() - b.fecha.getTime());
 
   for (const linea of lineas) {
     const v = linea.venta;
     if (!v) {
-      // Una cuenta de mesa cerrada SIN cobrar: no suma al total (no entró plata) pero queda en la planilla, con quién la
-      // canceló, cuándo y por qué.
-      const c = linea.mesa;
+      // Una cuenta (de mesa o de delivery) cerrada SIN cobrar: no suma al total (no entró plata) pero queda en la planilla, con
+      // quién la canceló, cuándo y por qué.
+      const c = linea.cuenta;
       if (!c) continue;
       totalCanceladasMesa += c.total;
       const motivo = [
@@ -116,14 +115,14 @@ export async function GET(request: NextRequest) {
         .filter(Boolean)
         .join(" · ");
       const filaMesa = hoja.addRow([
-        `Mesa ${c.mesa} · Cuenta de mesa ${formatearNumero(c.numero)}`,
+        `${c.titulo} · ${c.etiqueta}`,
         c.cerradaEn ? c.cerradaEn.toLocaleDateString("es-PY", opcionesFecha) : "—",
         c.cerradaEn
           ? c.cerradaEn.toLocaleTimeString("es-PY", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: ZONA_NEGOCIO })
           : "—",
         "Sin cobrar",
         c.cerradaPor ? `${c.cerradaPor} (la canceló)` : "—",
-        `${[c.mozo.nombre, c.mozo.apellido].filter(Boolean).join(" ")} (mozo)`,
+        `${c.responsable} (${c.rolResponsable})`,
         "Cancelada sin cobrar",
         Math.round(c.total),
         motivo,
@@ -179,7 +178,7 @@ export async function GET(request: NextRequest) {
   if (canceladasMesa.length > 0) {
     const filaSinCobrar = filaTitulo(
       hoja,
-      ["", "", "", "", "", "", `CUENTAS DE MESA CANCELADAS SIN COBRAR: ${canceladasMesa.length} (Gs.)`, Math.round(totalCanceladasMesa), ""],
+      ["", "", "", "", "", "", `CUENTAS CANCELADAS SIN COBRAR: ${canceladasMesa.length} (Gs.)`, Math.round(totalCanceladasMesa), ""],
       9
     );
     filaSinCobrar.getCell(8).numFmt = "#,##0";

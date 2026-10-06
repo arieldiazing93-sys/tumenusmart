@@ -114,11 +114,13 @@ export async function calcularSalidasPorVenta(
       ventaPosId: true,
       orderId: true,
       cuentaMesaId: true,
+      cuentaDeliveryId: true,
       almacen: { select: { nombre: true } },
       insumo: { select: { nombre: true, unidadMedida: true } },
       ventaPos: { select: { numero: true } },
       order: { select: { numero: true } },
       cuentaMesa: { select: { numero: true, mesa: true } },
+      cuentaDelivery: { select: { numero: true } },
     },
   });
   const recortado = encontrados.length > tope;
@@ -157,7 +159,7 @@ export async function calcularSalidasPorVenta(
   const porVenta = new Map<string, { momento: number; filas: Fila[] }>();
   const ventasDistintas = new Set<string>();
   for (const m of movimientos) {
-    const refId = m.ventaPosId ?? m.orderId ?? m.cuentaMesaId ?? m.id;
+    const refId = m.ventaPosId ?? m.orderId ?? m.cuentaMesaId ?? m.cuentaDeliveryId ?? m.id;
     ventasDistintas.add(refId);
     const tipo: TipoSalidaVenta = m.tipo === "cancelacion" ? "cancelacion" : "venta";
     const fila: Fila = {
@@ -170,7 +172,9 @@ export async function calcularSalidasPorVenta(
           ? `Venta mostrador ${formatearNumero(m.ventaPos.numero)}`
           : m.cuentaMesa
             ? `Mesa ${m.cuentaMesa.mesa} · Cuenta ${formatearNumero(m.cuentaMesa.numero)}`
-            : "—",
+            : m.cuentaDelivery
+              ? `Delivery · Cuenta ${formatearNumero(m.cuentaDelivery.numero)}`
+              : "—",
       producto: m.motivo ?? `Toda la venta: ${(textoDeLaVenta.get(refId) ?? ["—"]).join("; ")}`,
       insumo: m.insumo.nombre,
       unidad: etiquetaUnidadMedida(m.insumo.unidadMedida),

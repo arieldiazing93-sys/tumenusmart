@@ -1117,6 +1117,31 @@ export async function cancelarVenta(ventaId: string, motivo: string): Promise<Re
       });
     }
 
+    // Lo mismo si esta venta cobró la cuenta de un delivery (Servicio delivery): su stock quedó enlazado a la cuenta de delivery.
+    const cuentaDelivery = await tx.cuentaDelivery.findFirst({
+      where: { storeId, ventaPosId: ventaId },
+      select: {
+        id: true,
+        items: { where: { estado: "activo" }, select: { cantidad: true, nombreProducto: true, consumo: true } },
+      },
+    });
+    if (cuentaDelivery) {
+      for (const item of cuentaDelivery.items) {
+        await devolverConsumo(
+          tx,
+          storeId,
+          leerConsumoGuardado(item.consumo),
+          { cuentaDeliveryId: cuentaDelivery.id },
+          `Cancelado: ${item.cantidad} × ${item.nombreProducto} (cobro cancelado)`,
+          identidad
+        );
+      }
+      await tx.cuentaDelivery.update({
+        where: { id: cuentaDelivery.id },
+        data: { estado: "anulada", motivoCierre: `Cobro cancelado: ${motivo.trim() || "sin motivo"}` },
+      });
+    }
+
     // La propina que se cargó con esta venta (tarjeta o transferencia) ya no corresponde si se cancela el cobro: si todavía está
     // pendiente de pagarle al mozo, se anula. Una que ya se le pagó no se toca (el retiro de caja ya salió): se ve en Propinas.
     await tx.propinaMozo.updateMany({
@@ -1149,6 +1174,7 @@ export async function cancelarVenta(ventaId: string, motivo: string): Promise<Re
 
   revalidatePath("/admin/pos/cuentas");
   revalidatePath(`/admin/pos/venta/${ventaId}`);
+  revalidatePath("/admin/delivery");
   revalidatePath("/admin/stock/insumos");
   revalidatePath("/admin/agenda");
   revalidatePath("/admin/agenda/citas");

@@ -115,7 +115,7 @@ export async function GET(request: NextRequest) {
 
   hoja.addRow([]);
   filaTitulo(hoja, ["Canal de venta", "Ventas", "Ingresos (Gs.)"], 3);
-  for (const canal of ["carta", "telefono", "mostrador", "comedor"] as const) {
+  for (const canal of ["mostrador", "comedor", "delivery"] as const) {
     hoja.addRow([ETIQUETAS_CANAL[canal], stats.porCanal[canal].cantidad, Math.round(stats.porCanal[canal].ingresos)]);
   }
 

@@ -2,13 +2,13 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { marcarPedidoEntregado } from "./actions";
+import { marcarCuentaEntregada } from "./actions";
 
 /**
- * Marcar entregado. Es solo la ruta del repartidor: el pedido ya llegó cobrado y facturado desde la caja, así que acá no se
- * pregunta con qué pagó el cliente (lo que se cobró y cómo ya quedó cargado). Un solo toque para confirmar.
+ * Marcar entregado. Es solo la ruta del repartidor: un solo toque para confirmar. El cobro lo hace la caja con lo que el repartidor
+ * trae (o ya estaba cobrado), así que acá no se pregunta nada.
  */
-export function EntregarBoton({ repartidorId, orderId }: { repartidorId: string; orderId: string }) {
+export function EntregarBoton({ repartidorId, cuentaId }: { repartidorId: string; cuentaId: string }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -17,7 +17,7 @@ export function EntregarBoton({ repartidorId, orderId }: { repartidorId: string;
   function marcar() {
     setError(null);
     startTransition(async () => {
-      const resultado = await marcarPedidoEntregado(repartidorId, orderId);
+      const resultado = await marcarCuentaEntregada(repartidorId, cuentaId);
       if (!resultado.ok) {
         setError(resultado.error);
         return;

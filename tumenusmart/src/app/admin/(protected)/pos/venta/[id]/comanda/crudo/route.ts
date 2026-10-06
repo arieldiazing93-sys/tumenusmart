@@ -25,7 +25,9 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   ]);
   if (!venta) return new NextResponse("No encontrado", { status: 404 });
 
-  const items = area ? venta.items.filter((i) => i.product?.areaImpresionId === area) : venta.items;
+  // La línea de "Costo de envío" de un delivery no es para la cocina.
+  const itemsDeCocina = venta.items.filter((i) => !i.esEnvio);
+  const items = area ? itemsDeCocina.filter((i) => i.product?.areaImpresionId === area) : itemsDeCocina;
 
   const hora = venta.creadoEn.toLocaleString("es-PY", {
     day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", timeZone: ZONA_NEGOCIO,
@@ -36,7 +38,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   if (areaImpresion) l.push(centrado(areaImpresion.nombre.toUpperCase()));
   l.push(separador());
   l.push(hora);
-  l.push(venta.tipoEntrega === "llevar" ? "PARA LLEVAR" : "EN EL LOCAL");
+  l.push(venta.tipoEntrega === "llevar" ? "PARA LLEVAR" : venta.tipoEntrega === "delivery" ? "DELIVERY" : "EN EL LOCAL");
   l.push(separador());
 
   for (const item of items) {

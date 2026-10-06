@@ -67,7 +67,8 @@ export async function calcularEstadisticas(storeId: string, rango: RangoFecha) {
 
   const unidadesVendidas =
     validosPedidos.reduce((s, p) => s + p.items.reduce((si, it) => si + it.cantidad, 0), 0) +
-    validasVentas.reduce((s, v) => s + v.items.reduce((si, it) => si + it.cantidad, 0), 0);
+    // La línea de "Costo de envío" de una venta de delivery no es un producto: no cuenta como unidad vendida.
+    validasVentas.reduce((s, v) => s + v.items.reduce((si, it) => si + (it.esEnvio ? 0 : it.cantidad), 0), 0);
   const productosPorPedido = ventasValidas > 0 ? unidadesVendidas / ventasValidas : 0;
 
   // Clientes únicos por teléfono, combinando las dos fuentes — el mismo
@@ -122,31 +123,34 @@ export async function calcularEstadisticas(storeId: string, rango: RangoFecha) {
     porTipoEntrega[grupo].cantidad += 1;
     porTipoEntrega[grupo].ingresos += Number(p.total);
   }
-  // El POS no tiene delivery — "local" (se consume ahí) equivale a "mesa" y
-  // "llevar" (para llevar) equivale a "retiro", mismo par de categorías que
-  // ya usa el propio ticket del POS para diferenciar el comprobante.
+  // Una venta del Servicio delivery (`tipoEntrega` "delivery") es de delivery; "local" (se consume ahí) equivale a "mesa" y
+  // "llevar" (para llevar) equivale a "retiro", mismo par de categorías que ya usa el propio ticket del POS para diferenciar el
+  // comprobante.
   for (const v of validasVentas) {
-    const grupo = v.tipoEntrega === "local" ? "mesa" : "retiro";
+    const grupo = v.tipoEntrega === "delivery" ? "delivery" : v.tipoEntrega === "local" ? "mesa" : "retiro";
     porTipoEntrega[grupo].cantidad += 1;
     porTipoEntrega[grupo].ingresos += Number(v.total);
   }
 
-  // Por dónde entró cada venta: la carta digital, un pedido cargado por teléfono, el mostrador (Punto de Venta) o el
-  // Servicio comedor. Un pedido sabe su origen (`Order.origen`); una venta del comedor es la que cobró una cuenta de mesa
-  // (`CuentaMesa.ventaPosId`), y el resto de las ventas del POS son del mostrador.
+  // Por dónde entró cada venta: el mostrador (Punto de Venta), el Servicio comedor o el Servicio delivery. Una venta del comedor es
+  // la que cobró una cuenta de mesa (`CuentaMesa.ventaPosId`), una de delivery la que cobró una cuenta de delivery
+  // (`CuentaDelivery.ventaPosId`), y el resto de las ventas del POS son del mostrador. (Los canales "carta" y "telefono" eran de los
+  // pedidos del módulo Pedidos, que ya no existe: quedan en cero.)
   const idsVentas = validasVentas.map((v) => v.id);
-  const cuentasCobradas = idsVentas.length
-    ? await prisma.cuentaMesa.findMany({
-        where: { storeId, ventaPosId: { in: idsVentas } },
-        select: { ventaPosId: true },
-      })
-    : [];
+  const [cuentasCobradas, cuentasDeliveryCobradas] = idsVentas.length
+    ? await Promise.all([
+        prisma.cuentaMesa.findMany({ where: { storeId, ventaPosId: { in: idsVentas } }, select: { ventaPosId: true } }),
+        prisma.cuentaDelivery.findMany({ where: { storeId, ventaPosId: { in: idsVentas } }, select: { ventaPosId: true } }),
+      ])
+    : [[], []];
   const ventasDelComedor = new Set(cuentasCobradas.map((c) => c.ventaPosId));
+  const ventasDelDelivery = new Set(cuentasDeliveryCobradas.map((c) => c.ventaPosId));
   const porCanal = {
     carta: { cantidad: 0, ingresos: 0 },
     telefono: { cantidad: 0, ingresos: 0 },
     mostrador: { cantidad: 0, ingresos: 0 },
     comedor: { cantidad: 0, ingresos: 0 },
+    delivery: { cantidad: 0, ingresos: 0 },
   };
   for (const p of validosPedidos) {
     const canal = p.origen === "telefono" ? "telefono" : "carta";
@@ -154,7 +158,7 @@ export async function calcularEstadisticas(storeId: string, rango: RangoFecha) {
     porCanal[canal].ingresos += Number(p.total);
   }
   for (const v of validasVentas) {
-    const canal = ventasDelComedor.has(v.id) ? "comedor" : "mostrador";
+    const canal = ventasDelDelivery.has(v.id) ? "delivery" : ventasDelComedor.has(v.id) ? "comedor" : "mostrador";
     porCanal[canal].cantidad += 1;
     porCanal[canal].ingresos += Number(v.total);
   }
@@ -183,6 +187,7 @@ export const ETIQUETAS_CANAL = {
   telefono: "Pedidos por teléfono",
   mostrador: "Mostrador (Punto de Venta)",
   comedor: "Servicio comedor",
+  delivery: "Servicio delivery",
 } as const;
 
 export type FilaRanking = {
@@ -225,7 +230,8 @@ export async function calcularRankingProductos(
     // Un producto que solo se vende por mostrador (POS) no puede figurar
     // como "sin ventas" solo porque nadie lo pidió online.
     prisma.ventaPosItem.findMany({
-      where: { storeId, ventaPos: { creadoEn: rango, cancelada: false } },
+      // La línea de "Costo de envío" de una venta de delivery no es un producto: no entra al ranking.
+      where: { storeId, esEnvio: false, ventaPos: { creadoEn: rango, cancelada: false } },
       select: {
         nombreProducto: true,
         cantidad: true,

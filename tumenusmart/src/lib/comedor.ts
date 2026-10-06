@@ -95,15 +95,19 @@ export function textoComanda(datos: {
   /** La hora ya formateada ("03/10 12:45"). */
   hora: string;
   lineas: LineaComanda[];
+  /** Si no es una mesa (la comanda de una cuenta de delivery): el título que va en lugar de "MESA 5" ("DELIVERY 12"). */
+  titulo?: string;
+  /** La línea que va en lugar de "Mozo: Ana" ("Cliente: Pedro"). */
+  persona?: string;
 }): string {
   // Sin acentos y sin caracteres de control: nada de lo que viene de afuera puede colar comandos de impresora en la comanda.
   const s = (texto: string) => sinControles(sinAcentos(texto));
   const l: string[] = [separador()];
-  l.push(negrita(centrado(s(`MESA ${datos.mesa}`).toUpperCase())));
+  l.push(negrita(centrado(s(datos.titulo ?? `MESA ${datos.mesa}`).toUpperCase())));
   l.push(centrado(s(datos.area).toUpperCase()));
   l.push(separador());
   l.push(`${datos.hora}   Pedido ${datos.ronda}`);
-  l.push(s(`Mozo: ${datos.mozo}`));
+  l.push(s(datos.persona ?? `Mozo: ${datos.mozo}`));
   l.push(separador());
   for (const x of datos.lineas) {
     l.push(s(`${x.cantidad} x ${x.nombre}`).toUpperCase());
@@ -378,15 +382,24 @@ export function textoCuenta(datos: {
   totales: TotalesDeCuenta;
   /** Si la cuenta salió de dividir otra: la mesa original ("1" para la cuenta "1-A"). */
   divididaDe?: string | null;
+  /** Si no es una mesa (la cuenta de un delivery): el encabezado que va en lugar de "Mesa 5   Cuenta 3" ("Delivery   Cuenta 12"). */
+  titulo?: string;
+  /** La línea que va en lugar de "Mozo: Ana" ("Cliente: Pedro"). */
+  persona?: string;
+  /** Una línea de dirección u otro dato de la entrega (ya sin enlaces largos), debajo de la persona. */
+  detalle?: string;
+  /** El costo de envío de un delivery: sale como línea aparte, sin descuento, y ya está sumado en `totales.total`. */
+  envio?: number;
 }): string {
   const s = (texto: string) => sinControles(sinAcentos(texto));
   const l: string[] = [separador()];
   l.push(negrita(centrado(s(datos.local).toUpperCase())));
   l.push(centrado("CUENTA - NO ES FACTURA"));
   l.push(separador());
-  l.push(s(`Mesa ${datos.mesa}   Cuenta ${formatearNumero(datos.numero)}`));
+  l.push(s(datos.titulo ?? `Mesa ${datos.mesa}   Cuenta ${formatearNumero(datos.numero)}`));
   if (datos.divididaDe) l.push(s(`Cuenta dividida de la mesa ${datos.divididaDe}`));
-  l.push(s(`Mozo: ${datos.mozo}`));
+  l.push(s(datos.persona ?? `Mozo: ${datos.mozo}`));
+  if (datos.detalle) l.push(s(datos.detalle));
   l.push(datos.hora);
   l.push(separador());
   l.push(filaTabla("Ctd", "Descripcion", "Importe"));
@@ -396,9 +409,13 @@ export function textoCuenta(datos: {
   }
   l.push(separador());
   const t = datos.totales;
-  if (t.descuento > 0) {
+  const envio = datos.envio ?? 0;
+  if (t.descuento > 0 || envio > 0) {
     l.push(`SUBTOTAL: ${formatearGuarani(t.subtotal)}`);
-    l.push(`DESCUENTO${t.porcentaje != null ? ` ${textoPorcentaje(t.porcentaje)}%` : ""}: -${formatearGuarani(t.descuento)}`);
+    if (t.descuento > 0) {
+      l.push(`DESCUENTO${t.porcentaje != null ? ` ${textoPorcentaje(t.porcentaje)}%` : ""}: -${formatearGuarani(t.descuento)}`);
+    }
+    if (envio > 0) l.push(`ENVIO: ${formatearGuarani(envio)}`);
   }
   l.push(negrita(`TOTAL: ${formatearGuarani(t.total)}`));
   l.push(separador());
@@ -417,11 +434,13 @@ export function textoAnulacion(datos: {
   nombre: string;
   opciones?: string | null;
   motivo: string;
+  /** Si no es una mesa (un delivery): el título que va en lugar de "MESA 5" ("DELIVERY 12"). */
+  titulo?: string;
 }): string {
   const s = (texto: string) => sinControles(sinAcentos(texto));
   const l: string[] = [separador()];
   l.push(negrita(centrado("*** ANULADO ***")));
-  l.push(negrita(centrado(s(`MESA ${datos.mesa}`).toUpperCase())));
+  l.push(negrita(centrado(s(datos.titulo ?? `MESA ${datos.mesa}`).toUpperCase())));
   l.push(centrado(s(datos.area).toUpperCase()));
   l.push(separador());
   l.push(datos.hora);

@@ -8,21 +8,19 @@ import { formatearGuarani, formatearNumero } from "@/lib/format";
 import { nombreCompleto } from "@/lib/agenda-personal";
 import { etiquetaFormaPagoPos, FORMAS_PAGO_POS, FORMA_PAGO_MIXTO } from "@/lib/turno-pos";
 import { detallePagos, filtroPorFormaPago, montoCobradoConForma } from "@/lib/pago-venta";
-import { cargarCuentasMesaCanceladas, type CuentaMesaCancelada } from "@/lib/cuentas-canceladas";
+import { cargarCuentasCanceladas, type CuentaCancelada } from "@/lib/cuentas-canceladas";
 import { ZONA_NEGOCIO } from "@/lib/timezone";
 
 export const dynamic = "force-dynamic";
 
-function FilaCuentaMesaCancelada({ c }: { c: CuentaMesaCancelada }) {
+function FilaCuentaCancelada({ c }: { c: CuentaCancelada }) {
   return (
     <Tr>
       <Td>
-        <Link href={`/admin/pos/cuentas/mesa/${c.id}`} className="font-medium text-azul-oscuro hover:underline">
-          Mesa {c.mesa}
+        <Link href={c.href} className="font-medium text-azul-oscuro hover:underline">
+          {c.titulo}
         </Link>
-        <span className="mt-0.5 block text-[10px] font-medium uppercase text-tinta-suave">
-          Cuenta de mesa {formatearNumero(c.numero)}
-        </span>
+        <span className="mt-0.5 block text-[10px] font-medium uppercase text-tinta-suave">{c.etiqueta}</span>
       </Td>
       <Td>
         {c.cerradaEn
@@ -45,8 +43,8 @@ function FilaCuentaMesaCancelada({ c }: { c: CuentaMesaCancelada }) {
         <span className="mt-0.5 block text-[10px] text-tinta-suave">la canceló</span>
       </Td>
       <Td>
-        {[c.mozo.nombre, c.mozo.apellido].filter(Boolean).join(" ")}
-        <span className="mt-0.5 block text-[10px] text-tinta-suave">mozo</span>
+        {c.responsable}
+        <span className="mt-0.5 block text-[10px] text-tinta-suave">{c.rolResponsable}</span>
       </Td>
       <Td>
         <Pastilla color="peligro">Cancelada</Pastilla>
@@ -63,7 +61,7 @@ function FilaCuentaMesaCancelada({ c }: { c: CuentaMesaCancelada }) {
       </Td>
       <Td className="cifra text-right font-medium text-tinta-suave line-through">{formatearGuarani(c.total)}</Td>
       <Td className="text-right">
-        <BotonEnlace href={`/admin/pos/cuentas/mesa/${c.id}`} tono="navegar" tam="sm">
+        <BotonEnlace href={c.href} tono="navegar" tam="sm">
           Ver
         </BotonEnlace>
       </Td>
@@ -142,20 +140,20 @@ export default async function CuentasPosPage({
     },
   });
 
-  // Las cuentas de mesa que se cancelaron antes de cobrarse no son ventas, pero NO pueden desaparecer: si alguien imprimió la
-  // cuenta, el cliente pagó y después la cancelaron, esa plata no está en ninguna venta. Se muestran acá, con quién la
+  // Las cuentas (de mesa o de delivery) que se cancelaron antes de cobrarse no son ventas, pero NO pueden desaparecer: si alguien
+  // imprimió la cuenta, el cliente pagó y después la cancelaron, esa plata no está en ninguna venta. Se muestran acá, con quién la
   // canceló y por qué. Solo cuando no se filtra por forma de pago (una cuenta sin cobrar no tiene forma de pago).
   // (La misma función la usan el Excel y el PDF de este historial, para que los tres muestren lo mismo.)
-  const canceladasMesa = formaPago ? [] : await cargarCuentasMesaCanceladas(db, rango);
+  const canceladasSinCobrar = formaPago ? [] : await cargarCuentasCanceladas(db, rango);
 
   // Todo junto, de la más reciente a la más vieja.
   const filas = [
-    ...ventas.map((v) => ({ clave: v.id, fecha: v.creadoEn, venta: v, mesa: null as CuentaMesaCancelada | null })),
-    ...canceladasMesa.map((c) => ({
-      clave: `mesa-${c.id}`,
+    ...ventas.map((v) => ({ clave: v.id, fecha: v.creadoEn, venta: v, cuenta: null as CuentaCancelada | null })),
+    ...canceladasSinCobrar.map((c) => ({
+      clave: `${c.canal}-${c.id}`,
       fecha: c.cerradaEn ?? new Date(0),
       venta: null,
-      mesa: c as CuentaMesaCancelada | null,
+      cuenta: c as CuentaCancelada | null,
     })),
   ].sort((a, b) => b.fecha.getTime() - a.fecha.getTime());
 
@@ -176,7 +174,7 @@ export default async function CuentasPosPage({
     <div>
       <Cabecera
         titulo="Historial de cuentas"
-        bajada="Todas las ventas cerradas desde la caja: las del mostrador y las cuentas de mesa del servicio comedor, más las cuentas de mesa que se cancelaron sin cobrar (con quién y por qué). Los pedidos de la carta tienen su propio historial en Pedidos."
+        bajada="Todas las cuentas que se cierran desde la caja: las ventas del mostrador, las cuentas de mesa del servicio comedor y las de delivery, más las cuentas que se cancelaron sin cobrar (con quién y por qué)."
         acciones={
           <>
             <a
@@ -274,7 +272,7 @@ export default async function CuentasPosPage({
       {filas.length === 0 ? (
         <Vacio
           titulo="No hay cuentas en este período"
-          detalle="Las ventas cerradas por Punto de Venta y las cuentas de mesa canceladas van a aparecer acá."
+          detalle="Las ventas cerradas (mostrador, comedor y delivery) y las cuentas canceladas sin cobrar van a aparecer acá."
         />
       ) : (
         <Tabla>
@@ -296,8 +294,8 @@ export default async function CuentasPosPage({
           <tbody>
             {filas.map((fila) => {
               const v = fila.venta;
-              // Una cuenta de mesa cancelada sin cobrar: no es una venta, pero tiene que verse (con quién la canceló y por qué).
-              if (!v) return fila.mesa ? <FilaCuentaMesaCancelada key={fila.clave} c={fila.mesa} /> : null;
+              // Una cuenta cancelada sin cobrar: no es una venta, pero tiene que verse (con quién la canceló y por qué).
+              if (!v) return fila.cuenta ? <FilaCuentaCancelada key={fila.clave} c={fila.cuenta} /> : null;
               return (
               <Tr key={v.id}>
                 <Td>
@@ -311,6 +309,12 @@ export default async function CuentasPosPage({
                     <span className="mt-0.5 block text-[10px] font-medium uppercase text-tinta-suave">
                       {/* "Mesa 1 · Cuenta de mesa #0004": la venta tiene su número (el de arriba) y acá se ve de qué cuenta de mesa salió. */}
                       {v.nota.replace(" · Cuenta #", " · Cuenta de mesa #")}
+                    </span>
+                  )}
+                  {v.nota?.startsWith("Delivery · ") && (
+                    <span className="mt-0.5 block text-[10px] font-medium uppercase text-tinta-suave">
+                      {/* "Delivery · Cuenta de delivery #0012": de qué cuenta de delivery salió la venta. */}
+                      {v.nota.replace(" · Cuenta #", " · Cuenta de delivery #")}
                     </span>
                   )}
                   {v.comprobanteTipo === "factura" && v.facturaNumero && (

@@ -434,7 +434,10 @@ export function DetalleCuenta({
       )}
       {dialogo?.tipo === "descuento" && (
         <DialogoDescuento
-          cuenta={cuenta}
+          titulo={`Descuento · mesa ${cuenta.mesa}`}
+          descuento={cuenta.descuento}
+          subtotal={cuenta.totales.subtotal}
+          onAplicar={(d, motivo) => aplicarDescuento(cuenta.id, d, motivo)}
           onCerrar={() => setDialogo(null)}
           onListo={() => {
             setDialogo(null);
@@ -547,7 +550,7 @@ function PieDeCuenta({ cuenta }: { cuenta: CuentaCajaFila }) {
  * cuenta en partes iguales, se cancela entero. Por defecto propone cancelar UNA unidad (lo menos destructivo): para cancelar todo
  * está el botón "Todas".
  */
-function DialogoCancelarProducto({
+export function DialogoCancelarProducto({
   nombre,
   cantidad,
   enteras,
@@ -669,7 +672,7 @@ function DialogoCancelarProducto({
 }
 
 /** Pide el motivo de una cancelación: sin motivo (al menos 3 letras) no se hace nada. */
-function DialogoMotivo({
+export function DialogoMotivo({
   titulo,
   texto,
   confirmar,
@@ -736,24 +739,39 @@ function DialogoMotivo({
   );
 }
 
-/** El descuento general de la cuenta: porcentaje o monto fijo, con motivo, mostrando cuánto queda a pagar. */
-function DialogoDescuento({
-  cuenta,
+/**
+ * El descuento general de la cuenta: porcentaje o monto fijo, con motivo, mostrando cuánto queda a pagar. Lo usan la cuenta de una mesa
+ * y la de un delivery: cada una dice cómo se guarda (`onAplicar`), cuánto valen sus productos y, si lo tiene, su costo de envío (que
+ * no se descuenta pero sí se suma al total que se muestra).
+ */
+export function DialogoDescuento({
+  titulo,
+  descuento,
+  subtotal,
+  envio = 0,
+  onAplicar,
   onCerrar,
   onListo,
 }: {
-  cuenta: CuentaCajaFila;
+  titulo: string;
+  /** El descuento que ya tiene la cuenta, si lo tiene. */
+  descuento: { tipo: "porcentaje" | "monto"; valor: number; motivo: string } | null;
+  /** Lo que valen los productos de la cuenta, sin descuento. */
+  subtotal: number;
+  /** El costo de envío de un delivery (0 en una mesa). */
+  envio?: number;
+  /** Guarda el descuento (o lo quita con `null`). */
+  onAplicar: (descuento: { tipo: "porcentaje" | "monto"; valor: number } | null, motivo: string) => Promise<{ ok: true } | { ok: false; error: string }>;
   onCerrar: () => void;
   onListo: () => void;
 }) {
-  const [tipo, setTipo] = useState<"porcentaje" | "monto">(cuenta.descuento?.tipo ?? "porcentaje");
-  const [valorTexto, setValorTexto] = useState(cuenta.descuento ? String(cuenta.descuento.valor).replace(".", ",") : "");
-  const [motivo, setMotivo] = useState(cuenta.descuento?.motivo ?? "");
+  const [tipo, setTipo] = useState<"porcentaje" | "monto">(descuento?.tipo ?? "porcentaje");
+  const [valorTexto, setValorTexto] = useState(descuento ? String(descuento.valor).replace(".", ",") : "");
+  const [motivo, setMotivo] = useState(descuento?.motivo ?? "");
   const [error, setError] = useState<string | null>(null);
   const [pendiente, iniciar] = useTransition();
 
   const valor = parseFloat(valorTexto.replace(",", "."));
-  const subtotal = cuenta.totales.subtotal;
   const calculado = Number.isFinite(valor) && valor > 0 ? calcularDescuento(subtotal, { tipo, valor }) : null;
   // Un 0 es "sin descuento": reemplaza al que ya tenía la cuenta y la deja en su monto original (para corregir uno mal puesto).
   const esCero = Number.isFinite(valor) && valor === 0;
@@ -774,7 +792,7 @@ function DialogoDescuento({
     setError(null);
     iniciar(async () => {
       try {
-        const r = await aplicarDescuento(cuenta.id, { tipo, valor }, motivo);
+        const r = await onAplicar({ tipo, valor }, motivo);
         if (!r.ok) {
           setError(r.error);
           return;
@@ -790,7 +808,7 @@ function DialogoDescuento({
     setError(null);
     iniciar(async () => {
       try {
-        const r = await aplicarDescuento(cuenta.id, null, "");
+        const r = await onAplicar(null, "");
         if (!r.ok) {
           setError(r.error);
           return;
@@ -803,7 +821,7 @@ function DialogoDescuento({
   }
 
   return (
-    <Modal titulo={`Descuento · mesa ${cuenta.mesa}`} onCerrar={onCerrar}>
+    <Modal titulo={titulo} onCerrar={onCerrar}>
       <div className="flex flex-col gap-3">
         <Segmentado
           opciones={[
@@ -817,7 +835,7 @@ function DialogoDescuento({
         <Campo
           etiqueta={tipo === "porcentaje" ? "Porcentaje de descuento *" : "Monto a descontar *"}
           ayuda={
-            cuenta.descuento
+            descuento
               ? "Escribí el nuevo valor y se reemplaza el descuento anterior. Con 0 la cuenta vuelve a su monto original."
               : undefined
           }
@@ -849,15 +867,16 @@ function DialogoDescuento({
           <span>
             {formatearGuarani(subtotal)}
             {calculado && calculado.ok ? ` − ${formatearGuarani(calculado.monto)}` : ""}
+            {envio > 0 ? ` + envío ${formatearGuarani(envio)}` : ""}
           </span>
           <span className="cifra text-[1.2rem] font-bold text-tinta">
-            {formatearGuarani(calculado && calculado.ok ? subtotal - calculado.monto : subtotal)}
+            {formatearGuarani((calculado && calculado.ok ? subtotal - calculado.monto : subtotal) + envio)}
           </span>
         </div>
 
         {error && <MensajeError>{error}</MensajeError>}
         <div className="flex flex-wrap justify-end gap-2">
-          {cuenta.descuento && (
+          {descuento && (
             <button type="button" disabled={pendiente} onClick={quitar} className={clasesBoton("peligro", "md")}>
               Quitar descuento
             </button>

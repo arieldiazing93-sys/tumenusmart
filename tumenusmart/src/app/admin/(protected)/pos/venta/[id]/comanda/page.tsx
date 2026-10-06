@@ -53,7 +53,9 @@ export default async function ComandaVentaPosPage({
   ]);
   if (!venta) notFound();
 
-  const items = area ? venta.items.filter((i) => i.product?.areaImpresionId === area) : venta.items;
+  // La línea de "Costo de envío" de un delivery no es para la cocina.
+  const itemsDeCocina = venta.items.filter((i) => !i.esEnvio);
+  const items = area ? itemsDeCocina.filter((i) => i.product?.areaImpresionId === area) : itemsDeCocina;
 
   const hora = venta.creadoEn.toLocaleString("es-PY", {
     day: "2-digit",
@@ -84,7 +86,7 @@ export default async function ComandaVentaPosPage({
           {/* En mayúscula y solo, para que el cocinero lo vea sin tener que
               buscarlo entre el resto del texto: es el dato que decide si
               sirve en un plato o empaca para llevar. */}
-          <p>{venta.tipoEntrega === "llevar" ? "PARA LLEVAR" : "EN EL LOCAL"}</p>
+          <p>{venta.tipoEntrega === "llevar" ? "PARA LLEVAR" : venta.tipoEntrega === "delivery" ? "DELIVERY" : "EN EL LOCAL"}</p>
         </div>
 
         <Separador />

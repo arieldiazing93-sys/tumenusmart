@@ -8,7 +8,7 @@ import { detallePagos, filtroPorFormaPago, montoCobradoConForma } from "@/lib/pa
 import { ZONA_NEGOCIO } from "@/lib/timezone";
 import { ImprimirBoton } from "../../../estadisticas/imprimir/ImprimirBoton";
 import { nombreCompleto } from "@/lib/agenda-personal";
-import { cargarCuentasMesaCanceladas, type CuentaMesaCancelada } from "@/lib/cuentas-canceladas";
+import { cargarCuentasCanceladas, type CuentaCancelada } from "@/lib/cuentas-canceladas";
 
 export const dynamic = "force-dynamic";
 
@@ -28,9 +28,9 @@ export default async function ImprimirCuentasPosPage({
   const db = prismaDelLocal(storeId);
   const [local, canceladasMesa, ventas] = await Promise.all([
     localActual(),
-    // Las cuentas de mesa cerradas sin cobrar también van en el reporte (con una forma de pago filtrada no entran: una cuenta
-    // sin cobrar no tiene forma de pago). Es la misma función que usan la pantalla y el Excel.
-    formaPago ? Promise.resolve<CuentaMesaCancelada[]>([]) : cargarCuentasMesaCanceladas(db, rango),
+    // Las cuentas (de mesa y de delivery) cerradas sin cobrar también van en el reporte (con una forma de pago filtrada no entran:
+    // una cuenta sin cobrar no tiene forma de pago). Es la misma función que usan la pantalla y el Excel.
+    formaPago ? Promise.resolve<CuentaCancelada[]>([]) : cargarCuentasCanceladas(db, rango),
     db.ventaPos.findMany({
       where: { creadoEn: { gte: rango.gte, lt: rango.lt }, ...filtroPorFormaPago(formaPago) },
       orderBy: { creadoEn: "asc" },
@@ -72,14 +72,14 @@ export default async function ImprimirCuentasPosPage({
     );
   const totalCanceladasMesa = canceladasMesa.reduce((s, c) => s + c.total, 0);
 
-  // Ventas y cuentas de mesa canceladas sin cobrar, juntas y en orden de fecha (de la más vieja a la más nueva).
+  // Ventas y cuentas canceladas sin cobrar, juntas y en orden de fecha (de la más vieja a la más nueva).
   const filas = [
-    ...ventas.map((v) => ({ clave: v.id, fecha: v.creadoEn, venta: v, mesa: null as CuentaMesaCancelada | null })),
+    ...ventas.map((v) => ({ clave: v.id, fecha: v.creadoEn, venta: v, cuenta: null as CuentaCancelada | null })),
     ...canceladasMesa.map((c) => ({
-      clave: `mesa-${c.id}`,
+      clave: `${c.canal}-${c.id}`,
       fecha: c.cerradaEn ?? new Date(0),
       venta: null,
-      mesa: c as CuentaMesaCancelada | null,
+      cuenta: c as CuentaCancelada | null,
     })),
   ].sort((a, b) => a.fecha.getTime() - b.fecha.getTime());
 
@@ -113,17 +113,15 @@ export default async function ImprimirCuentasPosPage({
             {filas.map((fila) => {
               const v = fila.venta;
               if (!v) {
-                // Una cuenta de mesa cerrada SIN cobrar: no suma al total (no entró plata) pero queda a la vista, con quién la
-                // canceló, cuándo y por qué.
-                const c = fila.mesa;
+                // Una cuenta (de mesa o de delivery) cerrada SIN cobrar: no suma al total (no entró plata) pero queda a la vista,
+                // con quién la canceló, cuándo y por qué.
+                const c = fila.cuenta;
                 if (!c) return null;
                 return (
                   <tr key={fila.clave} className="border-b border-linea-fina">
                     <td className="py-1.5">
-                      Mesa {c.mesa}
-                      <span className="block text-[10px] uppercase text-tinta-suave">
-                        Cuenta de mesa {formatearNumero(c.numero)}
-                      </span>
+                      {c.titulo}
+                      <span className="block text-[10px] uppercase text-tinta-suave">{c.etiqueta}</span>
                     </td>
                     <td className="py-1.5 text-tinta-media">
                       {c.cerradaEn
@@ -143,8 +141,8 @@ export default async function ImprimirCuentasPosPage({
                       <span className="block text-[10px] text-tinta-suave">la canceló</span>
                     </td>
                     <td className="py-1.5 text-tinta-media">
-                      {[c.mozo.nombre, c.mozo.apellido].filter(Boolean).join(" ")}
-                      <span className="block text-[10px] text-tinta-suave">mozo</span>
+                      {c.responsable}
+                      <span className="block text-[10px] text-tinta-suave">{c.rolResponsable}</span>
                     </td>
                     <td className="py-1.5 text-tinta-media">
                       Cancelada sin cobrar
@@ -199,7 +197,7 @@ export default async function ImprimirCuentasPosPage({
             {canceladasMesa.length > 0 && (
               <tr className="font-medium text-tinta-media">
                 <td className="py-1.5" colSpan={6}>
-                  Cuentas de mesa canceladas sin cobrar: {canceladasMesa.length} (no suman al total)
+                  Cuentas canceladas sin cobrar: {canceladasMesa.length} (no suman al total)
                 </td>
                 <td className="cifra py-1.5 text-right">{formatearGuarani(totalCanceladasMesa)}</td>
               </tr>

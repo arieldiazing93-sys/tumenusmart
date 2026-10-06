@@ -90,9 +90,9 @@ const EXCEPCIONES = {
       "servidor y no duplica un envío repetido",
   },
   "src/app/repartidor/[id]/actions.ts": {
-    marcarPedidoEntregado:
-      "el repartidor no tiene cuenta; la acción verifica que el pedido esté " +
-      "asignado a ESE repartidor y sea de su mismo local",
+    marcarCuentaEntregada:
+      "el repartidor no tiene cuenta; la acción verifica que la cuenta de delivery esté " +
+      "asignada a ESE repartidor, en ruta y sea de su mismo local",
   },
 };
 

@@ -39,11 +39,6 @@ function armarGrupos(hayIdeaSinVer: boolean, rol: string, ventasACredito: boolea
         // varias veces por hora.
         { href: "/admin/pos", label: "Punto de venta", icono: "pos" as const,
           ver: conPermiso("pos.vender") },
-        // El historial de TODAS las ventas cerradas: las del mostrador y también las cuentas de mesa que se cobran
-        // desde Servicio comedor. Vive acá y no en "Cómo va el negocio": el cajero necesita buscar una cuenta y poder
-        // cancelarla en el momento, no solo el dueño repasando el día después.
-        { href: "/admin/pos/cuentas", label: "Historial de cuentas", icono: "pedidos" as const,
-          ver: conPermiso("pos.vender") },
         // El mozo carga las mesas desde su celular o tablet (enlace público con su PIN) y la caja opera las cuentas
         // y imprime las comandas con las impresoras de su estación. Es un submenú: las pantallas de adentro son
         // suyas (las cuentas abiertas y la impresión automática). Lo que se configura (mozos, mesas, reglas) vive en
@@ -59,6 +54,15 @@ function armarGrupos(hayIdeaSinVer: boolean, rol: string, ventasACredito: boolea
             { href: "/admin/comedor/propinas", label: "Propinas", icono: "usuarios" as const,
               ver: conPermiso("comedor.gestionar") },
           ] },
+        // Las cuentas de los pedidos a domicilio: la caja abre una con los datos del cliente y su dirección, le carga los productos,
+        // la manda con un repartidor y la cobra. Tercera opción del día a día, después del Punto de venta y el Servicio comedor.
+        { href: "/admin/delivery", label: "Servicio delivery", icono: "repartidores" as const,
+          ver: conPermiso("delivery.ver") },
+        // El historial de TODAS las cuentas que se cierran: las ventas del mostrador, las cuentas de mesa y de delivery que se
+        // cobran, y las que se cancelaron sin cobrar. Vive acá y no en "Cómo va el negocio": el cajero necesita buscar una cuenta
+        // y poder cancelarla en el momento, no solo el dueño repasando el día después.
+        { href: "/admin/pos/cuentas", label: "Historial de cuentas", icono: "pedidos" as const,
+          ver: conPermiso("pos.vender") },
         // Facturas del mostrador, del comedor y de las citas. Vive en "Día a día" para
         // encontrarla rápido: ahí se ve una factura recién emitida, se anula, se
         // remite y se ven sus datos para la factura electrónica. El permiso sigue

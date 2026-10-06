@@ -201,6 +201,8 @@ export async function calcularReporteProductosVendidos(
         costoAgregados: true,
         costoProducto: true,
         opcionesTexto: true,
+        // La línea de "Costo de envío" de una venta de delivery: no es un producto, sale aparte.
+        esEnvio: true,
         // Para repartir entre los ítems el descuento general de la cuenta.
         ventaPos: { select: { total: true, descuento: true } },
         product: {
@@ -259,6 +261,8 @@ export async function calcularReporteProductosVendidos(
     categoriaId: string | null;
     categoriaNombre: string;
     categoriaOrden: number;
+    // El costo de envío de las ventas de delivery: va en su propia categoría, no entre los productos ni los combos.
+    esEnvio: boolean;
   };
 
   // La clave es el producto si lo tiene, o el nombre del combo si no — así
@@ -272,7 +276,7 @@ export async function calcularReporteProductosVendidos(
   // todos en proporción, para que la venta del reporte sea la plata que de
   // verdad entró — la misma que suman Estadísticas y Analytics con `total`.
   const todosLosItems = [
-    ...items.map((i) => ({ ...i, factorDescuento: 1 })),
+    ...items.map((i) => ({ ...i, factorDescuento: 1, esEnvio: false })),
     ...itemsPos.map(({ ventaPos, ...i }) => ({
       ...i,
       factorDescuento: factorDeDescuento(Number(ventaPos.total), Number(ventaPos.descuento)),
@@ -280,7 +284,7 @@ export async function calcularReporteProductosVendidos(
   ];
 
   for (const item of todosLosItems) {
-    const clave = item.productId ?? `combo:${item.nombreProducto}`;
+    const clave = item.esEnvio ? "__envio__" : (item.productId ?? `combo:${item.nombreProducto}`);
     const esCombo = !item.productId;
     const actual: Acumulado = acumulado.get(clave) ?? {
       nombre: item.nombreProducto,
@@ -296,8 +300,9 @@ export async function calcularReporteProductosVendidos(
       costoAgregadosIncompleto: false,
       detalleAgregados: new Map(),
       categoriaId: item.product?.category?.id ?? null,
-      categoriaNombre: item.product?.category?.nombre ?? "Mitad y mitad / combos",
+      categoriaNombre: item.esEnvio ? "Envíos (delivery)" : (item.product?.category?.nombre ?? "Mitad y mitad / combos"),
       categoriaOrden: item.product?.category?.orden ?? Number.MAX_SAFE_INTEGER,
+      esEnvio: item.esEnvio,
     };
 
     // La tasa de IVA es la que tenía el producto AL VENDER (snapshot en el
@@ -405,7 +410,7 @@ export async function calcularReporteProductosVendidos(
     const ganancia = totalCosto != null ? totalVenta - totalCosto : null;
     const margen = ganancia != null && totalVenta > 0 ? (ganancia / totalVenta) * 100 : null;
 
-    const claveCategoria = a.categoriaId ?? SIN_CATEGORIA;
+    const claveCategoria = a.esEnvio ? "__envio__" : (a.categoriaId ?? SIN_CATEGORIA);
     let categoria = categoriasMap.get(claveCategoria);
     if (!categoria) {
       categoria = {
