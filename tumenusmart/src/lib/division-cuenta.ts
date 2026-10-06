@@ -64,7 +64,8 @@ export type LineaBase = {
 /**
  * Cómo queda una línea en una de las cuentas resultantes.
  *  - "conservar": la fila no cambia y sigue en la cuenta original.
- *  - "mover": la fila existente pasa tal cual a otra cuenta.
+ *  - "mover": la fila existente pasa a otra cuenta (con la cantidad que lleva esa línea: la misma si pasa entera, o menos si el
+ *    producto se repartió entre varias cuentas y ya no queda nada en la original).
  *  - "actualizar": la fila existente sigue en la cuenta original pero con otros datos (menos cantidad, o su parte).
  *  - "crear": una fila nueva en otra cuenta.
  */
@@ -403,12 +404,17 @@ export function dividirEnPartesIguales(
 //  Dividir por producto
 // ---------------------------------------------------------------------------------------------------------------------
 
-/** Qué producto (y cuántas unidades) pasa a qué cuenta nueva. `destino` va de 1 (la cuenta "A") a `destinos` (la última). */
+/**
+ * Qué producto (y cuántas unidades) pasa a qué cuenta nueva. `destino` va de 1 (la cuenta "A") a `destinos` (la última).
+ * Un mismo producto puede aparecer varias veces con destinos distintos: 3 parrilladas para 3 personas son 1 que se queda, 1 a la
+ * cuenta A y 1 a la B.
+ */
 export type AsignacionDeLinea = { itemId: string; destino: number; cantidad: number };
 
 /**
- * Pasa productos a cuentas nuevas. Los que no se mencionan se quedan en la cuenta original. Una línea se pasa entera, o, si es de
- * varias unidades enteras, solo algunas (2 de las 3 pizzas): las cantidades quedan enteras y el precio de lista no cambia.
+ * Pasa productos a cuentas nuevas. Los que no se mencionan se quedan en la cuenta original. Una línea se pasa entera a una sola
+ * cuenta, o, si es de varias unidades enteras, se reparte: algunas unidades a una cuenta, otras a otra y el resto se queda (de 3
+ * pizzas, 1 a la A, 1 a la B y 1 se queda). Las cantidades quedan enteras y el precio de lista no cambia.
  */
 export function dividirPorProducto(
   lineas: LineaBase[],
@@ -424,39 +430,60 @@ export function dividirPorProducto(
   const original = totalesDeCuenta(lineas, descuento);
   if (original.descuentoInvalido) return falla(`El descuento ya no corresponde a esta cuenta (${original.descuentoInvalido}) Cambialo o quitalo.`);
 
-  const porId = new Map<string, AsignacionDeLinea>();
+  // Lo que se pasa de cada producto, por cuenta de destino (lo repetido para la misma cuenta se suma).
+  const porId = new Map<string, { destino: number; cantidad: number }[]>();
   for (const a of asignaciones) {
     if (!lineas.some((l) => l.id === a.itemId)) return falla("Uno de los productos ya no está en la cuenta. Actualizá la pantalla.");
-    if (porId.has(a.itemId)) return falla("Un producto no puede ir a dos cuentas a la vez.");
     if (!Number.isInteger(a.destino) || a.destino < 1 || a.destino > destinos) return falla("Una cuenta de destino no es válida.");
     if (!Number.isFinite(a.cantidad) || a.cantidad <= 0) return falla("La cantidad a pasar tiene que ser mayor a cero.");
-    porId.set(a.itemId, a);
+    const lista = porId.get(a.itemId) ?? [];
+    const igual = lista.find((x) => x.destino === a.destino);
+    if (igual) igual.cantidad += a.cantidad;
+    else lista.push({ destino: a.destino, cantidad: a.cantidad });
+    porId.set(a.itemId, lista);
   }
 
   const porParte: LineaDeParte[][] = Array.from({ length: destinos + 1 }, () => []);
   for (const origen of lineas) {
-    const a = porId.get(origen.id);
-    if (!a) {
+    const lista = [...(porId.get(origen.id) ?? [])].sort((x, y) => x.destino - y.destino);
+    if (lista.length === 0) {
       porParte[0].push(lineaIntacta(origen, "conservar"));
       continue;
     }
-    if (a.cantidad > origen.cantidad + 1e-9) {
-      return falla(`No se pueden pasar ${formatearCantidad(a.cantidad)} de "${origen.nombreProducto}": hay ${formatearCantidad(origen.cantidad)}.`);
+    const pasa = lista.reduce((s, x) => s + x.cantidad, 0);
+    if (pasa > origen.cantidad + 1e-9) {
+      return falla(`No se pueden pasar ${formatearCantidad(pasa)} de "${origen.nombreProducto}": hay ${formatearCantidad(origen.cantidad)}.`);
     }
-    // Se pasa la línea entera.
-    if (Math.abs(a.cantidad - origen.cantidad) < 1e-9) {
-      porParte[a.destino].push(lineaIntacta(origen, "mover"));
+    const quedan = Math.abs(origen.cantidad - pasa) < 1e-9 ? 0 : origen.cantidad - pasa;
+
+    // Se pasa la línea entera a una sola cuenta.
+    if (lista.length === 1 && quedan === 0) {
+      porParte[lista[0].destino].push(lineaIntacta(origen, "mover"));
       continue;
     }
-    // Se pasan solo algunas unidades: tiene que ser una línea de unidades enteras y a precio entero, para que las dos
-    // mitades de la línea sigan dando enteros exactos.
-    if (!Number.isInteger(origen.cantidad) || !Number.isInteger(a.cantidad) || !esEntero(origen.precioUnitario)) {
-      return falla(`"${origen.nombreProducto}" solo se puede pasar entero.`);
+    // Se reparte la línea: tiene que ser de unidades enteras y a precio entero, para que cada pedazo siga dando enteros exactos.
+    if (!Number.isInteger(origen.cantidad) || lista.some((x) => !Number.isInteger(x.cantidad)) || !esEntero(origen.precioUnitario)) {
+      return falla(`"${origen.nombreProducto}" solo se puede pasar entero y a una sola cuenta.`);
     }
-    const quedan = origen.cantidad - a.cantidad;
-    const consumos = repartirConsumo(origen.consumo ?? [], [quedan / origen.cantidad, a.cantidad / origen.cantidad]);
-    porParte[0].push({ ...lineaIntacta(origen, "actualizar"), cantidad: quedan, consumo: consumos[0], importe: importeDeLinea({ ...origen, cantidad: quedan }) });
-    porParte[a.destino].push({ ...lineaIntacta(origen, "crear"), cantidad: a.cantidad, consumo: consumos[1], importe: importeDeLinea({ ...origen, cantidad: a.cantidad }) });
+    const consumos = repartirConsumo(origen.consumo ?? [], [quedan, ...lista.map((x) => x.cantidad)].map((c) => c / origen.cantidad));
+    if (quedan > 0) {
+      porParte[0].push({
+        ...lineaIntacta(origen, "actualizar"),
+        cantidad: quedan,
+        consumo: consumos[0],
+        importe: importeDeLinea({ ...origen, cantidad: quedan }),
+      });
+    }
+    lista.forEach((x, i) => {
+      // Si no queda nada en la original, su fila pasa a la primera cuenta (con su parte); las demás son filas nuevas.
+      const accion: AccionDeLinea = quedan === 0 && i === 0 ? "mover" : "crear";
+      porParte[x.destino].push({
+        ...lineaIntacta(origen, accion),
+        cantidad: x.cantidad,
+        consumo: consumos[i + 1],
+        importe: importeDeLinea({ ...origen, cantidad: x.cantidad }),
+      });
+    });
   }
 
   if (porParte[0].length === 0) return falla("Dejá al menos un producto en la cuenta original.");

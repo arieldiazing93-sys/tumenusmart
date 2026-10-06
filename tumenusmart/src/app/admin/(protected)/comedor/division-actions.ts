@@ -198,9 +198,14 @@ export async function dividirCuenta(cuentaId: string, datos: DatosDivision): Pro
           const fila = filaPorId.get(l.origenId);
           if (!fila) throw new ErrorDeUsuario(cambio);
           if (l.accion === "mover") {
+            // Pasa a otra cuenta. Si el producto se repartió entre varias cuentas y no quedó nada en la original, esta fila lleva solo
+            // su parte (menos cantidad y menos stock descontado): se actualiza junto con el cambio de cuenta.
+            const cambiaLaCantidad = Math.abs(l.cantidad - fila.cantidad) > 1e-9;
             const r = await tx.itemCuentaMesa.updateMany({
               where: { id: fila.id, storeId, cuentaId: cuenta.id, estado: "activo" },
-              data: { cuentaId: destino.id },
+              data: cambiaLaCantidad
+                ? { cuentaId: destino.id, cantidad: l.cantidad, consumo: l.consumo as unknown as Prisma.InputJsonValue }
+                : { cuentaId: destino.id },
             });
             if (r.count !== 1) throw new ErrorDeUsuario(cambio);
           } else if (l.accion === "actualizar") {
