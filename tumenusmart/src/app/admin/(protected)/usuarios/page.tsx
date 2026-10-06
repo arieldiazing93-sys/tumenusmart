@@ -23,7 +23,7 @@ export default async function AdminUsuariosPage() {
   const sesion = await sesionActual();
   // El layout ya lo oculta del menú, pero alguien podría escribir la dirección
   // a mano. La pantalla se defiende sola.
-  if (!sesion || sesion.rol !== "superadmin") redirect("/admin/pedidos");
+  if (!sesion || sesion.rol !== "superadmin") redirect("/admin/pos");
 
   const [usuarios, locales] = await Promise.all([
     prisma.usuario.findMany({

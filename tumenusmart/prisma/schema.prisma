@@ -911,18 +911,8 @@ model Order {
   // WhatsApp". Esta marca distingue los pedidos realmente enviados de los
   // que el cliente armó y abandonó en el último paso.
   enviadoWhatsapp      Boolean       @default(false)
-  /// La suma de los productos, SIN descuento ni envío.
   subtotal             Decimal       @db.Decimal(10, 2)
   costoEnvio           Decimal       @db.Decimal(10, 2) @default(0)
-  /// Descuento general del pedido en guaraníes (0 = sin descuento): lo da la caja mientras el pedido está abierto, igual que en la
-  /// cuenta de una mesa. Se calcula sobre los productos (no sobre el envío) y `total` ya lo lleva restado:
-  /// total = subtotal − descuento + costoEnvio.
-  descuento            Decimal       @default(0) @db.Decimal(10, 2)
-  /// "porcentaje" o "monto", su valor y por qué: con esto el descuento por porcentaje se ajusta solo si se cancela un producto.
-  descuentoTipo        String?
-  descuentoValor       Decimal?      @db.Decimal(10, 2)
-  descuentoMotivo      String?
-  descuentoPor         String?
   total                Decimal       @db.Decimal(10, 2)
   items                OrderItem[]
   createdAt            DateTime      @default(now())
@@ -986,10 +976,6 @@ model OrderItem {
   /// = no se conocía al vender (sin receta, o un insumo sin costo); en esos
   /// casos el reporte cae al costo actual del producto, si lo tiene.
   costoProducto Decimal? @db.Decimal(10, 2)
-  /// Lo que descontó este ítem de cada insumo al cargarse (ya multiplicado por su cantidad): `[{ insumoId, almacenId, cantidad }]`.
-  /// Sirve para devolver al stock EXACTAMENTE lo que bajó si el producto se cancela con el pedido abierto (el pedido no guarda las
-  /// opciones elegidas, solo su texto). Null en los pedidos anteriores a esta función: ahí el stock no se devuelve solo.
-  consumo Json?
 
   @@index([storeId])
   @@index([orderId])

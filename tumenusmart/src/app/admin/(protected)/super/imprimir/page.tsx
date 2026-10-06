@@ -19,7 +19,7 @@ export default async function ImprimirCarteraPage({
   // "sos vos, el dueño de TuMenuSmart" — un admin de un local no tiene que
   // poder abrir este informe de cobranza de los demás.
   const sesion = await sesionActual();
-  if (!sesion || sesion.rol !== "superadmin") redirect("/admin/pedidos");
+  if (!sesion || sesion.rol !== "superadmin") redirect("/admin/pos");
 
   const { fecha, desde, hasta } = await searchParams;
   const fechaActiva = fecha ?? "mes";

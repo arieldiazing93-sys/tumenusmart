@@ -14,7 +14,7 @@ export const dynamic = "force-dynamic";
  */
 export default async function AsesoresPage() {
   const sesion = await sesionActual();
-  if (!sesion || sesion.rol !== "superadmin") redirect("/admin/pedidos");
+  if (!sesion || sesion.rol !== "superadmin") redirect("/admin/pos");
 
   const asesores = await prisma.asesor.findMany({
     orderBy: [{ activo: "desc" }, { nombre: "asc" }],

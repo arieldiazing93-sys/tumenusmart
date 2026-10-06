@@ -233,7 +233,7 @@ export async function exigirPermiso(permiso: Permiso): Promise<SesionUsuario> {
 export async function pantallaConPermiso(permiso: Permiso): Promise<SesionUsuario> {
   const sesion = await sesionActual();
   if (!sesion) redirect("/admin/login");
-  if (!puede(sesion.rol, permiso)) redirect("/admin/pedidos");
+  if (!puede(sesion.rol, permiso)) redirect("/admin/pos");
   return sesion;
 }
 

@@ -36,13 +36,12 @@ function armarGrupos(hayIdeaSinVer: boolean, rol: string, ventasACredito: boolea
       titulo: "Día a día",
       secciones: [
         // Punto de venta va primero: es lo que más se toca en el momento,
-        // varias veces por hora. Pedidos (online) queda debajo.
+        // varias veces por hora.
         { href: "/admin/pos", label: "Punto de venta", icono: "pos" as const,
           ver: conPermiso("pos.vender") },
         // El historial de TODAS las ventas cerradas: las del mostrador y también las cuentas de mesa que se cobran
-        // desde Servicio comedor. Los pedidos de la carta tienen su propio historial en "Pedidos". Vive acá y no en
-        // "Cómo va el negocio": el cajero necesita buscar una cuenta y poder cancelarla en el momento, no solo el
-        // dueño repasando el día después.
+        // desde Servicio comedor. Vive acá y no en "Cómo va el negocio": el cajero necesita buscar una cuenta y poder
+        // cancelarla en el momento, no solo el dueño repasando el día después.
         { href: "/admin/pos/cuentas", label: "Historial de cuentas", icono: "pedidos" as const,
           ver: conPermiso("pos.vender") },
         // El mozo carga las mesas desde su celular o tablet (enlace público con su PIN) y la caja opera las cuentas
@@ -60,10 +59,7 @@ function armarGrupos(hayIdeaSinVer: boolean, rol: string, ventasACredito: boolea
             { href: "/admin/comedor/propinas", label: "Propinas", icono: "usuarios" as const,
               ver: conPermiso("comedor.gestionar") },
           ] },
-        // Los pedidos de la carta (online, por teléfono): con su propio historial.
-        { href: "/admin/pedidos", label: "Pedidos", icono: "pedidos" as const,
-          ver: conPermiso("pedidos.ver") },
-        // Facturas de pedidos y de mostrador, juntas. Vive en "Día a día" para
+        // Facturas del mostrador, del comedor y de las citas. Vive en "Día a día" para
         // encontrarla rápido: ahí se ve una factura recién emitida, se anula, se
         // remite y se ven sus datos para la factura electrónica. El permiso sigue
         // siendo el del dueño (pos.verHistorico).
@@ -381,7 +377,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           />
 
           <Link
-            href="/admin/pedidos"
+            href="/admin/pos"
             className="flex min-w-0 flex-none items-center gap-2 text-[0.95rem] font-semibold tracking-titular text-tinta"
           >
             <Logo tam={22} color="#D2501F" />

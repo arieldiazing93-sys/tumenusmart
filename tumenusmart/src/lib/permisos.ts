@@ -18,16 +18,11 @@ export type Rol = "superadmin" | "local" | "empleado";
 /**
  * Cada cosa que se puede hacer en el panel.
  *
- * Son verbos concretos y no secciones: "ver pedidos" y "cambiar el estado de
- * un pedido" son permisos distintos aunque vivan en la misma pantalla.
+ * Son verbos concretos y no secciones: "ver las reservas" y "gestionarlas"
+ * son permisos distintos aunque vivan en la misma pantalla.
  */
 export type Permiso =
   // --- día a día ---
-  | "pedidos.ver"
-  | "pedidos.cambiarEstado"
-  | "pedidos.asignarRepartidor"
-  // Cargar un pedido a mano (el cliente llamó por teléfono). Entra como cualquier otro y sigue el mismo camino.
-  | "pedidos.crear"
   | "reservas.ver"
   | "reservas.gestionar"
   | "repartidores.ver"
@@ -96,11 +91,6 @@ export type Permiso =
  * Nada de eso se arregla con un toque.
  */
 const PERMISOS_EMPLEADO: Permiso[] = [
-  "pedidos.ver",
-  "pedidos.cambiarEstado",
-  "pedidos.asignarRepartidor",
-  // Quien atiende el teléfono es quien carga el pedido: es lo mismo que toma el mostrador, y queda en la bitácora.
-  "pedidos.crear",
   "reservas.ver",
   "reservas.gestionar",
   // Quien atiende el mostrador es quien anota y mueve los turnos, igual que

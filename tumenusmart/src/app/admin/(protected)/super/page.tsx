@@ -82,7 +82,7 @@ export default async function SuperPage({
   searchParams: Promise<{ fecha?: string; desde?: string; hasta?: string }>;
 }) {
   const sesion = await sesionActual();
-  if (!sesion || sesion.rol !== "superadmin") redirect("/admin/pedidos");
+  if (!sesion || sesion.rol !== "superadmin") redirect("/admin/pos");
 
   const ahora = new Date();
   const desdeActividad = new Date(ahora.getTime() - DIAS_DE_ACTIVIDAD * 86400000);

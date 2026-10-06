@@ -18,10 +18,7 @@ const SI = (rol, p) => esperar(`${rol} SÍ puede ${p}`, puede(rol, p), true);
 const NO = (rol, p) => esperar(`${rol} NO puede ${p}`, puede(rol, p), false);
 
 console.log("\n— el empleado —");
-SI("empleado", "pedidos.ver");
-SI("empleado", "pedidos.cambiarEstado");
-SI("empleado", "pedidos.asignarRepartidor");
-SI("empleado", "pedidos.crear");
+SI("empleado", "pos.vender");
 SI("empleado", "comedor.ver");
 SI("empleado", "comedor.gestionar");
 SI("empleado", "reservas.ver");
@@ -61,7 +58,7 @@ console.log("— el superadmin —");
 SI("superadmin", "cartera.gestionar");
 SI("superadmin", "usuarios.gestionar");
 SI("superadmin", "configuracion.editar");
-SI("superadmin", "pedidos.ver");
+SI("superadmin", "pos.vender");
 
 console.log("— el empleado nunca puede más que el dueño —");
 for (const p of permisosDe("empleado")) {

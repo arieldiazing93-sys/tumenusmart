@@ -1,7 +1,6 @@
 import { prisma } from "./prisma";
 import { listarDias, claveDia } from "./rango-fecha";
 import { factorDeDescuento } from "./descuento-venta";
-import { factorDeDescuentoPedido } from "./pedido-abierto";
 
 export type RangoFecha = { gte: Date; lt: Date };
 
@@ -221,13 +220,7 @@ export async function calcularRankingProductos(
         storeId,
         order: { createdAt: rango, estado: { not: "cancelado" }, ...PEDIDO_REAL },
       },
-      select: {
-        nombreProducto: true,
-        cantidad: true,
-        precioUnitario: true,
-        // Para repartir entre los ítems el descuento general que se le dio al pedido.
-        order: { select: { subtotal: true, descuento: true } },
-      },
+      select: { nombreProducto: true, cantidad: true, precioUnitario: true },
     }),
     // Un producto que solo se vende por mostrador (POS) no puede figurar
     // como "sin ventas" solo porque nadie lo pidió online.
@@ -251,10 +244,7 @@ export async function calcularRankingProductos(
   // Los ítems del mostrador guardan el precio sin el descuento general de la
   // cuenta: se lo reparte en proporción para que la facturación sea la real.
   const todosLosItems = [
-    ...items.map(({ order, ...i }) => ({
-      ...i,
-      factorDescuento: factorDeDescuentoPedido(Number(order.subtotal), Number(order.descuento)),
-    })),
+    ...items.map((i) => ({ ...i, factorDescuento: 1 })),
     ...itemsPos.map(({ ventaPos, ...i }) => ({
       ...i,
       factorDescuento: factorDeDescuento(Number(ventaPos.total), Number(ventaPos.descuento)),

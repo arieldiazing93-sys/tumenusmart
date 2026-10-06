@@ -96,5 +96,5 @@ export async function crearPrimerUsuario(formData: FormData) {
   });
 
   await abrirSesion(usuario.id);
-  redirect("/admin/pedidos");
+  redirect("/admin/pos");
 }

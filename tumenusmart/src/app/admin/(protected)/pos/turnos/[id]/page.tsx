@@ -161,7 +161,7 @@ export default async function ComprobanteTurnoPosPage({
   const miIdentidad = sesion.nombre?.trim() || sesion.email;
   const esPropio = turno.abiertoPor === miIdentidad || turno.cerradoPor === miIdentidad;
   if (!esPropio && !puede(sesion.rol, "pos.verHistorico")) {
-    redirect("/admin/pedidos");
+    redirect("/admin/pos");
   }
 
   // Lo que quedó congelado en TurnoPos al cerrar: SOLO mostrador + retiro/
