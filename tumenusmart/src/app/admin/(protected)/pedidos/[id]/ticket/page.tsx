@@ -5,6 +5,7 @@ import { idLocalActual } from "@/lib/local-actual";
 import { formatearGuarani, formatearMiles, formatearNumero, formatearTelefonoLocal, sinAcentos } from "@/lib/format";
 import { numeroALetras } from "@/lib/numero-a-letras";
 import { etiquetaMetodoPago } from "@/lib/metodos-pago";
+import { textoPorcentaje } from "@/lib/descuento-venta";
 import { SIN_REGISTRO_FISCAL, etiquetaTipoIdentificacion } from "@/lib/tipo-cliente";
 import { ZONA_NEGOCIO } from "@/lib/timezone";
 import { ImprimirAuto } from "@/components/ImprimirAuto";
@@ -267,6 +268,15 @@ export default async function TicketPage({
 
         <div>
           <p>Subtotal: {formatearGuarani(Number(pedido.subtotal))}</p>
+          {Number(pedido.descuento) > 0 && (
+            <p className="mt-1">
+              DESCUENTO
+              {pedido.descuentoTipo === "porcentaje" && pedido.descuentoValor != null
+                ? ` ${textoPorcentaje(Number(pedido.descuentoValor))}%`
+                : ""}
+              : -{formatearGuarani(Number(pedido.descuento))}
+            </p>
+          )}
           {esDelivery && (
             <p className="mt-1">
               Envio:{" "}

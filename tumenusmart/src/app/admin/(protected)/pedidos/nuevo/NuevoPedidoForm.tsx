@@ -2,21 +2,18 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Area, Boton, Campo, Entrada, Selector, Tarjeta, clasesBoton } from "@/components/ui";
+import { Area, Boton, Campo, Entrada, Selector, Tarjeta } from "@/components/ui";
 import { Segmentado } from "@/components/Segmentado";
-import { PanelLateral } from "@/components/PanelLateral";
 import { formatearGuarani } from "@/lib/format";
-import { SIN_REGISTRO_FISCAL, TIPOS_IDENTIFICACION_FISCAL, etiquetaTipoIdentificacion } from "@/lib/tipo-cliente";
 import type { AgregadoVenta, CategoriaVenta, GrupoMitadVenta, ProductoMitadVenta, ProductoVenta } from "@/lib/catalogo-venta";
 import { AgregadosPickerPos } from "../../pos/AgregadosPickerPos";
 import { MitadYMitadPickerPos } from "../../pos/MitadYMitadPickerPos";
 import { EntradaConLupa } from "../../pos/EntradaConLupa";
-import { buscarClienteFiscalPorNumero, buscarClienteParaPedido, crearPedidoManual, type ClienteFiscalEncontrado } from "./actions";
-import { limpiarTexto } from "@/lib/datos-fiscales";
+import { buscarClienteParaPedido, crearPedidoManual } from "./actions";
+import { CamposFiscalesCliente, fichaVacia, type FichaFiscal } from "../CamposFiscalesCliente";
 import { extraerUbicacion, primerEnlace, textoSinEnlaces } from "@/lib/ubicacion-mapa";
 
 type Zona = { id: string; nombre: string; costoEnvio: number };
-type MetodoPago = { value: string; label: string };
 type TipoEntrega = "delivery" | "retiro";
 
 /**
@@ -44,33 +41,20 @@ const TARJETA = "flex flex-col gap-3 !border-2 !border-azul/50";
 /** El rótulo de cada sección del panel del pedido, igual que en el Punto de Venta. */
 const ROTULO = "text-[0.72rem] font-semibold uppercase tracking-rotulo text-tinta-suave";
 
-const ICONOS_PAGO: Record<string, string> = {
-  efectivo: "💵",
-  transferencia: "🏦",
-  tarjeta_debito: "💳",
-  tarjeta_credito: "💳",
-};
-
-/** Una forma de pago: blanca con borde, y en azul la elegida — igual que en el cobro del Punto de Venta. */
-function claseMetodo(elegido: boolean): string {
-  return `flex min-w-0 items-center gap-2 rounded-lg border px-3 py-2.5 text-left text-[0.85rem] font-medium leading-tight transition-colors active:scale-[0.98] ${
-    elegido
-      ? "border-azul bg-azul-luz text-azul-oscuro"
-      : "border-linea text-tinta-media hover:border-azul/40 hover:bg-papel-suave"
-  }`;
-}
-
 /** Para buscar sin que importen las mayúsculas ni los acentos. */
 function sinTildes(texto: string): string {
   return texto.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
 }
 
 /**
- * La pantalla para cargar un pedido que llegó por teléfono, en dos pasos.
+ * La pantalla para cargar un pedido que llegó por WhatsApp o por teléfono, en dos pasos.
  *
- * Paso 1: quién es el cliente y cómo se le entrega. Paso 2: los productos y el pedido, con el mismo aspecto y los
- * mismos efectos que el Punto de Venta (chips de categoría, tarjetas de producto, panel del pedido a un costado). En
- * el celular el panel baja debajo de los productos y una barra fija abajo lleva hasta él.
+ * Paso 1: quién es el cliente y cómo se le entrega (y, si ya se sabe, su ficha para la factura). Paso 2: los productos y el pedido, con
+ * el mismo aspecto y los mismos efectos que el Punto de Venta (chips de categoría, tarjetas de producto, panel del pedido a un costado).
+ * En el celular el panel baja debajo de los productos y una barra fija abajo lleva hasta él.
+ *
+ * El pedido se crea ABIERTO, como la cuenta de una mesa: todavía no se cobra. Después, desde su detalle, se le pueden cargar más
+ * productos, dar un descuento o cancelar algo, y al final se cobra (forma de pago y comprobante).
  *
  * Lo que se ve acá es para trabajar rápido: los precios que vale son los que recalcula el servidor al guardar.
  */
@@ -78,24 +62,10 @@ export function NuevoPedidoForm({
   categorias,
   gruposMitad,
   zonas,
-  metodosPago,
-  facturaObligatoria,
-  puedeFacturar,
-  motivoSinFactura,
-  diasParaVencerTimbrado,
 }: {
   categorias: CategoriaVenta[];
   gruposMitad: GrupoMitadVenta[];
   zonas: Zona[];
-  metodosPago: MetodoPago[];
-  /** Si el local factura TODA venta (timbrado Autoimpresor). */
-  facturaObligatoria: boolean;
-  /** Si esta computadora tiene un punto de expedición vigente. Sin eso no se pregunta por factura (igual que el POS). */
-  puedeFacturar: boolean;
-  /** Por qué esta computadora no puede facturar (ya redactado), o null si puede. */
-  motivoSinFactura: string | null;
-  /** Días hasta que venza el timbrado de esta computadora, o null si no tiene punto de expedición. */
-  diasParaVencerTimbrado: number | null;
 }) {
   const router = useRouter();
 
@@ -116,29 +86,9 @@ export function NuevoPedidoForm({
   const [zonaId, setZonaId] = useState("");
   const [costoEnvioTexto, setCostoEnvioTexto] = useState("");
 
-  const [metodoPago, setMetodoPago] = useState<string>(metodosPago[0]?.value ?? "efectivo");
-  // Si el local factura todo y esta computadora puede hacerlo, no hay "Ticket" que elegir: arranca en factura.
-  const [comprobanteTipo, setComprobanteTipo] = useState<"ticket" | "factura">(
-    facturaObligatoria && puedeFacturar ? "factura" : "ticket"
-  );
-  const [registroFiscal, setRegistroFiscal] = useState<"con" | "sin">("con");
-  const [facturaTipo, setFacturaTipo] = useState<string>(TIPOS_IDENTIFICACION_FISCAL[0].valor);
-  const [facturaNumero, setFacturaNumero] = useState("");
-  const [facturaRazon, setFacturaRazon] = useState("");
-  const [facturaEmail, setFacturaEmail] = useState("");
-  /** Lo que dijo la lupa del número de documento: el cliente ya existe (uno o varios parecidos), no existe o falló. */
-  const [busquedaFiscal, setBusquedaFiscal] = useState<
-    | { estado: "existe" | "varios"; resultados: ClienteFiscalEncontrado[] }
-    | { estado: "nuevo" }
-    | { estado: "error"; mensaje: string }
-    | null
-  >(null);
-  const [buscandoFiscal, setBuscandoFiscal] = useState(false);
-  /** El panel del cobro (forma de pago, comprobante y notas) está abierto a la derecha. */
-  const [cobrando, setCobrando] = useState(false);
-  /** Los datos de la última factura con registro fiscal del cliente (por su teléfono), para completarlos al elegir "Factura". */
-  const [facturaAnterior, setFacturaAnterior] = useState<ClienteFiscalEncontrado | null>(null);
-  /** Los datos de la factura se completaron solos con los de la última factura de este cliente. */
+  // La ficha fiscal del cliente (número, tipo, razón social y correo): queda en el pedido y se completa sola al cobrarlo.
+  const [ficha, setFicha] = useState<FichaFiscal>(fichaVacia);
+  /** Los datos de la ficha se completaron solos con los de la última factura de este cliente. */
   const [datosDeFacturaAnterior, setDatosDeFacturaAnterior] = useState(false);
   const [notas, setNotas] = useState("");
 
@@ -179,50 +129,6 @@ export function NuevoPedidoForm({
   const costoEnvioInvalido = tipoEntrega === "delivery" && (!Number.isFinite(costoEnvioNumero) || costoEnvioNumero < 0);
   const costoEnvio = tipoEntrega === "delivery" && !costoEnvioInvalido ? costoEnvioNumero : 0;
   const total = subtotal + costoEnvio;
-
-  // Sin un punto de expedición vigente en esta computadora no se ofrece factura: siempre se manda ticket (y si el
-  // local factura todo, el servidor lo convierte en factura a Consumidor Final).
-  const comprobanteEfectivo = puedeFacturar ? comprobanteTipo : "ticket";
-  const conRegistroFiscal = comprobanteEfectivo === "factura" && registroFiscal === "con";
-  // Si el local exige facturar todo y esta computadora no puede, no se puede cargar nada (igual que el mostrador).
-  const bloqueadoSinFacturar = facturaObligatoria && !puedeFacturar;
-  const textoBloqueo =
-    "Este local exige facturar todas las ventas y esta computadora no tiene un punto de expedición vigente asignado. " +
-    "No se puede cargar el pedido hasta que el dueño le asigne uno en Puntos de expedición." +
-    (motivoSinFactura ? ` ${motivoSinFactura}` : "");
-
-  /** Trae al formulario los datos de un cliente fiscal que ya estaba en el sistema. */
-  function aplicarClienteFiscal(c: ClienteFiscalEncontrado) {
-    setFacturaNumero(c.numeroIdentificacion);
-    setFacturaTipo(TIPOS_IDENTIFICACION_FISCAL.some((t) => t.valor === c.tipoIdentificacion) ? c.tipoIdentificacion : "ruc");
-    setFacturaRazon(c.razonSocial);
-    setFacturaEmail(c.email ?? "");
-  }
-
-  /** La lupa: ¿ya existe este número en el sistema? Si existe se cargan sus datos; si no, se crea al cobrar el pedido. */
-  function buscarFiscal() {
-    const texto = limpiarTexto(facturaNumero);
-    if (texto.length < 3 || buscandoFiscal) return;
-    setBusquedaFiscal(null);
-    setBuscandoFiscal(true);
-    buscarClienteFiscalPorNumero(texto)
-      .then((r) => {
-        const exactos = r.filter((c) => c.numeroIdentificacion.toLowerCase() === texto.toLowerCase());
-        if (r.length === 0) {
-          setBusquedaFiscal({ estado: "nuevo" });
-        } else if (exactos.length === 1 || r.length === 1) {
-          // Un solo candidato (aunque lo escrito sea una parte del número): se completa todo en el acto.
-          const elegido = exactos.length === 1 ? exactos[0] : r[0];
-          aplicarClienteFiscal(elegido);
-          setDatosDeFacturaAnterior(false);
-          setBusquedaFiscal({ estado: "existe", resultados: [elegido] });
-        } else {
-          setBusquedaFiscal({ estado: "varios", resultados: r });
-        }
-      })
-      .catch(() => setBusquedaFiscal({ estado: "error", mensaje: "No se pudo buscar. Revisá la conexión y probá de nuevo." }))
-      .finally(() => setBuscandoFiscal(false));
-  }
 
   function agregarProducto(p: ProductoVenta) {
     setError(null);
@@ -348,27 +254,22 @@ export function NuevoPedidoForm({
     // La dirección NO se completa sola: el cliente puede estar pidiendo desde otro lugar. Se ofrecen como opciones,
     // y la zona y el envío se eligen siempre a mano, según de dónde pide hoy.
     setDireccionesAnteriores(r.direcciones);
-    // Un cliente recurrente trae los datos de su última factura: si ya se eligió "Factura" se completan en el acto; si no, se
-    // completan cuando se elija.
-    setFacturaAnterior(r.facturaAnterior);
-    prellenarFactura(r.facturaAnterior);
-  }
-
-  /** Completa la factura con los datos de la última que tuvo este cliente, solo si todavía no se escribió nada. */
-  function prellenarFactura(f: ClienteFiscalEncontrado | null) {
-    if (!f || facturaNumero.trim() || facturaRazon.trim()) return;
-    aplicarClienteFiscal(f);
-    setRegistroFiscal("con");
-    setDatosDeFacturaAnterior(true);
+    // Un cliente recurrente trae los datos de su última factura: se completan solos, solo si todavía no se escribió nada.
+    const anterior = r.facturaAnterior;
+    if (anterior && !ficha.numero.trim() && !ficha.razon.trim()) {
+      setFicha({
+        tipo: anterior.tipoIdentificacion,
+        numero: anterior.numeroIdentificacion,
+        razon: anterior.razonSocial,
+        email: anterior.email ?? "",
+      });
+      setDatosDeFacturaAnterior(true);
+    }
   }
 
   // Pasa a los productos solo con los datos del cliente y de la entrega bien cargados.
   function continuar() {
     setError(null);
-    if (bloqueadoSinFacturar) {
-      setError(textoBloqueo);
-      return;
-    }
     if (!telefono.trim() || !nombre.trim()) {
       setError("Cargá el teléfono y el nombre del cliente.");
       return;
@@ -388,28 +289,8 @@ export function NuevoPedidoForm({
         return;
       }
     }
-    // Si ya se cargó la ficha fiscal del cliente (número y razón social), el comprobante arranca en "Factura · con registro
-    // fiscal" con esos datos; se puede cambiar en el cobro.
-    if (puedeFacturar && facturaNumero.trim() && facturaRazon.trim()) {
-      setComprobanteTipo("factura");
-      setRegistroFiscal("con");
-    }
     setPaso("productos");
     window.scrollTo({ top: 0 });
-  }
-
-  /** Abre el cobro a la derecha (forma de pago, comprobante y notas) con el pedido ya armado. */
-  function irACobrar() {
-    setError(null);
-    if (bloqueadoSinFacturar) {
-      setError(textoBloqueo);
-      return;
-    }
-    if (carrito.length === 0) {
-      setError("Agregá al menos un producto al pedido.");
-      return;
-    }
-    setCobrando(true);
   }
 
   function volverAlCliente() {
@@ -421,10 +302,6 @@ export function NuevoPedidoForm({
   async function crear() {
     if (guardando) return;
     setError(null);
-    if (bloqueadoSinFacturar) {
-      setError(textoBloqueo);
-      return;
-    }
 
     if (!telefono.trim() || !nombre.trim()) {
       setError("Cargá el teléfono y el nombre del cliente.");
@@ -447,8 +324,9 @@ export function NuevoPedidoForm({
       setError("El costo de envío no es un número válido.");
       return;
     }
-    if (conRegistroFiscal && (!facturaNumero.trim() || !facturaRazon.trim())) {
-      setError("Para factura con registro fiscal hacen falta el número y la razón social.");
+    // La ficha, si se empezó a cargar, tiene que estar completa: el número y la razón social van juntos.
+    if ((ficha.numero.trim() || ficha.razon.trim()) && !(ficha.numero.trim() && ficha.razon.trim())) {
+      setError("Los datos de factura del cliente están incompletos: hacen falta el número y la razón social (o dejalos vacíos).");
       return;
     }
 
@@ -462,22 +340,14 @@ export function NuevoPedidoForm({
         direccion: tipoEntrega === "delivery" ? direccion : undefined,
         deliveryZoneId: tipoEntrega === "delivery" && zonaId && zonaId !== COORDINAR ? zonaId : undefined,
         costoEnvio: tipoEntrega === "delivery" ? costoEnvioNumero : undefined,
-        metodoPago,
-        comprobanteTipo: comprobanteEfectivo,
-        facturaTipoIdentificacion:
-          comprobanteEfectivo === "factura" ? (registroFiscal === "sin" ? SIN_REGISTRO_FISCAL.tipo : facturaTipo) : undefined,
-        facturaRuc: conRegistroFiscal ? facturaNumero.trim() : undefined,
-        facturaRazonSocial: conRegistroFiscal ? facturaRazon.trim() : undefined,
-        facturaEmail: conRegistroFiscal ? facturaEmail.trim() || undefined : undefined,
-        // La ficha fiscal cargada en el paso 1 (aunque el comprobante termine siendo ticket): el cliente queda creado o
-        // actualizado en el sistema para la próxima vez.
+        // La ficha fiscal del cliente: queda creada o actualizada en el sistema y en el pedido, lista para completar la factura al cobrar.
         clienteFiscal:
-          facturaNumero.trim() || facturaRazon.trim()
+          ficha.numero.trim() || ficha.razon.trim()
             ? {
-                tipoIdentificacion: facturaTipo,
-                numeroIdentificacion: facturaNumero.trim(),
-                razonSocial: facturaRazon.trim(),
-                email: facturaEmail.trim() || undefined,
+                tipoIdentificacion: ficha.tipo,
+                numeroIdentificacion: ficha.numero.trim(),
+                razonSocial: ficha.razon.trim(),
+                email: ficha.email.trim() || undefined,
               }
             : undefined,
         notas: notas.trim() || undefined,
@@ -502,127 +372,8 @@ export function NuevoPedidoForm({
       return;
     }
     // Se queda en "guardando" hasta cambiar de pantalla, para que un segundo clic no cargue el pedido dos veces. Va al detalle del
-    // pedido ya cobrado y, si es con factura, ya emitida.
+    // pedido, que queda abierto: ahí se le cargan más productos, se le da un descuento o se cobra.
     router.push(`/admin/pedidos/${r.orderId}`);
-  }
-
-  // Los campos de la ficha fiscal del cliente (número con lupa, tipo, razón social y correo): se usan en el paso 1 y en el cobro,
-  // con los mismos datos (lo que se carga en uno aparece en el otro).
-  function camposFiscales(idBase: string) {
-    return (
-      <>
-                        {datosDeFacturaAnterior && (
-                          <p className="rounded-lg border border-exito/40 bg-exito-luz px-2.5 py-1.5 text-[0.78rem] font-medium text-exito">
-                            Cliente recurrente: se cargaron los datos de su última factura. Revisalos.
-                          </p>
-                        )}
-                        {/* Primero el número, con la lupa: si el cliente ya está en el sistema se traen sus datos; si no, se crea
-                            al cobrar el pedido. */}
-                        <div>
-                          <label htmlFor={idBase} className="mb-1.5 block text-[0.82rem] font-semibold text-tinta">
-                            Número de documento
-                          </label>
-                          <span className="mb-1.5 block text-[0.78rem] text-tinta-suave">
-                            {facturaTipo === "ruc" ? "Con su dígito verificador: 80012345-6" : "Tocá la lupa para ver si ya está en el sistema"}
-                          </span>
-                          <div className="flex items-center gap-2">
-                            <Entrada
-                              id={idBase}
-                              value={facturaNumero}
-                              onChange={(e) => {
-                                setFacturaNumero(e.target.value);
-                                setBusquedaFiscal(null);
-                              }}
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter") {
-                                  e.preventDefault();
-                                  buscarFiscal();
-                                }
-                              }}
-                              placeholder="80012345-6"
-                              maxLength={30}
-                              autoComplete="off"
-                              className="min-w-0 flex-1"
-                            />
-                            <button
-                              type="button"
-                              onClick={buscarFiscal}
-                              disabled={buscandoFiscal || limpiarTexto(facturaNumero).length < 3}
-                              aria-label="Buscar en el sistema si ya existe"
-                              title="Buscar en el sistema si ya existe"
-                              className={`${clasesBoton("navegar", "md")} flex-none !px-3`}
-                            >
-                              {buscandoFiscal ? (
-                                "…"
-                              ) : (
-                                <svg viewBox="0 0 24 24" width={18} height={18} fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                                  <circle cx="11" cy="11" r="7" />
-                                  <path d="m20 20-3.5-3.5" />
-                                </svg>
-                              )}
-                            </button>
-                          </div>
-                          {busquedaFiscal?.estado === "existe" && (
-                            <p className="mt-1.5 rounded-lg border border-exito/40 bg-exito-luz px-2.5 py-1.5 text-[0.78rem] font-medium text-exito">
-                              Ya existe en el sistema: se cargaron su tipo de documento, razón social y correo. Revisalos.
-                            </p>
-                          )}
-                          {busquedaFiscal?.estado === "nuevo" && (
-                            <p className="mt-1.5 rounded-lg border border-amarillo/60 bg-amarillo-luz px-2.5 py-1.5 text-[0.78rem] font-medium text-amarillo-oscuro">
-                              No existe en el sistema: cargá la razón social y se crea al cobrar el pedido.
-                            </p>
-                          )}
-                          {busquedaFiscal?.estado === "varios" && (
-                            <div className="mt-1.5 flex flex-col gap-1.5">
-                              <p className="text-[0.78rem] font-medium text-tinta-media">Hay varios parecidos: elegí el que corresponde.</p>
-                              {busquedaFiscal.resultados.map((c) => (
-                                <button
-                                  key={`${c.tipoIdentificacion}-${c.numeroIdentificacion}`}
-                                  type="button"
-                                  onClick={() => {
-                                    aplicarClienteFiscal(c);
-                                    setBusquedaFiscal({ estado: "existe", resultados: [c] });
-                                  }}
-                                  className="rounded-lg border-2 border-azul/50 bg-azul-luz/40 px-2.5 py-1.5 text-left hover:bg-azul-luz"
-                                >
-                                  <span className="cifra block text-[0.86rem] font-semibold text-tinta">{c.numeroIdentificacion}</span>
-                                  <span className="block text-[0.8rem] text-tinta-media">
-                                    {c.razonSocial} · {etiquetaTipoIdentificacion(c.tipoIdentificacion)}
-                                  </span>
-                                </button>
-                              ))}
-                            </div>
-                          )}
-                          {busquedaFiscal?.estado === "error" && (
-                            <p className="mt-1.5 text-[0.78rem] font-medium text-peligro">{busquedaFiscal.mensaje}</p>
-                          )}
-                        </div>
-                        <Campo etiqueta="Tipo de documento">
-                          <Selector value={facturaTipo} onChange={(e) => setFacturaTipo(e.target.value)}>
-                            {TIPOS_IDENTIFICACION_FISCAL.map((t) => (
-                              <option key={t.valor} value={t.valor}>
-                                {t.etiqueta}
-                              </option>
-                            ))}
-                          </Selector>
-                        </Campo>
-                        <Campo etiqueta="Razón social">
-                          <Entrada
-                            value={facturaRazon}
-                            onChange={(e) => setFacturaRazon(e.target.value)}
-                            maxLength={120}
-                          />
-                        </Campo>
-                        <Campo etiqueta="Correo (opcional)">
-                          <Entrada
-                            type="email"
-                            value={facturaEmail}
-                            onChange={(e) => setFacturaEmail(e.target.value)}
-                            maxLength={120}
-                          />
-                        </Campo>
-      </>
-    );
   }
 
   const mensajeError = error ? (
@@ -635,7 +386,7 @@ export function NuevoPedidoForm({
   const ubicacionPegada = extraerUbicacion(direccion);
   const enlacePegado = primerEnlace(direccion);
   // Para los resumenes: lo escrito sin la URL larga (o "ubicacion del mapa" si solo se pego el enlace).
-  const direccionParaMostrar = textoSinEnlaces(direccion) || (enlacePegado ? "ubicación del mapa" : '');
+  const direccionParaMostrar = textoSinEnlaces(direccion) || (enlacePegado ? "ubicación del mapa" : "");
 
   // Para el resumen de la entrega en el panel del pedido.
   const zonaElegida = zonas.find((z) => z.id === zonaId);
@@ -663,18 +414,13 @@ export function NuevoPedidoForm({
           >
             2
           </span>
-          Productos y pago
+          Productos
         </li>
       </ol>
 
       {/* Paso 1: quién es el cliente y cómo se le entrega. */}
       {paso === "cliente" && (
         <div className="mx-auto flex max-w-3xl flex-col gap-4">
-          {bloqueadoSinFacturar && (
-            <p role="alert" className="rounded-lg bg-peligro-luz px-3 py-2 text-[0.82rem] font-medium text-peligro">
-              {textoBloqueo}
-            </p>
-          )}
           <Tarjeta className={TARJETA}>
             <h2 className="text-[1rem] font-semibold tracking-titular text-tinta">Cliente y entrega</h2>
 
@@ -691,7 +437,6 @@ export function NuevoPedidoForm({
                     setTelefono(e.target.value);
                     setEstadoCliente("");
                     setDireccionesAnteriores([]);
-                    setFacturaAnterior(null);
                   }}
                   onBlur={buscarCliente}
                   onBuscar={buscarCliente}
@@ -811,16 +556,24 @@ export function NuevoPedidoForm({
                 <p className={ROTULO}>Datos de factura del cliente (opcional)</p>
                 <p className="mt-0.5 text-[0.78rem] leading-snug text-tinta-suave">
                   Si el cliente pide factura, cargá acá su ficha: número de documento, tipo, razón social y correo. Si ya existe,
-                  buscalo con la lupa; si no, se crea al cobrar el pedido. Estos datos se completan solos en el cobro.
+                  buscalo con la lupa; si no, se guarda como cliente nuevo. Estos datos se completan solos cuando cobrás el pedido.
                 </p>
               </div>
-              {camposFiscales("pedido-factura-numero-cliente")}
+              <CamposFiscalesCliente
+                idBase="pedido-factura-numero-cliente"
+                ficha={ficha}
+                onCambiar={(f) => {
+                  setFicha(f);
+                  setDatosDeFacturaAnterior(false);
+                }}
+                avisoRecurrente={datosDeFacturaAnterior}
+              />
             </div>
           </Tarjeta>
 
           {mensajeError}
           <div className="flex justify-end">
-            <Boton onClick={continuar} disabled={bloqueadoSinFacturar} tam="lg">
+            <Boton onClick={continuar} tam="lg">
               Continuar a los productos →
             </Boton>
           </div>
@@ -1003,6 +756,23 @@ export function NuevoPedidoForm({
                   ? `🛵 ${direccionParaMostrar}${textoZona ? ` · ${textoZona}` : ""} · envío ${formatearGuarani(costoEnvio)}`
                   : "🏪 Retiro en el local"}
               </p>
+              {ficha.numero.trim() && ficha.razon.trim() && (
+                <p className="text-[0.78rem] leading-snug text-tinta-suave">
+                  Factura a nombre de {ficha.razon.trim()} ({ficha.numero.trim()}), si se cobra con factura.
+                </p>
+              )}
+            </div>
+
+            <div className="flex flex-col gap-2 border-t border-linea pt-3.5">
+              <p className={ROTULO}>Notas (opcional)</p>
+              <Area
+                value={notas}
+                onChange={(e) => setNotas(e.target.value)}
+                rows={2}
+                maxLength={500}
+                aria-label="Notas del pedido"
+                placeholder="Ej: sin cebolla, tocar timbre, cambio de 100.000"
+              />
             </div>
 
             <div className="flex flex-col gap-1.5 border-t border-linea pt-3">
@@ -1026,18 +796,13 @@ export function NuevoPedidoForm({
 
             {mensajeError}
 
-            {/* El cobro (forma de pago, factura y notas) se hace en un panel a la derecha, como en el Servicio comedor. */}
-            <Boton
-              tono="principal"
-              onClick={irACobrar}
-              disabled={carrito.length === 0 || bloqueadoSinFacturar}
-              tam="lg"
-              className="w-full"
-            >
-              Cobrar {formatearGuarani(total)}
+            {/* El pedido se crea abierto: el cobro (forma de pago y comprobante) es el último paso, desde su detalle. */}
+            <Boton tono="nuevo" onClick={crear} disabled={guardando || carrito.length === 0} tam="lg" className="w-full">
+              {guardando ? "Creando…" : "Crear pedido"}
             </Boton>
             <p className="-mt-2 text-[0.74rem] leading-snug text-tinta-suave">
-              Se abre el cobro a la derecha: forma de pago, comprobante y notas. El pedido nace cobrado y confirmado.
+              El pedido queda abierto y confirmado: después podés cargarle más productos, darle un descuento o cancelar algo. Al final
+              lo cobrás (forma de pago y factura) desde su detalle.
             </p>
           </Tarjeta>
         </div>
@@ -1045,7 +810,7 @@ export function NuevoPedidoForm({
 
       {/* Barra fija en celular/tablet angosto (como la del Punto de Venta): el panel del pedido queda debajo de toda la
           grilla, así que sin esto habría que scrollear hasta el final cada vez. */}
-      {paso === "productos" && carrito.length > 0 && !bloqueadoSinFacturar && (
+      {paso === "productos" && carrito.length > 0 && (
         <div
           className="fixed inset-x-0 bottom-0 z-30 border-t border-linea bg-papel/95 px-4 py-3 shadow-alta backdrop-blur-sm lg:hidden"
           style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom, 0px))" }}
@@ -1060,144 +825,6 @@ export function NuevoPedidoForm({
             <span className="cifra text-[1.05rem] font-bold">{formatearGuarani(total)}</span>
           </a>
         </div>
-      )}
-
-      {/* El cobro del pedido: panel a la derecha (igual que el Servicio comedor y la Agenda). Forma de pago, comprobante y notas;
-          abajo, el total y el botón que cobra y crea el pedido. */}
-      {cobrando && (
-        <PanelLateral
-          titulo="Cobrar pedido"
-          ancho="ancho"
-          onCerrar={() => {
-            if (!guardando) setCobrando(false);
-          }}
-        >
-          <div className="flex min-h-0 flex-1 flex-col gap-3.5 overflow-y-auto px-5 py-4">
-            <div className="rounded-lg border-2 border-azul/50 bg-azul-luz/30 px-3 py-2">
-              <p className="text-[0.88rem] font-semibold text-tinta">
-                {nombre} · {telefono}
-              </p>
-              <p className="text-[0.8rem] leading-snug text-tinta-media">
-                {tipoEntrega === "delivery"
-                  ? `🛵 ${direccionParaMostrar}${textoZona ? ` · ${textoZona}` : ""} · envío ${formatearGuarani(costoEnvio)}`
-                  : "🏪 Retiro en el local"}
-              </p>
-            </div>
-
-            <div className="flex flex-col gap-2 border-t border-linea pt-3.5">
-              <p className={ROTULO}>Cobro — forma de pago</p>
-              <p className="text-[0.78rem] leading-snug text-tinta-media">
-                El pedido se cobra al crearlo: entra a la caja del turno abierto con la forma que elijas
-                {comprobanteTipo === "factura" || facturaObligatoria ? " y la factura se emite en el acto" : ""}.
-                {tipoEntrega === "delivery" ? " En efectivo, el repartidor tiene que traer esa plata de vuelta (Rendiciones)." : ""}
-              </p>
-              <div className="grid grid-cols-2 gap-2">
-                {metodosPago.map((m) => (
-                  <button
-                    key={m.value}
-                    type="button"
-                    onClick={() => setMetodoPago(m.value)}
-                    aria-pressed={metodoPago === m.value}
-                    className={claseMetodo(metodoPago === m.value)}
-                  >
-                    <span aria-hidden="true" className="text-base leading-none">
-                      {ICONOS_PAGO[m.value] ?? "💰"}
-                    </span>
-                    {m.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Solo se pregunta por factura si esta computadora puede emitirla (tiene un punto de expedición vigente),
-                igual que en el Punto de Venta: sin folio no hay factura que ofrecer. */}
-            {puedeFacturar ? (
-              <div className="flex flex-col gap-2 border-t border-linea pt-3.5">
-                <p className={ROTULO}>Comprobante</p>
-                {diasParaVencerTimbrado != null && diasParaVencerTimbrado <= 30 && (
-                  <p className="rounded-lg bg-aviso-luz px-3 py-2 text-[0.78rem] font-medium text-aviso">
-                    El timbrado de esta estación vence en {diasParaVencerTimbrado} día
-                    {diasParaVencerTimbrado === 1 ? "" : "s"}.
-                  </p>
-                )}
-                {facturaObligatoria ? (
-                  <p className="rounded-lg bg-papel-suave px-3 py-2 text-[0.78rem] text-tinta-media">
-                    Este local factura todas las ventas — no se puede cargar como ticket.
-                  </p>
-                ) : (
-                  <Segmentado<"ticket" | "factura">
-                    opciones={[
-                      { value: "ticket", label: "Ticket" },
-                      { value: "factura", label: "Factura" },
-                    ]}
-                    valor={comprobanteTipo}
-                    onChange={(v) => {
-                      setComprobanteTipo(v);
-                      // Al elegir "Factura" para un cliente recurrente, se completan solos los datos de su última factura.
-                      if (v === "factura") prellenarFactura(facturaAnterior);
-                    }}
-                  />
-                )}
-                {comprobanteTipo === "factura" && (
-                  <div className="flex flex-col gap-2 rounded-lg border border-linea bg-papel-suave p-3">
-                    <Segmentado<"con" | "sin">
-                      opciones={[
-                        { value: "con", label: "Con registro fiscal" },
-                        { value: "sin", label: "Sin registro fiscal" },
-                      ]}
-                      valor={registroFiscal}
-                      onChange={setRegistroFiscal}
-                      color="tinta"
-                    />
-                    {registroFiscal === "sin" ? (
-                      <p className="text-[0.8rem] text-tinta-media">Se factura a Consumidor Final (Sin Nombre).</p>
-                    ) : (
-                      <>
-                        {camposFiscales("pedido-factura-numero-cobro")}
-                      </>
-                    )}
-                  </div>
-                )}
-              </div>
-            ) : null}
-
-            <div className="flex flex-col gap-2 border-t border-linea pt-3.5">
-              <p className={ROTULO}>Notas (opcional)</p>
-              <Area
-                value={notas}
-                onChange={(e) => setNotas(e.target.value)}
-                rows={2}
-                maxLength={500}
-                aria-label="Notas del pedido"
-                placeholder="Ej: sin cebolla, tocar timbre, cambio de 100.000"
-              />
-            </div>
-
-          </div>
-
-          <div className="flex flex-none flex-col gap-2 border-t border-linea bg-superficie px-4 py-3">
-            <div className="flex items-center justify-between">
-              <span className="text-[0.85rem] text-tinta-media">Total ({cantidadTotal})</span>
-              <span className="cifra text-[1.4rem] font-bold text-tinta">{formatearGuarani(total)}</span>
-            </div>
-
-            {mensajeError}
-
-            <Boton
-              tono="nuevo"
-              onClick={crear}
-              disabled={guardando || carrito.length === 0 || bloqueadoSinFacturar}
-              tam="lg"
-              className="w-full"
-            >
-              {guardando ? "Cobrando…" : `Cobrar ${formatearGuarani(total)} y crear pedido`}
-            </Boton>
-            <p className="text-[0.74rem] leading-snug text-tinta-suave">
-              Nace cobrado y confirmado. Después lo pasás a &ldquo;En preparación&rdquo; desde su detalle y sigue el circuito de
-              siempre: comanda, repartidor, despacho y entrega.
-            </p>
-          </div>
-        </PanelLateral>
       )}
 
       {productoEligiendo && (

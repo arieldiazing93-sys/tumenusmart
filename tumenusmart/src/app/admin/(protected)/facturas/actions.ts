@@ -661,6 +661,7 @@ export async function remitirFactura(
       facturaAnuladaEn: true,
       facturaMotivoAnulacion: true,
       costoEnvio: true,
+      descuento: true,
       tipoEntrega: true,
       items: {
         select: {
@@ -690,7 +691,9 @@ export async function remitirFactura(
   }));
   const costoEnvio = Number(pedido.costoEnvio ?? 0);
   if (costoEnvio > 0) lineas.push({ precioUnitario: costoEnvio, cantidad: 1, iva: "gravado10" });
-  const desglose = desglosarIva(lineas);
+  // El descuento general del pedido (si lo tuvo) se reparte entre las líneas, igual que al emitir la factura original.
+  const descuentoPedido = Math.max(0, Number(pedido.descuento ?? 0));
+  const desglose = desglosarIva(lineas, descuentoPedido);
 
   try {
     await prisma.$transaction(async (tx) => {
@@ -790,7 +793,7 @@ export async function remitirFactura(
         condicion: "contado",
         fechaVencimientoCredito: null,
         items: itemsComprobante,
-        descuento: 0,
+        descuento: descuentoPedido,
         reemplazaAId: anterior?.id ?? null,
         emitidoPor: identidad,
       });

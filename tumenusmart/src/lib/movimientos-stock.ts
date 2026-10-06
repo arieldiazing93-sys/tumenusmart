@@ -129,17 +129,34 @@ export async function revertirMovimientosVenta(
   ref: RefVenta,
   registradoPor?: string | null
 ): Promise<void> {
-  const movimientos = await db.movimientoStock.findMany({
-    where: { ...ref, tipo: "venta" },
-    select: { insumoId: true, almacenId: true, cantidad: true, motivo: true },
+  const todos = await db.movimientoStock.findMany({
+    where: { ...ref, tipo: { in: ["venta", "cancelacion"] } },
+    select: { insumoId: true, almacenId: true, cantidad: true, motivo: true, tipo: true },
   });
+  const movimientos = todos.filter((m) => m.tipo === "venta");
   if (movimientos.length === 0) return;
+
+  // Lo que ya se devolvió antes (se canceló un producto con el pedido abierto) no se devuelve dos veces: se descuenta, por insumo y
+  // almacén, de lo que salió.
+  const yaDevuelto = new Map<string, number>();
+  for (const m of todos) {
+    if (m.tipo !== "cancelacion") continue;
+    const clave = `${m.insumoId}|${m.almacenId ?? ""}`;
+    yaDevuelto.set(clave, (yaDevuelto.get(clave) ?? 0) + aNumero(m.cantidad));
+  }
 
   const filas: Prisma.MovimientoStockCreateManyInput[] = [];
   const restituciones: { insumoId: string; cantidad: number }[] = [];
   for (const m of movimientos) {
-    const cantidadARestituir = -aNumero(m.cantidad); // el de "venta" ya está en negativo
-    if (cantidadARestituir === 0) continue;
+    let cantidadARestituir = -aNumero(m.cantidad); // el de "venta" ya está en negativo
+    const clave = `${m.insumoId}|${m.almacenId ?? ""}`;
+    const devuelto = yaDevuelto.get(clave) ?? 0;
+    if (devuelto > 0 && cantidadARestituir > 0) {
+      const descontar = Math.min(devuelto, cantidadARestituir);
+      cantidadARestituir = redondear3(cantidadARestituir - descontar);
+      yaDevuelto.set(clave, devuelto - descontar);
+    }
+    if (cantidadARestituir <= 0) continue;
     restituciones.push({ insumoId: m.insumoId, cantidad: cantidadARestituir });
     filas.push({
       storeId,

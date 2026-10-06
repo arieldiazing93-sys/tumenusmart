@@ -408,7 +408,7 @@ export default async function ComprobanteTurnoPosPage({
           </table>
           {turno.rendiciones.length > 0 && (
             <p className="mt-2 text-[0.78rem] text-tinta-suave">
-              Los pedidos de delivery ya están sumados arriba (se cobraron al cargarlos). Lo que{" "}
+              Los pedidos de delivery ya están sumados arriba (se cobraron en la caja con “Cobrar pedido”). Lo que{" "}
               {turno.rendiciones.length === 1 ? "rindió el repartidor" : "rindieron los repartidores"} durante este turno
               está más abajo como control del efectivo que volvió a la caja: no se suma otra vez.
             </p>

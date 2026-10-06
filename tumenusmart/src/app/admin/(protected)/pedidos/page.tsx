@@ -4,14 +4,13 @@ import { headers } from "next/headers";
 import { pantallaConPermiso } from "@/lib/auth";
 import { puede } from "@/lib/permisos";
 import { prismaDelLocal } from "@/lib/prisma-local";
-import { formatearGuarani, formatearNumero } from "@/lib/format";
-import { ESTADOS_PEDIDO, etiquetaEstado, colorEstado } from "@/lib/estados-pedido";
-import { etiquetaMetodoPago } from "@/lib/metodos-pago";
+import { ESTADOS_PEDIDO } from "@/lib/estados-pedido";
 import { calcularRangoFecha, type FiltroFecha } from "@/lib/rango-fecha";
-import { ZONA_NEGOCIO } from "@/lib/timezone";
 import { obtenerEstadoTienda } from "@/lib/estado-tienda";
-import { linkWhatsappCliente } from "@/lib/whatsapp";
 import { idLocalActual } from "@/lib/local-actual";
+import { PedidosMaestro } from "./PedidosMaestro";
+import { cargarContextoPedidos } from "./contexto-pedidos";
+import { aFilaDePedido } from "./tipos-pedido";
 import { PausaPedidosToggle } from "../PausaPedidosToggle";
 import { CompartirCarta } from "../CompartirCarta";
 import { TarjetaIdeaSemana } from "../TarjetaIdeaSemana";
@@ -111,6 +110,11 @@ export default async function AdminPedidosPage({
 
   const urlCarta = store ? await urlPublicaCarta(store.slug) : "";
 
+  // El detalle de cada pedido (a la derecha de la lista) necesita los repartidores y las impresoras de esta computadora, la carta
+  // (para cargarle productos) y lo necesario para cobrar (formas de pago y si esta computadora factura).
+  const contexto = await cargarContextoPedidos(prisma, storeId, sesion.rol);
+  const filas = pedidos.map(aFilaDePedido);
+
   // La idea de la semana se muestra acá porque Pedidos es la pantalla que el
   // encargado abre todos los días.
   const ideaSemana = await ideaDeLaSemana(storeId).catch(() => null);
@@ -197,10 +201,10 @@ export default async function AdminPedidosPage({
     <div>
       <Cabecera
         titulo="Pedidos"
-        bajada="Lo que entró por la carta y por teléfono. Los nuevos de la carta aparecen arriba y avisan solos."
+        bajada="Lo que el cliente pidió por WhatsApp o por teléfono y se cargó a mano. El pedido queda abierto: se corrige si hace falta (más productos, descuento, cancelar algo) y al final se cobra."
         acciones={
           <>
-            {/* El cliente que llama por teléfono se carga acá y sigue el mismo circuito que los de la carta. */}
+            {/* El pedido que llega por WhatsApp o teléfono se carga acá: queda abierto hasta cobrarlo. */}
             {puede(sesion.rol, "pedidos.crear") && (
               <BotonEnlace href="/admin/pedidos/nuevo" tono="nuevo" tam="md">
                 + Nuevo pedido
@@ -447,168 +451,9 @@ export default async function AdminPedidosPage({
         </div>
       </div>
 
-      {pedidos.length === 0 && (
-        <p className="text-tinta-media">No hay pedidos con estos filtros.</p>
-      )}
-
-      {pedidos.length > 0 && (
-        <div className="overflow-x-auto rounded-lg border border-linea bg-white">
-          <table className="w-full min-w-[900px] text-left text-sm">
-            <thead className="border-b border-linea bg-papel-suave text-xs uppercase tracking-wide text-tinta-media">
-              <tr>
-                <th className="px-3 py-2">N°</th>
-                <th className="px-3 py-2">Hora</th>
-                <th className="px-3 py-2">Cliente</th>
-                <th className="px-3 py-2">Teléfono</th>
-                <th className="px-3 py-2">Productos</th>
-                <th className="px-3 py-2">Total</th>
-                <th className="px-3 py-2">Entrega</th>
-                <th className="px-3 py-2">Repartidor</th>
-                <th className="px-3 py-2">Pago</th>
-                <th className="px-3 py-2">Estado</th>
-                <th className="px-3 py-2 text-center">Escribir</th>
-              </tr>
-            </thead>
-            <tbody>
-              {pedidos.map((pedido) => {
-                const resumenProductos = pedido.items
-                  .map((i) => `${i.cantidad}x ${i.nombreProducto}`)
-                  .join(", ");
-                return (
-                  <tr
-                    key={pedido.id}
-                    className="cursor-pointer border-b border-linea-fina last:border-0 hover:bg-papel-suave"
-                  >
-                    <td className="px-3 py-3">
-                      {/*
-                        prefetch={false} en todos los enlaces de la fila.
-
-                        Next precarga cada enlace apenas entra en pantalla, y
-                        esta pantalla es force-dynamic: cada precarga es un
-                        render COMPLETO en el servidor, con sus consultas a la
-                        base. Con hasta 100 pedidos en la lista, desplazarse
-                        disparaba cientos de renders para terminar abriendo uno.
-                        En los registros de Vercel se veían cinco GET a
-                        /admin/pedidos/<id> en 70 milisegundos sin que nadie
-                        tocara nada.
-
-                        Y con connection_limit=1 es peor: esas precargas
-                        compiten por la misma conexión que necesita la pantalla
-                        que estás mirando.
-
-                        El costo es que abrir un pedido ya no viene adelantado.
-                        Se paga una vez al abrir, en lugar de cientos de veces
-                        al desplazarse.
-                      */}
-                      <Link prefetch={false} href={`/admin/pedidos/${pedido.id}`} className="block font-medium text-tinta-media">
-                        {formatearNumero(pedido.numero)}
-                        {pedido.comprobanteTipo === "factura" && pedido.facturaNumero && (
-                          <span className="mt-0.5 block text-[10px] font-medium uppercase text-tinta-suave">
-                            {pedido.facturaNumero}
-                          </span>
-                        )}
-                        {!pedido.turnoPosId && pedido.estado !== "cancelado" && (
-                          <span
-                            title="Este pedido todavía no se cobró: no entró a ninguna caja"
-                            className="mt-0.5 block text-[10px] font-bold uppercase text-amarillo-oscuro"
-                          >
-                            Sin cobrar
-                          </span>
-                        )}
-                        {pedido.origen === "telefono" && (
-                          <span
-                            title="Lo cargó una persona del local porque el cliente llamó por teléfono"
-                            className="mt-0.5 block text-[10px] font-medium uppercase text-azul-oscuro"
-                          >
-                            Teléfono
-                          </span>
-                        )}
-                      </Link>
-                    </td>
-                    <td className="px-3 py-3">
-                      <Link prefetch={false} href={`/admin/pedidos/${pedido.id}`} className="block">
-                        {new Date(pedido.createdAt).toLocaleDateString("es-PY", {
-                          day: "2-digit",
-                          month: "2-digit",
-                          timeZone: ZONA_NEGOCIO,
-                        })}{" "}
-                        {new Date(pedido.createdAt).toLocaleTimeString("es-PY", {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                          hour12: false,
-                          timeZone: ZONA_NEGOCIO,
-                        })}
-                      </Link>
-                    </td>
-                    <td className="px-3 py-3">
-                      <Link prefetch={false} href={`/admin/pedidos/${pedido.id}`} className="block font-medium">
-                        {pedido.clienteNombre}
-                      </Link>
-                    </td>
-                    <td className="px-3 py-3">
-                      <Link prefetch={false} href={`/admin/pedidos/${pedido.id}`} className="block">
-                        {pedido.clienteTelefono}
-                      </Link>
-                    </td>
-                    <td className="px-3 py-3">
-                      <Link prefetch={false} href={`/admin/pedidos/${pedido.id}`} className="block max-w-[220px] truncate">
-                        {resumenProductos}
-                      </Link>
-                    </td>
-                    <td className="px-3 py-3">
-                      <Link prefetch={false} href={`/admin/pedidos/${pedido.id}`} className="block font-semibold">
-                        {formatearGuarani(Number(pedido.total))}
-                      </Link>
-                    </td>
-                    <td className="px-3 py-3">
-                      <Link prefetch={false} href={`/admin/pedidos/${pedido.id}`} className="block">
-                        {pedido.tipoEntrega === "delivery" ? pedido.deliveryZone?.nombre ?? "A coordinar" : "Retiro"}
-                      </Link>
-                    </td>
-                    <td className="px-3 py-3">
-                      <Link prefetch={false} href={`/admin/pedidos/${pedido.id}`} className="block">
-                        {pedido.repartidor?.nombre ?? "—"}
-                      </Link>
-                    </td>
-                    <td className="px-3 py-3">
-                      <Link prefetch={false} href={`/admin/pedidos/${pedido.id}`} className="block">
-                        {etiquetaMetodoPago(pedido.metodoPagoReferencia)}
-                      </Link>
-                    </td>
-                    <td className="px-3 py-3">
-                      <Link prefetch={false} href={`/admin/pedidos/${pedido.id}`}>
-                        <span
-                          className={`inline-block whitespace-nowrap rounded-full px-2.5 py-1 text-[0.74rem] font-semibold ${colorEstado(pedido.estado)}`}
-                        >
-                          {etiquetaEstado(pedido.estado)}
-                        </span>
-                      </Link>
-                    </td>
-                    <td className="px-3 py-3 text-center">
-                      {/* Fuera del <Link> de la fila a propósito: acá el clic
-                          abre WhatsApp, no el detalle del pedido. */}
-                      <a
-                        href={linkWhatsappCliente(
-                          pedido.clienteTelefono,
-                          `Hola ${pedido.clienteNombre}, te escribimos de ${
-                            store?.nombre ?? "el local"
-                          } por tu pedido ${formatearNumero(pedido.numero)}.`
-                        )}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        title={`Escribirle a ${pedido.clienteNombre} por WhatsApp`}
-                        className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-[#25D366]/10 text-base text-[#128C7E] hover:bg-[#25D366]/20"
-                      >
-                        💬
-                      </a>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
+      {/* Los pedidos como las cuentas del Servicio comedor: la lista a la izquierda (con el botón Ver) y, con doble clic en uno, todo lo
+          que lo compone a la derecha, con sus botones. */}
+      <PedidosMaestro pedidos={filas} contexto={contexto} />
     </div>
   );
 }

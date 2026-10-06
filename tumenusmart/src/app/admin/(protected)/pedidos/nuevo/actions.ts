@@ -5,25 +5,21 @@ import { exigirPermiso } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { prismaDelLocal, siguienteNumeroPedido, upsertClienteFiscal } from "@/lib/prisma-local";
 import { idLocalActual } from "@/lib/local-actual";
-import { estacionActual } from "@/lib/estacion-actual";
 import { armarPedido, type LineaPedida } from "@/lib/precio-pedido";
 import { cargarCatalogoParaPedido } from "@/lib/catalogo-pedido";
-import { puedeFacturarDesdeEstaEstacion, textoSinFactura } from "@/lib/factura-estacion";
 import { registrarConsumoVenta } from "@/lib/movimientos-stock";
 import { registrarBitacora } from "@/lib/bitacora";
-import { METODOS_PAGO_PEDIDO, metodosPagoHabilitados } from "@/lib/metodos-pago";
-import { SIN_REGISTRO_FISCAL } from "@/lib/tipo-cliente";
 import { limpiarTexto, validarDatosFiscales } from "@/lib/datos-fiscales";
 import { extraerUbicacion } from "@/lib/ubicacion-mapa";
-import { FORMAS_PAGO_POS, etiquetaFormaPagoPos } from "@/lib/turno-pos";
-import { SELECT_PEDIDO_PARA_EMISION, emitirFacturaDePedidoEnTransaccion } from "@/lib/emision-pedido";
-import type { PuntoParaComprobante } from "@/lib/comprobante";
+import { consumoParaGuardar } from "@/lib/pedido-abierto";
 import { formatearGuarani, formatearNumero } from "@/lib/format";
-import { turnoAbierto } from "../../pos/turno-actual";
 
 /**
- * Lo que carga una persona del local cuando el cliente llama por teléfono. Igual que en el checkout público, lo único
+ * Lo que carga una persona del local cuando el cliente pidió por WhatsApp o por teléfono. Igual que en el checkout público, lo único
  * que se manda de los productos es QUÉ y cuántos: nombres, precios y textos de la comanda los pone el servidor.
+ *
+ * El pedido se carga ABIERTO: todavía no se cobra ni se factura. La forma de pago y el comprobante se eligen al final, con el botón
+ * "Cobrar pedido" del detalle (ver `cobrarPedido`), cuando ya se corrigió lo que hubiera que corregir.
  */
 export type DatosPedidoManual = {
   clienteNombre: string;
@@ -37,25 +33,16 @@ export type DatosPedidoManual = {
    * Puede ser distinto del de la zona: por teléfono se arregla el precio, y queda en la bitácora.
    */
   costoEnvio?: number;
-  metodoPago: string;
-  comprobanteTipo: "ticket" | "factura";
-  facturaTipoIdentificacion?: string;
-  facturaRuc?: string;
-  facturaRazonSocial?: string;
-  facturaEmail?: string;
   /**
-   * La ficha fiscal del cliente cargada en el paso 1 (número, tipo, razón social y correo), aunque el comprobante sea ticket: el
-   * cliente queda creado o actualizado en el sistema. Si el comprobante es factura con registro fiscal, usa los mismos datos.
+   * La ficha fiscal del cliente cargada en el paso 1 (número, tipo, razón social y correo): el cliente queda creado o actualizado en
+   * el sistema y sus datos quedan en el pedido para completar la factura al cobrarlo (se pueden cambiar ahí).
    */
   clienteFiscal?: { tipoIdentificacion: string; numeroIdentificacion: string; razonSocial: string; email?: string };
   notas?: string;
   items: LineaPedida[];
 };
 
-/** `sinTurno`: cobrar el pedido exige el turno de caja abierto de esta computadora (sin turno no se vende). */
-export type ResultadoPedidoManual =
-  | { ok: true; orderId: string; facturaNumero: string | null }
-  | { ok: false; error: string; sinTurno?: true };
+export type ResultadoPedidoManual = { ok: true; orderId: string } | { ok: false; error: string };
 
 /** Largos máximos de los textos libres, los mismos que el checkout público. */
 const LARGO = { nombre: 80, telefono: 30, direccion: 200, notas: 500, razonSocial: 120, ruc: 30, email: 120 };
@@ -73,10 +60,9 @@ function recortar(valor: string | undefined, max: number): string | undefined {
  * teléfono, y la caja lo carga acá. Los precios salen de la base, se descuenta el stock de las recetas y el pedido nace en la
  * misma tabla, así que desde ahí sigue el circuito de siempre (en preparación, repartidor, en despacho, entregado).
  *
- * Nace COBRADO y confirmado: la forma de pago que se elige acá es con la que se cobra, y en ese mismo momento el pedido entra
- * a la caja del turno abierto de esta computadora (formaPagoPos + turnoPosId + cobradoEn) y, si es con factura, se emite en el
- * acto con los datos que la caja cargó (los comparó antes en la DNIT). Todo en una sola transacción: o queda el pedido cobrado,
- * con su stock y su factura, o no queda nada. Sin turno de caja abierto no se vende: se devuelve `sinTurno`.
+ * Nace ABIERTO y confirmado, como la cuenta de una mesa: la caja puede cargarle más productos, darle un descuento o cancelar un
+ * producto (con motivo) mientras no se cobre. Cobrarlo —forma de pago, ticket o factura— es el último paso (`cobrarPedido`), y recién
+ * ahí entra a la caja del turno abierto. Por eso crear el pedido NO exige turno de caja.
  *
  * No se frena por "pedidos pausados" ni por el horario de la carta: eso es para el cliente que pide solo; quien atiende decide.
  *
@@ -97,15 +83,6 @@ export async function crearPedidoManual(datos: DatosPedidoManual): Promise<Resul
   if (datos.tipoEntrega !== "delivery" && datos.tipoEntrega !== "retiro") {
     return { ok: false, error: "Elegí si es delivery o retiro." };
   }
-  if (!METODOS_PAGO_PEDIDO.some((m) => m.value === datos.metodoPago)) {
-    return { ok: false, error: "Elegí la forma de pago." };
-  }
-  // El pedido se COBRA acá: la forma de pago tiene que ser una de las cuatro que entran a la caja (nada de "otro", que se
-  // contaría como efectivo sin serlo).
-  const formaPago = FORMAS_PAGO_POS.find((f) => f.valor === datos.metodoPago)?.valor;
-  if (!formaPago) {
-    return { ok: false, error: "Elegí con qué se cobra: efectivo, tarjeta de débito, tarjeta de crédito o transferencia." };
-  }
   if (!Array.isArray(datos.items) || datos.items.length === 0) {
     return { ok: false, error: "El pedido está vacío: agregá al menos un producto." };
   }
@@ -117,95 +94,12 @@ export async function crearPedidoManual(datos: DatosPedidoManual): Promise<Resul
   // La dirección puede ser el enlace de Google Maps con la ubicación del cliente (llega por WhatsApp): se leen sus coordenadas.
   const ubicacion = direccion ? extraerUbicacion(direccion) : null;
 
-  // ------------------------------------------------------------------- la caja
-  // Cobrar es entrar a la caja del turno abierto de ESTA computadora (misma cookie de estación que usa el Punto de Venta). Sin
-  // turno abierto no se vende: no habría a qué cierre atar el cobro y la plata quedaría fuera de la caja.
-  const estacion = await estacionActual(db);
-  if (!estacion) {
-    return {
-      ok: false,
-      error: "Esta computadora no está vinculada a una caja. Vinculala en Estaciones (punto de venta) para poder cobrar el pedido.",
-    };
-  }
-  const turno = await turnoAbierto(db, estacion.id);
-  if (!turno) {
-    return {
-      ok: false,
-      error: "No hay un turno de caja abierto en esta computadora. Abrilo (Punto de venta → Abrir turno) y volvé a cargar el pedido.",
-      sinTurno: true,
-    };
-  }
-
-  // Store no pertenece a ningún local (no está en MODELOS_POR_LOCAL): se lee con el cliente global.
-  const local = await prisma.store.findUnique({
-    where: { id: storeId },
-    select: {
-      facturaObligatoria: true,
-      aceptaEfectivo: true,
-      aceptaTransferencia: true,
-      aceptaTarjetaDebito: true,
-      aceptaTarjetaCredito: true,
-    },
-  });
-
-  // El local pudo destildar una forma de pago en Configuración: se vuelve a comprobar acá, no solo en la pantalla.
-  if (!metodosPagoHabilitados(local).some((m) => m.value === datos.metodoPago)) {
-    return { ok: false, error: "Esa forma de pago no está habilitada en este local. Elegí otra." };
-  }
-
-  // ------------------------------------------------------------- comprobante
-  // Las mismas reglas que el cobro del Punto de Venta (registrarVenta). La pantalla ya las respeta, pero esto es lo
-  // que de verdad vale: una acción del servidor se puede llamar sin pasar por ella.
-  const quiereFactura = datos.comprobanteTipo === "factura";
-  const sinNombre = quiereFactura && datos.facturaTipoIdentificacion === SIN_REGISTRO_FISCAL.tipo;
-  const facturaObligatoria = local?.facturaObligatoria ?? false;
-  const facturacion = await puedeFacturarDesdeEstaEstacion(db);
-
-  // Si el local exige facturar toda venta (timbrado Autoimpresor, RG 90/2021): sin un punto de expedición vigente en
-  // esta computadora no hay forma legal de cargar el pedido, y con punto vigente no se puede colar un "ticket".
-  if (facturaObligatoria) {
-    if (!facturacion.puedeFacturar) {
-      return {
-        ok: false,
-        error:
-          "Este local exige facturar todas las ventas y esta computadora no tiene un punto de expedición vigente asignado. Pedile al dueño que lo asigne en Puntos de expedición.",
-      };
-    }
-    if (!quiereFactura) {
-      return { ok: false, error: "Este local exige facturar todas las ventas — no se puede cargar como ticket." };
-    }
-  }
-
-  // Los datos del comprador que tipeó la caja, revisados con la validación mínima (el RUC con su dígito, razón social de al
-  // menos 4 letras, correo con forma de correo). Lo que se guarda es el texto ya limpio.
-  let comprador: { tipoIdentificacion: string; numeroIdentificacion: string; razonSocial: string | null; email: string | null } | null =
+  // La ficha fiscal del cliente (paso 1): solo si trae algo escrito, y revisada con la misma validación mínima que la factura (el
+  // RUC con su dígito, razón social de al menos 4 letras, correo con forma de correo).
+  let fichaFiscal: { tipoIdentificacion: string; numeroIdentificacion: string; razonSocial: string | null; email: string | null } | null =
     null;
-  if (quiereFactura) {
-    const revisado = validarDatosFiscales(
-      sinNombre
-        ? { modo: "sin_nombre" }
-        : {
-            modo: "con_registro",
-            tipoIdentificacion: datos.facturaTipoIdentificacion,
-            numeroIdentificacion: datos.facturaRuc,
-            razonSocial: datos.facturaRazonSocial,
-            email: datos.facturaEmail,
-          }
-    );
-    if (!revisado.ok) return { ok: false, error: revisado.error };
-    comprador = revisado.datos;
-    if (!facturacion.puedeFacturar && facturacion.motivo) {
-      return { ok: false, error: `${textoSinFactura(facturacion.motivo)} Cargalo como ticket.` };
-    }
-  }
-  const comprobanteTipoFinal = quiereFactura ? "factura" : "ticket";
-  const consumidorFinal = sinNombre;
-
-  // La ficha fiscal del cliente que se cargó en el paso 1: si es la misma de la factura, no se repite; si el comprobante es ticket (o
-  // "sin registro fiscal") igual se guarda el cliente. Solo si trae algo escrito, y revisada con la misma validación mínima.
-  let fichaFiscal = comprador && !consumidorFinal && comprador.razonSocial ? comprador : null;
   const cf = datos.clienteFiscal;
-  if (!fichaFiscal && cf && (limpiarTexto(cf.numeroIdentificacion) || limpiarTexto(cf.razonSocial))) {
+  if (cf && (limpiarTexto(cf.numeroIdentificacion) || limpiarTexto(cf.razonSocial))) {
     const revisada = validarDatosFiscales({
       modo: "con_registro",
       tipoIdentificacion: cf.tipoIdentificacion,
@@ -215,20 +109,6 @@ export async function crearPedidoManual(datos: DatosPedidoManual): Promise<Resul
     });
     if (!revisada.ok) return { ok: false, error: `Datos de factura del cliente: ${revisada.error}` };
     fichaFiscal = revisada.datos;
-  }
-
-  // El punto de expedición de esta computadora, para emitir la factura en el acto (con el número consumido dentro de la
-  // transacción del cobro).
-  let punto: (PuntoParaComprobante & { activo: boolean }) | null = null;
-  if (comprobanteTipoFinal === "factura") {
-    const conPunto = await db.estacion.findUnique({ where: { id: estacion.id }, select: { puntoExpedicion: true } });
-    punto = conPunto?.puntoExpedicion ?? null;
-    if (!punto || !punto.activo || punto.timbradoHasta < new Date()) {
-      return {
-        ok: false,
-        error: "Esta computadora no tiene un punto de expedición vigente: no se puede emitir la factura. Cargalo como ticket o asignalo en Puntos de expedición.",
-      };
-    }
   }
 
   // ---------------------------------------------------------------- el precio
@@ -275,13 +155,11 @@ export async function crearPedidoManual(datos: DatosPedidoManual): Promise<Resul
   // El número se pide justo antes de crear el pedido: si algo falló en las validaciones de arriba, no se gasta.
   const numero = await siguienteNumeroPedido(storeId);
   const quien = sesion.nombre?.trim() || sesion.email;
-  const ahora = new Date();
 
-  // En una transacción: si el pedido se crea, queda cobrado en la caja, con el descuento de stock de su receta y (si es con
-  // factura) con su factura emitida; nunca a medias. Si falla la factura, no queda nada y no se consume ningún número.
-  let resultado: { orderId: string; facturaNumero: string | null };
+  // En una transacción: si el pedido se crea, queda con el descuento de stock de su receta; nunca a medias.
+  let orderId: string;
   try {
-    resultado = await prisma.$transaction(
+    orderId = await prisma.$transaction(
       async (tx) => {
         const nuevoPedido = await tx.order.create({
           data: {
@@ -299,16 +177,15 @@ export async function crearPedidoManual(datos: DatosPedidoManual): Promise<Resul
             // guardan sus coordenadas: el repartidor abre el mapa con un toque desde su ruta.
             clienteLat: ubicacion?.lat,
             clienteLng: ubicacion?.lng,
-            metodoPagoReferencia: datos.metodoPago,
-            // Cobrado en este momento: entra a la caja del turno abierto.
-            formaPagoPos: formaPago,
-            turnoPosId: turno.id,
-            cobradoEn: ahora,
-            comprobanteTipo: comprobanteTipoFinal,
-            facturaTipoIdentificacion: comprador?.tipoIdentificacion,
-            facturaRazonSocial: consumidorFinal ? null : comprador?.razonSocial,
-            facturaRuc: comprador?.numeroIdentificacion,
-            facturaEmail: consumidorFinal ? undefined : (comprador?.email ?? undefined),
+            // Cómo paga se decide al cobrar: ahí queda la forma real (formaPagoPos) y esta referencia se actualiza.
+            metodoPagoReferencia: "otro",
+            // Los datos del comprador cargados en el paso 1 quedan en el pedido, listos para completar la factura al cobrarlo. Mientras
+            // no se cobre es "ticket": el comprobante se elige al cobrar.
+            comprobanteTipo: "ticket",
+            facturaTipoIdentificacion: fichaFiscal?.tipoIdentificacion,
+            facturaRazonSocial: fichaFiscal?.razonSocial,
+            facturaRuc: fichaFiscal?.numeroIdentificacion,
+            facturaEmail: fichaFiscal?.email ?? undefined,
             notas: recortar(datos.notas, LARGO.notas),
             subtotal,
             costoEnvio,
@@ -326,6 +203,8 @@ export async function crearPedidoManual(datos: DatosPedidoManual): Promise<Resul
                 costoAgregados: l.costoAgregados,
                 costoProducto: l.costoProducto,
                 precioAgregados: l.precioAgregados,
+                // Lo que descuenta de cada insumo, para devolverlo exacto si el producto se cancela con el pedido abierto.
+                consumo: consumoParaGuardar(l),
               })),
             },
           },
@@ -333,8 +212,8 @@ export async function crearPedidoManual(datos: DatosPedidoManual): Promise<Resul
 
         await registrarConsumoVenta(tx, storeId, armado.lineas, { orderId: nuevoPedido.id }, quien);
 
-        // El cliente con datos fiscales (de la factura o de la ficha del paso 1) queda guardado, o se le actualiza el nombre y el
-        // correo, para la próxima vez.
+        // El cliente con datos fiscales (la ficha del paso 1) queda guardado, o se le actualiza el nombre y el correo, para la
+        // próxima vez.
         if (fichaFiscal?.razonSocial) {
           await upsertClienteFiscal(tx, storeId, {
             tipoIdentificacion: fichaFiscal.tipoIdentificacion,
@@ -344,23 +223,7 @@ export async function crearPedidoManual(datos: DatosPedidoManual): Promise<Resul
           });
         }
 
-        // La factura se emite en el acto, con el punto de expedición de esta computadora.
-        let facturaNumero: string | null = null;
-        if (punto && comprador) {
-          const paraEmitir = await tx.order.findUniqueOrThrow({
-            where: { id: nuevoPedido.id },
-            select: SELECT_PEDIDO_PARA_EMISION,
-          });
-          facturaNumero = await emitirFacturaDePedidoEnTransaccion(tx, {
-            storeId,
-            orderId: nuevoPedido.id,
-            pedido: paraEmitir,
-            punto,
-            emitidoPor: quien,
-          });
-        }
-
-        return { orderId: nuevoPedido.id, facturaNumero };
+        return nuevoPedido.id;
       },
       { timeout: 20_000, maxWait: 10_000 }
     );
@@ -368,19 +231,17 @@ export async function crearPedidoManual(datos: DatosPedidoManual): Promise<Resul
     console.error("[pedidos] crearPedidoManual falló", e);
     return {
       ok: false,
-      error: "No se pudo cargar el pedido. No se registró nada (ni cobro, ni factura, ni stock): probá de nuevo. Si insiste, fijate en Pedidos si quedó cargado.",
+      error: "No se pudo cargar el pedido. No se registró nada (ni stock ni pedido): probá de nuevo. Si insiste, fijate en Pedidos si quedó cargado.",
     };
   }
 
-  // Quién cargó y cobró el pedido queda en la bitácora (se llama DESPUÉS de guardar: nunca frena un pedido).
+  // Quién cargó el pedido queda en la bitácora (se llama DESPUÉS de guardar: nunca frena un pedido).
   await registrarBitacora(storeId, sesion, {
     modulo: "pedidos",
-    accion: "pedido_cargado_y_cobrado",
-    descripcion: `Cargó y cobró el pedido ${formatearNumero(numero)} (${formatearGuarani(total)}) con ${etiquetaFormaPagoPos(formaPago)} para ${clienteNombre}${
-      resultado.facturaNumero ? `; emitió la factura N° ${resultado.facturaNumero}` : ""
-    }.`,
+    accion: "pedido_cargado",
+    descripcion: `Cargó el pedido ${formatearNumero(numero)} (${formatearGuarani(total)}) para ${clienteNombre}. Queda abierto: se cobra al final.`,
     entidad: "Order",
-    entidadId: resultado.orderId,
+    entidadId: orderId,
     detalle: {
       pedido: numero,
       total,
@@ -389,19 +250,12 @@ export async function crearPedidoManual(datos: DatosPedidoManual): Promise<Resul
       costoDeLaZona: datos.tipoEntrega === "delivery" ? costoZona : null,
       tipoEntrega: datos.tipoEntrega,
       productos: armado.lineas.length,
-      comprobante: comprobanteTipoFinal,
-      factura: resultado.facturaNumero,
-      formaPago,
-      turno: turno.id,
     },
   });
 
   revalidatePath("/admin/pedidos");
   revalidatePath("/admin/stock/insumos");
-  revalidatePath("/admin/pos");
-  revalidatePath("/admin/pos/turnos");
-  if (resultado.facturaNumero) revalidatePath("/admin/facturas");
-  return { ok: true, orderId: resultado.orderId, facturaNumero: resultado.facturaNumero };
+  return { ok: true, orderId };
 }
 
 export type ClienteFiscalEncontrado = {

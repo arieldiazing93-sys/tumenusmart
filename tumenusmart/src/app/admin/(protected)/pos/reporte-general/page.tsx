@@ -210,7 +210,7 @@ export default async function ReporteGeneralPosPage({
       )}
 
       <p className="mt-3 text-[0.76rem] text-tinta-suave">
-        Los pedidos (delivery y retiro) entran con la fecha y la forma de pago con las que se cobraron en la caja al cargarlos.
+        Los pedidos (delivery y retiro) entran con la fecha y la forma de pago con las que se cobraron en la caja (botón “Cobrar pedido”).
         Esto es independiente de si el repartidor ya rindió el efectivo: para controlar eso, entrá a "Rendiciones".
       </p>
     </div>

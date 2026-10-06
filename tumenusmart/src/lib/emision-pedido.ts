@@ -33,6 +33,7 @@ export const SELECT_PEDIDO_PARA_EMISION = {
   facturaRazonSocial: true,
   facturaEmail: true,
   costoEnvio: true,
+  descuento: true,
   items: {
     select: {
       productId: true,
@@ -71,6 +72,8 @@ export type PedidoParaEmision = {
    *  servicio — si no se suma acá, Gravadas+Exentas queda por debajo del
    *  total real del pedido en la factura impresa. */
   costoEnvio?: unknown;
+  /** El descuento general del pedido en guaraníes (0 o ausente = sin descuento): se reparte entre las líneas (productos y envío). */
+  descuento?: unknown;
 };
 
 /**
@@ -93,7 +96,10 @@ export function armarEmisionDePedido(
   if (costoEnvio > 0) {
     lineas.push({ precioUnitario: costoEnvio, cantidad: 1, iva: "gravado10" });
   }
-  const desglose = desglosarIva(lineas);
+  // El descuento general del pedido se reparte entre todas las líneas, igual que en el comprobante (así el IVA sale de lo que
+  // de verdad se cobró y las tasas suman exacto el total).
+  const descuento = Math.max(0, Number(pedido.descuento ?? 0));
+  const desglose = desglosarIva(lineas, descuento);
 
   // La foto fiscal de esta factura (ver Comprobante): se guarda en la misma
   // transacción que marca el pedido con su número. El envío entra como una
@@ -133,7 +139,7 @@ export function armarEmisionDePedido(
       condicion: "contado",
       fechaVencimientoCredito: null,
       items: itemsComprobante,
-      descuento: 0,
+      descuento,
     },
     datos: {
       facturaNumero: formatearNumeroFactura(pe.establecimiento, pe.puntoExpedicion, correlativo),

@@ -49,8 +49,8 @@ export function EstadoBotones({
   const [fallback, setFallback] = useState<{ label: string; url: string }[]>([]);
 
   const faltaRepartidor = tipoEntrega === "delivery" && !repartidorId;
-  // El pedido se cobra al cargarlo (entra a la caja del turno) y recién ahí sigue su recorrido: acá no se mueve plata. Uno sin cobrar
-  // no sale de despacho (delivery) ni se entrega: el cuadro "Cobro" de abajo lo cobra.
+  // El pedido se cobra al final, con "Cobrar pedido" (entra a la caja del turno): acá no se mueve plata. Uno sin cobrar no sale de
+  // despacho (delivery) ni se entrega.
   const bloqueadoPorCobro = (estado: string) =>
     !cobrado &&
     estadoActual !== estado &&
@@ -124,7 +124,7 @@ export function EstadoBotones({
     setError(null);
     setAviso(null);
     if (bloqueadoPorCobro(estado)) {
-      setError("Este pedido todavía no se cobró: cobralo primero con el botón “Cobrar” del cuadro Cobro (más abajo).");
+      setError("Este pedido todavía no se cobró: cobralo primero con el botón “Cobrar pedido” (arriba).");
       return;
     }
     if (estado === "en_despacho" && faltaRepartidor) {
@@ -150,7 +150,7 @@ export function EstadoBotones({
   return (
     <div>
       <div className="flex flex-wrap gap-2">
-        {ESTADOS_PEDIDO.map((e) => {
+        {ESTADOS_PEDIDO.filter((e) => e.value !== "cancelado").map((e) => {
           const activo = estadoActual === e.value;
           const sinCobrar = bloqueadoPorCobro(e.value);
           const bloqueado = (e.value === "en_despacho" && faltaRepartidor) || sinCobrar;
@@ -179,12 +179,23 @@ export function EstadoBotones({
             </button>
           );
         })}
+        {/* Cancelar el pedido (si algo se cargó mal): pide el motivo y queda en el historial. En rojo, como todo lo que cancela. */}
+        {estadoActual !== "cancelado" && (
+          <button
+            type="button"
+            disabled={pending}
+            onClick={() => handleClick("cancelado")}
+            className={`${clasesBoton("peligro", "sm")} ml-auto`}
+          >
+            Cancelar pedido
+          </button>
+        )}
       </div>
       {error && <p className="mt-2 text-sm text-peligro">{error}</p>}
       {aviso && !error && <p className="mt-2 text-sm text-aviso">{aviso}</p>}
       {!cobrado && estadoActual !== "cancelado" && !error && (
         <p className="mt-2 rounded-lg border border-amarillo/60 bg-amarillo-luz px-3 py-2 text-[0.82rem] font-medium text-amarillo-oscuro">
-          Este pedido todavía no se cobró: cobralo con el cuadro Cobro (más abajo) antes de{" "}
+          Este pedido todavía no se cobró: cobralo con el botón “Cobrar pedido” (arriba) antes de{" "}
           {tipoEntrega === "delivery" ? "despacharlo" : "entregarlo"}.
         </p>
       )}

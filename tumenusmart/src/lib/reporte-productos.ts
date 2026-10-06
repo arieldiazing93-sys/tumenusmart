@@ -4,6 +4,7 @@ import { costoDelProducto } from "./costo-receta";
 import { aplanarReceta } from "./insumo-elaborado";
 import { cargarElaborados } from "./cargar-elaborados";
 import { factorDeDescuento } from "./descuento-venta";
+import { factorDeDescuentoPedido } from "./pedido-abierto";
 import { TASAS_IVA } from "./iva";
 
 /**
@@ -179,6 +180,8 @@ export async function calcularReporteProductosVendidos(
         costoAgregados: true,
         costoProducto: true,
         opcionesTexto: true,
+        // Para repartir entre los ítems el descuento general que se le dio al pedido.
+        order: { select: { subtotal: true, descuento: true } },
         product: {
           select: {
             costo: true,
@@ -272,7 +275,11 @@ export async function calcularReporteProductosVendidos(
   // todos en proporción, para que la venta del reporte sea la plata que de
   // verdad entró — la misma que suman Estadísticas y Analytics con `total`.
   const todosLosItems = [
-    ...items.map((i) => ({ ...i, factorDescuento: 1 })),
+    // El pedido guarda el precio de cada producto sin el descuento (el envío no se descuenta, por eso se usa el subtotal).
+    ...items.map(({ order, ...i }) => ({
+      ...i,
+      factorDescuento: factorDeDescuentoPedido(Number(order.subtotal), Number(order.descuento)),
+    })),
     ...itemsPos.map(({ ventaPos, ...i }) => ({
       ...i,
       factorDescuento: factorDeDescuento(Number(ventaPos.total), Number(ventaPos.descuento)),

@@ -1,22 +1,18 @@
 import { Volver } from "@/components/Volver";
-import { Pastilla } from "@/components/ui";
 import { notFound } from "next/navigation";
 import { pantallaConPermiso } from "@/lib/auth";
 import { prismaDelLocal } from "@/lib/prisma-local";
 import { idLocalActual } from "@/lib/local-actual";
-import { formatearGuarani, formatearNumero } from "@/lib/format";
-import { etiquetaMetodoPago } from "@/lib/metodos-pago";
-import { etiquetaFormaPagoPos } from "@/lib/turno-pos";
-import { enlaceDeMapa, extraerUbicacion, primerEnlace, textoSinEnlaces } from "@/lib/ubicacion-mapa";
-import { SIN_REGISTRO_FISCAL, etiquetaTipoIdentificacion } from "@/lib/tipo-cliente";
-import { EstadoBotones } from "../EstadoBotones";
-import { CobroPedido } from "../CobroPedido";
-import { RepartidorSelect } from "../RepartidorSelect";
-import { ZONA_NEGOCIO } from "@/lib/timezone";
-import { estacionActual } from "@/lib/estacion-actual";
+import { DetallePedido } from "../DetallePedido";
+import { cargarContextoPedidos } from "../contexto-pedidos";
+import { aFilaDePedido } from "../tipos-pedido";
 
 export const dynamic = "force-dynamic";
 
+/**
+ * Un pedido suelto (el enlace directo, por ejemplo al terminar de cargarlo): es el mismo detalle que se abre a la derecha de la
+ * lista de Pedidos.
+ */
 export default async function DetallePedidoPage({
   params,
 }: {
@@ -25,7 +21,7 @@ export default async function DetallePedidoPage({
   // Layout y página se renderizan en paralelo: sin este chequeo acá, una
   // sesión vencida podía terminar en el `throw` de idLocalActual() de acá
   // abajo antes de que el layout redirigiera a /admin/login.
-  await pantallaConPermiso("pedidos.ver");
+  const sesion = await pantallaConPermiso("pedidos.ver");
 
   // Todas las consultas de acá abajo quedan atadas a este local.
   const storeId = await idLocalActual();
@@ -33,256 +29,24 @@ export default async function DetallePedidoPage({
 
   const { id } = await params;
 
-  // Las impresoras de la MISMA computadora desde la que se atiende — misma cookie de estación que usa el Punto de Venta.
-  const estacion = await estacionActual(prisma);
-
-  const [pedido, repartidores, estacionConImpresoras] = await Promise.all([
+  const [pedido, contexto] = await Promise.all([
     prisma.order.findUnique({
       where: { id },
       include: { items: true, deliveryZone: true, repartidor: true },
     }),
-    prisma.repartidor.findMany({ where: { activo: true }, orderBy: { nombre: "asc" } }),
-    estacion
-      ? prisma.estacion.findUnique({
-          where: { id: estacion.id },
-          select: {
-            areaTicketId: true,
-            impresoras: { select: { areaImpresionId: true, nombreImpresora: true } },
-          },
-        })
-      : Promise.resolve(null),
+    // Repartidores, impresoras de ESTA computadora, la carta y lo necesario para cobrar (ver cargarContextoPedidos).
+    cargarContextoPedidos(prisma, storeId, sesion.rol),
   ]);
 
-  // Impresión automática (QZ Tray) — ver src/lib/impresion-comprobantes.ts.
-  const impresorasPorArea = Object.fromEntries(
-    (estacionConImpresoras?.impresoras ?? []).map((i) => [i.areaImpresionId, i.nombreImpresora])
-  );
-  const nombreImpresoraTicket = estacionConImpresoras?.areaTicketId
-    ? (impresorasPorArea[estacionConImpresoras.areaTicketId] ?? null)
-    : null;
-
   if (!pedido) notFound();
-
-  // Un pedido entra a la caja del turno al cobrarse (al cargarlo a mano, o con "Cobrar"): quedan la forma de pago y el turno.
-  const cobrado = !!pedido.turnoPosId;
-
-  // El enlace de la ubicación del cliente (el mismo que abre el repartidor desde su ruta).
-  const coordenadas =
-    pedido.clienteLat != null && pedido.clienteLng != null
-      ? { lat: pedido.clienteLat, lng: pedido.clienteLng }
-      : extraerUbicacion(pedido.direccion);
-  const linkUbicacion = coordenadas ? enlaceDeMapa(coordenadas) : primerEnlace(pedido.direccion);
 
   return (
     <div>
       <div className="mb-3">
         <Volver href="/admin/pedidos" texto="Volver a pedidos" />
       </div>
-
-      <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="text-[1.4rem] font-semibold tracking-titular text-tinta">
-            Pedido {formatearNumero(pedido.numero)}
-          </h1>
-          <p className="text-sm text-tinta-media">
-            {new Date(pedido.createdAt).toLocaleString("es-PY", { timeZone: ZONA_NEGOCIO })}
-          </p>
-        </div>
-
-        {/* Se abren en una pestaña aparte y disparan la impresión solas, para
-            no perder de vista el pedido que se está atendiendo. */}
-        <div className="flex flex-wrap gap-2">
-          <a
-            href={`/admin/pedidos/${pedido.id}/comanda`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="rounded-lg bg-noche px-3 py-2 text-sm font-semibold text-white hover:bg-noche-panel"
-          >
-            👨‍🍳 Comanda de cocina
-          </a>
-          <a
-            href={`/admin/pedidos/${pedido.id}/ticket`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="rounded-lg border border-linea px-3 py-2 text-sm font-semibold text-tinta-media hover:border-brand hover:text-brand"
-          >
-            {pedido.comprobanteTipo === "factura" && pedido.facturaNumero ? "🧾 Factura" : "🧾 Ticket"}
-          </a>
-        </div>
-      </div>
-
-      <div className="mb-4 rounded-lg border border-linea bg-white p-3.5">
-        <p className="font-medium text-tinta">{pedido.clienteNombre}</p>
-        <p className="text-sm text-tinta-media">{pedido.clienteTelefono}</p>
-        {pedido.origen === "telefono" && (
-          <div className="mt-2">
-            <Pastilla color="azul">Cargado por teléfono</Pastilla>
-          </div>
-        )}
-      </div>
-
-      <div className="mb-4">
-        <h2 className="mb-2 text-sm font-semibold text-tinta">Estado del pedido</h2>
-        <EstadoBotones
-          orderId={pedido.id}
-          estadoActual={pedido.estado}
-          tipoEntrega={pedido.tipoEntrega}
-          repartidorId={pedido.repartidorId}
-          cobrado={cobrado}
-          comprobanteTipo={pedido.comprobanteTipo}
-          facturaNumero={pedido.facturaNumero}
-          facturaAnulada={pedido.facturaAnulada}
-          nombreImpresoraTicket={nombreImpresoraTicket}
-          impresorasPorArea={impresorasPorArea}
-        />
-      </div>
-
-      <div className="mb-4 grid gap-3 sm:grid-cols-2">
-        <div className="rounded-lg border border-linea bg-white p-3.5">
-          <p className="mb-1 text-sm font-bold uppercase tracking-wide text-tinta">
-            Entrega
-          </p>
-          <p className="text-sm text-tinta">
-            {pedido.tipoEntrega === "delivery"
-              ? `Delivery — ${pedido.deliveryZone?.nombre ?? "a coordinar"}`
-              : "Retiro en el local"}
-          </p>
-          {pedido.tipoEntrega === "delivery" && textoSinEnlaces(pedido.direccion) && (
-            <p className="text-sm text-tinta-media">{textoSinEnlaces(pedido.direccion)}</p>
-          )}
-          {/* La ubicación: el punto marcado/pegado (coordenadas) o, si solo hay un enlace corto de Google Maps, ese enlace. */}
-          {pedido.tipoEntrega === "delivery" && linkUbicacion && (
-            <a
-              href={linkUbicacion}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-sm text-brand hover:underline"
-            >
-              Ver ubicación en el mapa
-            </a>
-          )}
-
-          {pedido.tipoEntrega === "delivery" && (
-            <div className="mt-2.5 border-t border-linea-fina pt-2.5">
-              <p className="mb-1 text-sm font-bold uppercase tracking-wide text-tinta">
-                Repartidor
-              </p>
-              <RepartidorSelect
-                orderId={pedido.id}
-                repartidorIdActual={pedido.repartidorId}
-                repartidores={repartidores}
-              />
-            </div>
-          )}
-        </div>
-
-        <div className="rounded-lg border border-linea bg-white p-3.5">
-          <p className="mb-1 text-sm font-bold uppercase tracking-wide text-tinta">
-            Pago
-          </p>
-          {cobrado ? (
-            <p className="text-sm text-tinta">
-              <span className="font-medium text-exito">Cobrado</span> con {etiquetaFormaPagoPos(pedido.formaPagoPos ?? "efectivo")}
-              {pedido.cobradoEn
-                ? ` · ${new Date(pedido.cobradoEn).toLocaleString("es-PY", { timeZone: ZONA_NEGOCIO })}`
-                : ""}
-              {pedido.tipoEntrega === "delivery" && pedido.formaPagoPos === "efectivo"
-                ? " · el repartidor tiene que traer el efectivo"
-                : ""}
-            </p>
-          ) : (
-            <p className="text-sm text-tinta">{etiquetaMetodoPago(pedido.metodoPagoReferencia)}</p>
-          )}
-
-          {/* Un pedido sin cobrar (uno viejo): se cobra acá y entra a la caja del turno (ver CobroPedido). */}
-          {!cobrado && pedido.estado !== "cancelado" && (
-            <CobroPedido
-              orderId={pedido.id}
-              total={Number(pedido.total)}
-              formaSugerida={pedido.metodoPagoReferencia}
-              conFactura={pedido.comprobanteTipo === "factura" && !pedido.facturaNumero}
-            />
-          )}
-
-          {pedido.comprobanteTipo === "factura" && (
-            <div className="mt-2.5 rounded bg-aviso-luz px-2 py-1.5 text-sm text-aviso">
-              <p className="font-medium">
-                {pedido.facturaNumero ? `Factura N° ${pedido.facturaNumero}` : "Factura (todavía sin emitir)"}
-                {pedido.facturaAnulada && <span className="ml-1.5 text-peligro">(ANULADA)</span>}
-              </p>
-              <p>
-                Razón social:{" "}
-                {pedido.facturaTipoIdentificacion === SIN_REGISTRO_FISCAL.tipo
-                  ? SIN_REGISTRO_FISCAL.etiquetaDisplay
-                  : pedido.facturaRazonSocial}
-              </p>
-              <p>
-                {pedido.facturaTipoIdentificacion === SIN_REGISTRO_FISCAL.tipo
-                  ? "RUC"
-                  : etiquetaTipoIdentificacion(pedido.facturaTipoIdentificacion ?? "ruc")}
-                : {pedido.facturaRuc}
-              </p>
-              {pedido.facturaEmail && <p>Correo: {pedido.facturaEmail}</p>}
-              {!pedido.facturaNumero && (
-                <p className="mt-1 text-tinta-media">
-                  Se emite al cobrar el pedido (necesita el punto de expedición vigente de esta computadora).
-                </p>
-              )}
-            </div>
-          )}
-
-          {pedido.notas && (
-            <div className="mt-2.5 border-t border-linea-fina pt-2.5">
-              <p className="mb-1 text-sm font-bold uppercase tracking-wide text-tinta">
-                Nota del cliente
-              </p>
-              <p className="text-sm text-tinta-media">{pedido.notas}</p>
-            </div>
-          )}
-        </div>
-      </div>
-
-      <div className="mb-4 rounded-lg border border-linea bg-white p-3.5">
-        <p className="mb-2 text-sm font-bold uppercase tracking-wide text-tinta">
-          Productos
-        </p>
-        <ul className="flex flex-col gap-2">
-          {pedido.items.map((item) => (
-            <li key={item.id} className="flex items-start justify-between text-sm">
-              <div>
-                <p className="text-tinta">
-                  {item.cantidad}x {item.nombreProducto}
-                </p>
-                {item.opcionesTexto && (
-                  <p className="text-tinta-media">{item.opcionesTexto}</p>
-                )}
-                {item.ingredientesQuitadosTexto && (
-                  <p className="text-peligro">{item.ingredientesQuitadosTexto}</p>
-                )}
-              </div>
-              <span className="whitespace-nowrap font-medium text-tinta">
-                {formatearGuarani(item.cantidad * Number(item.precioUnitario))}
-              </span>
-            </li>
-          ))}
-        </ul>
-
-        <div className="mt-3 flex flex-col gap-1 border-t border-linea-fina pt-2.5 text-sm">
-          <div className="flex justify-between text-tinta-media">
-            <span>Subtotal</span>
-            <span>{formatearGuarani(Number(pedido.subtotal))}</span>
-          </div>
-          {pedido.tipoEntrega === "delivery" && (
-            <div className="flex justify-between text-tinta-media">
-              <span>Envío</span>
-              <span>{formatearGuarani(Number(pedido.costoEnvio))}</span>
-            </div>
-          )}
-          <div className="flex justify-between text-base font-semibold text-tinta">
-            <span>Total</span>
-            <span>{formatearGuarani(Number(pedido.total))}</span>
-          </div>
-        </div>
+      <div className="max-w-3xl">
+        <DetallePedido pedido={aFilaDePedido(pedido)} contexto={contexto} />
       </div>
     </div>
   );

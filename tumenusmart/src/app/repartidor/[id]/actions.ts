@@ -14,7 +14,7 @@ export type ResultadoEntrega = { ok: true } | { ok: false; error: string };
 /**
  * El repartidor marca un pedido como entregado: es su ruta de trabajo y nada más.
  *
- * El dinero NO se mueve acá: el pedido ya llegó cobrado y facturado desde la caja (se cobra al cargarlo a mano). Lo que queda de
+ * El dinero NO se mueve acá: el pedido ya llegó cobrado y facturado desde la caja (se cobra al final con "Cobrar pedido", antes de despacharlo). Lo que queda de
  * la entrega es el control del efectivo: se guarda en `cobroMetodo` CÓMO se cobró en la caja (efectivo, transferencia…), para que la
  * Rendición sepa cuánto efectivo tiene que traer de vuelta. Eso ya NO suma nada a la caja del turno (ya estaba sumado al cobrarlo).
  *
