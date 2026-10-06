@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { MensajeError, Selector, clasesBoton } from "@/components/ui";
+import { MensajeError, Pastilla, Selector, clasesBoton, type ColorEstado } from "@/components/ui";
 import { PanelLateral } from "@/components/PanelLateral";
 import { Segmentado } from "@/components/Segmentado";
 import { formatearCantidad, formatearGuarani, formatearNumero } from "@/lib/format";
@@ -18,6 +18,12 @@ import type { CuentaCajaFila } from "./ComedorCaja";
 import { dividirCuenta } from "./division-actions";
 
 type Modo = "iguales" | "producto";
+
+/** A qué cuenta nueva pasa un producto (1 = la primera, "1-A") y cuántas de sus unidades. */
+type Elegido = { destino: number; cantidad: number };
+
+/** Un color por cuenta nueva, para leer de un vistazo a cuál va cada producto. */
+const COLORES_DE_CUENTA: ColorEstado[] = ["azul", "exito", "marca", "amarillo", "aviso"];
 
 /** Un contador con menos y más, para elegir en cuántas partes. */
 function Contador({
@@ -59,9 +65,27 @@ function Contador({
 }
 
 /**
+ * Que las cuentas nuevas usadas sean 1, 2, 3… sin saltos: si se vacía la "1-A" y queda la "1-B", la "1-B" pasa a ser la "1-A".
+ * Así nunca queda una cuenta nueva sin productos en el medio.
+ */
+function compactar(actual: Record<string, Elegido>): Record<string, Elegido> {
+  const usados = [...new Set(Object.values(actual).map((e) => e.destino).filter((d) => d >= 1))].sort((a, b) => a - b);
+  const nuevoNumero = new Map(usados.map((d, i) => [d, i + 1]));
+  return Object.fromEntries(
+    Object.entries(actual)
+      .filter(([, e]) => e.destino >= 1)
+      .map(([id, e]) => [id, { ...e, destino: nuevoNumero.get(e.destino) ?? e.destino }])
+  );
+}
+
+/**
  * Dividir la cuenta de una mesa porque cada uno quiere su factura: en partes iguales (cada parte lleva, por ejemplo, media
- * pizza: 0,5) o por producto (se eligen los productos que pasan a una cuenta nueva y las cantidades quedan enteras). La
+ * pizza: 0,5) o por producto (se marcan los productos y se mueven a una cuenta nueva; las cantidades quedan enteras). La
  * original conserva su nombre ("Mesa 1") y las nuevas se llaman "1-A", "1-B"…
+ *
+ * Por producto: una sola lista con una casilla en cada producto. Se marcan los que pasan a otra persona y se toca "Mover a
+ * Mesa 1-A" (o "1-B" para una tercera persona): la cuenta nueva se arma con esos productos. Se puede mover de nuevo o
+ * devolver a la original las veces que haga falta antes de confirmar.
  *
  * Lo que se muestra sale de la MISMA función que usa el servidor para dividir (src/lib/division-cuenta.ts), así que lo que se
  * ve es exactamente lo que se guarda: totales enteros que suman justo el total de la cuenta, sin un guaraní de diferencia.
@@ -81,9 +105,9 @@ export function DividirCuentaPanel({
 }) {
   const [modo, setModo] = useState<Modo>("iguales");
   const [partes, setPartes] = useState(2);
-  const [destinos, setDestinos] = useState(1);
-  // Por producto: a qué cuenta nueva pasa cada línea (0 = se queda) y cuántas unidades.
-  const [elegido, setElegido] = useState<Record<string, { destino: number; cantidad: number }>>({});
+  // Por producto: a qué cuenta nueva pasa cada producto (los que no están acá se quedan en la original) y cuáles están marcados.
+  const [elegido, setElegido] = useState<Record<string, Elegido>>({});
+  const [marcados, setMarcados] = useState<Record<string, boolean>>({});
   const [haciendo, setHaciendo] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -96,34 +120,65 @@ export function DividirCuentaPanel({
   }));
   const pedido = cuenta.descuento ? { tipo: cuenta.descuento.tipo, valor: cuenta.descuento.valor } : null;
 
+  // Por producto: cuántas cuentas nuevas hay ahora (las usadas son 1..k) y las marcas que siguen valiendo.
+  const idsActivos = new Set(activos.map((i) => i.id));
+  const asignaciones: AsignacionDeLinea[] = Object.entries(elegido)
+    .filter(([id]) => idsActivos.has(id))
+    .map(([itemId, e]) => ({ itemId, destino: e.destino, cantidad: e.cantidad }));
+  const cuentasNuevasPorProducto = asignaciones.reduce((m, a) => Math.max(m, a.destino), 0);
+  const cantidadMarcados = activos.filter((i) => marcados[i.id]).length;
+
   const base = cuenta.mesaBase ?? cuenta.mesa;
   const ocupadas = new Set(mesasOcupadas.map(claveDeMesa));
-  const cuantasNuevas = modo === "iguales" ? partes - 1 : destinos;
-  const nombres = nombresDeCuentasNuevas(base, cuantasNuevas, (clave) => ocupadas.has(clave));
+  // Los nombres que hacen falta: en partes iguales, uno por parte menos la original; por producto, los usados más el que
+  // se crearía con el próximo "Mover a…".
+  const cuantosNombres =
+    modo === "iguales" ? partes - 1 : Math.min(cuentasNuevasPorProducto + 1, PARTES_MAXIMAS - 1);
+  const nombres = nombresDeCuentasNuevas(base, cuantosNombres, (clave) => ocupadas.has(clave));
   const nombreDeParte = (indice: number) => (indice === 0 ? `Mesa ${cuenta.mesa}` : `Mesa ${nombres?.[indice - 1] ?? "…"}`);
 
-  const asignaciones: AsignacionDeLinea[] = Object.entries(elegido)
-    .filter(([, e]) => e.destino >= 1 && e.destino <= destinos)
-    .map(([itemId, e]) => ({ itemId, destino: e.destino, cantidad: e.cantidad }));
   const plan =
-    modo === "iguales" ? dividirEnPartesIguales(lineas, pedido, partes) : dividirPorProducto(lineas, pedido, destinos, asignaciones);
+    modo === "iguales"
+      ? dividirEnPartesIguales(lineas, pedido, partes)
+      : cuentasNuevasPorProducto >= 1
+        ? dividirPorProducto(lineas, pedido, cuentasNuevasPorProducto, asignaciones)
+        : null;
 
-  function cambiarDestinos(nuevo: number) {
-    setDestinos(nuevo);
-    // Lo que iba a una cuenta que ya no existe vuelve a quedarse en la original.
-    setElegido((actual) => Object.fromEntries(Object.entries(actual).map(([id, e]) => [id, e.destino > nuevo ? { ...e, destino: 0 } : e])));
+  // ------------------------------------------------------------------------------------------- marcar y mover
+  function marcar(id: string, valor: boolean) {
+    setMarcados((actual) => ({ ...actual, [id]: valor }));
   }
 
-  function elegirDestino(itemId: string, cantidadTotal: number, destino: number) {
-    setElegido((actual) => ({ ...actual, [itemId]: { destino, cantidad: actual[itemId]?.cantidad ?? cantidadTotal } }));
+  function marcarTodos(valor: boolean) {
+    setMarcados(valor ? Object.fromEntries(activos.map((i) => [i.id, true])) : {});
+  }
+
+  /** Mueve los productos marcados a la cuenta nueva `destino` (la siguiente libre crea una cuenta nueva). */
+  function moverMarcados(destino: number) {
+    const ids = activos.filter((i) => marcados[i.id]);
+    if (ids.length === 0) return;
+    setError(null);
+    setElegido((actual) =>
+      compactar({ ...actual, ...Object.fromEntries(ids.map((i) => [i.id, { destino, cantidad: i.cantidad }])) })
+    );
+    setMarcados({});
+  }
+
+  /** Devuelve los productos marcados a la cuenta original. */
+  function devolverMarcados() {
+    const ids = new Set(activos.filter((i) => marcados[i.id]).map((i) => i.id));
+    if (ids.size === 0) return;
+    setError(null);
+    setElegido((actual) => compactar(Object.fromEntries(Object.entries(actual).filter(([id]) => !ids.has(id)))));
+    setMarcados({});
   }
 
   function elegirCantidad(itemId: string, cantidad: number) {
-    setElegido((actual) => ({ ...actual, [itemId]: { destino: actual[itemId]?.destino ?? 0, cantidad } }));
+    setElegido((actual) => (actual[itemId] ? { ...actual, [itemId]: { ...actual[itemId], cantidad } } : actual));
   }
 
   async function dividir() {
-    if (!plan.ok || !nombres || haciendo) return;
+    if (!plan || !plan.ok || !nombres || haciendo) return;
     setHaciendo(true);
     setError(null);
     try {
@@ -131,7 +186,7 @@ export function DividirCuentaPanel({
         cuenta.id,
         modo === "iguales"
           ? { modo, partes, totalMostrado: cuenta.totales.total }
-          : { modo, destinos, asignaciones, totalMostrado: cuenta.totales.total }
+          : { modo, destinos: cuentasNuevasPorProducto, asignaciones, totalMostrado: cuenta.totales.total }
       );
       if (!r.ok) {
         setError(r.error);
@@ -150,6 +205,7 @@ export function DividirCuentaPanel({
   }
 
   const sinProductos = activos.length === 0;
+  const puedeDividir = !!plan && plan.ok && !!nombres && !sinProductos;
 
   return (
     <PanelLateral titulo={`Dividir la mesa ${cuenta.mesa}`} onCerrar={() => !haciendo && onCerrar()} ancho="ancho">
@@ -171,7 +227,7 @@ export function DividirCuentaPanel({
           <Segmentado<Modo>
             opciones={[
               { value: "iguales", label: "En partes iguales", sublabel: "Cada uno paga lo mismo" },
-              { value: "producto", label: "Por producto", sublabel: "Elegís qué paga cada uno" },
+              { value: "producto", label: "Por producto", sublabel: "Cada uno paga lo suyo" },
             ]}
             valor={modo}
             onChange={(m) => {
@@ -194,67 +250,114 @@ export function DividirCuentaPanel({
               </p>
             </div>
           ) : (
-            <div className="flex flex-col gap-3">
-              <div className="flex flex-col gap-2 rounded-xl border-2 border-azul/50 bg-superficie p-3.5">
+            <div className="flex flex-col gap-2 rounded-xl border-2 border-azul/50 bg-superficie p-3">
+              <p className="text-[0.76rem] leading-snug text-tinta-suave">
+                Marcá los productos que paga otra persona y tocá <strong className="font-semibold text-tinta">Mover</strong>: se crea su
+                cuenta ({nombres ? `Mesa ${nombres[0]}` : "…"}). Para una tercera persona, marcá los suyos y movelos a la siguiente. Lo
+                que no muevas se queda en la Mesa {cuenta.mesa}.
+              </p>
+
+              {/* La barra de acciones queda a la vista aunque la lista sea larga. */}
+              <div className="sticky top-0 z-10 -mx-1 flex flex-col gap-2 rounded-lg border border-linea bg-papel-suave px-2.5 py-2">
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <p className="text-[0.85rem] font-semibold text-tinta">Cuentas nuevas</p>
-                  <Contador valor={destinos} minimo={1} maximo={PARTES_MAXIMAS - 1} onCambiar={cambiarDestinos} etiqueta="cuentas nuevas" />
+                  <label className="flex cursor-pointer items-center gap-2 text-[0.82rem] font-medium text-tinta">
+                    <input
+                      type="checkbox"
+                      checked={cantidadMarcados === activos.length && activos.length > 0}
+                      onChange={(e) => marcarTodos(e.target.checked)}
+                      className="h-5 w-5 accent-azul"
+                    />
+                    Marcar todos
+                  </label>
+                  <span className="text-[0.78rem] font-semibold text-tinta-media">
+                    {cantidadMarcados === 0
+                      ? "Ninguno marcado"
+                      : cantidadMarcados === 1
+                        ? "1 marcado"
+                        : `${cantidadMarcados} marcados`}
+                  </span>
                 </div>
-                <p className="text-[0.76rem] leading-snug text-tinta-suave">
-                  Elegí a qué cuenta pasa cada producto. Lo que no cambies se queda en la Mesa {cuenta.mesa}. Las cantidades quedan
-                  enteras.
-                </p>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {Array.from({ length: Math.min(cuentasNuevasPorProducto + 1, PARTES_MAXIMAS - 1) }, (_, k) => k + 1).map((d) => {
+                    const esNueva = d === cuentasNuevasPorProducto + 1;
+                    return (
+                      <button
+                        key={d}
+                        type="button"
+                        disabled={cantidadMarcados === 0 || !nombres}
+                        onClick={() => moverMarcados(d)}
+                        // Verde si crea una cuenta nueva; azul si es para una que ya tiene productos.
+                        className={clasesBoton(esNueva ? "nuevo" : "navegar", "sm")}
+                      >
+                        Mover a Mesa {nombres?.[d - 1] ?? "…"}
+                        {esNueva && cuentasNuevasPorProducto > 0 ? " (nueva)" : ""}
+                      </button>
+                    );
+                  })}
+                  {cuentasNuevasPorProducto > 0 && (
+                    <button
+                      type="button"
+                      disabled={cantidadMarcados === 0}
+                      onClick={devolverMarcados}
+                      className={clasesBoton("suave", "sm")}
+                    >
+                      Devolver a Mesa {cuenta.mesa}
+                    </button>
+                  )}
+                </div>
               </div>
 
-              <ul className="flex flex-col gap-2">
+              <ul className="flex flex-col divide-y divide-linea-fina">
                 {activos.map((i) => {
-                  const e = elegido[i.id] ?? { destino: 0, cantidad: i.cantidad };
-                  const pasa = e.destino >= 1 && e.destino <= destinos;
-                  const enteraYVariasUnidades = Number.isInteger(i.cantidad) && i.cantidad > 1;
+                  const e = elegido[i.id];
+                  const destino = e ? e.destino : 0;
+                  const puedeParcial = destino >= 1 && Number.isInteger(i.cantidad) && i.cantidad > 1;
                   return (
-                    <li key={i.id} className="rounded-xl border border-linea bg-superficie p-3">
-                      <div className="flex items-start justify-between gap-2">
-                        <p className="min-w-0 text-[0.86rem] text-tinta">
+                    <li key={i.id} className={`flex flex-col gap-1 py-2 ${marcados[i.id] ? "bg-azul-luz/40" : ""}`}>
+                      <label className="flex cursor-pointer items-start gap-2.5 px-1">
+                        <input
+                          type="checkbox"
+                          checked={!!marcados[i.id]}
+                          onChange={(ev) => marcar(i.id, ev.target.checked)}
+                          className="mt-0.5 h-5 w-5 flex-none accent-azul"
+                          aria-label={`Marcar ${i.nombre}`}
+                        />
+                        <span className="min-w-0 flex-1 text-[0.86rem] leading-snug text-tinta">
                           <span className="font-semibold">{formatearCantidad(i.cantidad)} ×</span> {i.nombre}
                           {i.opciones && <span className="block text-[0.74rem] text-tinta-suave">+ {i.opciones}</span>}
-                        </p>
-                        <p className="cifra flex-none text-[0.86rem] font-semibold text-tinta">
-                          {formatearGuarani(i.precioUnitario * i.cantidad)}
-                        </p>
-                      </div>
-                      <div className="mt-2 flex flex-wrap items-center gap-2">
-                        <div className="min-w-[10rem] flex-1">
+                        </span>
+                        <span className="flex flex-none flex-col items-end gap-1">
+                          <span className="cifra text-[0.86rem] font-semibold text-tinta">
+                            {formatearGuarani(i.precioUnitario * i.cantidad)}
+                          </span>
+                          {destino >= 1 ? (
+                            <Pastilla color={COLORES_DE_CUENTA[(destino - 1) % COLORES_DE_CUENTA.length]}>
+                              → Mesa {nombres?.[destino - 1] ?? "…"}
+                            </Pastilla>
+                          ) : (
+                            <Pastilla>Mesa {cuenta.mesa}</Pastilla>
+                          )}
+                        </span>
+                      </label>
+                      {puedeParcial && e && (
+                        <div className="flex items-center gap-1.5 pl-8">
+                          <span className="text-[0.76rem] text-tinta-suave">Pasan</span>
                           <Selector
-                            value={String(pasa ? e.destino : 0)}
-                            onChange={(ev) => elegirDestino(i.id, i.cantidad, Number(ev.target.value))}
-                            aria-label={`A qué cuenta pasa ${i.nombre}`}
+                            value={String(e.cantidad)}
+                            onChange={(ev) => elegirCantidad(i.id, Number(ev.target.value))}
+                            aria-label={`Cuántas unidades de ${i.nombre} pasan`}
+                            className="!w-auto"
                           >
-                            <option value="0">Se queda en Mesa {cuenta.mesa}</option>
-                            {Array.from({ length: destinos }, (_, k) => (
+                            {Array.from({ length: i.cantidad }, (_, k) => (
                               <option key={k + 1} value={k + 1}>
-                                Pasa a Mesa {nombres?.[k] ?? "…"}
+                                {k + 1}
+                                {k + 1 === i.cantidad ? " (todas)" : ""}
                               </option>
                             ))}
                           </Selector>
+                          <span className="text-[0.76rem] text-tinta-suave">de {formatearCantidad(i.cantidad)}</span>
                         </div>
-                        {pasa && enteraYVariasUnidades && (
-                          <div className="flex items-center gap-1.5">
-                            <span className="text-[0.76rem] text-tinta-suave">Cuántas</span>
-                            <Selector
-                              value={String(e.cantidad)}
-                              onChange={(ev) => elegirCantidad(i.id, Number(ev.target.value))}
-                              aria-label={`Cuántas unidades de ${i.nombre} pasan`}
-                            >
-                              {Array.from({ length: i.cantidad }, (_, k) => (
-                                <option key={k + 1} value={k + 1}>
-                                  {k + 1}
-                                  {k + 1 === i.cantidad ? " (todas)" : ""}
-                                </option>
-                              ))}
-                            </Selector>
-                          </div>
-                        )}
-                      </div>
+                      )}
                     </li>
                   );
                 })}
@@ -266,7 +369,11 @@ export function DividirCuentaPanel({
           {!sinProductos && (
             <div className="flex flex-col gap-2">
               <p className="text-[0.72rem] font-semibold uppercase tracking-rotulo text-tinta-suave">Así queda</p>
-              {plan.ok ? (
+              {plan === null ? (
+                <p className="rounded-lg bg-papel-suave px-3 py-2 text-[0.82rem] text-tinta-media">
+                  Todavía no moviste ningún producto: marcalos arriba y tocá “Mover a Mesa {nombres?.[0] ?? "…"}”.
+                </p>
+              ) : plan.ok ? (
                 <>
                   {plan.partes.map((p) => (
                     <div key={p.indice} className="rounded-xl border-2 border-azul/50 bg-superficie p-3">
@@ -274,19 +381,28 @@ export function DividirCuentaPanel({
                         <p className="text-[0.9rem] font-semibold text-tinta">
                           {nombreDeParte(p.indice)}
                           {p.indice === 0 && <span className="font-normal text-tinta-suave"> · la original</span>}
+                          {modo === "producto" && (
+                            <span className="font-normal text-tinta-suave">
+                              {" "}
+                              · {p.lineas.length} {p.lineas.length === 1 ? "producto" : "productos"}
+                            </span>
+                          )}
                         </p>
                         <p className="cifra text-[1.05rem] font-bold text-tinta">{formatearGuarani(p.total)}</p>
                       </div>
-                      <ul className="mt-1.5 flex flex-col gap-0.5 text-[0.8rem] text-tinta-media">
-                        {p.lineas.map((l) => (
-                          <li key={`${l.origenId}-${l.accion}`} className="flex justify-between gap-2">
-                            <span className="min-w-0">
-                              <strong className="font-semibold text-tinta">{formatearCantidad(l.cantidad)} ×</strong> {l.nombreProducto}
-                            </span>
-                            <span className="cifra flex-none">{formatearGuarani(l.importe)}</span>
-                          </li>
-                        ))}
-                      </ul>
+                      {/* En partes iguales se ve el detalle (las fracciones); por producto la lista de arriba ya lo muestra. */}
+                      {modo === "iguales" && (
+                        <ul className="mt-1.5 flex flex-col gap-0.5 text-[0.8rem] text-tinta-media">
+                          {p.lineas.map((l) => (
+                            <li key={`${l.origenId}-${l.accion}`} className="flex justify-between gap-2">
+                              <span className="min-w-0">
+                                <strong className="font-semibold text-tinta">{formatearCantidad(l.cantidad)} ×</strong> {l.nombreProducto}
+                              </span>
+                              <span className="cifra flex-none">{formatearGuarani(l.importe)}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
                       {p.montoDescuento > 0 && (
                         <p className="mt-1 text-[0.74rem] text-tinta-suave">
                           {formatearGuarani(p.subtotal)} − descuento {formatearGuarani(p.montoDescuento)}
@@ -326,7 +442,7 @@ export function DividirCuentaPanel({
             <button
               type="button"
               onClick={() => void dividir()}
-              disabled={haciendo || sinProductos || !plan.ok || !nombres}
+              disabled={haciendo || !puedeDividir}
               className={clasesBoton("nuevo", "md")}
             >
               {haciendo ? "Dividiendo…" : "Dividir la cuenta"}

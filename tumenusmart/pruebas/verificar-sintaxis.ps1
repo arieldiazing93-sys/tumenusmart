@@ -30,7 +30,7 @@ $plantilla = @'
 <!doctype html>
 <meta charset="utf-8">
 <body><pre id="out">sin ejecutar</pre>
-<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone@7.25.6/babel.min.js"></script>
 <script>
 var BASE = "__BASE__";
 var ARCHIVOS = __ARCHIVOS__;
