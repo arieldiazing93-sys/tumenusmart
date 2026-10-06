@@ -80,6 +80,10 @@ export function PagarCuentaPanel({
   const [propinaMonto, setPropinaMonto] = useState("");
   const [propinaForma, setPropinaForma] = useState<string>(FORMAS_PROPINA[0].valor);
   const [propinaMozoId, setPropinaMozoId] = useState(() => (mozos.some((m) => m.id === cuenta.mozoId) ? cuenta.mozoId : ""));
+  // La propina va para el mozo de la mesa; "Cambiar" deja elegir a otro (hace falta si el de la mesa ya no está activo).
+  const [cambiandoMozo, setCambiandoMozo] = useState(false);
+  const mozoDeLaMesaActivo = mozos.some((m) => m.id === cuenta.mozoId);
+  const nombreDelMozoDeLaMesa = mozos.find((m) => m.id === cuenta.mozoId)?.nombre ?? cuenta.mozo;
   const [propinaAnotada, setPropinaAnotada] = useState<{ monto: number; mozo: string } | null>(null);
 
   const [mostrarCobro, setMostrarCobro] = useState(false);
@@ -425,14 +429,47 @@ export function PagarCuentaPanel({
                     </Campo>
                   </div>
                   <Campo etiqueta="Para el mozo">
-                    <Selector value={propinaMozoId} onChange={(e) => setPropinaMozoId(e.target.value)}>
-                      <option value="">Elegí el mozo…</option>
-                      {mozos.map((m) => (
-                        <option key={m.id} value={m.id}>
-                          {m.nombre}
-                        </option>
-                      ))}
-                    </Selector>
+                    {/* La mesa ya tiene su mozo: la propina va para él sin preguntar de nuevo. Solo se elige otro si hace falta
+                        (con "Cambiar"), o si el de la mesa ya no está activo. */}
+                    {mozoDeLaMesaActivo && !cambiandoMozo ? (
+                      <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-linea bg-superficie px-3 py-2">
+                        <p className="min-w-0 text-[0.9rem] font-semibold text-tinta">
+                          {nombreDelMozoDeLaMesa} <span className="font-normal text-tinta-suave">· el mozo de la mesa</span>
+                        </p>
+                        <button type="button" onClick={() => setCambiandoMozo(true)} className={clasesBoton("navegar", "sm")}>
+                          Cambiar
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col gap-1.5">
+                        <Selector value={propinaMozoId} onChange={(e) => setPropinaMozoId(e.target.value)}>
+                          <option value="">Elegí el mozo…</option>
+                          {mozos.map((m) => (
+                            <option key={m.id} value={m.id}>
+                              {m.nombre}
+                            </option>
+                          ))}
+                        </Selector>
+                        {mozoDeLaMesaActivo ? (
+                          <div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setPropinaMozoId(cuenta.mozoId);
+                                setCambiandoMozo(false);
+                              }}
+                              className={clasesBoton("navegar", "sm")}
+                            >
+                              Usar el mozo de la mesa
+                            </button>
+                          </div>
+                        ) : (
+                          <p className="text-[0.74rem] leading-snug text-aviso">
+                            El mozo de esta mesa ya no está activo: elegí a quién le corresponde la propina.
+                          </p>
+                        )}
+                      </div>
+                    )}
                   </Campo>
                   <p className="text-[0.74rem] leading-snug text-tinta-suave">
                     La propina es aparte de la cuenta: no suma a lo vendido. Cobrala en la tarjeta (o transferencia) por ese
