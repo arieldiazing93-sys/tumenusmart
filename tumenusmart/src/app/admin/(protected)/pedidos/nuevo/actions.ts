@@ -14,6 +14,7 @@ import { registrarBitacora } from "@/lib/bitacora";
 import { METODOS_PAGO_PEDIDO, metodosPagoHabilitados } from "@/lib/metodos-pago";
 import { SIN_REGISTRO_FISCAL } from "@/lib/tipo-cliente";
 import { limpiarTexto, validarDatosFiscales } from "@/lib/datos-fiscales";
+import { extraerUbicacion } from "@/lib/ubicacion-mapa";
 import { FORMAS_PAGO_POS, etiquetaFormaPagoPos } from "@/lib/turno-pos";
 import { SELECT_PEDIDO_PARA_EMISION, emitirFacturaDePedidoEnTransaccion } from "@/lib/emision-pedido";
 import type { PuntoParaComprobante } from "@/lib/comprobante";
@@ -108,6 +109,8 @@ export async function crearPedidoManual(datos: DatosPedidoManual): Promise<Resul
   if (datos.tipoEntrega === "delivery" && !direccion) {
     return { ok: false, error: "Para delivery hace falta la dirección: es lo que ve el repartidor." };
   }
+  // La dirección puede ser el enlace de Google Maps con la ubicación del cliente (llega por WhatsApp): se leen sus coordenadas.
+  const ubicacion = direccion ? extraerUbicacion(direccion) : null;
 
   // ------------------------------------------------------------------- la caja
   // Cobrar es entrar a la caja del turno abierto de ESTA computadora (misma cookie de estación que usa el Punto de Venta). Sin
@@ -271,6 +274,10 @@ export async function crearPedidoManual(datos: DatosPedidoManual): Promise<Resul
             estado: "confirmado",
             deliveryZoneId: zonaId,
             direccion,
+            // Si la dirección trae el enlace de ubicación que el cliente mandó por WhatsApp (se copia y se pega tal cual), se
+            // guardan sus coordenadas: el repartidor abre el mapa con un toque desde su ruta.
+            clienteLat: ubicacion?.lat,
+            clienteLng: ubicacion?.lng,
             metodoPagoReferencia: datos.metodoPago,
             // Cobrado en este momento: entra a la caja del turno abierto.
             formaPagoPos: formaPago,
@@ -414,12 +421,19 @@ export async function buscarClienteFiscalPorNumero(numero: string): Promise<Clie
 }
 
 export type ResultadoBuscarClienteParaPedido =
-  | { ok: true; nombre: string; direcciones: string[] }
+  | {
+      ok: true;
+      nombre: string;
+      direcciones: string[];
+      /** Los datos de la última factura con registro fiscal de este cliente (para completarlos al elegir "Factura"), o null. */
+      facturaAnterior: ClienteFiscalEncontrado | null;
+    }
   | { ok: false };
 
 /**
- * Cuando se busca el teléfono: si ya es cliente del local, devuelve su nombre y hasta tres direcciones distintas de
- * sus últimos deliveries, para ofrecerlas como opciones. Solo lee; nunca crea nada.
+ * Cuando se busca el teléfono: si ya es cliente del local, devuelve su nombre, hasta tres direcciones distintas de
+ * sus últimos deliveries (para ofrecerlas como opciones) y los datos de su última factura con registro fiscal, para que un
+ * cliente recurrente no tenga que buscarse de nuevo. Solo lee; nunca crea nada.
  *
  * A propósito NO devuelve la zona ni el costo de envío de pedidos anteriores: el mismo cliente puede pedir hoy desde
  * otro lugar (cerca del local, lejos, el trabajo) y arrastrar el envío de la vez pasada sería cobrarle mal. La zona
@@ -455,5 +469,27 @@ export async function buscarClienteParaPedido(telefono: string): Promise<Resulta
     if (direcciones.length === 3) break;
   }
 
-  return { ok: true, nombre: cliente.nombre, direcciones };
+  // La última factura vigente con registro fiscal (no "Sin Nombre": esa no tiene razón social) de este cliente.
+  const ultimaFactura = await db.order.findFirst({
+    where: {
+      customerId: cliente.id,
+      comprobanteTipo: "factura",
+      facturaAnulada: false,
+      facturaRuc: { not: null },
+      facturaRazonSocial: { not: null },
+    },
+    orderBy: { createdAt: "desc" },
+    select: { facturaTipoIdentificacion: true, facturaRuc: true, facturaRazonSocial: true, facturaEmail: true },
+  });
+  const facturaAnterior: ClienteFiscalEncontrado | null =
+    ultimaFactura?.facturaRuc && ultimaFactura.facturaRazonSocial
+      ? {
+          tipoIdentificacion: ultimaFactura.facturaTipoIdentificacion ?? "ruc",
+          numeroIdentificacion: ultimaFactura.facturaRuc,
+          razonSocial: ultimaFactura.facturaRazonSocial,
+          email: ultimaFactura.facturaEmail,
+        }
+      : null;
+
+  return { ok: true, nombre: cliente.nombre, direcciones, facturaAnterior };
 }

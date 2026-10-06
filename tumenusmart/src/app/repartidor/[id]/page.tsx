@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { formatearGuarani } from "@/lib/format";
 import { etiquetaFormaPagoPos } from "@/lib/turno-pos";
+import { enlaceDeMapa, extraerUbicacion, primerEnlace, textoSinEnlaces } from "@/lib/ubicacion-mapa";
 import { ZONA_NEGOCIO, inicioDeHoyEnAsuncion } from "@/lib/timezone";
 import { EntregarBoton } from "./EntregarBoton";
 
@@ -54,10 +55,14 @@ export default async function RepartidorPage({
           const resumenProductos = pedido.items
             .map((i) => `${i.cantidad}x ${i.nombreProducto}`)
             .join(", ");
-          const linkUbicacion =
+          // La ubicación del cliente: el punto que marcó en el mapa (o que la caja pegó de su WhatsApp) o, si solo hay un enlace
+          // corto de Google Maps, ese enlace tal cual. El repartidor la abre con un toque desde su ruta.
+          const coordenadas =
             pedido.clienteLat != null && pedido.clienteLng != null
-              ? `https://www.google.com/maps?q=${pedido.clienteLat},${pedido.clienteLng}`
-              : null;
+              ? { lat: pedido.clienteLat, lng: pedido.clienteLng }
+              : extraerUbicacion(pedido.direccion);
+          const linkUbicacion = coordenadas ? enlaceDeMapa(coordenadas) : primerEnlace(pedido.direccion);
+          const direccionEscrita = textoSinEnlaces(pedido.direccion);
 
           return (
             <div
@@ -79,18 +84,21 @@ export default async function RepartidorPage({
                 📞 {pedido.clienteTelefono}
               </a>
 
-              <p className="mb-1 text-sm text-neutral-700">
-                📍 {pedido.direccion || "Sin referencia de dirección"}
-              </p>
+              {direccionEscrita ? (
+                <p className="mb-2 text-sm text-neutral-700">📍 {direccionEscrita}</p>
+              ) : (
+                !linkUbicacion && <p className="mb-2 text-sm text-neutral-700">📍 Sin referencia de dirección</p>
+              )}
 
+              {/* Botón grande: con un toque abre el mapa con la ubicación del cliente. */}
               {linkUbicacion && (
                 <a
                   href={linkUbicacion}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="mb-3 inline-block text-sm font-medium text-brand hover:underline"
+                  className="mb-3 flex items-center justify-center gap-2 rounded-lg bg-brand px-4 py-3 text-sm font-semibold text-white hover:bg-brand-dark"
                 >
-                  Ver ubicación en el mapa →
+                  📍 Abrir la ubicación del cliente en el mapa
                 </a>
               )}
 

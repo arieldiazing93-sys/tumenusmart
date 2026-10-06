@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Area, Boton, Campo, Entrada, Selector, Tarjeta, clasesBoton } from "@/components/ui";
 import { Segmentado } from "@/components/Segmentado";
+import { PanelLateral } from "@/components/PanelLateral";
 import { formatearGuarani } from "@/lib/format";
 import { SIN_REGISTRO_FISCAL, TIPOS_IDENTIFICACION_FISCAL, etiquetaTipoIdentificacion } from "@/lib/tipo-cliente";
 import type { AgregadoVenta, CategoriaVenta, GrupoMitadVenta, ProductoMitadVenta, ProductoVenta } from "@/lib/catalogo-venta";
@@ -12,6 +13,7 @@ import { MitadYMitadPickerPos } from "../../pos/MitadYMitadPickerPos";
 import { EntradaConLupa } from "../../pos/EntradaConLupa";
 import { buscarClienteFiscalPorNumero, buscarClienteParaPedido, crearPedidoManual, type ClienteFiscalEncontrado } from "./actions";
 import { limpiarTexto } from "@/lib/datos-fiscales";
+import { extraerUbicacion, primerEnlace, textoSinEnlaces } from "@/lib/ubicacion-mapa";
 
 type Zona = { id: string; nombre: string; costoEnvio: number };
 type MetodoPago = { value: string; label: string };
@@ -132,6 +134,12 @@ export function NuevoPedidoForm({
     | null
   >(null);
   const [buscandoFiscal, setBuscandoFiscal] = useState(false);
+  /** El panel del cobro (forma de pago, comprobante y notas) está abierto a la derecha. */
+  const [cobrando, setCobrando] = useState(false);
+  /** Los datos de la última factura con registro fiscal del cliente (por su teléfono), para completarlos al elegir "Factura". */
+  const [facturaAnterior, setFacturaAnterior] = useState<ClienteFiscalEncontrado | null>(null);
+  /** Los datos de la factura se completaron solos con los de la última factura de este cliente. */
+  const [datosDeFacturaAnterior, setDatosDeFacturaAnterior] = useState(false);
   const [notas, setNotas] = useState("");
 
   const [error, setError] = useState<string | null>(null);
@@ -202,9 +210,12 @@ export function NuevoPedidoForm({
         const exactos = r.filter((c) => c.numeroIdentificacion.toLowerCase() === texto.toLowerCase());
         if (r.length === 0) {
           setBusquedaFiscal({ estado: "nuevo" });
-        } else if (exactos.length === 1) {
-          aplicarClienteFiscal(exactos[0]);
-          setBusquedaFiscal({ estado: "existe", resultados: exactos });
+        } else if (exactos.length === 1 || r.length === 1) {
+          // Un solo candidato (aunque lo escrito sea una parte del número): se completa todo en el acto.
+          const elegido = exactos.length === 1 ? exactos[0] : r[0];
+          aplicarClienteFiscal(elegido);
+          setDatosDeFacturaAnterior(false);
+          setBusquedaFiscal({ estado: "existe", resultados: [elegido] });
         } else {
           setBusquedaFiscal({ estado: "varios", resultados: r });
         }
@@ -337,6 +348,18 @@ export function NuevoPedidoForm({
     // La dirección NO se completa sola: el cliente puede estar pidiendo desde otro lugar. Se ofrecen como opciones,
     // y la zona y el envío se eligen siempre a mano, según de dónde pide hoy.
     setDireccionesAnteriores(r.direcciones);
+    // Un cliente recurrente trae los datos de su última factura: si ya se eligió "Factura" se completan en el acto; si no, se
+    // completan cuando se elija.
+    setFacturaAnterior(r.facturaAnterior);
+    if (comprobanteTipo === "factura") prellenarFactura(r.facturaAnterior);
+  }
+
+  /** Completa la factura con los datos de la última que tuvo este cliente, solo si todavía no se escribió nada. */
+  function prellenarFactura(f: ClienteFiscalEncontrado | null) {
+    if (!f || facturaNumero.trim() || facturaRazon.trim()) return;
+    aplicarClienteFiscal(f);
+    setRegistroFiscal("con");
+    setDatosDeFacturaAnterior(true);
   }
 
   // Pasa a los productos solo con los datos del cliente y de la entrega bien cargados.
@@ -367,6 +390,20 @@ export function NuevoPedidoForm({
     }
     setPaso("productos");
     window.scrollTo({ top: 0 });
+  }
+
+  /** Abre el cobro a la derecha (forma de pago, comprobante y notas) con el pedido ya armado. */
+  function irACobrar() {
+    setError(null);
+    if (bloqueadoSinFacturar) {
+      setError(textoBloqueo);
+      return;
+    }
+    if (carrito.length === 0) {
+      setError("Agregá al menos un producto al pedido.");
+      return;
+    }
+    setCobrando(true);
   }
 
   function volverAlCliente() {
@@ -458,6 +495,12 @@ export function NuevoPedidoForm({
     </p>
   ) : null;
 
+  // La dirección puede ser el enlace de ubicación que el cliente mandó por WhatsApp (se pega tal cual).
+  const ubicacionPegada = extraerUbicacion(direccion);
+  const enlacePegado = primerEnlace(direccion);
+  // Para los resumenes: lo escrito sin la URL larga (o "ubicacion del mapa" si solo se pego el enlace).
+  const direccionParaMostrar = textoSinEnlaces(direccion) || (enlacePegado ? "ubicación del mapa" : '');
+
   // Para el resumen de la entrega en el panel del pedido.
   const zonaElegida = zonas.find((z) => z.id === zonaId);
   const textoZona = zonaId === COORDINAR ? "zona a coordinar" : (zonaElegida?.nombre ?? "");
@@ -512,6 +555,7 @@ export function NuevoPedidoForm({
                     setTelefono(e.target.value);
                     setEstadoCliente("");
                     setDireccionesAnteriores([]);
+                    setFacturaAnterior(null);
                   }}
                   onBlur={buscarCliente}
                   onBuscar={buscarCliente}
@@ -554,13 +598,25 @@ export function NuevoPedidoForm({
 
             {tipoEntrega === "delivery" && (
               <div className="flex flex-col gap-3">
-                <Campo etiqueta="Dirección" ayuda="Calle, número y referencia: es lo que ve el repartidor.">
+                <Campo
+                  etiqueta="Dirección"
+                  ayuda="Calle, número y referencia, o pegá tal cual el enlace de ubicación que el cliente mandó por WhatsApp: es lo que ve el repartidor."
+                >
                   <Entrada
                     value={direccion}
                     onChange={(e) => setDireccion(e.target.value)}
-                    placeholder="Ej: Av. Mcal. López 1234 casi Brasil, portón negro"
+                    placeholder="Ej: Av. Mcal. López 1234 casi Brasil, o https://www.google.com/maps?q=-25.3,-57.6"
                     maxLength={200}
                   />
+                  {ubicacionPegada ? (
+                    <p className="mt-1.5 rounded-lg border border-exito/40 bg-exito-luz px-2.5 py-1.5 text-[0.78rem] font-medium text-exito">
+                      Ubicación del cliente reconocida: el repartidor la abre en el mapa con un toque desde su ruta.
+                    </p>
+                  ) : enlacePegado ? (
+                    <p className="mt-1.5 rounded-lg border border-amarillo/60 bg-amarillo-luz px-2.5 py-1.5 text-[0.78rem] font-medium text-amarillo-oscuro">
+                      Enlace guardado tal cual: el repartidor lo abre desde su ruta.
+                    </p>
+                  ) : null}
                 </Campo>
 
                 {direccionesAnteriores.length > 0 && (
@@ -798,7 +854,86 @@ export function NuevoPedidoForm({
               </p>
               <p className="text-[0.8rem] leading-snug text-tinta-media">
                 {tipoEntrega === "delivery"
-                  ? `🛵 ${direccion}${textoZona ? ` · ${textoZona}` : ""} · envío ${formatearGuarani(costoEnvio)}`
+                  ? `🛵 ${direccionParaMostrar}${textoZona ? ` · ${textoZona}` : ""} · envío ${formatearGuarani(costoEnvio)}`
+                  : "🏪 Retiro en el local"}
+              </p>
+            </div>
+
+            <div className="flex flex-col gap-1.5 border-t border-linea pt-3">
+              {tipoEntrega === "delivery" && (
+                <>
+                  <div className="flex items-center justify-between text-[0.85rem] text-tinta-media">
+                    <span>Subtotal</span>
+                    <span className="cifra">{formatearGuarani(subtotal)}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-[0.85rem] text-tinta-media">
+                    <span>Envío</span>
+                    <span className="cifra">{formatearGuarani(costoEnvio)}</span>
+                  </div>
+                </>
+              )}
+              <div className="flex items-center justify-between">
+                <span className="text-[0.85rem] text-tinta-media">Total ({cantidadTotal})</span>
+                <span className="cifra text-[1.4rem] font-bold text-tinta">{formatearGuarani(total)}</span>
+              </div>
+            </div>
+
+            {mensajeError}
+
+            {/* El cobro (forma de pago, factura y notas) se hace en un panel a la derecha, como en el Servicio comedor. */}
+            <Boton
+              tono="principal"
+              onClick={irACobrar}
+              disabled={carrito.length === 0 || bloqueadoSinFacturar}
+              tam="lg"
+              className="w-full"
+            >
+              Cobrar {formatearGuarani(total)}
+            </Boton>
+            <p className="-mt-2 text-[0.74rem] leading-snug text-tinta-suave">
+              Se abre el cobro a la derecha: forma de pago, comprobante y notas. El pedido nace cobrado y confirmado.
+            </p>
+          </Tarjeta>
+        </div>
+      </div>
+
+      {/* Barra fija en celular/tablet angosto (como la del Punto de Venta): el panel del pedido queda debajo de toda la
+          grilla, así que sin esto habría que scrollear hasta el final cada vez. */}
+      {paso === "productos" && carrito.length > 0 && !bloqueadoSinFacturar && (
+        <div
+          className="fixed inset-x-0 bottom-0 z-30 border-t border-linea bg-papel/95 px-4 py-3 shadow-alta backdrop-blur-sm lg:hidden"
+          style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom, 0px))" }}
+        >
+          <a
+            href="#resumen-pedido"
+            className="flex w-full items-center justify-between rounded-lg bg-brand px-4 py-3 text-white shadow-sm transition-transform active:scale-[0.98]"
+          >
+            <span className="text-[0.85rem] font-semibold">
+              {cantidadTotal} {cantidadTotal === 1 ? "item" : "items"} · Ver pedido
+            </span>
+            <span className="cifra text-[1.05rem] font-bold">{formatearGuarani(total)}</span>
+          </a>
+        </div>
+      )}
+
+      {/* El cobro del pedido: panel a la derecha (igual que el Servicio comedor y la Agenda). Forma de pago, comprobante y notas;
+          abajo, el total y el botón que cobra y crea el pedido. */}
+      {cobrando && (
+        <PanelLateral
+          titulo="Cobrar pedido"
+          ancho="ancho"
+          onCerrar={() => {
+            if (!guardando) setCobrando(false);
+          }}
+        >
+          <div className="flex min-h-0 flex-1 flex-col gap-3.5 overflow-y-auto px-5 py-4">
+            <div className="rounded-lg border-2 border-azul/50 bg-azul-luz/30 px-3 py-2">
+              <p className="text-[0.88rem] font-semibold text-tinta">
+                {nombre} · {telefono}
+              </p>
+              <p className="text-[0.8rem] leading-snug text-tinta-media">
+                {tipoEntrega === "delivery"
+                  ? `🛵 ${direccionParaMostrar}${textoZona ? ` · ${textoZona}` : ""} · envío ${formatearGuarani(costoEnvio)}`
                   : "🏪 Retiro en el local"}
               </p>
             </div>
@@ -850,7 +985,11 @@ export function NuevoPedidoForm({
                       { value: "factura", label: "Factura" },
                     ]}
                     valor={comprobanteTipo}
-                    onChange={setComprobanteTipo}
+                    onChange={(v) => {
+                      setComprobanteTipo(v);
+                      // Al elegir "Factura" para un cliente recurrente, se completan solos los datos de su última factura.
+                      if (v === "factura") prellenarFactura(facturaAnterior);
+                    }}
                   />
                 )}
                 {comprobanteTipo === "factura" && (
@@ -868,6 +1007,11 @@ export function NuevoPedidoForm({
                       <p className="text-[0.8rem] text-tinta-media">Se factura a Consumidor Final (Sin Nombre).</p>
                     ) : (
                       <>
+                        {datosDeFacturaAnterior && (
+                          <p className="rounded-lg border border-exito/40 bg-exito-luz px-2.5 py-1.5 text-[0.78rem] font-medium text-exito">
+                            Cliente recurrente: se cargaron los datos de su última factura. Revisalos.
+                          </p>
+                        )}
                         {/* Primero el número, con la lupa: si el cliente ya está en el sistema se traen sus datos; si no, se crea
                             al cobrar el pedido. */}
                         <div>
@@ -992,28 +1136,18 @@ export function NuevoPedidoForm({
               />
             </div>
 
-            <div className="flex flex-col gap-1.5 border-t border-linea pt-3">
-              {tipoEntrega === "delivery" && (
-                <>
-                  <div className="flex items-center justify-between text-[0.85rem] text-tinta-media">
-                    <span>Subtotal</span>
-                    <span className="cifra">{formatearGuarani(subtotal)}</span>
-                  </div>
-                  <div className="flex items-center justify-between text-[0.85rem] text-tinta-media">
-                    <span>Envío</span>
-                    <span className="cifra">{formatearGuarani(costoEnvio)}</span>
-                  </div>
-                </>
-              )}
-              <div className="flex items-center justify-between">
-                <span className="text-[0.85rem] text-tinta-media">Total ({cantidadTotal})</span>
-                <span className="cifra text-[1.4rem] font-bold text-tinta">{formatearGuarani(total)}</span>
-              </div>
+          </div>
+
+          <div className="flex flex-none flex-col gap-2 border-t border-linea bg-superficie px-4 py-3">
+            <div className="flex items-center justify-between">
+              <span className="text-[0.85rem] text-tinta-media">Total ({cantidadTotal})</span>
+              <span className="cifra text-[1.4rem] font-bold text-tinta">{formatearGuarani(total)}</span>
             </div>
 
             {mensajeError}
 
-            <Boton tono="nuevo"
+            <Boton
+              tono="nuevo"
               onClick={crear}
               disabled={guardando || carrito.length === 0 || bloqueadoSinFacturar}
               tam="lg"
@@ -1021,31 +1155,12 @@ export function NuevoPedidoForm({
             >
               {guardando ? "Cobrando…" : `Cobrar ${formatearGuarani(total)} y crear pedido`}
             </Boton>
-            <p className="-mt-2 text-[0.74rem] leading-snug text-tinta-suave">
+            <p className="text-[0.74rem] leading-snug text-tinta-suave">
               Nace cobrado y confirmado. Después lo pasás a &ldquo;En preparación&rdquo; desde su detalle y sigue el circuito de
               siempre: comanda, repartidor, despacho y entrega.
             </p>
-          </Tarjeta>
-        </div>
-      </div>
-
-      {/* Barra fija en celular/tablet angosto (como la del Punto de Venta): el panel del pedido queda debajo de toda la
-          grilla, así que sin esto habría que scrollear hasta el final cada vez. */}
-      {paso === "productos" && carrito.length > 0 && !bloqueadoSinFacturar && (
-        <div
-          className="fixed inset-x-0 bottom-0 z-30 border-t border-linea bg-papel/95 px-4 py-3 shadow-alta backdrop-blur-sm lg:hidden"
-          style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom, 0px))" }}
-        >
-          <a
-            href="#resumen-pedido"
-            className="flex w-full items-center justify-between rounded-lg bg-brand px-4 py-3 text-white shadow-sm transition-transform active:scale-[0.98]"
-          >
-            <span className="text-[0.85rem] font-semibold">
-              {cantidadTotal} {cantidadTotal === 1 ? "item" : "items"} · Ver pedido
-            </span>
-            <span className="cifra text-[1.05rem] font-bold">{formatearGuarani(total)}</span>
-          </a>
-        </div>
+          </div>
+        </PanelLateral>
       )}
 
       {productoEligiendo && (

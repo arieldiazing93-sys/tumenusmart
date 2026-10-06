@@ -7,6 +7,7 @@ import { idLocalActual } from "@/lib/local-actual";
 import { formatearGuarani, formatearNumero } from "@/lib/format";
 import { etiquetaMetodoPago } from "@/lib/metodos-pago";
 import { etiquetaFormaPagoPos } from "@/lib/turno-pos";
+import { enlaceDeMapa, extraerUbicacion, primerEnlace, textoSinEnlaces } from "@/lib/ubicacion-mapa";
 import { SIN_REGISTRO_FISCAL, etiquetaTipoIdentificacion } from "@/lib/tipo-cliente";
 import { EstadoBotones } from "../EstadoBotones";
 import { CobroPedido } from "../CobroPedido";
@@ -64,6 +65,13 @@ export default async function DetallePedidoPage({
 
   // Un pedido entra a la caja del turno al cobrarse (al cargarlo a mano, o con "Cobrar"): quedan la forma de pago y el turno.
   const cobrado = !!pedido.turnoPosId;
+
+  // El enlace de la ubicación del cliente (el mismo que abre el repartidor desde su ruta).
+  const coordenadas =
+    pedido.clienteLat != null && pedido.clienteLng != null
+      ? { lat: pedido.clienteLat, lng: pedido.clienteLng }
+      : extraerUbicacion(pedido.direccion);
+  const linkUbicacion = coordenadas ? enlaceDeMapa(coordenadas) : primerEnlace(pedido.direccion);
 
   return (
     <div>
@@ -139,21 +147,20 @@ export default async function DetallePedidoPage({
               ? `Delivery — ${pedido.deliveryZone?.nombre ?? "a coordinar"}`
               : "Retiro en el local"}
           </p>
-          {pedido.tipoEntrega === "delivery" && pedido.direccion && (
-            <p className="text-sm text-tinta-media">{pedido.direccion}</p>
+          {pedido.tipoEntrega === "delivery" && textoSinEnlaces(pedido.direccion) && (
+            <p className="text-sm text-tinta-media">{textoSinEnlaces(pedido.direccion)}</p>
           )}
-          {pedido.tipoEntrega === "delivery" &&
-            pedido.clienteLat != null &&
-            pedido.clienteLng != null && (
-              <a
-                href={`https://www.google.com/maps?q=${pedido.clienteLat},${pedido.clienteLng}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-sm text-brand hover:underline"
-              >
-                Ver ubicación en el mapa
-              </a>
-            )}
+          {/* La ubicación: el punto marcado/pegado (coordenadas) o, si solo hay un enlace corto de Google Maps, ese enlace. */}
+          {pedido.tipoEntrega === "delivery" && linkUbicacion && (
+            <a
+              href={linkUbicacion}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-sm text-brand hover:underline"
+            >
+              Ver ubicación en el mapa
+            </a>
+          )}
 
           {pedido.tipoEntrega === "delivery" && (
             <div className="mt-2.5 border-t border-linea-fina pt-2.5">
