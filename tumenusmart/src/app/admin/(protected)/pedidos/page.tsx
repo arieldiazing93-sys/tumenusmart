@@ -12,12 +12,10 @@ import { ZONA_NEGOCIO } from "@/lib/timezone";
 import { obtenerEstadoTienda } from "@/lib/estado-tienda";
 import { linkWhatsappCliente } from "@/lib/whatsapp";
 import { idLocalActual } from "@/lib/local-actual";
-import { limpiarPedidosSinEnviarDelLocal } from "@/lib/pedidos-sin-enviar";
 import { PausaPedidosToggle } from "../PausaPedidosToggle";
 import { CompartirCarta } from "../CompartirCarta";
 import { TarjetaIdeaSemana } from "../TarjetaIdeaSemana";
 import { ideaDeLaSemana } from "@/lib/idea-semanal";
-import { AvisoPedidosNuevos } from "./AvisoPedidosNuevos";
 
 export const dynamic = "force-dynamic";
 
@@ -92,11 +90,7 @@ export default async function AdminPedidosPage({
   const tipoActivo = tipo === "delivery" || tipo === "retiro" ? tipo : null;
   const filtroTipo = tipoActivo ? { tipoEntrega: tipoActivo } : {};
 
-  // Los pedidos de la carta que el cliente nunca mandó por WhatsApp y ya vencieron (ver pedido-vencimiento.ts) se descartan acá,
-  // para que no queden en la lista como "sin enviar". Nunca lanza, y es una sola consulta.
-  await limpiarPedidosSinEnviarDelLocal(storeId, new Date());
-
-  const [pedidos, store, estadoTienda, pedidosEnviados] = await Promise.all([
+  const [pedidos, store, estadoTienda] = await Promise.all([
     prisma.order.findMany({
       where: {
         storeId,
@@ -113,9 +107,6 @@ export default async function AdminPedidosPage({
     }),
     prisma.store.findUnique({ where: { id: storeId } }),
     obtenerEstadoTienda(storeId),
-    // Punto de partida del vigilante de pedidos nuevos: si este número
-    // sube mientras la pantalla está abierta, es que entró un pedido.
-    prisma.order.count({ where: { storeId, enviadoWhatsapp: true } }),
   ]);
 
   const urlCarta = store ? await urlPublicaCarta(store.slug) : "";
@@ -298,7 +289,6 @@ export default async function AdminPedidosPage({
         )}
 
         <div className="ml-auto flex flex-none items-center gap-2">
-          <AvisoPedidosNuevos enviadosIniciales={pedidosEnviados} />
           <PausaPedidosToggle
             pausado={store?.pedidosPausados ?? false}
             mensaje={store?.mensajePausa ?? null}
@@ -512,25 +502,17 @@ export default async function AdminPedidosPage({
                       */}
                       <Link prefetch={false} href={`/admin/pedidos/${pedido.id}`} className="block font-medium text-tinta-media">
                         {formatearNumero(pedido.numero)}
-                        {!pedido.enviadoWhatsapp && pedido.estado === "pendiente" && (
-                          <span
-                            title="El cliente armó el pedido pero nunca apretó 'Enviar por WhatsApp'"
-                            className="mt-0.5 block text-[10px] font-medium uppercase text-aviso"
-                          >
-                            sin enviar
-                          </span>
-                        )}
                         {pedido.comprobanteTipo === "factura" && pedido.facturaNumero && (
                           <span className="mt-0.5 block text-[10px] font-medium uppercase text-tinta-suave">
                             {pedido.facturaNumero}
                           </span>
                         )}
-                        {pedido.facturaPedida && !pedido.facturaNumero && pedido.estado !== "cancelado" && (
+                        {!pedido.turnoPosId && pedido.estado !== "cancelado" && (
                           <span
-                            title="El cliente pidió factura: falta cargar sus datos a mano y emitirla"
+                            title="Este pedido todavía no se cobró: no entró a ninguna caja"
                             className="mt-0.5 block text-[10px] font-bold uppercase text-amarillo-oscuro"
                           >
-                            Factura pendiente
+                            Sin cobrar
                           </span>
                         )}
                         {pedido.origen === "telefono" && (

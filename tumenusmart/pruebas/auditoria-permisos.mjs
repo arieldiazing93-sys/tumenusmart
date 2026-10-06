@@ -38,17 +38,13 @@ const EXCEPCIONES = {
   // Nadie inicia sesión para pedir una pizza. Estas acciones se protegen de
   // otra forma: el id de la URL es un cuid imposible de adivinar, y cada una
   // verifica que lo que va a tocar pertenezca a ese local.
-  "src/app/[slug]/checkout/actions.ts": {
-    crearPedido: "el cliente no tiene cuenta; el pedido se crea contra el local del slug",
-  },
+  // (El menú digital ya no crea pedidos: arma el mensaje de WhatsApp en el navegador del cliente y la caja carga el pedido a mano
+  // en el panel, con permiso. Por eso no hay acciones públicas de pedidos.)
   "src/app/[slug]/reservas/actions.ts": {
-    crearReserva: "igual que el pedido: el cliente no inicia sesión",
-  },
-  "src/app/[slug]/pedido/[id]/actions.ts": {
-    marcarEnviadoWhatsapp: "solo marca un pedido que ya existe, filtrando por id + local",
+    crearReserva: "el cliente no inicia sesión",
   },
   "src/app/[slug]/reserva/[id]/actions.ts": {
-    marcarReservaEnviada: "igual que la anterior",
+    marcarReservaEnviada: "solo marca una reserva que ya existe, filtrando por id + local",
   },
   // La reserva pública de turnos: el cliente no tiene cuenta. El local sale de la
   // dirección de la página (nunca del navegador), la página tiene que estar

@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { formatearGuarani } from "@/lib/format";
-import { etiquetaMetodoPago } from "@/lib/metodos-pago";
+import { etiquetaFormaPagoPos } from "@/lib/turno-pos";
 import { ZONA_NEGOCIO, inicioDeHoyEnAsuncion } from "@/lib/timezone";
 import { EntregarBoton } from "./EntregarBoton";
 
@@ -23,16 +23,7 @@ export default async function RepartidorPage({
   // enlace circule, nunca muestra pedidos de otro negocio.
   const storeId = repartidor.storeId;
 
-  const [store, pendientes, entregadosHoy] = await Promise.all([
-    prisma.store.findUnique({
-      where: { id: storeId },
-      select: {
-        aceptaEfectivo: true,
-        aceptaTransferencia: true,
-        aceptaTarjetaDebito: true,
-        aceptaTarjetaCredito: true,
-      },
-    }),
+  const [pendientes, entregadosHoy] = await Promise.all([
     prisma.order.findMany({
       where: { storeId, repartidorId: id, estado: "en_despacho" },
       include: { items: true },
@@ -112,19 +103,24 @@ export default async function RepartidorPage({
                   {formatearGuarani(Number(pedido.total))}
                 </span>
                 <span className="text-base font-bold text-neutral-900">
-                  {etiquetaMetodoPago(pedido.metodoPagoReferencia)}
+                  {etiquetaFormaPagoPos(pedido.formaPagoPos ?? "efectivo")}
                 </span>
               </div>
 
-              <EntregarBoton
-                  repartidorId={id}
-                  orderId={pedido.id}
-                  pagoSugerido={pedido.metodoPagoReferencia}
-                  aceptaEfectivo={store?.aceptaEfectivo ?? true}
-                  aceptaTransferencia={store?.aceptaTransferencia ?? true}
-                  aceptaTarjetaDebito={store?.aceptaTarjetaDebito ?? true}
-                  aceptaTarjetaCredito={store?.aceptaTarjetaCredito ?? true}
-                />
+              {/* El pedido ya está cobrado y facturado desde la caja: la ruta del repartidor solo dice qué trae y qué no. */}
+              {pedido.formaPagoPos === "efectivo" || !pedido.turnoPosId ? (
+                <p className="mb-3 rounded-md bg-aviso-luz px-2.5 py-2 text-[0.82rem] font-medium text-aviso">
+                  {pedido.turnoPosId
+                    ? `Cobrado en efectivo: traé ${formatearGuarani(Number(pedido.total))} a la caja cuando vuelvas.`
+                    : `Este pedido no figura cobrado en la caja: avisá al local antes de entregarlo.`}
+                </p>
+              ) : (
+                <p className="mb-3 rounded-md bg-exito-luz px-2.5 py-2 text-[0.82rem] font-medium text-exito">
+                  Ya está pago ({etiquetaFormaPagoPos(pedido.formaPagoPos ?? "")}): no cobres nada, solo entregá.
+                </p>
+              )}
+
+              <EntregarBoton repartidorId={id} orderId={pedido.id} />
             </div>
           );
         })}

@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import Link from "next/link";
 import dynamic from "next/dynamic";
 import { useCart } from "@/components/CartProvider";
 import { formatearGuarani } from "@/lib/format";
@@ -9,10 +9,11 @@ import { distanciaKm, encontrarZonaPorDistancia } from "@/lib/geo";
 import { Tarjeta, Campo, Entrada, Aviso } from "@/components/ui";
 import { Segmentado } from "@/components/Segmentado";
 import { BotonEnviar } from "@/components/BotonEnviar";
+import { BotonWhatsappCTA } from "@/components/BotonWhatsappCTA";
 import { IconoWhatsapp } from "@/components/iconos";
 import { METODOS_PAGO_PEDIDO, type MetodoPagoPedido } from "@/lib/metodos-pago";
-import { crearPedido } from "./actions";
-import { guardarDatosFacturaCliente } from "@/lib/factura-cliente-sesion";
+import { ingredientesQuitadosTexto, opcionesTexto, precioUnitario } from "@/lib/cart-types";
+import { construirLinkWhatsapp, construirMensajePedido } from "@/lib/whatsapp";
 
 // Leaflet usa `window`, así que el mapa se carga solo en el navegador.
 const MapPicker = dynamic(
@@ -30,8 +31,13 @@ const TIPOS_ENTREGA: { value: TipoEntrega; label: string; sublabel?: string }[] 
 ];
 
 type Props = {
-  /** nombre del local en la URL — viaja al servidor al confirmar el pedido */
+  /** nombre del local en la URL (para volver a la carta) */
   slug: string;
+  nombreLocal: string;
+  /** El WhatsApp del local: a donde va el pedido. */
+  whatsappNumero: string;
+  /** El saludo con el que empieza el mensaje (Configuración), si el local lo cargó. */
+  saludo: string | null;
   storeLat: number | null;
   storeLng: number | null;
   envioModo: "zonas" | "coordinar";
@@ -50,6 +56,9 @@ type Props = {
 
 export function CheckoutForm({
   slug,
+  nombreLocal,
+  whatsappNumero,
+  saludo,
   storeLat,
   storeLng,
   envioModo,
@@ -63,7 +72,6 @@ export function CheckoutForm({
   aceptaRetiro,
   zonas,
 }: Props) {
-  const router = useRouter();
   const { items, subtotal, vaciarCarrito } = useCart();
 
   // Solo lo que el local dejó habilitado en Configuración — así el cliente
@@ -110,7 +118,10 @@ export function CheckoutForm({
   const [facturaRazonSocial, setFacturaRazonSocial] = useState("");
   const [facturaRuc, setFacturaRuc] = useState("");
   const [facturaEmail, setFacturaEmail] = useState("");
-  const [enviando, setEnviando] = useState(false);
+  /** El enlace de WhatsApp con el pedido ya escrito: cuando existe, se muestra la pantalla de "enviá tu pedido". */
+  const [enlace, setEnlace] = useState<string | null>(null);
+  /** El cliente ya tocó el botón de WhatsApp (el carrito se vació en ese momento). */
+  const [enviado, setEnviado] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // Qué campo disparó el último error, para resaltarlo — no todo el aviso
   // sirve de igual manera si el ojo no sabe dónde corregir.
@@ -158,7 +169,12 @@ export function CheckoutForm({
     textoEnvio = "Fuera de cobertura — a coordinar";
   }
 
-  async function handleSubmit(e: React.FormEvent) {
+  /**
+   * El menú digital NO crea el pedido: arma el mensaje de WhatsApp con todo lo que el cliente eligió y lo escribió (también sus datos
+   * de factura) y se lo manda al local. Quien atiende lo lee y lo carga a mano en el sistema (Pedidos → Nuevo pedido), donde recién
+   * se calculan los precios de verdad, se cobra y se factura. Nada de lo que escribe el cliente llega a un servidor ni a una base.
+   */
+  function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
     setCampoInvalido(null);
@@ -171,6 +187,14 @@ export function CheckoutForm({
       fallar("Tu carrito está vacío.");
       return;
     }
+    if (!nombre.trim() || !telefono.trim()) {
+      fallar("Escribí tu nombre y tu teléfono para que el local pueda confirmarte el pedido.");
+      return;
+    }
+    if (!whatsappNumero.replace(/\D/g, "")) {
+      fallar("Este local todavía no configuró su WhatsApp: no se puede enviar el pedido por acá.");
+      return;
+    }
     if (tipoEntrega === "delivery" && (clienteLat == null || clienteLng == null)) {
       fallar("Marcá tu ubicación en el mapa para poder entregarte el pedido.", "ubicacion");
       return;
@@ -180,61 +204,99 @@ export function CheckoutForm({
       return;
     }
 
-    setEnviando(true);
-    try {
-      const resultado = await crearPedido({
-        slug,
-        clienteNombre: nombre,
-        clienteTelefono: telefono,
-        tipoEntrega,
-        clienteLat: tipoEntrega === "delivery" ? clienteLat ?? undefined : undefined,
-        clienteLng: tipoEntrega === "delivery" ? clienteLng ?? undefined : undefined,
-        direccion: tipoEntrega === "delivery" ? direccion : undefined,
-        metodoPagoReferencia: metodoPago,
-        // Solo "ticket" o "factura": la razón social, el RUC y el correo NO se mandan al servidor (no se guardan): van en el
-        // mensaje de WhatsApp y la caja los carga a mano.
-        comprobanteTipo,
-        // Solo qué eligió el cliente. El precio, el nombre y los textos de
-        // la comanda los arma el servidor leyendo la carta: si viajaran desde
-        // acá, cualquiera los cambia antes de que salgan.
-        items: items.map((i) => ({
-          productId: i.mitadYMitad ? undefined : i.productId,
-          mitadYMitad: i.mitadYMitad
-            ? { productIdA: i.mitadYMitad.productIdA, productIdB: i.mitadYMitad.productIdB }
-            : undefined,
-          opcionIds: i.opciones.map((o) => o.id),
-          ingredientesQuitados: i.ingredientesQuitados ?? [],
-          cantidad: i.cantidad,
-        })),
-        // No es lo que se cobra: es lo que el cliente tenía en pantalla, para
-        // que el servidor avise si un precio cambió mientras completaba.
-        totalMostrado: total,
-      });
-      if (!resultado.ok) {
-        fallar(resultado.error);
-        setEnviando(false);
-        return;
-      }
-      // Los datos de factura se quedan en ESTE navegador (no se guardaron) para que la pantalla siguiente los agregue al
-      // mensaje de WhatsApp.
-      if (comprobanteTipo === "factura") {
-        guardarDatosFacturaCliente(resultado.orderId, {
-          razonSocial: facturaRazonSocial.trim(),
-          ruc: facturaRuc.trim(),
-          email: facturaEmail.trim() || undefined,
-        });
-      }
-      vaciarCarrito();
-      router.push(`/${slug}/pedido/${resultado.orderId}`);
-    } catch (err) {
-      fallar(err instanceof Error ? err.message : "No se pudo generar el pedido.");
-      setEnviando(false);
-    }
+    const mensaje = construirMensajePedido({
+      saludo,
+      clienteNombre: nombre.trim(),
+      clienteTelefono: telefono.trim(),
+      tipoEntrega,
+      direccion: tipoEntrega === "delivery" ? direccion.trim() : null,
+      zonaNombre: tipoEntrega === "delivery" ? zonaEncontrada?.nombre ?? null : null,
+      clienteLat: tipoEntrega === "delivery" ? clienteLat : null,
+      clienteLng: tipoEntrega === "delivery" ? clienteLng : null,
+      metodoPagoReferencia: metodoPago,
+      comprobanteTipo,
+      facturaRazonSocial: comprobanteTipo === "factura" ? facturaRazonSocial.trim() : null,
+      facturaRuc: comprobanteTipo === "factura" ? facturaRuc.trim() : null,
+      facturaEmail: comprobanteTipo === "factura" ? facturaEmail.trim() || null : null,
+      items: items.map((i) => ({
+        nombreProducto: i.nombreProducto,
+        cantidad: i.cantidad,
+        precioUnitario: precioUnitario(i),
+        opcionesTexto: opcionesTexto(i) || null,
+        ingredientesQuitadosTexto: ingredientesQuitadosTexto(i) || null,
+      })),
+      subtotal,
+      costoEnvio: tipoEntrega === "delivery" ? costoEnvio : 0,
+      total,
+    });
+    setEnlace(construirLinkWhatsapp(whatsappNumero, mensaje));
+    window.scrollTo({ top: 0 });
+  }
+
+  // Ya está listo el mensaje: lo único que falta es que el cliente toque el botón y lo mande por WhatsApp.
+  if (enlace) {
+    return (
+      <div className="flex flex-col items-center px-1 pt-2 text-center">
+        <span aria-hidden="true" className="flex h-16 w-16 items-center justify-center rounded-full bg-brand text-white">
+          <svg viewBox="0 0 24 24" width={30} height={30} fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round">
+            <path d="M20 6 9 17l-5-5" />
+          </svg>
+        </span>
+        <h2 className="mt-4 text-[1.3rem] font-semibold tracking-titular text-tinta">
+          {enviado ? "¡Pedido enviado!" : "Tu pedido está listo"}
+        </h2>
+
+        {enviado ? (
+          <p className="mt-1.5 max-w-sm text-[0.92rem] leading-snug text-tinta-media">
+            {nombreLocal} lo va a cargar y te lo confirma por WhatsApp. Si no se abrió WhatsApp, tocá el botón de nuevo.
+          </p>
+        ) : (
+          <div className="mt-3 w-full max-w-sm text-left">
+            <Aviso titulo="Falta un paso" color="aviso">
+              Tocá el botón y enviá el mensaje por WhatsApp a {nombreLocal}. Hasta que no lo envíes, el local no se entera de tu
+              pedido.
+            </Aviso>
+          </div>
+        )}
+
+        <div className="mt-6 flex w-full justify-center">
+          <BotonWhatsappCTA
+            link={enlace}
+            yaEnviado={false}
+            // El botón salta tres veces cada tanto mientras no se lo toca; el carrito se vacía recién al enviarlo.
+            llamar
+            onEnviar={() => {
+              setEnviado(true);
+              vaciarCarrito();
+            }}
+          />
+        </div>
+
+        {!enviado && (
+          <button
+            type="button"
+            onClick={() => setEnlace(null)}
+            className="mt-4 text-[0.88rem] font-medium text-tinta-media underline-offset-2 hover:text-tinta hover:underline"
+          >
+            Corregir mi pedido
+          </button>
+        )}
+
+        {enviado && (
+          <Link
+            href={`/${slug}`}
+            className="mt-6 flex h-12 w-full max-w-sm items-center justify-center rounded-xl border border-linea bg-superficie text-[0.92rem] font-semibold text-tinta transition-colors hover:border-brand"
+          >
+            Volver al menú
+          </Link>
+        )}
+      </div>
+    );
   }
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-      <fieldset disabled={enviando} className="flex flex-col gap-4">
+      <fieldset className="flex flex-col gap-4">
         <Tarjeta className="flex flex-col gap-4">
           <p className="rotulo">Tus datos</p>
           <Campo etiqueta="Nombre">
@@ -300,8 +362,8 @@ export function CheckoutForm({
                 />
               </Campo>
               <p className="text-[0.78rem] leading-snug text-tinta-media">
-                Estos datos no se guardan en el sistema: van en el mensaje de WhatsApp que vas a enviar al local, y ahí los
-                revisan y cargan uno por uno para que la factura salga sin errores. Revisalos bien antes de enviar.
+                Estos datos van en el mensaje de WhatsApp que vas a enviar al local. Ellos los revisan y cargan uno por uno para que
+                la factura salga sin errores, así que escribilos con cuidado.
               </p>
             </div>
           )}
@@ -324,7 +386,7 @@ export function CheckoutForm({
               <div>
                 <Campo
                   etiqueta="¿Dónde te lo llevamos?"
-                  ayuda="Marcá el punto en el mapa. Es lo que abre el repartidor para llegar, así que sin eso no se puede enviar el pedido."
+                  ayuda="Marcá el punto en el mapa. Es lo que abre el repartidor para llegar, así que sin eso no se puede armar el pedido."
                 >
                   <div
                     key={campoInvalido === "ubicacion" ? `sac-${intento}` : "mapa"}
@@ -394,16 +456,11 @@ export function CheckoutForm({
 
       {error && <Aviso color="peligro">{error}</Aviso>}
 
-      <BotonEnviar
-        enviando={enviando}
-        disabled={!aceptaPedidos}
-        enviandoTexto="Generando pedido..."
-        className="w-full"
-      >
+      <BotonEnviar enviando={false} disabled={!aceptaPedidos} className="w-full">
         {aceptaPedidos ? (
           <>
             <IconoWhatsapp tam={26} />
-            Confirmar pedido
+            Armar mi pedido para enviar
           </>
         ) : (
           "No disponible en este momento"

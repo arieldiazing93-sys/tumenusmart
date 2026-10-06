@@ -837,17 +837,17 @@ export async function cerrarTurno(
   if (!turno) return { ok: false, error: "Ese turno no existe." };
   if (turno.estado !== "abierto") return { ok: false, error: "Ese turno ya está cerrado." };
 
-  // Corte general: no se puede cerrar caja mientras haya plata de delivery
-  // circulando sin rendir — ni aunque sea de otra estación (ver
-  // entregasSinRendir en turno-actual.ts). El formulario ya avisa esto antes
-  // de mostrar el corte ciego, pero esta es la comprobación que de verdad
-  // vale: llamar a la acción a mano no puede saltearla.
+  // Corte general: no se puede cerrar caja mientras haya efectivo de delivery
+  // sin volver — ni aunque sea de otra estación (ver entregasSinRendir en
+  // turno-actual.ts). El formulario ya avisa esto antes de mostrar el corte
+  // ciego, pero esta es la comprobación que de verdad vale: llamar a la
+  // acción a mano no puede saltearla.
   const pendientes = await entregasSinRendir(db);
   if (pendientes.length > 0) {
     const repartidores = [...new Set(pendientes.map((p) => p.repartidor?.nombre ?? "sin asignar"))];
     return {
       ok: false,
-      error: `No se puede cerrar el turno: hay ${pendientes.length} entrega(s) de delivery sin rendir (${repartidores.join(", ")}). Recibí esa rendición en Cierre antes de cerrar caja.`,
+      error: `No se puede cerrar el turno: hay ${pendientes.length} pedido(s) de delivery sin entregar o sin rendir (${repartidores.join(", ")}). Entregalos y recibí esa rendición en Rendiciones (o cancelá el pedido) antes de cerrar caja.`,
     };
   }
 

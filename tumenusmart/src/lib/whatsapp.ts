@@ -10,9 +10,12 @@ type ItemPedido = {
 };
 
 type DatosMensaje = {
-  numero: number;
+  /** El número de pedido, si ya existe. El menú digital no crea pedidos (solo arma este mensaje), así que normalmente no hay. */
+  numero?: number | null;
   saludo?: string | null;
   clienteNombre: string;
+  /** El teléfono que escribió el cliente: la caja lo necesita para cargar el pedido a mano. */
+  clienteTelefono?: string | null;
   tipoEntrega: string;
   direccion?: string | null;
   zonaNombre?: string | null;
@@ -20,11 +23,6 @@ type DatosMensaje = {
   clienteLng?: number | null;
   metodoPagoReferencia: string;
   comprobanteTipo?: string | null;
-  /**
-   * El cliente pidió factura desde la carta: el mensaje dice "Comprobante: Factura" y los datos (razón social, RUC, correo)
-   * los agrega el navegador del cliente, que es el único que los tiene (no se guardan en el pedido). Ver `factura-cliente-sesion.ts`.
-   */
-  facturaPedida?: boolean;
   facturaRazonSocial?: string | null;
   facturaRuc?: string | null;
   facturaEmail?: string | null;
@@ -37,28 +35,26 @@ type DatosMensaje = {
   linkSeguimiento?: string | null;
 };
 
-/** La línea del mensaje que anuncia que el cliente quiere factura; justo debajo van sus datos, si el navegador los tiene. */
-export const MARCA_FACTURA_PEDIDA = "Comprobante: Factura";
-
 /**
- * Arma el texto del pedido, prolijo y legible, tal como lo va a
- * recibir el restaurante en WhatsApp.
+ * Arma el texto del pedido, prolijo y legible, tal como lo va a recibir el
+ * restaurante en WhatsApp. Es lo ÚNICO que sale del menú digital: la caja lo lee
+ * y carga el pedido a mano en el sistema (los datos de factura incluidos: los
+ * compara antes en la DNIT).
  */
 export function construirMensajePedido(datos: DatosMensaje): string {
   const lineas: string[] = [];
 
   if (datos.saludo) lineas.push(datos.saludo);
-  lineas.push(`Pedido ${formatearNumero(datos.numero)}`);
+  lineas.push(datos.numero != null ? `Pedido ${formatearNumero(datos.numero)}` : "Pedido nuevo");
   lineas.push("");
   lineas.push(`Cliente: ${datos.clienteNombre}`);
+  if (datos.clienteTelefono?.trim()) lineas.push(`Teléfono: ${datos.clienteTelefono.trim()}`);
 
   if (datos.comprobanteTipo === "factura") {
     lineas.push("Comprobante: Factura");
     if (datos.facturaRazonSocial) lineas.push(`Razón social: ${datos.facturaRazonSocial}`);
     if (datos.facturaRuc) lineas.push(`RUC: ${datos.facturaRuc}`);
     if (datos.facturaEmail) lineas.push(`Correo: ${datos.facturaEmail}`);
-  } else if (datos.facturaPedida) {
-    lineas.push(MARCA_FACTURA_PEDIDA);
   }
   lineas.push(`Método de pago: ${etiquetaMetodoPago(datos.metodoPagoReferencia)}`);
 

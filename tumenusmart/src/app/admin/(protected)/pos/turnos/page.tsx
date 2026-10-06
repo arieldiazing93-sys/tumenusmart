@@ -127,7 +127,7 @@ export default async function TurnosPosPage({
   // cancelada o un pedido pasado a "cancelado" DESPUÉS de cerrar el turno es
   // justo lo que esto saca a la luz.
   const turnoIds = turnos.map((t) => t.id);
-  const [ventasHoy, pedidosHoy, rendicionesPorTurno, creditoHoy] = turnoIds.length
+  const [ventasHoy, pedidosHoy, creditoHoy] = turnoIds.length
     ? await Promise.all([
         db.ventaPos.groupBy({
           by: ["turnoPosId"],
@@ -141,11 +141,6 @@ export default async function TurnosPosPage({
           _count: { _all: true },
           _sum: { total: true },
         }),
-        db.rendicion.groupBy({
-          by: ["turnoPosId"],
-          where: { turnoPosId: { in: turnoIds } },
-          _sum: { totalEfectivo: true, totalTransferencia: true, totalTarjetaDebito: true, totalTarjetaCredito: true },
-        }),
         // Las ventas a crédito cuentan como venta pero no como plata cobrada:
         // el total "de hoy" las descuenta, igual que lo congelado al cerrar.
         db.ventaPos.groupBy({
@@ -154,23 +149,9 @@ export default async function TurnosPosPage({
           _sum: { total: true },
         }),
       ])
-    : [[], [], [], []];
-  // Corte general: lo que el repartidor rindió (en cualquiera de las 4
-  // formas) se cuenta junto con el resto de la caja del cajero — sin
-  // sumarlo acá, "Sistema" quedaría por debajo de lo declarado y se vería
-  // como un sobrante que nunca existió (ver mismo criterio en
-  // turnos/[id]/page.tsx).
-  const rendidoPorTurno = new Map<string, number>();
-  for (const r of rendicionesPorTurno) {
-    if (!r.turnoPosId) continue;
-    rendidoPorTurno.set(
-      r.turnoPosId,
-      Number(r._sum.totalEfectivo ?? 0) +
-        Number(r._sum.totalTransferencia ?? 0) +
-        Number(r._sum.totalTarjetaDebito ?? 0) +
-        Number(r._sum.totalTarjetaCredito ?? 0)
-    );
-  }
+    : [[], [], []];
+  // Los pedidos de delivery ya están en lo calculado de cada turno (se cobran al cargarlos): las rendiciones de los repartidores
+  // son un control del efectivo y NO se suman acá (contarían dos veces la misma venta).
   const hoyPorTurno = new Map<string, { cantidad: number; total: number }>();
   for (const v of ventasHoy) {
     const actual = hoyPorTurno.get(v.turnoPosId!) ?? { cantidad: 0, total: 0 };
@@ -287,7 +268,6 @@ export default async function TurnosPosPage({
               const calculadoBase = totalCalculado(t);
               const calculado =
                 calculadoBase +
-                (rendidoPorTurno.get(t.id) ?? 0) +
                 Number(t.montoInicial ?? 0) +
                 Number(t.movimientosEfectivoNeto ?? 0);
               const declarado = totalDeclarado(t);

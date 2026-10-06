@@ -13,10 +13,6 @@
     {
       "path": "/api/cron/limpiar-fotos-asistencia",
       "schedule": "0 8 * * *"
-    },
-    {
-      "path": "/api/cron/limpiar-pedidos-sin-enviar",
-      "schedule": "*/2 * * * *"
     }
   ]
 }

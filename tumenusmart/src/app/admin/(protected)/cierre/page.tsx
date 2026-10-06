@@ -153,7 +153,7 @@ export default async function CierrePage({
     <div>
       <Cabecera
         titulo="Rendición de repartidores"
-        bajada="Lo que cada uno tiene que rendir cuando vuelve. Solo cuenta el efectivo: lo de tarjeta y transferencia ya entró al negocio."
+        bajada="Control del efectivo que cada repartidor tiene que traer cuando vuelve. La venta ya se cobró en la caja al cargar el pedido: esto no suma nada al turno, solo controla que el efectivo vuelva. Lo de tarjeta y transferencia ya entró al negocio."
       />
 
       <FiltroTurno

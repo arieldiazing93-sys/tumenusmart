@@ -124,6 +124,8 @@ export default async function ComprobanteTurnoPosPage({
             formaPagoPos: true,
             estado: true,
             updatedAt: true,
+            // Cuándo se cobró (la hora de la venta): `updatedAt` cambia con cada paso de la entrega.
+            cobradoEn: true,
           },
         },
         // Rendiciones de repartidor recibidas mientras este turno estaba
@@ -226,11 +228,14 @@ export default async function ComprobanteTurnoPosPage({
   });
   const propinaPorForma = (forma: string) => Number(propinasDelTurno.find((p) => p.forma === forma)?._sum.monto ?? 0);
   const totalPropinasDelTurno = propinasDelTurno.reduce((s, p) => s + Number(p._sum.monto ?? 0), 0);
+  // Los pedidos de delivery ya están sumados en `calculadoBase`: se cobran al cargarlos (entran a la caja de ese momento). Las
+  // rendiciones de los repartidores son un CONTROL del efectivo que vuelve a la caja: se muestran más abajo pero NO se suman acá
+  // (sumarlas contaría dos veces la misma venta).
   const calculado: Record<FormaPagoPos, number> = {
-    efectivo: calculadoBase.efectivo + totalRendicionesEfectivo + montoInicial + movimientosNeto,
-    transferencia: calculadoBase.transferencia + totalRendicionesTransferencia + propinaPorForma("transferencia"),
-    tarjeta_debito: calculadoBase.tarjeta_debito + totalRendicionesTarjetaDebito + propinaPorForma("tarjeta_debito"),
-    tarjeta_credito: calculadoBase.tarjeta_credito + totalRendicionesTarjetaCredito + propinaPorForma("tarjeta_credito"),
+    efectivo: calculadoBase.efectivo + montoInicial + movimientosNeto,
+    transferencia: calculadoBase.transferencia + propinaPorForma("transferencia"),
+    tarjeta_debito: calculadoBase.tarjeta_debito + propinaPorForma("tarjeta_debito"),
+    tarjeta_credito: calculadoBase.tarjeta_credito + propinaPorForma("tarjeta_credito"),
   };
 
   const totalCalculadoCongelado =
@@ -403,9 +408,9 @@ export default async function ComprobanteTurnoPosPage({
           </table>
           {turno.rendiciones.length > 0 && (
             <p className="mt-2 text-[0.78rem] text-tinta-suave">
-              Cada forma de acá arriba incluye lo que rindió{" "}
-              {turno.rendiciones.length === 1 ? "el repartidor" : "los repartidores"} de delivery durante
-              este turno — es la misma caja, la misma cuenta y el mismo resumen de POS.
+              Los pedidos de delivery ya están sumados arriba (se cobraron al cargarlos). Lo que{" "}
+              {turno.rendiciones.length === 1 ? "rindió el repartidor" : "rindieron los repartidores"} durante este turno
+              está más abajo como control del efectivo que volvió a la caja: no se suma otra vez.
             </p>
           )}
           {montoInicial > 0 && (
@@ -525,7 +530,7 @@ export default async function ComprobanteTurnoPosPage({
         {turno.pedidos.length > 0 && (
           <section className="mt-4 break-inside-avoid">
             <h2 className="mb-1.5 text-[0.95rem] font-semibold tracking-titular text-tinta">
-              Pedidos de retiro cobrados en este turno
+              Pedidos (delivery y retiro) cobrados en este turno
             </h2>
             <table className="w-full border-collapse text-left">
               <thead>
@@ -543,7 +548,7 @@ export default async function ComprobanteTurnoPosPage({
                       {formatearNumero(p.numero)}
                     </td>
                     <td className="cifra border-b border-linea-fina py-1 text-[0.82rem] text-tinta-media">
-                      {horaCorta(p.updatedAt)}
+                      {horaCorta(p.cobradoEn ?? p.updatedAt)}
                     </td>
                     <td className="border-b border-linea-fina py-1 text-[0.82rem] text-tinta-media">
                       {etiquetaFormaPagoPos(p.formaPagoPos ?? "efectivo")}
@@ -566,7 +571,7 @@ export default async function ComprobanteTurnoPosPage({
         {turno.rendiciones.length > 0 && (
           <section className="mt-4 break-inside-avoid">
             <h2 className="mb-1.5 text-[0.95rem] font-semibold tracking-titular text-tinta">
-              Delivery rendido durante este turno
+              Control del efectivo de delivery rendido durante este turno (no suma: ya está cobrado arriba)
             </h2>
             <table className="w-full border-collapse text-left">
               <thead>

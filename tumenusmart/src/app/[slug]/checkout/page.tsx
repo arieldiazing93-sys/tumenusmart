@@ -32,6 +32,9 @@ export default async function CheckoutPage({
       <AvisoTienda estado={estadoTienda} />
       <CheckoutForm
         slug={slug}
+        nombreLocal={store.nombre}
+        whatsappNumero={store.whatsappNumero}
+        saludo={store.mensajeSaludo}
         storeLat={store.lat}
         storeLng={store.lng}
         envioModo={store.envioModo === "coordinar" ? "coordinar" : "zonas"}

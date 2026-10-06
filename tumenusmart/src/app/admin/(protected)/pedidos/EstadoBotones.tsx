@@ -2,12 +2,9 @@
 
 import { useState, useTransition } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { clasesBoton } from "@/components/ui";
 import { cambiarEstadoPedido, type ResultadoPedidoAccion } from "./actions";
 import { ESTADOS_PEDIDO } from "@/lib/estados-pedido";
-import { FORMAS_PAGO_POS, type FormaPagoPos } from "@/lib/turno-pos";
-import { rutaParaAbrirTurno } from "@/lib/turno-requerido";
 import { imprimirComprobante } from "@/lib/impresion-comprobantes";
 
 export function EstadoBotones({
@@ -15,11 +12,10 @@ export function EstadoBotones({
   estadoActual,
   tipoEntrega,
   repartidorId,
-  turnoAbiertoId,
+  cobrado,
   comprobanteTipo,
   facturaNumero,
   facturaAnulada,
-  facturaPendiente,
   nombreImpresoraTicket,
   impresorasPorArea,
 }: {
@@ -27,29 +23,24 @@ export function EstadoBotones({
   estadoActual: string;
   tipoEntrega: string;
   repartidorId: string | null;
-  /** Id del turno de caja del Punto de Venta abierto ahora, o null si no hay. */
-  turnoAbiertoId: string | null;
+  /** El pedido ya se cobró (entró a la caja de un turno). Sin cobrar no se despacha (delivery) ni se entrega. */
+  cobrado: boolean;
   comprobanteTipo: string;
   facturaNumero: string | null;
   facturaAnulada: boolean;
-  /** El cliente pidió factura en la carta y todavía no se emitió: no se despacha ni se entrega hasta emitirla (o dejarla sin factura). */
-  facturaPendiente: boolean;
   /** Impresora QZ Tray para el ticket/factura, en esta estación — null = sin configurar, cae al manual. */
   nombreImpresoraTicket: string | null;
   /** Mapa Área de Impresión → impresora QZ Tray, en esta estación. */
   impresorasPorArea: Record<string, string>;
 }) {
-  const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
-  const [pidiendoPago, setPidiendoPago] = useState(false);
   const [pidiendoMotivoCancelacion, setPidiendoMotivoCancelacion] = useState(false);
   const [motivoCancelacion, setMotivoCancelacion] = useState("");
   // Se muestra una vez, justo al pasar a "En despacho" — un recordatorio
   // corto, no un bloqueo: el cajero puede perfectamente marcar "Entregado"
-  // él mismo después (por ejemplo si el repartidor no tiene el teléfono a
-  // mano), y en ese caso ya queda cubierto por pideFormaPago más abajo.
+  // él mismo después (por ejemplo si el repartidor no tiene el teléfono a mano).
   const [avisoDespacho, setAvisoDespacho] = useState(false);
   // Impresión automática (QZ Tray) que no salió sola — link manual, nunca
   // un window.open ciego (ver src/lib/impresion-comprobantes.ts: entre el
@@ -58,18 +49,12 @@ export function EstadoBotones({
   const [fallback, setFallback] = useState<{ label: string; url: string }[]>([]);
 
   const faltaRepartidor = tipoEntrega === "delivery" && !repartidorId;
-  // Retiro/mesa se cobra en el mostrador: marcarlo "entregado" es una venta, y
-  // sin turno de caja abierto no se vende — en ese caso se manda directo a
-  // abrir el turno (ver handleClick) y al abrirlo se vuelve a este pedido. Con
-  // turno, tiene que decir con qué se cobró para que entre en ese mismo cierre.
-  // Delivery pregunta SIEMPRE, aunque lo normal sea confirmarlo desde la
-  // pantalla del repartidor (/repartidor/[id]) — si el cajero lo marca entregado
-  // desde acá (por ejemplo porque el repartidor no tiene el teléfono a mano),
-  // igual tiene que quedar con qué se cobró: si no, el pedido queda invisible
-  // en Rendición (ver cambiarEstadoPedido).
-  const pideFormaPago = tipoEntrega === "delivery" || turnoAbiertoId != null;
-  const faltaTurno = tipoEntrega !== "delivery" && turnoAbiertoId == null;
-  const irAAbrirTurno = () => router.push(rutaParaAbrirTurno(`/admin/pedidos/${orderId}`));
+  // El pedido se cobra al cargarlo (entra a la caja del turno) y recién ahí sigue su recorrido: acá no se mueve plata. Uno sin cobrar
+  // no sale de despacho (delivery) ni se entrega: el cuadro "Cobro" de abajo lo cobra.
+  const bloqueadoPorCobro = (estado: string) =>
+    !cobrado &&
+    estadoActual !== estado &&
+    (estado === "entregado" || (estado === "en_despacho" && tipoEntrega === "delivery"));
   // Si la factura ya está anulada, cancelar el pedido no le hace nada de
   // yapa a un número que ya está muerto — se trata como cualquier
   // cancelación común. Solo bloquea si TODAVÍA hay una factura viva.
@@ -79,8 +64,9 @@ export function EstadoBotones({
    * Comanda al pasar a "en preparación" (una por Área de Impresión presente
    * en el pedido, resueltas por el propio cambiarEstadoPedido) y
    * ticket/factura al pasar a "en despacho" (delivery) o "entregado" (no
-   * delivery) — los mismos dos casos donde cambiarEstadoPedido YA emite el
-   * número de factura, así que nunca se imprime dos veces el mismo pedido.
+   * delivery): el repartidor sale con el papel, el cliente que retira se lo
+   * lleva. El número de la factura ya se emitió al cobrar el pedido: acá solo
+   * se imprime, una vez por pedido.
    *
    * Uno por vez, NUNCA en paralelo: mandar varios trabajos juntos a la
    * misma impresora física los mezcla en su buffer (confirmado con una
@@ -118,23 +104,6 @@ export function EstadoBotones({
     if (fallos.length > 0) setFallback((actual) => [...actual, ...fallos]);
   }
 
-  function confirmarEntregado(formaPago: FormaPagoPos) {
-    setError(null);
-    setAviso(null);
-    startTransition(async () => {
-      const resultado = await cambiarEstadoPedido(orderId, "entregado", formaPago);
-      if (!resultado.ok) {
-        // El turno se cerró mientras tanto: sin turno no se cobra, se va a abrir uno.
-        if (resultado.sinTurno) irAAbrirTurno();
-        else setError(resultado.error);
-      } else {
-        setPidiendoPago(false);
-        if (resultado.aviso) setAviso(resultado.aviso);
-        imprimirSegunEstado("entregado", resultado);
-      }
-    });
-  }
-
   // Mismo criterio que CancelarVentaBoton del POS: motivo obligatorio,
   // queda quién y cuándo — para cualquier pedido, tenga factura o no.
   function confirmarCancelacion() {
@@ -142,7 +111,7 @@ export function EstadoBotones({
     setError(null);
     setAviso(null);
     startTransition(async () => {
-      const resultado = await cambiarEstadoPedido(orderId, "cancelado", undefined, motivoCancelacion);
+      const resultado = await cambiarEstadoPedido(orderId, "cancelado", motivoCancelacion);
       if (!resultado.ok) setError(resultado.error);
       else {
         setPidiendoMotivoCancelacion(false);
@@ -151,30 +120,15 @@ export function EstadoBotones({
     });
   }
 
-  // Con la factura pedida y sin emitir, el delivery no sale y nada se entrega (el servidor lo exige igual).
-  const bloqueadoPorFactura = (estado: string) =>
-    facturaPendiente &&
-    estadoActual !== estado &&
-    (estado === "entregado" || (estado === "en_despacho" && tipoEntrega === "delivery"));
-
   function handleClick(estado: string) {
     setError(null);
     setAviso(null);
-    if (bloqueadoPorFactura(estado)) {
-      setError("El cliente pidió factura: emitila con “Emitir factura” (en el cuadro amarillo de abajo) o entregá el pedido sin factura.");
+    if (bloqueadoPorCobro(estado)) {
+      setError("Este pedido todavía no se cobró: cobralo primero con el botón “Cobrar” del cuadro Cobro (más abajo).");
       return;
     }
     if (estado === "en_despacho" && faltaRepartidor) {
       setError("Asigná un repartidor antes de pasar el pedido a \"En despacho\".");
-      return;
-    }
-    if (estado === "entregado" && estadoActual !== "entregado" && faltaTurno) {
-      // Entregar un retiro/mesa es venderlo: antes hace falta el turno de caja abierto, que es el primer movimiento.
-      irAAbrirTurno();
-      return;
-    }
-    if (estado === "entregado" && estadoActual !== "entregado" && pideFormaPago) {
-      setPidiendoPago(true);
       return;
     }
     if (estado === "cancelado") {
@@ -184,8 +138,7 @@ export function EstadoBotones({
     startTransition(async () => {
       const resultado = await cambiarEstadoPedido(orderId, estado);
       if (!resultado.ok) {
-        if (resultado.sinTurno) irAAbrirTurno();
-        else setError(resultado.error);
+        setError(resultado.error);
       } else {
         if (resultado.aviso) setAviso(resultado.aviso);
         imprimirSegunEstado(estado, resultado);
@@ -199,16 +152,16 @@ export function EstadoBotones({
       <div className="flex flex-wrap gap-2">
         {ESTADOS_PEDIDO.map((e) => {
           const activo = estadoActual === e.value;
-          const sinFactura = bloqueadoPorFactura(e.value);
-          const bloqueado = (e.value === "en_despacho" && faltaRepartidor) || sinFactura;
+          const sinCobrar = bloqueadoPorCobro(e.value);
+          const bloqueado = (e.value === "en_despacho" && faltaRepartidor) || sinCobrar;
           return (
             <button
               key={e.value}
               type="button"
               disabled={pending}
               title={
-                sinFactura
-                  ? "Primero emití la factura que pidió el cliente"
+                sinCobrar
+                  ? "Primero cobrá el pedido"
                   : bloqueado
                     ? "Asigná un repartidor primero"
                     : undefined
@@ -229,10 +182,10 @@ export function EstadoBotones({
       </div>
       {error && <p className="mt-2 text-sm text-peligro">{error}</p>}
       {aviso && !error && <p className="mt-2 text-sm text-aviso">{aviso}</p>}
-      {facturaPendiente && !error && (
+      {!cobrado && estadoActual !== "cancelado" && !error && (
         <p className="mt-2 rounded-lg border border-amarillo/60 bg-amarillo-luz px-3 py-2 text-[0.82rem] font-medium text-amarillo-oscuro">
-          El cliente pidió factura y todavía no se emitió: cargá sus datos a mano con “Emitir factura” (cuadro amarillo de abajo) antes
-          de {tipoEntrega === "delivery" ? "despachar" : "entregar"} el pedido.
+          Este pedido todavía no se cobró: cobralo con el cuadro Cobro (más abajo) antes de{" "}
+          {tipoEntrega === "delivery" ? "despacharlo" : "entregarlo"}.
         </p>
       )}
       {faltaRepartidor && !error && (
@@ -256,37 +209,6 @@ export function EstadoBotones({
               Abrir {c.label}
             </a>
           ))}
-        </div>
-      )}
-
-      {pidiendoPago && (
-        <div className="mt-3 rounded-lg border border-linea bg-papel-suave p-3">
-          <p className="mb-2 text-sm text-tinta">¿Con qué se cobró este pedido?</p>
-          <div className="flex flex-wrap gap-2">
-            {FORMAS_PAGO_POS.map((f) => (
-              <button
-                key={f.valor}
-                type="button"
-                disabled={pending}
-                onClick={() => confirmarEntregado(f.valor)}
-                className="rounded-full border border-linea px-3 py-1.5 text-sm font-medium text-tinta-media hover:border-brand hover:text-brand disabled:opacity-50"
-              >
-                {f.etiqueta}
-              </button>
-            ))}
-          </div>
-          <button
-            type="button"
-            onClick={() => setPidiendoPago(false)}
-            className="mt-2 text-xs font-medium text-tinta-suave hover:text-peligro"
-          >
-            Cancelar
-          </button>
-          <p className="mt-2 text-xs text-tinta-suave">
-            {tipoEntrega === "delivery"
-              ? "Queda pendiente de rendir en Cierre, igual que si lo confirmara el repartidor."
-              : "Se suma al cierre del turno que está abierto ahora en el Punto de Venta."}
-          </p>
         </div>
       )}
 

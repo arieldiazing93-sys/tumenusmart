@@ -12,13 +12,11 @@ import { normalizarCobro } from "@/lib/rendicion";
 export type ResultadoEntrega = { ok: true } | { ok: false; error: string };
 
 /**
- * El repartidor marca un pedido como entregado y dice CÓMO le pagaron.
+ * El repartidor marca un pedido como entregado: es su ruta de trabajo y nada más.
  *
- * Las dos cosas van juntas en un solo paso a propósito. Si la forma de cobro
- * se cargara después, en la puerta se aprieta "entregado" y el dato se
- * completa —o no— cuando ya nadie se acuerda si aquel fue el que pagó con
- * tarjeta. Preguntándolo en el momento, la respuesta es la de alguien que
- * acaba de tener la plata en la mano.
+ * El dinero NO se mueve acá: el pedido ya llegó cobrado y facturado desde la caja (se cobra al cargarlo a mano). Lo que queda de
+ * la entrega es el control del efectivo: se guarda en `cobroMetodo` CÓMO se cobró en la caja (efectivo, transferencia…), para que la
+ * Rendición sepa cuánto efectivo tiene que traer de vuelta. Eso ya NO suma nada a la caja del turno (ya estaba sumado al cobrarlo).
  *
  * Devuelve {ok,error} en vez de lanzar: Next.js esconde el mensaje real de
  * cualquier excepción que escape de una Server Action en producción (queda
@@ -27,8 +25,7 @@ export type ResultadoEntrega = { ok: true } | { ok: false; error: string };
  */
 export async function marcarPedidoEntregado(
   repartidorId: string,
-  orderId: string,
-  cobro: string
+  orderId: string
 ): Promise<ResultadoEntrega> {
   const [repartidor, pedido] = await Promise.all([
     prisma.repartidor.findUnique({
@@ -37,7 +34,7 @@ export async function marcarPedidoEntregado(
     }),
     prisma.order.findUnique({
       where: { id: orderId },
-      select: { repartidorId: true, estado: true, storeId: true },
+      select: { repartidorId: true, estado: true, storeId: true, formaPagoPos: true },
     }),
   ]);
 
@@ -61,12 +58,10 @@ export async function marcarPedidoEntregado(
     where: { id: orderId },
     data: {
       estado: "entregado",
-      // Nunca se guarda lo que llegó tal cual: viene del teléfono del
-      // repartidor. `normalizarCobro` deja pasar solo las formas conocidas
-      // (ver FORMAS_DE_COBRO en src/lib/rendicion.ts) y, ante cualquier otra
-      // cosa, cuenta como efectivo — que es el lado seguro: el pedido queda
-      // como plata a rendir en vez de desaparecer de la cuenta.
-      cobroMetodo: normalizarCobro(cobro),
+      // La forma de cobro sale de lo que se cobró en la caja, nunca del teléfono del repartidor. `normalizarCobro` deja pasar
+      // solo las formas conocidas (ver FORMAS_DE_COBRO en src/lib/rendicion.ts) y, ante cualquier otra cosa (un pedido viejo que
+      // quedó sin cobrar), cuenta como efectivo — que es el lado seguro: queda como plata a rendir en vez de desaparecer.
+      cobroMetodo: normalizarCobro(pedido.formaPagoPos),
       entregadoEn: new Date(),
     },
   });

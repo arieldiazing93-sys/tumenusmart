@@ -3,16 +3,22 @@
 import { revalidatePath } from "next/cache";
 import { exigirPermiso } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { prismaDelLocal, siguienteNumeroPedido } from "@/lib/prisma-local";
+import { prismaDelLocal, siguienteNumeroPedido, upsertClienteFiscal } from "@/lib/prisma-local";
 import { idLocalActual } from "@/lib/local-actual";
+import { estacionActual } from "@/lib/estacion-actual";
 import { armarPedido, type LineaPedida } from "@/lib/precio-pedido";
 import { cargarCatalogoParaPedido } from "@/lib/catalogo-pedido";
 import { puedeFacturarDesdeEstaEstacion, textoSinFactura } from "@/lib/factura-estacion";
 import { registrarConsumoVenta } from "@/lib/movimientos-stock";
 import { registrarBitacora } from "@/lib/bitacora";
 import { METODOS_PAGO_PEDIDO, metodosPagoHabilitados } from "@/lib/metodos-pago";
-import { SIN_REGISTRO_FISCAL, TIPOS_IDENTIFICACION_FISCAL } from "@/lib/tipo-cliente";
+import { SIN_REGISTRO_FISCAL } from "@/lib/tipo-cliente";
+import { limpiarTexto, validarDatosFiscales } from "@/lib/datos-fiscales";
+import { FORMAS_PAGO_POS, etiquetaFormaPagoPos } from "@/lib/turno-pos";
+import { SELECT_PEDIDO_PARA_EMISION, emitirFacturaDePedidoEnTransaccion } from "@/lib/emision-pedido";
+import type { PuntoParaComprobante } from "@/lib/comprobante";
 import { formatearGuarani, formatearNumero } from "@/lib/format";
+import { turnoAbierto } from "../../pos/turno-actual";
 
 /**
  * Lo que carga una persona del local cuando el cliente llama por teléfono. Igual que en el checkout público, lo único
@@ -40,7 +46,10 @@ export type DatosPedidoManual = {
   items: LineaPedida[];
 };
 
-export type ResultadoPedidoManual = { ok: true; orderId: string } | { ok: false; error: string };
+/** `sinTurno`: cobrar el pedido exige el turno de caja abierto de esta computadora (sin turno no se vende). */
+export type ResultadoPedidoManual =
+  | { ok: true; orderId: string; facturaNumero: string | null }
+  | { ok: false; error: string; sinTurno?: true };
 
 /** Largos máximos de los textos libres, los mismos que el checkout público. */
 const LARGO = { nombre: 80, telefono: 30, direccion: 200, notas: 500, razonSocial: 120, ruc: 30, email: 120 };
@@ -54,13 +63,16 @@ function recortar(valor: string | undefined, max: number): string | undefined {
 }
 
 /**
- * Carga un pedido que llegó por teléfono, con la misma lógica que uno del menú digital: los precios salen de la
- * base, se descuenta el stock de las recetas y el pedido nace en la misma tabla, así que desde ahí sigue el mismo
- * circuito (en preparación, repartidor, en despacho, entregado, factura, rendición).
+ * Carga un pedido a mano (Pedidos → Nuevo pedido): el cliente pidió por WhatsApp (el menú digital solo arma ese mensaje) o por
+ * teléfono, y la caja lo carga acá. Los precios salen de la base, se descuenta el stock de las recetas y el pedido nace en la
+ * misma tabla, así que desde ahí sigue el circuito de siempre (en preparación, repartidor, en despacho, entregado).
  *
- * Nace "confirmado": la persona que lo carga ya lo acordó con el cliente, así que no hay nada por confirmar ni
- * botón de WhatsApp que esperar. No se frena por "pedidos pausados" ni por el horario de la carta: eso es para el
- * cliente que pide solo; quien atiende el teléfono decide.
+ * Nace COBRADO y confirmado: la forma de pago que se elige acá es con la que se cobra, y en ese mismo momento el pedido entra
+ * a la caja del turno abierto de esta computadora (formaPagoPos + turnoPosId + cobradoEn) y, si es con factura, se emite en el
+ * acto con los datos que la caja cargó (los comparó antes en la DNIT). Todo en una sola transacción: o queda el pedido cobrado,
+ * con su stock y su factura, o no queda nada. Sin turno de caja abierto no se vende: se devuelve `sinTurno`.
+ *
+ * No se frena por "pedidos pausados" ni por el horario de la carta: eso es para el cliente que pide solo; quien atiende decide.
  *
  * Devuelve un resultado en vez de lanzar los errores de validación: Next.js oculta en producción el mensaje de
  * cualquier `throw` de una Server Action.
@@ -82,6 +94,12 @@ export async function crearPedidoManual(datos: DatosPedidoManual): Promise<Resul
   if (!METODOS_PAGO_PEDIDO.some((m) => m.value === datos.metodoPago)) {
     return { ok: false, error: "Elegí la forma de pago." };
   }
+  // El pedido se COBRA acá: la forma de pago tiene que ser una de las cuatro que entran a la caja (nada de "otro", que se
+  // contaría como efectivo sin serlo).
+  const formaPago = FORMAS_PAGO_POS.find((f) => f.valor === datos.metodoPago)?.valor;
+  if (!formaPago) {
+    return { ok: false, error: "Elegí con qué se cobra: efectivo, tarjeta de débito, tarjeta de crédito o transferencia." };
+  }
   if (!Array.isArray(datos.items) || datos.items.length === 0) {
     return { ok: false, error: "El pedido está vacío: agregá al menos un producto." };
   }
@@ -89,6 +107,25 @@ export async function crearPedidoManual(datos: DatosPedidoManual): Promise<Resul
   const direccion = datos.tipoEntrega === "delivery" ? recortar(datos.direccion, LARGO.direccion) : undefined;
   if (datos.tipoEntrega === "delivery" && !direccion) {
     return { ok: false, error: "Para delivery hace falta la dirección: es lo que ve el repartidor." };
+  }
+
+  // ------------------------------------------------------------------- la caja
+  // Cobrar es entrar a la caja del turno abierto de ESTA computadora (misma cookie de estación que usa el Punto de Venta). Sin
+  // turno abierto no se vende: no habría a qué cierre atar el cobro y la plata quedaría fuera de la caja.
+  const estacion = await estacionActual(db);
+  if (!estacion) {
+    return {
+      ok: false,
+      error: "Esta computadora no está vinculada a una caja. Vinculala en Estaciones (punto de venta) para poder cobrar el pedido.",
+    };
+  }
+  const turno = await turnoAbierto(db, estacion.id);
+  if (!turno) {
+    return {
+      ok: false,
+      error: "No hay un turno de caja abierto en esta computadora. Abrilo (Punto de venta → Abrir turno) y volvé a cargar el pedido.",
+      sinTurno: true,
+    };
   }
 
   // Store no pertenece a ningún local (no está en MODELOS_POR_LOCAL): se lee con el cliente global.
@@ -131,24 +168,44 @@ export async function crearPedidoManual(datos: DatosPedidoManual): Promise<Resul
     }
   }
 
+  // Los datos del comprador que tipeó la caja, revisados con la validación mínima (el RUC con su dígito, razón social de al
+  // menos 4 letras, correo con forma de correo). Lo que se guarda es el texto ya limpio.
+  let comprador: { tipoIdentificacion: string; numeroIdentificacion: string; razonSocial: string | null; email: string | null } | null =
+    null;
   if (quiereFactura) {
-    if (!sinNombre) {
-      if (!TIPOS_IDENTIFICACION_FISCAL.some((t) => t.valor === datos.facturaTipoIdentificacion)) {
-        return { ok: false, error: "Elegí con o sin registro fiscal, y el tipo de documento." };
-      }
-      if (!datos.facturaRuc?.trim() || !datos.facturaRazonSocial?.trim()) {
-        return { ok: false, error: "Para factura con registro fiscal hacen falta el número y la razón social." };
-      }
-      if (datos.facturaEmail?.trim() && !datos.facturaEmail.includes("@")) {
-        return { ok: false, error: "El correo electrónico no es válido." };
-      }
-    }
+    const revisado = validarDatosFiscales(
+      sinNombre
+        ? { modo: "sin_nombre" }
+        : {
+            modo: "con_registro",
+            tipoIdentificacion: datos.facturaTipoIdentificacion,
+            numeroIdentificacion: datos.facturaRuc,
+            razonSocial: datos.facturaRazonSocial,
+            email: datos.facturaEmail,
+          }
+    );
+    if (!revisado.ok) return { ok: false, error: revisado.error };
+    comprador = revisado.datos;
     if (!facturacion.puedeFacturar && facturacion.motivo) {
       return { ok: false, error: `${textoSinFactura(facturacion.motivo)} Cargalo como ticket.` };
     }
   }
   const comprobanteTipoFinal = quiereFactura ? "factura" : "ticket";
   const consumidorFinal = sinNombre;
+
+  // El punto de expedición de esta computadora, para emitir la factura en el acto (con el número consumido dentro de la
+  // transacción del cobro).
+  let punto: (PuntoParaComprobante & { activo: boolean }) | null = null;
+  if (comprobanteTipoFinal === "factura") {
+    const conPunto = await db.estacion.findUnique({ where: { id: estacion.id }, select: { puntoExpedicion: true } });
+    punto = conPunto?.puntoExpedicion ?? null;
+    if (!punto || !punto.activo || punto.timbradoHasta < new Date()) {
+      return {
+        ok: false,
+        error: "Esta computadora no tiene un punto de expedición vigente: no se puede emitir la factura. Cargalo como ticket o asignalo en Puntos de expedición.",
+      };
+    }
+  }
 
   // ---------------------------------------------------------------- el precio
   // La carta REAL del local: lo que mandó el navegador solo dice qué productos y cuántos.
@@ -184,7 +241,7 @@ export async function crearPedidoManual(datos: DatosPedidoManual): Promise<Resul
   const total = subtotal + costoEnvio;
 
   // El cliente es de este local: cada negocio tiene su propia ficha de esa persona (se completa storeId a mano
-  // porque se usa el cliente global, igual que en el checkout público).
+  // porque se usa el cliente global).
   const customer = await prisma.customer.upsert({
     where: { storeId_telefono: { storeId, telefono: clienteTelefono } },
     update: { nombre: clienteNombre },
@@ -194,75 +251,106 @@ export async function crearPedidoManual(datos: DatosPedidoManual): Promise<Resul
   // El número se pide justo antes de crear el pedido: si algo falló en las validaciones de arriba, no se gasta.
   const numero = await siguienteNumeroPedido(storeId);
   const quien = sesion.nombre?.trim() || sesion.email;
+  const ahora = new Date();
 
-  // En una transacción: si el pedido se crea, el descuento de stock de su receta queda creado de yapa, nunca a medias.
-  const order = await prisma.$transaction(async (tx) => {
-    const nuevoPedido = await tx.order.create({
-      data: {
-        storeId,
-        numero,
-        customerId: customer.id,
-        clienteNombre,
-        clienteTelefono,
-        tipoEntrega: datos.tipoEntrega,
-        origen: "telefono",
-        estado: "confirmado",
-        deliveryZoneId: zonaId,
-        direccion,
-        metodoPagoReferencia: datos.metodoPago,
-        comprobanteTipo: comprobanteTipoFinal,
-        facturaTipoIdentificacion:
-          comprobanteTipoFinal === "factura"
-            ? consumidorFinal
-              ? SIN_REGISTRO_FISCAL.tipo
-              : datos.facturaTipoIdentificacion
-            : undefined,
-        facturaRazonSocial: consumidorFinal
-          ? null
-          : comprobanteTipoFinal === "factura"
-            ? recortar(datos.facturaRazonSocial, LARGO.razonSocial)
-            : undefined,
-        facturaRuc: consumidorFinal
-          ? SIN_REGISTRO_FISCAL.numero
-          : comprobanteTipoFinal === "factura"
-            ? recortar(datos.facturaRuc, LARGO.ruc)
-            : undefined,
-        facturaEmail:
-          comprobanteTipoFinal === "factura" && !consumidorFinal ? recortar(datos.facturaEmail, LARGO.email) : undefined,
-        notas: recortar(datos.notas, LARGO.notas),
-        subtotal,
-        costoEnvio,
-        total,
-        items: {
-          create: armado.lineas.map((l) => ({
+  // En una transacción: si el pedido se crea, queda cobrado en la caja, con el descuento de stock de su receta y (si es con
+  // factura) con su factura emitida; nunca a medias. Si falla la factura, no queda nada y no se consume ningún número.
+  let resultado: { orderId: string; facturaNumero: string | null };
+  try {
+    resultado = await prisma.$transaction(
+      async (tx) => {
+        const nuevoPedido = await tx.order.create({
+          data: {
             storeId,
-            productId: l.productId,
-            nombreProducto: l.nombreProducto,
-            cantidad: l.cantidad,
-            precioUnitario: l.precioUnitario,
-            iva: l.iva,
-            opcionesTexto: l.opcionesTexto,
-            ingredientesQuitadosTexto: l.ingredientesQuitadosTexto,
-            costoAgregados: l.costoAgregados,
-            costoProducto: l.costoProducto,
-            precioAgregados: l.precioAgregados,
-          })),
-        },
+            numero,
+            customerId: customer.id,
+            clienteNombre,
+            clienteTelefono,
+            tipoEntrega: datos.tipoEntrega,
+            origen: "telefono",
+            estado: "confirmado",
+            deliveryZoneId: zonaId,
+            direccion,
+            metodoPagoReferencia: datos.metodoPago,
+            // Cobrado en este momento: entra a la caja del turno abierto.
+            formaPagoPos: formaPago,
+            turnoPosId: turno.id,
+            cobradoEn: ahora,
+            comprobanteTipo: comprobanteTipoFinal,
+            facturaTipoIdentificacion: comprador?.tipoIdentificacion,
+            facturaRazonSocial: consumidorFinal ? null : comprador?.razonSocial,
+            facturaRuc: comprador?.numeroIdentificacion,
+            facturaEmail: consumidorFinal ? undefined : (comprador?.email ?? undefined),
+            notas: recortar(datos.notas, LARGO.notas),
+            subtotal,
+            costoEnvio,
+            total,
+            items: {
+              create: armado.lineas.map((l) => ({
+                storeId,
+                productId: l.productId,
+                nombreProducto: l.nombreProducto,
+                cantidad: l.cantidad,
+                precioUnitario: l.precioUnitario,
+                iva: l.iva,
+                opcionesTexto: l.opcionesTexto,
+                ingredientesQuitadosTexto: l.ingredientesQuitadosTexto,
+                costoAgregados: l.costoAgregados,
+                costoProducto: l.costoProducto,
+                precioAgregados: l.precioAgregados,
+              })),
+            },
+          },
+        });
+
+        await registrarConsumoVenta(tx, storeId, armado.lineas, { orderId: nuevoPedido.id }, quien);
+
+        // La factura se emite en el acto, con el punto de expedición de esta computadora.
+        let facturaNumero: string | null = null;
+        if (punto && comprador) {
+          // Un cliente con datos fiscales queda guardado (o se le actualiza el nombre y el correo) para la próxima vez.
+          if (!consumidorFinal && comprador.razonSocial) {
+            await upsertClienteFiscal(tx, storeId, {
+              tipoIdentificacion: comprador.tipoIdentificacion,
+              numeroIdentificacion: comprador.numeroIdentificacion,
+              razonSocial: comprador.razonSocial,
+              email: comprador.email ?? "",
+            });
+          }
+          const paraEmitir = await tx.order.findUniqueOrThrow({
+            where: { id: nuevoPedido.id },
+            select: SELECT_PEDIDO_PARA_EMISION,
+          });
+          facturaNumero = await emitirFacturaDePedidoEnTransaccion(tx, {
+            storeId,
+            orderId: nuevoPedido.id,
+            pedido: paraEmitir,
+            punto,
+            emitidoPor: quien,
+          });
+        }
+
+        return { orderId: nuevoPedido.id, facturaNumero };
       },
-    });
+      { timeout: 20_000, maxWait: 10_000 }
+    );
+  } catch (e) {
+    console.error("[pedidos] crearPedidoManual falló", e);
+    return {
+      ok: false,
+      error: "No se pudo cargar el pedido. No se registró nada (ni cobro, ni factura, ni stock): probá de nuevo. Si insiste, fijate en Pedidos si quedó cargado.",
+    };
+  }
 
-    await registrarConsumoVenta(tx, storeId, armado.lineas, { orderId: nuevoPedido.id }, quien);
-
-    return nuevoPedido;
-  });
-
-  // Quién cargó el pedido queda en la bitácora (se llama DESPUÉS de guardar: nunca frena un pedido).
+  // Quién cargó y cobró el pedido queda en la bitácora (se llama DESPUÉS de guardar: nunca frena un pedido).
   await registrarBitacora(storeId, sesion, {
     modulo: "pedidos",
-    accion: "pedido_cargado_por_telefono",
-    descripcion: `Cargó el pedido ${formatearNumero(numero)} por teléfono (${formatearGuarani(total)}) para ${clienteNombre}.`,
+    accion: "pedido_cargado_y_cobrado",
+    descripcion: `Cargó y cobró el pedido ${formatearNumero(numero)} (${formatearGuarani(total)}) con ${etiquetaFormaPagoPos(formaPago)} para ${clienteNombre}${
+      resultado.facturaNumero ? `; emitió la factura N° ${resultado.facturaNumero}` : ""
+    }.`,
     entidad: "Order",
-    entidadId: order.id,
+    entidadId: resultado.orderId,
     detalle: {
       pedido: numero,
       total,
@@ -272,12 +360,57 @@ export async function crearPedidoManual(datos: DatosPedidoManual): Promise<Resul
       tipoEntrega: datos.tipoEntrega,
       productos: armado.lineas.length,
       comprobante: comprobanteTipoFinal,
+      factura: resultado.facturaNumero,
+      formaPago,
+      turno: turno.id,
     },
   });
 
   revalidatePath("/admin/pedidos");
   revalidatePath("/admin/stock/insumos");
-  return { ok: true, orderId: order.id };
+  revalidatePath("/admin/pos");
+  revalidatePath("/admin/pos/turnos");
+  if (resultado.facturaNumero) revalidatePath("/admin/facturas");
+  return { ok: true, orderId: resultado.orderId, facturaNumero: resultado.facturaNumero };
+}
+
+export type ClienteFiscalEncontrado = {
+  tipoIdentificacion: string;
+  numeroIdentificacion: string;
+  razonSocial: string;
+  email: string | null;
+};
+
+/**
+ * La lupa del número de documento (RUC, cédula…): busca si el cliente ya existe en el sistema, para traer su razón social y su
+ * correo en vez de volver a tipearlos. Si no existe, se crea al cobrar el pedido. Solo busca en los clientes de ESTE local y
+ * devuelve unos pocos; nunca crea nada.
+ */
+export async function buscarClienteFiscalPorNumero(numero: string): Promise<ClienteFiscalEncontrado[]> {
+  await exigirPermiso("pedidos.crear");
+  const db = prismaDelLocal(await idLocalActual());
+
+  const texto = limpiarTexto(numero);
+  if (texto.length < 3 || texto.length > 30) return [];
+
+  const filas = await db.customer.findMany({
+    where: { numeroIdentificacion: { contains: texto, mode: "insensitive" } },
+    orderBy: { nombre: "asc" },
+    select: { tipoIdentificacion: true, numeroIdentificacion: true, nombre: true, email: true },
+    take: 6,
+  });
+  return filas.flatMap((f) =>
+    f.numeroIdentificacion
+      ? [
+          {
+            tipoIdentificacion: f.tipoIdentificacion ?? "ruc",
+            numeroIdentificacion: f.numeroIdentificacion,
+            razonSocial: f.nombre,
+            email: f.email,
+          },
+        ]
+      : []
+  );
 }
 
 export type ResultadoBuscarClienteParaPedido =

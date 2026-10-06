@@ -115,7 +115,9 @@ export default async function SuperPage({
       include: { asesor: { select: { nombre: true } } },
     }),
     prisma.order.findMany({
-      where: { createdAt: { gte: desdeActividad }, enviadoWhatsapp: true },
+      // Los pedidos los carga la caja a mano (el menú digital solo manda el mensaje de WhatsApp): la actividad son los pedidos
+      // cargados, sin contar los cancelados.
+      where: { createdAt: { gte: desdeActividad }, estado: { not: "cancelado" } },
       select: { storeId: true },
     }),
     prisma.product.findMany({ select: { storeId: true } }),

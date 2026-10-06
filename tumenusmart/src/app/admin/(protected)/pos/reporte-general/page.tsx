@@ -210,8 +210,8 @@ export default async function ReporteGeneralPosPage({
       )}
 
       <p className="mt-3 text-[0.76rem] text-tinta-suave">
-        La forma de pago del delivery es la que declaró el repartidor al entregar. Esto es
-        independiente de si ya rindió esa plata: para controlar eso, entrá a "Rendiciones".
+        Los pedidos (delivery y retiro) entran con la fecha y la forma de pago con las que se cobraron en la caja al cargarlos.
+        Esto es independiente de si el repartidor ya rindió el efectivo: para controlar eso, entrá a "Rendiciones".
       </p>
     </div>
   );

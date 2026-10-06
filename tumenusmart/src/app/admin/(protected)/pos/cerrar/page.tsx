@@ -37,9 +37,9 @@ export default async function CerrarTurnoPage() {
         <Tarjeta className="max-w-lg shadow-sm !border-2 !border-azul/50">
           <p className="mb-3 rounded-lg bg-aviso-luz px-3.5 py-3 text-[0.85rem] font-medium text-aviso">
             Todavía no se puede cerrar: hay {pendientes.length}{" "}
-            {pendientes.length === 1 ? "entrega" : "entregas"} de delivery sin rendir —{" "}
-            {repartidores.join(", ")}. El corte general del turno necesita esa plata recibida
-            primero.
+            {pendientes.length === 1 ? "pedido" : "pedidos"} de delivery sin entregar o sin rendir —{" "}
+            {repartidores.join(", ")}. El efectivo de esos pedidos ya está contado en la caja de este turno: tiene que volver (rendición)
+            antes de contar la caja.
           </p>
           <Link href="/admin/cierre" className={clasesBoton("navegar")}>
             Ir a recibir rendiciones

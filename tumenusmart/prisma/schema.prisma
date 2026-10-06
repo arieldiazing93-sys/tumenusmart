@@ -845,11 +845,11 @@ model Order {
   // antes de esta fase, donde solo se guardaba razón social/RUC a secas.
   facturaTipoIdentificacion String?
   facturaEmail         String?
-  /// El cliente pidió factura desde la carta digital. Solo eso: sus datos (RUC, razón social, correo) NO se guardan —van en el
-  /// mensaje de WhatsApp— y la caja los carga a mano, tras consultarlos en la DNIT, con "Emitir factura". Mientras sea true y
-  /// no haya número de factura, el pedido no pasa a "en despacho" ni a "entregado". Los pedidos que cargó una persona del local
-  /// (teléfono, mostrador) nunca lo usan: ahí los datos ya los tipea la caja.
-  facturaPedida        Boolean       @default(false)
+
+  /// Cuándo la caja cobró este pedido (queda en `formaPagoPos` y en el turno `turnoPosId`). Un pedido se COBRA al cargarlo a mano
+  /// (Pedidos → Nuevo pedido): en ese momento entra a la caja del turno abierto y, si es factura, se emite en el acto. Es la fecha
+  /// de la venta para los reportes y el cierre (no `updatedAt`, que cambia con cada paso de la entrega). null = todavía sin cobrar.
+  cobradoEn            DateTime?
 
   // Fiscales — se completan y se CONGELAN solo cuando se emite como
   // factura de verdad (retiro al marcar "entregado", delivery al

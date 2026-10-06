@@ -2,15 +2,16 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Area, Boton, Campo, Entrada, Selector, Tarjeta } from "@/components/ui";
+import { Area, Boton, Campo, Entrada, Selector, Tarjeta, clasesBoton } from "@/components/ui";
 import { Segmentado } from "@/components/Segmentado";
 import { formatearGuarani } from "@/lib/format";
-import { SIN_REGISTRO_FISCAL, TIPOS_IDENTIFICACION_FISCAL } from "@/lib/tipo-cliente";
+import { SIN_REGISTRO_FISCAL, TIPOS_IDENTIFICACION_FISCAL, etiquetaTipoIdentificacion } from "@/lib/tipo-cliente";
 import type { AgregadoVenta, CategoriaVenta, GrupoMitadVenta, ProductoMitadVenta, ProductoVenta } from "@/lib/catalogo-venta";
 import { AgregadosPickerPos } from "../../pos/AgregadosPickerPos";
 import { MitadYMitadPickerPos } from "../../pos/MitadYMitadPickerPos";
 import { EntradaConLupa } from "../../pos/EntradaConLupa";
-import { buscarClienteParaPedido, crearPedidoManual } from "./actions";
+import { buscarClienteFiscalPorNumero, buscarClienteParaPedido, crearPedidoManual, type ClienteFiscalEncontrado } from "./actions";
+import { limpiarTexto } from "@/lib/datos-fiscales";
 
 type Zona = { id: string; nombre: string; costoEnvio: number };
 type MetodoPago = { value: string; label: string };
@@ -123,6 +124,14 @@ export function NuevoPedidoForm({
   const [facturaNumero, setFacturaNumero] = useState("");
   const [facturaRazon, setFacturaRazon] = useState("");
   const [facturaEmail, setFacturaEmail] = useState("");
+  /** Lo que dijo la lupa del número de documento: el cliente ya existe (uno o varios parecidos), no existe o falló. */
+  const [busquedaFiscal, setBusquedaFiscal] = useState<
+    | { estado: "existe" | "varios"; resultados: ClienteFiscalEncontrado[] }
+    | { estado: "nuevo" }
+    | { estado: "error"; mensaje: string }
+    | null
+  >(null);
+  const [buscandoFiscal, setBuscandoFiscal] = useState(false);
   const [notas, setNotas] = useState("");
 
   const [error, setError] = useState<string | null>(null);
@@ -173,6 +182,36 @@ export function NuevoPedidoForm({
     "Este local exige facturar todas las ventas y esta computadora no tiene un punto de expedición vigente asignado. " +
     "No se puede cargar el pedido hasta que el dueño le asigne uno en Puntos de expedición." +
     (motivoSinFactura ? ` ${motivoSinFactura}` : "");
+
+  /** Trae al formulario los datos de un cliente fiscal que ya estaba en el sistema. */
+  function aplicarClienteFiscal(c: ClienteFiscalEncontrado) {
+    setFacturaNumero(c.numeroIdentificacion);
+    setFacturaTipo(TIPOS_IDENTIFICACION_FISCAL.some((t) => t.valor === c.tipoIdentificacion) ? c.tipoIdentificacion : "ruc");
+    setFacturaRazon(c.razonSocial);
+    setFacturaEmail(c.email ?? "");
+  }
+
+  /** La lupa: ¿ya existe este número en el sistema? Si existe se cargan sus datos; si no, se crea al cobrar el pedido. */
+  function buscarFiscal() {
+    const texto = limpiarTexto(facturaNumero);
+    if (texto.length < 3 || buscandoFiscal) return;
+    setBusquedaFiscal(null);
+    setBuscandoFiscal(true);
+    buscarClienteFiscalPorNumero(texto)
+      .then((r) => {
+        const exactos = r.filter((c) => c.numeroIdentificacion.toLowerCase() === texto.toLowerCase());
+        if (r.length === 0) {
+          setBusquedaFiscal({ estado: "nuevo" });
+        } else if (exactos.length === 1) {
+          aplicarClienteFiscal(exactos[0]);
+          setBusquedaFiscal({ estado: "existe", resultados: exactos });
+        } else {
+          setBusquedaFiscal({ estado: "varios", resultados: r });
+        }
+      })
+      .catch(() => setBusquedaFiscal({ estado: "error", mensaje: "No se pudo buscar. Revisá la conexión y probá de nuevo." }))
+      .finally(() => setBuscandoFiscal(false));
+  }
 
   function agregarProducto(p: ProductoVenta) {
     setError(null);
@@ -408,7 +447,8 @@ export function NuevoPedidoForm({
       setError(r.error);
       return;
     }
-    // Se queda en "guardando" hasta cambiar de pantalla, para que un segundo clic no cargue el pedido dos veces.
+    // Se queda en "guardando" hasta cambiar de pantalla, para que un segundo clic no cargue el pedido dos veces. Va al detalle del
+    // pedido ya cobrado y, si es con factura, ya emitida.
     router.push(`/admin/pedidos/${r.orderId}`);
   }
 
@@ -764,7 +804,12 @@ export function NuevoPedidoForm({
             </div>
 
             <div className="flex flex-col gap-2 border-t border-linea pt-3.5">
-              <p className={ROTULO}>Pago</p>
+              <p className={ROTULO}>Cobro — forma de pago</p>
+              <p className="text-[0.78rem] leading-snug text-tinta-media">
+                El pedido se cobra al crearlo: entra a la caja del turno abierto con la forma que elijas
+                {comprobanteTipo === "factura" || facturaObligatoria ? " y la factura se emite en el acto" : ""}.
+                {tipoEntrega === "delivery" ? " En efectivo, el repartidor tiene que traer esa plata de vuelta (Rendiciones)." : ""}
+              </p>
               <div className="grid grid-cols-2 gap-2">
                 {metodosPago.map((m) => (
                   <button
@@ -823,6 +868,87 @@ export function NuevoPedidoForm({
                       <p className="text-[0.8rem] text-tinta-media">Se factura a Consumidor Final (Sin Nombre).</p>
                     ) : (
                       <>
+                        {/* Primero el número, con la lupa: si el cliente ya está en el sistema se traen sus datos; si no, se crea
+                            al cobrar el pedido. */}
+                        <div>
+                          <label htmlFor="pedido-factura-numero" className="mb-1.5 block text-[0.82rem] font-semibold text-tinta">
+                            Número de documento
+                          </label>
+                          <span className="mb-1.5 block text-[0.78rem] text-tinta-suave">
+                            {facturaTipo === "ruc" ? "Con su dígito verificador: 80012345-6" : "Tocá la lupa para ver si ya está en el sistema"}
+                          </span>
+                          <div className="flex items-center gap-2">
+                            <Entrada
+                              id="pedido-factura-numero"
+                              value={facturaNumero}
+                              onChange={(e) => {
+                                setFacturaNumero(e.target.value);
+                                setBusquedaFiscal(null);
+                              }}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                  e.preventDefault();
+                                  buscarFiscal();
+                                }
+                              }}
+                              placeholder="80012345-6"
+                              maxLength={30}
+                              autoComplete="off"
+                              className="min-w-0 flex-1"
+                            />
+                            <button
+                              type="button"
+                              onClick={buscarFiscal}
+                              disabled={buscandoFiscal || limpiarTexto(facturaNumero).length < 3}
+                              aria-label="Buscar en el sistema si ya existe"
+                              title="Buscar en el sistema si ya existe"
+                              className={`${clasesBoton("navegar", "md")} flex-none !px-3`}
+                            >
+                              {buscandoFiscal ? (
+                                "…"
+                              ) : (
+                                <svg viewBox="0 0 24 24" width={18} height={18} fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                                  <circle cx="11" cy="11" r="7" />
+                                  <path d="m20 20-3.5-3.5" />
+                                </svg>
+                              )}
+                            </button>
+                          </div>
+                          {busquedaFiscal?.estado === "existe" && (
+                            <p className="mt-1.5 rounded-lg border border-exito/40 bg-exito-luz px-2.5 py-1.5 text-[0.78rem] font-medium text-exito">
+                              Ya existe en el sistema: se cargaron su tipo de documento, razón social y correo. Revisalos.
+                            </p>
+                          )}
+                          {busquedaFiscal?.estado === "nuevo" && (
+                            <p className="mt-1.5 rounded-lg border border-amarillo/60 bg-amarillo-luz px-2.5 py-1.5 text-[0.78rem] font-medium text-amarillo-oscuro">
+                              No existe en el sistema: cargá la razón social y se crea al cobrar el pedido.
+                            </p>
+                          )}
+                          {busquedaFiscal?.estado === "varios" && (
+                            <div className="mt-1.5 flex flex-col gap-1.5">
+                              <p className="text-[0.78rem] font-medium text-tinta-media">Hay varios parecidos: elegí el que corresponde.</p>
+                              {busquedaFiscal.resultados.map((c) => (
+                                <button
+                                  key={`${c.tipoIdentificacion}-${c.numeroIdentificacion}`}
+                                  type="button"
+                                  onClick={() => {
+                                    aplicarClienteFiscal(c);
+                                    setBusquedaFiscal({ estado: "existe", resultados: [c] });
+                                  }}
+                                  className="rounded-lg border-2 border-azul/50 bg-azul-luz/40 px-2.5 py-1.5 text-left hover:bg-azul-luz"
+                                >
+                                  <span className="cifra block text-[0.86rem] font-semibold text-tinta">{c.numeroIdentificacion}</span>
+                                  <span className="block text-[0.8rem] text-tinta-media">
+                                    {c.razonSocial} · {etiquetaTipoIdentificacion(c.tipoIdentificacion)}
+                                  </span>
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                          {busquedaFiscal?.estado === "error" && (
+                            <p className="mt-1.5 text-[0.78rem] font-medium text-peligro">{busquedaFiscal.mensaje}</p>
+                          )}
+                        </div>
                         <Campo etiqueta="Tipo de documento">
                           <Selector value={facturaTipo} onChange={(e) => setFacturaTipo(e.target.value)}>
                             {TIPOS_IDENTIFICACION_FISCAL.map((t) => (
@@ -831,14 +957,6 @@ export function NuevoPedidoForm({
                               </option>
                             ))}
                           </Selector>
-                        </Campo>
-                        <Campo etiqueta="Número">
-                          <Entrada
-                            value={facturaNumero}
-                            onChange={(e) => setFacturaNumero(e.target.value)}
-                            placeholder="80012345-6"
-                            maxLength={30}
-                          />
                         </Campo>
                         <Campo etiqueta="Razón social">
                           <Entrada
@@ -901,10 +1019,10 @@ export function NuevoPedidoForm({
               tam="lg"
               className="w-full"
             >
-              {guardando ? "Guardando…" : "Crear pedido"}
+              {guardando ? "Cobrando…" : `Cobrar ${formatearGuarani(total)} y crear pedido`}
             </Boton>
             <p className="-mt-2 text-[0.74rem] leading-snug text-tinta-suave">
-              Nace confirmado. Después lo pasás a &ldquo;En preparación&rdquo; desde su detalle y sigue el circuito de
+              Nace cobrado y confirmado. Después lo pasás a &ldquo;En preparación&rdquo; desde su detalle y sigue el circuito de
               siempre: comanda, repartidor, despacho y entrega.
             </p>
           </Tarjeta>

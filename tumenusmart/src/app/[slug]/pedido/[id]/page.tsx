@@ -1,30 +1,16 @@
 import { VolverAlMenu } from "@/components/Volver";
-import { headers } from "next/headers";
+import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { construirMensajePedido, construirLinkWhatsapp } from "@/lib/whatsapp";
 import { formatearGuarani, formatearNumero } from "@/lib/format";
 import { pasosSeguimiento, indicePaso } from "@/lib/seguimiento-pedido";
 import { AutoRefresh } from "@/components/AutoRefresh";
 import { SeguimientoTracker } from "@/components/SeguimientoTracker";
 import { SelloFidelidad } from "@/components/SelloFidelidad";
 import { Tarjeta, Aviso } from "@/components/ui";
-import { EnviarPedido, PedidoVencido } from "./EnviarPedido";
-import { limiteDeEnvio, segundosParaEnviar } from "@/lib/pedido-vencimiento";
-import { descartarPedidoSinEnviar } from "@/lib/pedidos-sin-enviar";
 import { localPorSlug } from "@/lib/local-por-slug";
 import { progresoDeCliente } from "@/lib/fidelidad";
-import { SIN_REGISTRO_FISCAL } from "@/lib/tipo-cliente";
 
 export const dynamic = "force-dynamic";
-
-/** URL pública de esta misma pantalla, para mandársela al cliente por WhatsApp. */
-async function urlSeguimiento(slug: string, orderId: string): Promise<string> {
-  const cabeceras = await headers();
-  const host = cabeceras.get("x-forwarded-host") ?? cabeceras.get("host");
-  if (!host) return "";
-  const protocolo = host.startsWith("localhost") ? "http" : "https";
-  return `${protocolo}://${host}/${slug}/pedido/${orderId}`;
-}
 
 export default async function SeguimientoPedidoPage({
   params,
@@ -35,62 +21,14 @@ export default async function SeguimientoPedidoPage({
   const store = await localPorSlug(slug);
 
   // El pedido se busca DENTRO de este local: el id de otro negocio,
-  // aunque se escriba a mano en la barra, no aparece.
-  const ahora = new Date();
-  let order = await prisma.order.findFirst({
+  // aunque se escriba a mano en la barra, no aparece. Los pedidos los carga la caja a mano (el menú digital solo manda el mensaje de
+  // WhatsApp): esta pantalla es para seguir el estado de uno que ya está cargado.
+  const order = await prisma.order.findFirst({
     where: { id, storeId: store.id },
     include: { items: true, deliveryZone: true },
   });
 
-  // Un pedido que el cliente nunca mandó por WhatsApp y ya venció se cancela acá mismo (si no lo hizo antes la tarea
-  // programada): se borra y le devuelve el stock.
-  if (order && order.origen === "menu" && !order.enviadoWhatsapp && order.estado === "pendiente" && order.createdAt < limiteDeEnvio(ahora)) {
-    if (await descartarPedidoSinEnviar({ id: order.id, storeId: store.id }, ahora)) order = null;
-  }
-
-  // No existe (o venció y se borró): el mismo mensaje para cualquier id, así no se sabe cuáles existieron.
-  if (!order) return <PedidoVencido slug={slug} nombreLocal={store.nombre} />;
-
-  const linkSeguimiento = await urlSeguimiento(slug, order.id);
-
-  // Si esto fue una conversión transparente (el cliente eligió "Ticket" pero
-  // el local factura todo — ver checkout/actions.ts), el mensaje de
-  // WhatsApp que el cliente ve en su propio teléfono tiene que seguir
-  // pareciendo un ticket: mostrarle "Comprobante: Factura" / "RUC: X"
-  // delataría una conversión que para él tiene que ser invisible.
-  const esConversionTransparente = order.facturaTipoIdentificacion === SIN_REGISTRO_FISCAL.tipo;
-
-  const mensaje = construirMensajePedido({
-    numero: order.numero,
-    saludo: store.mensajeSaludo,
-    clienteNombre: order.clienteNombre,
-    tipoEntrega: order.tipoEntrega,
-    direccion: order.direccion,
-    zonaNombre: order.deliveryZone?.nombre,
-    clienteLat: order.clienteLat,
-    clienteLng: order.clienteLng,
-    metodoPagoReferencia: order.metodoPagoReferencia,
-    comprobanteTipo: esConversionTransparente ? "ticket" : order.comprobanteTipo,
-    // Pidió factura desde la carta: el mensaje lo dice y el navegador del cliente le agrega sus datos (no se guardan acá).
-    facturaPedida: order.facturaPedida,
-    facturaRazonSocial: order.facturaRazonSocial,
-    facturaRuc: order.facturaRuc,
-    facturaEmail: order.facturaEmail,
-    notas: order.notas,
-    items: order.items.map((i) => ({
-      nombreProducto: i.nombreProducto,
-      cantidad: i.cantidad,
-      precioUnitario: Number(i.precioUnitario),
-      opcionesTexto: i.opcionesTexto,
-      ingredientesQuitadosTexto: i.ingredientesQuitadosTexto,
-    })),
-    subtotal: Number(order.subtotal),
-    costoEnvio: Number(order.costoEnvio),
-    total: Number(order.total),
-    linkSeguimiento: linkSeguimiento || null,
-  });
-
-  const linkWhatsapp = construirLinkWhatsapp(store.whatsappNumero, mensaje);
+  if (!order) notFound();
 
   const cancelado = order.estado === "cancelado";
   const pasos = pasosSeguimiento(order.tipoEntrega);
@@ -116,22 +54,6 @@ export default async function SeguimientoPedidoPage({
         </h1>
         <p className="text-[0.85rem] text-tinta-suave">{store.nombre}</p>
       </div>
-
-      {/* El aviso "Falta un paso" con su cuenta regresiva, el botón de WhatsApp (que salta mientras no se lo toca) y, si el tiempo
-          se acaba, la pantalla de "se venció". Solo cuenta mientras el pedido espera el envío y nadie del local lo tomó. */}
-      <EnviarPedido
-        slug={slug}
-        orderId={order.id}
-        nombreLocal={store.nombre}
-        link={linkWhatsapp}
-        yaEnviado={order.enviadoWhatsapp}
-        conAviso={!cancelado}
-        venceEnSegundos={
-          !order.enviadoWhatsapp && order.estado === "pendiente" && order.origen === "menu"
-            ? segundosParaEnviar(order.createdAt, ahora)
-            : null
-        }
-      />
 
       {cancelado ? (
         <div className="mb-8">

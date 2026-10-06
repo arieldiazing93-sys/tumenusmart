@@ -85,29 +85,8 @@ export default async function ImprimirTurnosPosPage({
     }),
   ]);
 
-  // Corte general: lo que rindió el repartidor (en cualquiera de las 4
-  // formas) entra en la misma caja que cuenta el cajero — sin sumarlo acá,
-  // "Sistema" queda por debajo de lo declarado y aparenta un sobrante que
-  // nunca existió (mismo criterio que turnos/[id]/page.tsx).
-  const turnoIds = turnos.map((t) => t.id);
-  const rendicionesPorTurno = turnoIds.length
-    ? await db.rendicion.groupBy({
-        by: ["turnoPosId"],
-        where: { turnoPosId: { in: turnoIds } },
-        _sum: { totalEfectivo: true, totalTransferencia: true, totalTarjetaDebito: true, totalTarjetaCredito: true },
-      })
-    : [];
-  const rendidoPorTurno = new Map<string, number>();
-  for (const r of rendicionesPorTurno) {
-    if (!r.turnoPosId) continue;
-    rendidoPorTurno.set(
-      r.turnoPosId,
-      Number(r._sum.totalEfectivo ?? 0) +
-        Number(r._sum.totalTransferencia ?? 0) +
-        Number(r._sum.totalTarjetaDebito ?? 0) +
-        Number(r._sum.totalTarjetaCredito ?? 0)
-    );
-  }
+  // Los pedidos de delivery ya están en lo calculado de cada turno (se cobran al cargarlos): las rendiciones de los repartidores
+  // son un control del efectivo y NO se suman acá (contarían dos veces la misma venta; mismo criterio que turnos/[id]/page.tsx).
 
   const finRangoInclusive = new Date(rango.lt.getTime() - 24 * 60 * 60 * 1000);
   const opcionesFecha: Intl.DateTimeFormatOptions = {
@@ -158,7 +137,6 @@ export default async function ImprimirTurnosPosPage({
               const declarado = totalDeclarado(t);
               const calculado =
                 totalCalculado(t) +
-                (rendidoPorTurno.get(t.id) ?? 0) +
                 Number(t.montoInicial ?? 0) +
                 Number(t.movimientosEfectivoNeto ?? 0);
               return (

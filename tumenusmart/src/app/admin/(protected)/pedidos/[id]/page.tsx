@@ -2,18 +2,17 @@ import { Volver } from "@/components/Volver";
 import { Pastilla } from "@/components/ui";
 import { notFound } from "next/navigation";
 import { pantallaConPermiso } from "@/lib/auth";
-import { prisma as prismaGlobal } from "@/lib/prisma";
 import { prismaDelLocal } from "@/lib/prisma-local";
 import { idLocalActual } from "@/lib/local-actual";
 import { formatearGuarani, formatearNumero } from "@/lib/format";
 import { etiquetaMetodoPago } from "@/lib/metodos-pago";
+import { etiquetaFormaPagoPos } from "@/lib/turno-pos";
 import { SIN_REGISTRO_FISCAL, etiquetaTipoIdentificacion } from "@/lib/tipo-cliente";
 import { EstadoBotones } from "../EstadoBotones";
-import { FacturaPedida } from "../FacturaPedida";
+import { CobroPedido } from "../CobroPedido";
 import { RepartidorSelect } from "../RepartidorSelect";
 import { ZONA_NEGOCIO } from "@/lib/timezone";
 import { estacionActual } from "@/lib/estacion-actual";
-import { turnoAbierto } from "../../pos/turno-actual";
 
 export const dynamic = "force-dynamic";
 
@@ -33,17 +32,15 @@ export default async function DetallePedidoPage({
 
   const { id } = await params;
 
-  // Se ata al turno de la MISMA computadora desde la que se marca entregado
-  // — misma cookie de estación que usa el Punto de Venta.
+  // Las impresoras de la MISMA computadora desde la que se atiende — misma cookie de estación que usa el Punto de Venta.
   const estacion = await estacionActual(prisma);
 
-  const [pedido, repartidores, turno, estacionConImpresoras, local] = await Promise.all([
+  const [pedido, repartidores, estacionConImpresoras] = await Promise.all([
     prisma.order.findUnique({
       where: { id },
       include: { items: true, deliveryZone: true, repartidor: true },
     }),
     prisma.repartidor.findMany({ where: { activo: true }, orderBy: { nombre: "asc" } }),
-    estacion ? turnoAbierto(prisma, estacion.id) : Promise.resolve(null),
     estacion
       ? prisma.estacion.findUnique({
           where: { id: estacion.id },
@@ -53,8 +50,6 @@ export default async function DetallePedidoPage({
           },
         })
       : Promise.resolve(null),
-    // Store no pertenece a ningún local (no está en MODELOS_POR_LOCAL): se lee con el cliente global.
-    prismaGlobal.store.findUnique({ where: { id: storeId }, select: { facturaObligatoria: true } }),
   ]);
 
   // Impresión automática (QZ Tray) — ver src/lib/impresion-comprobantes.ts.
@@ -67,8 +62,8 @@ export default async function DetallePedidoPage({
 
   if (!pedido) notFound();
 
-  // El cliente pidió factura en la carta y la caja todavía no la emitió (sus datos están solo en el WhatsApp).
-  const facturaPendiente = pedido.facturaPedida && !pedido.facturaNumero && pedido.estado !== "cancelado";
+  // Un pedido entra a la caja del turno al cobrarse (al cargarlo a mano, o con "Cobrar"): quedan la forma de pago y el turno.
+  const cobrado = !!pedido.turnoPosId;
 
   return (
     <div>
@@ -125,11 +120,10 @@ export default async function DetallePedidoPage({
           estadoActual={pedido.estado}
           tipoEntrega={pedido.tipoEntrega}
           repartidorId={pedido.repartidorId}
-          turnoAbiertoId={turno?.id ?? null}
+          cobrado={cobrado}
           comprobanteTipo={pedido.comprobanteTipo}
           facturaNumero={pedido.facturaNumero}
           facturaAnulada={pedido.facturaAnulada}
-          facturaPendiente={facturaPendiente}
           nombreImpresoraTicket={nombreImpresoraTicket}
           impresorasPorArea={impresorasPorArea}
         />
@@ -179,16 +173,27 @@ export default async function DetallePedidoPage({
           <p className="mb-1 text-sm font-bold uppercase tracking-wide text-tinta">
             Pago
           </p>
-          <p className="text-sm text-tinta">{etiquetaMetodoPago(pedido.metodoPagoReferencia)}</p>
+          {cobrado ? (
+            <p className="text-sm text-tinta">
+              <span className="font-medium text-exito">Cobrado</span> con {etiquetaFormaPagoPos(pedido.formaPagoPos ?? "efectivo")}
+              {pedido.cobradoEn
+                ? ` · ${new Date(pedido.cobradoEn).toLocaleString("es-PY", { timeZone: ZONA_NEGOCIO })}`
+                : ""}
+              {pedido.tipoEntrega === "delivery" && pedido.formaPagoPos === "efectivo"
+                ? " · el repartidor tiene que traer el efectivo"
+                : ""}
+            </p>
+          ) : (
+            <p className="text-sm text-tinta">{etiquetaMetodoPago(pedido.metodoPagoReferencia)}</p>
+          )}
 
-          {/* La factura que pidió el cliente desde la carta: se cargan sus datos a mano y se emite (ver FacturaPedida). */}
-          {pedido.facturaPedida && (
-            <FacturaPedida
+          {/* Un pedido sin cobrar (uno viejo): se cobra acá y entra a la caja del turno (ver CobroPedido). */}
+          {!cobrado && pedido.estado !== "cancelado" && (
+            <CobroPedido
               orderId={pedido.id}
-              numeroPedido={formatearNumero(pedido.numero)}
-              tipoEntrega={pedido.tipoEntrega}
-              facturaObligatoria={local?.facturaObligatoria ?? false}
-              pendiente={facturaPendiente}
+              total={Number(pedido.total)}
+              formaSugerida={pedido.metodoPagoReferencia}
+              conFactura={pedido.comprobanteTipo === "factura" && !pedido.facturaNumero}
             />
           )}
 
@@ -213,8 +218,7 @@ export default async function DetallePedidoPage({
               {pedido.facturaEmail && <p>Correo: {pedido.facturaEmail}</p>}
               {!pedido.facturaNumero && (
                 <p className="mt-1 text-tinta-media">
-                  Se emite al pasar a {pedido.tipoEntrega === "delivery" ? '"En despacho"' : '"Entregado"'}, si
-                  esta computadora tiene una estación con punto de expedición vigente.
+                  Se emite al cobrar el pedido (necesita el punto de expedición vigente de esta computadora).
                 </p>
               )}
             </div>

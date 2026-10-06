@@ -231,7 +231,7 @@ export async function cancelarFactura(
     const resultado =
       origen === "venta"
         ? await cancelarVenta(id, motivo)
-        : await cambiarEstadoPedido(id, "cancelado", undefined, motivo);
+        : await cambiarEstadoPedido(id, "cancelado", motivo);
     if (!resultado.ok) return resultado;
     await anotarEnBitacora();
     revalidatePath("/admin/facturas");
