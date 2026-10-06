@@ -1,6 +1,5 @@
 import { VolverAlMenu } from "@/components/Volver";
 import { headers } from "next/headers";
-import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { construirMensajePedido, construirLinkWhatsapp } from "@/lib/whatsapp";
 import { formatearGuarani, formatearNumero } from "@/lib/format";
@@ -9,7 +8,9 @@ import { AutoRefresh } from "@/components/AutoRefresh";
 import { SeguimientoTracker } from "@/components/SeguimientoTracker";
 import { SelloFidelidad } from "@/components/SelloFidelidad";
 import { Tarjeta, Aviso } from "@/components/ui";
-import { BotonWhatsapp } from "./BotonWhatsapp";
+import { EnviarPedido, PedidoVencido } from "./EnviarPedido";
+import { limiteDeEnvio, segundosParaEnviar } from "@/lib/pedido-vencimiento";
+import { descartarPedidoSinEnviar } from "@/lib/pedidos-sin-enviar";
 import { localPorSlug } from "@/lib/local-por-slug";
 import { progresoDeCliente } from "@/lib/fidelidad";
 import { SIN_REGISTRO_FISCAL } from "@/lib/tipo-cliente";
@@ -35,12 +36,20 @@ export default async function SeguimientoPedidoPage({
 
   // El pedido se busca DENTRO de este local: el id de otro negocio,
   // aunque se escriba a mano en la barra, no aparece.
-  const order = await prisma.order.findFirst({
+  const ahora = new Date();
+  let order = await prisma.order.findFirst({
     where: { id, storeId: store.id },
     include: { items: true, deliveryZone: true },
   });
 
-  if (!order) notFound();
+  // Un pedido que el cliente nunca mandó por WhatsApp y ya venció se cancela acá mismo (si no lo hizo antes la tarea
+  // programada): se borra y le devuelve el stock.
+  if (order && order.origen === "menu" && !order.enviadoWhatsapp && order.estado === "pendiente" && order.createdAt < limiteDeEnvio(ahora)) {
+    if (await descartarPedidoSinEnviar({ id: order.id, storeId: store.id }, ahora)) order = null;
+  }
+
+  // No existe (o venció y se borró): el mismo mensaje para cualquier id, así no se sabe cuáles existieron.
+  if (!order) return <PedidoVencido slug={slug} nombreLocal={store.nombre} />;
 
   const linkSeguimiento = await urlSeguimiento(slug, order.id);
 
@@ -108,22 +117,21 @@ export default async function SeguimientoPedidoPage({
         <p className="text-[0.85rem] text-tinta-suave">{store.nombre}</p>
       </div>
 
-      {!order.enviadoWhatsapp && !cancelado && (
-        <div className="mb-6">
-          <Aviso titulo="Falta un paso" color="aviso">
-            Enviá el pedido por WhatsApp para que {store.nombre} lo reciba y lo confirme.
-          </Aviso>
-        </div>
-      )}
-
-      <div className="mb-8 flex justify-center">
-        <BotonWhatsapp
-          slug={slug}
-          orderId={order.id}
-          link={linkWhatsapp}
-          yaEnviado={order.enviadoWhatsapp}
-        />
-      </div>
+      {/* El aviso "Falta un paso" con su cuenta regresiva, el botón de WhatsApp (que salta mientras no se lo toca) y, si el tiempo
+          se acaba, la pantalla de "se venció". Solo cuenta mientras el pedido espera el envío y nadie del local lo tomó. */}
+      <EnviarPedido
+        slug={slug}
+        orderId={order.id}
+        nombreLocal={store.nombre}
+        link={linkWhatsapp}
+        yaEnviado={order.enviadoWhatsapp}
+        conAviso={!cancelado}
+        venceEnSegundos={
+          !order.enviadoWhatsapp && order.estado === "pendiente" && order.origen === "menu"
+            ? segundosParaEnviar(order.createdAt, ahora)
+            : null
+        }
+      />
 
       {cancelado ? (
         <div className="mb-8">

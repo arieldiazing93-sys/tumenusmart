@@ -14,10 +14,16 @@ export function BotonWhatsappCTA({
   link,
   yaEnviado,
   onEnviar,
+  llamar = false,
 }: {
   link: string;
   yaEnviado: boolean;
   onEnviar: () => void;
+  /**
+   * El botón salta tres veces cada tanto mientras no se lo toca, para llamar la atención (el envío es un paso que se olvida
+   * y sin él el local no se entera). Es el mismo salto de la pantalla final de reservas de turnos.
+   */
+  llamar?: boolean;
 }) {
   const [enviado, setEnviado] = useState(yaEnviado);
 
@@ -26,7 +32,7 @@ export function BotonWhatsappCTA({
     onEnviar();
   }
 
-  return (
+  const boton = (
     <a
       href={link}
       target="_blank"
@@ -41,4 +47,8 @@ export function BotonWhatsappCTA({
       <span aria-hidden="true">→</span>
     </a>
   );
+
+  // El que salta es este contenedor y no el botón: así el botón conserva su propio efecto al apretarlo. Deja de saltar
+  // apenas se lo toca.
+  return llamar && !enviado ? <div className="animate-llamar">{boton}</div> : boton;
 }

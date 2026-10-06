@@ -16,6 +16,7 @@ import { registrarConsumoVenta } from "@/lib/movimientos-stock";
 import { costoDelProducto } from "@/lib/costo-receta";
 import { aplanarReceta } from "@/lib/insumo-elaborado";
 import { cargarElaborados } from "@/lib/cargar-elaborados";
+import { limpiarPedidosSinEnviarDelLocal } from "@/lib/pedidos-sin-enviar";
 
 export type DatosCheckout = {
   /** de qué local es el pedido, tomado de la URL que visitó el cliente */
@@ -72,6 +73,10 @@ export async function crearPedido(datos: DatosCheckout): Promise<ResultadoPedido
   // local que podamos usar a ciegas.
   const local = await localPorSlug(datos.slug);
   const storeId = local.id;
+
+  // Los pedidos que otros clientes armaron y nunca mandaron por WhatsApp (y ya vencieron) se descartan antes: el stock que
+  // tenían descontado vuelve y el pedido de este cliente no choca con ellos. Nunca lanza.
+  await limpiarPedidosSinEnviarDelLocal(storeId, new Date());
 
   if (estaSuspendido(local)) {
     return { ok: false, error: "Este menú no está tomando pedidos en este momento." };

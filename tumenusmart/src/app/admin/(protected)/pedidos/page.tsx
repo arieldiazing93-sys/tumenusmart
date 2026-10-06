@@ -12,6 +12,7 @@ import { ZONA_NEGOCIO } from "@/lib/timezone";
 import { obtenerEstadoTienda } from "@/lib/estado-tienda";
 import { linkWhatsappCliente } from "@/lib/whatsapp";
 import { idLocalActual } from "@/lib/local-actual";
+import { limpiarPedidosSinEnviarDelLocal } from "@/lib/pedidos-sin-enviar";
 import { PausaPedidosToggle } from "../PausaPedidosToggle";
 import { CompartirCarta } from "../CompartirCarta";
 import { TarjetaIdeaSemana } from "../TarjetaIdeaSemana";
@@ -90,6 +91,10 @@ export default async function AdminPedidosPage({
   // tipo se ven los dos mezclados; cualquier otro valor de la URL (un enlace viejo con "mesa" o "todos") se ignora.
   const tipoActivo = tipo === "delivery" || tipo === "retiro" ? tipo : null;
   const filtroTipo = tipoActivo ? { tipoEntrega: tipoActivo } : {};
+
+  // Los pedidos de la carta que el cliente nunca mandó por WhatsApp y ya vencieron (ver pedido-vencimiento.ts) se descartan acá,
+  // para que no queden en la lista como "sin enviar". Nunca lanza, y es una sola consulta.
+  await limpiarPedidosSinEnviarDelLocal(storeId, new Date());
 
   const [pedidos, store, estadoTienda, pedidosEnviados] = await Promise.all([
     prisma.order.findMany({

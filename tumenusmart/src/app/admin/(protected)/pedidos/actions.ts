@@ -18,7 +18,7 @@ import {
   type PuntoParaComprobante,
 } from "@/lib/comprobante";
 import { SIN_REGISTRO_FISCAL } from "@/lib/tipo-cliente";
-import { validarDatosFiscales, type DatosFiscalesManuales } from "@/lib/datos-fiscales";
+import { limpiarTexto, validarDatosFiscales, type DatosFiscalesManuales } from "@/lib/datos-fiscales";
 import { revertirMovimientosVenta } from "@/lib/movimientos-stock";
 import { registrarBitacora } from "@/lib/bitacora";
 import { formatearGuarani } from "@/lib/format";
@@ -515,21 +515,59 @@ export async function asignarRepartidor(
 // Factura de los pedidos de la carta digital: se carga y se emite A MANO.
 //
 // El cliente escribe su razón social y su RUC en el checkout, pero esos datos NO se guardan: van solo en el mensaje de
-// WhatsApp. La caja los consulta en la DNIT, los tipea acá y emite la factura (el único error posible es de tipeo de la
-// caja, no del cliente apurado). Mientras el pedido siga con la factura pedida y sin emitir, no pasa a despacho ni a entregado.
+// WhatsApp. La caja los compara antes en la página de la DNIT (y lo resuelve con el cliente por WhatsApp o por llamada), los
+// tipea acá y emite la factura (el único error posible es de tipeo de la caja, no del cliente apurado). Acá no se vuelve a pedir
+// esa verificación ni se calcula el dígito del RUC. Mientras el pedido siga con la factura pedida y sin emitir, no pasa a
+// despacho ni a entregado.
 
 /** Lo que manda la pantalla "Emitir factura": los datos del comprador tal como los tipeó la caja. */
-export type DatosEmitirFactura = DatosFiscalesManuales & {
-  /** La persona confirmó que revisó la razón social y el RUC en la consulta de la DNIT. */
-  verificadoEnDnit?: boolean;
-};
+export type DatosEmitirFactura = DatosFiscalesManuales;
 
-export type ResultadoEmitirFactura =
-  | { ok: true; numero: string }
-  | { ok: false; error: string; dvDistinto?: { esperado: number } };
+export type ResultadoEmitirFactura = { ok: true; numero: string } | { ok: false; error: string };
 
 /** Un motivo para frenar la emisión que la persona puede entender (se muestra tal cual). */
 class ErrorDeEmision extends Error {}
+
+/** Un cliente con datos fiscales que ya está en el sistema (de una factura anterior). */
+export type ClienteFiscalEncontrado = {
+  tipoIdentificacion: string;
+  numeroIdentificacion: string;
+  razonSocial: string;
+  email: string | null;
+};
+
+/**
+ * La lupa de "Emitir factura": busca por número de documento (RUC, cédula…) si el cliente ya existe en el sistema, para
+ * traer su razón social y su correo en vez de volver a tipearlos. Si no existe, se crea al emitir la factura. Solo busca en
+ * los clientes de ESTE local y devuelve unos pocos.
+ */
+export async function buscarClienteFiscalPorNumero(numero: string): Promise<ClienteFiscalEncontrado[]> {
+  await exigirPermiso("pedidos.cambiarEstado");
+  const storeId = await idLocalActual();
+  const prisma = prismaDelLocal(storeId);
+
+  const texto = limpiarTexto(numero);
+  if (texto.length < 3 || texto.length > 30) return [];
+
+  const filas = await prisma.customer.findMany({
+    where: { numeroIdentificacion: { contains: texto, mode: "insensitive" } },
+    orderBy: { nombre: "asc" },
+    select: { tipoIdentificacion: true, numeroIdentificacion: true, nombre: true, email: true },
+    take: 6,
+  });
+  return filas.flatMap((f) =>
+    f.numeroIdentificacion
+      ? [
+          {
+            tipoIdentificacion: f.tipoIdentificacion ?? "ruc",
+            numeroIdentificacion: f.numeroIdentificacion,
+            razonSocial: f.nombre,
+            email: f.email,
+          },
+        ]
+      : []
+  );
+}
 
 /**
  * Emite la factura de un pedido con los datos que cargó la caja. Todo en una sola transacción: se toma el pedido (si otra
@@ -544,11 +582,8 @@ export async function emitirFacturaPedido(orderId: string, datos: DatosEmitirFac
   const id = String(orderId);
 
   if (!datos || typeof datos !== "object") return { ok: false, error: "Faltan los datos de la factura." };
-  if (datos.modo === "con_registro" && datos.verificadoEnDnit !== true) {
-    return { ok: false, error: "Marcá que revisaste la razón social y el RUC en la consulta de la DNIT." };
-  }
   const v = validarDatosFiscales(datos);
-  if (!v.ok) return { ok: false, error: v.error, dvDistinto: v.dvDistinto };
+  if (!v.ok) return { ok: false, error: v.error };
 
   const pedido = await prisma.order.findUnique({
     where: { id },
@@ -644,9 +679,7 @@ export async function emitirFacturaPedido(orderId: string, datos: DatosEmitirFac
     accion: "factura_emitida_a_mano",
     descripcion: `Emitió la factura N° ${numeroFactura} del pedido #${String(pedido.numero).padStart(4, "0")} a ${
       comprador.razonSocial ?? SIN_REGISTRO_FISCAL.etiquetaDisplay
-    } (${comprador.tipoIdentificacion} ${comprador.numeroIdentificacion}), con los datos cargados a mano${
-      datos.modo === "con_registro" ? " y revisados en la DNIT" : ""
-    }.`,
+    } (${comprador.tipoIdentificacion} ${comprador.numeroIdentificacion}), con los datos cargados a mano.`,
     entidad: "Order",
     entidadId: id,
     detalle: {
@@ -655,8 +688,6 @@ export async function emitirFacturaPedido(orderId: string, datos: DatosEmitirFac
       tipoIdentificacion: comprador.tipoIdentificacion,
       numeroIdentificacion: comprador.numeroIdentificacion,
       razonSocial: comprador.razonSocial,
-      verificadoEnDnit: datos.modo === "con_registro",
-      dvConfirmadoALaMano: datos.dvConfirmado === true,
     },
   });
   revalidatePath("/admin/pedidos");

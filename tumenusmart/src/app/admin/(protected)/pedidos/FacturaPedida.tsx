@@ -6,13 +6,19 @@ import { Campo, Entrada, MensajeError, Selector, clasesBoton } from "@/component
 import { PanelLateral } from "@/components/PanelLateral";
 import { Segmentado } from "@/components/Segmentado";
 import { SIN_REGISTRO_FISCAL, TIPOS_IDENTIFICACION_FISCAL, etiquetaTipoIdentificacion } from "@/lib/tipo-cliente";
-import { limpiarTexto, revisarRuc, validarDatosFiscales } from "@/lib/datos-fiscales";
-import { emitirFacturaPedido, resolverPedidoSinFactura } from "./actions";
+import { limpiarTexto, validarDatosFiscales } from "@/lib/datos-fiscales";
+import {
+  buscarClienteFiscalPorNumero,
+  emitirFacturaPedido,
+  resolverPedidoSinFactura,
+  type ClienteFiscalEncontrado,
+} from "./actions";
 
 /**
  * La factura de un pedido de la carta digital. El cliente la pidió y mandó sus datos por WhatsApp, pero esos datos no están en el
- * sistema: la caja los consulta en la DNIT, los tipea acá y emite la factura. Es el filtro de seguridad: si hay un error, es de
- * tipeo de la caja y no un dato mal escrito por el cliente apurado.
+ * sistema: la caja los compara antes en la página de la DNIT (y lo resuelve con el cliente por WhatsApp o por llamada), los tipea
+ * acá y emite la factura. Es el filtro de seguridad: si hay un error, es de tipeo de la caja y no un dato mal escrito por el
+ * cliente apurado.
  *
  * Con la factura pedida y sin emitir, el pedido no pasa a "En despacho" (delivery) ni a "Entregado". La salida alternativa es
  * dejarlo sin factura, con motivo (no se ofrece en un local que factura todas las ventas).
@@ -62,9 +68,8 @@ export function FacturaPedida({
         <div className="mt-2.5 rounded-lg border-2 border-amarillo/60 bg-amarillo-luz p-3">
           <p className="text-[0.88rem] font-semibold text-amarillo-oscuro">El cliente pidió factura — datos pendientes</p>
           <p className="mt-0.5 text-[0.8rem] leading-snug text-tinta-media">
-            Sus datos llegaron en el mensaje de WhatsApp y no están cargados en el sistema. Consultá la razón social y el RUC en la
-            DNIT y cargalos a mano con “Emitir factura”. Hasta entonces el pedido no pasa a{" "}
-            {tipoEntrega === "delivery" ? "“En despacho”" : "“Entregado”"}.
+            Sus datos llegaron en el mensaje de WhatsApp y no están cargados en el sistema: cargalos a mano con “Emitir factura”.
+            Hasta entonces el pedido no pasa a {tipoEntrega === "delivery" ? "“En despacho”" : "“Entregado”"}.
           </p>
           <div className="mt-2 flex flex-wrap gap-2">
             <button type="button" onClick={() => setAbierto(true)} className={clasesBoton("principal", "sm")}>
@@ -134,13 +139,19 @@ export function FacturaPedida({
 
 type Paso = "datos" | "revisar" | "listo";
 
+/** Lo que dijo la lupa: el cliente ya existe (uno o varios parecidos), no existe (se crea al emitir) o falló la búsqueda. */
+type Busqueda =
+  | { estado: "existe" | "varios"; resultados: ClienteFiscalEncontrado[] }
+  | { estado: "nuevo" }
+  | { estado: "error"; mensaje: string };
+
 const FILA_RESUMEN = "flex items-baseline justify-between gap-3";
 const ROTULO_RESUMEN = "text-[0.72rem] font-semibold uppercase tracking-rotulo text-tinta-suave";
 
 /**
- * Tres pasos: (1) cargar los datos tal como figuran en la DNIT; (2) revisarlos en un resumen y confirmar que se verificaron
- * (y, si el dígito verificador del RUC no coincide con el cálculo, confirmarlo aparte); (3) la factura emitida. El servidor vuelve
- * a validar todo: lo de acá es para avisar a tiempo, no para dar nada por bueno.
+ * Tres pasos: (1) cargar los datos (la caja ya los comparó en la DNIT y los resolvió con el cliente por WhatsApp o por llamada:
+ * acá no se vuelve a pedir esa verificación); (2) un resumen para revisar antes de emitir; (3) la factura emitida. El servidor
+ * vuelve a validar lo mínimo: lo de acá es para avisar a tiempo, no para dar nada por bueno.
  */
 function PanelEmitirFactura({
   orderId,
@@ -160,33 +171,57 @@ function PanelEmitirFactura({
   const [numero, setNumero] = useState("");
   const [razon, setRazon] = useState("");
   const [email, setEmail] = useState("");
-  const [verificado, setVerificado] = useState(false);
-  const [dvConfirmado, setDvConfirmado] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [numeroEmitido, setNumeroEmitido] = useState("");
   const [emitiendo, iniciar] = useTransition();
+  const [busqueda, setBusqueda] = useState<Busqueda | null>(null);
+  const [buscando, setBuscando] = useState(false);
+
+  /** Trae al formulario los datos de un cliente que ya estaba en el sistema. */
+  function aplicar(c: ClienteFiscalEncontrado) {
+    setNumero(c.numeroIdentificacion);
+    setTipo(TIPOS_IDENTIFICACION_FISCAL.some((t) => t.valor === c.tipoIdentificacion) ? c.tipoIdentificacion : "ruc");
+    setRazon(c.razonSocial);
+    setEmail(c.email ?? "");
+  }
+
+  /** La lupa: ¿ya existe este número en el sistema? Si existe se cargan sus datos; si no, se crea al emitir. */
+  function buscar() {
+    const texto = limpiarTexto(numero);
+    if (texto.length < 3 || buscando) return;
+    setBusqueda(null);
+    setBuscando(true);
+    buscarClienteFiscalPorNumero(texto)
+      .then((r) => {
+        const exactos = r.filter((c) => c.numeroIdentificacion.toLowerCase() === texto.toLowerCase());
+        if (r.length === 0) {
+          setBusqueda({ estado: "nuevo" });
+        } else if (exactos.length === 1) {
+          aplicar(exactos[0]);
+          setBusqueda({ estado: "existe", resultados: exactos });
+        } else {
+          setBusqueda({ estado: "varios", resultados: r });
+        }
+      })
+      .catch(() => setBusqueda({ estado: "error", mensaje: "No se pudo buscar. Revisá la conexión y probá de nuevo." }))
+      .finally(() => setBuscando(false));
+  }
 
   const modoServidor = modo === "con" ? "con_registro" : "sin_nombre";
-  const revisionRuc = modo === "con" && tipo === "ruc" ? revisarRuc(numero) : null;
-  const dvDistinto = revisionRuc?.estado === "dv_distinto";
 
   function pasarARevisar() {
     setError(null);
-    // El dígito verificador se confirma en el paso siguiente: acá solo se frena lo que seguro está mal.
     const r = validarDatosFiscales({
       modo: modoServidor,
       tipoIdentificacion: tipo,
       numeroIdentificacion: numero,
       razonSocial: razon,
       email,
-      dvConfirmado: true,
     });
     if (!r.ok) {
       setError(r.error);
       return;
     }
-    setVerificado(false);
-    setDvConfirmado(false);
     setPaso("revisar");
   }
 
@@ -200,8 +235,6 @@ function PanelEmitirFactura({
           numeroIdentificacion: numero,
           razonSocial: razon,
           email,
-          dvConfirmado,
-          verificadoEnDnit: verificado,
         });
         if (!r.ok) {
           setError(r.error);
@@ -216,34 +249,15 @@ function PanelEmitirFactura({
     });
   }
 
-  const puedeEmitir = !emitiendo && (modo === "sin" || (verificado && (!dvDistinto || dvConfirmado)));
-
   return (
     <PanelLateral titulo={`Emitir factura · pedido ${numeroPedido}`} onCerrar={onCerrar}>
       <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-5 py-4">
         {paso === "datos" && (
           <>
-            <div className="flex flex-col gap-2 rounded-lg border-2 border-azul/50 bg-azul-luz/40 p-3">
-              <p className="text-[0.82rem] leading-snug text-tinta">
-                Los datos del cliente llegaron por WhatsApp. <strong className="font-semibold">Antes de cargarlos, consultá la razón
-                social y el RUC en la DNIT</strong> y escribí acá lo que figura ahí, no lo que escribió el cliente.
-              </p>
-              <div>
-                <a
-                  href="https://www.dnit.gov.py"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className={clasesBoton("navegar", "sm")}
-                >
-                  Abrir el sitio de la DNIT
-                </a>
-              </div>
-            </div>
-
             <Segmentado<"con" | "sin">
               opciones={[
-                { value: "con", label: "Con datos del cliente" },
-                { value: "sin", label: "Sin nombre" },
+                { value: "con", label: "Con registro fiscal" },
+                { value: "sin", label: "Sin registro fiscal" },
               ]}
               valor={modo}
               onChange={(v) => {
@@ -259,6 +273,86 @@ function PanelEmitirFactura({
               </p>
             ) : (
               <div className="flex flex-col gap-3">
+                {/* Primero el número, con la lupa: si el cliente ya está en el sistema se traen sus datos; si no, se crea al emitir. */}
+                <div>
+                  <label htmlFor="factura-numero" className="mb-1.5 block text-[0.82rem] font-semibold text-tinta">
+                    Número de documento
+                  </label>
+                  <span className="mb-1.5 block text-[0.78rem] text-tinta-suave">
+                    {tipo === "ruc" ? "Con su dígito verificador: 80012345-6" : "Tocá la lupa para ver si ya está en el sistema"}
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <Entrada
+                      id="factura-numero"
+                      value={numero}
+                      onChange={(e) => {
+                        setNumero(e.target.value);
+                        setBusqueda(null);
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          buscar();
+                        }
+                      }}
+                      placeholder={tipo === "ruc" ? "80012345-6" : ""}
+                      maxLength={30}
+                      autoComplete="off"
+                      className="min-w-0 flex-1"
+                    />
+                    <button
+                      type="button"
+                      onClick={buscar}
+                      disabled={buscando || limpiarTexto(numero).length < 3}
+                      aria-label="Buscar en el sistema si ya existe"
+                      title="Buscar en el sistema si ya existe"
+                      className={`${clasesBoton("navegar", "md")} flex-none !px-3`}
+                    >
+                      {buscando ? (
+                        "…"
+                      ) : (
+                        <svg viewBox="0 0 24 24" width={18} height={18} fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                          <circle cx="11" cy="11" r="7" />
+                          <path d="m20 20-3.5-3.5" />
+                        </svg>
+                      )}
+                    </button>
+                  </div>
+                  {busqueda?.estado === "existe" && (
+                    <p className="mt-1.5 rounded-lg border border-exito/40 bg-exito-luz px-2.5 py-1.5 text-[0.78rem] font-medium text-exito">
+                      Ya existe en el sistema: se cargaron su tipo de documento, razón social y correo. Revisalos.
+                    </p>
+                  )}
+                  {busqueda?.estado === "nuevo" && (
+                    <p className="mt-1.5 rounded-lg border border-amarillo/60 bg-amarillo-luz px-2.5 py-1.5 text-[0.78rem] font-medium text-amarillo-oscuro">
+                      No existe en el sistema: cargá la razón social y se crea al emitir la factura.
+                    </p>
+                  )}
+                  {busqueda?.estado === "varios" && (
+                    <div className="mt-1.5 flex flex-col gap-1.5">
+                      <p className="text-[0.78rem] font-medium text-tinta-media">Hay varios parecidos: elegí el que corresponde.</p>
+                      {busqueda.resultados.map((c) => (
+                        <button
+                          key={`${c.tipoIdentificacion}-${c.numeroIdentificacion}`}
+                          type="button"
+                          onClick={() => {
+                            aplicar(c);
+                            setBusqueda({ estado: "existe", resultados: [c] });
+                          }}
+                          className="rounded-lg border-2 border-azul/50 bg-azul-luz/40 px-2.5 py-1.5 text-left hover:bg-azul-luz"
+                        >
+                          <span className="cifra block text-[0.86rem] font-semibold text-tinta">{c.numeroIdentificacion}</span>
+                          <span className="block text-[0.8rem] text-tinta-media">
+                            {c.razonSocial} · {etiquetaTipoIdentificacion(c.tipoIdentificacion)}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  {busqueda?.estado === "error" && (
+                    <p className="mt-1.5 text-[0.78rem] font-medium text-peligro">{busqueda.mensaje}</p>
+                  )}
+                </div>
                 <Campo etiqueta="Tipo de documento">
                   <Selector value={tipo} onChange={(e) => setTipo(e.target.value)}>
                     {TIPOS_IDENTIFICACION_FISCAL.map((t) => (
@@ -268,26 +362,7 @@ function PanelEmitirFactura({
                     ))}
                   </Selector>
                 </Campo>
-                <Campo etiqueta="Número" ayuda={tipo === "ruc" ? "Con su dígito verificador: 80012345-6" : undefined}>
-                  <Entrada
-                    value={numero}
-                    onChange={(e) => setNumero(e.target.value)}
-                    placeholder={tipo === "ruc" ? "80012345-6" : ""}
-                    maxLength={30}
-                    autoComplete="off"
-                    invalido={revisionRuc?.estado === "formato" || revisionRuc?.estado === "dv_distinto"}
-                  />
-                  {revisionRuc?.estado === "formato" && (
-                    <p className="mt-1.5 text-[0.78rem] font-medium text-peligro">{revisionRuc.mensaje}</p>
-                  )}
-                  {revisionRuc?.estado === "dv_distinto" && (
-                    <p className="mt-1.5 text-[0.78rem] font-medium text-peligro">{revisionRuc.mensaje}</p>
-                  )}
-                  {revisionRuc?.estado === "ok" && (
-                    <p className="mt-1.5 text-[0.78rem] font-medium text-exito">El dígito verificador coincide.</p>
-                  )}
-                </Campo>
-                <Campo etiqueta="Razón social" ayuda="Tal como figura en la DNIT">
+                <Campo etiqueta="Razón social">
                   <Entrada value={razon} onChange={(e) => setRazon(e.target.value)} maxLength={120} autoComplete="off" />
                 </Campo>
                 <Campo etiqueta="Correo (opcional)">
@@ -333,33 +408,6 @@ function PanelEmitirFactura({
               )}
             </div>
 
-            {modo === "con" && (
-              <div className="flex flex-col gap-2.5">
-                {dvDistinto && revisionRuc?.estado === "dv_distinto" && (
-                  <label className="flex items-start gap-2 rounded-lg border-2 border-peligro/50 bg-peligro-luz p-2.5 text-[0.82rem] text-tinta">
-                    <input
-                      type="checkbox"
-                      checked={dvConfirmado}
-                      onChange={(e) => setDvConfirmado(e.target.checked)}
-                      className="mt-0.5 h-4 w-4 flex-none accent-peligro"
-                    />
-                    <span>
-                      <strong className="font-semibold text-peligro">El dígito verificador no coincide</strong> con el cálculo (debería
-                      ser {revisionRuc.esperado}). Si en la DNIT figura exactamente así, marcá esta casilla; si no, volvé y corregilo.
-                    </span>
-                  </label>
-                )}
-                <label className="flex items-start gap-2 rounded-lg border border-linea bg-papel-suave p-2.5 text-[0.82rem] text-tinta">
-                  <input
-                    type="checkbox"
-                    checked={verificado}
-                    onChange={(e) => setVerificado(e.target.checked)}
-                    className="mt-0.5 h-4 w-4 flex-none accent-azul"
-                  />
-                  <span>Revisé la razón social y el número en la consulta de la DNIT y coinciden con lo que cargué.</span>
-                </label>
-              </div>
-            )}
             {error && <MensajeError>{error}</MensajeError>}
           </>
         )}
@@ -400,7 +448,7 @@ function PanelEmitirFactura({
             >
               Corregir
             </button>
-            <button type="button" disabled={!puedeEmitir} onClick={emitir} className={clasesBoton("principal", "md")}>
+            <button type="button" disabled={emitiendo} onClick={emitir} className={clasesBoton("principal", "md")}>
               {emitiendo ? "Emitiendo…" : "Emitir factura"}
             </button>
           </>
