@@ -202,14 +202,20 @@ export function FichaProducto({
 
           <h2 className="mt-4 text-xl font-semibold tracking-titular">{producto.nombre}</h2>
           {/* Precio de promoción: la ficha lo dice y muestra el precio normal. */}
-          {producto.enPromocion && (
+          {(producto.enPromocion || producto.etiquetaPromo) && (
             <p className="mt-1 flex flex-wrap items-center gap-1.5 text-[0.82rem]">
               <span className="rounded-full bg-exito-luz px-2 py-0.5 text-[0.66rem] font-bold uppercase tracking-rotulo text-exito">
-                Promo
+                {producto.etiquetaPromo ?? "Promo"}
               </span>
               <span className="text-tinta-media">
-                Precio de promoción · antes{" "}
-                <span className="cifra line-through">{formatearGuarani(producto.precioNormal ?? producto.precio)}</span>
+                {producto.enPromocion ? (
+                  <>
+                    Precio de promoción · antes{" "}
+                    <span className="cifra line-through">{formatearGuarani(producto.precioNormal ?? producto.precio)}</span>
+                  </>
+                ) : (
+                  "Promoción por cantidad: se aplica al armar tu pedido en el local."
+                )}
               </span>
             </p>
           )}

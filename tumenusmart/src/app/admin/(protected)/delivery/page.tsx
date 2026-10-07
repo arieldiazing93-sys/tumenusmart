@@ -148,6 +148,7 @@ export default async function DeliveryPage() {
     puedeCobrar,
     categorias: [],
     gruposMitad: [],
+    promociones: [],
     zonas: [],
     repartidores: [],
     imprimirCuenta: { ok: false, motivo: "" },
@@ -170,6 +171,7 @@ export default async function DeliveryPage() {
       ...contexto,
       categorias: catalogo.categorias,
       gruposMitad: catalogo.gruposMitad,
+      promociones: catalogo.promociones,
       zonas: zonas.map((z) => ({ id: z.id, nombre: z.nombre, costoEnvio: Number(z.costoEnvio) })),
       repartidores,
     };

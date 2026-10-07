@@ -6,6 +6,8 @@ import {
   tramosDeFilas,
   type TramoPromocion,
 } from "@/lib/precio-promocion";
+import { etiquetaDePromo, promoVigenteDe, type PromoDef, type TipoPromocion } from "@/lib/promociones";
+import { cargarPromociones } from "@/lib/promociones-servidor";
 
 /**
  * La carta lista para vender a mano: categorías con sus productos disponibles, los agregados de cada uno y los grupos
@@ -19,6 +21,9 @@ import {
  * resolver sola cuando cambia la franja — así una pantalla que queda abierta todo el día muestra siempre el precio que
  * cobra el servidor.
  */
+
+/** La promoción que rige para un producto en este momento, para la etiqueta de su tarjeta (solo después de `conPromosVigentes`). */
+export type PromoDeTarjeta = { nombre: string; etiqueta: string; tipo: TipoPromocion };
 
 export type AgregadoVenta = {
   id: string;
@@ -41,6 +46,8 @@ export type ProductoVenta = {
   promos?: TramoPromocion[];
   precioNormal?: number;
   enPromocion?: boolean;
+  /** Solo después de `conPromosVigentes`: la promoción por descuento o por volumen que rige ahora para este producto. */
+  promo?: PromoDeTarjeta;
 };
 export type CategoriaVenta = { id: string; nombre: string; productos: ProductoVenta[] };
 export type ProductoMitadVenta = {
@@ -52,6 +59,7 @@ export type ProductoMitadVenta = {
   promos?: TramoPromocion[];
   precioNormal?: number;
   enPromocion?: boolean;
+  promo?: PromoDeTarjeta;
 };
 export type GrupoMitadVenta = { nombreVisible: string; categoriaId: string; productos: ProductoMitadVenta[] };
 
@@ -60,7 +68,7 @@ const PROMOS = { promociones: SELECCION_PROMOCIONES } as const;
 
 export async function cargarCatalogoDeVenta(
   db: PrismaLocal
-): Promise<{ categorias: CategoriaVenta[]; gruposMitad: GrupoMitadVenta[] }> {
+): Promise<{ categorias: CategoriaVenta[]; gruposMitad: GrupoMitadVenta[]; promociones: PromoDef[] }> {
   const categorias = await db.category.findMany({
     where: { activa: true },
     orderBy: { orden: "asc" },
@@ -154,7 +162,10 @@ export async function cargarCatalogoDeVenta(
   }
   const gruposMitad = [...gruposPorClave.values()].filter((g) => g.productos.length > 1);
 
-  return { categorias: categoriasVenta, gruposMitad };
+  // Las promociones activas (por descuento y por volumen): la pantalla las aplica según el día y la hora (ver conPromosVigentes).
+  const promociones = await cargarPromociones(db);
+
+  return { categorias: categoriasVenta, gruposMitad, promociones };
 }
 
 /**
@@ -166,9 +177,16 @@ export async function cargarCatalogoDeVenta(
 export function conPromosVigentes(
   categorias: CategoriaVenta[],
   gruposMitad: GrupoMitadVenta[],
-  ahora: Date | number
+  ahora: Date | number,
+  promociones: PromoDef[] = []
 ): { categorias: CategoriaVenta[]; gruposMitad: GrupoMitadVenta[] } {
   const pos = segundoDeSemanaAsuncion(ahora);
+
+  // La etiqueta de la tarjeta: la promoción por descuento o por volumen que rige ahora para el producto (si alguna).
+  const etiquetaDe = (productId: string): PromoDeTarjeta | undefined => {
+    const p = promoVigenteDe(promociones, productId, pos);
+    return p ? { nombre: p.nombre, etiqueta: etiquetaDePromo(p), tipo: p.tipo } : undefined;
+  };
 
   const agregado = (a: AgregadoVenta): AgregadoVenta => {
     const { promos, ...resto } = a;
@@ -179,7 +197,14 @@ export function conPromosVigentes(
   const producto = (p: ProductoVenta): ProductoVenta => {
     const { promos, ...resto } = p;
     const v = precioEnPosicion(p.precio, promos, pos);
-    return { ...resto, precio: v.precio, precioNormal: v.precioNormal, enPromocion: v.enPromocion, agregados: p.agregados.map(agregado) };
+    return {
+      ...resto,
+      precio: v.precio,
+      precioNormal: v.precioNormal,
+      enPromocion: v.enPromocion,
+      agregados: p.agregados.map(agregado),
+      promo: etiquetaDe(p.id),
+    };
   };
 
   return {
@@ -189,15 +214,28 @@ export function conPromosVigentes(
       productos: g.productos.map((p) => {
         const { promos, ...resto } = p;
         const v = precioEnPosicion(p.precio, promos, pos);
-        return { ...resto, precio: v.precio, precioNormal: v.precioNormal, enPromocion: v.enPromocion, agregados: p.agregados.map(agregado) };
+        return {
+          ...resto,
+          precio: v.precio,
+          precioNormal: v.precioNormal,
+          enPromocion: v.enPromocion,
+          agregados: p.agregados.map(agregado),
+          promo: etiquetaDe(p.id),
+        };
       }),
     })),
   };
 }
 
 /** Todas las promociones de una carta, juntas: para saber cuándo cambia el próximo precio. */
-export function promosDeLaCarta(categorias: CategoriaVenta[], gruposMitad: GrupoMitadVenta[]): TramoPromocion[] {
+export function promosDeLaCarta(
+  categorias: CategoriaVenta[],
+  gruposMitad: GrupoMitadVenta[],
+  promociones: PromoDef[] = []
+): TramoPromocion[] {
   const todas: TramoPromocion[] = [];
+  // Los días y horas de las Promociones también cambian precios (empiezan y terminan): cuentan como límites de cambio.
+  for (const pr of promociones) for (const f of pr.franjas) todas.push({ ...f, precio: 0 });
   const sumar = (p: { promos?: TramoPromocion[]; agregados: AgregadoVenta[] }) => {
     if (p.promos) todas.push(...p.promos);
     for (const a of p.agregados) if (a.promos) todas.push(...a.promos);

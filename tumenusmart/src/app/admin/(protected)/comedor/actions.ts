@@ -19,6 +19,8 @@ import { calcularDescuento, textoPorcentaje } from "@/lib/descuento-venta";
 import { claveDiaAsuncion } from "@/lib/timezone";
 import { formatearCantidad, formatearGuarani, formatearNumero } from "@/lib/format";
 import { repartirConsumo } from "@/lib/division-cuenta";
+import { cortesiasSobrantes } from "@/lib/promociones";
+import { cargarPromocionesEnTransaccion } from "@/lib/promociones-servidor";
 import {
   ESTADOS_CUENTA_ABIERTA,
   contenidoParaGuardar,
@@ -210,6 +212,9 @@ async function anularParteDeItem(
       precioAgregados: item.precioAgregados,
       areaImpresionId: item.areaImpresionId,
       consumo: consumoAnulado as unknown as Prisma.InputJsonValue,
+      // Conserva la promoción y si era la parte regalada: la fila cancelada es el rastro de lo que había.
+      promocionId: item.promocionId,
+      cortesia: item.cortesia,
       estado: "anulado",
       anuladoPor: quien,
       anuladoEn: ahora,
@@ -252,6 +257,41 @@ async function anularParteDeItem(
       },
     });
   }
+}
+
+/**
+ * Después de cancelar productos: si la cuenta tenía cortesías de una promoción por volumen ("por cada 2, regalar 1") que ya no
+ * corresponden (se cancelaron las que se pagaban), las cancela también, empezando por las últimas cargadas, con el mismo motivo.
+ * Va dentro de la transacción de quien llama. Devuelve cuántas unidades de cortesía recortó.
+ */
+async function recortarCortesias(
+  tx: Prisma.TransactionClient,
+  storeId: string,
+  cuenta: { id: string; mesa: string },
+  razon: string,
+  quien: string
+): Promise<number> {
+  const activos = await tx.itemCuentaMesa.findMany({
+    where: { cuentaId: cuenta.id, storeId, estado: "activo", promocionId: { not: null } },
+    orderBy: [{ ronda: "asc" }, { linea: "asc" }],
+  });
+  if (activos.length === 0) return 0;
+  const promos = await cargarPromocionesEnTransaccion(tx, storeId);
+  const sobrantes = cortesiasSobrantes(
+    activos.map((i) => ({ id: i.id, productId: i.productId, cantidad: i.cantidad, promocionId: i.promocionId, cortesia: i.cortesia })),
+    promos
+  );
+  let recortadas = 0;
+  const motivo = `La promoción ya no corresponde (${razon})`;
+  for (const s of sobrantes) {
+    const item = activos.find((a) => a.id === s.itemId);
+    // Una cuenta dividida puede dejar fracciones (0,5): esas no se tocan.
+    if (!item || !Number.isInteger(item.cantidad) || !Number.isInteger(s.cantidad)) continue;
+    if (s.cantidad >= item.cantidad) await anularItems(tx, storeId, cuenta, [item], motivo, quien);
+    else await anularParteDeItem(tx, storeId, cuenta, item, s.cantidad, motivo, quien);
+    recortadas += s.cantidad;
+  }
+  return recortadas;
 }
 
 /**
@@ -333,6 +373,9 @@ export async function anularProductos(
         await anularParteDeItem(tx, storeId, cuenta, item, pedida, razon, quien);
         detalles.push(`${pedida} de ${item.cantidad} × ${item.nombreProducto} (quedan ${item.cantidad - pedida})`);
       }
+      // Si había cortesías de una promoción por volumen que ya no corresponden, se cancelan también.
+      const recortadas = await recortarCortesias(tx, storeId, cuenta, razon, quien);
+      if (recortadas > 0) detalles.push(`${recortadas} de cortesía de promoción`);
       return `${detalles.join(" y ")} de la mesa ${cuenta.mesa}`;
     }, OPCIONES_TX);
   } catch (e) {

@@ -27,7 +27,7 @@ export default async function MozoPage({ params }: { params: Promise<{ token: st
   const mozo = await mozoDeSesion(local);
   if (!mozo) return <PinMozo token={token} nombreLocal={local.nombre} />;
 
-  const { categorias, gruposMitad } = await cargarCatalogoDeVenta(prismaDelLocal(local.id));
+  const { categorias, gruposMitad, promociones } = await cargarCatalogoDeVenta(prismaDelLocal(local.id));
   return (
     <MozoApp
       token={token}
@@ -35,6 +35,7 @@ export default async function MozoPage({ params }: { params: Promise<{ token: st
       mozo={nombreDeMozo(mozo)}
       categorias={categorias}
       gruposMitad={gruposMitad}
+      promociones={promociones}
     />
   );
 }

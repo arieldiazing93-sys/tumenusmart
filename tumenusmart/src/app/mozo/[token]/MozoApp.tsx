@@ -15,7 +15,9 @@ import type {
 import { AgregadosPickerPos } from "@/app/admin/(protected)/pos/AgregadosPickerPos";
 import { MitadYMitadPickerPos } from "@/app/admin/(protected)/pos/MitadYMitadPickerPos";
 import { usePromosVigentes } from "@/lib/use-promos-vigentes";
-import { repreciarCarrito } from "@/lib/precio-carrito-pos";
+import { lineasParaPromos, repreciarCarrito } from "@/lib/precio-carrito-pos";
+import { aplicarPromociones, detallePorLinea, type PromoDef } from "@/lib/promociones";
+import { segundoDeSemanaAsuncion } from "@/lib/precio-promocion";
 import {
   detalleDeCuenta,
   enviarPedido,
@@ -110,17 +112,20 @@ export function MozoApp({
   mozo,
   categorias: categoriasBase,
   gruposMitad: gruposBase,
+  promociones: promocionesBase,
 }: {
   token: string;
   nombreLocal: string;
   mozo: string;
   categorias: CategoriaVenta[];
   gruposMitad: GrupoMitadVenta[];
+  /** Las promociones activas (por descuento y por volumen). */
+  promociones: PromoDef[];
 }) {
   const router = useRouter();
   // Los precios de ESTE momento: un producto con precio de promoción (de lunes a viernes de 18 a 20, por ejemplo) viene con el precio que
   // vale ahora y cambia solo cuando empieza o termina la franja, aunque la tablet quede abierta todo el día. El servidor cobra con el mismo cálculo.
-  const { categorias, gruposMitad } = usePromosVigentes(categoriasBase, gruposBase);
+  const { categorias, gruposMitad, promociones, ahora } = usePromosVigentes(categoriasBase, gruposBase, promocionesBase);
 
   const [vista, setVista] = useState<Vista>("salon");
   const [cuentas, setCuentas] = useState<CuentaAbierta[]>([]);
@@ -353,7 +358,19 @@ export function MozoApp({
   const productoVivo = productoEligiendo
     ? categorias.flatMap((c) => c.productos).find((p) => p.id === productoEligiendo.id)
     : undefined;
-  const total = useMemo(() => carrito.reduce((s, i) => s + i.precio * i.cantidad, 0), [carrito]);
+  // Las promociones aplicadas a lo que se está cargando. Es una vista previa: al enviar, el servidor vuelve a calcular con lo que la cuenta
+  // ya tiene (dos cervezas en dos pedidos distintos son "dos") y con la hora exacta del envío.
+  const lineasPromo = useMemo(() => lineasParaPromos(carrito, categorias), [carrito, categorias]);
+  const resultadoPromos = useMemo(
+    () => aplicarPromociones(lineasPromo, promociones, segundoDeSemanaAsuncion(ahora)),
+    [lineasPromo, promociones, ahora]
+  );
+  const detallePromos = useMemo(
+    () => detallePorLinea(lineasPromo, resultadoPromos, promociones),
+    [lineasPromo, resultadoPromos, promociones]
+  );
+  const ahorroPromos = resultadoPromos.ahorro;
+  const total = useMemo(() => carrito.reduce((s, i) => s + i.precio * i.cantidad, 0) - ahorroPromos, [carrito, ahorroPromos]);
   const cantidadTotal = useMemo(() => carrito.reduce((s, i) => s + i.cantidad, 0), [carrito]);
 
   function agregarProducto(p: ProductoVenta) {
@@ -940,6 +957,17 @@ export function MozoApp({
                     )}
                     <p className="text-[0.86rem] font-medium leading-snug text-tinta">{p.nombre}</p>
                     <p className="cifra mt-1.5 text-[0.9rem] font-semibold text-tinta">{formatearGuarani(p.precio)}</p>
+                    {/* Promoción por descuento o por volumen que rige ahora para este producto (2x1, −20 %…). */}
+                    {p.promo && (
+                      <p className="mt-1">
+                        <span
+                          title={p.promo.nombre}
+                          className="rounded-full bg-exito-luz px-1.5 py-0.5 text-[0.64rem] font-bold uppercase tracking-rotulo text-exito"
+                        >
+                          {p.promo.etiqueta}
+                        </span>
+                      </p>
+                    )}
                     {/* Precio de promoción: se ve el precio normal y que ahora rige la promoción. */}
                     {p.enPromocion && (
                       <p className="mt-0.5 flex flex-wrap items-center gap-1.5">
@@ -974,7 +1002,7 @@ export function MozoApp({
             <p className={ROTULO}>{abriendoMesa ? "4" : "3"} · Revisá antes de enviar</p>
             <EstadoImpresion imprimiendo={imprimiendo} />
             <ul className="flex flex-col gap-2.5 rounded-xl border-2 border-azul/50 bg-superficie p-3">
-              {carrito.map((i) => (
+              {carrito.map((i, indice) => (
                 <li key={i.key} className="border-b border-linea-fina pb-2.5 last:border-0 last:pb-0">
                   <div className="flex items-center justify-between gap-2">
                     <div className="min-w-0">
@@ -983,6 +1011,11 @@ export function MozoApp({
                       <p className="cifra text-[0.8rem] font-medium text-tinta">
                         {formatearGuarani(i.precio)} c/u · {formatearGuarani(i.precio * i.cantidad)}
                       </p>
+                      {detallePromos[indice]?.texto && (
+                        <p className="text-[0.78rem] font-semibold text-exito">
+                          🎁 {detallePromos[indice].texto} · −{formatearGuarani(detallePromos[indice].ahorro)}
+                        </p>
+                      )}
                     </div>
                     <div className="flex flex-none items-center gap-1">
                       <button
@@ -1040,6 +1073,11 @@ export function MozoApp({
               </span>
               <span className="cifra text-[1.4rem] font-bold text-tinta">{formatearGuarani(total)}</span>
             </div>
+            {ahorroPromos > 0 && (
+              <p className="text-[0.8rem] text-exito">
+                Con promociones: −{formatearGuarani(ahorroPromos)}. Al enviar, el servidor termina de calcularlas con lo que la cuenta ya tiene.
+              </p>
+            )}
 
             <div className="flex flex-col gap-2">
               <Boton tono="principal" tam="lg" className="w-full" disabled={enviando || carrito.length === 0} onClick={() => void enviar()}>

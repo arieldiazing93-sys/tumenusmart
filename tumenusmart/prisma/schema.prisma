@@ -206,6 +206,9 @@ model Store {
   horariosAtencion HorarioAtencion[]
   horariosCategoria CategoriaHorario[]
   preciosPromocion  PrecioPromocion[]
+  promociones      Promocion[]
+  promocionesDias  PromocionDia[]
+  promocionesProductos PromocionProducto[]
   usuarios         Usuario[]
   ideasSemanales   IdeaSemanal[]
   pagos            Pago[]
@@ -544,6 +547,66 @@ model PrecioPromocion {
   @@index([storeId])
 }
 
+/// Una promoción: por DESCUENTO ("PROMO 20 %") o por VOLUMEN ("2 por 1": por cada `porCada`, se regalan `regalar`), que rige en ciertos días y
+/// horas (PromocionDia) para un grupo de productos (PromocionProducto). Un producto está en una promoción a la vez (lo exige el panel al guardar).
+/// Las reglas del tiempo y del cálculo están en src/lib/precio-promocion.ts y src/lib/promociones.ts.
+model Promocion {
+  id         String   @id @default(cuid())
+  storeId    String
+  store      Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  nombre     String
+  /// "descuento" | "volumen"
+  tipo       String
+  activa     Boolean  @default(true)
+  /// Solo en "descuento": 0 < porcentaje < 100.
+  porcentaje Decimal? @db.Decimal(5, 2)
+  /// Solo en "volumen": por cada `porCada` unidades se regalan `regalar` (1 <= regalar < porCada).
+  porCada    Int?
+  regalar    Int?
+  /// En "volumen": cada producto cuenta por separado (hacen falta 2 del MISMO producto).
+  forzarPorProducto    Boolean @default(false)
+  /// Si el descuento o la cortesía alcanza también a los agregados del producto.
+  aplicaAModificadores Boolean @default(false)
+  dias       PromocionDia[]
+  productos  PromocionProducto[]
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([storeId])
+}
+
+/// Un día de la semana en que rige una promoción: desde `diaInicio` + `horaInicio` hasta `diaFin` + `horaFin` (fin excluido; ver precio-promocion.ts).
+/// Como máximo uno por día de inicio.
+model PromocionDia {
+  id          String    @id @default(cuid())
+  storeId     String
+  store       Store     @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  promocionId String
+  promocion   Promocion @relation(fields: [promocionId], references: [id], onDelete: Cascade)
+  diaInicio   Int
+  horaInicio  String
+  diaFin      Int
+  horaFin     String
+
+  @@unique([promocionId, diaInicio])
+  @@index([storeId])
+}
+
+/// Un producto que participa de una promoción.
+model PromocionProducto {
+  id          String    @id @default(cuid())
+  storeId     String
+  store       Store     @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  promocionId String
+  promocion   Promocion @relation(fields: [promocionId], references: [id], onDelete: Cascade)
+  productId   String
+  product     Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([promocionId, productId])
+  @@index([storeId])
+  @@index([productId])
+}
+
 model Product {
   id          String          @id @default(cuid())
   storeId     String
@@ -620,6 +683,8 @@ model Product {
   servicioAgenda ServicioAgenda?
   /// Precios de promoción: franjas de la semana en que se vende a otro precio (ver PrecioPromocion y src/lib/precio-promocion.ts).
   promociones PrecioPromocion[]
+  /// Las promociones por descuento y por volumen en que participa este producto (ver PromocionProducto).
+  enPromociones PromocionProducto[]
   orderItems  OrderItem[]
   ventaPosItems VentaPosItem[]
   createdAt   DateTime        @default(now())
@@ -2765,6 +2830,11 @@ model ItemCuentaMesa {
   /// Los insumos que descontó al enviarse ([{insumoId, almacenId, cantidad}], ya multiplicados por la cantidad), para
   /// poder devolverlos si el producto se anula.
   consumo        Json    @default("[]")
+  /// La promoción (ver Promocion) que se le aplicó a esta línea al cargarla, si alguna. Sirve para que las unidades pedidas en distintos
+  /// pedidos de la misma cuenta se sumen ("por cada 2, regalar 1") y para recortar las cortesías si después se cancelan productos.
+  promocionId    String?
+  /// true en la parte REGALADA de una promoción por volumen (precio 0, o solo los agregados): igual baja stock y cuenta como entregada.
+  cortesia       Boolean @default(false)
 
   /// "activo" | "anulado"
   estado          String    @default("activo")
@@ -2922,6 +2992,11 @@ model ItemCuentaDelivery {
   /// Los insumos que descontó al cargarse ([{insumoId, almacenId, cantidad}], ya multiplicados por la cantidad), para poder
   /// devolverlos si el producto se anula.
   consumo        Json    @default("[]")
+  /// La promoción (ver Promocion) que se le aplicó a esta línea al cargarla, si alguna. Sirve para que las unidades pedidas en distintos
+  /// pedidos de la misma cuenta se sumen ("por cada 2, regalar 1") y para recortar las cortesías si después se cancelan productos.
+  promocionId    String?
+  /// true en la parte REGALADA de una promoción por volumen (precio 0, o solo los agregados): igual baja stock y cuenta como entregada.
+  cortesia       Boolean @default(false)
 
   /// "activo" | "anulado"
   estado          String    @default("activo")

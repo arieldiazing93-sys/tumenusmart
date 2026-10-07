@@ -115,6 +115,7 @@ export function AbrirCuentaPanel({
         mesa={mesa}
         categorias={contexto.categorias}
         gruposMitad={contexto.gruposMitad}
+        promociones={contexto.promociones}
         // Volver sin enviar no abre nada: se regresa a los datos de la cuenta.
         onCerrar={() => setPaso("datos")}
         onEnviado={(areas) => onAbierta(mesa, areas)}

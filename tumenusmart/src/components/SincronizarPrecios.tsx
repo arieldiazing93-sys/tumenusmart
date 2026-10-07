@@ -18,17 +18,20 @@ import { useCart } from "./CartProvider";
  */
 export function SincronizarPrecios({
   precios,
+  descuentos,
   refrescarEn,
 }: {
   precios: Record<string, number>;
+  /** El porcentaje de la Promoción por descuento que rige ahora, por producto. */
+  descuentos?: Record<string, number>;
   refrescarEn: number | null;
 }) {
   const { fijarPrecios } = useCart();
   const router = useRouter();
 
   useEffect(() => {
-    fijarPrecios(precios);
-  }, [precios, fijarPrecios]);
+    fijarPrecios(precios, descuentos);
+  }, [precios, descuentos, fijarPrecios]);
 
   useEffect(() => {
     if (refrescarEn === null) return;

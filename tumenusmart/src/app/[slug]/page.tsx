@@ -8,6 +8,9 @@ import { Carta, type CategoriaCarta } from "@/components/Carta";
 import { obtenerEstadoTienda } from "@/lib/estado-tienda";
 import { localPorSlug } from "@/lib/local-por-slug";
 import { categoriaOcultaPorHorario } from "@/lib/horario-atencion";
+import { prismaDelLocal } from "@/lib/prisma-local";
+import { cargarPromociones } from "@/lib/promociones-servidor";
+import { etiquetaDePromo, promoVigenteDe } from "@/lib/promociones";
 import {
   SELECCION_PROMOCIONES,
   precioEnPosicion,
@@ -58,7 +61,7 @@ export default async function CatalogoPage({
   const store = await localPorSlug(slug);
   const storeId = store.id;
 
-  const [categoriasCrudas, destacados, estadoTienda, paginaReservas] = await Promise.all([
+  const [categoriasCrudas, destacados, estadoTienda, paginaReservas, promociones] = await Promise.all([
     prisma.category.findMany({
       where: { storeId, activa: true },
       orderBy: { orden: "asc" },
@@ -96,6 +99,8 @@ export default async function CatalogoPage({
     // propia dirección (no necesariamente el mismo slug que el menú) — si el negocio la
     // tiene habilitada, se linkea desde acá igual que "Reservar mesa".
     prisma.paginaReservas.findUnique({ where: { storeId }, select: { habilitada: true, slug: true } }),
+    // Las Promociones activas (por descuento y por volumen): ver src/lib/promociones.ts.
+    cargarPromociones(prismaDelLocal(storeId)),
   ]);
 
   // Una categoría con tramos de bloqueo propios (ej: "Hamburguesas Simple"
@@ -109,6 +114,26 @@ export default async function CatalogoPage({
   const posicion = segundoDeSemanaAsuncion(ahora);
   const vigente = (p: { precio: unknown; promociones: FilaDePromocion[] }) =>
     precioEnPosicion(Number(p.precio), tramosDeFilas(p.promociones), posicion);
+  // Lo que ve el cliente de un producto: el precio de ahora (promoción de precio, y después el descuento de una Promoción si rige), el precio
+  // normal para tacharlo y la etiqueta de la promoción ("−20 %", "2x1"). Las Promociones por volumen no cambian el precio: solo se anuncian.
+  const precioPublico = (p: { id: string; precio: unknown; promociones: FilaDePromocion[] }) => {
+    const v = vigente(p);
+    const promo = promoVigenteDe(promociones, p.id, posicion);
+    if (promo && promo.tipo === "descuento" && promo.porcentaje) {
+      return {
+        precio: Math.round(v.precio * (1 - promo.porcentaje / 100)),
+        precioNormal: Number(p.precio),
+        enPromocion: true,
+        etiquetaPromo: etiquetaDePromo(promo),
+      };
+    }
+    return {
+      precio: v.precio,
+      precioNormal: Number(p.precio),
+      enPromocion: v.enPromocion,
+      etiquetaPromo: promo ? etiquetaDePromo(promo) : undefined,
+    };
+  };
   const conProductos = categoriasCrudas.filter(
     (c) => c.productos.length > 0 && !categoriaOcultaPorHorario(c.horarios, ahora)
   );
@@ -156,9 +181,7 @@ export default async function CatalogoPage({
       id: p.id,
       nombre: p.nombre,
       descripcion: p.descripcion,
-      precio: vigente(p).precio,
-      precioNormal: Number(p.precio),
-      enPromocion: vigente(p).enPromocion,
+      ...precioPublico(p),
       imagenUrl: p.imagenUrl,
       ingredientes: p.ingredientes,
       opciones: combinarOpciones(p.opciones, p.gruposAgregados, posicion).map((o) => ({
@@ -301,9 +324,7 @@ export default async function CatalogoPage({
         productos={destacados.map((p) => ({
           id: p.id,
           nombre: p.nombre,
-          precio: vigente(p).precio,
-          precioNormal: Number(p.precio),
-          enPromocion: vigente(p).enPromocion,
+          ...precioPublico(p),
           imagenUrl: p.imagenUrl,
         }))}
       />

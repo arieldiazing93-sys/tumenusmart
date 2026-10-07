@@ -452,6 +452,7 @@ export function DetalleCuenta({
           mesa={cuenta.mesa}
           categorias={contexto.categorias}
           gruposMitad={contexto.gruposMitad}
+          promociones={contexto.promociones}
           onCerrar={() => setCargando(false)}
           onEnviado={(areas) => {
             setCargando(false);

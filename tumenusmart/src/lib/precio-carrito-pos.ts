@@ -12,6 +12,7 @@
 
 import { calcularPrecioMitadYMitad } from "./mitad-mitad";
 import type { AgregadoVenta, CategoriaVenta, GrupoMitadVenta, ProductoMitadVenta, ProductoVenta } from "./catalogo-venta";
+import type { LineaDePromo } from "./promociones";
 
 export type LineaDeCarrito =
   | { tipo: "producto"; productId: string; agregadoIds: string[]; precio: number }
@@ -73,4 +74,27 @@ export function repreciarCarrito<T extends LineaDeCarrito>(
     return { ...linea, precio };
   });
   return cambio ? nuevo : carrito;
+}
+
+/**
+ * Las líneas del carrito como las necesitan las promociones (`aplicarPromociones`): una por línea del carrito, en el mismo orden. Lo que
+ * hace falta además del precio es cuánto de ese precio son agregados (la promoción puede incluirlos o no). Un combo mitad y mitad, o un
+ * producto que ya no está en la carta, va sin `productId`: no entra en ninguna promoción (igual que en el servidor).
+ */
+export function lineasParaPromos<T extends LineaDeCarrito & { cantidad: number }>(
+  carrito: T[],
+  categorias: CategoriaVenta[]
+): LineaDePromo[] {
+  const productos = new Map<string, ProductoVenta>();
+  for (const c of categorias) for (const p of c.productos) productos.set(p.id, p);
+  return carrito.map((linea) => {
+    if (linea.tipo === "combo") return { productId: undefined, cantidad: linea.cantidad, precioUnitario: linea.precio, precioAgregados: 0 };
+    const p = productos.get(linea.productId);
+    return {
+      productId: p ? p.id : undefined,
+      cantidad: linea.cantidad,
+      precioUnitario: linea.precio,
+      precioAgregados: p ? sumaAgregados(p.agregados, linea.agregadoIds) : 0,
+    };
+  });
 }

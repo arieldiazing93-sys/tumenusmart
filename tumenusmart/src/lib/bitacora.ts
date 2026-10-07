@@ -24,6 +24,7 @@ export const MODULOS_BITACORA = [
   { valor: "stock", etiqueta: "Stock" },
   { valor: "gastos", etiqueta: "Gastos" },
   { valor: "productos", etiqueta: "Productos y precios" },
+  { valor: "promociones", etiqueta: "Promociones" },
   { valor: "cotizaciones", etiqueta: "Cotizaciones" },
   { valor: "clientes", etiqueta: "Clientes" },
   { valor: "empleados", etiqueta: "Empleados" },

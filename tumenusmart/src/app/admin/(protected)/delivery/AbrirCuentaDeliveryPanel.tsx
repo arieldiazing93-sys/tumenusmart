@@ -201,6 +201,7 @@ export function AbrirCuentaDeliveryPanel({
       <CargarProductosPanel
         categorias={contexto.categorias}
         gruposMitad={contexto.gruposMitad}
+        promociones={contexto.promociones}
         titulo={`Cargar productos · Delivery ${formatearNumero(creada.numero)} · ${nombre.trim()}`}
         textoEnviar="Enviar a cocina"
         enviarItems={(items, envioId) => cargarProductosDelivery(creada.id, { envioId, items })}

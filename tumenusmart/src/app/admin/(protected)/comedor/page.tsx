@@ -139,6 +139,7 @@ export default async function ComedorPage() {
     puedeCobrar,
     categorias: [],
     gruposMitad: [],
+    promociones: [],
     apertura: { mozos: [], mesas: [], sectores: [], mesasOcupadas: [] },
     imprimirCuenta: { ok: false, motivo: "" },
     cobro: { ok: false, motivo: "" },
@@ -167,6 +168,7 @@ export default async function ComedorPage() {
       ...contexto,
       categorias: catalogo.categorias,
       gruposMitad: catalogo.gruposMitad,
+      promociones: catalogo.promociones,
       apertura: {
         mozos: mozos.map((m) => ({ id: m.id, nombre: nombre(m) })),
         mesas: mesasCargadas.map((m) => ({ nombre: m.nombre, sectorId: m.sectorId, ocupada: ocupadas.has(m.clave) })),

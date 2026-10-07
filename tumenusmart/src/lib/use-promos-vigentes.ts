@@ -8,6 +8,10 @@ import {
   type GrupoMitadVenta,
 } from "@/lib/catalogo-venta";
 import { segundosHastaElProximoCambio } from "@/lib/precio-promocion";
+import type { PromoDef } from "@/lib/promociones";
+
+/** Para que la lista vacía por defecto sea siempre la misma (y no dispare cálculos de más). */
+const SIN_PROMOCIONES: PromoDef[] = [];
 
 /**
  * Los precios de la carta de ESTE momento, para una pantalla que queda abierta todo el día (el Punto de venta, la caja
@@ -20,8 +24,12 @@ import { segundosHastaElProximoCambio } from "@/lib/precio-promocion";
  *
  * Sin ninguna promoción en la carta no pone ni un temporizador: la pantalla se comporta igual que siempre.
  */
-export function usePromosVigentes(categorias: CategoriaVenta[], gruposMitad: GrupoMitadVenta[]) {
-  const promos = useMemo(() => promosDeLaCarta(categorias, gruposMitad), [categorias, gruposMitad]);
+export function usePromosVigentes(
+  categorias: CategoriaVenta[],
+  gruposMitad: GrupoMitadVenta[],
+  promociones: PromoDef[] = SIN_PROMOCIONES
+) {
+  const promos = useMemo(() => promosDeLaCarta(categorias, gruposMitad, promociones), [categorias, gruposMitad, promociones]);
   const hayPromos = promos.length > 0;
   const [ahora, setAhora] = useState(() => Date.now());
   const refrescar = useCallback(() => setAhora(Date.now()), []);
@@ -48,6 +56,10 @@ export function usePromosVigentes(categorias: CategoriaVenta[], gruposMitad: Gru
     };
   }, [hayPromos, refrescar]);
 
-  const vigentes = useMemo(() => conPromosVigentes(categorias, gruposMitad, ahora), [categorias, gruposMitad, ahora]);
-  return { categorias: vigentes.categorias, gruposMitad: vigentes.gruposMitad, refrescar };
+  const vigentes = useMemo(
+    () => conPromosVigentes(categorias, gruposMitad, ahora, promociones),
+    [categorias, gruposMitad, ahora, promociones]
+  );
+  // `ahora` también sale: las Promociones por descuento y por volumen se aplican al carrito con el mismo instante que los precios.
+  return { categorias: vigentes.categorias, gruposMitad: vigentes.gruposMitad, promociones, ahora, refrescar };
 }

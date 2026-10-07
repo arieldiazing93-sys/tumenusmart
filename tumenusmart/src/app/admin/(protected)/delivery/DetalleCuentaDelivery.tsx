@@ -549,6 +549,7 @@ export function DetalleCuentaDelivery({
         <CargarProductosPanel
           categorias={contexto.categorias}
           gruposMitad={contexto.gruposMitad}
+          promociones={contexto.promociones}
           titulo={`Cargar productos · Delivery ${formatearNumero(cuenta.numero)} · ${cuenta.clienteNombre}`}
           textoEnviar="Enviar a cocina"
           enviarItems={(items, envioId) => cargarProductosDelivery(cuenta.id, { envioId, items })}

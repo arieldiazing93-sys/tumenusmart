@@ -25,7 +25,7 @@ type CartContextValue = {
   actualizarCantidad: (key: string, cantidad: number) => void;
   vaciarCarrito: () => void;
   /** Los precios vigentes de la carta (promociones incluidas): el carrito se pone al día con ellos. Ver SincronizarPrecios. */
-  fijarPrecios: (precios: Record<string, number>) => void;
+  fijarPrecios: (precios: Record<string, number>, descuentos?: Record<string, number>) => void;
   subtotal: number;
   cantidadTotal: number;
 };
@@ -44,11 +44,16 @@ export function CartProvider({
   const [itemsGuardados, setItems] = useState<ItemCarrito[]>([]);
   // Los precios vigentes de la carta de este momento (con las promociones de precio). Hasta que llegan, no se toca nada.
   const [precios, setPrecios] = useState<Record<string, number> | null>(null);
+  // Los descuentos de las Promociones que rigen ahora, por producto (porcentaje).
+  const [descuentos, setDescuentos] = useState<Record<string, number> | null>(null);
   const [cargado, setCargado] = useState(false);
   // Lo que se muestra y se suma: cada línea con el precio de AHORA. Un cliente que agregó una pizza a las 17:50 y pide a las 18:05 ve y
   // paga el precio de las 18:05 — no el de cuando tocó el producto.
-  const items = useMemo(() => conPreciosVigentes(itemsGuardados, precios), [itemsGuardados, precios]);
-  const fijarPrecios = useCallback((nuevos: Record<string, number>) => setPrecios(nuevos), []);
+  const items = useMemo(() => conPreciosVigentes(itemsGuardados, precios, descuentos), [itemsGuardados, precios, descuentos]);
+  const fijarPrecios = useCallback((nuevos: Record<string, number>, nuevosDescuentos?: Record<string, number>) => {
+    setPrecios(nuevos);
+    setDescuentos(nuevosDescuentos ?? null);
+  }, []);
 
   // Cargar el carrito de ESTE local (si existe) al montar en el navegador.
   // Si se cambia de local, se vacía y se lee el del nuevo.

@@ -24,6 +24,8 @@ export type ProductoCarta = {
   /** El precio normal, para tacharlo cuando rige una promoción. */
   precioNormal?: number;
   enPromocion?: boolean;
+  /** La etiqueta de la Promoción que rige ahora para este producto ("−20 %", "2x1"), si alguna. */
+  etiquetaPromo?: string;
   imagenUrl: string | null;
   ingredientes: string[];
   opciones: OpcionCarta[];

@@ -356,14 +356,14 @@ function FilaProducto({
             </span>
             {/* Precio de promoción: se ve el precio normal tachado y que ahora rige la promoción. */}
             {producto.enPromocion && (
-              <>
-                <span className="cifra text-[0.74rem] text-tinta-suave line-through">
-                  {formatearGuarani(producto.precioNormal ?? producto.precio)}
-                </span>
-                <span className="rounded-full bg-exito-luz px-1.5 py-0.5 text-[0.62rem] font-bold uppercase tracking-rotulo text-exito">
-                  Promo
-                </span>
-              </>
+              <span className="cifra text-[0.74rem] text-tinta-suave line-through">
+                {formatearGuarani(producto.precioNormal ?? producto.precio)}
+              </span>
+            )}
+            {(producto.enPromocion || producto.etiquetaPromo) && (
+              <span className="rounded-full bg-exito-luz px-1.5 py-0.5 text-[0.62rem] font-bold uppercase tracking-rotulo text-exito">
+                {producto.etiquetaPromo ?? "Promo"}
+              </span>
             )}
           </span>
 

@@ -325,3 +325,52 @@ export function tramosDeFilas(filas: FilaDePromocion[] | undefined): TramoPromoc
     precio: Number(f.precio.toString()),
   }));
 }
+
+// ---------------------------------------------------------------------------------------------------------------------
+//  Franjas sin precio (las usan las Promociones por descuento y por volumen)
+// ---------------------------------------------------------------------------------------------------------------------
+
+/** Un día y hora de inicio, un día y hora de fin: las mismas reglas del tiempo que las promociones de precio, pero sin precio. */
+export type Franja = { diaInicio: number; horaInicio: string; diaFin: number; horaFin: string };
+
+/** ¿Cae el segundo `pos` de la semana adentro de la franja? (la hora de fin queda excluida, igual que en `ventanaDeTramo`). */
+export function franjaContiene(f: Franja, pos: number): boolean {
+  const v = ventanaDeTramo({ ...f, precio: 0 });
+  return !!v && ventanaContiene(v, pos);
+}
+
+/** ¿Se pisan dos conjuntos de franjas (alguna franja de uno comparte algún segundo con alguna del otro)? */
+export function franjasSePisan(a: Franja[], b: Franja[]): boolean {
+  for (const x of a) {
+    const vx = ventanaDeTramo({ ...x, precio: 0 });
+    if (!vx) continue;
+    for (const y of b) {
+      const vy = ventanaDeTramo({ ...y, precio: 0 });
+      if (!vy) continue;
+      if (ventanaContiene(vx, vy.inicio) || ventanaContiene(vy, vx.inicio)) return true;
+    }
+  }
+  return false;
+}
+
+export type ResultadoFranjas = { ok: true; franjas: Franja[] } | { ok: false; error: string };
+
+/**
+ * Revisa las franjas que escribió el dueño (días y horas que existen, ninguna que termine antes de empezar, una sola por día de
+ * inicio, ninguna que se pise con otra) y las deja normalizadas ("HH:MM" → "HH:MM:SS"). Mismas reglas y mismos mensajes que
+ * `validarTramos`; acá no hay precio.
+ */
+export function validarFranjas(entradas: unknown): ResultadoFranjas {
+  if (!Array.isArray(entradas)) return { ok: false, error: "Los días y horarios no llegaron bien." };
+  const r = validarTramos(entradas.map((e) => ({ ...((e ?? {}) as object), precio: 1 })));
+  if (!r.ok) return { ok: false, error: r.error };
+  return {
+    ok: true,
+    franjas: r.tramos.map((t) => ({ diaInicio: t.diaInicio, horaInicio: t.horaInicio, diaFin: t.diaFin, horaFin: t.horaFin })),
+  };
+}
+
+/** "Lunes 18:00:00 a 20:00:00" / "Viernes 22:00:00 a Sábado 02:00:00" */
+export function describirFranjaSola(f: Franja): string {
+  return describirFranja({ ...f, precio: 0 });
+}

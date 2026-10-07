@@ -12,7 +12,11 @@ import { calcularPrecioMitadYMitad } from "./mitad-mitad";
  *  - cada agregado elegido: su precio vigente.
  * Lo que ya no está en la carta (se ocultó, se borró) queda con el precio que tenía. Devuelve el mismo arreglo si nada cambió.
  */
-export function conPreciosVigentes(items: ItemCarrito[], precios: Record<string, number> | null): ItemCarrito[] {
+export function conPreciosVigentes(
+  items: ItemCarrito[],
+  precios: Record<string, number> | null,
+  descuentos: Record<string, number> | null = null
+): ItemCarrito[] {
   if (!precios || items.length === 0) return items;
 
   let cambio = false;
@@ -26,7 +30,12 @@ export function conPreciosVigentes(items: ItemCarrito[], precios: Record<string,
       }
     } else {
       const p = precios[item.productId];
-      if (typeof p === "number") precioBase = p;
+      if (typeof p === "number") {
+        // Una promoción por descuento que rige ahora para este producto: baja el precio del producto (redondeado al guaraní, igual que
+        // en el servidor). Los agregados y los combos mitad y mitad no se tocan.
+        const d = descuentos?.[item.productId];
+        precioBase = typeof d === "number" && d > 0 && d < 100 ? Math.round(p * (1 - d / 100)) : p;
+      }
     }
 
     let opcionesCambiaron = false;

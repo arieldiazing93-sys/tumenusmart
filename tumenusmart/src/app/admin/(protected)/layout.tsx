@@ -139,6 +139,9 @@ function armarGrupos(hayIdeaSinVer: boolean, rol: string, ventasACredito: boolea
           ver: conPermiso("categorias.ver") },
         { href: "/admin/grupos-agregados", label: "Grupos de agregados", icono: "productos" as const,
           ver: conPermiso("productos.ver") },
+        // Descuentos ("PROMO 20 %") y promociones por volumen ("2 por 1") que rigen en ciertos días y horas, en todos los canales de venta.
+        { href: "/admin/promociones", label: "Promociones", icono: "productos" as const,
+          ver: conPermiso("productos.ver") },
       ],
     },
     {

@@ -7,6 +7,7 @@ import { Boton, Pastilla } from "@/components/ui";
 import { formatearGuarani } from "@/lib/format";
 import { textoEstadoCuenta, type ImpuestosDeCuenta, type TotalesDeCuenta } from "@/lib/comedor";
 import type { CategoriaVenta, GrupoMitadVenta } from "@/lib/catalogo-venta";
+import type { PromoDef } from "@/lib/promociones";
 import { AbrirCuentaPanel } from "./AbrirCuentaPanel";
 import { DetalleCuenta } from "./DetalleCuenta";
 import { PagarCuentaPanel } from "./PagarCuentaPanel";
@@ -58,6 +59,8 @@ export type ContextoCaja = {
   puedeCobrar: boolean;
   categorias: CategoriaVenta[];
   gruposMitad: GrupoMitadVenta[];
+  /** Las promociones activas (por descuento y por volumen) para mostrarlas al cargar productos. */
+  promociones: PromoDef[];
   /** Para ABRIR una cuenta desde la caja: los mozos activos, las mesas del salón (con su sector) y cuáles están ocupadas. */
   apertura: {
     mozos: { id: string; nombre: string }[];

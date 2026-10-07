@@ -245,6 +245,9 @@ export async function dividirCuenta(cuentaId: string, datos: DatosDivision): Pro
               precioAgregados: l.precioAgregados,
               areaImpresionId: fila.areaImpresionId,
               consumo: l.consumo as unknown as Prisma.InputJsonValue,
+              // La parte nueva sigue siendo de la misma promoción (y de cortesía, si lo era).
+              promocionId: fila.promocionId,
+              cortesia: fila.cortesia,
               estado: "activo",
               enviadoEn: fila.enviadoEn,
             });

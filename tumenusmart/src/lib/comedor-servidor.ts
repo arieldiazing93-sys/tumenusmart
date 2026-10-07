@@ -4,6 +4,9 @@ import { prismaDelLocal } from "@/lib/prisma-local";
 import { armarPedido, type LineaPedida } from "@/lib/precio-pedido";
 import { cargarCatalogoParaPedido } from "@/lib/catalogo-pedido";
 import { consumosGuardablesPorLinea, registrarConsumoVenta } from "@/lib/movimientos-stock";
+import { aplicarPromociones, previasDeCuenta } from "@/lib/promociones";
+import { cargarPromociones } from "@/lib/promociones-servidor";
+import { segundoDeSemanaAsuncion } from "@/lib/precio-promocion";
 import { ZONA_NEGOCIO } from "@/lib/timezone";
 import {
   ESTADOS_CUENTA_ABIERTA,
@@ -182,6 +185,9 @@ export async function guardarRonda(datos: DatosRonda): Promise<ResultadoRonda> {
   const catalogo = await cargarCatalogoParaPedido(db, storeId, pedidas);
   const armado = armarPedido(catalogo, pedidas);
   if (!armado.ok) return { ok: false, error: armado.motivo };
+  // Las promociones activas (por descuento y por volumen): se aplican dentro de la transacción, con lo que la cuenta ya tiene.
+  const promos = await cargarPromociones(db);
+  const posicionPromos = segundoDeSemanaAsuncion(new Date());
   if (armado.subtotal <= 0) return { ok: false, error: "El total tiene que ser mayor a cero." };
 
   // ------------------------------------------------------- a qué área sale cada producto
@@ -263,10 +269,19 @@ export async function guardarRonda(datos: DatosRonda): Promise<ResultadoRonda> {
         const { _max } = await tx.itemCuentaMesa.aggregate({ where: { cuentaId: cuenta.id }, _max: { ronda: true } });
         const ronda = (_max.ronda ?? 0) + 1;
 
+        // Promociones: lo ya pedido en esta cuenta cuenta (dos cervezas en dos pedidos distintos son "dos"). Un descuento baja el precio de la
+        // línea; la cortesía se separa en su propia línea a Gs. 0. Las líneas finales son las que se guardan, descuentan stock y se cobran;
+        // la comanda de cocina sale con lo pedido (`armado.lineas`), que es lo que hay que preparar.
+        const previos = await tx.itemCuentaMesa.findMany({
+          where: { cuentaId: cuenta.id, storeId, estado: "activo", promocionId: { not: null } },
+          select: { id: true, productId: true, cantidad: true, promocionId: true, cortesia: true },
+        });
+        const finales = aplicarPromociones(armado.lineas, promos, posicionPromos, previasDeCuenta(previos, promos)).lineas;
+
         // Lo que va a descontar cada línea, calculado igual que el descuento real (con su redondeo): se guarda en el producto.
-        const consumosPorLinea = await consumosGuardablesPorLinea(tx, storeId, armado.lineas);
+        const consumosPorLinea = await consumosGuardablesPorLinea(tx, storeId, finales);
         await tx.itemCuentaMesa.createMany({
-          data: armado.lineas.map((l, i) => ({
+          data: finales.map((l, i) => ({
             storeId,
             cuentaId: cuenta.id,
             ronda,
@@ -281,17 +296,20 @@ export async function guardarRonda(datos: DatosRonda): Promise<ResultadoRonda> {
             iva: l.iva,
             opcionesTexto: l.opcionesTexto ?? null,
             ingredientesQuitadosTexto: l.ingredientesQuitadosTexto ?? null,
-            nota: notas[i],
+            nota: notas[l.origen],
             costoProducto: l.costoProducto,
             costoAgregados: l.costoAgregados,
             precioAgregados: l.precioAgregados,
-            areaImpresionId: areasDeLinea[i][0] ?? null,
+            areaImpresionId: areasDeLinea[l.origen][0] ?? null,
             // Lo que descontó de cada insumo (por la cantidad), para poder devolverlo si el producto se anula.
             consumo: consumosPorLinea[i],
+            // La promoción que se le aplicó y si es la parte regalada.
+            promocionId: l.promocionId ?? null,
+            cortesia: l.cortesia === true,
           })),
         });
 
-        await registrarConsumoVenta(tx, storeId, armado.lineas, { cuentaMesaId: cuenta.id }, datos.quien);
+        await registrarConsumoVenta(tx, storeId, finales, { cuentaMesaId: cuenta.id }, datos.quien);
 
         // Una comanda por área, con solo lo que sale en esa área.
         const lineasConArea = armado.lineas.flatMap((l, i) =>
@@ -321,7 +339,7 @@ export async function guardarRonda(datos: DatosRonda): Promise<ResultadoRonda> {
         });
         if (trabajos.length > 0) await tx.trabajoImpresion.createMany({ data: trabajos });
 
-        return { cuenta, ronda, areasImpresas: trabajos.map((t) => t.titulo.split(" · ")[1]) };
+        return { cuenta, ronda, areasImpresas: trabajos.map((t) => t.titulo.split(" · ")[1]), totalFinal: totalDeLineas(finales) };
       },
       // Más tiempo que los 5 s de fábrica: desde Vercel hasta la base cada consulta tarda, y una receta con varios insumos
       // hace varias seguidas dentro de la misma transacción.
@@ -371,7 +389,8 @@ export async function guardarRonda(datos: DatosRonda): Promise<ResultadoRonda> {
     cuentaNumero: resultado.cuenta.numero,
     mesa: resultado.cuenta.mesa,
     ronda: resultado.ronda,
-    totalEnvio: totalDeLineas(armado.lineas),
+    // Lo que vale este envío DESPUÉS de las promociones.
+    totalEnvio: resultado.totalFinal,
     areas: [...new Set(resultado.areasImpresas)],
     yaEnviado: false,
   };

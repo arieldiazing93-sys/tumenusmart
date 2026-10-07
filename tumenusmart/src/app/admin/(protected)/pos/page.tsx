@@ -82,13 +82,14 @@ export default async function PosPage() {
 
   // La carta lista para vender, con los precios normales y las promociones de cada producto y agregado (mismo armado que usan el
   // comedor, el delivery y el mozo — ver catalogo-venta.ts). La pantalla resuelve sola qué precio vale en cada momento.
-  const { categorias: categoriasVenta, gruposMitad } = await cargarCatalogoDeVenta(db);
+  const { categorias: categoriasVenta, gruposMitad, promociones } = await cargarCatalogoDeVenta(db);
 
   return (
     <PantallaVenta
       turnoId={turno.id}
       categorias={categoriasVenta}
       gruposMitad={gruposMitad}
+      promociones={promociones}
       puedeFacturar={puedeFacturar}
       diasParaVencerTimbrado={diasParaVencerTimbrado}
       facturaObligatoria={store?.facturaObligatoria ?? false}

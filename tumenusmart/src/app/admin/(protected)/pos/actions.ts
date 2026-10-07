@@ -23,6 +23,8 @@ import { DURACION_MINIMA_CITA } from "@/lib/agenda-cita";
 import { calcularDescuento, type DescuentoPedido } from "@/lib/descuento-venta";
 import { SIN_REGISTRO_FISCAL } from "@/lib/tipo-cliente";
 import { SELECCION_PROMOCIONES, precioEnPosicion, segundoDeSemanaAsuncion, tramosDeFilas } from "@/lib/precio-promocion";
+import { aplicarPromociones } from "@/lib/promociones";
+import { cargarPromociones } from "@/lib/promociones-servidor";
 import { turnoAbierto, pedidosDelTurno, netoMovimientosCaja } from "./turno-actual";
 
 export type ResultadoAbrirTurno =
@@ -481,6 +483,15 @@ export async function registrarVenta(turnoId: string, datos: DatosVenta): Promis
       return { ...f, precioUnitario: Math.round(manual) };
     });
     subtotal = filas.reduce((suma, f) => suma + f.precioUnitario * f.cantidad, 0);
+  } else {
+    // Promociones (por descuento y por volumen, ver src/lib/promociones.ts): rigen según el día y la hora de este momento, para los
+    // productos que están en ellas. Un descuento baja el precio de la línea; la cortesía se separa en su propia línea a Gs. 0. Todo lo de
+    // abajo (stock, comprobante, IVA, reportes) trabaja con estas líneas finales, así lo que se cobra es exacto al guaraní.
+    const promos = await cargarPromociones(db);
+    if (promos.length > 0) {
+      filas = aplicarPromociones(armado.lineas, promos, posicionPromos).lineas;
+      subtotal = filas.reduce((suma, f) => suma + f.precioUnitario * f.cantidad, 0);
+    }
   }
   if (subtotal <= 0) return { ok: false, error: "El total tiene que ser mayor a cero." };
 

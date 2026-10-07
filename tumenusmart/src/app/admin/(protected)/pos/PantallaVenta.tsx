@@ -29,7 +29,9 @@ import type {
   ProductoVenta,
 } from "@/lib/catalogo-venta";
 import { usePromosVigentes } from "@/lib/use-promos-vigentes";
-import { repreciarCarrito } from "@/lib/precio-carrito-pos";
+import { lineasParaPromos, repreciarCarrito } from "@/lib/precio-carrito-pos";
+import { aplicarPromociones, detallePorLinea, type PromoDef } from "@/lib/promociones";
+import { segundoDeSemanaAsuncion } from "@/lib/precio-promocion";
 
 // La carta llega con el precio normal y las promociones de cada producto; la pantalla calcula el precio de cada momento
 // (ver usePromosVigentes). Los tipos son los de la carta compartida (catalogo-venta.ts).
@@ -79,6 +81,7 @@ export function PantallaVenta({
   turnoId,
   categorias: categoriasBase,
   gruposMitad: gruposBase,
+  promociones: promocionesBase,
   puedeFacturar,
   diasParaVencerTimbrado,
   facturaObligatoria,
@@ -92,6 +95,8 @@ export function PantallaVenta({
   turnoId: string;
   categorias: Categoria[];
   gruposMitad: GrupoMitad[];
+  /** Las promociones activas (por descuento y por volumen): se aplican según el día y la hora, igual que las aplica el servidor al cobrar. */
+  promociones: PromoDef[];
   /** Si la estación de este turno tiene un punto de expedición vigente. */
   puedeFacturar: boolean;
   /** Días hasta que venza el timbrado de esa estación, o null si no aplica. */
@@ -121,7 +126,7 @@ export function PantallaVenta({
   const router = useRouter();
   // Los precios de ESTE momento: si un producto tiene un precio de promoción (de lunes a viernes de 18 a 20, por ejemplo), acá ya
   // viene con el precio que vale ahora, y cambia solo cuando empieza o termina la franja. Es el mismo precio que cobra el servidor.
-  const { categorias, gruposMitad, refrescar: refrescarPrecios } = usePromosVigentes(categoriasBase, gruposBase);
+  const { categorias, gruposMitad, promociones, ahora, refrescar: refrescarPrecios } = usePromosVigentes(categoriasBase, gruposBase, promocionesBase);
   // Si el local exige facturar todo y esta estación puede hacerlo, no hay
   // "Ticket" que elegir — arranca directo en factura. Si exige facturar
   // todo pero esta estación NO puede (sin punto de expedición vigente), no
@@ -197,7 +202,20 @@ export function PantallaVenta({
   const productoVivo = productoEligiendo
     ? categorias.flatMap((c) => c.productos).find((p) => p.id === productoEligiendo.id)
     : undefined;
-  const subtotal = useMemo(() => carrito.reduce((s, i) => s + i.precio * i.cantidad, 0), [carrito]);
+  const subtotalDeLista = useMemo(() => carrito.reduce((s, i) => s + i.precio * i.cantidad, 0), [carrito]);
+  // Las promociones (por descuento: la línea baja de precio; por volumen: parte de las unidades sale de cortesía). Es la misma cuenta que
+  // hace el servidor al cobrar (registrarVenta), con el mismo día y hora, así que el total de acá es el que se cobra.
+  const lineasPromo = useMemo(() => lineasParaPromos(carrito, categorias), [carrito, categorias]);
+  const resultadoPromos = useMemo(
+    () => aplicarPromociones(lineasPromo, promociones, segundoDeSemanaAsuncion(ahora)),
+    [lineasPromo, promociones, ahora]
+  );
+  const detallePromos = useMemo(
+    () => detallePorLinea(lineasPromo, resultadoPromos, promociones),
+    [lineasPromo, resultadoPromos, promociones]
+  );
+  const ahorroPromos = resultadoPromos.ahorro;
+  const subtotal = subtotalDeLista - ahorroPromos;
   // Sin descuento tildado, o con el campo vacío, no se descuenta nada. Es la
   // misma función que usa el servidor (registrarVenta), así que el total que se
   // ve acá es el que se cobra.
@@ -734,6 +752,17 @@ export function PantallaVenta({
                   <p className="cifra mt-1.5 text-[0.9rem] font-semibold text-tinta">
                     {formatearGuarani(p.precio)}
                   </p>
+                  {/* Promoción por descuento o por volumen que rige ahora para este producto (2x1, −20 %…). */}
+                  {p.promo && (
+                    <p className="mt-1">
+                      <span
+                        title={p.promo.nombre}
+                        className="rounded-full bg-exito-luz px-1.5 py-0.5 text-[0.66rem] font-bold uppercase tracking-rotulo text-exito"
+                      >
+                        {p.promo.etiqueta}
+                      </span>
+                    </p>
+                  )}
                   {/* Precio de promoción: se ve cuál es el precio normal y que ahora rige la promoción. */}
                   {p.enPromocion && (
                     <p className="mt-0.5 flex flex-wrap items-center gap-1.5">
@@ -788,7 +817,7 @@ export function PantallaVenta({
             </p>
           ) : (
             <div className="flex flex-col gap-2.5">
-              {carrito.map((i) => (
+              {carrito.map((i, indice) => (
                 <div
                   key={i.key}
                   className="flex items-center justify-between gap-2 border-b border-linea-fina pb-2.5 last:border-0 last:pb-0"
@@ -799,6 +828,12 @@ export function PantallaVenta({
                     <p className="cifra text-[0.78rem] font-medium text-tinta">
                       {formatearGuarani(i.precio)} c/u · {formatearGuarani(i.precio * i.cantidad)}
                     </p>
+                    {/* Lo que hizo una promoción con esta línea: cuánto se ahorra y cuál es. */}
+                    {detallePromos[indice]?.texto && (
+                      <p className="text-[0.74rem] font-semibold text-exito">
+                        🎁 {detallePromos[indice].texto} · −{formatearGuarani(detallePromos[indice].ahorro)}
+                      </p>
+                    )}
                   </div>
                   <div className="flex flex-none items-center gap-1">
                     <button
@@ -1072,16 +1107,24 @@ export function PantallaVenta({
           </div>
 
           <div className="flex flex-col gap-1.5 border-t border-linea pt-3">
-            {descuentoMonto > 0 && (
+            {(descuentoMonto > 0 || ahorroPromos > 0) && (
               <>
                 <div className="flex items-center justify-between text-[0.85rem] text-tinta-media">
                   <span>Subtotal</span>
-                  <span className="cifra">{formatearGuarani(subtotal)}</span>
+                  <span className="cifra">{formatearGuarani(subtotalDeLista)}</span>
                 </div>
-                <div className="flex items-center justify-between text-[0.85rem] font-medium text-exito">
-                  <span>Descuento</span>
-                  <span className="cifra">-{formatearGuarani(descuentoMonto)}</span>
-                </div>
+                {ahorroPromos > 0 && (
+                  <div className="flex items-center justify-between text-[0.85rem] font-medium text-exito">
+                    <span>Promociones</span>
+                    <span className="cifra">-{formatearGuarani(ahorroPromos)}</span>
+                  </div>
+                )}
+                {descuentoMonto > 0 && (
+                  <div className="flex items-center justify-between text-[0.85rem] font-medium text-exito">
+                    <span>Descuento</span>
+                    <span className="cifra">-{formatearGuarani(descuentoMonto)}</span>
+                  </div>
+                )}
               </>
             )}
             <div className="flex items-center justify-between">
