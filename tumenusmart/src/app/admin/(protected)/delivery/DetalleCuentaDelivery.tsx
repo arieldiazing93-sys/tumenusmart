@@ -309,7 +309,8 @@ export function DetalleCuentaDelivery({
                   // botón lleva directo a abrirlo y, al abrirlo, se vuelve acá.
                   disabled={pendiente || (!contexto.cobro.ok && !contexto.cobro.sinTurno) || !!t.descuentoInvalido || t.total <= 0}
                   onClick={() => (contexto.cobro.ok ? onCobrar() : router.push(rutaParaAbrirTurno("/admin/delivery")))}
-                  className={clasesBoton("principal", "sm")}
+                  // Del mismo celeste que los demás botones de la fila (pedido del dueño): ninguno va en naranja.
+                  className={clasesBoton("navegar", "sm")}
                 >
                   Cobrar cuenta
                 </button>

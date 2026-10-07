@@ -243,19 +243,16 @@ export function PantallaRepartidor({
                 <span className="text-xs text-neutral-500">incluye {formatearGuarani(t.envio)} de envío</span>
               </div>
 
-              {/* Qué hacer con la plata: depende de si la caja ya cerró la cuenta. */}
-              {t.estado === "pagada" ? (
+              {/* Solo se avisa lo que cambia lo que hay que hacer: que la caja ya cobró (no cobrar de nuevo) o que canceló. Mientras la
+                  caja no cobró no hay leyenda: el total ya está arriba. */}
+              {t.estado === "pagada" && (
                 <p className="mb-3 rounded-md bg-exito-luz px-2.5 py-2 text-[0.82rem] font-medium text-exito">
                   La caja ya la cobró{t.pago ? `: ${t.pago}` : ""}. No cobres nada: solo entregá.
                 </p>
-              ) : t.estado === "anulada" ? (
+              )}
+              {t.estado === "anulada" && (
                 <p className="mb-3 rounded-md bg-peligro-luz px-2.5 py-2 text-[0.82rem] font-medium text-peligro">
                   {t.cobroCancelado ? "La caja canceló el cobro de este pedido." : "La caja canceló este pedido."}
-                </p>
-              ) : (
-                <p className="mb-3 rounded-md bg-aviso-luz px-2.5 py-2 text-[0.82rem] font-medium text-aviso">
-                  Todavía no está cobrado: cobrale {formatearGuarani(t.total)} al cliente y traelo a la caja.
-                  {t.estado === "abierta" && " El total puede cambiar si la caja le agrega algo."}
                 </p>
               )}
 
