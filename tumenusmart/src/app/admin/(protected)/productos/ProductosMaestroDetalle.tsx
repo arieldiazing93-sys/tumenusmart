@@ -16,6 +16,8 @@ export type ProductoFila = {
   precio: number;
   disponible: boolean;
   destacado: boolean;
+  /** Tiene al menos un precio de promoción cargado. */
+  conPromocion: boolean;
 };
 
 type Categoria = { id: string; nombre: string };
@@ -228,6 +230,14 @@ export function ProductosMaestroDetalle({
                       {p.destacado && <span title="Destacado">⭐ </span>}
                       {p.nombre}
                     </span>
+                    {p.conPromocion && (
+                      <span
+                        title="Tiene precios de promoción"
+                        className="ml-1.5 rounded-full bg-exito-luz px-1.5 py-0.5 align-middle text-[0.62rem] font-bold uppercase tracking-rotulo text-exito"
+                      >
+                        Promo
+                      </span>
+                    )}
                     {categoriaFiltro === TODAS && (
                       <span className="block text-[0.72rem] font-normal text-tinta-suave">
                         {nombreDeCategoria.get(p.categoryId) ?? ""}

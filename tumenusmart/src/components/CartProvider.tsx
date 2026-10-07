@@ -2,12 +2,14 @@
 
 import {
   createContext,
+  useCallback,
   useContext,
   useEffect,
   useMemo,
   useState,
 } from "react";
 import { ItemCarrito, precioUnitario } from "@/lib/cart-types";
+import { conPreciosVigentes } from "@/lib/cart-precios";
 
 // Un carrito por local. Sin esto, alguien que abre dos menús distintos en el
 // mismo navegador terminaría con productos de un negocio dentro del pedido
@@ -22,6 +24,8 @@ type CartContextValue = {
   quitarItem: (key: string) => void;
   actualizarCantidad: (key: string, cantidad: number) => void;
   vaciarCarrito: () => void;
+  /** Los precios vigentes de la carta (promociones incluidas): el carrito se pone al día con ellos. Ver SincronizarPrecios. */
+  fijarPrecios: (precios: Record<string, number>) => void;
   subtotal: number;
   cantidadTotal: number;
 };
@@ -36,8 +40,15 @@ export function CartProvider({
   /** nombre del local en la URL — separa este carrito del de otros negocios */
   claveLocal: string;
 }) {
-  const [items, setItems] = useState<ItemCarrito[]>([]);
+  // Lo que el cliente pidió, con el precio con que se lo mostraron al pedirlo. Es lo que se guarda en el teléfono.
+  const [itemsGuardados, setItems] = useState<ItemCarrito[]>([]);
+  // Los precios vigentes de la carta de este momento (con las promociones de precio). Hasta que llegan, no se toca nada.
+  const [precios, setPrecios] = useState<Record<string, number> | null>(null);
   const [cargado, setCargado] = useState(false);
+  // Lo que se muestra y se suma: cada línea con el precio de AHORA. Un cliente que agregó una pizza a las 17:50 y pide a las 18:05 ve y
+  // paga el precio de las 18:05 — no el de cuando tocó el producto.
+  const items = useMemo(() => conPreciosVigentes(itemsGuardados, precios), [itemsGuardados, precios]);
+  const fijarPrecios = useCallback((nuevos: Record<string, number>) => setPrecios(nuevos), []);
 
   // Cargar el carrito de ESTE local (si existe) al montar en el navegador.
   // Si se cambia de local, se vacía y se lee el del nuevo.
@@ -57,11 +68,11 @@ export function CartProvider({
   useEffect(() => {
     if (!cargado) return;
     try {
-      window.localStorage.setItem(claveGuardado(claveLocal), JSON.stringify(items));
+      window.localStorage.setItem(claveGuardado(claveLocal), JSON.stringify(itemsGuardados));
     } catch {
       // si falla el guardado, el carrito sigue funcionando en memoria
     }
-  }, [items, cargado, claveLocal]);
+  }, [itemsGuardados, cargado, claveLocal]);
 
   function agregarItem(nuevo: ItemCarrito) {
     setItems((actuales) => {
@@ -108,6 +119,7 @@ export function CartProvider({
         quitarItem,
         actualizarCantidad,
         vaciarCarrito,
+        fijarPrecios,
         subtotal,
         cantidadTotal,
       }}

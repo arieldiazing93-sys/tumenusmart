@@ -40,7 +40,16 @@ export default async function AdminProductosPage({
       // lista podría salir distinta en cada carga y las flechas moverían el
       // producto equivocado.
       orderBy: [{ orden: "asc" }, { createdAt: "asc" }],
-      select: { id: true, nombre: true, categoryId: true, precio: true, disponible: true, destacado: true },
+      select: {
+        id: true,
+        nombre: true,
+        categoryId: true,
+        precio: true,
+        disponible: true,
+        destacado: true,
+        // Cuántos precios de promoción tiene (para marcarlo en la lista).
+        _count: { select: { promociones: true } },
+      },
     }),
     // Estos dos solo los usa el formulario de "Nuevo producto".
     puedeEditar
@@ -107,6 +116,7 @@ export default async function AdminProductosPage({
             precio: Number(p.precio),
             disponible: p.disponible,
             destacado: p.destacado,
+            conPromocion: p._count.promociones > 0,
           }))}
           categorias={categorias}
           areasImpresion={areasImpresion}

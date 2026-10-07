@@ -7,6 +7,8 @@ type Producto = {
   id: string;
   nombre: string;
   precio: number;
+  precioNormal?: number;
+  enPromocion?: boolean;
   imagenUrl: string | null;
 };
 
@@ -58,6 +60,11 @@ export function CarruselDestacados({ productos }: { productos: Producto[] }) {
               <span className="cifra mt-1 block text-[0.75rem] text-tinta-media">
                 {formatearGuarani(p.precio)}
               </span>
+              {p.enPromocion && (
+                <span className="mt-1 inline-block rounded-full bg-exito-luz px-1.5 py-0.5 text-[0.6rem] font-bold uppercase tracking-rotulo text-exito">
+                  Promo
+                </span>
+              )}
             </span>
           </a>
         ))}

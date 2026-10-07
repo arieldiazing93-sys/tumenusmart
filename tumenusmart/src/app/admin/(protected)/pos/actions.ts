@@ -22,6 +22,7 @@ import { anularComprobantes, crearComprobante, descripcionDeItem } from "@/lib/c
 import { DURACION_MINIMA_CITA } from "@/lib/agenda-cita";
 import { calcularDescuento, type DescuentoPedido } from "@/lib/descuento-venta";
 import { SIN_REGISTRO_FISCAL } from "@/lib/tipo-cliente";
+import { SELECCION_PROMOCIONES, precioEnPosicion, segundoDeSemanaAsuncion, tramosDeFilas } from "@/lib/precio-promocion";
 import { turnoAbierto, pedidosDelTurno, netoMovimientosCaja } from "./turno-actual";
 
 export type ResultadoAbrirTurno =
@@ -85,7 +86,8 @@ export async function abrirTurno(
 export type ResultadoVenta =
   | { ok: true; ventaId: string; total: number; areasImpresion: string[] }
   /** `sinTurno`: el turno de caja ya no está abierto; la pantalla manda directo a abrirlo (ver src/lib/turno-requerido.ts). */
-  | { ok: false; error: string; sinTurno?: true };
+  /** `precioCambio`: el total que tenía la pantalla ya no es el que corresponde (entró o salió una promoción de precio); la pantalla se recalcula. */
+  | { ok: false; error: string; sinTurno?: true; precioCambio?: true };
 
 export type ItemVentaInput =
   | {
@@ -148,6 +150,12 @@ export type DatosVenta = {
    * una cita (esa ya tiene su persona): el servidor lo exige y lo verifica, nunca confía en el navegador.
    */
   personalId?: string;
+  /**
+   * El total que el cajero tenía en pantalla (ya con el descuento). Si el servidor calcula otro —porque entró o salió una
+   * promoción de precio justo mientras tanto— no cobra: avisa y la pantalla se vuelve a calcular. Opcional: quien no lo manda
+   * (el cobro de una cita de la agenda) no se compara.
+   */
+  totalMostrado?: number;
 };
 
 /** Lo que se lanza dentro de la transacción si la cita ya no se puede cobrar (la cobraron en ese instante). */
@@ -328,6 +336,8 @@ export async function registrarVenta(turnoId: string, datos: DatosVenta): Promis
       id: true,
       nombre: true,
       precio: true,
+      // Precios de promoción: el precio que se cobra es el vigente en este momento (ver precio-promocion.ts).
+      promociones: SELECCION_PROMOCIONES,
       disponible: true,
       ingredientes: true,
       mitadYMitadGrupo: true,
@@ -368,6 +378,7 @@ export async function registrarVenta(turnoId: string, datos: DatosVenta): Promis
                       precio: true,
                       costo: true,
                       almacenId: true,
+                      promociones: SELECCION_PROMOCIONES,
                       // Un modificador ES un Product: trae su propia receta —
                       // con el costo de cada insumo, porque el costo del
                       // agregado sale de ahí (ver costo-receta.ts).
@@ -398,12 +409,14 @@ export async function registrarVenta(turnoId: string, datos: DatosVenta): Promis
   // Las preparaciones (salsa, masa…) que lleve alguna receta se abren acá en
   // los insumos con que se hacen: el stock y el costo salen de esos insumos.
   const elaborados = await cargarElaborados(storeId);
+  // Un solo segundo de la semana para todo el catálogo: ningún producto queda en una franja distinta de otro.
+  const posicionPromos = segundoDeSemanaAsuncion(new Date());
   const catalogo: ProductoBase[] = productosDelLocal.map((p) => {
     const receta = aplanarReceta(p.receta, elaborados);
     return {
       id: p.id,
       nombre: p.nombre,
-      precio: p.precio,
+      precio: precioEnPosicion(Number(p.precio), tramosDeFilas(p.promociones), posicionPromos).precio,
       disponible: p.disponible,
       ingredientes: p.ingredientes,
       mitadYMitadGrupo: p.mitadYMitadGrupo,
@@ -427,7 +440,7 @@ export async function registrarVenta(turnoId: string, datos: DatosVenta): Promis
               id: m.product.id,
               nombre: m.product.nombre,
               tipo: "agregado",
-              precioExtra: m.product.precio,
+              precioExtra: precioEnPosicion(Number(m.product.precio), tramosDeFilas(m.product.promociones), posicionPromos).precio,
               costo: costoDelProducto(m.product.costo, recetaAgregado),
               receta: recetaAgregado,
               almacenId: m.product.almacenId,
@@ -487,6 +500,16 @@ export async function registrarVenta(turnoId: string, datos: DatosVenta): Promis
   const descuento = calcularDescuento(subtotal, datos.descuento);
   if (!descuento.ok) return { ok: false, error: descuento.error };
   const total = subtotal - descuento.monto;
+
+  // El cajero vio un total en pantalla. Si el servidor calcula otro (una promoción de precio empezó o terminó justo entre medio), no se
+  // cobra a ciegas: se avisa y la pantalla se vuelve a calcular con los precios de ahora.
+  if (datos.totalMostrado !== undefined && Math.round(Number(datos.totalMostrado)) !== Math.round(total)) {
+    return {
+      ok: false,
+      error: `Cambió un precio mientras armabas la cuenta (una promoción empezó o terminó). El total ahora es ${formatearGuarani(total)}. Revisá la cuenta y volvé a cobrar.`,
+      precioCambio: true,
+    };
+  }
 
   // La base de la comisión de producto: el subtotal de las líneas de producto, con su parte
   // proporcional del descuento general ya restada — mismo criterio que la de servicio (más abajo).

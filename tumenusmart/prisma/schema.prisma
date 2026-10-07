@@ -205,6 +205,7 @@ model Store {
   horariosReserva  HorarioReserva[]
   horariosAtencion HorarioAtencion[]
   horariosCategoria CategoriaHorario[]
+  preciosPromocion  PrecioPromocion[]
   usuarios         Usuario[]
   ideasSemanales   IdeaSemanal[]
   pagos            Pago[]
@@ -520,6 +521,29 @@ model CategoriaHorario {
   @@index([categoryId])
 }
 
+/// Un precio de promoción de un producto: vale desde `diaInicio` + `horaInicio` hasta `diaFin` + `horaFin` (la hora de fin queda
+/// EXCLUIDA; un fin con segundos en 59 se lee como "hasta el final de ese minuto") y después vuelve el precio normal. Días: 0 = domingo
+/// … 6 = sábado; horas "HH:MM:SS" en hora de Asunción. Como máximo una por producto y día de inicio; el fin puede ser otro día (cruzar
+/// la medianoche) y dos de un mismo producto no pueden pisarse. Todas las reglas del tiempo están en src/lib/precio-promocion.ts.
+/// Cada modificador de un grupo de agregados es un Product, así que también puede tener sus promociones.
+model PrecioPromocion {
+  id         String   @id @default(cuid())
+  storeId    String
+  store      Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  productId  String
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  diaInicio  Int
+  horaInicio String
+  diaFin     Int
+  horaFin    String
+  precio     Decimal  @db.Decimal(10, 2)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([productId, diaInicio])
+  @@index([storeId])
+}
+
 model Product {
   id          String          @id @default(cuid())
   storeId     String
@@ -594,6 +618,8 @@ model Product {
   /// Si es un servicio de la Reserva de turnos: su duración, búfer, color y
   /// quién lo realiza (ver ServicioAgenda).
   servicioAgenda ServicioAgenda?
+  /// Precios de promoción: franjas de la semana en que se vende a otro precio (ver PrecioPromocion y src/lib/precio-promocion.ts).
+  promociones PrecioPromocion[]
   orderItems  OrderItem[]
   ventaPosItems VentaPosItem[]
   createdAt   DateTime        @default(now())

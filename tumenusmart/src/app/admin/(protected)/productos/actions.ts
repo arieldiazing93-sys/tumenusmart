@@ -11,6 +11,7 @@ import { normalizarIva } from "@/lib/iva";
 import { normalizarUnidadMedida, etiquetaUnidadMedida } from "@/lib/unidad-medida";
 import { formatearGuarani } from "@/lib/format";
 import { registrarBitacora } from "@/lib/bitacora";
+import { describirTramo, validarTramos } from "@/lib/precio-promocion";
 
 export type ResultadoFoto = { ok: true; url: string } | { ok: false; error: string };
 
@@ -634,4 +635,78 @@ export async function alternarDisponibleProducto(id: string, disponible: boolean
 
   revalidatePath("/admin/productos");
   revalidatePath("/[slug]", "layout");
+}
+
+// ===========================================================================
+//  Precios de promoción — un precio que vale solo en ciertos días y horas
+//  (de lunes a viernes de 18 a 20 horas, 27.000 en vez de 30.000) y que vuelve
+//  solo al normal cuando pasa la franja. Todas las reglas del tiempo y del
+//  precio están en src/lib/precio-promocion.ts; el servidor cobra con ellas
+//  en todos los canales (catalogo-pedido.ts y registrarVenta del POS).
+// ===========================================================================
+
+/**
+ * Guarda las promociones de un producto: reemplaza TODAS las que tenía por las que llegan (una lista vacía las quita todas).
+ * Lo que llega del navegador se revisa de nuevo acá con `validarTramos` (días y horas que existen, precio entero mayor a cero,
+ * una sola promoción por día de inicio, ninguna que termine antes de empezar y ninguna que se pise con otra): la base nunca
+ * guarda dos precios para un mismo momento.
+ *
+ * Un servicio (corte de pelo, revisión) no entra: su precio se maneja en Agenda → Servicios.
+ */
+export async function guardarPromocionesProducto(productId: string, entradas: unknown): Promise<ResultadoProducto> {
+  const sesion = await exigirPermiso("productos.editar");
+  // Todas las consultas de acá abajo quedan atadas a este local.
+  const idLocal = await idLocalActual();
+  const prisma = prismaDelLocal(idLocal);
+
+  const producto = await prisma.product.findUnique({
+    where: { id: productId },
+    select: { id: true, nombre: true, precio: true, esServicio: true },
+  });
+  if (!producto) return { ok: false, error: "Ese producto ya no existe." };
+  if (producto.esServicio) {
+    return {
+      ok: false,
+      error: "Un servicio tiene su precio en Agenda → Servicios. Los precios de promoción son para productos.",
+    };
+  }
+
+  const validadas = validarTramos(entradas);
+  if (!validadas.ok) return { ok: false, error: validadas.error };
+
+  // Reemplazo completo en una sola transacción: o queda todo lo nuevo, o no se toca nada (nunca queda a medias).
+  await prisma.$transaction([
+    prisma.precioPromocion.deleteMany({ where: { productId } }),
+    prisma.precioPromocion.createMany({
+      data: validadas.tramos.map((t) => ({
+        storeId: idLocal,
+        productId,
+        diaInicio: t.diaInicio,
+        horaInicio: t.horaInicio,
+        diaFin: t.diaFin,
+        horaFin: t.horaFin,
+        precio: t.precio,
+      })),
+    }),
+  ]);
+
+  await registrarBitacora(idLocal, sesion, {
+    modulo: "productos",
+    accion: "promociones_guardadas",
+    descripcion:
+      validadas.tramos.length === 0
+        ? `Quitó todos los precios de promoción de ${producto.nombre}.`
+        : `Guardó ${validadas.tramos.length} ${validadas.tramos.length === 1 ? "precio" : "precios"} de promoción de ${producto.nombre} (precio normal ${formatearGuarani(Number(producto.precio))}): ${validadas.tramos.map(describirTramo).join("; ")}.`,
+    entidad: "Product",
+    entidadId: productId,
+    detalle: { producto: producto.nombre, precioNormal: Number(producto.precio), promociones: validadas.tramos },
+  });
+
+  // El precio se calcula en cada canal: se vuelven a leer las pantallas que lo muestran.
+  revalidatePath("/admin/productos");
+  revalidatePath("/admin/pos");
+  revalidatePath("/admin/comedor");
+  revalidatePath("/admin/delivery");
+  revalidatePath("/[slug]", "layout");
+  return { ok: true };
 }

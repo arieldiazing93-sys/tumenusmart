@@ -1,4 +1,11 @@
 import type { PrismaLocal } from "@/lib/prisma-local";
+import {
+  SELECCION_PROMOCIONES,
+  precioEnPosicion,
+  segundoDeSemanaAsuncion,
+  tramosDeFilas,
+  type TramoPromocion,
+} from "@/lib/precio-promocion";
 
 /**
  * La carta lista para vender a mano: categorías con sus productos disponibles, los agregados de cada uno y los grupos
@@ -6,15 +13,34 @@ import type { PrismaLocal } from "@/lib/prisma-local";
  * Punto de Venta (que arma lo mismo en su propia pantalla).
  *
  * Es solo para MOSTRAR: el precio que vale es el que vuelve a calcular el servidor al guardar (precio-pedido.ts).
+ *
+ * Precios de promoción: cada producto y cada agregado viaja con su precio NORMAL (`precio`, `precioExtra`) y con sus
+ * promociones (`promos`). La pantalla las resuelve con `conPromosVigentes` según la hora de ese momento y las vuelve a
+ * resolver sola cuando cambia la franja — así una pantalla que queda abierta todo el día muestra siempre el precio que
+ * cobra el servidor.
  */
 
-export type AgregadoVenta = { id: string; nombre: string; precioExtra: number };
+export type AgregadoVenta = {
+  id: string;
+  nombre: string;
+  /** El precio normal; con `conPromosVigentes` pasa a ser el vigente. */
+  precioExtra: number;
+  /** Las promociones de este agregado (si es un producto de un grupo). Las quita `conPromosVigentes`. */
+  promos?: TramoPromocion[];
+  /** Solo después de `conPromosVigentes`: el precio normal y si el vigente es el de una promoción. */
+  precioNormal?: number;
+  enPromocion?: boolean;
+};
 export type ProductoVenta = {
   id: string;
   nombre: string;
+  /** El precio normal; con `conPromosVigentes` pasa a ser el vigente. */
   precio: number;
   esServicio: boolean;
   agregados: AgregadoVenta[];
+  promos?: TramoPromocion[];
+  precioNormal?: number;
+  enPromocion?: boolean;
 };
 export type CategoriaVenta = { id: string; nombre: string; productos: ProductoVenta[] };
 export type ProductoMitadVenta = {
@@ -23,8 +49,14 @@ export type ProductoMitadVenta = {
   precio: number;
   mitadYMitadModo: string;
   agregados: AgregadoVenta[];
+  promos?: TramoPromocion[];
+  precioNormal?: number;
+  enPromocion?: boolean;
 };
 export type GrupoMitadVenta = { nombreVisible: string; categoriaId: string; productos: ProductoMitadVenta[] };
+
+/** La parte de un `select` de Prisma que trae las promociones de un producto. */
+const PROMOS = { promociones: SELECCION_PROMOCIONES } as const;
 
 export async function cargarCatalogoDeVenta(
   db: PrismaLocal
@@ -45,6 +77,7 @@ export async function cargarCatalogoDeVenta(
           esServicio: true,
           mitadYMitadGrupo: true,
           mitadYMitadModo: true,
+          ...PROMOS,
           opciones: {
             where: { tipo: "agregado" },
             orderBy: { orden: "asc" },
@@ -56,7 +89,7 @@ export async function cargarCatalogoDeVenta(
                 select: {
                   modificadores: {
                     where: { product: { disponible: true } },
-                    select: { product: { select: { id: true, nombre: true, precio: true } } },
+                    select: { product: { select: { id: true, nombre: true, precio: true, ...PROMOS } } },
                   },
                 },
               },
@@ -68,7 +101,8 @@ export async function cargarCatalogoDeVenta(
   });
 
   // Los agregados propios del producto más los de cualquier grupo reutilizable adjuntado. Cada modificador de un
-  // grupo ES un Product real: se usa su propio precio (mismo criterio que la carta pública y el Punto de Venta).
+  // grupo ES un Product real: se usa su propio precio y sus propias promociones (mismo criterio que la carta pública y
+  // el Punto de Venta).
   function agregadosDe(p: (typeof categorias)[number]["productos"][number]): AgregadoVenta[] {
     return [
       ...p.opciones.map((o) => ({ id: o.id, nombre: o.nombre, precioExtra: Number(o.precioExtra) })),
@@ -77,6 +111,7 @@ export async function cargarCatalogoDeVenta(
           id: m.product.id,
           nombre: m.product.nombre,
           precioExtra: Number(m.product.precio),
+          promos: tramosDeFilas(m.product.promociones),
         }))
       ),
     ];
@@ -93,6 +128,7 @@ export async function cargarCatalogoDeVenta(
         precio: Number(p.precio),
         esServicio: p.esServicio,
         agregados: agregadosDe(p),
+        promos: tramosDeFilas(p.promociones),
       })),
     }));
 
@@ -111,6 +147,7 @@ export async function cargarCatalogoDeVenta(
         precio: Number(p.precio),
         mitadYMitadModo: p.mitadYMitadModo,
         agregados: agregadosDe(p),
+        promos: tramosDeFilas(p.promociones),
       });
       gruposPorClave.set(clave, entrada);
     }
@@ -118,4 +155,54 @@ export async function cargarCatalogoDeVenta(
   const gruposMitad = [...gruposPorClave.values()].filter((g) => g.productos.length > 1);
 
   return { categorias: categoriasVenta, gruposMitad };
+}
+
+/**
+ * La carta con los precios de ESTE momento: a cada producto y agregado con promociones le pone el precio de la
+ * franja en que estamos (o el normal). Siempre se calcula desde la carta ORIGINAL (con sus `promos`), nunca desde su
+ * propio resultado: por eso devuelve copias sin `promos`, con `precioNormal` y `enPromocion` para poder tachar el
+ * precio de lista. Se calcula el segundo de la semana una sola vez, así toda la carta queda en el mismo instante.
+ */
+export function conPromosVigentes(
+  categorias: CategoriaVenta[],
+  gruposMitad: GrupoMitadVenta[],
+  ahora: Date | number
+): { categorias: CategoriaVenta[]; gruposMitad: GrupoMitadVenta[] } {
+  const pos = segundoDeSemanaAsuncion(ahora);
+
+  const agregado = (a: AgregadoVenta): AgregadoVenta => {
+    const { promos, ...resto } = a;
+    const v = precioEnPosicion(a.precioExtra, promos, pos);
+    return { ...resto, precioExtra: v.precio, precioNormal: v.precioNormal, enPromocion: v.enPromocion };
+  };
+
+  const producto = (p: ProductoVenta): ProductoVenta => {
+    const { promos, ...resto } = p;
+    const v = precioEnPosicion(p.precio, promos, pos);
+    return { ...resto, precio: v.precio, precioNormal: v.precioNormal, enPromocion: v.enPromocion, agregados: p.agregados.map(agregado) };
+  };
+
+  return {
+    categorias: categorias.map((c) => ({ ...c, productos: c.productos.map(producto) })),
+    gruposMitad: gruposMitad.map((g) => ({
+      ...g,
+      productos: g.productos.map((p) => {
+        const { promos, ...resto } = p;
+        const v = precioEnPosicion(p.precio, promos, pos);
+        return { ...resto, precio: v.precio, precioNormal: v.precioNormal, enPromocion: v.enPromocion, agregados: p.agregados.map(agregado) };
+      }),
+    })),
+  };
+}
+
+/** Todas las promociones de una carta, juntas: para saber cuándo cambia el próximo precio. */
+export function promosDeLaCarta(categorias: CategoriaVenta[], gruposMitad: GrupoMitadVenta[]): TramoPromocion[] {
+  const todas: TramoPromocion[] = [];
+  const sumar = (p: { promos?: TramoPromocion[]; agregados: AgregadoVenta[] }) => {
+    if (p.promos) todas.push(...p.promos);
+    for (const a of p.agregados) if (a.promos) todas.push(...a.promos);
+  };
+  for (const c of categorias) for (const p of c.productos) sumar(p);
+  for (const g of gruposMitad) for (const p of g.productos) sumar(p);
+  return todas;
 }

@@ -3,6 +3,7 @@ import type { LineaPedida, ProductoBase } from "@/lib/precio-pedido";
 import { costoDelProducto } from "@/lib/costo-receta";
 import { aplanarReceta } from "@/lib/insumo-elaborado";
 import { cargarElaborados } from "@/lib/cargar-elaborados";
+import { SELECCION_PROMOCIONES, precioEnPosicion, segundoDeSemanaAsuncion, tramosDeFilas } from "@/lib/precio-promocion";
 
 /**
  * Lee de la base los productos que pidió una persona (con sus agregados, recetas y costos) y los deja en la forma
@@ -13,12 +14,17 @@ import { cargarElaborados } from "@/lib/cargar-elaborados";
  * negocio nunca aparece. Un producto de una categoría dada de baja tampoco aparece y el pedido se rechaza solo. No se
  * filtra por `disponible` a propósito, para poder decir QUÉ producto se quedó sin stock.
  *
+ * Precios de promoción: el precio que sale en `precio` y en el `precioExtra` de cada agregado es el VIGENTE en `ahora` (el de la
+ * franja en que estamos, o el normal). Todos los canales cobran con esto, así que lo que se cobra es igual en el mostrador, el comedor,
+ * el delivery y el mozo. `ahora` se pasa para poder probar cualquier instante; en producción es el momento de la llamada.
+ *
  * Devuelve [] si el pedido no nombra ningún producto.
  */
 export async function cargarCatalogoParaPedido(
   db: PrismaLocal,
   storeId: string,
-  items: LineaPedida[]
+  items: LineaPedida[],
+  ahora: Date = new Date()
 ): Promise<ProductoBase[]> {
   const idsPedidos = new Set<string>();
   for (const item of items) {
@@ -34,6 +40,7 @@ export async function cargarCatalogoParaPedido(
     where: { id: { in: [...idsPedidos] }, category: { activa: true } },
     orderBy: { orden: "asc" },
     include: {
+      promociones: SELECCION_PROMOCIONES,
       opciones: { orderBy: { orden: "asc" } },
       receta: {
         select: {
@@ -56,6 +63,7 @@ export async function cargarCatalogoParaPedido(
                       precio: true,
                       costo: true,
                       almacenId: true,
+                      promociones: SELECCION_PROMOCIONES,
                       receta: {
                         select: {
                           insumoId: true,
@@ -76,12 +84,14 @@ export async function cargarCatalogoParaPedido(
 
   // Las preparaciones (salsa, masa…) que lleve alguna receta se abren acá en los insumos con que se hacen.
   const elaborados = await cargarElaborados(storeId);
+  // Un solo segundo de la semana para todo el catálogo: ningún producto queda en una franja distinta de otro.
+  const posicion = segundoDeSemanaAsuncion(ahora);
   return productos.map((p) => {
     const receta = aplanarReceta(p.receta, elaborados);
     return {
       id: p.id,
       nombre: p.nombre,
-      precio: p.precio,
+      precio: precioEnPosicion(Number(p.precio), tramosDeFilas(p.promociones), posicion).precio,
       disponible: p.disponible,
       ingredientes: p.ingredientes,
       mitadYMitadGrupo: p.mitadYMitadGrupo,
@@ -109,7 +119,7 @@ export async function cargarCatalogoParaPedido(
               id: m.product.id,
               nombre: m.product.nombre,
               tipo: "agregado",
-              precioExtra: m.product.precio,
+              precioExtra: precioEnPosicion(Number(m.product.precio), tramosDeFilas(m.product.promociones), posicion).precio,
               costo: costoDelProducto(m.product.costo, recetaAgregado),
               receta: recetaAgregado,
               almacenId: m.product.almacenId,

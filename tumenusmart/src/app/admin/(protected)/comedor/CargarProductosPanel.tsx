@@ -14,6 +14,8 @@ import type {
 import { AgregadosPickerPos } from "../pos/AgregadosPickerPos";
 import { MitadYMitadPickerPos } from "../pos/MitadYMitadPickerPos";
 import { abrirCuentaEnCaja, cargarProductosCaja } from "./actions";
+import { usePromosVigentes } from "@/lib/use-promos-vigentes";
+import { repreciarCarrito } from "@/lib/precio-carrito-pos";
 
 /** Un producto (con o sin agregados) o un combo mitad y mitad ya armado, con su nota para la cocina. */
 type ItemCarrito = { key: string; nombre: string; precio: number; cantidad: number; detalle?: string; nota: string } & (
@@ -52,8 +54,8 @@ export function CargarProductosPanel({
   cuentaId,
   nuevaCuenta,
   mesa = "",
-  categorias,
-  gruposMitad,
+  categorias: categoriasBase,
+  gruposMitad: gruposBase,
   onCerrar,
   onEnviado,
   enviarItems,
@@ -83,9 +85,17 @@ export function CargarProductosPanel({
   /** Sin la nota para la cocina en cada producto (un pedido no guarda notas por producto). */
   sinNotas?: boolean;
 }) {
+  // Los precios de ESTE momento: un producto con precio de promoción (de lunes a viernes de 18 a 20, por ejemplo) viene con el precio que
+  // vale ahora y cambia solo cuando empieza o termina la franja. El servidor cobra con el mismo cálculo.
+  const { categorias, gruposMitad } = usePromosVigentes(categoriasBase, gruposBase);
   const [categoriaId, setCategoriaId] = useState<string>(categorias[0]?.id ?? TODOS);
   const [busqueda, setBusqueda] = useState("");
-  const [carrito, setCarrito] = useState<ItemCarrito[]>([]);
+  // Lo que se pidió; el precio de cada línea se vuelve a calcular con los precios vigentes.
+  const [carritoGuardado, setCarrito] = useState<ItemCarrito[]>([]);
+  const carrito = useMemo(
+    () => repreciarCarrito(carritoGuardado, categorias, gruposMitad),
+    [carritoGuardado, categorias, gruposMitad]
+  );
   const [productoEligiendo, setProductoEligiendo] = useState<ProductoVenta | null>(null);
   const [notaAbierta, setNotaAbierta] = useState<string | null>(null);
   const [envioId, setEnvioId] = useState(() => nuevoEnvioId());
@@ -112,6 +122,10 @@ export function CargarProductosPanel({
       ? gruposMitad
       : gruposMitad.filter((g) => g.categoriaId === categoriaId);
 
+  // El producto cuyo selector de agregados está abierto, con los precios de este momento.
+  const productoVivo = productoEligiendo
+    ? categorias.flatMap((c) => c.productos).find((p) => p.id === productoEligiendo.id)
+    : undefined;
   const total = carrito.reduce((s, i) => s + i.precio * i.cantidad, 0);
   const cantidadTotal = carrito.reduce((s, i) => s + i.cantidad, 0);
 
@@ -336,6 +350,17 @@ export function CargarProductosPanel({
                   )}
                   <p className="text-[0.85rem] font-medium leading-snug text-tinta">{p.nombre}</p>
                   <p className="cifra mt-1.5 text-[0.88rem] font-semibold text-tinta">{formatearGuarani(p.precio)}</p>
+                  {/* Precio de promoción: se ve el precio normal y que ahora rige la promoción. */}
+                  {p.enPromocion && (
+                    <p className="mt-0.5 flex flex-wrap items-center gap-1.5">
+                      <span className="rounded-full bg-exito-luz px-1.5 py-0.5 text-[0.64rem] font-bold uppercase tracking-rotulo text-exito">
+                        Promo
+                      </span>
+                      <span className="cifra text-[0.72rem] text-tinta-suave line-through">
+                        {formatearGuarani(p.precioNormal ?? p.precio)}
+                      </span>
+                    </p>
+                  )}
                   {p.agregados.length > 0 && (
                     <span className="mt-1.5 text-[0.66rem] font-semibold uppercase tracking-rotulo text-azul">+ agregados</span>
                   )}
@@ -415,8 +440,8 @@ export function CargarProductosPanel({
       {productoEligiendo && (
         <AgregadosPickerPos
           nombre={productoEligiendo.nombre}
-          precioBase={productoEligiendo.precio}
-          agregados={productoEligiendo.agregados}
+          precioBase={(productoVivo ?? productoEligiendo).precio}
+          agregados={(productoVivo ?? productoEligiendo).agregados}
           onCerrar={() => setProductoEligiendo(null)}
           onAgregar={confirmarAgregadosProducto}
         />

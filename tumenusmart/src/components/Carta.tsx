@@ -33,8 +33,16 @@ export function Carta({
   estilo: string;
 }) {
   const [busqueda, setBusqueda] = useState("");
-  const [abierto, setAbierto] = useState<ProductoCarta | null>(null);
+  const [abiertoElegido, setAbierto] = useState<ProductoCarta | null>(null);
   const [categoriaActiva, setCategoriaActiva] = useState(categorias[0]?.id ?? "");
+  // La ficha abierta, con los datos de AHORA: si el precio cambia (empieza o termina una promoción) con la ficha abierta, la ficha lo sigue.
+  const abierto = useMemo(
+    () =>
+      abiertoElegido
+        ? (categorias.flatMap((c) => c.productos).find((p) => p.id === abiertoElegido.id) ?? abiertoElegido)
+        : null,
+    [abiertoElegido, categorias]
+  );
   // Qué categorías ya se mostraron alguna vez: cada bloque entra con una
   // animación suave la PRIMERA vez que aparece en pantalla al bajar por la
   // carta, y se queda así — no vuelve a jugar la animación si el cliente
@@ -342,8 +350,21 @@ function FilaProducto({
         )}
 
         <span className="mt-1.5 flex items-center justify-between gap-2">
-          <span className={`cifra font-semibold ${tarjetas ? "text-[0.98rem]" : "text-[0.88rem]"}`}>
-            {formatearGuarani(producto.precio)}
+          <span className="flex flex-wrap items-baseline gap-x-1.5">
+            <span className={`cifra font-semibold ${tarjetas ? "text-[0.98rem]" : "text-[0.88rem]"}`}>
+              {formatearGuarani(producto.precio)}
+            </span>
+            {/* Precio de promoción: se ve el precio normal tachado y que ahora rige la promoción. */}
+            {producto.enPromocion && (
+              <>
+                <span className="cifra text-[0.74rem] text-tinta-suave line-through">
+                  {formatearGuarani(producto.precioNormal ?? producto.precio)}
+                </span>
+                <span className="rounded-full bg-exito-luz px-1.5 py-0.5 text-[0.62rem] font-bold uppercase tracking-rotulo text-exito">
+                  Promo
+                </span>
+              </>
+            )}
           </span>
 
           {conFicha ? (

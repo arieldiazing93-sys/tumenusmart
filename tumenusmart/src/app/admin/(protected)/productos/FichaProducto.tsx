@@ -11,6 +11,8 @@ import { formatearGuarani } from "@/lib/format";
 import { costoDeReceta, costoDelProducto } from "@/lib/costo-receta";
 import { aplanarReceta } from "@/lib/insumo-elaborado";
 import { cargarElaborados } from "@/lib/cargar-elaborados";
+import { SELECCION_PROMOCIONES, tramosDeFilas } from "@/lib/precio-promocion";
+import { PromocionesProducto } from "./PromocionesProducto";
 import { Tarjeta } from "@/components/ui";
 
 /**
@@ -31,6 +33,8 @@ export async function FichaProducto({ productoId }: { productoId: string }) {
     prisma.product.findUnique({
       where: { id: productoId },
       include: {
+        // Los precios de promoción (días y horas en que se vende a otro precio).
+        promociones: SELECCION_PROMOCIONES,
         opciones: {
           orderBy: { orden: "asc" },
           select: { id: true, nombre: true, precioExtra: true },
@@ -136,7 +140,18 @@ export async function FichaProducto({ productoId }: { productoId: string }) {
             {nombreCategoria} · {formatearGuarani(Number(producto.precio))}
           </p>
         </div>
-        <EliminarProductoBoton productId={producto.id} />
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Un servicio tiene su precio en Agenda → Servicios: las promociones de precio son para productos. */}
+          {!producto.esServicio && (
+            <PromocionesProducto
+              productId={producto.id}
+              nombreProducto={producto.nombre}
+              precioNormal={Number(producto.precio)}
+              promociones={tramosDeFilas(producto.promociones)}
+            />
+          )}
+          <EliminarProductoBoton productId={producto.id} />
+        </div>
       </div>
 
       <EditarProductoForm

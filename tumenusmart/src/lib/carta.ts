@@ -19,7 +19,11 @@ export type ProductoCarta = {
   id: string;
   nombre: string;
   descripcion: string | null;
+  /** El precio de ESTE momento: el de la promoción si estamos dentro de una franja, o el normal. */
   precio: number;
+  /** El precio normal, para tacharlo cuando rige una promoción. */
+  precioNormal?: number;
+  enPromocion?: boolean;
   imagenUrl: string | null;
   ingredientes: string[];
   opciones: OpcionCarta[];
@@ -32,6 +36,8 @@ export type GrupoMitad = {
     id: string;
     nombre: string;
     precio: number;
+    precioNormal?: number;
+    enPromocion?: boolean;
     mitadYMitadModo: string;
     opciones: OpcionCarta[];
   }[];

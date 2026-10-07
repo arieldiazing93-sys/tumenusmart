@@ -8,6 +8,7 @@ import { idLocalActual } from "@/lib/local-actual";
 import { estacionActual } from "@/lib/estacion-actual";
 import { nombreCompleto } from "@/lib/agenda-personal";
 import { diasParaVencer } from "@/lib/factura-pos";
+import { cargarCatalogoDeVenta } from "@/lib/catalogo-venta";
 import { turnoAbierto } from "./turno-actual";
 import { PantallaVenta } from "./PantallaVenta";
 import { EstacionNoVinculada } from "./EstacionNoVinculada";
@@ -79,108 +80,9 @@ export default async function PosPage() {
       ).map((p) => ({ id: p.id, nombre: nombreCompleto(p) }))
     : [];
 
-  const categorias = await db.category.findMany({
-    where: { activa: true },
-    orderBy: { orden: "asc" },
-    select: {
-      id: true,
-      nombre: true,
-      productos: {
-        where: { disponible: true },
-        orderBy: { orden: "asc" },
-        select: {
-          id: true,
-          nombre: true,
-          precio: true,
-          // Para saber si la cuenta lleva algún servicio (y entonces preguntar quién hizo el trabajo).
-          esServicio: true,
-          mitadYMitadGrupo: true,
-          mitadYMitadModo: true,
-          opciones: {
-            where: { tipo: "agregado" },
-            orderBy: { orden: "asc" },
-            select: { id: true, nombre: true, precioExtra: true },
-          },
-          gruposAgregados: {
-            select: {
-              group: {
-                select: {
-                  modificadores: {
-                    where: { product: { disponible: true } },
-                    select: { product: { select: { id: true, nombre: true, precio: true } } },
-                  },
-                },
-              },
-            },
-          },
-        },
-      },
-    },
-  });
-
-  // Los agregados propios (opciones, ya filtradas a tipo "agregado") más
-  // los de cualquier grupo reutilizable adjuntado — cada modificador de un
-  // grupo ES un Product real (ver OptionGroupProduct), se usa su propio
-  // precio. Ver el mismo criterio en src/app/[slug]/page.tsx.
-  function agregadosDe(p: (typeof categorias)[number]["productos"][number]) {
-    return [
-      ...p.opciones.map((o) => ({ id: o.id, nombre: o.nombre, precioExtra: Number(o.precioExtra) })),
-      ...p.gruposAgregados.flatMap((g) =>
-        g.group.modificadores.map((m) => ({
-          id: m.product.id,
-          nombre: m.product.nombre,
-          precioExtra: Number(m.product.precio),
-        }))
-      ),
-    ];
-  }
-
-  const categoriasVenta = categorias
-    .filter((c) => c.productos.length > 0)
-    .map((c) => ({
-      id: c.id,
-      nombre: c.nombre,
-      productos: c.productos.map((p) => ({
-        id: p.id,
-        nombre: p.nombre,
-        precio: Number(p.precio),
-        esServicio: p.esServicio,
-        agregados: agregadosDe(p),
-      })),
-    }));
-
-  // Mismo agrupado que el menú público (ver src/app/[slug]/page.tsx): los
-  // productos con el mismo mitadYMitadGrupo (sin distinguir mayúsculas ni
-  // espacios de más) arman un combo, mostrado dentro de la categoría donde
-  // están sus productos.
-  type ProductoMitad = {
-    id: string;
-    nombre: string;
-    precio: number;
-    mitadYMitadModo: string;
-    agregados: { id: string; nombre: string; precioExtra: number }[];
-  };
-  const gruposPorClave = new Map<
-    string,
-    { nombreVisible: string; categoriaId: string; productos: ProductoMitad[] }
-  >();
-  for (const c of categorias) {
-    for (const p of c.productos) {
-      const nombreGrupo = p.mitadYMitadGrupo?.trim();
-      if (!nombreGrupo) continue;
-      const clave = nombreGrupo.toLowerCase();
-      const entrada = gruposPorClave.get(clave) ?? { nombreVisible: nombreGrupo, categoriaId: c.id, productos: [] };
-      entrada.productos.push({
-        id: p.id,
-        nombre: p.nombre,
-        precio: Number(p.precio),
-        mitadYMitadModo: p.mitadYMitadModo,
-        agregados: agregadosDe(p),
-      });
-      gruposPorClave.set(clave, entrada);
-    }
-  }
-  const gruposMitad = [...gruposPorClave.values()].filter((g) => g.productos.length > 1);
+  // La carta lista para vender, con los precios normales y las promociones de cada producto y agregado (mismo armado que usan el
+  // comedor, el delivery y el mozo — ver catalogo-venta.ts). La pantalla resuelve sola qué precio vale en cada momento.
+  const { categorias: categoriasVenta, gruposMitad } = await cargarCatalogoDeVenta(db);
 
   return (
     <PantallaVenta

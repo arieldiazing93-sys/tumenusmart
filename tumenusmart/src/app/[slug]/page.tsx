@@ -8,6 +8,13 @@ import { Carta, type CategoriaCarta } from "@/components/Carta";
 import { obtenerEstadoTienda } from "@/lib/estado-tienda";
 import { localPorSlug } from "@/lib/local-por-slug";
 import { categoriaOcultaPorHorario } from "@/lib/horario-atencion";
+import {
+  SELECCION_PROMOCIONES,
+  precioEnPosicion,
+  segundoDeSemanaAsuncion,
+  tramosDeFilas,
+  type FilaDePromocion,
+} from "@/lib/precio-promocion";
 
 export const dynamic = "force-dynamic";
 
@@ -24,15 +31,18 @@ export const dynamic = "force-dynamic";
  */
 function combinarOpciones<
   O extends { id: string; nombre: string; tipo: string; precioExtra: unknown },
-  G extends { group: { modificadores: { product: { id: string; nombre: string; precio: unknown } }[] } },
->(opciones: O[], gruposAgregados: G[]) {
+  G extends {
+    group: { modificadores: { product: { id: string; nombre: string; precio: unknown; promociones: FilaDePromocion[] } }[] };
+  },
+>(opciones: O[], gruposAgregados: G[], posicion: number) {
   return [
     ...opciones,
     ...gruposAgregados.flatMap((g) =>
       g.group.modificadores.map((m) => ({
         id: m.product.id,
         nombre: m.product.nombre,
-        precioExtra: m.product.precio,
+        // El precio de ESTE momento: un agregado con precio de promoción sale con el de la franja en que estamos.
+        precioExtra: precioEnPosicion(Number(m.product.precio), tramosDeFilas(m.product.promociones), posicion).precio,
         tipo: "agregado" as const,
       }))
     ),
@@ -57,6 +67,7 @@ export default async function CatalogoPage({
           where: { storeId, disponible: true },
           orderBy: { orden: "asc" },
           include: {
+            promociones: SELECCION_PROMOCIONES,
             opciones: { orderBy: { orden: "asc" } },
             gruposAgregados: {
               select: {
@@ -64,7 +75,7 @@ export default async function CatalogoPage({
                   select: {
                     modificadores: {
                       where: { product: { disponible: true } },
-                      select: { product: { select: { id: true, nombre: true, precio: true } } },
+                      select: { product: { select: { id: true, nombre: true, precio: true, promociones: SELECCION_PROMOCIONES } } },
                     },
                   },
                 },
@@ -78,6 +89,7 @@ export default async function CatalogoPage({
     prisma.product.findMany({
       where: { storeId, destacado: true, disponible: true },
       orderBy: { orden: "asc" },
+      include: { promociones: SELECCION_PROMOCIONES },
     }),
     obtenerEstadoTienda(storeId),
     // La Reserva de turnos (barberías, salones) es una página pública aparte, con su
@@ -92,6 +104,11 @@ export default async function CatalogoPage({
   // cargados, la categoría se muestra siempre — esto es una excepción que
   // configura el que la necesita, no algo que haya que definir por default.
   const ahora = new Date();
+  // Un solo segundo de la semana para toda la carta: ningún producto queda en una franja distinta de otro. Los precios de promoción
+  // (de lunes a viernes de 18 a 20, por ejemplo) salen con el precio de este momento; ver SincronizarPrecios para cuando cambian.
+  const posicion = segundoDeSemanaAsuncion(ahora);
+  const vigente = (p: { precio: unknown; promociones: FilaDePromocion[] }) =>
+    precioEnPosicion(Number(p.precio), tramosDeFilas(p.promociones), posicion);
   const conProductos = categoriasCrudas.filter(
     (c) => c.productos.length > 0 && !categoriaOcultaPorHorario(c.horarios, ahora)
   );
@@ -117,9 +134,11 @@ export default async function CatalogoPage({
       entrada.productos.push({
         id: producto.id,
         nombre: producto.nombre,
-        precio: Number(producto.precio),
+        precio: vigente(producto).precio,
+        precioNormal: Number(producto.precio),
+        enPromocion: vigente(producto).enPromocion,
         mitadYMitadModo: producto.mitadYMitadModo,
-        opciones: combinarOpciones(producto.opciones, producto.gruposAgregados).map((o) => ({
+        opciones: combinarOpciones(producto.opciones, producto.gruposAgregados, posicion).map((o) => ({
           id: o.id,
           nombre: o.nombre,
           tipo: o.tipo,
@@ -137,10 +156,12 @@ export default async function CatalogoPage({
       id: p.id,
       nombre: p.nombre,
       descripcion: p.descripcion,
-      precio: Number(p.precio),
+      precio: vigente(p).precio,
+      precioNormal: Number(p.precio),
+      enPromocion: vigente(p).enPromocion,
       imagenUrl: p.imagenUrl,
       ingredientes: p.ingredientes,
-      opciones: combinarOpciones(p.opciones, p.gruposAgregados).map((o) => ({
+      opciones: combinarOpciones(p.opciones, p.gruposAgregados, posicion).map((o) => ({
         id: o.id,
         nombre: o.nombre,
         tipo: o.tipo,
@@ -280,7 +301,9 @@ export default async function CatalogoPage({
         productos={destacados.map((p) => ({
           id: p.id,
           nombre: p.nombre,
-          precio: Number(p.precio),
+          precio: vigente(p).precio,
+          precioNormal: Number(p.precio),
+          enPromocion: vigente(p).enPromocion,
           imagenUrl: p.imagenUrl,
         }))}
       />

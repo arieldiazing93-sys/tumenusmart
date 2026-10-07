@@ -21,12 +21,23 @@ import { ClienteRapidoModal } from "./ClienteRapidoModal";
 import { MitadYMitadPickerPos } from "./MitadYMitadPickerPos";
 import { AgregadosPickerPos } from "./AgregadosPickerPos";
 import { imprimirComprobante, type ResultadoImpresion } from "@/lib/impresion-comprobantes";
+import type {
+  AgregadoVenta,
+  CategoriaVenta,
+  GrupoMitadVenta,
+  ProductoMitadVenta,
+  ProductoVenta,
+} from "@/lib/catalogo-venta";
+import { usePromosVigentes } from "@/lib/use-promos-vigentes";
+import { repreciarCarrito } from "@/lib/precio-carrito-pos";
 
-type Agregado = { id: string; nombre: string; precioExtra: number };
-type Producto = { id: string; nombre: string; precio: number; esServicio: boolean; agregados: Agregado[] };
-type Categoria = { id: string; nombre: string; productos: Producto[] };
-type ProductoMitad = { id: string; nombre: string; precio: number; mitadYMitadModo: string; agregados: Agregado[] };
-type GrupoMitad = { nombreVisible: string; categoriaId: string; productos: ProductoMitad[] };
+// La carta llega con el precio normal y las promociones de cada producto; la pantalla calcula el precio de cada momento
+// (ver usePromosVigentes). Los tipos son los de la carta compartida (catalogo-venta.ts).
+type Agregado = AgregadoVenta;
+type Producto = ProductoVenta;
+type Categoria = CategoriaVenta;
+type ProductoMitad = ProductoMitadVenta;
+type GrupoMitad = GrupoMitadVenta;
 type TipoEntregaPos = "local" | "llevar";
 
 /**
@@ -66,8 +77,8 @@ const CHIP_INACTIVO = "border-linea text-tinta-media hover:border-brand hover:te
  */
 export function PantallaVenta({
   turnoId,
-  categorias,
-  gruposMitad,
+  categorias: categoriasBase,
+  gruposMitad: gruposBase,
   puedeFacturar,
   diasParaVencerTimbrado,
   facturaObligatoria,
@@ -108,6 +119,9 @@ export function PantallaVenta({
   carta: { nombre: string; url: string } | null;
 }) {
   const router = useRouter();
+  // Los precios de ESTE momento: si un producto tiene un precio de promoción (de lunes a viernes de 18 a 20, por ejemplo), acá ya
+  // viene con el precio que vale ahora, y cambia solo cuando empieza o termina la franja. Es el mismo precio que cobra el servidor.
+  const { categorias, gruposMitad, refrescar: refrescarPrecios } = usePromosVigentes(categoriasBase, gruposBase);
   // Si el local exige facturar todo y esta estación puede hacerlo, no hay
   // "Ticket" que elegir — arranca directo en factura. Si exige facturar
   // todo pero esta estación NO puede (sin punto de expedición vigente), no
@@ -115,7 +129,13 @@ export function PantallaVenta({
   const facturaForzada = facturaObligatoria && puedeFacturar;
   const bloqueadoSinFacturar = facturaObligatoria && !puedeFacturar;
   const [categoriaId, setCategoriaId] = useState<string>(categorias[0]?.id ?? TODOS);
-  const [carrito, setCarrito] = useState<ItemCarrito[]>([]);
+  // Lo que se pidió (producto, agregados, cantidad). El precio de cada línea NO se queda con el de cuando se tocó el producto: se vuelve a
+  // calcular con los precios vigentes (si una promoción empieza o termina con la cuenta a medio armar, el total la sigue).
+  const [carritoGuardado, setCarrito] = useState<ItemCarrito[]>([]);
+  const carrito = useMemo(
+    () => repreciarCarrito(carritoGuardado, categorias, gruposMitad),
+    [carritoGuardado, categorias, gruposMitad]
+  );
   const [clienteNombre, setClienteNombre] = useState("");
   const [clienteTelefono, setClienteTelefono] = useState("");
   const [tipoEntrega, setTipoEntrega] = useState<TipoEntregaPos>("local");
@@ -173,6 +193,10 @@ export function PantallaVenta({
     categoriaId === TODOS ? gruposMitad : gruposMitad.filter((g) => g.categoriaId === categoriaId);
 
   const totalProductos = categorias.reduce((s, c) => s + c.productos.length, 0);
+  // El producto cuyo selector de agregados está abierto, con los precios de este momento.
+  const productoVivo = productoEligiendo
+    ? categorias.flatMap((c) => c.productos).find((p) => p.id === productoEligiendo.id)
+    : undefined;
   const subtotal = useMemo(() => carrito.reduce((s, i) => s + i.precio * i.cantidad, 0), [carrito]);
   // Sin descuento tildado, o con el campo vacío, no se descuenta nada. Es la
   // misma función que usa el servidor (registrarVenta), así que el total que se
@@ -391,6 +415,8 @@ export function PantallaVenta({
       descuento: descuentoPedido,
       creditoDias: esCredito ? creditoDias : undefined,
       personalId: personalAAsignar.length > 0 ? personalId : undefined,
+      // El total que se ve en pantalla: si el servidor calcula otro (entró o salió una promoción justo ahora), no cobra a ciegas.
+      totalMostrado: total,
       items: carrito.map((i) =>
         i.tipo === "combo"
           ? {
@@ -414,6 +440,11 @@ export function PantallaVenta({
       if (r.sinTurno) {
         router.push(rutaParaAbrirTurno("/admin/pos"));
         return;
+      }
+      // Un precio cambió por una promoción mientras se cobraba: se recalcula la pantalla ya, con los precios de ahora.
+      if (r.precioCambio) {
+        refrescarPrecios();
+        setMostrarCobro(false);
       }
       setError(r.error);
       return;
@@ -703,6 +734,17 @@ export function PantallaVenta({
                   <p className="cifra mt-1.5 text-[0.9rem] font-semibold text-tinta">
                     {formatearGuarani(p.precio)}
                   </p>
+                  {/* Precio de promoción: se ve cuál es el precio normal y que ahora rige la promoción. */}
+                  {p.enPromocion && (
+                    <p className="mt-0.5 flex flex-wrap items-center gap-1.5">
+                      <span className="rounded-full bg-exito-luz px-1.5 py-0.5 text-[0.64rem] font-bold uppercase tracking-rotulo text-exito">
+                        Promo
+                      </span>
+                      <span className="cifra text-[0.72rem] text-tinta-suave line-through">
+                        {formatearGuarani(p.precioNormal ?? p.precio)}
+                      </span>
+                    </p>
+                  )}
                   {p.agregados.length > 0 && (
                     <span className="mt-2 self-center text-[0.68rem] font-semibold uppercase tracking-rotulo text-azul">
                       + agregados
@@ -1138,8 +1180,9 @@ export function PantallaVenta({
       {productoEligiendo && (
         <AgregadosPickerPos
           nombre={productoEligiendo.nombre}
-          precioBase={productoEligiendo.precio}
-          agregados={productoEligiendo.agregados}
+          // Con los precios de ahora: si la promoción cambia con el cuadro abierto, también lo sigue.
+          precioBase={(productoVivo ?? productoEligiendo).precio}
+          agregados={(productoVivo ?? productoEligiendo).agregados}
           onCerrar={() => setProductoEligiendo(null)}
           onAgregar={confirmarAgregadosProducto}
         />

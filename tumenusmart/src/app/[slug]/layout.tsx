@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { CartProvider } from "@/components/CartProvider";
+import { SincronizarPrecios } from "@/components/SincronizarPrecios";
+import { cargarPreciosPublicos } from "@/lib/precios-publicos";
 import { localPorSlug, estaSuspendido } from "@/lib/local-por-slug";
 import { derivarPaletaMarca, esHexValido } from "@/lib/color-marca";
 
@@ -66,6 +68,10 @@ export default async function LocalLayout({
       ? derivarPaletaMarca(local.colorPrimario)
       : null;
 
+  // Los precios VIGENTES de la carta (con las promociones de precio por día y hora): el carrito del cliente se pone al día con ellos y
+  // la pantalla se actualiza sola justo cuando cambia algún precio. Ver SincronizarPrecios.
+  const { precios, refrescarEn } = await cargarPreciosPublicos(local.id);
+
   // <body> (layout raíz, compartido con el admin) pinta bg-papel-suave y
   // text-tinta y nunca se toca acá — por eso este div pinta los suyos
   // propios, con el token ya reescrito. Las dos cosas hacen falta, no solo
@@ -93,7 +99,10 @@ export default async function LocalLayout({
           : undefined
       }
     >
-      <CartProvider claveLocal={local.slug}>{children}</CartProvider>
+      <CartProvider claveLocal={local.slug}>
+        <SincronizarPrecios precios={precios} refrescarEn={refrescarEn} />
+        {children}
+      </CartProvider>
     </div>
   );
 }
