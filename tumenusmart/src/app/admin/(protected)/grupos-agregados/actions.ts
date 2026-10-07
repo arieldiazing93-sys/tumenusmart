@@ -10,13 +10,16 @@ import { etiquetaUnidadMedida } from "@/lib/unidad-medida";
 
 export type ResultadoGrupo = { ok: true } | { ok: false; error: string };
 
+/** Al crear un grupo se devuelve su id, para abrirlo enseguida en el panel de la derecha. */
+export type ResultadoGrupoCreado = { ok: true; id: string } | { ok: false; error: string };
+
 /**
  * Devuelve un resultado en vez de lanzar los errores de validación: Next.js
  * oculta en producción el mensaje de cualquier `throw` que salga de una
  * Server Action. Mismo patrón que areas-impresion/actions.ts y
  * productos/actions.ts.
  */
-export async function crearGrupo(formData: FormData): Promise<ResultadoGrupo> {
+export async function crearGrupo(formData: FormData): Promise<ResultadoGrupoCreado> {
   await exigirPermiso("productos.editar");
   const idLocal = await idLocalActual();
   const prisma = prismaDelLocal(idLocal);
@@ -24,9 +27,9 @@ export async function crearGrupo(formData: FormData): Promise<ResultadoGrupo> {
   const nombre = String(formData.get("nombre") ?? "").trim();
   if (!nombre) return { ok: false, error: "El nombre es obligatorio" };
 
-  await prisma.optionGroup.create({ data: { nombre, storeId: idLocal } });
+  const grupo = await prisma.optionGroup.create({ data: { nombre, storeId: idLocal } });
   revalidatePath("/admin/grupos-agregados");
-  return { ok: true };
+  return { ok: true, id: grupo.id };
 }
 
 export async function renombrarGrupo(id: string, nombre: string): Promise<ResultadoGrupo> {
@@ -167,6 +170,8 @@ export async function agregarProductoAGrupo(
     create: { groupId, productId, storeId: idLocal },
   });
 
+  // El grupo se abre a la derecha de la lista de Grupos de agregados: esa pantalla también se vuelve a leer.
+  revalidatePath("/admin/grupos-agregados");
   revalidatePath(`/admin/grupos-agregados/${groupId}`);
   revalidatePath("/[slug]", "layout");
   return { ok: true };
@@ -177,6 +182,8 @@ export async function quitarProductoDeGrupo(groupId: string, productId: string) 
   const prisma = prismaDelLocal(await idLocalActual());
 
   await prisma.optionGroupProduct.deleteMany({ where: { groupId, productId } });
+  // El grupo se abre a la derecha de la lista de Grupos de agregados: esa pantalla también se vuelve a leer.
+  revalidatePath("/admin/grupos-agregados");
   revalidatePath(`/admin/grupos-agregados/${groupId}`);
   revalidatePath("/[slug]", "layout");
 }
@@ -215,5 +222,6 @@ export async function moverModificadorDeGrupo(id: string, direccion: Direccion) 
   await prisma.$transaction(
     cambios.map((c) => prisma.optionGroupProduct.update({ where: { id: c.id }, data: { orden: c.orden } }))
   );
+  revalidatePath("/admin/grupos-agregados");
   revalidatePath(`/admin/grupos-agregados/${fila.groupId}`);
 }

@@ -336,6 +336,8 @@ export async function asignarGrupoAProducto(
   // La ficha se abre a la derecha de la lista de Productos: esa pantalla también se vuelve a leer.
   revalidatePath("/admin/productos");
   revalidatePath(`/admin/productos/${productId}`);
+  // "Usado en N productos" de Grupos de agregados cambia con esto.
+  revalidatePath("/admin/grupos-agregados");
   revalidatePath("/[slug]", "layout");
   return { ok: true };
 }
@@ -406,6 +408,7 @@ export async function aplicarGruposACategoria(
   }
 
   revalidatePath("/admin/productos");
+  revalidatePath("/admin/grupos-agregados");
   revalidatePath("/[slug]", "layout");
 
   return {

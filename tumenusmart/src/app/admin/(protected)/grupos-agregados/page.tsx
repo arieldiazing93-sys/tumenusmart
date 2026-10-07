@@ -1,10 +1,10 @@
 import { pantallaConPermiso } from "@/lib/auth";
 import { prismaDelLocal } from "@/lib/prisma-local";
 import { idLocalActual } from "@/lib/local-actual";
+import { etiquetaIva } from "@/lib/iva";
+import { etiquetaUnidadMedida } from "@/lib/unidad-medida";
 import { Cabecera } from "@/components/ui";
-import { CrearGrupoForm } from "./CrearGrupoForm";
-import { GrupoFila } from "./GrupoFila";
-import { moverGrupo } from "./actions";
+import { GruposMaestroDetalle } from "./GruposMaestroDetalle";
 
 export const dynamic = "force-dynamic";
 
@@ -15,17 +15,47 @@ export const dynamic = "force-dynamic";
  * real del catálogo (ver OptionGroupProduct), así que corregir su precio
  * en /admin/productos lo corrige en todos los productos que lo usan, sin
  * recargarlo a mano en cada uno. A diferencia de los agregados propios de
- * un producto (ProductOption, gestionados en /admin/productos/[id]), esto
- * es un catálogo aparte.
+ * un producto (ProductOption, que solo se pueden quitar desde la ficha del
+ * producto), esto es un catálogo aparte.
+ *
+ * En dos paneles, como Insumos y Productos: la lista a la izquierda y, con doble
+ * clic, el grupo completo a la derecha.
  */
-export default async function GruposAgregadosPage() {
+export default async function GruposAgregadosPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ grupo?: string }>;
+}) {
   await pantallaConPermiso("productos.editar");
   const prisma = prismaDelLocal(await idLocalActual());
 
+  const { grupo: grupoParam } = await searchParams;
+
   const grupos = await prisma.optionGroup.findMany({
     orderBy: [{ orden: "asc" }, { createdAt: "asc" }],
-    include: { _count: { select: { modificadores: true, productos: true } } },
+    include: {
+      modificadores: {
+        orderBy: [{ orden: "asc" }, { id: "asc" }],
+        include: {
+          product: {
+            select: {
+              id: true,
+              categoryId: true,
+              nombre: true,
+              precio: true,
+              iva: true,
+              unidadMedida: true,
+              disponible: true,
+            },
+          },
+        },
+      },
+      _count: { select: { productos: true } },
+    },
   });
+
+  // El grupo de la dirección (enlaces viejos a /grupos-agregados/<id>) solo se abre si es de este local.
+  const abiertoInicialId = grupoParam && grupos.some((g) => g.id === grupoParam) ? grupoParam : null;
 
   return (
     <div>
@@ -34,25 +64,24 @@ export default async function GruposAgregadosPage() {
         bajada="Un grupo con nombre (ej. Salsas, Quesos) que se adjunta a varios productos a la vez. Cada modificador es un producto real de tu catálogo (creálo primero en Productos)."
       />
 
-      <CrearGrupoForm />
-
-      <div className="flex flex-col gap-2">
-        {grupos.map((g, i) => (
-          <GrupoFila
-            key={g.id}
-            id={g.id}
-            nombre={g.nombre}
-            cantidadModificadores={g._count.modificadores}
-            cantidadProductos={g._count.productos}
-            esPrimero={i === 0}
-            esUltimo={i === grupos.length - 1}
-            moverGrupo={moverGrupo}
-          />
-        ))}
-        {grupos.length === 0 && (
-          <p className="text-sm text-tinta-suave">Todavía no hay grupos de agregados creados.</p>
-        )}
-      </div>
+      <GruposMaestroDetalle
+        grupos={grupos.map((g) => ({
+          id: g.id,
+          nombre: g.nombre,
+          cantidadProductos: g._count.productos,
+          modificadores: g.modificadores.map((m) => ({
+            id: m.id,
+            productId: m.product.id,
+            categoryId: m.product.categoryId,
+            nombre: m.product.nombre,
+            precio: Number(m.product.precio),
+            iva: etiquetaIva(m.product.iva),
+            unidadMedida: etiquetaUnidadMedida(m.product.unidadMedida),
+            disponible: m.product.disponible,
+          })),
+        }))}
+        abiertoInicialId={abiertoInicialId}
+      />
     </div>
   );
 }

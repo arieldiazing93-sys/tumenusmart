@@ -68,21 +68,27 @@ export function ProductosMaestroDetalle({
   const [esperandoId, setEsperandoId] = useState<string | null>(null);
   const panelRef = useRef<HTMLDivElement>(null);
 
-  // Si la dirección cambia de categoría (por ejemplo al guardar un producto que
-  // se pasó a otra), la lista la sigue.
-  useEffect(() => {
+  // Lo que vino de la dirección la última vez que se miró. Cuando cambia, la
+  // pantalla se ajusta EN EL MISMO DIBUJO en que llegan los datos nuevos (no en un
+  // efecto, que corre un instante después y podía pisar lo que el usuario
+  // acababa de elegir en el selector — lo encontró la prueba con React 19):
+  //  - si la dirección pasa a otra categoría (por ejemplo al guardar un producto
+  //    que se pasó a otra), la lista la sigue;
+  //  - si se abrió un producto desde la dirección (recién creado o guardado), se
+  //    cierra el formulario de "Nuevo producto".
+  const [categoriaVista, setCategoriaVista] = useState(categoriaInicial);
+  if (categoriaVista !== categoriaInicial) {
+    setCategoriaVista(categoriaInicial);
     setCategoriaFiltro(categoriaInicial);
-  }, [categoriaInicial]);
-
-  // Llegó la ficha pedida (o falló el pedido): ya no hay nada esperando. Y si se
-  // abrió un producto desde la dirección (recién creado o guardado), se cierra
-  // el formulario de "Nuevo producto".
-  useEffect(() => {
-    if (!abriendo) setEsperandoId(null);
-  }, [abriendo, abiertoId]);
-  useEffect(() => {
+  }
+  const [abiertoVisto, setAbiertoVisto] = useState(abiertoId);
+  if (abiertoVisto !== abiertoId) {
+    setAbiertoVisto(abiertoId);
     if (abiertoId) setCreando(false);
-  }, [abiertoId]);
+  }
+  // Mientras la ficha pedida viaja del servidor (la transición sigue pendiente),
+  // la fila queda resaltada y el panel avisa; al llegar, o si falla, se apaga solo.
+  const esperando = abriendo ? esperandoId : null;
 
   const indiceDeCategoria = useMemo(() => new Map(categorias.map((c, i) => [c.id, i])), [categorias]);
   const nombreDeCategoria = useMemo(() => new Map(categorias.map((c) => [c.id, c.nombre])), [categorias]);
@@ -106,7 +112,7 @@ export function ProductosMaestroDetalle({
   // la carta pública de esa categoría.
   const conFlechas = puedeEditar && categoriaFiltro !== TODAS && visibles.length > 1;
 
-  const resaltadoId = esperandoId ?? abiertoId;
+  const resaltadoId = esperando ?? abiertoId;
 
   // En pantalla angosta el panel queda debajo de la lista: se lo trae a la
   // vista, si no el doble clic parecería no hacer nada.
@@ -298,7 +304,7 @@ export function ProductosMaestroDetalle({
                 almacenes={almacenes}
               />
             </Tarjeta>
-          ) : esperandoId && esperandoId !== abiertoId ? (
+          ) : esperando && esperando !== abiertoId ? (
             <div className="rounded-xl border border-dashed border-linea bg-papel-suave px-6 py-14 text-center">
               <p className="text-[0.95rem] font-semibold tracking-titular text-tinta">Abriendo el producto…</p>
             </div>

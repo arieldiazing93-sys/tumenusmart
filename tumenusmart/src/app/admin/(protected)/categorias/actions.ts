@@ -8,12 +8,15 @@ import { moverEnLista, cambiosDeOrden, type Direccion } from "@/lib/ordenar";
 
 export type ResultadoCategoria = { ok: true } | { ok: false; error: string };
 
+/** Al crear una categoría se devuelve su id, para abrirla enseguida en el panel de la derecha. */
+export type ResultadoCategoriaCreada = { ok: true; id: string } | { ok: false; error: string };
+
 /**
  * Devuelve un resultado en vez de lanzar los errores de validación: Next.js
  * oculta en producción el mensaje de cualquier `throw` que salga de una
  * Server Action, así que el motivo real solo llega si viaja en el retorno.
  */
-export async function crearCategoria(formData: FormData): Promise<ResultadoCategoria> {
+export async function crearCategoria(formData: FormData): Promise<ResultadoCategoriaCreada> {
   await exigirPermiso("categorias.editar");
   // Todas las consultas de acá abajo quedan atadas a este local.
   const idLocal = await idLocalActual();
@@ -26,11 +29,13 @@ export async function crearCategoria(formData: FormData): Promise<ResultadoCateg
 
   // El local se escribe explícitamente aunque el filtro también lo inyecte:
   // así TypeScript obliga a pensarlo al crear, y el filtro queda de red.
-  await prisma.category.create({
+  const categoria = await prisma.category.create({
     data: { nombre, orden: (ultima?.orden ?? 0) + 1, storeId: idLocal },
   });
   revalidatePath("/admin/categorias");
-  return { ok: true };
+  // La lista de Productos también arma su selector con estas categorías.
+  revalidatePath("/admin/productos");
+  return { ok: true, id: categoria.id };
 }
 
 export async function renombrarCategoria(id: string, nombre: string): Promise<ResultadoCategoria> {
@@ -164,6 +169,8 @@ export async function agregarTramoCategoria(
     data: { categoryId, diaSemana, abre, cierra, storeId: idLocal },
   });
 
+  // El horario se ve y se edita en el panel de la derecha de la lista de Categorías.
+  revalidatePath("/admin/categorias");
   revalidatePath(`/admin/categorias/${categoryId}/horario`);
   revalidatePath("/[slug]", "layout");
   return { ok: true };
@@ -175,6 +182,8 @@ export async function eliminarTramoCategoria(categoryId: string, id: string): Pr
 
   await prisma.categoriaHorario.delete({ where: { id } });
 
+  // El horario se ve y se edita en el panel de la derecha de la lista de Categorías.
+  revalidatePath("/admin/categorias");
   revalidatePath(`/admin/categorias/${categoryId}/horario`);
   revalidatePath("/[slug]", "layout");
 }

@@ -5,7 +5,7 @@ import { formatearGuarani } from "@/lib/format";
 import { clasesBoton } from "@/components/ui";
 import { eliminarZona, alternarActivaZona, actualizarZona } from "./actions";
 
-/** Mismo patrón de "editar inline" que ya usa CategoriaFila.tsx — un click
+/** Edición "inline" — un click
  * abre los campos en el lugar, sin ir a otra pantalla ni perder de vista el
  * resto de la lista. Acá se editan los tres datos de la zona juntos: nombre,
  * radio y precio, porque son los mismos tres que pide el alta. */

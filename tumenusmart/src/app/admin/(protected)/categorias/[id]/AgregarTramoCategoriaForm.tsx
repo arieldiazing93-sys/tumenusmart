@@ -1,6 +1,8 @@
 "use client";
 
 import { useRef, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import { clasesBoton } from "@/components/ui";
 import { agregarTramoCategoria } from "../actions";
 
 export function AgregarTramoCategoriaForm({
@@ -12,6 +14,7 @@ export function AgregarTramoCategoriaForm({
   dia: number;
   diaLabel: string;
 }) {
+  const router = useRouter();
   const [pendiente, iniciar] = useTransition();
   const [todoElDia, setTodoElDia] = useState(false);
   const [agregado, setAgregado] = useState(false);
@@ -32,6 +35,8 @@ export function AgregarTramoCategoriaForm({
       setTodoElDia(false);
       setAgregado(true);
       setTimeout(() => setAgregado(false), 2500);
+      // El horario se ve en el panel de la categoría: se vuelve a leer para mostrar el bloqueo nuevo.
+      router.refresh();
     });
   }
 
@@ -70,7 +75,7 @@ export function AgregarTramoCategoriaForm({
           type="submit"
           disabled={pendiente}
           aria-label={`Agregar bloqueo al ${diaLabel}`}
-          className="flex-none rounded-lg bg-noche-panel px-2.5 py-1.5 text-sm font-semibold text-white hover:bg-noche-panel disabled:opacity-50"
+          className={`flex-none ${clasesBoton("nuevo", "sm")}`}
         >
           {todoElDia ? "Bloquear día" : "+"}
         </button>

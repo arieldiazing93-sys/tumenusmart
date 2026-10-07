@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { formatearGuarani } from "@/lib/format";
+import { clasesBoton } from "@/components/ui";
 import {
   buscarProductosParaGrupo,
   agregarProductoAGrupo,
@@ -15,8 +16,8 @@ import {
  * precio/IVA/unidad) — no se tipea un nombre/precio nuevo acá. Mismo
  * espíritu que SoftRestaurant: el modificador ES el producto.
  *
- * Se usa desde dos lugares: la pantalla propia de un grupo
- * (/admin/grupos-agregados/[id]) y directo en la tarjeta "Grupos de
+ * Se usa desde dos lugares: el panel de un grupo (a la derecha de la lista
+ * de Grupos de agregados) y directo en la tarjeta "Grupos de
  * agregados" de un producto — por eso vive en components/, no adentro de
  * ninguna de las dos rutas.
  */
@@ -86,7 +87,7 @@ export function BuscarProductoParaGrupo({ groupId }: { groupId: string }) {
                 type="button"
                 disabled={agregando}
                 onClick={() => agregar(p.id)}
-                className="rounded bg-brand px-2.5 py-1 text-xs font-medium text-white hover:bg-brand-dark disabled:opacity-50"
+                className={clasesBoton("nuevo", "sm")}
               >
                 Agregar
               </button>

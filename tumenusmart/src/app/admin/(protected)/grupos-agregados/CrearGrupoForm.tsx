@@ -1,43 +1,58 @@
 "use client";
 
-import { useRef, useState, useTransition } from "react";
+import { useState, useTransition } from "react";
 import { Tarjeta, Campo, Entrada, clasesBoton } from "@/components/ui";
 import { crearGrupo } from "./actions";
 
-export function CrearGrupoForm() {
+/**
+ * El formulario de "Nuevo grupo", en el panel de la derecha. Al crearlo se abre
+ * el grupo para cargarle sus modificadores enseguida.
+ */
+export function CrearGrupoForm({
+  onCreado,
+  onCancelar,
+}: {
+  onCreado: (id: string) => void;
+  onCancelar: () => void;
+}) {
   const [pendiente, iniciar] = useTransition();
-  const [agregado, setAgregado] = useState(false);
-  const formRef = useRef<HTMLFormElement>(null);
+  const [error, setError] = useState<string | null>(null);
 
   function alCrear(formData: FormData) {
+    setError(null);
     iniciar(async () => {
       const resultado = await crearGrupo(formData);
       if (!resultado.ok) {
-        alert(resultado.error);
+        setError(resultado.error);
         return;
       }
-      formRef.current?.reset();
-      setAgregado(true);
-      setTimeout(() => setAgregado(false), 2500);
+      onCreado(resultado.id);
     });
   }
 
   return (
-    <Tarjeta className="mb-6 flex flex-col gap-3">
-      <p className="rotulo text-[0.8rem] font-bold">Nuevo grupo</p>
-      <form ref={formRef} action={alCrear} className="flex flex-wrap items-end gap-3">
+    <Tarjeta className="!border-2 !border-azul/50 flex flex-col gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 className="text-[1.1rem] font-semibold tracking-titular text-tinta">Nuevo grupo</h2>
+        <button type="button" onClick={onCancelar} className={clasesBoton("peligro", "sm")}>
+          Cancelar
+        </button>
+      </div>
+      <form action={alCrear} className="campos-grises flex flex-wrap items-end gap-3">
         <div className="min-w-[14rem] flex-1">
           <Campo etiqueta="Nombre">
-            <Entrada name="nombre" required placeholder="Ej: Salsas, Quesos, Toppings" />
+            <Entrada name="nombre" required autoFocus placeholder="Ej: Salsas, Quesos, Toppings" />
           </Campo>
         </div>
-        <div className="flex items-center gap-2">
-          <button type="submit" disabled={pendiente} className={clasesBoton("nuevo")}>
-            {pendiente ? "Creando…" : "Crear grupo"}
-          </button>
-          {agregado && <span className="text-xs font-medium text-exito">✓ Creado</span>}
-        </div>
+        <button type="submit" disabled={pendiente} className={clasesBoton("nuevo")}>
+          {pendiente ? "Creando…" : "Crear grupo"}
+        </button>
       </form>
+      {error && <p className="text-sm font-medium text-peligro">{error}</p>}
+      <p className="text-xs text-tinta-suave">
+        Después de crearlo vas a poder agregarle los modificadores. Cada modificador es un producto real de tu
+        catálogo (creálo primero en Productos).
+      </p>
     </Tarjeta>
   );
 }
