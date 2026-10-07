@@ -46,9 +46,11 @@ export function AbrirCuentaDeliveryPanel({
   const [nombre, setNombre] = useState(cuenta?.clienteNombre ?? "");
   const [estadoCliente, setEstadoCliente] = useState<"" | "conocido" | "nuevo">("");
   const [buscandoCliente, setBuscandoCliente] = useState(false);
+  /** El nombre lo completó una búsqueda (y nadie lo tocó después): la próxima búsqueda lo puede reemplazar o limpiar. */
+  const [nombreAutocompletado, setNombreAutocompletado] = useState(false);
 
   const [ficha, setFicha] = useState<FichaFiscal>(cuenta?.ficha ?? fichaVacia());
-  /** Los datos de la ficha se completaron solos con los de la última factura de este cliente. */
+  /** Los datos de la ficha se completaron solos con los de la última factura de este cliente (y nadie los tocó después). */
   const [datosDeFacturaAnterior, setDatosDeFacturaAnterior] = useState(false);
 
   const [direccion, setDireccion] = useState(cuenta?.direccion ?? "");
@@ -72,9 +74,22 @@ export function AbrirCuentaDeliveryPanel({
     setCostoEnvioTexto(zona ? String(zona.costoEnvio) : "");
   }
 
-  // Al tocar la lupa, apretar Enter o salir del teléfono: si ya es cliente del local, completa el nombre (sin pisar lo que ya se
-  // escribió) y los datos de su última factura. La dirección NO: un mismo cliente pide desde varios lugares, así que la dirección
-  // (el enlace de Google Maps que manda) se carga siempre de nuevo, en cada cuenta.
+  /** Saca el nombre y los datos de factura que completó una búsqueda anterior (lo que escribió la persona a mano no se toca). */
+  function limpiarAutocompletado() {
+    if (nombreAutocompletado) {
+      setNombre("");
+      setNombreAutocompletado(false);
+    }
+    if (datosDeFacturaAnterior) {
+      setFicha(fichaVacia());
+      setDatosDeFacturaAnterior(false);
+    }
+  }
+
+  // Al tocar la lupa, apretar Enter o salir del teléfono se busca a ese cliente, CADA VEZ (también si ya se había buscado otro): si ya
+  // es cliente del local, completa su nombre y los datos de su última factura; si no existe, saca lo que había completado la búsqueda
+  // anterior. Lo que la persona escribió a mano no se pisa. La dirección NO: un mismo cliente pide desde varios lugares, así que la
+  // dirección (el enlace de Google Maps que manda) se carga siempre de nuevo, en cada cuenta.
   async function buscarCliente() {
     const numero = telefono.trim();
     if (!numero || buscandoCliente) return;
@@ -89,16 +104,26 @@ export function AbrirCuentaDeliveryPanel({
     setBuscandoCliente(false);
     if (!r.ok) {
       setEstadoCliente("nuevo");
+      limpiarAutocompletado();
       return;
     }
     setEstadoCliente("conocido");
-    const nombreEncontrado = r.nombre;
-    setNombre((actual) => (actual.trim() ? actual : nombreEncontrado));
-    // Un cliente recurrente trae los datos de su última factura: se completan solos, solo si todavía no se escribió nada.
+    if (!nombre.trim() || nombreAutocompletado) {
+      setNombre(r.nombre);
+      setNombreAutocompletado(true);
+    }
+    // Un cliente recurrente trae los datos de su última factura: se completan solos si todavía no se escribió nada (o si los había
+    // completado una búsqueda anterior); si este cliente no tiene, se saca lo del anterior.
     const anterior = r.facturaAnterior;
-    if (anterior && !ficha.numero.trim() && !ficha.razon.trim()) {
-      setFicha({ tipo: anterior.tipoIdentificacion, numero: anterior.numeroIdentificacion, razon: anterior.razonSocial, email: anterior.email ?? "" });
-      setDatosDeFacturaAnterior(true);
+    const fichaLibre = (!ficha.numero.trim() && !ficha.razon.trim()) || datosDeFacturaAnterior;
+    if (fichaLibre) {
+      if (anterior) {
+        setFicha({ tipo: anterior.tipoIdentificacion, numero: anterior.numeroIdentificacion, razon: anterior.razonSocial, email: anterior.email ?? "" });
+        setDatosDeFacturaAnterior(true);
+      } else if (datosDeFacturaAnterior) {
+        setFicha(fichaVacia());
+        setDatosDeFacturaAnterior(false);
+      }
     }
   }
 
@@ -196,14 +221,14 @@ export function AbrirCuentaDeliveryPanel({
       ancho="ancho"
     >
       <div className="flex min-h-0 flex-1 flex-col">
-        {/* Los campos donde se escribe van con un gris claro (se distinguen de la caja blanca): vale para todos los de este panel,
-            también los de los datos de factura. */}
-        <div className="flex flex-1 flex-col gap-4 overflow-y-auto px-4 py-4 [&_input]:!bg-papel-hundido [&_select]:!bg-papel-hundido [&_textarea]:!bg-papel-hundido">
+        {/* El fondo del panel es blanco y los campos donde se escribe llevan un gris muy claro (se distinguen del blanco): vale para
+            todos los de este panel, también los de los datos de factura. */}
+        <div className="flex flex-1 flex-col gap-4 overflow-y-auto bg-superficie px-4 py-4 [&_input]:!bg-papel-suave [&_select]:!bg-papel-suave [&_textarea]:!bg-papel-suave">
           {/* ---------------------------------------------------------------- 1 · el cliente */}
           <section className={CAJA}>
             <p className={ROTULO}>1 · El cliente</p>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <Campo etiqueta="Teléfono" ayuda={buscandoCliente ? "Buscando…" : "Tocá la lupa para ver si ya es cliente."}>
+            <div className="grid items-start gap-3 sm:grid-cols-2">
+              <Campo etiqueta="Teléfono">
                 <EntradaConLupa
                   type="tel"
                   inputMode="tel"
@@ -211,6 +236,8 @@ export function AbrirCuentaDeliveryPanel({
                   onChange={(e) => {
                     setTelefono(e.target.value);
                     setEstadoCliente("");
+                    // Si se borra el teléfono, se va también lo que había completado la búsqueda.
+                    if (!e.target.value.trim()) limpiarAutocompletado();
                   }}
                   onBlur={buscarCliente}
                   onBuscar={buscarCliente}
@@ -220,6 +247,7 @@ export function AbrirCuentaDeliveryPanel({
                   maxLength={30}
                   autoFocus={!edita}
                 />
+                {buscandoCliente && <span className="mt-1.5 block text-[0.78rem] text-tinta-suave">Buscando…</span>}
                 {estadoCliente === "conocido" && (
                   <span className="mt-1.5 block text-[0.78rem] font-medium text-exito">Cliente conocido: ya pidió antes.</span>
                 )}
@@ -228,7 +256,16 @@ export function AbrirCuentaDeliveryPanel({
                 )}
               </Campo>
               <Campo etiqueta="Nombre">
-                <Entrada value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Nombre del cliente" maxLength={80} />
+                <Entrada
+                  value={nombre}
+                  onChange={(e) => {
+                    setNombre(e.target.value);
+                    // Lo que se escribe a mano ya no se reemplaza ni se limpia con la búsqueda.
+                    setNombreAutocompletado(false);
+                  }}
+                  placeholder="Nombre del cliente"
+                  maxLength={80}
+                />
               </Campo>
             </div>
           </section>
@@ -279,7 +316,7 @@ export function AbrirCuentaDeliveryPanel({
           <section className={CAJA}>
             <p className={ROTULO}>3 · El envío</p>
             <div className="grid gap-3 sm:grid-cols-2">
-              <Campo etiqueta="Zona de envío" ayuda="Según dónde está hoy el cliente.">
+              <Campo etiqueta="Zona de envío">
                 <Selector value={zonaId} onChange={(e) => elegirZona(e.target.value)}>
                   <option value="">Elegí la zona…</option>
                   <option value={COORDINAR}>A coordinar (sin zona)</option>
@@ -290,7 +327,7 @@ export function AbrirCuentaDeliveryPanel({
                   ))}
                 </Selector>
               </Campo>
-              <Campo etiqueta="Costo de envío (Gs.)" ayuda="Se puede cambiar por lo que arreglaste con el cliente.">
+              <Campo etiqueta="Costo de envío (Gs.)">
                 <Entrada
                   type="number"
                   inputMode="numeric"
@@ -315,12 +352,6 @@ export function AbrirCuentaDeliveryPanel({
             </Campo>
           </section>
 
-          {!edita && (
-            <p className="rounded-lg bg-papel-suave px-3 py-2 text-[0.78rem] leading-snug text-tinta-media">
-              Al crear la cuenta se abre la carta para cargarle los productos. La cuenta queda abierta hasta cobrarla: podés tener
-              varias a la vez.
-            </p>
-          )}
         </div>
 
         <div className="flex flex-none flex-col gap-2 border-t border-linea bg-superficie px-4 py-3">

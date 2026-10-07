@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Campo, Entrada, Selector, clasesBoton } from "@/components/ui";
+import { Campo, Entrada, Selector } from "@/components/ui";
 import { TIPOS_IDENTIFICACION_FISCAL, etiquetaTipoIdentificacion } from "@/lib/tipo-cliente";
 import { limpiarTexto } from "@/lib/datos-fiscales";
 import { buscarClienteFiscalPorNumero, type ClienteFiscalEncontrado } from "./actions";
@@ -39,9 +39,13 @@ export function CamposFiscalesCliente({
 }) {
   const [busqueda, setBusqueda] = useState<Busqueda>(null);
   const [buscando, setBuscando] = useState(false);
+  /** La razón social y el correo los trajo la lupa (y nadie los tocó después): son de ESE número, no de otro que se escriba. */
+  const [trajoDatos, setTrajoDatos] = useState(false);
+  const datosAutocompletados = trajoDatos || !!avisoRecurrente;
 
   /** Trae a la ficha los datos de un cliente fiscal que ya estaba en el sistema. */
   function aplicar(c: ClienteFiscalEncontrado) {
+    setTrajoDatos(true);
     onCambiar({
       tipo: TIPOS_IDENTIFICACION_FISCAL.some((t) => t.valor === c.tipoIdentificacion) ? c.tipoIdentificacion : "ruc",
       numero: c.numeroIdentificacion,
@@ -61,6 +65,11 @@ export function CamposFiscalesCliente({
         const exactos = r.filter((c) => c.numeroIdentificacion.toLowerCase() === texto.toLowerCase());
         if (r.length === 0) {
           setBusqueda({ estado: "nuevo" });
+          // Si la razón social y el correo eran de la búsqueda anterior, no corresponden a este número: se sacan (se carga la nueva).
+          if (datosAutocompletados) {
+            onCambiar({ ...ficha, razon: "", email: "" });
+            setTrajoDatos(false);
+          }
         } else if (exactos.length === 1 || r.length === 1) {
           // Un solo candidato (aunque lo escrito sea una parte del número): se completa todo en el acto.
           const elegido = exactos.length === 1 ? exactos[0] : r[0];
@@ -94,7 +103,9 @@ export function CamposFiscalesCliente({
             id={idBase}
             value={ficha.numero}
             onChange={(e) => {
-              onCambiar({ ...ficha, numero: e.target.value });
+              // Con otro número, la razón social y el correo que trajo una búsqueda anterior ya no son de este cliente: se sacan.
+              onCambiar(datosAutocompletados ? { ...ficha, numero: e.target.value, razon: "", email: "" } : { ...ficha, numero: e.target.value });
+              setTrajoDatos(false);
               setBusqueda(null);
             }}
             onKeyDown={(e) => {
@@ -114,7 +125,8 @@ export function CamposFiscalesCliente({
             disabled={buscando || limpiarTexto(ficha.numero).length < 3}
             aria-label="Buscar en el sistema si ya existe"
             title="Buscar en el sistema si ya existe"
-            className={`${clasesBoton("navegar", "md")} flex-none !px-3`}
+            // Azul sólido, igual que la lupa del teléfono, y de la misma altura que el campo.
+            className="flex flex-none items-center justify-center self-stretch rounded-lg bg-azul px-3 text-white transition-colors hover:bg-azul-oscuro focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-azul/40 disabled:pointer-events-none disabled:opacity-40"
           >
             {buscando ? (
               "…"
@@ -169,10 +181,25 @@ export function CamposFiscalesCliente({
         </Selector>
       </Campo>
       <Campo etiqueta="Razón social">
-        <Entrada value={ficha.razon} onChange={(e) => onCambiar({ ...ficha, razon: e.target.value })} maxLength={120} />
+        <Entrada
+          value={ficha.razon}
+          onChange={(e) => {
+            onCambiar({ ...ficha, razon: e.target.value });
+            setTrajoDatos(false);
+          }}
+          maxLength={120}
+        />
       </Campo>
       <Campo etiqueta="Correo (opcional)">
-        <Entrada type="email" value={ficha.email} onChange={(e) => onCambiar({ ...ficha, email: e.target.value })} maxLength={120} />
+        <Entrada
+          type="email"
+          value={ficha.email}
+          onChange={(e) => {
+            onCambiar({ ...ficha, email: e.target.value });
+            setTrajoDatos(false);
+          }}
+          maxLength={120}
+        />
       </Campo>
     </>
   );
