@@ -23,7 +23,7 @@ export function MovimientosCajaBoton({ turnoId }: { turnoId: string }) {
 
   return (
     <>
-      <button type="button" onClick={() => setAbierto(true)} className={clasesBoton("navegar", "sm")}>
+      <button type="button" onClick={() => setAbierto(true)} className={clasesBoton("navegar", "md")}>
         💰 Caja: ingresos y retiros
       </button>
       {abierto && <ModalCaja turnoId={turnoId} onCerrar={() => setAbierto(false)} />}

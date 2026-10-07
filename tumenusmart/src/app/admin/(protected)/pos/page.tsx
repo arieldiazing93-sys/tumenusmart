@@ -1,5 +1,7 @@
 import { redirect } from "next/navigation";
+import { headers } from "next/headers";
 import { pantallaConPermiso } from "@/lib/auth";
+import { puede } from "@/lib/permisos";
 import { prisma } from "@/lib/prisma";
 import { prismaDelLocal } from "@/lib/prisma-local";
 import { idLocalActual } from "@/lib/local-actual";
@@ -12,8 +14,17 @@ import { EstacionNoVinculada } from "./EstacionNoVinculada";
 
 export const dynamic = "force-dynamic";
 
+/** La dirección pública de la carta, tomada del dominio con el que se entró al panel. */
+async function urlPublicaCarta(slug: string): Promise<string> {
+  const cabeceras = await headers();
+  const host = cabeceras.get("x-forwarded-host") ?? cabeceras.get("host") ?? "";
+  if (!host) return "";
+  const protocolo = host.startsWith("localhost") ? "http" : "https";
+  return `${protocolo}://${host}/${slug}`;
+}
+
 export default async function PosPage() {
-  await pantallaConPermiso("pos.vender");
+  const sesion = await pantallaConPermiso("pos.vender");
   const storeId = await idLocalActual();
   const db = prismaDelLocal(storeId);
 
@@ -51,8 +62,10 @@ export default async function PosPage() {
   // eso se lee con el cliente global, no con `db`.
   const store = await prisma.store.findUnique({
     where: { id: storeId },
-    select: { facturaObligatoria: true, ventasACredito: true, pedirPersonalEnVenta: true },
+    select: { facturaObligatoria: true, ventasACredito: true, pedirPersonalEnVenta: true, nombre: true, slug: true },
   });
+  // La carta pública (enlace y QR) para el botón "Ver mi carta" de arriba.
+  const urlCarta = store ? await urlPublicaCarta(store.slug) : "";
 
   // Solo si el local activó "preguntar el personal al cobrar" (barberías, salones): el personal activo,
   // para elegir a quién se le asigna el trabajo. En los demás negocios el punto de venta no lo muestra.
@@ -181,6 +194,8 @@ export default async function PosPage() {
       nombreImpresoraTicket={nombreImpresoraTicket}
       impresorasPorArea={impresorasPorArea}
       personal={personalParaVenta}
+      accesos={{ comedor: puede(sesion.rol, "comedor.ver"), delivery: puede(sesion.rol, "delivery.ver") }}
+      carta={store && urlCarta ? { nombre: store.nombre, url: urlCarta } : null}
     />
   );
 }

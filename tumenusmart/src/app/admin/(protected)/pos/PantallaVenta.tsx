@@ -14,6 +14,7 @@ import { SIN_REGISTRO_FISCAL, TIPOS_IDENTIFICACION_FISCAL, etiquetaCortaTipoIden
 import { buscarClientePorIdentificacion, buscarClientePorTelefono, registrarVenta } from "./actions";
 import { CobrarPanel } from "./CobrarPanel";
 import { MovimientosCajaBoton } from "./caja/MovimientosCajaBoton";
+import { CompartirCarta } from "../CompartirCarta";
 import { EntradaConLupa } from "./EntradaConLupa";
 import { ClienteFiscalModal, type DatosClienteFiscal } from "./ClienteFiscalModal";
 import { ClienteRapidoModal } from "./ClienteRapidoModal";
@@ -74,6 +75,8 @@ export function PantallaVenta({
   nombreImpresoraTicket,
   impresorasPorArea,
   personal,
+  accesos,
+  carta,
 }: {
   turnoId: string;
   categorias: Categoria[];
@@ -96,6 +99,13 @@ export function PantallaVenta({
    * se pregunta si la cuenta lleva algún servicio (ver `llevaServicio`): una cuenta de puros productos no asigna a nadie.
    */
   personal: { id: string; nombre: string }[];
+  /**
+   * Los accesos directos de arriba (para no tener que entrar por el menú): solo los que esta persona puede abrir. El historial de
+   * cuentas va siempre: es del mismo permiso que el propio punto de venta.
+   */
+  accesos: { comedor: boolean; delivery: boolean };
+  /** El nombre y la dirección pública de la carta, para el botón "Ver mi carta" (enlace y QR para imprimir). Null si no se pudo armar. */
+  carta: { nombre: string; url: string } | null;
 }) {
   const router = useRouter();
   // Si el local exige facturar todo y esta estación puede hacerlo, no hay
@@ -603,8 +613,26 @@ export function PantallaVenta({
         bajada="Venta rápida de mostrador."
         acciones={
           <>
+            {/* Accesos directos a lo que más usa la caja, sin pasar por el menú: la carta (enlace y QR para las mesas), el comedor, el
+                delivery y el historial de cuentas. Unos pocos a propósito: los reportes se miran desde el menú. */}
+            {carta && (
+              <CompartirCarta nombreNegocio={carta.nombre} url={carta.url} etiquetaBoton="📱 Ver mi carta" tonoBoton="navegar" tamBoton="md" />
+            )}
+            {accesos.comedor && (
+              <Link href="/admin/comedor" className={clasesBoton("navegar", "md")}>
+                🍽 Servicio comedor
+              </Link>
+            )}
+            {accesos.delivery && (
+              <Link href="/admin/delivery" className={clasesBoton("navegar", "md")}>
+                🛵 Servicio delivery
+              </Link>
+            )}
+            <Link href="/admin/pos/cuentas" className={clasesBoton("navegar", "md")}>
+              🧾 Historial de cuentas
+            </Link>
             <MovimientosCajaBoton turnoId={turnoId} />
-            <Link href="/admin/pos/cerrar" className={clasesBoton("navegar", "sm")}>
+            <Link href="/admin/pos/cerrar" className={clasesBoton("navegar", "md")}>
               🔒 Cerrar turno
             </Link>
           </>
