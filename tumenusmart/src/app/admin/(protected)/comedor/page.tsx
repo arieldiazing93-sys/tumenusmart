@@ -1,3 +1,4 @@
+import { headers } from "next/headers";
 import { pantallaConPermiso } from "@/lib/auth";
 import { puede } from "@/lib/permisos";
 import { prisma } from "@/lib/prisma";
@@ -19,9 +20,19 @@ import {
 import { BotonEnlace, Cabecera, Pastilla } from "@/components/ui";
 import { RefrescarCada } from "@/components/RefrescarCada";
 import { turnoAbierto } from "../pos/turno-actual";
+import { CompartirCarta } from "../CompartirCarta";
 import { ComedorCaja, type ContextoCaja, type CuentaCajaFila } from "./ComedorCaja";
 
 export const dynamic = "force-dynamic";
+
+/** La dirección pública de la carta, tomada del dominio con el que se entró al panel. */
+async function urlPublicaCarta(slug: string): Promise<string> {
+  const cabeceras = await headers();
+  const host = cabeceras.get("x-forwarded-host") ?? cabeceras.get("host") ?? "";
+  if (!host) return "";
+  const protocolo = host.startsWith("localhost") ? "http" : "https";
+  return `${protocolo}://${host}/${slug}`;
+}
 
 /**
  * Servicio comedor: las cuentas de las mesas, con lo que cargaron los mozos, y desde acá la caja las opera: carga productos,
@@ -34,6 +45,10 @@ export default async function ComedorPage() {
   const db = prismaDelLocal(storeId);
   const puedeGestionar = puede(sesion.rol, "comedor.gestionar");
   const puedeCobrar = puedeGestionar && puede(sesion.rol, "pos.vender");
+
+  // El enlace y el QR de la carta pública: el botón "Ver mi carta" de arriba los muestra en una ventana (el QR se descarga para ponerlo en las mesas).
+  const local = await prisma.store.findUnique({ where: { id: storeId }, select: { nombre: true, slug: true } });
+  const urlCarta = local ? await urlPublicaCarta(local.slug) : "";
 
   const desdeLatido = new Date(Date.now() - SEGUNDOS_LATIDO_IMPRESION * 1000);
   const [cuentas, enEspera, imprimiendo] = await Promise.all([
@@ -223,6 +238,10 @@ export default async function ComedorPage() {
         bajada="Las mesas abiertas y lo que cargaron los mozos. Se actualiza solo."
         acciones={
           <>
+            {/* Ver mi carta: abre el enlace público y el QR para imprimir y poner en las mesas. */}
+            {urlCarta && (
+              <CompartirCarta nombreNegocio={local?.nombre ?? "Nuestra carta"} url={urlCarta} etiquetaBoton="Ver mi carta" tonoBoton="navegar" />
+            )}
             {puedeGestionar && (
               <BotonEnlace href="/admin/impresion" tono="navegar" tam="md">
                 Impresión automática

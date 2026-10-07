@@ -27,9 +27,16 @@ function nombreArchivo(nombre: string): string {
 export function CompartirCarta({
   nombreNegocio,
   url,
+  etiquetaBoton = "🔗 Compartir mi carta",
+  tonoBoton = "principal",
+  tamBoton = "md",
 }: {
   nombreNegocio: string;
   url: string;
+  /** Lo que dice el botón que abre la ventana (en el Servicio comedor: "Ver mi carta"). */
+  etiquetaBoton?: string;
+  tonoBoton?: "principal" | "navegar" | "suave";
+  tamBoton?: "sm" | "md" | "lg";
 }) {
   const [abierto, setAbierto] = useState(false);
   const [solapa, setSolapa] = useState<Solapa>("link");
@@ -132,9 +139,9 @@ export function CompartirCarta({
       <button
         type="button"
         onClick={() => setAbierto(true)}
-        className={clasesBoton("principal")}
+        className={clasesBoton(tonoBoton, tamBoton)}
       >
-        🔗 Compartir mi carta
+        {etiquetaBoton}
       </button>
 
       {abierto && (
