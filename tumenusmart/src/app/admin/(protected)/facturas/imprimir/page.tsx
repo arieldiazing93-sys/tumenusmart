@@ -35,7 +35,8 @@ export default async function ImprimirFacturasPage({
   const ordenadas = [...filas].reverse();
   const vigentes = filas.filter(esVigente);
   const totalFacturado = vigentes.reduce((s, f) => s + f.total, 0);
-  const totalIva = vigentes.reduce((s, f) => s + (f.iva10 ?? 0) + (f.iva5 ?? 0), 0);
+  // Suma de lo que se ve en cada fila (cada IVA ya redondeado a guaraníes), así el total cierra con la columna.
+  const totalIva = vigentes.reduce((s, f) => s + Math.round(f.iva10 ?? 0) + Math.round(f.iva5 ?? 0), 0);
   const anuladas = filas.length - vigentes.length;
 
   return (
@@ -99,7 +100,7 @@ export default async function ImprimirFacturasPage({
             <tbody>
               {ordenadas.map((f) => {
                 const anulada = !esVigente(f);
-                const iva = f.iva10 != null || f.iva5 != null ? (f.iva10 ?? 0) + (f.iva5 ?? 0) : null;
+                const iva = f.iva10 != null || f.iva5 != null ? Math.round(f.iva10 ?? 0) + Math.round(f.iva5 ?? 0) : null;
                 return (
                   <tr key={f.key} className="border-b border-linea-fina break-inside-avoid">
                     <td className="cifra py-1.5 text-tinta">{f.facturaNumero}</td>

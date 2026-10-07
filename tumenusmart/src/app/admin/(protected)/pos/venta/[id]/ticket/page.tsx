@@ -360,7 +360,8 @@ export default async function TicketVentaPosPage({
               <p>
                 {filaEtiqueta(
                   "TOTAL IVA",
-                  formatearGuarani(Number(venta.facturaIva10 ?? 0) + Number(venta.facturaIva5 ?? 0)),
+                  // La suma de lo que se imprimió arriba (cada tasa ya redondeada a guaraníes).
+                  formatearGuarani(Math.round(Number(venta.facturaIva10 ?? 0)) + Math.round(Number(venta.facturaIva5 ?? 0))),
                   9
                 )}
               </p>

@@ -122,8 +122,11 @@ export function desglosarIva(lineas: LineaConIva[], descuento = 0): DesgloseIva 
     gravado10,
     gravado5,
     exento,
-    iva10: gravado10 / 11,
-    iva5: gravado5 / 21,
+    // El IVA contenido en cada tasa, en guaraníes ENTEROS (el guaraní no tiene decimales): 70.000 ÷ 11 = 6.363,64 → 6.364. Se redondea
+    // acá, en el origen, para que lo guardado, lo impreso y lo que suman los reportes sea lo mismo (con decimales guardados, el TOTAL IVA
+    // de una factura con 10 % y 5 % salía 1 Gs distinto de la suma de sus dos filas).
+    iva10: Math.round(gravado10 / 11),
+    iva5: Math.round(gravado5 / 21),
     totalGeneral: gravado10 + gravado5 + exento,
   };
 }

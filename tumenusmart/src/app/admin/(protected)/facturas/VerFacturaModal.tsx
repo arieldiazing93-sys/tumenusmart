@@ -275,7 +275,7 @@ export function VerFacturaModal({
                   <div className="flex justify-between font-medium text-tinta">
                     <span>Total IVA</span>
                     <span className="cifra">
-                      {formatearGuarani(detalle.facturaIva10 + detalle.facturaIva5)}
+                      {formatearGuarani(Math.round(detalle.facturaIva10) + Math.round(detalle.facturaIva5))}
                     </span>
                   </div>
                 </div>

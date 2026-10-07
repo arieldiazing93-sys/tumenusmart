@@ -139,7 +139,8 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     l.push("LIQUIDACION IVA");
     if (Number(venta.facturaIva10 ?? 0) > 0) l.push(filaEtiqueta("IVA 10%", formatearGuarani(Number(venta.facturaIva10)), 9));
     if (Number(venta.facturaIva5 ?? 0) > 0) l.push(filaEtiqueta("IVA 5%", formatearGuarani(Number(venta.facturaIva5)), 9));
-    l.push(filaEtiqueta("TOTAL IVA", formatearGuarani(Number(venta.facturaIva10 ?? 0) + Number(venta.facturaIva5 ?? 0)), 9));
+    // La suma de lo que se imprimió arriba (cada tasa ya redondeada a guaraníes), no el redondeo de la suma con decimales.
+    l.push(filaEtiqueta("TOTAL IVA", formatearGuarani(Math.round(Number(venta.facturaIva10 ?? 0)) + Math.round(Number(venta.facturaIva5 ?? 0))), 9));
     l.push(sep());
     l.push("ORIGINAL: CLIENTE");
     l.push("DUPLICADO: ARCHIVO TRIBUTARIO");

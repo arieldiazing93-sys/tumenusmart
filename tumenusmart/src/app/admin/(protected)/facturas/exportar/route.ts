@@ -121,8 +121,9 @@ export async function GET(request: NextRequest) {
       totalGravado10 += f.gravado10 ?? 0;
       totalGravado5 += f.gravado5 ?? 0;
       totalExento += f.exento ?? 0;
-      totalIva10 += f.iva10 ?? 0;
-      totalIva5 += f.iva5 ?? 0;
+      // Cada IVA ya redondeado a guaraníes (como se ve en su fila): el total de la columna es la suma de lo que se ve.
+      totalIva10 += Math.round(f.iva10 ?? 0);
+      totalIva5 += Math.round(f.iva5 ?? 0);
       total += f.total;
     }
   }

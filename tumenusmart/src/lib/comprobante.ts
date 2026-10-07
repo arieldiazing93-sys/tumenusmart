@@ -121,8 +121,9 @@ export function totalesDeItems(items: ItemCalculado[]): TotalesComprobante {
     gravado10: redondear2(gravado10),
     gravado5: redondear2(gravado5),
     exento: redondear2(exento),
-    iva10: redondear2(gravado10 / 11),
-    iva5: redondear2(gravado5 / 21),
+    // En guaraníes enteros, igual que en la venta (ver desglosarIva): 70.000 ÷ 11 = 6.363,64 → 6.364.
+    iva10: Math.round(gravado10 / 11),
+    iva5: Math.round(gravado5 / 21),
     descuento: redondear2(descuento),
     total: redondear2(gravado10 + gravado5 + exento),
   };
