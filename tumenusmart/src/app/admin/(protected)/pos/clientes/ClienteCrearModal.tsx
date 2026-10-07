@@ -9,9 +9,8 @@ import { crearCliente } from "./actions";
  * Alta manual de un cliente nuevo, en ventana modal (mismo estilo que
  * ClienteEditarModal/ClienteFiscalModal del POS).
  *
- * A diferencia de ClienteEditarModal, acá el teléfono SÍ se carga (en la
- * edición no, porque ya lo trajo la primera compra) y no hay Clave que
- * mostrar todavía: se asigna recién al guardar.
+ * A diferencia de ClienteEditarModal, acá no hay Clave que mostrar todavía:
+ * se asigna recién al guardar (y después nunca se cambia).
  */
 export function ClienteCrearModal({
   onCerrar,

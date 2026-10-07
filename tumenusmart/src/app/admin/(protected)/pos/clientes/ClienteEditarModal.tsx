@@ -11,17 +11,18 @@ import { actualizarCliente, subirFotoDelCliente } from "./actions";
  * Edición de un cliente ya existente, en ventana modal (mismo estilo que
  * ClienteFiscalModal del POS).
  *
- * Clave queda de solo lectura (correlativo interno, no algo que se
- * "corrige"). Tipo + N° de identificación SÍ se pueden corregir: los datos
- * de una venta ya emitida quedan congelados en sus propios campos
- * (VentaPos/Order), así que editar esta ficha no altera ningún ticket ya
- * impreso — sirve para arreglar un RUC/razón social mal tipeado de acá en
- * adelante.
+ * Se puede corregir todo menos la Clave (correlativo interno, no algo que se
+ * "corrige"): nombre o razón social, teléfono, tipo y N° de identificación
+ * (RUC, cédula…) y correo. Los datos de una venta ya emitida quedan
+ * congelados en sus propios campos (VentaPos), así que editar esta ficha no
+ * altera ningún ticket ya impreso — sirve para arreglar un RUC, un teléfono
+ * o una razón social mal tipeados de acá en adelante.
  */
 export function ClienteEditarModal({
   id,
   numero,
   nombre,
+  telefono,
   email,
   tipoIdentificacion,
   numeroIdentificacion,
@@ -32,6 +33,7 @@ export function ClienteEditarModal({
   id: string;
   numero: number | null;
   nombre: string;
+  telefono: string | null;
   email: string | null;
   tipoIdentificacion: string | null;
   numeroIdentificacion: string | null;
@@ -41,10 +43,10 @@ export function ClienteEditarModal({
   onGuardado: () => void;
 }) {
   const [valorNombre, setValorNombre] = useState(nombre);
+  const [valorTelefono, setValorTelefono] = useState(telefono ?? "");
   const [valorEmail, setValorEmail] = useState(email ?? "");
   const [valorTipo, setValorTipo] = useState(tipoIdentificacion ?? TIPOS_IDENTIFICACION_FISCAL[0].valor);
   const [valorNumeroIdent, setValorNumeroIdent] = useState(numeroIdentificacion ?? "");
-  const [tieneIdentificacion, setTieneIdentificacion] = useState(!!numeroIdentificacion);
   const [valorFoto, setValorFoto] = useState(fotoUrl ?? "");
   const [subiendoFoto, setSubiendoFoto] = useState(false);
   const [errorFoto, setErrorFoto] = useState<string | null>(null);
@@ -91,9 +93,11 @@ export function ClienteEditarModal({
     startTransition(async () => {
       const r = await actualizarCliente(id, {
         nombre: valorNombre,
+        telefono: valorTelefono,
         email: valorEmail,
-        tipoIdentificacion: tieneIdentificacion ? valorTipo : "",
-        numeroIdentificacion: tieneIdentificacion ? valorNumeroIdent : "",
+        // Sin número no hay identificación: el tipo solo vale acompañando a un número.
+        tipoIdentificacion: valorNumeroIdent.trim() ? valorTipo : "",
+        numeroIdentificacion: valorNumeroIdent,
         fotoUrl: valorFoto,
       });
       if (!r.ok) {
@@ -142,40 +146,32 @@ export function ClienteEditarModal({
             <Entrada value={valorNombre} onChange={(e) => setValorNombre(e.target.value)} autoFocus />
           </Campo>
 
-          {tieneIdentificacion ? (
-            <>
-              <Campo etiqueta="Tipo">
-                <Selector value={valorTipo} onChange={(e) => setValorTipo(e.target.value)}>
-                  {TIPOS_IDENTIFICACION_FISCAL.map((t) => (
-                    <option key={t.valor} value={t.valor}>
-                      {t.etiqueta}
-                    </option>
-                  ))}
-                </Selector>
-              </Campo>
-              <Campo etiqueta="N° de RUC / Cédula / etc.">
-                <Entrada value={valorNumeroIdent} onChange={(e) => setValorNumeroIdent(e.target.value)} />
-              </Campo>
-              <button
-                type="button"
-                onClick={() => {
-                  setTieneIdentificacion(false);
-                  setValorNumeroIdent("");
-                }}
-                className="self-start text-[0.76rem] font-medium text-tinta-suave underline"
-              >
-                Quitar identificación fiscal
-              </button>
-            </>
-          ) : (
-            <button
-              type="button"
-              onClick={() => setTieneIdentificacion(true)}
-              className="self-start text-[0.76rem] font-medium text-brand-texto underline"
-            >
-              + Agregar identificación fiscal
-            </button>
-          )}
+          <Campo etiqueta="Teléfono">
+            <Entrada
+              type="tel"
+              inputMode="tel"
+              value={valorTelefono}
+              onChange={(e) => setValorTelefono(e.target.value)}
+              placeholder="0981 123 456"
+            />
+          </Campo>
+
+          <Campo etiqueta="Tipo de identificación">
+            <Selector value={valorTipo} onChange={(e) => setValorTipo(e.target.value)}>
+              {TIPOS_IDENTIFICACION_FISCAL.map((t) => (
+                <option key={t.valor} value={t.valor}>
+                  {t.etiqueta}
+                </option>
+              ))}
+            </Selector>
+          </Campo>
+          <Campo etiqueta="N° de RUC / Cédula / etc.">
+            <Entrada
+              value={valorNumeroIdent}
+              onChange={(e) => setValorNumeroIdent(e.target.value)}
+              placeholder="Dejalo vacío si no tiene"
+            />
+          </Campo>
 
           <Campo etiqueta="Correo electrónico">
             <Entrada

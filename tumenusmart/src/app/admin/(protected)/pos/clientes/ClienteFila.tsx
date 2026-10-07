@@ -82,9 +82,14 @@ export function ClienteFila({ id, numero, nombre, email, telefono, tipoIdentific
           )}
         </Td>
         <Td>
-          <button type="button" onClick={() => setModal("ver")} className={clasesBoton("navegar", "sm")}>
-            Ver
-          </button>
+          <div className="flex items-center gap-1.5">
+            <button type="button" onClick={() => setModal("ver")} className={clasesBoton("navegar", "sm")}>
+              Ver
+            </button>
+            <button type="button" onClick={() => setModal("editar")} className={clasesBoton("navegar", "sm")}>
+              Editar
+            </button>
+          </div>
         </Td>
       </Tr>
       {/* Portal a document.body: <tr> solo puede tener <td>/<th> como hijos
@@ -111,6 +116,7 @@ export function ClienteFila({ id, numero, nombre, email, telefono, tipoIdentific
             id={id}
             numero={numero}
             nombre={nombre}
+            telefono={telefono}
             email={email}
             tipoIdentificacion={tipoIdentificacion}
             numeroIdentificacion={numeroIdentificacion}

@@ -14,6 +14,8 @@ import { clasesBoton } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
+/** Cada cuántos segundos la pantalla del repartidor vuelve a consultar sola (un minuto). */
+const SEGUNDOS_ACTUALIZAR = 60;
 /** Un pedido recién asignado se marca como "Nuevo" durante estos minutos. */
 const MINUTOS_NUEVO = 3;
 /** Cuántos pedidos como máximo trae el historial de una consulta (un tramo muy largo se acota). */
@@ -32,6 +34,19 @@ function hora(d: Date): string {
 
 function dia(d: Date): string {
   return d.toLocaleDateString("es-PY", { day: "2-digit", month: "2-digit", timeZone: ZONA_NEGOCIO });
+}
+
+/**
+ * Con qué se pagó una venta, en números comunes (los montos de la base vienen como Decimal): sus pagos, o la forma única por el total
+ * si la venta no tiene el detalle.
+ */
+function pagosDeVenta(v: {
+  formaPago: string;
+  total: { toString(): string };
+  pagos: { forma: string; monto: { toString(): string } }[];
+}): { forma: string; monto: number }[] {
+  if (v.pagos.length === 0) return [{ forma: v.formaPago, monto: Number(v.total.toString()) }];
+  return v.pagos.map((p) => ({ forma: p.forma, monto: Number(p.monto.toString()) }));
 }
 
 /** La ubicación del cliente: el punto marcado o pegado (coordenadas) o, si solo hay un enlace corto de Google Maps, ese enlace tal cual. */
@@ -116,8 +131,7 @@ export default async function RepartidorPage({
     if (!v) continue;
     cobradas += 1;
     totalCobrado += Number(v.total);
-    const pagos = v.pagos.length > 0 ? v.pagos : [{ forma: v.formaPago, monto: v.total }];
-    for (const p of pagos) porForma.set(p.forma, (porForma.get(p.forma) ?? 0) + Number(p.monto));
+    for (const p of pagosDeVenta(v)) porForma.set(p.forma, (porForma.get(p.forma) ?? 0) + p.monto);
   }
   const canceladas = cerradas.filter((c) => c.estado === "anulada").length;
 
@@ -134,9 +148,10 @@ export default async function RepartidorPage({
           ? "No tenés pedidos asignados en este momento."
           : `Tenés ${pendientes.length} ${pendientes.length === 1 ? "pedido" : "pedidos"} para entregar.`}
       </p>
-      {/* Se actualiza sola: cuando la caja te asigna un pedido, aparece acá sin que hagas nada. */}
+      {/* Se actualiza sola cada minuto: cuando la caja te asigna un pedido, aparece acá sin que hagas nada (y en el acto, con
+          "Actualizar" o al volver a abrir la pantalla). */}
       <div className="mb-5">
-        <RefrescarCada segundos={8} generadoEn={generadoEn} />
+        <RefrescarCada segundos={SEGUNDOS_ACTUALIZAR} generadoEn={generadoEn} />
       </div>
 
       <div className="flex flex-col gap-4">
@@ -284,7 +299,7 @@ export default async function RepartidorPage({
                 const cancelada = c.estado === "anulada";
                 const linkUbicacion = enlaceDeUbicacion(c);
                 const direccionEscrita = textoSinEnlaces(c.direccion);
-                const pagos = venta ? (venta.pagos.length > 0 ? venta.pagos : [{ forma: venta.formaPago, monto: venta.total }]) : [];
+                const pagos = venta ? pagosDeVenta(venta) : [];
                 return (
                   <div key={c.id} className="rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2 text-sm">
                     <div className="flex items-center justify-between gap-2">

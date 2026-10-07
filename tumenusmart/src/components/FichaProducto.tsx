@@ -195,7 +195,7 @@ export function FichaProducto({
             <img
               src={producto.imagenUrl}
               alt={producto.nombre}
-              className="h-40 w-full rounded-xl object-cover"
+              className="h-[175px] w-full rounded-xl object-cover"
               decoding="async"
             />
           )}

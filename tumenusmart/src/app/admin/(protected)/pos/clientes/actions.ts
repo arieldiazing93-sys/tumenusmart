@@ -7,6 +7,8 @@ import { idLocalActual } from "@/lib/local-actual";
 import { prismaDelLocal, siguienteNumeroCliente } from "@/lib/prisma-local";
 import { prisma } from "@/lib/prisma";
 import { subirFotoCliente } from "@/lib/supabase-storage";
+import { registrarBitacora } from "@/lib/bitacora";
+import { formatearNumero } from "@/lib/format";
 
 export type ResultadoActualizarCliente = { ok: true } | { ok: false; error: string };
 export type ResultadoCrearCliente = { ok: true } | { ok: false; error: string };
@@ -89,31 +91,44 @@ export async function crearCliente(datos: {
   return { ok: true };
 }
 
+/** Lo más largo que puede ser un teléfono escrito a mano (con prefijo, espacios y guiones). */
+const LARGO_TELEFONO_CLIENTE = 30;
+
 /**
- * Corrección de nombre/correo/identificación fiscal.
+ * Corrección de todos los datos del cliente: nombre o razón social, teléfono, correo, tipo y número de identificación fiscal (RUC,
+ * cédula…) y la foto. Lo único que NO se toca es la clave (el correlativo interno).
  *
- * No da de alta clientes — eso lo hace solo el flujo de venta. Tipo/número
- * de identificación SÍ se pueden corregir acá (a diferencia de lo que
- * decía este comentario antes): los datos fiscales de una venta ya emitida
- * quedan CONGELADOS en sus propios campos (`VentaPos`/`Order`), el ticket
- * impreso nunca vuelve a leer este `Customer` en vivo — corregir la ficha
- * acá no altera ningún documento ya impreso, solo el perfil a futuro.
+ * No da de alta clientes — eso lo hace solo el flujo de venta (o `crearCliente`). Tipo/número de identificación SÍ se pueden
+ * corregir acá: los datos fiscales de una venta ya emitida quedan CONGELADOS en sus propios campos (`VentaPos`), el ticket impreso
+ * nunca vuelve a leer este `Customer` en vivo — corregir la ficha acá no altera ningún documento ya impreso, solo el perfil a futuro.
+ * Lo mismo vale para las cuentas de delivery ya abiertas: guardan el teléfono y el nombre con que se abrieron.
+ *
+ * El teléfono y la identificación son únicos dentro del local: si el nuevo ya es de otro cliente, se avisa cuál dato choca en vez
+ * de pisarle los datos a ese otro cliente. Cada cambio queda en la Bitácora, con lo que decía antes.
  */
 export async function actualizarCliente(
   id: string,
   datos: {
     nombre: string;
+    telefono: string;
     email: string;
     tipoIdentificacion: string;
     numeroIdentificacion: string;
     fotoUrl: string;
   }
 ): Promise<ResultadoActualizarCliente> {
-  await exigirPermiso("pos.verHistorico");
-  const prisma = prismaDelLocal(await idLocalActual());
+  const sesion = await exigirPermiso("pos.verHistorico");
+  const storeId = await idLocalActual();
+  const prisma = prismaDelLocal(storeId);
 
   const nombre = datos.nombre.trim();
   if (!nombre) return { ok: false, error: "El nombre no puede quedar vacío." };
+
+  const telefono = datos.telefono.trim();
+  if (telefono.length > LARGO_TELEFONO_CLIENTE) {
+    return { ok: false, error: `El teléfono no puede tener más de ${LARGO_TELEFONO_CLIENTE} caracteres.` };
+  }
+  if (telefono && !/\d/.test(telefono)) return { ok: false, error: "El teléfono no es válido: tiene que llevar números." };
 
   const email = datos.email.trim();
   if (email && !email.includes("@")) return { ok: false, error: "El correo electrónico no es válido." };
@@ -128,11 +143,19 @@ export async function actualizarCliente(
   const fotoUrl = datos.fotoUrl.trim();
   if (fotoUrl && !/^https:\/\//i.test(fotoUrl)) return { ok: false, error: "La foto no es válida. Subila de nuevo." };
 
+  // El cliente se busca dentro de ESTE local: el id de otro negocio no aparece. Sirve además para dejar en la Bitácora lo que había.
+  const antes = await prisma.customer.findFirst({
+    where: { id: String(id) },
+    select: { id: true, numero: true, nombre: true, telefono: true, email: true, tipoIdentificacion: true, numeroIdentificacion: true },
+  });
+  if (!antes) return { ok: false, error: "No encontré a ese cliente. Actualizá la pantalla." };
+
   try {
     await prisma.customer.update({
-      where: { id },
+      where: { id: antes.id },
       data: {
         nombre,
+        telefono: telefono || null,
         email: email || null,
         tipoIdentificacion: tipoIdentificacion || null,
         numeroIdentificacion: numeroIdentificacion || null,
@@ -140,12 +163,39 @@ export async function actualizarCliente(
       },
     });
   } catch (err) {
-    // Choca contra @@unique([storeId, tipoIdentificacion, numeroIdentificacion])
-    // — ya hay otro cliente de este local con ese mismo tipo+número.
+    // Choca contra @@unique([storeId, telefono]) o @@unique([storeId, tipoIdentificacion, numeroIdentificacion]):
+    // ya hay otro cliente de este local con ese mismo dato.
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
-      return { ok: false, error: "Ya existe otro cliente con ese tipo y número de identificación." };
+      const campo = String(err.meta?.target ?? "");
+      return {
+        ok: false,
+        error: campo.includes("telefono")
+          ? "Ya existe otro cliente con ese teléfono."
+          : "Ya existe otro cliente con ese tipo y número de identificación.",
+      };
     }
     throw err;
+  }
+
+  // Solo se anota lo que cambió de verdad (la foto no: no es un dato del cliente que importe en el rastro).
+  const cambios: Record<string, { antes: string | null; despues: string | null }> = {};
+  const comparar = (campo: string, anterior: string | null, nuevo: string | null) => {
+    if ((anterior ?? null) !== (nuevo ?? null)) cambios[campo] = { antes: anterior ?? null, despues: nuevo ?? null };
+  };
+  comparar("nombre", antes.nombre, nombre);
+  comparar("telefono", antes.telefono, telefono || null);
+  comparar("email", antes.email, email || null);
+  comparar("tipoIdentificacion", antes.tipoIdentificacion, tipoIdentificacion || null);
+  comparar("numeroIdentificacion", antes.numeroIdentificacion, numeroIdentificacion || null);
+  if (Object.keys(cambios).length > 0) {
+    await registrarBitacora(storeId, sesion, {
+      modulo: "clientes",
+      accion: "cliente_editado",
+      descripcion: `Corrigió los datos del cliente ${antes.nombre}${antes.numero != null ? ` (clave ${formatearNumero(antes.numero)})` : ""}: ${Object.keys(cambios).join(", ")}.`,
+      entidad: "Customer",
+      entidadId: antes.id,
+      detalle: { cambios },
+    });
   }
 
   revalidatePath("/admin/pos/clientes");

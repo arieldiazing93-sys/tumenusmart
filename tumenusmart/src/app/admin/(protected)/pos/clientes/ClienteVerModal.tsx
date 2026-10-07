@@ -82,18 +82,20 @@ export function ClienteVerModal({
           <Campo etiqueta="Clave">
             <Entrada value={numero != null ? formatearNumero(numero) : "—"} disabled />
           </Campo>
+          <Campo etiqueta="Nombre / Razón social">
+            <Entrada value={nombre} disabled />
+          </Campo>
           <Campo etiqueta="Teléfono">
             <Entrada value={telefono ?? "—"} disabled />
           </Campo>
-          <Campo etiqueta="Identificación fiscal">
+          <Campo etiqueta="Tipo de identificación">
             <Entrada
-              value={
-                tipoIdentificacion && numeroIdentificacion
-                  ? `${etiquetaTipoIdentificacion(tipoIdentificacion)}: ${numeroIdentificacion}`
-                  : "—"
-              }
+              value={tipoIdentificacion && numeroIdentificacion ? etiquetaTipoIdentificacion(tipoIdentificacion) : "—"}
               disabled
             />
+          </Campo>
+          <Campo etiqueta="N° de RUC / Cédula / etc.">
+            <Entrada value={numeroIdentificacion ?? "—"} disabled />
           </Campo>
           <Campo etiqueta="Correo electrónico">
             <Entrada value={email ?? "—"} disabled />
