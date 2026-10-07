@@ -36,10 +36,18 @@ type DatosMensaje = {
 };
 
 /**
+ * Un dato del mensaje: el concepto va en negrita (así se distingue de lo que pidió el cliente) y después el valor. En WhatsApp la
+ * negrita es el texto entre asteriscos: `*Cliente:* Ariel`.
+ */
+function campo(concepto: string, valor: string): string {
+  return `*${concepto}:* ${valor}`;
+}
+
+/**
  * Arma el texto del pedido, prolijo y legible, tal como lo va a recibir el
  * restaurante en WhatsApp. Es lo ÚNICO que sale del menú digital: la caja lo lee
  * y carga el pedido a mano en el sistema (los datos de factura incluidos: los
- * compara antes en la DNIT).
+ * compara antes en la DNIT). Cada concepto con dos puntos (Cliente:, Teléfono:, Total:…) sale en negrita.
  */
 export function construirMensajePedido(datos: DatosMensaje): string {
   const lineas: string[] = [];
@@ -47,19 +55,19 @@ export function construirMensajePedido(datos: DatosMensaje): string {
   if (datos.saludo) lineas.push(datos.saludo);
   lineas.push(datos.numero != null ? `Pedido ${formatearNumero(datos.numero)}` : "Pedido nuevo");
   lineas.push("");
-  lineas.push(`Cliente: ${datos.clienteNombre}`);
-  if (datos.clienteTelefono?.trim()) lineas.push(`Teléfono: ${datos.clienteTelefono.trim()}`);
+  lineas.push(campo("Cliente", datos.clienteNombre));
+  if (datos.clienteTelefono?.trim()) lineas.push(campo("Teléfono", datos.clienteTelefono.trim()));
 
   if (datos.comprobanteTipo === "factura") {
-    lineas.push("Comprobante: Factura");
-    if (datos.facturaRazonSocial) lineas.push(`Razón social: ${datos.facturaRazonSocial}`);
-    if (datos.facturaRuc) lineas.push(`RUC: ${datos.facturaRuc}`);
-    if (datos.facturaEmail) lineas.push(`Correo: ${datos.facturaEmail}`);
+    lineas.push(campo("Comprobante", "Factura"));
+    if (datos.facturaRazonSocial) lineas.push(campo("Razón social", datos.facturaRazonSocial));
+    if (datos.facturaRuc) lineas.push(campo("RUC", datos.facturaRuc));
+    if (datos.facturaEmail) lineas.push(campo("Correo", datos.facturaEmail));
   }
-  lineas.push(`Método de pago: ${etiquetaMetodoPago(datos.metodoPagoReferencia)}`);
+  lineas.push(campo("Método de pago", etiquetaMetodoPago(datos.metodoPagoReferencia)));
 
   lineas.push("");
-  lineas.push("Detalle:");
+  lineas.push("*Detalle:*");
 
   for (const item of datos.items) {
     let linea = `• ${item.cantidad}x ${item.nombreProducto}`;
@@ -70,38 +78,36 @@ export function construirMensajePedido(datos: DatosMensaje): string {
   }
 
   lineas.push("");
-  lineas.push(`Subtotal: ${formatearGuarani(datos.subtotal)}`);
+  lineas.push(campo("Subtotal", formatearGuarani(datos.subtotal)));
   if (datos.tipoEntrega === "delivery") {
     const envioTexto = datos.zonaNombre
       ? `${formatearGuarani(datos.costoEnvio)} (${datos.zonaNombre})`
       : "A coordinar";
-    lineas.push(`Envío: ${envioTexto}`);
+    lineas.push(campo("Envío", envioTexto));
   }
-  lineas.push(`Total: ${formatearGuarani(datos.total)}${datos.tipoEntrega === "delivery" && !datos.zonaNombre ? " + envío" : ""}`);
+  lineas.push(campo("Total", `${formatearGuarani(datos.total)}${datos.tipoEntrega === "delivery" && !datos.zonaNombre ? " + envío" : ""}`));
   lineas.push("");
   lineas.push(
     datos.tipoEntrega === "delivery"
       ? datos.direccion?.trim()
-        ? `Entrega a domicilio: ${datos.direccion.trim()}`
+        ? campo("Entrega a domicilio", datos.direccion.trim())
         : // Sin referencia escrita, el pin del mapa es la dirección. Poner un
           // guion suelto haría pensar que se perdió el dato.
-          "Entrega a domicilio — ver ubicación abajo"
+          "*Entrega a domicilio* — ver ubicación abajo"
       : "Retiro en el local"
   );
   if (datos.tipoEntrega === "delivery" && datos.clienteLat != null && datos.clienteLng != null) {
-    lineas.push(
-      `Ubicación: https://www.google.com/maps?q=${datos.clienteLat},${datos.clienteLng}`
-    );
+    lineas.push(campo("Ubicación", `https://www.google.com/maps?q=${datos.clienteLat},${datos.clienteLng}`));
   }
 
   if (datos.notas) {
     lineas.push("");
-    lineas.push(`Nota: ${datos.notas}`);
+    lineas.push(campo("Nota", datos.notas));
   }
 
   if (datos.linkSeguimiento) {
     lineas.push("");
-    lineas.push(`Seguí tu pedido acá: ${datos.linkSeguimiento}`);
+    lineas.push(campo("Seguí tu pedido acá", datos.linkSeguimiento));
   }
 
   return lineas.join("\n");
@@ -165,14 +171,14 @@ export function construirMensajeReserva(datos: DatosMensajeReserva): string {
   if (datos.saludo) lineas.push(datos.saludo);
   lineas.push(`Reserva ${formatearNumero(datos.numero)}`);
   lineas.push("");
-  lineas.push(`Cliente: ${datos.clienteNombre}`);
-  lineas.push(`Teléfono: ${datos.clienteTelefono}`);
-  if (datos.clienteEmail) lineas.push(`Correo: ${datos.clienteEmail}`);
+  lineas.push(campo("Cliente", datos.clienteNombre));
+  lineas.push(campo("Teléfono", datos.clienteTelefono));
+  if (datos.clienteEmail) lineas.push(campo("Correo", datos.clienteEmail));
   lineas.push("");
-  lineas.push(`Fecha: ${datos.fechaTexto}`);
-  lineas.push(`Turno: ${datos.turnoTexto} — ${datos.horario}`);
-  lineas.push(`Personas: ${datos.personas}`);
-  lineas.push(`Motivo: ${datos.motivoTexto}`);
+  lineas.push(campo("Fecha", datos.fechaTexto));
+  lineas.push(campo("Turno", `${datos.turnoTexto} — ${datos.horario}`));
+  lineas.push(campo("Personas", String(datos.personas)));
+  lineas.push(campo("Motivo", datos.motivoTexto));
 
   return lineas.join("\n");
 }

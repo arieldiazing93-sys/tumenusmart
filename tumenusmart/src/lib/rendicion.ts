@@ -19,7 +19,7 @@
 // esta lista tenía "tarjeta" a secas, sin distinguir débito de crédito,
 // mientras el checkout y el POS ya venían separados. Además de la
 // inconsistencia, eso rompía en silencio la sugerencia de "lo que el
-// cliente había dicho" en la pantalla del repartidor (EntregarBoton): un
+// cliente había dicho" en la pantalla del repartidor (ya sin botón): un
 // pedido sugerido "tarjeta_debito" nunca coincidía con el botón "tarjeta".
 export type FormaDeCobro = "efectivo" | "tarjeta_debito" | "tarjeta_credito" | "transferencia";
 

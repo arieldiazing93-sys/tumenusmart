@@ -26,7 +26,7 @@ console.log("\n— la dirección del delivery —");
 const conReferencia = construirMensajePedido({
   ...BASE, tipoEntrega: "delivery", direccion: "Casa portón verde", clienteLat: -25.3, clienteLng: -57.6,
 });
-cierto("con referencia, la muestra", conReferencia.includes("Entrega a domicilio: Casa portón verde"));
+cierto("con referencia, la muestra", conReferencia.includes("*Entrega a domicilio:* Casa portón verde"));
 cierto("y además manda el mapa", conReferencia.includes("google.com/maps?q=-25.3,-57.6"));
 
 // El caso nuevo: el cliente solo marcó el pin y no escribió nada.
@@ -64,6 +64,21 @@ for (const [que, texto] of [
 ]) {
   cierto(`el mensaje incluye ${que}`, conReferencia.includes(texto));
 }
+
+console.log("— los conceptos van en negrita —");
+const completo = construirMensajePedido({
+  ...BASE, tipoEntrega: "delivery", direccion: "Casa portón verde", zonaNombre: "Centro", costoEnvio: 5000, subtotal: 165000,
+  metodoPagoReferencia: "efectivo", comprobanteTipo: "factura", facturaRazonSocial: "Ariel SA", facturaRuc: "80012345-6",
+  facturaEmail: "a@a.com", notas: "tocar timbre",
+});
+for (const concepto of [
+  "Cliente", "Teléfono", "Comprobante", "Razón social", "RUC", "Correo", "Método de pago", "Detalle",
+  "Subtotal", "Envío", "Total", "Entrega a domicilio", "Nota",
+]) {
+  cierto(`"${concepto}:" sale en negrita`, completo.includes(`*${concepto}:*`));
+}
+cierto("el valor no va en negrita", completo.includes("*Cliente:* Ariel") && !completo.includes("*Ariel*"));
+cierto("un concepto no queda sin negrita", !/(^|\n)(Cliente|Teléfono|Total|Subtotal|Detalle): /.test(completo));
 
 console.log("— el teléfono para WhatsApp —");
 igual("agrega el código de país", normalizarTelefonoParaWhatsapp("0984792335"), "595984792335");

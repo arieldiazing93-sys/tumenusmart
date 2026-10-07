@@ -14,8 +14,6 @@ import type { ContextoDelivery, CuentaDeliveryFila } from "./tipos-delivery";
 
 /** En la zona de envío: "todavía no se sabe". No es lo mismo que no haber elegido nada: eso no deja seguir. */
 const COORDINAR = "__coordinar__";
-const CHIP_ACTIVO = "border-brand bg-brand text-white";
-const CHIP_INACTIVO = "border-linea text-tinta-media hover:border-brand hover:text-brand";
 const ROTULO = "text-[0.72rem] font-semibold uppercase tracking-rotulo text-tinta-suave";
 const CAJA = "flex flex-col gap-3 rounded-xl border-2 border-azul/50 bg-superficie p-3.5";
 
@@ -47,8 +45,6 @@ export function AbrirCuentaDeliveryPanel({
   const [nombre, setNombre] = useState(cuenta?.clienteNombre ?? "");
   const [estadoCliente, setEstadoCliente] = useState<"" | "conocido" | "nuevo">("");
   const [buscandoCliente, setBuscandoCliente] = useState(false);
-  // Direcciones de cuentas anteriores del cliente: son opciones para elegir, nunca se completan solas.
-  const [direccionesAnteriores, setDireccionesAnteriores] = useState<string[]>([]);
 
   const [ficha, setFicha] = useState<FichaFiscal>(cuenta?.ficha ?? fichaVacia());
   /** Los datos de la ficha se completaron solos con los de la última factura de este cliente. */
@@ -76,12 +72,12 @@ export function AbrirCuentaDeliveryPanel({
   }
 
   // Al tocar la lupa, apretar Enter o salir del teléfono: si ya es cliente del local, completa el nombre (sin pisar lo que ya se
-  // escribió) y ofrece sus direcciones anteriores y los datos de su última factura.
+  // escribió) y los datos de su última factura. La dirección NO: un mismo cliente pide desde varios lugares, así que la dirección
+  // (el enlace de Google Maps que manda) se carga siempre de nuevo, en cada cuenta.
   async function buscarCliente() {
     const numero = telefono.trim();
     if (!numero || buscandoCliente) return;
     setBuscandoCliente(true);
-    setDireccionesAnteriores([]);
     let r: Awaited<ReturnType<typeof buscarClienteDelivery>>;
     try {
       r = await buscarClienteDelivery(numero);
@@ -97,9 +93,6 @@ export function AbrirCuentaDeliveryPanel({
     setEstadoCliente("conocido");
     const nombreEncontrado = r.nombre;
     setNombre((actual) => (actual.trim() ? actual : nombreEncontrado));
-    // La dirección NO se completa sola: el cliente puede estar pidiendo desde otro lugar. Se ofrecen como opciones, y la zona y el
-    // envío se eligen siempre a mano, según de dónde pide hoy.
-    setDireccionesAnteriores(r.direcciones);
     // Un cliente recurrente trae los datos de su última factura: se completan solos, solo si todavía no se escribió nada.
     const anterior = r.facturaAnterior;
     if (anterior && !ficha.numero.trim() && !ficha.razon.trim()) {
@@ -215,7 +208,6 @@ export function AbrirCuentaDeliveryPanel({
                   onChange={(e) => {
                     setTelefono(e.target.value);
                     setEstadoCliente("");
-                    setDireccionesAnteriores([]);
                   }}
                   onBlur={buscarCliente}
                   onBuscar={buscarCliente}
@@ -282,28 +274,11 @@ export function AbrirCuentaDeliveryPanel({
               ) : null}
             </Campo>
 
-            {direccionesAnteriores.length > 0 && (
-              <div className="rounded-lg border-2 border-azul/50 bg-papel-suave p-2.5">
-                <p className="mb-1.5 text-[0.78rem] font-semibold text-tinta">Direcciones anteriores de este cliente</p>
-                <div className="flex flex-wrap gap-1.5">
-                  {direccionesAnteriores.map((d) => (
-                    <button
-                      key={d}
-                      type="button"
-                      title="Usar esta dirección"
-                      onClick={() => setDireccion(d)}
-                      className={`max-w-full rounded-lg border px-2.5 py-1.5 text-left text-[0.8rem] leading-snug transition-colors ${
-                        direccion === d ? CHIP_ACTIVO : CHIP_INACTIVO
-                      }`}
-                    >
-                      {d}
-                    </button>
-                  ))}
-                </div>
-                <p className="mt-1.5 text-[0.76rem] leading-snug text-tinta-suave">
-                  Preguntale desde dónde pide hoy: puede ser otro lugar. La zona y el envío se eligen a mano.
-                </p>
-              </div>
+            {!edita && (
+              <p className="text-[0.76rem] leading-snug text-tinta-suave">
+                La dirección no se completa sola: el cliente puede pedir desde otro lugar cada vez. Cargala siempre de nuevo, igual que la
+                zona y el envío.
+              </p>
             )}
           </section>
 

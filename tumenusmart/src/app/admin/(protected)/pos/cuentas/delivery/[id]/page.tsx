@@ -8,7 +8,7 @@ import { Volver } from "@/components/Volver";
 import { formatearCantidad, formatearGuarani, formatearNumero } from "@/lib/format";
 import { textoPorcentaje } from "@/lib/descuento-venta";
 import { descuentoDeCuenta, textoEstadoCuenta } from "@/lib/comedor";
-import { textoEntrega, totalesDeDelivery } from "@/lib/delivery";
+import { totalesDeDelivery } from "@/lib/delivery";
 import { itemsAlCancelar, totalCargado } from "@/lib/cuentas-canceladas";
 import { enlaceDeMapa, extraerUbicacion, primerEnlace, textoSinEnlaces } from "@/lib/ubicacion-mapa";
 import { ZONA_NEGOCIO } from "@/lib/timezone";
@@ -52,7 +52,6 @@ export default async function DetalleCuentaDeliveryPage({ params }: { params: Pr
       zonaNombre: true,
       costoEnvio: true,
       notas: true,
-      entrega: true,
       repartidor: { select: { nombre: true } },
       abiertaEn: true,
       cerradaEn: true,
@@ -196,11 +195,8 @@ export default async function DetalleCuentaDeliveryPage({ params }: { params: Pr
               </dd>
             </div>
             <div>
-              <dt className="text-tinta-suave">Entrega</dt>
-              <dd className="font-semibold text-tinta">
-                {textoEntrega(cuenta.entrega)}
-                {cuenta.repartidor && <span className="font-normal text-tinta-media"> · {cuenta.repartidor.nombre}</span>}
-              </dd>
+              <dt className="text-tinta-suave">Repartidor</dt>
+              <dd className="font-semibold text-tinta">{cuenta.repartidor ? cuenta.repartidor.nombre : "Sin repartidor"}</dd>
             </div>
             {cuenta.impresaEn && (
               <div>

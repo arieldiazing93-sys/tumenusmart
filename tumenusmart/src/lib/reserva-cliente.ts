@@ -180,17 +180,19 @@ export function mensajeWhatsappCita(x: {
   total: number;
   codigo: string;
 }): string {
+  // Cada concepto con dos puntos va en negrita (en WhatsApp, entre asteriscos) para distinguirlo de lo que escribió el cliente.
+  const campo = (concepto: string, valor: string) => `*${concepto}:* ${valor}`;
   const lineas = [
     `Hola ${x.negocio}, quiero confirmar mi cita:`,
     "",
-    `Cliente: ${[x.cliente.nombre, x.cliente.apellido].filter(Boolean).join(" ")}`,
-    ...(x.cliente.telefono ? [`Teléfono: +${x.cliente.telefono}`] : []),
-    `Servicios: ${x.servicios.map((s) => `${s.nombre} (${textoDuracion(s.duracionMin)})`).join(", ")}`,
-    `Con: ${x.profesional}`,
-    `Día: ${x.fechaTexto}`,
-    `Hora: ${x.horaInicio} a ${x.horaFin}`,
-    `Total: ${formatearGuarani(x.total)}`,
-    ...x.cliente.extras.map((e) => `${e.etiqueta}: ${e.valor}`),
+    campo("Cliente", [x.cliente.nombre, x.cliente.apellido].filter(Boolean).join(" ")),
+    ...(x.cliente.telefono ? [campo("Teléfono", `+${x.cliente.telefono}`)] : []),
+    campo("Servicios", x.servicios.map((s) => `${s.nombre} (${textoDuracion(s.duracionMin)})`).join(", ")),
+    campo("Con", x.profesional),
+    campo("Día", x.fechaTexto),
+    campo("Hora", `${x.horaInicio} a ${x.horaFin}`),
+    campo("Total", formatearGuarani(x.total)),
+    ...x.cliente.extras.map((e) => campo(e.etiqueta, e.valor)),
     "",
     `Cita ${x.codigo}`,
   ];

@@ -21,16 +21,6 @@ export const LARGO_DELIVERY = { nombre: 80, telefono: 30, direccion: 200, notas:
 /** Tope del envío: más que esto es un número mal tipeado, no un precio. */
 export const ENVIO_MAXIMO = 10_000_000;
 
-/** Por dónde va la entrega: todavía no salió, va en camino o ya llegó. */
-export const ENTREGAS_DELIVERY = ["pendiente", "en_ruta", "entregada"] as const;
-export type EntregaDelivery = (typeof ENTREGAS_DELIVERY)[number];
-
-export function textoEntrega(entrega: string): string {
-  if (entrega === "en_ruta") return "En ruta";
-  if (entrega === "entregada") return "Entregada";
-  return "Por salir";
-}
-
 /** "Delivery 12" — cómo se llama la cuenta en comandas, ticket y listas. */
 export function nombreDeCuentaDelivery(numero: number): string {
   return `Delivery ${numero}`;

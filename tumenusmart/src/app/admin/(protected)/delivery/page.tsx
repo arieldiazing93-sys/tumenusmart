@@ -19,8 +19,8 @@ export const dynamic = "force-dynamic";
 
 /**
  * Servicio delivery: las cuentas de los pedidos a domicilio. La caja abre una cuenta con los datos del cliente y su dirección, le
- * carga los productos, la imprime, la manda con un repartidor y la cobra; puede haber varias abiertas a la vez. A la izquierda la
- * lista; con doble clic en una se abre su detalle a la derecha. Una cuenta ya cobrada sigue en la lista hasta que se entrega.
+ * carga los productos, la imprime, le asigna un repartidor (que ya lo ve en su enlace) y la cobra; puede haber varias abiertas a la
+ * vez. A la izquierda la lista; con doble clic en una se abre su detalle a la derecha. Al cobrarse, la cuenta sale de la lista.
  * Se actualiza solo.
  */
 export default async function DeliveryPage() {
@@ -33,9 +33,8 @@ export default async function DeliveryPage() {
   const desdeLatido = new Date(Date.now() - SEGUNDOS_LATIDO_IMPRESION * 1000);
   const [cuentas, enEspera, imprimiendo] = await Promise.all([
     db.cuentaDelivery.findMany({
-      where: {
-        OR: [{ estado: { in: [...ESTADOS_DELIVERY_ABIERTA] } }, { estado: "pagada", entrega: { not: "entregada" } }],
-      },
+      // Las cuentas que se siguen operando. Al cobrarse (o cancelarse) una cuenta sale de la lista y queda en el Historial de cuentas.
+      where: { estado: { in: [...ESTADOS_DELIVERY_ABIERTA] } },
       orderBy: { abiertaEn: "asc" },
       include: {
         repartidor: { select: { nombre: true } },
@@ -92,9 +91,7 @@ export default async function DeliveryPage() {
       notas: c.notas,
       repartidorId: c.repartidorId,
       repartidor: c.repartidor?.nombre ?? null,
-      entrega: c.entrega,
-      salioEn: c.salioEn ? c.salioEn.toISOString() : null,
-      entregadaEn: c.entregadaEn ? c.entregadaEn.toISOString() : null,
+      asignadaEn: c.salioEn ? c.salioEn.toISOString() : null,
       impresaEn: c.impresaEn ? c.impresaEn.toISOString() : null,
       descuento: descuentoDeCuenta(c)
         ? {

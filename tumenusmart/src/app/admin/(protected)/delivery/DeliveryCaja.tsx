@@ -6,7 +6,6 @@ import { MaestroDetalle } from "@/components/MaestroDetalle";
 import { Boton, Pastilla } from "@/components/ui";
 import { formatearGuarani, formatearNumero } from "@/lib/format";
 import { textoEstadoCuenta } from "@/lib/comedor";
-import { textoEntrega } from "@/lib/delivery";
 import { textoSinEnlaces } from "@/lib/ubicacion-mapa";
 import { Hace } from "../comedor/tiempo";
 import { AbrirCuentaDeliveryPanel } from "./AbrirCuentaDeliveryPanel";
@@ -14,17 +13,10 @@ import { DetalleCuentaDelivery } from "./DetalleCuentaDelivery";
 import { PagarCuentaDeliveryPanel } from "./PagarCuentaDeliveryPanel";
 import type { ContextoDelivery, CuentaDeliveryFila } from "./tipos-delivery";
 
-/** El color de lo que se ve de la entrega: gris si no salió, azul en camino, verde si llegó. */
-function colorEntrega(entrega: string): "neutro" | "azul" | "exito" {
-  if (entrega === "en_ruta") return "azul";
-  if (entrega === "entregada") return "exito";
-  return "neutro";
-}
-
 /**
  * Las cuentas de delivery en una columna, fila por fila; con doble clic en una se abre a la derecha todo lo que compone su cuenta y
- * los botones para operarla (ver DetalleCuentaDelivery). El panel de cobro vive acá y no dentro del detalle: al cobrarse, una cuenta
- * ya entregada desaparece de la lista, y el cobro tiene que poder mostrar su comprobante igual.
+ * los botones para operarla (ver DetalleCuentaDelivery). El panel de cobro vive acá y no dentro del detalle: al cobrarse, la cuenta
+ * desaparece de la lista, y el cobro tiene que poder mostrar su comprobante igual.
  */
 export function DeliveryCaja({ cuentas, contexto }: { cuentas: CuentaDeliveryFila[]; contexto: ContextoDelivery }) {
   const router = useRouter();
@@ -75,13 +67,16 @@ export function DeliveryCaja({ cuentas, contexto }: { cuentas: CuentaDeliveryFil
                   <span className="max-w-[16rem] truncate text-[0.74rem] text-tinta-suave">{textoSinEnlaces(c.direccion)}</span>
                 )}
                 <span className="mt-0.5 flex flex-wrap items-center gap-1">
-                  <Pastilla color={colorEntrega(c.entrega)} punto>
-                    {textoEntrega(c.entrega)}
-                  </Pastilla>
+                  {/* Asignar al repartidor ya lo manda a trabajar: no hay "salió" ni "entregado" que marcar. */}
+                  {c.repartidor ? (
+                    <Pastilla color="azul" punto>
+                      🛵 {c.repartidor}
+                    </Pastilla>
+                  ) : (
+                    <Pastilla color="neutro">Sin repartidor</Pastilla>
+                  )}
                   {c.estado === "por_cobrar" && <Pastilla color="amarillo">{textoEstadoCuenta(c.estado)}</Pastilla>}
-                  {c.estado === "pagada" && <Pastilla color="exito">Pagada</Pastilla>}
                 </span>
-                {c.repartidor && <span className="text-[0.72rem] text-tinta-suave">🛵 {c.repartidor}</span>}
               </div>
             ),
           },

@@ -89,11 +89,6 @@ const EXCEPCIONES = {
       "carga un pedido en una mesa del local de la llave; exige la sesión firmada del mozo, recalcula el precio en el " +
       "servidor y no duplica un envío repetido",
   },
-  "src/app/repartidor/[id]/actions.ts": {
-    marcarCuentaEntregada:
-      "el repartidor no tiene cuenta; la acción verifica que la cuenta de delivery esté " +
-      "asignada a ESE repartidor, en ruta y sea de su mismo local",
-  },
 };
 
 function archivos(dir) {

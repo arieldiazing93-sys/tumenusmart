@@ -29,7 +29,7 @@ export type CuentaDeliveryFila = {
   /** Lo exige la lista de dos paneles (MaestroDetalle): todas las cuentas se listan. */
   activo: true;
   numero: number;
-  /** "abierta" | "por_cobrar" | "pagada" (una pagada sigue en la lista mientras falte entregarla) */
+  /** "abierta" | "por_cobrar" (una cuenta cobrada o cancelada sale de la lista: queda en el Historial de cuentas) */
   estado: string;
   abiertaEn: string;
   clienteNombre: string;
@@ -43,12 +43,11 @@ export type CuentaDeliveryFila = {
   zonaNombre: string;
   costoEnvio: number;
   notas: string | null;
+  /** El repartidor asignado: asignarlo ya lo manda a trabajar (el pedido le aparece al instante en su enlace). */
   repartidorId: string | null;
   repartidor: string | null;
-  /** "pendiente" | "en_ruta" | "entregada" */
-  entrega: string;
-  salioEn: string | null;
-  entregadaEn: string | null;
+  /** Cuándo se le asignó el repartidor (ISO). */
+  asignadaEn: string | null;
   impresaEn: string | null;
   descuento: { tipo: "porcentaje" | "monto"; valor: number; motivo: string; por: string } | null;
   totales: TotalesDeDelivery;

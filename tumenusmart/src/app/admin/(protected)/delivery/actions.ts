@@ -30,14 +30,12 @@ import {
   totalDeLineas,
 } from "@/lib/comedor";
 import {
-  ENTREGAS_DELIVERY,
   ENVIO_MAXIMO,
   ESTADOS_DELIVERY_ABIERTA,
   LARGO_DELIVERY,
   NOMBRE_LINEA_ENVIO,
   lineaDeEnvio,
   nombreDeCuentaDelivery,
-  textoEntrega,
   totalesDeDelivery,
 } from "@/lib/delivery";
 import { encolarCuentaDelivery, guardarRondaDelivery } from "@/lib/delivery-servidor";
@@ -104,20 +102,18 @@ export type ResultadoBuscarClienteDelivery =
   | {
       ok: true;
       nombre: string;
-      /** Hasta tres direcciones distintas de sus últimas cuentas (para ofrecerlas como opciones). */
-      direcciones: string[];
       /** Los datos de la última factura con registro fiscal de este cliente (para completarlos), o null. */
       facturaAnterior: ClienteFiscalEncontrado | null;
     }
   | { ok: false };
 
 /**
- * Cuando se busca el teléfono: si ya es cliente del local, devuelve su nombre, hasta tres direcciones distintas de sus últimas
- * cuentas de delivery y los datos de la última factura con registro fiscal, para que un cliente recurrente no tenga que cargarse de
- * nuevo. Solo lee; nunca crea nada.
+ * Cuando se busca el teléfono: si ya es cliente del local, devuelve su nombre y los datos de su última factura con registro fiscal,
+ * para que un cliente recurrente no tenga que cargarse de nuevo. Solo lee; nunca crea nada.
  *
- * A propósito NO devuelve la zona ni el costo de envío de cuentas anteriores: el mismo cliente puede pedir hoy desde otro lugar y
- * arrastrar el envío de la vez pasada sería cobrarle mal. La zona y el costo se eligen siempre a mano.
+ * A propósito NO devuelve la dirección, la zona ni el costo de envío de cuentas anteriores (regla del dueño): un mismo cliente pide
+ * desde varios lugares, y arrastrar el de la vez pasada es mandar el pedido a otro lado y cobrar mal el envío. La dirección (el enlace
+ * de Google Maps que manda el cliente), la zona y el costo se cargan SIEMPRE a mano, en cada cuenta.
  */
 export async function buscarClienteDelivery(telefono: string): Promise<ResultadoBuscarClienteDelivery> {
   await exigirPermiso("delivery.gestionar");
@@ -134,7 +130,6 @@ export async function buscarClienteDelivery(telefono: string): Promise<Resultado
       take: 10,
       select: {
         clienteNombre: true,
-        direccion: true,
         facturaTipoIdentificacion: true,
         facturaRuc: true,
         facturaRazonSocial: true,
@@ -144,24 +139,10 @@ export async function buscarClienteDelivery(telefono: string): Promise<Resultado
   ]);
   if (!cliente && anteriores.length === 0) return { ok: false };
 
-  // Las más recientes primero, sin repetir (aunque cambie una mayúscula), hasta tres.
-  const vistas = new Set<string>();
-  const direcciones: string[] = [];
-  for (const c of anteriores) {
-    const direccion = c.direccion?.trim();
-    if (!direccion) continue;
-    const clave = direccion.toLowerCase();
-    if (vistas.has(clave)) continue;
-    vistas.add(clave);
-    direcciones.push(direccion);
-    if (direcciones.length === 3) break;
-  }
-
   const conFicha = anteriores.find((c) => c.facturaRuc && c.facturaRazonSocial);
   return {
     ok: true,
     nombre: cliente?.nombre ?? anteriores[0]?.clienteNombre ?? "",
-    direcciones,
     facturaAnterior:
       conFicha?.facturaRuc && conFicha.facturaRazonSocial
         ? {
@@ -1011,10 +992,14 @@ export async function reabrirCuentaDelivery(cuentaId: string): Promise<Resultado
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
-//  El repartidor y la entrega
+//  El repartidor
 // ---------------------------------------------------------------------------------------------------------------------
 
-/** Le asigna (o, con "", le saca) el repartidor a la cuenta. Puede cambiarse hasta que la entrega termine. */
+/**
+ * Le asigna (o, con "", le saca) el repartidor a la cuenta. Asignarlo YA lo manda a trabajar: el pedido le aparece al instante en su
+ * enlace (que se actualiza solo), sin ningún "salió" ni "entregado" de por medio. Se puede cambiar mientras la cuenta no esté cerrada;
+ * una vez cobrada queda en el historial de su enlace con la forma de pago con la que se cerró.
+ */
 export async function asignarRepartidorDelivery(cuentaId: string, repartidorId: string): Promise<Resultado> {
   const sesion = await exigirPermiso("delivery.gestionar");
   const storeId = await idLocalActual();
@@ -1022,11 +1007,12 @@ export async function asignarRepartidorDelivery(cuentaId: string, repartidorId: 
 
   const cuenta = await db.cuentaDelivery.findFirst({
     where: { id: String(cuentaId) },
-    select: { id: true, numero: true, estado: true, entrega: true },
+    select: { id: true, numero: true, estado: true },
   });
   if (!cuenta) return { ok: false, error: "No encontré esa cuenta." };
-  if (cuenta.estado === "anulada") return { ok: false, error: "Esa cuenta está cancelada." };
-  if (cuenta.entrega === "entregada") return { ok: false, error: "Esa cuenta ya se entregó." };
+  if (cuenta.estado !== "abierta" && cuenta.estado !== "por_cobrar") {
+    return { ok: false, error: "Esa cuenta ya está cerrada: no se le puede cambiar el repartidor." };
+  }
 
   // El repartidor se busca dentro de ESTE local y tiene que estar activo: un id de otro negocio no aparece.
   let repartidor: { id: string; nombre: string } | null = null;
@@ -1035,7 +1021,18 @@ export async function asignarRepartidorDelivery(cuentaId: string, repartidorId: 
     if (!repartidor) return { ok: false, error: "Ese repartidor ya no está activo. Elegí otro." };
   }
 
-  await db.cuentaDelivery.update({ where: { id: cuenta.id }, data: { repartidorId: repartidor?.id ?? null } });
+  // Con repartidor la cuenta queda "en ruta" (la hora sirve para avisarle que es nueva); sin repartidor, vuelve a "por salir". El
+  // estado va en la condición: si la cobraron o cancelaron en el mismo instante, no se cambia.
+  const asignada = await db.cuentaDelivery.updateMany({
+    where: { id: cuenta.id, estado: { in: [...ESTADOS_DELIVERY_ABIERTA] } },
+    data: {
+      repartidorId: repartidor?.id ?? null,
+      entrega: repartidor ? "en_ruta" : "pendiente",
+      salioEn: repartidor ? new Date() : null,
+      entregadaEn: null,
+    },
+  });
+  if (asignada.count !== 1) return { ok: false, error: "La cuenta ya no se puede cambiar. Actualizá la pantalla." };
 
   await registrarBitacora(storeId, sesion, {
     modulo: "delivery",
@@ -1048,61 +1045,6 @@ export async function asignarRepartidorDelivery(cuentaId: string, repartidorId: 
     detalle: { cuenta: cuenta.numero, repartidor: repartidor?.nombre ?? null },
   });
   refrescar();
-  revalidatePath("/repartidor");
-  return { ok: true };
-}
-
-/**
- * Marca por dónde va la entrega: "en_ruta" (salió con el repartidor), "entregada" (llegó) o "pendiente" (para corregir un error).
- * Sale con el repartidor asignado y con la cuenta ya impresa (o pagada): el papel de la cuenta viaja con el pedido. La entrega va
- * aparte del cobro: se puede cobrar antes o después de entregar.
- */
-export async function cambiarEntregaDelivery(cuentaId: string, entrega: string): Promise<Resultado> {
-  const sesion = await exigirPermiso("delivery.gestionar");
-  const storeId = await idLocalActual();
-  const db = prismaDelLocal(storeId);
-
-  if (!(ENTREGAS_DELIVERY as readonly string[]).includes(entrega)) return { ok: false, error: "Esa opción de entrega no es válida." };
-
-  const cuenta = await db.cuentaDelivery.findFirst({
-    where: { id: String(cuentaId) },
-    select: { id: true, numero: true, estado: true, entrega: true, repartidorId: true, items: { where: { estado: "activo" }, select: { id: true }, take: 1 } },
-  });
-  if (!cuenta) return { ok: false, error: "No encontré esa cuenta." };
-  if (cuenta.estado === "anulada") return { ok: false, error: "Esa cuenta está cancelada." };
-  if (cuenta.entrega === entrega) return { ok: true };
-
-  if (entrega === "en_ruta") {
-    if (cuenta.items.length === 0) return { ok: false, error: "La cuenta no tiene productos para mandar." };
-    if (cuenta.estado === "abierta") return { ok: false, error: "Primero imprimí la cuenta: sale con el repartidor." };
-    if (!cuenta.repartidorId) return { ok: false, error: "Asigná un repartidor antes de mandar la cuenta en ruta." };
-  }
-  if (entrega === "entregada" && cuenta.items.length === 0) {
-    return { ok: false, error: "La cuenta no tiene productos: no hay nada que entregar." };
-  }
-
-  const ahora = new Date();
-  // El estado va en la condición: si la cancelaron en el mismo instante, no se cambia.
-  const cambiada = await db.cuentaDelivery.updateMany({
-    where: { id: cuenta.id, estado: { not: "anulada" } },
-    data: {
-      entrega,
-      salioEn: entrega === "pendiente" ? null : entrega === "en_ruta" ? ahora : undefined,
-      entregadaEn: entrega === "entregada" ? ahora : null,
-    },
-  });
-  if (cambiada.count !== 1) return { ok: false, error: "La cuenta ya no se puede cambiar. Actualizá la pantalla." };
-
-  await registrarBitacora(storeId, sesion, {
-    modulo: "delivery",
-    accion: "entrega_cambiada",
-    descripcion: `Marcó la cuenta ${formatearNumero(cuenta.numero)} de delivery como “${textoEntrega(entrega)}”.`,
-    entidad: "CuentaDelivery",
-    entidadId: cuenta.id,
-    detalle: { cuenta: cuenta.numero, entrega },
-  });
-  refrescar();
-  revalidatePath("/repartidor");
   return { ok: true };
 }
 
@@ -1453,6 +1395,5 @@ export async function pagarCuentaDelivery(cuentaId: string, datos: DatosCobroDel
   revalidatePath("/admin/delivery");
   revalidatePath("/admin/pos");
   revalidatePath("/admin/pos/cuentas");
-  revalidatePath("/repartidor");
   return { ok: true, ventaId, total };
 }

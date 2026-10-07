@@ -183,7 +183,8 @@ export function PagarCuentaDeliveryPanel({
               <p className="text-[1.2rem] font-semibold tracking-titular text-tinta">Delivery {formatearNumero(cuenta.numero)} cobrado</p>
               <p className="cifra mt-1 text-[1.8rem] font-bold text-tinta">{formatearGuarani(hecho.total)}</p>
               <p className="mt-1 text-[0.82rem] text-tinta-media">
-                {esFactura ? "Con factura" : "Con ticket"} · {cuenta.entrega === "entregada" ? "ya está entregado" : "falta entregarlo"}
+                {esFactura ? "Con factura" : "Con ticket"}
+                {cuenta.repartidor ? ` · repartidor: ${cuenta.repartidor}` : ""}
               </p>
             </div>
             <p className="max-w-xs text-[0.85rem] leading-snug text-tinta-media">

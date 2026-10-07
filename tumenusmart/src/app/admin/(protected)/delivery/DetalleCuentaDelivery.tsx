@@ -6,7 +6,6 @@ import { MensajeError, Pastilla, Tarjeta, clasesBoton } from "@/components/ui";
 import { formatearCantidad, formatearGuarani, formatearNumero } from "@/lib/format";
 import { agruparPorClave, claveDeLinea, importeDeLinea, repartirEnFilas, textoEstadoCuenta } from "@/lib/comedor";
 import { textoPorcentaje } from "@/lib/descuento-venta";
-import { textoEntrega } from "@/lib/delivery";
 import { rutaParaAbrirTurno } from "@/lib/turno-requerido";
 import { enlaceDeMapa, extraerUbicacion, primerEnlace, textoSinEnlaces } from "@/lib/ubicacion-mapa";
 import { etiquetaTipoIdentificacion } from "@/lib/tipo-cliente";
@@ -17,7 +16,6 @@ import {
   anularProductosDelivery,
   aplicarDescuentoDelivery,
   asignarRepartidorDelivery,
-  cambiarEntregaDelivery,
   cancelarCuentaDelivery,
   cargarProductosDelivery,
   imprimirCuentaDelivery,
@@ -59,12 +57,12 @@ function textoDePedidos(rondas: number[]): string {
 /**
  * Todo lo que compone la cuenta de un delivery (los datos del cliente y la entrega, los productos cargados, su descuento y su total
  * con el envío) y, arriba, lo que la caja puede hacer con ella: cargar productos, dar un descuento, corregir los datos, imprimir la
- * cuenta, reabrirla, asignar el repartidor y marcar cuándo sale y cuándo llega, cobrarla, y cerrarla solo si quedó vacía. Cancelar un
- * producto o cerrar la cuenta siempre pide un motivo. Una cuenta con productos NO se cancela acá: se cobra y, si hace falta, se
- * cancela la venta desde el Historial de cuentas.
+ * cuenta, reabrirla, asignarle el repartidor, cobrarla, y cerrarla solo si quedó vacía. Cancelar un producto o cerrar la cuenta
+ * siempre pide un motivo. Una cuenta con productos NO se cancela acá: se cobra y, si hace falta, se cancela la venta desde el
+ * Historial de cuentas.
  *
- * Una cuenta impresa (por cobrar) no admite cambios hasta reabrirla. La entrega (repartidor, salió, llegó) va aparte: se puede
- * marcar en cualquier momento, también con la cuenta ya cobrada.
+ * Una cuenta impresa (por cobrar) no admite cambios hasta reabrirla. El repartidor se puede asignar en cualquier momento mientras la
+ * cuenta esté abierta: asignarlo ya lo manda a trabajar (le aparece al instante en su enlace), no hay que marcar nada más.
  */
 export function DetalleCuentaDelivery({
   cuenta,
@@ -87,13 +85,11 @@ export function DetalleCuentaDelivery({
 
   const abierta = cuenta.estado === "abierta";
   const porCobrar = cuenta.estado === "por_cobrar";
-  const pagada = cuenta.estado === "pagada";
   /** Todos sus productos se cancelaron: ya no hay nada que cobrar y la cuenta se puede cerrar. */
   const sinProductos = cuenta.items.every((i) => i.anulado);
   const t = cuenta.totales;
   /** Los productos se marcan para cancelarlos solo con la cuenta abierta y con el permiso de la caja. */
   const puedeMarcar = abierta && contexto.puedeGestionar;
-  const entregada = cuenta.entrega === "entregada";
 
   // La ubicación del cliente: el punto marcado o pegado (coordenadas) o, si solo hay un enlace corto, ese enlace.
   const coordenadas =
@@ -176,7 +172,7 @@ export function DetalleCuentaDelivery({
             </p>
           </div>
           <div className="flex flex-none flex-col items-end gap-0.5">
-            <Pastilla color={pagada ? "exito" : porCobrar ? "amarillo" : "marca"} punto>
+            <Pastilla color={porCobrar ? "amarillo" : "marca"} punto>
               {textoEstadoCuenta(cuenta.estado)}
             </Pastilla>
             <p className="cifra text-[1.35rem] font-bold leading-none text-tinta">{formatearGuarani(t.total)}</p>
@@ -208,9 +204,6 @@ export function DetalleCuentaDelivery({
           <p className="text-[0.76rem] font-medium text-amarillo-oscuro">
             Cuenta impresa a las <HoraDe iso={cuenta.impresaEn} />: no se le puede cargar nada hasta reabrirla.
           </p>
-        )}
-        {pagada && !entregada && (
-          <p className="text-[0.76rem] font-medium text-exito">Cuenta cobrada: solo falta entregarla.</p>
         )}
         {cuenta.descuento && (
           <p className="text-[0.76rem] text-tinta-media">
@@ -329,23 +322,26 @@ export function DetalleCuentaDelivery({
           </p>
         )}
 
-        {/* ------------------------------------------------------------ el repartidor y por dónde va la entrega */}
+        {/* ------------------------------------------------------------ el repartidor: asignarlo ya lo manda a trabajar */}
         {contexto.puedeGestionar && (
           <div className="flex flex-col gap-1.5 rounded-lg border-2 border-amarillo/60 bg-amarillo-luz/40 p-2.5">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className={ROTULO}>Entrega</p>
-              <Pastilla color={cuenta.entrega === "en_ruta" ? "azul" : entregada ? "exito" : "neutro"} punto>
-                {textoEntrega(cuenta.entrega)}
+              <p className={ROTULO}>Repartidor</p>
+              <Pastilla color={cuenta.repartidor ? "azul" : "neutro"} punto>
+                {cuenta.repartidor ? `🛵 ${cuenta.repartidor}` : "Sin repartidor"}
               </Pastilla>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              {/* Es lo que falta para poder mandarla: en amarillo se ve de un vistazo (igual que "personal" en el POS). */}
+              {/* Es lo que falta para que el pedido salga: en amarillo se ve de un vistazo (igual que "personal" en el POS). */}
               <select
                 value={cuenta.repartidorId ?? ""}
-                disabled={pendiente || entregada}
+                disabled={pendiente}
                 onChange={(e) => {
                   const nuevo = e.target.value;
-                  ejecutar(() => asignarRepartidorDelivery(cuenta.id, nuevo));
+                  ejecutar(
+                    () => asignarRepartidorDelivery(cuenta.id, nuevo),
+                    () => setAviso(nuevo ? "Repartidor asignado: el pedido ya le aparece en su enlace." : "Se le sacó el pedido al repartidor.")
+                  );
                 }}
                 aria-label="Repartidor"
                 className="rounded-lg border-2 border-amarillo bg-amarillo-campo px-3 py-2 text-[0.88rem] font-semibold text-tinta focus:outline-none focus:ring-2 focus:ring-amarillo/40 disabled:opacity-50"
@@ -361,59 +357,16 @@ export function DetalleCuentaDelivery({
                   <option value={cuenta.repartidorId}>{cuenta.repartidor ?? "Repartidor"}</option>
                 )}
               </select>
-              {cuenta.entrega === "pendiente" && (
-                <button
-                  type="button"
-                  disabled={pendiente || sinProductos}
-                  onClick={() => ejecutar(() => cambiarEntregaDelivery(cuenta.id, "en_ruta"), () => setAviso("La cuenta salió en ruta."))}
-                  className={clasesBoton("principal", "sm")}
-                >
-                  🛵 Mandar en ruta
-                </button>
-              )}
-              {!entregada && (
-                <button
-                  type="button"
-                  disabled={pendiente || sinProductos}
-                  onClick={() => ejecutar(() => cambiarEntregaDelivery(cuenta.id, "entregada"), () => setAviso("Cuenta marcada como entregada."))}
-                  className={clasesBoton("exito", "sm")}
-                >
-                  ✓ Marcar entregada
-                </button>
-              )}
-              {cuenta.entrega === "en_ruta" && (
-                <button
-                  type="button"
-                  disabled={pendiente}
-                  onClick={() => ejecutar(() => cambiarEntregaDelivery(cuenta.id, "pendiente"))}
-                  className={clasesBoton("suave", "sm")}
-                >
-                  Volver a “por salir”
-                </button>
-              )}
-              {entregada && (
-                <button
-                  type="button"
-                  disabled={pendiente}
-                  onClick={() => ejecutar(() => cambiarEntregaDelivery(cuenta.id, "en_ruta"))}
-                  className={clasesBoton("suave", "sm")}
-                >
-                  Deshacer la entrega
-                </button>
-              )}
             </div>
             <p className="text-[0.72rem] text-tinta-suave">
-              {cuenta.salioEn && (
+              {cuenta.asignadaEn && cuenta.repartidor ? (
                 <>
-                  Salió a las <HoraDe iso={cuenta.salioEn} />.{" "}
+                  Asignada a las <HoraDe iso={cuenta.asignadaEn} />.{" "}
                 </>
-              )}
-              {cuenta.entregadaEn && (
-                <>
-                  Entregada a las <HoraDe iso={cuenta.entregadaEn} />.{" "}
-                </>
-              )}
-              {cuenta.entrega === "pendiente" && "Para mandarla en ruta, la cuenta tiene que estar impresa y tener repartidor."}
+              ) : null}
+              {cuenta.repartidor
+                ? "Le aparece al instante en su enlace; cuando se cobre la cuenta, ahí mismo ve con qué método de pago se cerró."
+                : "Al asignarlo, el pedido le aparece al instante en su enlace: no hay que marcar nada más."}
             </p>
           </div>
         )}
@@ -485,6 +438,18 @@ export function DetalleCuentaDelivery({
                   </tr>
                 );
               })}
+              {/* El envío es una línea más de la cuenta (así sale en la factura): se ve con su zona y su monto, no solo en el pie.
+                  No se marca ni se cancela, y el descuento no lo toca. */}
+              <tr className="align-top text-tinta">
+                {puedeMarcar && <td className="py-1 pr-1" />}
+                <td className="cifra py-1 pr-2 text-[0.86rem] font-semibold">1</td>
+                <td className="py-1 pr-2 text-[0.86rem] leading-snug">
+                  <p>🛵 Costo de envío</p>
+                  <p className="text-[0.76rem] text-tinta-media">Zona: {cuenta.zonaNombre}</p>
+                  <p className="text-[0.7rem] text-tinta-suave">No lleva descuento</p>
+                </td>
+                <td className="cifra py-1 text-right text-[0.86rem] font-medium">{formatearGuarani(cuenta.costoEnvio)}</td>
+              </tr>
             </tbody>
             {/* Lo cancelado queda a la vista aparte, sin juntarse con nada: cada uno con quién lo canceló y por qué. */}
             {cancelados.length > 0 && (
