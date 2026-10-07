@@ -80,6 +80,16 @@ async function verificarCategoriaYArea(
 export type ResultadoProducto = { ok: true } | { ok: false; error: string };
 
 /**
+ * La dirección de la lista de Productos con un producto abierto a la derecha
+ * (y, si se pide, el cartel "Guardado"). Ver `ProductosMaestroDetalle`.
+ */
+function fichaDeProducto(categoryId: string, productId: string, guardado: boolean): string {
+  const params = new URLSearchParams({ categoria: categoryId, producto: productId });
+  if (guardado) params.set("guardado", "1");
+  return `/admin/productos?${params.toString()}`;
+}
+
+/**
  * Devuelve un resultado en vez de lanzar el error de "faltan datos": Next.js
  * oculta en producción el mensaje de cualquier `throw` que salga de una
  * Server Action. Este formulario todavía se envía directo (sin un
@@ -137,11 +147,11 @@ export async function crearProducto(formData: FormData): Promise<ResultadoProduc
   revalidatePath("/admin/productos");
   revalidatePath(`/admin/productos/${producto.id}`);
   revalidatePath("/[slug]", "layout");
-  // A la ficha del producto recién creado, no a la lista: ahí aparecen Receta
-  // y Grupos de agregados (necesitan que el producto ya exista) — si vuelve a
-  // la lista, quien lo cargó puede no saber que falta terminar de
-  // configurarlo. Mismo destino que actualizarProducto, más abajo.
-  redirect(`/admin/productos/${producto.id}?guardado=1`);
+  // A la ficha del producto recién creado (abierta a la derecha de la lista):
+  // ahí aparecen Receta y Grupos de agregados (necesitan que el producto ya
+  // exista) — si no se abriera, quien lo cargó puede no saber que falta
+  // terminar de configurarlo. Mismo destino que actualizarProducto, más abajo.
+  redirect(fichaDeProducto(categoryId, producto.id, true));
 }
 
 export async function actualizarProducto(
@@ -235,7 +245,8 @@ export async function actualizarProducto(
   revalidatePath("/admin/productos");
   revalidatePath(`/admin/productos/${productId}`);
   revalidatePath("/[slug]", "layout");
-  redirect(`/admin/productos/${productId}?guardado=1`);
+  // Vuelve a la lista con el producto abierto; si lo pasó a otra categoría, la lista sigue a la nueva.
+  redirect(fichaDeProducto(categoryId, productId, true));
 }
 
 /**
@@ -261,7 +272,10 @@ export async function eliminarProducto(productId: string): Promise<ResultadoProd
     };
   }
 
-  const aBorrar = await prisma.product.findUnique({ where: { id: productId }, select: { nombre: true, precio: true } });
+  const aBorrar = await prisma.product.findUnique({
+    where: { id: productId },
+    select: { nombre: true, precio: true, categoryId: true },
+  });
   await prisma.product.delete({ where: { id: productId } });
   await registrarBitacora(idLocal, sesion, {
     modulo: "productos",
@@ -274,7 +288,8 @@ export async function eliminarProducto(productId: string): Promise<ResultadoProd
     detalle: { producto: aBorrar?.nombre ?? null, precio: aBorrar ? Number(aBorrar.precio) : null },
   });
   revalidatePath("/admin/productos");
-  redirect("/admin/productos");
+  // Vuelve a la categoría donde estaba el producto, con la ficha de la derecha cerrada.
+  redirect(aBorrar ? `/admin/productos?${new URLSearchParams({ categoria: aBorrar.categoryId }).toString()}` : "/admin/productos");
 }
 
 /**
@@ -288,6 +303,8 @@ export async function eliminarOpcion(productId: string, optionId: string) {
   const prisma = prismaDelLocal(await idLocalActual());
 
   await prisma.productOption.delete({ where: { id: optionId } });
+  // La ficha se abre a la derecha de la lista de Productos: esa pantalla también se vuelve a leer.
+  revalidatePath("/admin/productos");
   revalidatePath(`/admin/productos/${productId}`);
 }
 
@@ -316,6 +333,8 @@ export async function asignarGrupoAProducto(
     });
   }
 
+  // La ficha se abre a la derecha de la lista de Productos: esa pantalla también se vuelve a leer.
+  revalidatePath("/admin/productos");
   revalidatePath(`/admin/productos/${productId}`);
   revalidatePath("/[slug]", "layout");
   return { ok: true };
@@ -425,6 +444,8 @@ export async function crearGrupoYAdjuntar(
     return nuevoGrupo;
   });
 
+  // La ficha se abre a la derecha de la lista de Productos: esa pantalla también se vuelve a leer.
+  revalidatePath("/admin/productos");
   revalidatePath(`/admin/productos/${productId}`);
   revalidatePath("/admin/grupos-agregados");
   return { ok: true, groupId: grupo.id };
@@ -515,6 +536,8 @@ export async function asignarInsumoAProducto(
     create: { productId, insumoId, cantidad, storeId: idLocal },
   });
 
+  // La ficha se abre a la derecha de la lista de Productos: esa pantalla también se vuelve a leer.
+  revalidatePath("/admin/productos");
   revalidatePath(`/admin/productos/${productId}`);
   return { ok: true };
 }
@@ -524,6 +547,8 @@ export async function quitarInsumoDeProducto(productId: string, insumoId: string
   const prisma = prismaDelLocal(await idLocalActual());
 
   await prisma.recetaItem.deleteMany({ where: { productId, insumoId } });
+  // La ficha se abre a la derecha de la lista de Productos: esa pantalla también se vuelve a leer.
+  revalidatePath("/admin/productos");
   revalidatePath(`/admin/productos/${productId}`);
 }
 

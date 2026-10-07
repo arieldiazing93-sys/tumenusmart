@@ -1,6 +1,7 @@
 "use client";
 
 import { useTransition } from "react";
+import { clasesBoton } from "@/components/ui";
 import { eliminarProducto, eliminarOpcion } from "../actions";
 
 export function EliminarProductoBoton({ productId }: { productId: string }) {
@@ -20,9 +21,9 @@ export function EliminarProductoBoton({ productId }: { productId: string }) {
           if (!resultado.ok) alert(resultado.error);
         });
       }}
-      className="text-sm text-peligro hover:underline disabled:opacity-50"
+      className={clasesBoton("peligro", "sm")}
     >
-      Borrar producto
+      {pending ? "Borrando…" : "Borrar producto"}
     </button>
   );
 }
