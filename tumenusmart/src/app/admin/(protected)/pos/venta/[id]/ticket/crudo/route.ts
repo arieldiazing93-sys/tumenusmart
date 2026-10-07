@@ -27,7 +27,15 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   const { id } = await params;
 
   const [venta, store] = await Promise.all([
-    db.ventaPos.findUnique({ where: { id }, include: { items: true, pagos: { orderBy: { orden: "asc" } } } }),
+    db.ventaPos.findUnique({
+      where: { id },
+      include: {
+        items: true,
+        pagos: { orderBy: { orden: "asc" } },
+        // La fecha de la factura es la de su emisión: en un delivery con "factura rápida" salió antes de que se cobrara la venta.
+        comprobantes: { where: { estado: "vigente" }, select: { fechaEmision: true }, orderBy: { createdAt: "desc" }, take: 1 },
+      },
+    }),
     db.store.findUnique({ where: { id: storeId } }),
   ]);
 
@@ -42,7 +50,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit",
     timeZone: ZONA_NEGOCIO,
   });
-  const fechaFactura = venta.creadoEn.toLocaleString("es-PY", {
+  const fechaFactura = (venta.comprobantes[0]?.fechaEmision ?? venta.creadoEn).toLocaleString("es-PY", {
     day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", second: "2-digit",
     timeZone: ZONA_NEGOCIO,
   });

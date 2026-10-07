@@ -49,6 +49,11 @@ export type CuentaDeliveryFila = {
   /** Cuándo se le asignó el repartidor (ISO). */
   asignadaEn: string | null;
   impresaEn: string | null;
+  /**
+   * La factura que ya se emitió con la "factura rápida" (antes de cobrar), o null. Con una factura emitida la cuenta está congelada:
+   * no se reabre ni se le cambia nada hasta cobrarla (o anular la factura).
+   */
+  factura: { numero: string; cliente: string; emitidaEn: string } | null;
   descuento: { tipo: "porcentaje" | "monto"; valor: number; motivo: string; por: string } | null;
   totales: TotalesDeDelivery;
   /** El IVA que lleva (ya sobre lo que se cobra, con el envío y el descuento): sale de las mismas líneas que la factura. */
@@ -68,6 +73,13 @@ export type ContextoDelivery = {
   repartidores: { id: string; nombre: string }[];
   /** Si esta computadora puede imprimir la cuenta (estación con impresora para el ticket) o por qué no. */
   imprimirCuenta: { ok: true } | { ok: false; motivo: string };
+  /**
+   * Si se puede emitir la "factura rápida" desde acá (hace falta una estación con un punto de expedición vigente; no hace falta turno
+   * de caja abierto: no se registra ninguna venta) o por qué no.
+   */
+  facturaRapida:
+    | { ok: true; diasParaVencerTimbrado: number | null; nombreImpresoraTicket: string | null }
+    | { ok: false; motivo: string };
   /** Si se puede cobrar desde acá (estación con turno abierto) y con qué comprobantes, o por qué no. */
   cobro:
     | {

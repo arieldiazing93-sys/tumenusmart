@@ -10,6 +10,7 @@ import { textoSinEnlaces } from "@/lib/ubicacion-mapa";
 import { Hace } from "../comedor/tiempo";
 import { AbrirCuentaDeliveryPanel } from "./AbrirCuentaDeliveryPanel";
 import { DetalleCuentaDelivery } from "./DetalleCuentaDelivery";
+import { FacturaRapidaDeliveryPanel } from "./FacturaRapidaDeliveryPanel";
 import { PagarCuentaDeliveryPanel } from "./PagarCuentaDeliveryPanel";
 import type { ContextoDelivery, CuentaDeliveryFila } from "./tipos-delivery";
 
@@ -22,6 +23,8 @@ export function DeliveryCaja({ cuentas, contexto }: { cuentas: CuentaDeliveryFil
   const router = useRouter();
   // Una copia de la cuenta que se está cobrando: sigue ahí aunque la lista se actualice y la cuenta ya no esté.
   const [cobrando, setCobrando] = useState<CuentaDeliveryFila | null>(null);
+  // Lo mismo para la "factura rápida": el panel sigue ahí aunque la lista se actualice al emitirse la factura.
+  const [facturando, setFacturando] = useState<CuentaDeliveryFila | null>(null);
   // La caja está abriendo una cuenta (carga los datos del cliente y su dirección, y después los productos) y lo que se avisa al terminar.
   const [abriendo, setAbriendo] = useState(false);
   const [aviso, setAviso] = useState<string | null>(null);
@@ -76,6 +79,8 @@ export function DeliveryCaja({ cuentas, contexto }: { cuentas: CuentaDeliveryFil
                     <Pastilla color="neutro">Sin repartidor</Pastilla>
                   )}
                   {c.estado === "por_cobrar" && <Pastilla color="amarillo">{textoEstadoCuenta(c.estado)}</Pastilla>}
+                  {/* Con la factura ya emitida y la venta sin registrar: se ve en la lista, para no olvidarse de cobrarla. */}
+                  {c.factura && <Pastilla color="azul">Factura {c.factura.numero}</Pastilla>}
                 </span>
               </div>
             ),
@@ -86,11 +91,22 @@ export function DeliveryCaja({ cuentas, contexto }: { cuentas: CuentaDeliveryFil
             celda: (c) => <span className="cifra font-semibold text-tinta">{formatearGuarani(c.totales.total)}</span>,
           },
         ]}
-        renderPanel={(c) => <DetalleCuentaDelivery cuenta={c} contexto={contexto} onCobrar={() => setCobrando(c)} />}
+        renderPanel={(c) => (
+          <DetalleCuentaDelivery cuenta={c} contexto={contexto} onCobrar={() => setCobrando(c)} onFacturar={() => setFacturando(c)} />
+        )}
       />
 
       {cobrando && contexto.cobro.ok && (
         <PagarCuentaDeliveryPanel cuenta={cobrando} cobro={contexto.cobro} onCerrar={() => setCobrando(null)} />
+      )}
+
+      {facturando && contexto.facturaRapida.ok && (
+        <FacturaRapidaDeliveryPanel
+          cuenta={facturando}
+          diasParaVencerTimbrado={contexto.facturaRapida.diasParaVencerTimbrado}
+          nombreImpresora={contexto.facturaRapida.nombreImpresoraTicket}
+          onCerrar={() => setFacturando(null)}
+        />
       )}
 
       {abriendo && (

@@ -304,7 +304,7 @@ export async function armarRegistroRg90(storeId: string, o: OpcionesRg90): Promi
     facturaRucEmisor: true,
   } as const;
 
-  const [pedidos, ventas] = await Promise.all([
+  const [pedidos, ventas, facturasRapidas] = await Promise.all([
     db.order.findMany({
       where: {
         comprobanteTipo: "factura",
@@ -322,12 +322,50 @@ export async function armarRegistroRg90(storeId: string, o: OpcionesRg90): Promi
         facturaAnulada: false,
         cancelada: false,
         creadoEn: { gte, lt },
+        // La factura de un delivery emitida con la "factura rápida" se informa aparte, por su comprobante (ver más abajo).
+        comprobantes: { none: { cuentaDeliveryId: { not: null } } },
       },
       select: { creadoEn: true, formaPago: true, ...campos },
+    }),
+    // Las facturas de la "factura rápida" de un delivery: se emiten ANTES de cobrar (y de registrar la venta), así que se informan por
+    // su propio comprobante, en el mes en que se emitieron — aunque la cuenta se cobre después, en otro mes. (Su venta se deja afuera
+    // de la lista de ventas de arriba para que la misma factura no salga dos veces.)
+    db.comprobante.findMany({
+      where: {
+        tipo: "factura",
+        estado: "vigente",
+        cuentaDeliveryId: { not: null },
+        fechaEmision: { gte, lt },
+      },
+      select: {
+        fechaEmision: true,
+        numero: true,
+        timbrado: true,
+        receptorTipoIdentificacion: true,
+        receptorNumeroIdentificacion: true,
+        receptorRazonSocial: true,
+        gravado10: true,
+        gravado5: true,
+        exento: true,
+        emisorRuc: true,
+      },
     }),
   ]);
 
   const facturas: FacturaBase[] = [
+    ...facturasRapidas.map((c) => ({
+      fecha: c.fechaEmision,
+      numero: c.numero,
+      timbrado: c.timbrado,
+      tipoIdentificacion: c.receptorTipoIdentificacion,
+      identificacion: c.receptorNumeroIdentificacion,
+      razonSocial: c.receptorRazonSocial,
+      gravado10: c.gravado10,
+      gravado5: c.gravado5,
+      exento: c.exento,
+      rucEmisor: c.emisorRuc,
+      aCredito: false,
+    })),
     ...pedidos.map((p) => ({
       fecha: p.createdAt,
       numero: p.facturaNumero,

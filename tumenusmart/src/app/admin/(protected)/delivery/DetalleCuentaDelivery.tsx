@@ -12,7 +12,9 @@ import { etiquetaTipoIdentificacion } from "@/lib/tipo-cliente";
 import { DialogoCancelarProducto, DialogoDescuento, DialogoMotivo } from "../comedor/DetalleCuenta";
 import { CargarProductosPanel } from "../comedor/CargarProductosPanel";
 import { Hace, HoraDe } from "../comedor/tiempo";
+import { imprimirComprobante } from "@/lib/impresion-comprobantes";
 import {
+  anularFacturaDelivery,
   anularProductosDelivery,
   aplicarDescuentoDelivery,
   asignarRepartidorDelivery,
@@ -22,6 +24,7 @@ import {
   reabrirCuentaDelivery,
 } from "./actions";
 import { AbrirCuentaDeliveryPanel } from "./AbrirCuentaDeliveryPanel";
+import { rutaCrudoFactura, textoImpresionFactura } from "./FacturaRapidaDeliveryPanel";
 import type { ContextoDelivery, CuentaDeliveryFila, ItemDeliveryFila } from "./tipos-delivery";
 
 const ROTULO = "text-[0.72rem] font-semibold uppercase tracking-rotulo text-tinta-suave";
@@ -46,7 +49,12 @@ type GrupoDeCuenta = {
   rondas: number[];
 };
 
-type Dialogo = { tipo: "anular"; grupo: GrupoDeCuenta } | { tipo: "cancelar" } | { tipo: "descuento" } | null;
+type Dialogo =
+  | { tipo: "anular"; grupo: GrupoDeCuenta }
+  | { tipo: "cancelar" }
+  | { tipo: "descuento" }
+  | { tipo: "anularFactura" }
+  | null;
 
 /**
  * Todo lo que compone la cuenta de un delivery (los datos del cliente y la entrega, los productos cargados, su descuento y su total
@@ -62,10 +70,13 @@ export function DetalleCuentaDelivery({
   cuenta,
   contexto,
   onCobrar,
+  onFacturar,
 }: {
   cuenta: CuentaDeliveryFila;
   contexto: ContextoDelivery;
   onCobrar: () => void;
+  /** Abre el panel de la "factura rápida": emite solo la factura, sin cobrar ni registrar la venta. */
+  onFacturar: () => void;
 }) {
   const router = useRouter();
   const [pendiente, iniciar] = useTransition();
@@ -149,6 +160,15 @@ export function DetalleCuentaDelivery({
     );
   }
 
+  /** Vuelve a mandar a la impresora la factura que ya se emitió (no emite otra ni gasta un número). */
+  async function imprimirFactura() {
+    setError(null);
+    setAviso(null);
+    const r = await imprimirComprobante(rutaCrudoFactura(cuenta.id), contexto.facturaRapida.ok ? contexto.facturaRapida.nombreImpresoraTicket : null);
+    if (r.ok) setAviso(textoImpresionFactura(r));
+    else setError(`${textoImpresionFactura(r)} Podés verla e imprimirla a mano desde “Ver factura”.`);
+  }
+
   return (
     <div className="flex flex-col gap-2">
       <Tarjeta padding={false} className="flex flex-col gap-2 !border-2 !border-azul/50 p-3">
@@ -194,9 +214,16 @@ export function DetalleCuentaDelivery({
           )}
         </div>
 
-        {porCobrar && cuenta.impresaEn && (
+        {porCobrar && cuenta.impresaEn && !cuenta.factura && (
           <p className="text-[0.76rem] font-medium text-amarillo-oscuro">
             Cuenta impresa a las <HoraDe iso={cuenta.impresaEn} />: no se le puede cargar nada hasta reabrirla.
+          </p>
+        )}
+        {/* Con la factura emitida y la venta sin registrar: queda a la vista para no olvidarse de cobrarla. */}
+        {cuenta.factura && (
+          <p className="rounded-lg border border-azul/40 bg-azul-luz/40 px-2.5 py-1.5 text-[0.78rem] font-medium text-azul-oscuro">
+            Factura {cuenta.factura.numero} emitida a las <HoraDe iso={cuenta.factura.emitidaEn} />
+            {cuenta.factura.cliente ? ` a nombre de ${cuenta.factura.cliente}` : ""}: falta cobrar la cuenta. Hasta entonces no se puede cambiar.
           </p>
         )}
         {cuenta.descuento && (
@@ -231,7 +258,8 @@ export function DetalleCuentaDelivery({
                   Editar datos
                 </button>
               )}
-              {porCobrar && (
+              {/* Con la factura ya emitida no se reabre: primero se anula la factura. */}
+              {porCobrar && !cuenta.factura && (
                 <button type="button" disabled={pendiente} onClick={reabrir} className={clasesBoton("navegar", "sm")}>
                   Reabrir cuenta
                 </button>
@@ -245,6 +273,34 @@ export function DetalleCuentaDelivery({
                 >
                   {porCobrar ? "Imprimir otra copia" : "Imprimir cuenta"}
                 </button>
+              )}
+              {/* Factura rápida: sale solo la factura (no se cobra ni se registra la venta), para que el repartidor lleve todos los
+                  documentos. Después, "Cobrar cuenta" usa esta misma factura. */}
+              {contexto.puedeCobrar && porCobrar && !cuenta.factura && (
+                <button
+                  type="button"
+                  disabled={pendiente || !contexto.facturaRapida.ok || sinProductos || !!t.descuentoInvalido || t.total <= 0}
+                  title={contexto.facturaRapida.ok ? "Emite e imprime solo la factura, sin cobrar" : contexto.facturaRapida.motivo}
+                  onClick={onFacturar}
+                  className={clasesBoton("navegar", "sm")}
+                >
+                  Factura rápida
+                </button>
+              )}
+              {cuenta.factura && (
+                <>
+                  <button type="button" disabled={pendiente} onClick={() => void imprimirFactura()} className={clasesBoton("navegar", "sm")}>
+                    Imprimir factura
+                  </button>
+                  <a href={`/admin/delivery/${cuenta.id}/factura`} target="_blank" rel="noopener noreferrer" className={clasesBoton("navegar", "sm")}>
+                    Ver factura
+                  </a>
+                  {contexto.puedeCobrar && (
+                    <button type="button" disabled={pendiente} onClick={() => setDialogo({ tipo: "anularFactura" })} className={clasesBoton("peligro", "sm")}>
+                      Anular factura
+                    </button>
+                  )}
+                </>
               )}
               {contexto.puedeCobrar && porCobrar && (
                 <button
@@ -455,6 +511,19 @@ export function DetalleCuentaDelivery({
           onCerrar={() => setDialogo(null)}
           onConfirmar={async (motivo) => {
             const r = await cancelarCuentaDelivery(cuenta.id, motivo);
+            if (r.ok) router.refresh();
+            return r;
+          }}
+        />
+      )}
+      {dialogo?.tipo === "anularFactura" && cuenta.factura && (
+        <DialogoMotivo
+          titulo={`Anular la factura ${cuenta.factura.numero}`}
+          texto="La factura se anula: su número queda consumido y registrado como anulado, con tu nombre y el motivo. Después se puede reabrir la cuenta y emitir otra factura. Si ya se la entregaron al cliente, recuperala."
+          confirmar="Anular factura"
+          onCerrar={() => setDialogo(null)}
+          onConfirmar={async (motivo) => {
+            const r = await anularFacturaDelivery(cuenta.id, motivo);
             if (r.ok) router.refresh();
             return r;
           }}

@@ -1488,6 +1488,10 @@ model Comprobante {
   /// …o el pedido online.
   orderId    String?
   order      Order?    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  /// …o la cuenta de un delivery a la que se le hizo la "factura rápida" (la factura sale ANTES de cobrar y de registrar la venta).
+  /// Al cobrar la cuenta, el comprobante pasa a colgar también de la venta (`ventaPosId`) y sigue siendo el mismo, con el mismo número.
+  cuentaDeliveryId String?
+  cuentaDelivery   CuentaDelivery? @relation(fields: [cuentaDeliveryId], references: [id], onDelete: SetNull)
 
   // --- gTimb: tipo, timbrado y numeración ---
   /// "factura" | "autofactura" | "nota_credito" | "nota_debito" | "nota_remision" (iTiDE).
@@ -1580,6 +1584,7 @@ model Comprobante {
   @@index([storeId, numero])
   @@index([ventaPosId])
   @@index([orderId])
+  @@index([cuentaDeliveryId])
 }
 
 /// Los datos del contribuyente que la factura ELECTRÓNICA (SIFEN) exige del
@@ -2846,6 +2851,8 @@ model CuentaDelivery {
   items            ItemCuentaDelivery[]
   trabajos         TrabajoImpresion[]
   movimientosStock MovimientoStock[]
+  /// Las facturas que salieron de esta cuenta (la "factura rápida", antes de cobrar): una vigente a la vez; las anuladas quedan.
+  comprobantes     Comprobante[]
 
   @@unique([storeId, numero])
   @@index([storeId, estado])

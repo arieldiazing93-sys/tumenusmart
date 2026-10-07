@@ -13,7 +13,7 @@ import { devolverConsumo } from "@/lib/movimientos-stock";
 import { validarPagosDeVenta } from "@/lib/pago-venta";
 import { FORMA_PAGO_A_CREDITO } from "@/lib/turno-pos";
 import { desglosarIva, formatearNumeroFactura } from "@/lib/factura-pos";
-import { crearComprobante, descripcionDeItem } from "@/lib/comprobante";
+import { anularComprobantes, crearComprobante, descripcionDeItem } from "@/lib/comprobante";
 import { SIN_REGISTRO_FISCAL } from "@/lib/tipo-cliente";
 import { limpiarTexto, validarDatosFiscales } from "@/lib/datos-fiscales";
 import { extraerUbicacion } from "@/lib/ubicacion-mapa";
@@ -972,12 +972,27 @@ export async function reabrirCuentaDelivery(cuentaId: string): Promise<Resultado
     return { ok: false, error: cuenta.estado === "abierta" ? "Esa cuenta ya está abierta." : "Esa cuenta ya está cerrada." };
   }
 
-  // El estado va en la condición: si justo la pagaron, no se reabre.
-  const reabierta = await prisma.cuentaDelivery.updateMany({
-    where: { id: cuenta.id, storeId, estado: "por_cobrar" },
-    data: { estado: "abierta", impresaEn: null, impresaPor: null },
-  });
-  if (reabierta.count !== 1) return { ok: false, error: "Esa cuenta ya no está impresa. Actualizá la pantalla." };
+  // Con la factura ya emitida la cuenta no se puede reabrir: cargarle o sacarle algo dejaría una factura que no dice lo que se cobra.
+  // Se revisa en la misma transacción que el cambio de estado: si justo ahora se emitió la factura, no queda reabierta con ella.
+  try {
+    await prisma.$transaction(async (tx) => {
+      // El estado va en la condición: si justo la pagaron, no se reabre. (Escribir primero bloquea la fila: una factura que se esté
+      // emitiendo en este mismo instante espera a que esto termine, y después ya no encuentra la cuenta "por cobrar".)
+      const reabierta = await tx.cuentaDelivery.updateMany({
+        where: { id: cuenta.id, storeId, estado: "por_cobrar" },
+        data: { estado: "abierta", impresaEn: null, impresaPor: null },
+      });
+      if (reabierta.count !== 1) throw new ErrorDeUsuario("Esa cuenta ya no está impresa. Actualizá la pantalla.");
+      const conFactura = await tx.comprobante.count({ where: { storeId, cuentaDeliveryId: cuenta.id, estado: "vigente" } });
+      if (conFactura > 0) {
+        throw new ErrorDeUsuario("Esta cuenta ya tiene la factura emitida: no se puede reabrir. Anulá la factura primero.");
+      }
+    }, OPCIONES_TX);
+  } catch (e) {
+    if (e instanceof ErrorDeUsuario) return { ok: false, error: e.message };
+    console.error("[delivery] reabrirCuentaDelivery falló", e);
+    return { ok: false, error: `No se pudo reabrir la cuenta. (Detalle: ${pistaDelError(e)})` };
+  }
 
   await registrarBitacora(storeId, sesion, {
     modulo: "delivery",
@@ -986,6 +1001,276 @@ export async function reabrirCuentaDelivery(cuentaId: string): Promise<Resultado
     entidad: "CuentaDelivery",
     entidadId: cuenta.id,
     detalle: { cuenta: cuenta.numero },
+  });
+  refrescar();
+  return { ok: true };
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+//  Factura rápida: la factura sale ANTES de cobrar la cuenta
+// ---------------------------------------------------------------------------------------------------------------------
+
+export type DatosFacturaRapida = {
+  /** "sin_nombre" para consumidor final, o el tipo (ruc, cedula…) si se factura con registro fiscal. */
+  facturaTipoIdentificacion: string;
+  facturaNumeroIdentificacion?: string;
+  facturaRazonSocial?: string;
+  facturaEmail?: string;
+  /** El total que la persona tenía en pantalla: sirve para avisar si la cuenta cambió mientras se emitía la factura. */
+  totalMostrado?: number;
+};
+
+export type ResultadoFacturaDelivery = { ok: true; numero: string } | { ok: false; error: string };
+
+/**
+ * "Factura rápida": emite SOLO la factura de la cuenta (con su número de timbrado, su comprobante y los datos del cliente), sin cobrar y
+ * sin registrar la venta: no entra en el turno de caja ni en los reportes de ventas hasta que se cobre la cuenta. Sirve cuando el
+ * repartidor tiene que salir ya con todos los documentos (la cuenta impresa y la factura) y la plata se registra recién cuando vuelve.
+ *
+ * Una factura emitida es un documento fiscal: su número se consume para siempre y la cuenta queda CONGELADA (no se reabre, no se le
+ * cargan ni cancelan productos, no cambia el descuento) hasta cobrarla; si hay que corregir algo se anula la factura (queda registrada
+ * como anulada) y se emite otra. Al cobrar, la venta usa esta misma factura: no sale otra ni se vuelve a consumir un número.
+ *
+ * Exige que la cuenta esté impresa ("por cobrar") y una estación con un punto de expedición vigente. No pide turno de caja abierto.
+ */
+export async function emitirFacturaDelivery(cuentaId: string, datos: DatosFacturaRapida): Promise<ResultadoFacturaDelivery> {
+  await exigirPermiso("delivery.gestionar");
+  const sesion = await exigirPermiso("pos.vender");
+  const storeId = await idLocalActual();
+  const db = prismaDelLocal(storeId);
+  const emitidoPor = nombreDe(sesion);
+
+  // La factura sale del punto de expedición de la estación de esta computadora.
+  const estacion = await estacionActual(db);
+  if (!estacion) {
+    return { ok: false, error: "Esta computadora no está vinculada a una estación. Vinculala en Estaciones para emitir la factura." };
+  }
+  const puntoExpedicion = (
+    await db.estacion.findUnique({ where: { id: estacion.id }, select: { puntoExpedicion: true } })
+  )?.puntoExpedicion ?? null;
+  if (!puntoExpedicion) {
+    return { ok: false, error: "Esta estación no tiene un punto de expedición asignado. Pedile al dueño que lo asigne en Estaciones." };
+  }
+  if (!puntoExpedicion.activo || puntoExpedicion.timbradoHasta < new Date()) {
+    return { ok: false, error: "El timbrado de este punto de expedición está vencido. No se puede emitir factura." };
+  }
+
+  // A quién se factura: "Sin Nombre" (Consumidor Final) o los datos ya revisados (texto limpio).
+  if (!datos?.facturaTipoIdentificacion) return { ok: false, error: "Elegí con o sin registro fiscal." };
+  const esSinRegistroFiscal = datos.facturaTipoIdentificacion === SIN_REGISTRO_FISCAL.tipo;
+  let comprador: { tipoIdentificacion: string; numeroIdentificacion: string; razonSocial: string | null; email: string | null } | null =
+    null;
+  if (!esSinRegistroFiscal) {
+    const revisado = validarDatosFiscales({
+      modo: "con_registro",
+      tipoIdentificacion: datos.facturaTipoIdentificacion,
+      numeroIdentificacion: datos.facturaNumeroIdentificacion,
+      razonSocial: datos.facturaRazonSocial,
+      email: datos.facturaEmail,
+    });
+    if (!revisado.ok) return { ok: false, error: revisado.error };
+    comprador = revisado.datos;
+  }
+  const compradorFinal = comprador;
+  const tipoIdFactura = esSinRegistroFiscal ? SIN_REGISTRO_FISCAL.tipo : (compradorFinal?.tipoIdentificacion ?? "");
+  const numeroIdFactura = esSinRegistroFiscal ? SIN_REGISTRO_FISCAL.numero : (compradorFinal?.numeroIdentificacion ?? "");
+  const razonSocialFactura = esSinRegistroFiscal ? null : (compradorFinal?.razonSocial ?? null);
+  const emailFactura = esSinRegistroFiscal ? null : (compradorFinal?.email ?? null);
+
+  // La cuenta y lo que vale: la misma cuenta que el cobro (los productos, el descuento y el envío como una línea más).
+  const cuenta = await db.cuentaDelivery.findFirst({
+    where: { id: String(cuentaId), estado: "por_cobrar" },
+    include: { items: { where: { estado: "activo" }, orderBy: [{ ronda: "asc" }, { linea: "asc" }] } },
+  });
+  if (!cuenta) {
+    return { ok: false, error: "Primero imprimí la cuenta: la factura se emite con la cuenta ya impresa (o esa cuenta ya se cerró)." };
+  }
+  if (cuenta.items.length === 0) return { ok: false, error: "La cuenta no tiene productos para facturar." };
+
+  const filas = lineasDeCobro(
+    cuenta.items.map((i) => ({
+      productId: i.productId,
+      nombreProducto: i.nombreProducto,
+      cantidad: i.cantidad,
+      precioUnitario: Number(i.precioUnitario),
+      iva: i.iva,
+      opcionesTexto: i.opcionesTexto,
+      costoProducto: i.costoProducto == null ? null : Number(i.costoProducto),
+      costoAgregados: i.costoAgregados == null ? null : Number(i.costoAgregados),
+      precioAgregados: Number(i.precioAgregados),
+    }))
+  );
+  const totales = totalesDeDelivery(filas, Number(cuenta.costoEnvio), descuentoDeCuenta(cuenta));
+  if (totales.descuentoInvalido) {
+    return { ok: false, error: `El descuento ya no corresponde a esta cuenta (${totales.descuentoInvalido}) Quitalo o cambialo.` };
+  }
+  const total = totales.total;
+  if (total <= 0) return { ok: false, error: "El total tiene que ser mayor a cero." };
+  const envio = lineaDeEnvio(totales.envio);
+  const filasVenta = envio ? [...filas, envio] : filas;
+
+  if (datos?.totalMostrado != null && Math.round(Number(datos.totalMostrado)) !== Math.round(total)) {
+    return {
+      ok: false,
+      error: `La cuenta cambió mientras emitías la factura: ahora es de ${formatearGuarani(total)}. Cerrá este cuadro y volvé a abrirlo.`,
+    };
+  }
+
+  // Para la factura, cada línea lleva su unidad de medida y si es un servicio.
+  const idsDeProductos = [...new Set(filas.flatMap((f) => (f.productId ? [f.productId] : [])))];
+  const datosProductos = idsDeProductos.length
+    ? await db.product.findMany({ where: { id: { in: idsDeProductos } }, select: { id: true, unidadMedida: true, esServicio: true } })
+    : [];
+  const unidadDelProducto = new Map(datosProductos.map((p) => [p.id, p.unidadMedida]));
+  const esServicioElProducto = new Map(datosProductos.map((p) => [p.id, p.esServicio]));
+
+  let numeroFactura = "";
+  try {
+    numeroFactura = await prisma.$transaction(async (tx) => {
+      // Primero se escribe en la cuenta, con el estado en la condición: bloquea la fila (dos facturas a la vez para la misma cuenta
+      // se hacen en fila) y asegura que no la cobraron, cancelaron ni reabrieron mientras tanto.
+      const bloqueada = await tx.cuentaDelivery.updateMany({
+        where: { id: cuenta.id, storeId, estado: "por_cobrar" },
+        data: { estado: "por_cobrar" },
+      });
+      if (bloqueada.count !== 1) throw new ErrorDeUsuario("Esa cuenta ya fue cobrada, cancelada o reabierta. Actualizá la pantalla.");
+      const yaTiene = await tx.comprobante.count({ where: { storeId, cuentaDeliveryId: cuenta.id, estado: "vigente" } });
+      if (yaTiene > 0) throw new ErrorDeUsuario("Esa cuenta ya tiene una factura emitida.");
+
+      if (compradorFinal?.razonSocial) {
+        await upsertClienteFiscal(tx, storeId, {
+          tipoIdentificacion: compradorFinal.tipoIdentificacion,
+          numeroIdentificacion: compradorFinal.numeroIdentificacion,
+          razonSocial: compradorFinal.razonSocial,
+          email: compradorFinal.email ?? "",
+        });
+        // La ficha de la cuenta queda con los datos con que se facturó.
+        await tx.cuentaDelivery.update({
+          where: { id: cuenta.id },
+          data: {
+            facturaTipoIdentificacion: compradorFinal.tipoIdentificacion,
+            facturaRuc: compradorFinal.numeroIdentificacion,
+            facturaRazonSocial: compradorFinal.razonSocial,
+            facturaEmail: compradorFinal.email,
+          },
+        });
+      }
+
+      // Atómico: se incrementa PRIMERO y se usa el valor ya incrementado (dos facturas a la vez no toman el mismo número).
+      const peActualizado = await tx.puntoExpedicion.update({
+        where: { id: puntoExpedicion.id },
+        data: { ultimoNumeroFactura: { increment: 1 } },
+        select: { ultimoNumeroFactura: true },
+      });
+      const comprobante = await crearComprobante(tx, {
+        storeId,
+        origen: { cuentaDeliveryId: cuenta.id },
+        punto: puntoExpedicion,
+        correlativo: peActualizado.ultimoNumeroFactura,
+        receptor: {
+          tipoIdentificacion: tipoIdFactura,
+          numeroIdentificacion: numeroIdFactura,
+          razonSocial: razonSocialFactura,
+          email: emailFactura,
+        },
+        presencia: "domicilio",
+        // La factura rápida es siempre al contado: el crédito se decide al cobrar y no se combina con una factura ya emitida.
+        condicion: "contado",
+        fechaVencimientoCredito: null,
+        items: filasVenta.map((f) => ({
+          productId: f.productId ?? null,
+          descripcion: descripcionDeItem(f.nombreProducto, f.opcionesTexto ?? undefined),
+          unidadMedida: f.productId ? (unidadDelProducto.get(f.productId) ?? null) : f.nombreProducto === NOMBRE_LINEA_ENVIO ? "unidad" : null,
+          esServicio: f.productId ? (esServicioElProducto.get(f.productId) ?? false) : f.nombreProducto === NOMBRE_LINEA_ENVIO ? null : false,
+          cantidad: f.cantidad,
+          precioUnitario: f.precioUnitario,
+          iva: f.iva,
+          // El descuento es sobre los productos: la línea de envío sale completa en la factura.
+          sinDescuento: f.productId === null && f.nombreProducto === NOMBRE_LINEA_ENVIO,
+        })),
+        descuento: totales.descuento,
+        emitidoPor,
+      });
+      return comprobante.numero;
+    }, OPCIONES_TX);
+  } catch (e) {
+    if (e instanceof ErrorDeUsuario) return { ok: false, error: e.message };
+    console.error("[delivery] emitirFacturaDelivery falló", e);
+    return {
+      ok: false,
+      error: `No se pudo emitir la factura. Antes de volver a intentar, fijate en el detalle de la cuenta si la factura quedó emitida. (Detalle: ${pistaDelError(e)})`,
+    };
+  }
+
+  await registrarBitacora(storeId, sesion, {
+    modulo: "delivery",
+    accion: "factura_emitida",
+    descripcion: `Emitió la factura ${numeroFactura} de la cuenta ${formatearNumero(cuenta.numero)} de delivery (${cuenta.clienteNombre}) por ${formatearGuarani(total)}, antes de cobrarla.`,
+    entidad: "CuentaDelivery",
+    entidadId: cuenta.id,
+    detalle: { cuenta: cuenta.numero, factura: numeroFactura, total, cliente: razonSocialFactura ?? SIN_REGISTRO_FISCAL.etiquetaDisplay },
+  });
+  refrescar();
+  return { ok: true, numero: numeroFactura };
+}
+
+/**
+ * Anula la factura emitida con la "factura rápida" (porque estaba mal, o porque hay que cambiar la cuenta). El número queda consumido
+ * para siempre y registrado como anulado, con quién lo anuló y por qué; la cuenta vuelve a poder reabrirse y se puede emitir otra
+ * factura. Solo mientras la cuenta no se haya cobrado: una vez cobrada, la factura se anula desde Facturas (o cancelando la venta).
+ */
+export async function anularFacturaDelivery(cuentaId: string, motivo: string): Promise<Resultado> {
+  await exigirPermiso("delivery.gestionar");
+  const sesion = await exigirPermiso("pos.vender");
+  const storeId = await idLocalActual();
+  const razon = limpiarMotivo(motivo);
+  if (!razon) return { ok: false, error: MENSAJE_MOTIVO };
+  const quien = nombreDe(sesion);
+
+  let numeroFactura = "";
+  let numeroCuenta = 0;
+  try {
+    const hecho = await prisma.$transaction(async (tx) => {
+      // Se bloquea la fila de la cuenta, con el estado en la condición: si la cobran justo ahora, no se anula.
+      const cuenta = await tx.cuentaDelivery.findFirst({
+        where: { id: String(cuentaId), storeId, estado: "por_cobrar" },
+        select: { id: true, numero: true },
+      });
+      if (!cuenta) throw new ErrorDeUsuario("Esa cuenta ya fue cobrada o cerrada: la factura ya no se anula desde acá.");
+      const bloqueada = await tx.cuentaDelivery.updateMany({
+        where: { id: cuenta.id, storeId, estado: "por_cobrar" },
+        data: { estado: "por_cobrar" },
+      });
+      if (bloqueada.count !== 1) throw new ErrorDeUsuario("Esa cuenta ya fue cobrada o cerrada. Actualizá la pantalla.");
+      const comprobante = await tx.comprobante.findFirst({
+        where: { storeId, cuentaDeliveryId: cuenta.id, estado: "vigente" },
+        select: { numero: true },
+      });
+      if (!comprobante) throw new ErrorDeUsuario("Esa cuenta no tiene una factura vigente.");
+      await anularComprobantes(tx, {
+        storeId,
+        origen: { cuentaDeliveryId: cuenta.id },
+        por: quien,
+        en: new Date(),
+        motivo: razon,
+      });
+      return { numeroFactura: comprobante.numero, numeroCuenta: cuenta.numero };
+    }, OPCIONES_TX);
+    numeroFactura = hecho.numeroFactura;
+    numeroCuenta = hecho.numeroCuenta;
+  } catch (e) {
+    if (e instanceof ErrorDeUsuario) return { ok: false, error: e.message };
+    console.error("[delivery] anularFacturaDelivery falló", e);
+    return { ok: false, error: `No se pudo anular la factura. (Detalle: ${pistaDelError(e)})` };
+  }
+
+  await registrarBitacora(storeId, sesion, {
+    modulo: "delivery",
+    accion: "factura_anulada",
+    descripcion: `Anuló la factura ${numeroFactura} de la cuenta ${formatearNumero(numeroCuenta)} de delivery, antes de cobrarla. Motivo: ${razon}.`,
+    entidad: "CuentaDelivery",
+    entidadId: String(cuentaId),
+    detalle: { cuenta: numeroCuenta, factura: numeroFactura, motivo: razon },
   });
   refrescar();
   return { ok: true };
@@ -1106,13 +1391,21 @@ export async function pagarCuentaDelivery(cuentaId: string, datos: DatosCobroDel
     select: { facturaObligatoria: true, ventasACredito: true },
   });
 
+  // Si a esta cuenta ya se le emitió la factura ("factura rápida"), el cobro usa ESA factura: no sale otra ni se consume otro número,
+  // y los datos del comprador y del timbrado son los de la factura emitida (lo que llegue del navegador sobre la factura se ignora).
+  const facturaPrevia = await db.comprobante.findFirst({
+    where: { cuentaDeliveryId: String(cuentaId), estado: "vigente" },
+  });
+
   // ------------------------------------------------------------ factura o ticket (mismas reglas que el mostrador)
-  const esFactura = datos?.comprobanteTipo === "factura";
-  const esSinRegistroFiscal = datos?.facturaTipoIdentificacion === SIN_REGISTRO_FISCAL.tipo;
+  const esFactura = !!facturaPrevia || datos?.comprobanteTipo === "factura";
+  const esSinRegistroFiscal = facturaPrevia
+    ? facturaPrevia.receptorTipoIdentificacion === SIN_REGISTRO_FISCAL.tipo
+    : datos?.facturaTipoIdentificacion === SIN_REGISTRO_FISCAL.tipo;
   const facturaObligatoria = store?.facturaObligatoria ?? false;
   const puntoVigente = !!puntoExpedicion && puntoExpedicion.activo && puntoExpedicion.timbradoHasta > new Date();
 
-  if (facturaObligatoria) {
+  if (facturaObligatoria && !facturaPrevia) {
     if (!puntoVigente) {
       return {
         ok: false,
@@ -1125,7 +1418,8 @@ export async function pagarCuentaDelivery(cuentaId: string, datos: DatosCobroDel
   // Los datos del comprador ya revisados (texto limpio): lo que se guarda y se factura es esto, no lo que llegó crudo del navegador.
   let comprador: { tipoIdentificacion: string; numeroIdentificacion: string; razonSocial: string | null; email: string | null } | null =
     null;
-  if (esFactura) {
+  // Con la factura ya emitida no se vuelve a validar nada de esto: ya se hizo al emitirla.
+  if (esFactura && !facturaPrevia) {
     if (!datos.facturaTipoIdentificacion) return { ok: false, error: "Elegí con o sin registro fiscal." };
     if (!esSinRegistroFiscal) {
       // La validación mínima: el RUC con su dígito, razón social de al menos 4 letras, correo válido.
@@ -1188,6 +1482,15 @@ export async function pagarCuentaDelivery(cuentaId: string, datos: DatosCobroDel
   const envio = lineaDeEnvio(totales.envio);
   const filasVenta = envio ? [...filas, envio] : filas;
 
+  // La factura ya emitida tiene que decir lo mismo que se cobra: la cuenta está congelada desde que se emitió, así que siempre
+  // coincide; si no, algo se tocó por fuera y no se cobra con una factura que no corresponde.
+  if (facturaPrevia && Math.round(Number(facturaPrevia.total)) !== Math.round(total)) {
+    return {
+      ok: false,
+      error: `La factura emitida (${facturaPrevia.numero}) es de ${formatearGuarani(Number(facturaPrevia.total))} y la cuenta ahora es de ${formatearGuarani(total)}. Anulá la factura y emití otra.`,
+    };
+  }
+
   // Si la cuenta cambió mientras se cobraba (se le cargó algo, o la caja le dio un descuento desde otra pantalla), el monto que la
   // persona vio ya no es el real: se avisa en vez de cobrar otra cosa.
   if (datos?.totalMostrado != null && Math.round(Number(datos.totalMostrado)) !== Math.round(total)) {
@@ -1205,6 +1508,13 @@ export async function pagarCuentaDelivery(cuentaId: string, datos: DatosCobroDel
     String(datos.pagos[0]?.forma ?? "").trim().toLowerCase() === FORMA_PAGO_A_CREDITO;
   let fechaVencimientoCredito: Date | null = null;
   if (esCredito) {
+    // La factura rápida sale siempre al contado: una venta a crédito con esa factura diría una condición que no es la de la venta.
+    if (facturaPrevia) {
+      return {
+        ok: false,
+        error: "La factura de esta cuenta ya se emitió al contado: no se puede cobrar a crédito. Anulá la factura si querés cobrarla a crédito.",
+      };
+    }
     if (!store?.ventasACredito) return { ok: false, error: "Este local no vende a crédito. Se activa en Configuración." };
     const diasPedidos = Math.round(Number(datos.creditoDias ?? 30));
     const dias = Number.isFinite(diasPedidos) ? Math.min(Math.max(diasPedidos, 0), 365) : 30;
@@ -1249,7 +1559,26 @@ export async function pagarCuentaDelivery(cuentaId: string, datos: DatosCobroDel
       let datosFactura: Record<string, unknown> = { comprobanteTipo: "ticket" };
       let correlativoFactura: number | null = null;
 
-      if (esFactura && puntoExpedicion) {
+      if (facturaPrevia) {
+        // La factura ya salió ("factura rápida"): la venta se registra con ESA factura (mismo número, timbrado y montos), sin consumir
+        // otro número ni crear otro comprobante.
+        datosFactura = {
+          comprobanteTipo: "factura",
+          facturaTipoIdentificacion: facturaPrevia.receptorTipoIdentificacion,
+          facturaRazonSocial: facturaPrevia.receptorRazonSocial,
+          facturaRuc: facturaPrevia.receptorNumeroIdentificacion,
+          facturaNumero: facturaPrevia.numero,
+          facturaTimbrado: facturaPrevia.timbrado,
+          facturaVencimiento: facturaPrevia.timbradoHasta,
+          facturaGravado10: Number(facturaPrevia.gravado10),
+          facturaGravado5: Number(facturaPrevia.gravado5),
+          facturaExento: Number(facturaPrevia.exento),
+          facturaIva10: Number(facturaPrevia.iva10),
+          facturaIva5: Number(facturaPrevia.iva5),
+          facturaRazonSocialEmisor: facturaPrevia.emisorRazonSocial,
+          facturaRucEmisor: facturaPrevia.emisorRuc,
+        };
+      } else if (esFactura && puntoExpedicion) {
         if (compradorFinal?.razonSocial) {
           await upsertClienteFiscal(tx, storeId, {
             tipoIdentificacion: compradorFinal.tipoIdentificacion,
@@ -1327,7 +1656,17 @@ export async function pagarCuentaDelivery(cuentaId: string, datos: DatosCobroDel
         select: { id: true },
       });
 
-      if (esFactura && puntoExpedicion && correlativoFactura !== null) {
+      if (facturaPrevia) {
+        // El comprobante de la factura rápida pasa a colgar también de esta venta (sigue siendo el mismo, con el mismo número): así la
+        // factura, el documento electrónico y la anulación al cancelar la venta funcionan igual que en cualquier otra venta.
+        const ligado = await tx.comprobante.updateMany({
+          where: { id: facturaPrevia.id, storeId, estado: "vigente", ventaPosId: null },
+          data: { ventaPosId: venta.id },
+        });
+        if (ligado.count !== 1) {
+          throw new ErrorDeUsuario("La factura de esta cuenta cambió mientras se cobraba (¿la anularon?). Actualizá la pantalla.");
+        }
+      } else if (esFactura && puntoExpedicion && correlativoFactura !== null) {
         await crearComprobante(tx, {
           storeId,
           origen: { ventaPosId: venta.id },
@@ -1376,7 +1715,7 @@ export async function pagarCuentaDelivery(cuentaId: string, datos: DatosCobroDel
     modulo: "delivery",
     accion: "cuenta_pagada",
     descripcion: `Cobró la cuenta ${formatearNumero(cuenta.numero)} de delivery (${cuenta.clienteNombre}) por ${formatearGuarani(total)}${
-      esFactura ? " con factura" : " con ticket"
+      facturaPrevia ? ` con la factura ${facturaPrevia.numero} (emitida antes)` : esFactura ? " con factura" : " con ticket"
     }${esCredito ? ", a crédito" : ""}${
       totales.descuento > 0 ? `, con un descuento de ${formatearGuarani(totales.descuento)}` : ""
     }${totales.envio > 0 ? `, con ${formatearGuarani(totales.envio)} de envío` : ""}.`,

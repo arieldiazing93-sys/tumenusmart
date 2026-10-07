@@ -7,6 +7,7 @@ import { estacionActual } from "@/lib/estacion-actual";
 import { diasParaVencer } from "@/lib/factura-pos";
 import { cargarCatalogoDeVenta } from "@/lib/catalogo-venta";
 import { formatearGuarani } from "@/lib/format";
+import { SIN_REGISTRO_FISCAL } from "@/lib/tipo-cliente";
 import { SEGUNDOS_LATIDO_IMPRESION, descuentoDeCuenta, impuestosDeCuenta, lineasDeCobro } from "@/lib/comedor";
 import { ESTADOS_DELIVERY_ABIERTA, lineaDeEnvio, totalesDeDelivery } from "@/lib/delivery";
 import { BotonEnlace, Cabecera, Pastilla } from "@/components/ui";
@@ -39,6 +40,13 @@ export default async function DeliveryPage() {
       include: {
         repartidor: { select: { nombre: true } },
         items: { orderBy: [{ ronda: "asc" }, { linea: "asc" }] },
+        // La factura que ya salió con la "factura rápida" (una vigente a la vez).
+        comprobantes: {
+          where: { estado: "vigente" },
+          orderBy: { createdAt: "desc" },
+          take: 1,
+          select: { numero: true, receptorRazonSocial: true, receptorTipoIdentificacion: true, fechaEmision: true },
+        },
       },
     }),
     db.trabajoImpresion.count({ where: { estado: { in: ["pendiente", "imprimiendo"] } } }),
@@ -93,6 +101,16 @@ export default async function DeliveryPage() {
       repartidor: c.repartidor?.nombre ?? null,
       asignadaEn: c.salioEn ? c.salioEn.toISOString() : null,
       impresaEn: c.impresaEn ? c.impresaEn.toISOString() : null,
+      factura: c.comprobantes[0]
+        ? {
+            numero: c.comprobantes[0].numero,
+            cliente:
+              c.comprobantes[0].receptorTipoIdentificacion === SIN_REGISTRO_FISCAL.tipo
+                ? SIN_REGISTRO_FISCAL.etiquetaDisplay
+                : (c.comprobantes[0].receptorRazonSocial ?? ""),
+            emitidaEn: c.comprobantes[0].fechaEmision.toISOString(),
+          }
+        : null,
       descuento: descuentoDeCuenta(c)
         ? {
             tipo: c.descuentoTipo === "porcentaje" ? "porcentaje" : "monto",
@@ -133,6 +151,7 @@ export default async function DeliveryPage() {
     zonas: [],
     repartidores: [],
     imprimirCuenta: { ok: false, motivo: "" },
+    facturaRapida: { ok: false, motivo: "" },
     cobro: { ok: false, motivo: "" },
   };
 
@@ -157,7 +176,12 @@ export default async function DeliveryPage() {
 
     if (!estacion) {
       const motivo = "Esta computadora no está vinculada a una estación. Vinculala en Estaciones.";
-      contexto = { ...contexto, imprimirCuenta: { ok: false, motivo }, cobro: { ok: false, motivo } };
+      contexto = {
+        ...contexto,
+        imprimirCuenta: { ok: false, motivo },
+        facturaRapida: { ok: false, motivo },
+        cobro: { ok: false, motivo },
+      };
     } else {
       const datos = await db.estacion.findUnique({
         where: { id: estacion.id },
@@ -179,6 +203,18 @@ export default async function DeliveryPage() {
               motivo:
                 "Esta estación no tiene impresora para el ticket. En Estaciones elegí el “Área del ticket/factura” y asignale una impresora.",
             },
+      };
+
+      // La "factura rápida" no registra ninguna venta: no necesita turno de caja abierto, solo un punto de expedición vigente.
+      const puntoDeFactura = datos?.puntoExpedicion ?? null;
+      const puntoVigente = !!puntoDeFactura?.activo && puntoDeFactura.timbradoHasta > new Date();
+      contexto = {
+        ...contexto,
+        facturaRapida: !puedeCobrar
+          ? { ok: false, motivo: "No tenés permiso para facturar." }
+          : puntoVigente && puntoDeFactura
+            ? { ok: true, diasParaVencerTimbrado: diasParaVencer(puntoDeFactura.timbradoHasta), nombreImpresoraTicket: impresoraDelTicket }
+            : { ok: false, motivo: "Esta estación no tiene un punto de expedición vigente: no puede emitir facturas." },
       };
 
       if (puedeCobrar) {

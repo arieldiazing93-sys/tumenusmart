@@ -56,9 +56,14 @@ export function PagarCuentaDeliveryPanel({
   const facturaForzada = facturaObligatoria && puedeFacturar;
   const bloqueadoSinFacturar = facturaObligatoria && !puedeFacturar;
 
+  // Si a la cuenta ya se le emitió la factura ("factura rápida"), el cobro usa ESA factura: no se elige comprobante ni cliente, no sale
+  // otra factura, y no se puede cobrar a crédito (la factura salió al contado).
+  const facturaEmitida = cuenta.factura;
   // La ficha que dio el cliente al pedir: el cobro arranca con esos datos y, con ellos, en "Factura con registro fiscal".
   const ficha = cuenta.ficha;
-  const [comprobanteTipo, setComprobanteTipo] = useState<"ticket" | "factura">(facturaForzada || (puedeFacturar && !!ficha) ? "factura" : "ticket");
+  const [comprobanteTipo, setComprobanteTipo] = useState<"ticket" | "factura">(
+    facturaEmitida || facturaForzada || (puedeFacturar && !!ficha) ? "factura" : "ticket"
+  );
   const [registroFiscal, setRegistroFiscal] = useState<"con" | "sin">("con");
   const [numero, setNumero] = useState(ficha?.numero ?? "");
   const [razonSocial, setRazonSocial] = useState(ficha?.razon ?? "");
@@ -73,7 +78,13 @@ export function PagarCuentaDeliveryPanel({
   const [cobrando, setCobrando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [errorCobro, setErrorCobro] = useState<string | null>(null);
-  const [hecho, setHecho] = useState<{ ventaId: string; total: number; impresion: ResultadoImpresion | null } | null>(null);
+  const [hecho, setHecho] = useState<{
+    ventaId: string;
+    total: number;
+    impresion: ResultadoImpresion | null;
+    /** La factura ya se había impreso al emitirla ("factura rápida"): al cobrar no sale otra copia sola. */
+    yaImpresa?: boolean;
+  } | null>(null);
   const [reimprimiendo, setReimprimiendo] = useState(false);
 
   const total = cuenta.totales.total;
@@ -106,7 +117,7 @@ export function PagarCuentaDeliveryPanel({
 
   function continuarAlCobro() {
     setError(null);
-    if (conRegistro && (!numero.trim() || !razonSocial.trim())) {
+    if (!facturaEmitida && conRegistro && (!numero.trim() || !razonSocial.trim())) {
       setError("Para factura con registro fiscal hacen falta el número y la razón social.");
       return;
     }
@@ -153,6 +164,11 @@ export function PagarCuentaDeliveryPanel({
       return;
     }
     setMostrarCobro(false);
+    // La factura rápida ya salió (y la lleva el repartidor): al cobrar no se imprime otra copia sola. "Imprimir de nuevo" sigue ahí.
+    if (facturaEmitida) {
+      setHecho({ ventaId: r.ventaId, total: r.total, impresion: { ok: true, omitida: true }, yaImpresa: true });
+      return;
+    }
     setHecho({ ventaId: r.ventaId, total: r.total, impresion: null });
     // El ticket sale solo en la impresora de esta estación; si no se puede, se avisa y queda para verlo e imprimirlo a mano.
     const impresion = await imprimirComprobante(`/admin/pos/venta/${r.ventaId}/ticket/crudo`, nombreImpresoraTicket);
@@ -163,7 +179,7 @@ export function PagarCuentaDeliveryPanel({
     if (!hecho) return;
     setReimprimiendo(true);
     const impresion = await imprimirComprobante(`/admin/pos/venta/${hecho.ventaId}/ticket/crudo`, nombreImpresoraTicket);
-    setHecho({ ...hecho, impresion });
+    setHecho({ ...hecho, impresion, yaImpresa: false });
     setReimprimiendo(false);
   }
 
@@ -188,8 +204,12 @@ export function PagarCuentaDeliveryPanel({
               </p>
             </div>
             <p className="max-w-xs text-[0.85rem] leading-snug text-tinta-media">
-              {hecho.impresion === null ? "Imprimiendo el ticket…" : textoImpresion(hecho.impresion)}
-              {hecho.impresion && !hecho.impresion.ok && " Podés verlo e imprimirlo a mano desde el botón de abajo."}
+              {hecho.yaImpresa
+                ? "La factura ya se había impreso cuando se emitió: acá no sale otra copia."
+                : hecho.impresion === null
+                  ? "Imprimiendo el ticket…"
+                  : textoImpresion(hecho.impresion)}
+              {!hecho.yaImpresa && hecho.impresion && !hecho.impresion.ok && " Podés verlo e imprimirlo a mano desde el botón de abajo."}
             </p>
             <div className="flex flex-wrap justify-center gap-2">
               <a
@@ -267,7 +287,17 @@ export function PagarCuentaDeliveryPanel({
               <p className="cifra flex-none text-[1.7rem] font-bold leading-none text-tinta">{formatearGuarani(total)}</p>
             </div>
 
-            {puedeFacturar && (
+            {/* La factura ya salió ("factura rápida"): se cobra con esa factura, sin elegir comprobante ni cliente. */}
+            {facturaEmitida && (
+              <div className="flex flex-col gap-1 rounded-xl border-2 border-azul/50 bg-superficie p-3.5">
+                <p className="text-[0.72rem] font-semibold uppercase tracking-rotulo text-tinta-suave">Comprobante</p>
+                <DatoDelCliente etiqueta="Factura" valor={facturaEmitida.numero} />
+                {facturaEmitida.cliente && <DatoDelCliente etiqueta="A nombre de" valor={facturaEmitida.cliente} />}
+                <p className="text-[0.78rem] text-tinta-suave">Ya está emitida: al cobrar se registra la venta con esta factura y no sale otra.</p>
+              </div>
+            )}
+
+            {puedeFacturar && !facturaEmitida && (
               <div className="flex flex-col gap-2 rounded-xl border-2 border-azul/50 bg-superficie p-3.5">
                 <p className="text-[0.72rem] font-semibold uppercase tracking-rotulo text-tinta-suave">Comprobante</p>
                 {diasParaVencerTimbrado != null && diasParaVencerTimbrado <= 30 && (
@@ -369,13 +399,13 @@ export function PagarCuentaDeliveryPanel({
               </div>
             )}
 
-            {!puedeFacturar && !facturaObligatoria && (
+            {!puedeFacturar && !facturaObligatoria && !facturaEmitida && (
               <p className="rounded-lg bg-papel-suave px-3 py-2 text-[0.8rem] text-tinta-media">
                 Esta estación no tiene un punto de expedición vigente: se cobra con ticket.
               </p>
             )}
 
-            {bloqueadoSinFacturar && (
+            {bloqueadoSinFacturar && !facturaEmitida && (
               <p className="rounded-lg bg-peligro-luz px-3 py-2 text-[0.82rem] font-medium text-peligro">
                 Este local exige facturar todas las ventas y esta estación no tiene un punto de expedición vigente asignado. No se
                 puede cobrar hasta que el dueño le asigne uno en Puntos de expedición.
@@ -389,7 +419,7 @@ export function PagarCuentaDeliveryPanel({
             <button type="button" onClick={onCerrar} className={clasesBoton("peligro", "lg")}>
               Cancelar
             </button>
-            <Boton tono="principal" tam="lg" className="flex-1" disabled={bloqueadoSinFacturar} onClick={continuarAlCobro}>
+            <Boton tono="principal" tam="lg" className="flex-1" disabled={bloqueadoSinFacturar && !facturaEmitida} onClick={continuarAlCobro}>
               Continuar al cobro
             </Boton>
           </div>
@@ -413,13 +443,14 @@ export function PagarCuentaDeliveryPanel({
 
       {mostrarCobro && (
         <CobrarPanel
-          clienteNombre={(conRegistro && razonSocial.trim()) || cuenta.clienteNombre}
+          clienteNombre={(!facturaEmitida && conRegistro && razonSocial.trim()) || cuenta.clienteNombre}
           cantidadItems={cantidadProductos}
           total={total}
           cobrando={cobrando}
           error={errorCobro}
           personal={[]}
-          permiteCredito={permiteCredito}
+          // Con la factura ya emitida (al contado) no se cobra a crédito.
+          permiteCredito={permiteCredito && !facturaEmitida}
           bloqueClienteCredito={bloqueClienteCredito}
           creditoListo
           hayModalEncima={false}

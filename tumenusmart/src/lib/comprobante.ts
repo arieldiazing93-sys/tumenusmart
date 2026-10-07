@@ -144,8 +144,8 @@ export function tipoTransaccionDe(items: Pick<ItemFuente, "esServicio">[]): "ven
 
 export type DatosNuevoComprobante = {
   storeId: string;
-  /** De qué cuenta sale: exactamente una de las dos. */
-  origen: { ventaPosId: string } | { orderId: string };
+  /** De qué cuenta sale: exactamente una (la cuenta de delivery, en la "factura rápida": la factura sale antes de que exista la venta). */
+  origen: { ventaPosId: string } | { orderId: string } | { cuentaDeliveryId: string };
   punto: PuntoParaComprobante;
   /** El correlativo que ya se incrementó en el punto de expedición (1, 2, 3…). */
   correlativo: number;
@@ -187,6 +187,7 @@ export async function crearComprobante(db: Db, datos: DatosNuevoComprobante): Pr
       storeId: datos.storeId,
       ventaPosId: "ventaPosId" in datos.origen ? datos.origen.ventaPosId : null,
       orderId: "orderId" in datos.origen ? datos.origen.orderId : null,
+      cuentaDeliveryId: "cuentaDeliveryId" in datos.origen ? datos.origen.cuentaDeliveryId : null,
       tipo: "factura",
       modalidad: "autoimpresor",
       puntoExpedicionId: punto.id,
@@ -237,6 +238,15 @@ export async function crearComprobante(db: Db, datos: DatosNuevoComprobante): Pr
   });
 }
 
+/** El pedazo de `where` que dice de qué cuenta es el comprobante. */
+function filtroDeOrigen(
+  origen: { ventaPosId: string } | { orderId: string } | { cuentaDeliveryId: string }
+): { ventaPosId: string } | { orderId: string } | { cuentaDeliveryId: string } {
+  if ("ventaPosId" in origen) return { ventaPosId: origen.ventaPosId };
+  if ("orderId" in origen) return { orderId: origen.orderId };
+  return { cuentaDeliveryId: origen.cuentaDeliveryId };
+}
+
 /**
  * Marca como anulados los comprobantes vigentes de una venta o pedido. Sin
  * ninguno vigente (una factura de antes de que existiera esta tabla) no hace
@@ -247,7 +257,7 @@ export async function anularComprobantes(
   db: Db,
   datos: {
     storeId: string;
-    origen: { ventaPosId: string } | { orderId: string };
+    origen: { ventaPosId: string } | { orderId: string } | { cuentaDeliveryId: string };
     por: string;
     en: Date;
     motivo: string | null;
@@ -256,7 +266,7 @@ export async function anularComprobantes(
   await db.comprobante.updateMany({
     where: {
       storeId: datos.storeId,
-      ...("ventaPosId" in datos.origen ? { ventaPosId: datos.origen.ventaPosId } : { orderId: datos.origen.orderId }),
+      ...filtroDeOrigen(datos.origen),
       estado: "vigente",
     },
     data: { estado: "anulado", anuladoPor: datos.por, anuladoEn: datos.en, motivoAnulacion: datos.motivo },
@@ -267,12 +277,12 @@ export async function anularComprobantes(
 export async function ultimoComprobanteAnulado(
   db: Db,
   storeId: string,
-  origen: { ventaPosId: string } | { orderId: string }
+  origen: { ventaPosId: string } | { orderId: string } | { cuentaDeliveryId: string }
 ): Promise<{ id: string } | null> {
   return db.comprobante.findFirst({
     where: {
       storeId,
-      ...("ventaPosId" in origen ? { ventaPosId: origen.ventaPosId } : { orderId: origen.orderId }),
+      ...filtroDeOrigen(origen),
       estado: "anulado",
     },
     orderBy: { createdAt: "desc" },
