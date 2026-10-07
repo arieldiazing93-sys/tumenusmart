@@ -205,13 +205,14 @@ export default async function TurnosPosPage({
         >
           <input type="hidden" name="fecha" value="rango" />
           {estacionElegida && <input type="hidden" name="estacion" value={estacionElegida.id} />}
-          <Campo etiqueta="Desde" className="w-44">
+          {/* En el celular las dos fechas van lado a lado y el botón a lo ancho; en pantalla ancha, en una fila. */}
+          <Campo etiqueta="Desde" className="w-[calc(50%-0.375rem)] sm:w-44">
             <Entrada type="date" name="desde" defaultValue={diaDesde} required />
           </Campo>
-          <Campo etiqueta="Hasta" className="w-44">
+          <Campo etiqueta="Hasta" className="w-[calc(50%-0.375rem)] sm:w-44">
             <Entrada type="date" name="hasta" defaultValue={diaHasta} required />
           </Campo>
-          <button type="submit" className={clasesBoton("principal", "md")}>
+          <button type="submit" className={`${clasesBoton("principal", "md")} w-full sm:w-auto`}>
             Filtrar
           </button>
         </form>

@@ -10,6 +10,7 @@ import { etiquetaFormaPagoPos, FORMAS_PAGO_POS, FORMA_PAGO_MIXTO } from "@/lib/t
 import { detallePagos, filtroPorFormaPago, montoCobradoConForma } from "@/lib/pago-venta";
 import { cargarCuentasCanceladas, type CuentaCancelada } from "@/lib/cuentas-canceladas";
 import { ZONA_NEGOCIO } from "@/lib/timezone";
+import { FiltroFechaReporte } from "@/components/FiltroFechaReporte";
 
 export const dynamic = "force-dynamic";
 
@@ -195,58 +196,22 @@ export default async function CuentasPosPage({
         }
       />
 
-      <div className="mb-3 flex flex-wrap items-center gap-2">
-        {FILTROS_FECHA.map((f) => (
-          <Link
-            key={f.value}
-            href={hrefFecha(f.value)}
-            className={`rounded-full border px-3 py-1.5 text-sm font-medium ${
-              fechaActiva === f.value && fechaActiva !== "rango"
-                ? "border-brand bg-brand text-white"
-                : "border-linea text-tinta-media hover:border-brand hover:text-brand"
-            }`}
-          >
-            {f.label}
-          </Link>
-        ))}
+      {/* El filtro de fechas (con hora): se adapta al celular (atajos que se deslizan, rango en dos campos lado a lado). */}
+      <FiltroFechaReporte
+        accion="/admin/pos/cuentas"
+        opciones={FILTROS_FECHA}
+        activa={fechaActiva}
+        desde={desde}
+        hasta={hasta}
+        conservar={{ formaPago }}
+        conHora
+      />
 
-        <form
-          method="get"
-          action="/admin/pos/cuentas"
-          className={`flex flex-wrap items-center gap-1.5 rounded-full border px-2 py-1 text-sm ${
-            fechaActiva === "rango" ? "border-brand bg-brand-light" : "border-linea"
-          }`}
-        >
-          <input type="hidden" name="fecha" value="rango" />
-          {formaPago && <input type="hidden" name="formaPago" value={formaPago} />}
-          <input
-            type="datetime-local"
-            name="desde"
-            defaultValue={fechaActiva === "rango" ? desde : ""}
-            required
-            className="rounded-md border border-linea px-1.5 py-1 text-xs"
-          />
-          <span className="text-tinta-suave">–</span>
-          <input
-            type="datetime-local"
-            name="hasta"
-            defaultValue={fechaActiva === "rango" ? hasta : ""}
-            required
-            className="rounded-md border border-linea px-1.5 py-1 text-xs"
-          />
-          <button
-            type="submit"
-            className="rounded-full bg-noche-panel px-3 py-1 text-xs font-medium text-white hover:bg-noche-panel"
-          >
-            Filtrar
-          </button>
-        </form>
-      </div>
-
-      <div className="mb-6 flex flex-wrap items-center gap-2">
+      {/* Las formas de pago: en el celular, una fila que se desliza con el dedo. */}
+      <div className="-mx-4 mb-5 flex gap-2 overflow-x-auto px-4 pb-1 [-ms-overflow-style:none] [scrollbar-width:none] sm:mx-0 sm:mb-6 sm:flex-wrap sm:overflow-visible sm:px-0 sm:pb-0 [&::-webkit-scrollbar]:hidden">
         <Link
           href={hrefFormaPago(null)}
-          className={`rounded-full border px-3 py-1 text-xs font-medium ${
+          className={`flex-none whitespace-nowrap rounded-full border px-3 py-1.5 text-xs font-medium ${
             !formaPago
               ? "border-tinta bg-tinta text-white"
               : "border-linea text-tinta-media hover:border-tinta/40"
@@ -258,7 +223,7 @@ export default async function CuentasPosPage({
           <Link
             key={f.valor}
             href={hrefFormaPago(f.valor)}
-            className={`rounded-full border px-3 py-1 text-xs font-medium ${
+            className={`flex-none whitespace-nowrap rounded-full border px-3 py-1.5 text-xs font-medium ${
               formaPago === f.valor
                 ? "border-tinta bg-tinta text-white"
                 : "border-linea text-tinta-media hover:border-tinta/40"

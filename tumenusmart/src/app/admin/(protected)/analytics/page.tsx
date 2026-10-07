@@ -10,6 +10,7 @@ import { formatearGuarani } from "@/lib/format";
 import { ZONA_NEGOCIO } from "@/lib/timezone";
 import { linkWhatsappCliente } from "@/lib/whatsapp";
 import { CanjearFidelidadBoton } from "./CanjearFidelidadBoton";
+import { FiltroFechaReporte } from "@/components/FiltroFechaReporte";
 
 export const dynamic = "force-dynamic";
 
@@ -46,11 +47,11 @@ function Tarjeta({
 }) {
   const c = COLORES_TARJETA[color];
   return (
-    <div className={`rounded-xl border p-4 ${c.caja}`}>
+    <div className={`rounded-xl border p-3 sm:p-4 ${c.caja}`}>
       <p className={`text-[0.68rem] font-semibold uppercase tracking-rotulo ${c.rotulo}`}>
         {etiqueta}
       </p>
-      <p className={`cifra mt-1.5 text-[1.45rem] font-semibold leading-none ${c.cifra}`}>
+      <p className={`cifra mt-1.5 break-words text-[1.15rem] font-semibold leading-none sm:text-[1.45rem] ${c.cifra}`}>
         {valor}
       </p>
       {detalle && <p className="mt-1.5 text-[0.72rem] text-tinta-media">{detalle}</p>}
@@ -149,52 +150,10 @@ export default async function AnalyticsPage({
         }
       />
 
+      {/* El filtro de fechas: se adapta al celular (atajos que se deslizan, rango en dos campos lado a lado). */}
+      <FiltroFechaReporte accion="/admin/analytics" opciones={FILTROS_FECHA} activa={fechaActiva} desde={desde} hasta={hasta} />
+
       <div className="mb-6 flex flex-wrap items-center gap-2">
-        {FILTROS_FECHA.map((f) => (
-          <Link
-            key={f.value}
-            href={hrefFecha(f.value)}
-            className={`rounded-full border px-3 py-1.5 text-sm font-medium ${
-              fechaActiva === f.value && fechaActiva !== "rango"
-                ? "border-brand bg-brand text-white"
-                : "border-linea text-tinta-media hover:border-brand hover:text-brand"
-            }`}
-          >
-            {f.label}
-          </Link>
-        ))}
-
-        <form
-          method="get"
-          action="/admin/analytics"
-          className={`flex items-center gap-1.5 rounded-full border px-2 py-1 text-sm ${
-            fechaActiva === "rango" ? "border-brand bg-brand-light" : "border-linea"
-          }`}
-        >
-          <input type="hidden" name="fecha" value="rango" />
-          <input
-            type="date"
-            name="desde"
-            defaultValue={fechaActiva === "rango" ? desde : ""}
-            required
-            className="rounded-md border border-linea px-1.5 py-1 text-xs"
-          />
-          <span className="text-tinta-suave">–</span>
-          <input
-            type="date"
-            name="hasta"
-            defaultValue={fechaActiva === "rango" ? hasta : ""}
-            required
-            className="rounded-md border border-linea px-1.5 py-1 text-xs"
-          />
-          <button
-            type="submit"
-            className="rounded-full bg-noche-panel px-3 py-1 text-xs font-medium text-white hover:bg-noche-panel"
-          >
-            Filtrar
-          </button>
-        </form>
-
         {/*
           Buscador de clientes por teléfono, empujado a la derecha. Filtra
           solo la tabla de abajo — las tarjetas de arriba (1 vez / 2-3 veces
@@ -204,7 +163,7 @@ export default async function AnalyticsPage({
         <form
           method="get"
           action="/admin/analytics"
-          className={`ml-auto flex items-center gap-1.5 rounded-full border px-2 py-1 text-sm ${
+          className={`flex w-full items-center gap-1.5 rounded-full border px-2 py-1 text-sm sm:ml-auto sm:w-auto ${
             telefonoBuscado ? "border-brand bg-brand-light" : "border-linea"
           }`}
         >
@@ -216,7 +175,7 @@ export default async function AnalyticsPage({
             name="telefono"
             defaultValue={telefonoBuscado}
             placeholder="Buscar por teléfono"
-            className="w-40 rounded-md border border-linea px-2 py-1 text-xs"
+            className="min-w-0 flex-1 rounded-md border border-linea px-2 py-1.5 text-[16px] sm:w-40 sm:flex-none sm:py-1 sm:text-xs"
           />
           <button
             type="submit"

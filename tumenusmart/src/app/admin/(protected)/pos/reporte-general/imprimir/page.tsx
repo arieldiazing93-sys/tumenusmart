@@ -2,7 +2,7 @@ import { pantallaConPermiso } from "@/lib/auth";
 import { idLocalActual, localActual } from "@/lib/local-actual";
 import { calcularRangoFecha } from "@/lib/rango-fecha";
 import { formatearGuarani, formatearNumero } from "@/lib/format";
-import { COLUMNAS_FORMA_PAGO, calcularReporteGeneralPos } from "@/lib/reporte-general-pos";
+import { COLUMNAS_CANAL, COLUMNAS_FORMA_PAGO, calcularReporteGeneralPos } from "@/lib/reporte-general-pos";
 import { ZONA_NEGOCIO } from "@/lib/timezone";
 import { ImprimirBoton } from "../../../estadisticas/imprimir/ImprimirBoton";
 
@@ -53,8 +53,7 @@ export default async function ImprimirReporteGeneralPosPage({
           {finRangoInclusive.toLocaleDateString("es-PY", opcionesFecha)}
         </p>
         <p className="mt-1 text-xs text-tinta-suave">
-          Mostrador y pedidos (delivery y retiro) cobrados, con la fecha y la forma de pago de la caja — el control de si el
-          repartidor ya rindió el efectivo está en Rendiciones.
+          Todo lo cobrado —mostrador, comedor, delivery y reservas de turnos— con la fecha y la forma de pago de la caja.
         </p>
       </div>
 
@@ -65,8 +64,11 @@ export default async function ImprimirReporteGeneralPosPage({
           <thead>
             <tr className="border-b border-linea text-left text-xs uppercase tracking-wide text-tinta-media">
               <th className="py-1.5">N°</th>
-              <th className="py-1.5">ID Pedido</th>
-              <th className="py-1.5">ID Venta POS</th>
+              {COLUMNAS_CANAL.map((c) => (
+                <th key={c.valor} className="py-1.5">
+                  {c.etiqueta}
+                </th>
+              ))}
               <th className="py-1.5">Fecha</th>
               <th className="py-1.5 text-right">Importe</th>
               {COLUMNAS_FORMA_PAGO.map((f) => (
@@ -78,10 +80,13 @@ export default async function ImprimirReporteGeneralPosPage({
           </thead>
           <tbody>
             {reporte.filas.map((f) => (
-              <tr key={`${f.n}-${f.idPedido ?? ""}-${f.idVenta ?? ""}`} className="border-b border-linea-fina">
+              <tr key={`${f.n}-${f.idVentaDb}`} className="border-b border-linea-fina">
                 <td className="py-1.5">{f.n}</td>
-                <td className="py-1.5 text-tinta-media">{f.idPedido != null ? formatearNumero(f.idPedido) : "—"}</td>
-                <td className="py-1.5 text-tinta-media">{f.idVenta != null ? formatearNumero(f.idVenta) : "—"}</td>
+                {COLUMNAS_CANAL.map((c) => (
+                  <td key={c.valor} className="py-1.5 text-tinta-media">
+                    {f.canal === c.valor ? formatearNumero(f.idVenta) : "—"}
+                  </td>
+                ))}
                 <td className="py-1.5 text-tinta-media">{f.fecha.toLocaleString("es-PY", opcionesFechaHora)}</td>
                 <td className="cifra py-1.5 text-right">{formatearGuarani(f.importe)}</td>
                 {COLUMNAS_FORMA_PAGO.map((fp) => (
@@ -94,7 +99,7 @@ export default async function ImprimirReporteGeneralPosPage({
           </tbody>
           <tfoot>
             <tr className="border-t-2 border-linea font-semibold text-tinta">
-              <td className="py-2" colSpan={4}>
+              <td className="py-2" colSpan={2 + COLUMNAS_CANAL.length}>
                 CUENTAS ({reporte.filas.length})
               </td>
               <td className="cifra py-2 text-right">{formatearGuarani(reporte.totalImporte)}</td>

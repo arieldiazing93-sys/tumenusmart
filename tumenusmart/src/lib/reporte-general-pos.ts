@@ -1,31 +1,41 @@
 /**
- * El reporte general de cuentas: ventas del Punto de Venta y pedidos (delivery
- * y retiro) cobrados, mezclados en una sola lista ordenada por fecha, con el
- * importe de cada una repartido en su columna de forma de pago — mismo criterio
- * que un libro de caja de toda la vida. "General" quiere decir general: todo
- * lo que se cobró.
+ * El reporte general de cuentas: todo lo que se cobró en el Punto de Venta, en una sola lista ordenada por fecha, con el importe de cada
+ * venta repartido en su columna de forma de pago — mismo criterio que un libro de caja de toda la vida. "General" quiere decir
+ * general: todo lo que se cobró, venga de donde venga.
  *
- * Un pedido entra con la fecha en que se COBRÓ (`cobradoEn`: al cargarlo a mano
- * o con "Cobrar") y la forma de pago con la que se cobró (`formaPagoPos`), igual
- * que un delivery o un retiro: la entrega no cambia la venta.
+ * Las ventas entran por las cuatro formas de vender que hay hoy, cada una en su propia columna de identificación:
+ *   - Mostrador (Punto de Venta),
+ *   - Servicio comedor (la cuenta de una mesa),
+ *   - Servicio delivery (la cuenta de un pedido a domicilio),
+ *   - Reserva de turnos (la cita cobrada).
+ * Todas son una venta del Punto de Venta (`VentaPos`) con el número que se ve en el Historial de cuentas; el canal sale de la cuenta o la
+ * cita que se cobró con esa venta.
  *
- * Esto es independiente de la Rendición del repartidor: ese es un control
- * del efectivo en la calle (qué tiene que devolver, en mano), no un reporte de
- * ventas — un mismo pedido de delivery aparece acá (se vendió, se cobró) y
- * puede seguir pendiente de rendir allá. No son la misma pregunta, y la
- * rendición NO suma acá (contaría dos veces la misma venta).
+ * Una venta entra con la fecha en que se COBRÓ y con la forma de pago con la que se cobró; una a crédito no entra hasta que se cobra
+ * (entonces entra cada cobro, con su forma de pago).
  */
 import { prismaDelLocal } from "./prisma-local";
 import { normalizarFormaPagoPos, FORMAS_PAGO_POS, FORMA_PAGO_A_CREDITO, type FormaPagoPos } from "./turno-pos";
 
+/** Por dónde se vendió: las cuatro formas de vender. */
+export type CanalDeVenta = "mostrador" | "comedor" | "delivery" | "reserva";
+
+/** Las cuatro formas de vender, en el orden en que van sus columnas, con el rótulo de cada una. */
+export const COLUMNAS_CANAL: { valor: CanalDeVenta; etiqueta: string }[] = [
+  { valor: "mostrador", etiqueta: "Mostrador" },
+  { valor: "comedor", etiqueta: "Comedor" },
+  { valor: "delivery", etiqueta: "Delivery" },
+  { valor: "reserva", etiqueta: "Reserva" },
+];
+
 export type FilaReporteGeneral = {
   n: number;
-  /** Número correlativo para mostrar (ver formatearNumero). */
-  idPedido: number | null;
-  idVenta: number | null;
+  /** Número correlativo de la venta para mostrar (ver formatearNumero). */
+  idVenta: number;
   /** El id real (cuid) de la base, para armar el link — nunca se muestra. */
-  idPedidoDb: string | null;
-  idVentaDb: string | null;
+  idVentaDb: string;
+  /** De cuál de las cuatro formas de vender es. */
+  canal: CanalDeVenta;
   fecha: Date;
   importe: number;
   formaPago: FormaPagoPos;
@@ -35,6 +45,8 @@ export type ReporteGeneralPos = {
   filas: FilaReporteGeneral[];
   totalImporte: number;
   totalPorForma: Record<FormaPagoPos, number>;
+  /** Cuánto se cobró por cada forma de vender. */
+  totalPorCanal: Record<CanalDeVenta, number>;
 };
 
 export async function calcularReporteGeneralPos(
@@ -43,7 +55,7 @@ export async function calcularReporteGeneralPos(
 ): Promise<ReporteGeneralPos> {
   const db = prismaDelLocal(storeId);
 
-  const [ventas, cobros, pedidos] = await Promise.all([
+  const [ventas, cobros] = await Promise.all([
     // Las ventas a crédito no entran: este reporte es lo que se COBRÓ. Cuando
     // el cliente paga, aparece el cobro (más abajo).
     db.ventaPos.findMany({
@@ -68,17 +80,24 @@ export async function calcularReporteGeneralPos(
       where: { createdAt: { gte: rango.gte, lt: rango.lt }, ventaPos: { cancelada: false } },
       select: { monto: true, formaPago: true, createdAt: true, ventaPos: { select: { id: true, numero: true } } },
     }),
-    // Pedidos (delivery y retiro) cobrados: la fecha es la del COBRO (`cobradoEn`), no la de la entrega ni `updatedAt` (que cambia
-    // con cada paso del recorrido).
-    db.order.findMany({
-      where: {
-        turnoPosId: { not: null },
-        cobradoEn: { gte: rango.gte, lt: rango.lt },
-        estado: { not: "cancelado" },
-      },
-      select: { id: true, numero: true, total: true, formaPagoPos: true, cobradoEn: true },
-    }),
   ]);
+
+  // De dónde vino cada venta: la que cobró una cuenta de mesa es del comedor, la que cobró una cuenta de delivery es del delivery, la
+  // que cobró una cita de la agenda es una reserva de turnos, y el resto es del mostrador. (Una cita "de mostrador" es la que crea el
+  // propio Punto de Venta al asignarle una venta a alguien del personal: esa venta sigue siendo del mostrador.)
+  const idsDeVentas = [...new Set([...ventas.map((v) => v.id), ...cobros.map((c) => c.ventaPos.id)])];
+  const [cuentasMesa, cuentasDelivery, citas] = idsDeVentas.length
+    ? await Promise.all([
+        db.cuentaMesa.findMany({ where: { ventaPosId: { in: idsDeVentas } }, select: { ventaPosId: true } }),
+        db.cuentaDelivery.findMany({ where: { ventaPosId: { in: idsDeVentas } }, select: { ventaPosId: true } }),
+        db.cita.findMany({ where: { ventaPosId: { in: idsDeVentas }, origen: { not: "mostrador" } }, select: { ventaPosId: true } }),
+      ])
+    : [[], [], []];
+  const delComedor = new Set(cuentasMesa.map((c) => c.ventaPosId));
+  const delDelivery = new Set(cuentasDelivery.map((c) => c.ventaPosId));
+  const deReserva = new Set(citas.map((c) => c.ventaPosId));
+  const canalDe = (ventaId: string): CanalDeVenta =>
+    delDelivery.has(ventaId) ? "delivery" : delComedor.has(ventaId) ? "comedor" : deReserva.has(ventaId) ? "reserva" : "mostrador";
 
   const combinadas = [
     // Una fila por cada forma de pago de la venta: una cuenta dividida (50.000
@@ -91,32 +110,21 @@ export async function calcularReporteGeneralPos(
           ? v.pagos.map((p) => ({ forma: p.forma, importe: Number(p.monto) }))
           : [{ forma: v.formaPago, importe: Number(v.total) }];
       return partes.map((p) => ({
-        idPedido: null as number | null,
-        idVenta: v.numero as number | null,
-        idPedidoDb: null as string | null,
-        idVentaDb: v.id as string | null,
+        idVenta: v.numero,
+        idVentaDb: v.id,
+        canal: canalDe(v.id),
         fecha: v.creadoEn,
         importe: p.importe,
         formaPago: normalizarFormaPagoPos(p.forma),
       }));
     }),
     ...cobros.map((c) => ({
-      idPedido: null as number | null,
-      idVenta: c.ventaPos.numero as number | null,
-      idPedidoDb: null as string | null,
-      idVentaDb: c.ventaPos.id as string | null,
+      idVenta: c.ventaPos.numero,
+      idVentaDb: c.ventaPos.id,
+      canal: canalDe(c.ventaPos.id),
       fecha: c.createdAt,
       importe: Number(c.monto),
       formaPago: normalizarFormaPagoPos(c.formaPago),
-    })),
-    ...pedidos.map((p) => ({
-      idPedido: p.numero as number | null,
-      idVenta: null as number | null,
-      idPedidoDb: p.id as string | null,
-      idVentaDb: null as string | null,
-      fecha: p.cobradoEn!,
-      importe: Number(p.total),
-      formaPago: normalizarFormaPagoPos(p.formaPagoPos),
     })),
   ].sort((a, b) => a.fecha.getTime() - b.fecha.getTime());
 
@@ -128,13 +136,15 @@ export async function calcularReporteGeneralPos(
     tarjeta_debito: 0,
     tarjeta_credito: 0,
   };
+  const totalPorCanal: Record<CanalDeVenta, number> = { mostrador: 0, comedor: 0, delivery: 0, reserva: 0 };
   let totalImporte = 0;
   for (const f of filas) {
     totalImporte += f.importe;
     totalPorForma[f.formaPago] += f.importe;
+    totalPorCanal[f.canal] += f.importe;
   }
 
-  return { filas, totalImporte, totalPorForma };
+  return { filas, totalImporte, totalPorForma, totalPorCanal };
 }
 
 /** Las 4 formas de pago, para que quien arma la tabla no repita el orden a mano. */

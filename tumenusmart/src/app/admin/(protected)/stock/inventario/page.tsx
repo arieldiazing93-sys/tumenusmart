@@ -31,14 +31,16 @@ export default async function InventarioPage({
       <Cabecera
         titulo="Registro de inventario"
         bajada="Los inventarios que contaste en cada almacén, con lo que dijo el sistema, lo que había y la diferencia. Cada diferencia también queda en el historial del insumo."
-        acciones={
-          puede(sesion.rol, "stock.editar") && (
-            <BotonEnlace tono="nuevo" href="/admin/stock/inventario/nuevo">+ Nuevo inventario</BotonEnlace>
-          )
-        }
       />
 
+      {/* Una fila a la vista justo debajo del título: el botón de nuevo inventario y, al lado, las dos vistas. Abajo, el historial. */}
       <div className="mb-4 flex flex-wrap items-center gap-2">
+        {puede(sesion.rol, "stock.editar") && (
+          <>
+            <BotonEnlace tono="nuevo" href="/admin/stock/inventario/nuevo">+ Nuevo inventario</BotonEnlace>
+            <span aria-hidden="true" className="mx-1 h-6 w-px bg-linea" />
+          </>
+        )}
         <BotonEnlace href="/admin/stock/inventario" tono={verInsumos ? "suave" : "principal"} tam="sm">
           Inventarios registrados
         </BotonEnlace>

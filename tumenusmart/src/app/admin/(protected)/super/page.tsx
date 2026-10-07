@@ -17,6 +17,7 @@ import {
 import { Cabecera, clasesBoton } from "@/components/ui";
 import { AltaLocal } from "./AltaLocal";
 import { AccionesLocal } from "./AccionesLocal";
+import { FiltroFechaReporte } from "@/components/FiltroFechaReporte";
 
 export const dynamic = "force-dynamic";
 
@@ -268,52 +269,8 @@ export default async function SuperPage({
         El rango de acá abajo es solo para el reporte de pagos cobrados —
         no toca la lista de locales, que siempre muestra el estado de HOY.
       */}
-      <div className="mb-6 flex flex-wrap items-center gap-2">
-        <span className="text-xs text-tinta-suave">Período del reporte:</span>
-        {FILTROS_FECHA.map((f) => (
-          <Link
-            key={f.value}
-            href={`/admin/super?fecha=${f.value}`}
-            className={`rounded-full border px-3 py-1.5 text-sm font-medium ${
-              fechaActiva === f.value
-                ? "border-brand bg-brand text-white"
-                : "border-linea text-tinta-media hover:border-brand hover:text-brand"
-            }`}
-          >
-            {f.label}
-          </Link>
-        ))}
-        <form
-          method="get"
-          action="/admin/super"
-          className={`flex items-center gap-1.5 rounded-full border px-2 py-1 text-sm ${
-            fechaActiva === "rango" ? "border-brand bg-brand-light" : "border-linea"
-          }`}
-        >
-          <input type="hidden" name="fecha" value="rango" />
-          <input
-            type="date"
-            name="desde"
-            defaultValue={fechaActiva === "rango" ? desde : ""}
-            required
-            className="rounded-md border border-linea px-1.5 py-1 text-xs"
-          />
-          <span className="text-tinta-suave">–</span>
-          <input
-            type="date"
-            name="hasta"
-            defaultValue={fechaActiva === "rango" ? hasta : ""}
-            required
-            className="rounded-md border border-linea px-1.5 py-1 text-xs"
-          />
-          <button
-            type="submit"
-            className="rounded-full bg-noche-panel px-3 py-1 text-xs font-medium text-white hover:bg-noche-panel"
-          >
-            Filtrar
-          </button>
-        </form>
-      </div>
+      <div className="mb-1 text-xs text-tinta-suave">Período del reporte:</div>
+      <FiltroFechaReporte accion="/admin/super" opciones={FILTROS_FECHA} activa={fechaActiva} desde={desde} hasta={hasta} />
 
       <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
         <Tarjeta etiqueta="Locales" valor={filas.length} />

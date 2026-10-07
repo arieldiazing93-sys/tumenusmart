@@ -1,10 +1,10 @@
-import Link from "next/link";
 import { pantallaConPermiso } from "@/lib/auth";
 import { Cabecera, Cifra, Tabla, Td, Th, Tr, Vacio, clasesBoton } from "@/components/ui";
 import { idLocalActual } from "@/lib/local-actual";
 import { formatearGuarani } from "@/lib/format";
 import { calcularRangoFecha, type FiltroFecha } from "@/lib/rango-fecha";
 import { calcularReporteMozos } from "@/lib/reporte-mozos";
+import { FiltroFechaReporte } from "@/components/FiltroFechaReporte";
 
 export const dynamic = "force-dynamic";
 
@@ -55,52 +55,8 @@ export default async function ReporteMozosPage({
         }
       />
 
-      <div className="flex flex-wrap items-center gap-2">
-        {FILTROS_FECHA.map((f) => (
-          <Link
-            key={f.value}
-            href={`/admin/reporte-mozos?fecha=${f.value}`}
-            className={`rounded-full border px-3 py-1.5 text-sm font-medium ${
-              fechaActiva === f.value
-                ? "border-brand bg-brand text-white"
-                : "border-linea text-tinta-media hover:border-brand hover:text-brand"
-            }`}
-          >
-            {f.label}
-          </Link>
-        ))}
-
-        <form
-          method="get"
-          action="/admin/reporte-mozos"
-          className={`flex items-center gap-1.5 rounded-full border px-2 py-1 text-sm ${
-            fechaActiva === "rango" ? "border-brand bg-brand-light" : "border-linea"
-          }`}
-        >
-          <input type="hidden" name="fecha" value="rango" />
-          <input
-            type="date"
-            name="desde"
-            defaultValue={fechaActiva === "rango" ? desde : ""}
-            required
-            className="rounded-md border border-linea px-1.5 py-1 text-xs"
-          />
-          <span className="text-tinta-suave">–</span>
-          <input
-            type="date"
-            name="hasta"
-            defaultValue={fechaActiva === "rango" ? hasta : ""}
-            required
-            className="rounded-md border border-linea px-1.5 py-1 text-xs"
-          />
-          <button
-            type="submit"
-            className="rounded-full bg-noche-panel px-3 py-1 text-xs font-medium text-white hover:bg-noche-panel"
-          >
-            Filtrar
-          </button>
-        </form>
-      </div>
+      {/* El filtro de fechas: se adapta al celular (atajos que se deslizan, rango en dos campos lado a lado). */}
+      <FiltroFechaReporte accion="/admin/reporte-mozos" opciones={FILTROS_FECHA} activa={fechaActiva} desde={desde} hasta={hasta} />
 
       {!hayDatos ? (
         <Vacio

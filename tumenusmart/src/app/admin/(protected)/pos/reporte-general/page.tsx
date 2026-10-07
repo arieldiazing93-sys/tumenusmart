@@ -4,8 +4,9 @@ import { idLocalActual } from "@/lib/local-actual";
 import { Cabecera, clasesBoton, Tabla, Th, Td, Tr, Vacio } from "@/components/ui";
 import { calcularRangoFecha, type FiltroFecha } from "@/lib/rango-fecha";
 import { formatearGuarani, formatearNumero } from "@/lib/format";
-import { COLUMNAS_FORMA_PAGO, calcularReporteGeneralPos } from "@/lib/reporte-general-pos";
+import { COLUMNAS_CANAL, COLUMNAS_FORMA_PAGO, calcularReporteGeneralPos } from "@/lib/reporte-general-pos";
 import { ZONA_NEGOCIO } from "@/lib/timezone";
+import { FiltroFechaReporte } from "@/components/FiltroFechaReporte";
 
 export const dynamic = "force-dynamic";
 
@@ -18,11 +19,11 @@ const FILTROS_FECHA: { value: FiltroFecha; label: string }[] = [
 ];
 
 /**
- * Reporte general de cuentas: pedidos de mostrador + ventas del Punto de
- * Venta + delivery ya entregado, en una sola lista, con el importe de cada
- * una repartido en su columna de forma de pago y una fila de totales al
- * pie — mismo criterio que un libro de caja. Ver
- * src/lib/reporte-general-pos.ts para el detalle de cómo se arma.
+ * Reporte general de cuentas: todo lo que se cobró —mostrador, comedor,
+ * delivery y reservas de turnos— en una sola lista, con el número de la venta
+ * en la columna de su forma de vender, el importe repartido en su columna de
+ * forma de pago y una fila de totales al pie — mismo criterio que un libro de
+ * caja. Ver src/lib/reporte-general-pos.ts para el detalle de cómo se arma.
  */
 export default async function ReporteGeneralPosPage({
   searchParams,
@@ -64,7 +65,7 @@ export default async function ReporteGeneralPosPage({
     <div>
       <Cabecera
         titulo="Reporte general de cuentas"
-        bajada="Todo lo que se cobró — mostrador, retiro y delivery ya entregado — detallado por forma de pago."
+        bajada="Todo lo que se cobró — mostrador, comedor, delivery y reservas de turnos — detallado por forma de pago."
         acciones={
           <>
             <a
@@ -85,65 +86,23 @@ export default async function ReporteGeneralPosPage({
         }
       />
 
-      <div className="mb-6 flex flex-wrap items-center gap-2">
-        {FILTROS_FECHA.map((f) => (
-          <Link
-            key={f.value}
-            href={hrefFecha(f.value)}
-            className={`rounded-full border px-3 py-1.5 text-sm font-medium ${
-              fechaActiva === f.value && fechaActiva !== "rango"
-                ? "border-brand bg-brand text-white"
-                : "border-linea text-tinta-media hover:border-brand hover:text-brand"
-            }`}
-          >
-            {f.label}
-          </Link>
-        ))}
-
-        <form
-          method="get"
-          action="/admin/pos/reporte-general"
-          className={`flex items-center gap-1.5 rounded-full border px-2 py-1 text-sm ${
-            fechaActiva === "rango" ? "border-brand bg-brand-light" : "border-linea"
-          }`}
-        >
-          <input type="hidden" name="fecha" value="rango" />
-          <input
-            type="date"
-            name="desde"
-            defaultValue={fechaActiva === "rango" ? desde : ""}
-            required
-            className="rounded-md border border-linea px-1.5 py-1 text-xs"
-          />
-          <span className="text-tinta-suave">–</span>
-          <input
-            type="date"
-            name="hasta"
-            defaultValue={fechaActiva === "rango" ? hasta : ""}
-            required
-            className="rounded-md border border-linea px-1.5 py-1 text-xs"
-          />
-          <button
-            type="submit"
-            className="rounded-full bg-noche-panel px-3 py-1 text-xs font-medium text-white hover:bg-noche-panel"
-          >
-            Filtrar
-          </button>
-        </form>
-      </div>
+      {/* El filtro de fechas: se adapta al celular (atajos que se deslizan, rango en dos campos lado a lado). */}
+      <FiltroFechaReporte accion="/admin/pos/reporte-general" opciones={FILTROS_FECHA} activa={fechaActiva} desde={desde} hasta={hasta} />
 
       {reporte.filas.length === 0 ? (
         <Vacio
           titulo="No hay cuentas en este período"
-          detalle="Los pedidos de mostrador, las ventas del Punto de Venta y el delivery entregado van a aparecer acá."
+          detalle="Las ventas del mostrador, del comedor, del delivery y de las reservas de turnos van a aparecer acá apenas se cobren."
         />
       ) : (
         <Tabla className="!border-2 !border-azul/50">
           <thead>
             <tr>
               <Th>N°</Th>
-              <Th>ID Pedido</Th>
-              <Th>ID Venta POS</Th>
+              {/* Una columna por cada forma de vender: el número de la venta va en la de su canal. */}
+              {COLUMNAS_CANAL.map((c) => (
+                <Th key={c.valor}>{c.etiqueta}</Th>
+              ))}
               <Th>Fecha</Th>
               <Th className="text-right">Importe</Th>
               {COLUMNAS_FORMA_PAGO.map((f) => (
@@ -155,32 +114,19 @@ export default async function ReporteGeneralPosPage({
           </thead>
           <tbody>
             {reporte.filas.map((f) => (
-              <Tr key={`${f.n}-${f.idPedido ?? ""}-${f.idVenta ?? ""}`}>
+              <Tr key={`${f.n}-${f.idVentaDb}`}>
                 <Td>{f.n}</Td>
-                <Td>
-                  {f.idPedido != null && f.idPedidoDb ? (
-                    <Link
-                      href={`/admin/pedidos/${f.idPedidoDb}`}
-                      className="font-medium text-azul-oscuro hover:underline"
-                    >
-                      {formatearNumero(f.idPedido)}
-                    </Link>
-                  ) : (
-                    "—"
-                  )}
-                </Td>
-                <Td>
-                  {f.idVenta != null && f.idVentaDb ? (
-                    <Link
-                      href={`/admin/pos/venta/${f.idVentaDb}`}
-                      className="font-medium text-azul-oscuro hover:underline"
-                    >
-                      {formatearNumero(f.idVenta)}
-                    </Link>
-                  ) : (
-                    "—"
-                  )}
-                </Td>
+                {COLUMNAS_CANAL.map((c) => (
+                  <Td key={c.valor}>
+                    {f.canal === c.valor ? (
+                      <Link href={`/admin/pos/venta/${f.idVentaDb}`} className="font-medium text-azul-oscuro hover:underline">
+                        {formatearNumero(f.idVenta)}
+                      </Link>
+                    ) : (
+                      "—"
+                    )}
+                  </Td>
+                ))}
                 <Td>{f.fecha.toLocaleString("es-PY", opcionesFechaHora)}</Td>
                 <Td className="cifra text-right font-medium text-tinta">{formatearGuarani(f.importe)}</Td>
                 {COLUMNAS_FORMA_PAGO.map((fp) => (
@@ -193,7 +139,7 @@ export default async function ReporteGeneralPosPage({
           </tbody>
           <tfoot>
             <tr>
-              <Td colSpan={4} className="text-right font-semibold">
+              <Td colSpan={2 + COLUMNAS_CANAL.length} className="text-right font-semibold">
                 CUENTAS ({reporte.filas.length})
               </Td>
               <Td className="cifra text-right font-bold text-tinta">
@@ -209,10 +155,16 @@ export default async function ReporteGeneralPosPage({
         </Tabla>
       )}
 
-      <p className="mt-3 text-[0.76rem] text-tinta-suave">
-        Los pedidos (delivery y retiro) entran con la fecha y la forma de pago con las que se cobraron en la caja (botón “Cobrar pedido”).
-        Esto es independiente de si el repartidor ya rindió el efectivo: para controlar eso, entrá a "Rendiciones".
-      </p>
+      {/* Cuánto entró por cada forma de vender, para cuadrarlo de un vistazo con el cierre y con Estadísticas. */}
+      {reporte.filas.length > 0 && (
+        <div className="mt-3 flex flex-wrap gap-x-6 gap-y-1 text-[0.8rem] text-tinta-media">
+          {COLUMNAS_CANAL.map((c) => (
+            <span key={c.valor}>
+              {c.etiqueta}: <span className="cifra font-semibold text-tinta">{formatearGuarani(reporte.totalPorCanal[c.valor])}</span>
+            </span>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

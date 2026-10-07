@@ -13,6 +13,7 @@ import {
 import { ZONA_NEGOCIO } from "@/lib/timezone";
 import { etiquetaTurno } from "@/lib/reservas";
 import { VentasPorDiaChart } from "@/components/VentasPorDiaChart";
+import { FiltroFechaReporte } from "@/components/FiltroFechaReporte";
 
 export const dynamic = "force-dynamic";
 
@@ -65,11 +66,11 @@ function Tarjeta({
 }) {
   const c = COLORES_TARJETA[color];
   return (
-    <div className={`rounded-xl border p-4 ${c.caja}`}>
+    <div className={`rounded-xl border p-3 sm:p-4 ${c.caja}`}>
       <p className={`text-[0.68rem] font-semibold uppercase tracking-rotulo ${c.rotulo}`}>
         {etiqueta}
       </p>
-      <p className={`cifra mt-1.5 text-[1.45rem] font-semibold leading-none ${c.cifra}`}>
+      <p className={`cifra mt-1.5 break-words text-[1.15rem] font-semibold leading-none sm:text-[1.45rem] ${c.cifra}`}>
         {valor}
       </p>
       {detalle && <p className="mt-1.5 text-[0.72rem] text-tinta-media">{detalle}</p>}
@@ -152,52 +153,8 @@ export default async function AdminEstadisticasPage({
         }
       />
 
-      <div className="mb-6 flex flex-wrap items-center gap-2">
-        {FILTROS_FECHA.map((f) => (
-          <Link
-            key={f.value}
-            href={hrefFecha(f.value)}
-            className={`rounded-full border px-3 py-1.5 text-sm font-medium ${
-              fechaActiva === f.value && fechaActiva !== "rango"
-                ? "border-brand bg-brand text-white"
-                : "border-linea text-tinta-media hover:border-brand hover:text-brand"
-            }`}
-          >
-            {f.label}
-          </Link>
-        ))}
-
-        <form
-          method="get"
-          action="/admin/estadisticas"
-          className={`flex items-center gap-1.5 rounded-full border px-2 py-1 text-sm ${
-            fechaActiva === "rango" ? "border-brand bg-brand-light" : "border-linea"
-          }`}
-        >
-          <input type="hidden" name="fecha" value="rango" />
-          <input
-            type="date"
-            name="desde"
-            defaultValue={fechaActiva === "rango" ? desde : ""}
-            required
-            className="rounded-md border border-linea px-1.5 py-1 text-xs"
-          />
-          <span className="text-tinta-suave">–</span>
-          <input
-            type="date"
-            name="hasta"
-            defaultValue={fechaActiva === "rango" ? hasta : ""}
-            required
-            className="rounded-md border border-linea px-1.5 py-1 text-xs"
-          />
-          <button
-            type="submit"
-            className="rounded-full bg-noche-panel px-3 py-1 text-xs font-medium text-white hover:bg-noche-panel"
-          >
-            Filtrar
-          </button>
-        </form>
-      </div>
+      {/* El filtro de fechas: se adapta al celular (atajos que se deslizan, rango en dos campos lado a lado). */}
+      <FiltroFechaReporte accion="/admin/estadisticas" opciones={FILTROS_FECHA} activa={fechaActiva} desde={desde} hasta={hasta} />
 
       <div className="mb-8 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
         <Tarjeta color="dinero" etiqueta="Ingresos" valor={formatearGuarani(stats.ingresos)} detalle="Sin contar cancelados" />
@@ -295,7 +252,7 @@ export default async function AdminEstadisticasPage({
           </p>
         ) : (
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-            <div className="overflow-hidden rounded-lg border-2 border-azul/50 bg-white lg:col-span-2">
+            <div className="overflow-x-auto rounded-lg border-2 border-azul/50 bg-white lg:col-span-2">
               <table className="w-full text-left text-sm">
                 <thead className="border-b border-linea bg-papel-suave text-xs uppercase tracking-wide text-tinta-media">
                   <tr>

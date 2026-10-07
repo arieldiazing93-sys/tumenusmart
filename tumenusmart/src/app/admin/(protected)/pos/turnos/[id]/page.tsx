@@ -356,7 +356,7 @@ export default async function ComprobanteTurnoPosPage({
           <h2 className="mb-1.5 text-[0.95rem] font-semibold tracking-titular text-tinta">
             Por forma de pago
           </h2>
-          <table className="w-full border-collapse text-left">
+          <div className="overflow-x-auto"><table className="w-full min-w-[20rem] border-collapse text-left">
             <thead>
               <tr className="text-[0.7rem] uppercase tracking-rotulo text-tinta-suave">
                 <th className="border-b border-linea pb-1.5 font-semibold">Forma</th>
@@ -405,7 +405,7 @@ export default async function ComprobanteTurnoPosPage({
                 </td>
               </tr>
             </tfoot>
-          </table>
+          </table></div>
           {turno.rendiciones.length > 0 && (
             <p className="mt-2 text-[0.78rem] text-tinta-suave">
               Los pedidos de delivery ya están sumados arriba (se cobraron en la caja con “Cobrar pedido”). Lo que{" "}
@@ -446,7 +446,7 @@ export default async function ComprobanteTurnoPosPage({
             <h2 className="mb-1.5 text-[0.95rem] font-semibold tracking-titular text-tinta">
               Movimientos de caja (efectivo)
             </h2>
-            <table className="w-full border-collapse text-left">
+            <div className="overflow-x-auto"><table className="w-full min-w-[20rem] border-collapse text-left">
               <thead>
                 <tr className="text-[0.7rem] uppercase tracking-rotulo text-tinta-suave">
                   <th className="w-24 border-b border-linea pb-1.5 font-semibold">Hora</th>
@@ -475,7 +475,7 @@ export default async function ComprobanteTurnoPosPage({
                   </tr>
                 ))}
               </tbody>
-            </table>
+            </table></div>
           </section>
         )}
 
@@ -486,7 +486,7 @@ export default async function ComprobanteTurnoPosPage({
           {turno.ventas.length === 0 ? (
             <p className="text-[0.85rem] text-tinta-suave">No hubo ventas en este turno.</p>
           ) : (
-            <table className="w-full border-collapse text-left">
+            <div className="overflow-x-auto"><table className="w-full min-w-[20rem] border-collapse text-left">
               <thead>
                 <tr className="text-[0.7rem] uppercase tracking-rotulo text-tinta-suave">
                   <th className="w-20 border-b border-linea pb-1.5 font-semibold">Venta</th>
@@ -523,7 +523,7 @@ export default async function ComprobanteTurnoPosPage({
                   </tr>
                 ))}
               </tbody>
-            </table>
+            </table></div>
           )}
         </section>
 
@@ -532,7 +532,7 @@ export default async function ComprobanteTurnoPosPage({
             <h2 className="mb-1.5 text-[0.95rem] font-semibold tracking-titular text-tinta">
               Pedidos (delivery y retiro) cobrados en este turno
             </h2>
-            <table className="w-full border-collapse text-left">
+            <div className="overflow-x-auto"><table className="w-full min-w-[20rem] border-collapse text-left">
               <thead>
                 <tr className="text-[0.7rem] uppercase tracking-rotulo text-tinta-suave">
                   <th className="w-20 border-b border-linea pb-1.5 font-semibold">Pedido</th>
@@ -564,7 +564,7 @@ export default async function ComprobanteTurnoPosPage({
                   </tr>
                 ))}
               </tbody>
-            </table>
+            </table></div>
           </section>
         )}
 
@@ -573,7 +573,7 @@ export default async function ComprobanteTurnoPosPage({
             <h2 className="mb-1.5 text-[0.95rem] font-semibold tracking-titular text-tinta">
               Control del efectivo de delivery rendido durante este turno (no suma: ya está cobrado arriba)
             </h2>
-            <table className="w-full border-collapse text-left">
+            <div className="overflow-x-auto"><table className="w-full min-w-[20rem] border-collapse text-left">
               <thead>
                 <tr className="text-[0.7rem] uppercase tracking-rotulo text-tinta-suave">
                   <th className="border-b border-linea pb-1.5 font-semibold">Repartidor</th>
@@ -631,7 +631,7 @@ export default async function ComprobanteTurnoPosPage({
                   </td>
                 </tr>
               </tfoot>
-            </table>
+            </table></div>
           </section>
         )}
 

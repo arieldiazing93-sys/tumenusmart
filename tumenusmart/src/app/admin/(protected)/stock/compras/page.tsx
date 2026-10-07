@@ -50,12 +50,20 @@ export default async function ComprasPage({ searchParams }: { searchParams: Prom
       <Cabecera
         titulo="Compras"
         bajada="Cada compra suma stock a los insumos que trae y actualiza su costo de reposición. Una compra cargada con algún dato mal se corrige o se anula desde su detalle."
-        acciones={<BotonEnlace tono="nuevo" href="/admin/stock/compras/nueva">+ Nueva compra</BotonEnlace>}
       />
 
-      <form method="get" className="mb-5 grid grid-cols-1 gap-3 rounded-xl border-2 border-azul/50 bg-superficie p-4 sm:grid-cols-2 lg:grid-cols-4">
+      {/* El botón de nueva compra, a la vista justo debajo del título. */}
+      <div className="mb-3">
+        <BotonEnlace tono="nuevo" href="/admin/stock/compras/nueva">+ Nueva compra</BotonEnlace>
+      </div>
+
+      {/* Compacto: los filtros y su botón en una sola fila (en pantalla ancha) y el reporte debajo, en una línea. */}
+      <form
+        method="get"
+        className="mb-4 grid grid-cols-1 items-end gap-x-3 gap-y-2 rounded-xl border-2 border-azul/50 bg-superficie p-3 sm:grid-cols-2 lg:grid-cols-[1.4fr_1fr_1fr_1fr_auto]"
+      >
         <Campo etiqueta="Proveedor">
-          <Selector name="proveedor" defaultValue={proveedor ?? ""}>
+          <Selector name="proveedor" defaultValue={proveedor ?? ""} className="!py-1.5">
             <option value="">Todos</option>
             {proveedores.map((p) => (
               <option key={p.id} value={p.id}>
@@ -65,21 +73,21 @@ export default async function ComprasPage({ searchParams }: { searchParams: Prom
           </Selector>
         </Campo>
         <Campo etiqueta="Folio de factura">
-          <Entrada name="folio" defaultValue={folio ?? ""} placeholder="Ej: 001-001" />
+          <Entrada name="folio" defaultValue={folio ?? ""} placeholder="Ej: 001-001" className="!py-1.5" />
         </Campo>
         <Campo etiqueta="Desde">
-          <Entrada type="date" name="desde" defaultValue={desde ?? ""} />
+          <Entrada type="date" name="desde" defaultValue={desde ?? ""} className="!py-1.5" />
         </Campo>
         <Campo etiqueta="Hasta">
-          <Entrada type="date" name="hasta" defaultValue={hasta ?? ""} />
+          <Entrada type="date" name="hasta" defaultValue={hasta ?? ""} className="!py-1.5" />
         </Campo>
-        <div className="flex flex-wrap items-center gap-2 sm:col-span-2 lg:col-span-4">
-          <button type="submit" className={clasesBoton("suave")}>
+        <div className="flex flex-wrap items-center gap-2">
+          <button type="submit" className={clasesBoton("suave", "sm")}>
             Buscar
           </button>
           {hayFiltros && (
-            <Link href="/admin/stock/compras" className={clasesBoton("fantasma")}>
-              Limpiar filtros
+            <Link href="/admin/stock/compras" className={clasesBoton("fantasma", "sm")}>
+              Limpiar
             </Link>
           )}
         </div>
@@ -87,7 +95,7 @@ export default async function ComprasPage({ searchParams }: { searchParams: Prom
         {/* El reporte sale con lo que está escrito arriba (proveedor y fechas),
             sin tener que apretar Buscar antes: cada botón manda este mismo
             formulario a su propia dirección. Sin fechas, es el mes actual. */}
-        <div className="flex flex-wrap items-center gap-2 border-t border-linea pt-3 sm:col-span-2 lg:col-span-4">
+        <div className="flex flex-wrap items-center gap-2 border-t border-linea pt-2 sm:col-span-2 lg:col-span-5">
           <span className="text-sm font-medium text-tinta">Reporte de compras</span>
           <button type="submit" formAction="/admin/stock/compras/exportar" className={clasesBoton("principal", "sm")}>
             Descargar Excel
@@ -100,9 +108,6 @@ export default async function ComprasPage({ searchParams }: { searchParams: Prom
           >
             Ver reporte / PDF
           </button>
-          <span className="text-xs text-tinta-suave">
-            Usa el proveedor y el rango Desde / Hasta de arriba. Sin fechas, toma el mes actual.
-          </span>
         </div>
       </form>
 

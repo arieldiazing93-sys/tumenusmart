@@ -1475,8 +1475,9 @@ model VentaPosItem {
 ///
 /// Una venta o un pedido puede tener varios a lo largo del tiempo (una factura
 /// anulada y su remisión): el que rige es el de `estado = "vigente"`. Debe
-/// tener origen: exactamente una de ventaPosId / orderId (lo exige un CHECK en
-/// la migración).
+/// tener origen: una venta O un pedido, o —la "factura rápida" de un delivery,
+/// que sale antes de cobrar— solo la cuenta de delivery (y, una vez cobrada,
+/// la cuenta y la venta). Lo exige un CHECK en la migración.
 model Comprobante {
   id      String @id @default(cuid())
   storeId String

@@ -1,11 +1,11 @@
 import { Fragment } from "react";
-import Link from "next/link";
 import { pantallaConPermiso } from "@/lib/auth";
 import { Cabecera, clasesBoton } from "@/components/ui";
 import { idLocalActual } from "@/lib/local-actual";
 import { formatearGuarani } from "@/lib/format";
 import { calcularRangoFecha, type FiltroFecha } from "@/lib/rango-fecha";
 import { calcularReporteProductosVendidos } from "@/lib/reporte-productos";
+import { FiltroFechaReporte } from "@/components/FiltroFechaReporte";
 
 export const dynamic = "force-dynamic";
 
@@ -63,52 +63,8 @@ export default async function ProductosVendidosPage({
         }
       />
 
-      <div className="mb-6 flex flex-wrap items-center gap-2">
-        {FILTROS_FECHA.map((f) => (
-          <Link
-            key={f.value}
-            href={`/admin/productos-vendidos?fecha=${f.value}`}
-            className={`rounded-full border px-3 py-1.5 text-sm font-medium ${
-              fechaActiva === f.value
-                ? "border-brand bg-brand text-white"
-                : "border-linea text-tinta-media hover:border-brand hover:text-brand"
-            }`}
-          >
-            {f.label}
-          </Link>
-        ))}
-
-        <form
-          method="get"
-          action="/admin/productos-vendidos"
-          className={`flex items-center gap-1.5 rounded-full border px-2 py-1 text-sm ${
-            fechaActiva === "rango" ? "border-brand bg-brand-light" : "border-linea"
-          }`}
-        >
-          <input type="hidden" name="fecha" value="rango" />
-          <input
-            type="date"
-            name="desde"
-            defaultValue={fechaActiva === "rango" ? desde : ""}
-            required
-            className="rounded-md border border-linea px-1.5 py-1 text-xs"
-          />
-          <span className="text-tinta-suave">–</span>
-          <input
-            type="date"
-            name="hasta"
-            defaultValue={fechaActiva === "rango" ? hasta : ""}
-            required
-            className="rounded-md border border-linea px-1.5 py-1 text-xs"
-          />
-          <button
-            type="submit"
-            className="rounded-full bg-noche-panel px-3 py-1 text-xs font-medium text-white hover:bg-noche-panel"
-          >
-            Filtrar
-          </button>
-        </form>
-      </div>
+      {/* El filtro de fechas: se adapta al celular (atajos que se deslizan, rango en dos campos lado a lado). */}
+      <FiltroFechaReporte accion="/admin/productos-vendidos" opciones={FILTROS_FECHA} activa={fechaActiva} desde={desde} hasta={hasta} />
 
       {reporte.categorias.length === 0 ? (
         <p className="text-sm text-tinta-suave">Todavía no hay ventas en este período.</p>
@@ -293,9 +249,9 @@ function TarjetaTotal({
 }) {
   const c = COLORES_TOTAL[color];
   return (
-    <div className={`rounded-xl border p-4 ${c.caja}`}>
+    <div className={`rounded-xl border p-3 sm:p-4 ${c.caja}`}>
       <p className={`text-[0.68rem] font-semibold uppercase tracking-rotulo ${c.rotulo}`}>{etiqueta}</p>
-      <p className={`cifra mt-1.5 text-[1.3rem] font-semibold leading-none ${c.cifra}`}>{valor}</p>
+      <p className={`cifra mt-1.5 break-words text-[1.1rem] font-semibold leading-none sm:text-[1.3rem] ${c.cifra}`}>{valor}</p>
     </div>
   );
 }

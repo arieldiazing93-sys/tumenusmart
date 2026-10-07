@@ -27,6 +27,7 @@ import { calcularDisponibilidad } from "@/lib/cupos-reserva";
 import { EstadoReservaSelect } from "./EstadoReservaSelect";
 import { NotaReservaField } from "./NotaReservaField";
 import { RegistrarReservaForm } from "./RegistrarReservaForm";
+import { FiltroFechaReporte } from "@/components/FiltroFechaReporte";
 
 export const dynamic = "force-dynamic";
 
@@ -238,58 +239,16 @@ export default async function AdminReservasPage({
         </p>
       )}
 
-      <div className="mb-6 flex flex-wrap items-center gap-2">
-        {VISTAS.map((v) => (
-          <Link
-            key={v.value}
-            href={hrefVista(v.value)}
-            className={`rounded-full border px-3 py-1.5 text-sm font-medium ${
-              vista === v.value
-                ? "border-brand bg-brand text-white"
-                : "border-linea text-tinta-media hover:border-brand hover:text-brand"
-            }`}
-          >
-            {v.label}
-          </Link>
-        ))}
-
-        {/*
-          "Rango" es un formulario y no un link como las otras tres, mismo
-          criterio que ya usan Pedidos/Estadísticas/Analytics: hace falta
-          pedirle al encargado las dos fechas antes de poder armar el
-          período, así que no alcanza con un solo click.
-        */}
-        <form
-          method="get"
-          action="/admin/reservas"
-          className={`flex items-center gap-1.5 rounded-full border px-2 py-1 text-sm ${
-            vista === "rango" ? "border-brand bg-brand-light" : "border-linea"
-          }`}
-        >
-          <input type="hidden" name="vista" value="rango" />
-          <input
-            type="date"
-            name="desde"
-            defaultValue={vista === "rango" ? desde : ""}
-            required
-            className="rounded-md border border-linea px-1.5 py-1 text-xs"
-          />
-          <span className="text-tinta-suave">–</span>
-          <input
-            type="date"
-            name="hasta"
-            defaultValue={vista === "rango" ? hasta : ""}
-            required
-            className="rounded-md border border-linea px-1.5 py-1 text-xs"
-          />
-          <button
-            type="submit"
-            className="rounded-full bg-noche-panel px-3 py-1 text-xs font-medium text-white hover:bg-noche-panel"
-          >
-            Filtrar
-          </button>
-        </form>
-      </div>
+      {/* Día / Semana / Mes y, aparte, un rango: se adapta al celular (atajos que se deslizan, rango en dos campos lado a lado). */}
+      <FiltroFechaReporte
+        accion="/admin/reservas"
+        parametro="vista"
+        opciones={VISTAS}
+        activa={vista}
+        desde={desde}
+        hasta={hasta}
+        conservar={{ dia: diaAncla }}
+      />
 
       {vista === "rango" && (
         <div>
