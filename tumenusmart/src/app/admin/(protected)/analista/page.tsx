@@ -8,13 +8,8 @@ import { aplanarReceta } from "@/lib/insumo-elaborado";
 import { cargarElaborados } from "@/lib/cargar-elaborados";
 import { clasesBoton } from "@/components/ui";
 import { ideaDeLaSemana, marcarIdeaVista } from "@/lib/idea-semanal";
-import {
-  analizar,
-  type Confianza,
-  type Idea,
-  type PedidoAnalisis,
-  type ProductoAnalisis,
-} from "@/lib/analista";
+import { cargarVentasParaAnalisis } from "@/lib/ventas-para-analisis";
+import { analizar, type Confianza, type Idea, type ProductoAnalisis } from "@/lib/analista";
 
 export const dynamic = "force-dynamic";
 
@@ -57,13 +52,9 @@ export default async function AnalistaPage() {
 
   const desde = new Date(Date.now() - DIAS_DE_HISTORIA * 24 * 60 * 60 * 1000);
 
-  const [pedidosCrudos, productosCrudos] = await Promise.all([
-    prisma.order.findMany({
-      where: { createdAt: { gte: desde } },
-      include: { items: true },
-      orderBy: { createdAt: "desc" },
-      take: TOPE_PEDIDOS,
-    }),
+  const [pedidos, productosCrudos] = await Promise.all([
+    // Las ventas de los últimos días (todo entra como una venta del Punto de Venta: mostrador, comedor, delivery y citas).
+    cargarVentasParaAnalisis(prisma, desde, TOPE_PEDIDOS),
     // Con la receta: el costo de un producto sale de lo que cuestan sus insumos (ver costo-receta.ts).
     prisma.product.findMany({
       include: {
@@ -74,26 +65,6 @@ export default async function AnalistaPage() {
   ]);
   // Una receta que lleva una preparación (salsa, masa…) se costea con los insumos con que se hace.
   const elaborados = await cargarElaborados(storeId);
-
-  const pedidos: PedidoAnalisis[] = pedidosCrudos.map((p) => ({
-    id: p.id,
-    creado: p.createdAt,
-    estado: p.estado,
-    // Mismo criterio que Estadísticas (PEDIDO_REAL): cuenta si se envió por WhatsApp o si el local ya lo tocó. Un pedido
-    // cargado por teléfono nace confirmado y nunca pasa por WhatsApp: sin esto las Ideas lo ignoraban.
-    enviado: p.enviadoWhatsapp || p.estado !== "pendiente",
-    tipoEntrega: p.tipoEntrega,
-    total: Number(p.total),
-    costoEnvio: Number(p.costoEnvio),
-    clienteNombre: p.clienteNombre,
-    clienteTelefono: p.clienteTelefono,
-    items: p.items.map((i) => ({
-      productId: i.productId,
-      nombre: i.nombreProducto,
-      cantidad: i.cantidad,
-      precioUnitario: Number(i.precioUnitario),
-    })),
-  }));
 
   const productos: ProductoAnalisis[] = productosCrudos.map((pr) => ({
     id: pr.id,

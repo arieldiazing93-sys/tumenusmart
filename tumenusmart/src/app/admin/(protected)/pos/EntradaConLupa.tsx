@@ -49,7 +49,8 @@ export function EntradaConLupa({
         disabled={buscando || vacio}
         aria-label={etiquetaBoton}
         title={etiquetaBoton}
-        className="absolute inset-y-0 right-0 flex w-10 items-center justify-center rounded-r-lg text-tinta-media transition-colors hover:text-brand focus-visible:text-brand disabled:pointer-events-none disabled:opacity-40"
+        // Azul y con el ícono en blanco: se ve que es un botón y no un adorno del campo. Cubre el borde derecho del campo.
+        className="absolute inset-y-px right-px flex w-10 items-center justify-center rounded-r-[0.45rem] bg-azul text-white transition-colors hover:bg-azul-oscuro focus-visible:bg-azul-oscuro focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-azul/40 disabled:pointer-events-none disabled:opacity-40"
       >
         <svg
           viewBox="0 0 24 24"

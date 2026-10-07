@@ -1352,6 +1352,8 @@ export async function pagarCuentaDelivery(cuentaId: string, datos: DatosCobroDel
             cantidad: f.cantidad,
             precioUnitario: f.precioUnitario,
             iva: f.iva,
+            // El descuento es sobre los productos: la línea de envío sale completa en la factura.
+            sinDescuento: f.productId === null && f.nombreProducto === NOMBRE_LINEA_ENVIO,
           })),
           descuento: totales.descuento,
           emitidoPor: registradoPor,

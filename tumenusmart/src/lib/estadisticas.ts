@@ -1,6 +1,6 @@
 import { prisma } from "./prisma";
 import { listarDias, claveDia } from "./rango-fecha";
-import { factorDeDescuento } from "./descuento-venta";
+import { factorDeDescuentoDeProductos, totalDeEnvio } from "./descuento-venta";
 
 export type RangoFecha = { gte: Date; lt: Date };
 
@@ -236,8 +236,14 @@ export async function calcularRankingProductos(
         nombreProducto: true,
         cantidad: true,
         precioUnitario: true,
-        // Para repartir entre los ítems el descuento general de la cuenta.
-        ventaPos: { select: { total: true, descuento: true } },
+        // Para repartir entre los ítems el descuento general de la cuenta (con el envío aparte: no se descuenta).
+        ventaPos: {
+          select: {
+            total: true,
+            descuento: true,
+            items: { where: { esEnvio: true }, select: { precioUnitario: true, cantidad: true } },
+          },
+        },
       },
     }),
     prisma.product.findMany({
@@ -253,7 +259,8 @@ export async function calcularRankingProductos(
     ...items.map((i) => ({ ...i, factorDescuento: 1 })),
     ...itemsPos.map(({ ventaPos, ...i }) => ({
       ...i,
-      factorDescuento: factorDeDescuento(Number(ventaPos.total), Number(ventaPos.descuento)),
+      // El descuento es sobre los productos: el total cobrado trae el envío adentro y se lo saca antes de repartir.
+      factorDescuento: factorDeDescuentoDeProductos(Number(ventaPos.total), Number(ventaPos.descuento), totalDeEnvio(ventaPos.items)),
     })),
   ];
   for (const item of todosLosItems) {

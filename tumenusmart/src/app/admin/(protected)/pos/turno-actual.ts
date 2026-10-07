@@ -40,34 +40,6 @@ export async function pedidosDelTurno(db: PrismaLocal, turnoId: string) {
 }
 
 /**
- * Delivery con efectivo que todavía NO volvió a la caja — en TODO el local, sin importar la estación: lo despachado o entregado
- * que no se rindió (`rendicionId` vacío) y, además, todo delivery COBRADO EN EFECTIVO que todavía no se rindió aunque siga en
- * preparación (ese efectivo ya está contado en la caja del turno al cobrarse, pero el repartidor aún no lo trajo).
- *
- * Se usa para frenar el cierre de un turno: con plata sin devolver, el efectivo que cuenta el cajero no coincide con lo que el
- * sistema espera (ver cerrarTurno en pos/actions.ts). Es a propósito store-wide y no por estación — el reparto no es exclusivo de
- * una computadora. Los cancelados no cuentan.
- */
-export async function entregasSinRendir(db: PrismaLocal) {
-  return db.order.findMany({
-    where: {
-      tipoEntrega: "delivery",
-      rendicionId: null,
-      OR: [
-        { estado: { in: ["en_despacho", "entregado"] } },
-        { estado: { not: "cancelado" }, turnoPosId: { not: null }, formaPagoPos: "efectivo" },
-      ],
-    },
-    select: {
-      id: true,
-      numero: true,
-      estado: true,
-      repartidor: { select: { nombre: true } },
-    },
-  });
-}
-
-/**
  * Lo que entró (ingresos) y salió (retiros) de la caja en efectivo durante el
  * turno, aparte de las ventas — ver MovimientoCaja. El `neto` (ingresos menos
  * retiros) es lo que se le suma al efectivo que tendría que haber al cerrar.

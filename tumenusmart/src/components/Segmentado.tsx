@@ -29,15 +29,18 @@ export function Segmentado<T extends string>({
   onChange,
   className = "",
   color = "brand",
+  dosColumnas = false,
 }: {
   opciones: { value: T; label: string; sublabel?: string }[];
   valor: T;
   onChange: (v: T) => void;
   className?: string;
   color?: ColorSegmentado;
+  /** Las opciones en tarjetas de a dos por fila (cuatro opciones = dos filas), en vez de todas en una sola línea. */
+  dosColumnas?: boolean;
 }) {
   return (
-    <div className={`flex gap-3 ${className}`}>
+    <div className={`${dosColumnas ? "grid grid-cols-2" : "flex"} gap-3 ${className}`}>
       {opciones.map((o) => {
         const activo = o.value === valor;
         return (

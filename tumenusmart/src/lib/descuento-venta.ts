@@ -71,6 +71,20 @@ export function factorDeDescuento(total: number, descuento: number): number {
   return descuento > 0 && bruto > 0 ? total / bruto : 1;
 }
 
+/**
+ * Lo mismo que `factorDeDescuento`, pero para los PRODUCTOS de una venta de delivery: el descuento es sobre los productos y el costo
+ * de envío (`envio`, la suma de sus líneas de envío) se cobra completo, así que el total cobrado trae el envío adentro y hay que
+ * sacárselo antes de repartir. Las líneas de envío van sin factor (1). Con `envio` en 0 da exactamente lo mismo que la otra.
+ */
+export function factorDeDescuentoDeProductos(total: number, descuento: number, envio: number): number {
+  return factorDeDescuento(total - envio, descuento);
+}
+
+/** La suma de las líneas de envío de una venta (0 si no es un delivery o no cobró envío). */
+export function totalDeEnvio(lineas: { precioUnitario: unknown; cantidad: number }[]): number {
+  return lineas.reduce((s, l) => s + Number(l.precioUnitario) * l.cantidad, 0);
+}
+
 /** "10", "12,5" — un porcentaje tal como se imprime (sin ceros de más). */
 export function textoPorcentaje(valor: number): string {
   return String(valor).replace(".", ",");

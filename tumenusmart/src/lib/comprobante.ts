@@ -52,6 +52,8 @@ export type ItemFuente = {
   precioUnitario: number;
   /** "gravado10" | "gravado5" | "exento". */
   iva: string;
+  /** true en el costo de envío de un delivery: el descuento general es sobre los productos y esta línea no recibe nada de él. */
+  sinDescuento?: boolean;
 };
 
 export type ItemCalculado = ItemFuente & {
@@ -86,7 +88,11 @@ export function descripcionDeItem(nombreProducto: string, opcionesTexto: string 
  */
 export function repartirDescuento(items: ItemFuente[], descuentoTotal: number): ItemCalculado[] {
   const brutos = items.map((i) => redondear2(i.cantidad * i.precioUnitario));
-  const descuentos = repartirDescuentoEnLineas(brutos, descuentoTotal);
+  // Una línea "sin descuento" (el envío) queda fuera del reparto: con monto 0 no le toca nada.
+  const descuentos = repartirDescuentoEnLineas(
+    brutos.map((b, i) => (items[i].sinDescuento ? 0 : b)),
+    descuentoTotal
+  );
   return items.map((it, idx) => ({
     ...it,
     unidadMedida: it.unidadMedida ?? "unidad",

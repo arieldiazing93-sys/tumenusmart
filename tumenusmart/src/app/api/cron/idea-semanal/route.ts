@@ -5,13 +5,8 @@ import { ZONA_NEGOCIO } from "@/lib/timezone";
 import { costoDelProducto } from "@/lib/costo-receta";
 import { aplanarReceta } from "@/lib/insumo-elaborado";
 import { cargarElaborados } from "@/lib/cargar-elaborados";
-import {
-  analizar,
-  elegirIdeaDeLaSemana,
-  lunesDeLaSemana,
-  type PedidoAnalisis,
-  type ProductoAnalisis,
-} from "@/lib/analista";
+import { cargarVentasParaAnalisis } from "@/lib/ventas-para-analisis";
+import { analizar, elegirIdeaDeLaSemana, lunesDeLaSemana, type ProductoAnalisis } from "@/lib/analista";
 
 export const dynamic = "force-dynamic";
 /** El recorrido de varios locales no entra en el tiempo por defecto. */
@@ -59,13 +54,9 @@ export async function GET(request: NextRequest) {
     try {
       const db = prismaDelLocal(local.id);
 
-      const [pedidosCrudos, productosCrudos, previas] = await Promise.all([
-        db.order.findMany({
-          where: { createdAt: { gte: desde } },
-          include: { items: true },
-          orderBy: { createdAt: "desc" },
-          take: TOPE_PEDIDOS,
-        }),
+      const [pedidos, productosCrudos, previas] = await Promise.all([
+        // Las ventas de los últimos días (todo entra como una venta del Punto de Venta: mostrador, comedor, delivery y citas).
+        cargarVentasParaAnalisis(db, desde, TOPE_PEDIDOS),
         db.product.findMany({
           include: {
             category: true,
@@ -78,25 +69,6 @@ export async function GET(request: NextRequest) {
           select: { clave: true, semana: true },
         }),
       ]);
-
-      const pedidos: PedidoAnalisis[] = pedidosCrudos.map((p) => ({
-        id: p.id,
-        creado: p.createdAt,
-        estado: p.estado,
-        // Mismo criterio que Estadísticas (PEDIDO_REAL): un pedido cargado por teléfono nace confirmado y no pasa por WhatsApp.
-        enviado: p.enviadoWhatsapp || p.estado !== "pendiente",
-        tipoEntrega: p.tipoEntrega,
-        total: Number(p.total),
-        costoEnvio: Number(p.costoEnvio),
-        clienteNombre: p.clienteNombre,
-        clienteTelefono: p.clienteTelefono,
-        items: p.items.map((i) => ({
-          productId: i.productId,
-          nombre: i.nombreProducto,
-          cantidad: i.cantidad,
-          precioUnitario: Number(i.precioUnitario),
-        })),
-      }));
 
       // Una receta que lleva una preparación (salsa, masa…) se costea con los insumos con que se hace.
       const elaborados = await cargarElaborados(local.id);

@@ -48,7 +48,7 @@ export default async function EnviosPage({
     <div>
       <Cabecera
         titulo="Envíos"
-        bajada="Cuántos pedidos llegan por delivery y de qué zona, aparte de retiro en el local — para saber dónde conviene reforzar reparto."
+        bajada="Cuántas cuentas de Servicio delivery se cobraron y de qué zona, con qué repartidor — para saber dónde conviene reforzar reparto."
         acciones={
           <>
             <a
@@ -120,20 +120,15 @@ export default async function EnviosPage({
         <p className="text-sm text-tinta-suave">Todavía no hay pedidos en este período.</p>
       ) : (
         <>
-          <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
             <TarjetaTotal
               color="volumen"
               etiqueta="Pedidos delivery"
               valor={String(reporte.totalGeneral.cantidadDelivery)}
             />
             <TarjetaTotal
-              color="volumen"
-              etiqueta="Pedidos retiro"
-              valor={String(reporte.totalGeneral.cantidadRetiro)}
-            />
-            <TarjetaTotal
               color="dinero"
-              etiqueta="Facturado (delivery + retiro)"
+              etiqueta="Facturado (delivery)"
               valor={formatearGuarani(Math.round(reporte.totalGeneral.totalFacturado))}
             />
             <TarjetaTotal
@@ -197,20 +192,6 @@ export default async function EnviosPage({
                     </td>
                   </tr>
                 )}
-                {/* Retiro va aparte, no como una "zona" más — no tiene envío ni
-                    tiene sentido compararlo por % del delivery. */}
-                <tr className="border-t-2 border-linea bg-papel-suave/60">
-                  <td className="px-3 py-2 font-medium text-tinta">Retiro en el local</td>
-                  <td className="cifra px-3 py-2 text-right text-tinta-media">
-                    {reporte.retiro.cantidadPedidos}
-                  </td>
-                  <td className="px-3 py-2 text-right text-tinta-suave">—</td>
-                  <td className="cifra px-3 py-2 text-right text-tinta-media">
-                    {formatearGuarani(Math.round(reporte.retiro.totalFacturado))}
-                  </td>
-                  <td className="px-3 py-2 text-right text-tinta-suave">—</td>
-                  <td className="px-3 py-2 text-right text-tinta-suave">—</td>
-                </tr>
               </tbody>
             </table>
           </div>

@@ -486,7 +486,11 @@ function ideaCategoriaAusente(
 
 function agruparClientes(reales: PedidoAnalisis[]) {
   return agruparPorCliente(
-    reales.map((p) => ({
+    // Sin teléfono no hay a quién sumarle la compra (una venta de mostrador de un cliente de paso): no es un cliente que se pueda
+    // seguir, y todas juntas parecerían una sola persona con cientos de compras.
+    reales
+      .filter((p) => p.clienteTelefono.trim() !== "")
+      .map((p) => ({
       clienteTelefono: p.clienteTelefono,
       clienteNombre: p.clienteNombre,
       createdAt: p.creado,

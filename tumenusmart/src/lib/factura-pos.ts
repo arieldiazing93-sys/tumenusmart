@@ -18,7 +18,13 @@
  * cualquier factura paraguaya real, que nunca imprime decimales.
  */
 
-export type LineaConIva = { precioUnitario: number; cantidad: number; iva: string };
+export type LineaConIva = {
+  precioUnitario: number;
+  cantidad: number;
+  iva: string;
+  /** true en el costo de envío de un delivery: el descuento general es sobre los productos y esta línea no recibe nada de él. */
+  sinDescuento?: boolean;
+};
 
 function redondear2(n: number): number {
   return Math.round(n * 100) / 100;
@@ -100,7 +106,11 @@ export function desglosarIva(lineas: LineaConIva[], descuento = 0): DesgloseIva 
     gravado5 = 0;
     exento = 0;
     const montos = lineas.map((l) => redondear2(l.precioUnitario * l.cantidad));
-    const descuentos = repartirDescuentoEnLineas(montos, descuento);
+    // Una línea "sin descuento" (el envío) queda fuera del reparto: con monto 0 no le toca nada, y los productos se llevan todo.
+    const descuentos = repartirDescuentoEnLineas(
+      montos.map((m, i) => (lineas[i].sinDescuento ? 0 : m)),
+      descuento
+    );
     lineas.forEach((l, i) => {
       const neto = montos[i] - descuentos[i];
       if (l.iva === "gravado10") gravado10 += neto;

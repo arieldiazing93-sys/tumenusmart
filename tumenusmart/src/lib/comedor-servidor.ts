@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { prismaDelLocal } from "@/lib/prisma-local";
 import { armarPedido, type LineaPedida } from "@/lib/precio-pedido";
 import { cargarCatalogoParaPedido } from "@/lib/catalogo-pedido";
-import { registrarConsumoVenta } from "@/lib/movimientos-stock";
+import { consumosGuardablesPorLinea, registrarConsumoVenta } from "@/lib/movimientos-stock";
 import { ZONA_NEGOCIO } from "@/lib/timezone";
 import {
   ESTADOS_CUENTA_ABIERTA,
@@ -263,6 +263,8 @@ export async function guardarRonda(datos: DatosRonda): Promise<ResultadoRonda> {
         const { _max } = await tx.itemCuentaMesa.aggregate({ where: { cuentaId: cuenta.id }, _max: { ronda: true } });
         const ronda = (_max.ronda ?? 0) + 1;
 
+        // Lo que va a descontar cada línea, calculado igual que el descuento real (con su redondeo): se guarda en el producto.
+        const consumosPorLinea = await consumosGuardablesPorLinea(tx, storeId, armado.lineas);
         await tx.itemCuentaMesa.createMany({
           data: armado.lineas.map((l, i) => ({
             storeId,
@@ -285,11 +287,7 @@ export async function guardarRonda(datos: DatosRonda): Promise<ResultadoRonda> {
             precioAgregados: l.precioAgregados,
             areaImpresionId: areasDeLinea[i][0] ?? null,
             // Lo que descontó de cada insumo (por la cantidad), para poder devolverlo si el producto se anula.
-            consumo: l.consumo.map((c) => ({
-              insumoId: c.insumoId,
-              almacenId: c.almacenId,
-              cantidad: c.cantidad * l.cantidad,
-            })),
+            consumo: consumosPorLinea[i],
           })),
         });
 

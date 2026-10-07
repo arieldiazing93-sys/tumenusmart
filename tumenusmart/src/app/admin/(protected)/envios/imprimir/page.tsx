@@ -78,13 +78,7 @@ export default async function ImprimirEnviosPage({
                 </td>
               </tr>
               <tr className="border-b border-linea">
-                <td className="py-2 text-tinta-media">Pedidos retiro</td>
-                <td className="py-2 text-right font-semibold text-tinta">
-                  {reporte.totalGeneral.cantidadRetiro}
-                </td>
-              </tr>
-              <tr className="border-b border-linea">
-                <td className="py-2 text-tinta-media">Facturado (delivery + retiro)</td>
+                <td className="py-2 text-tinta-media">Facturado (delivery)</td>
                 <td className="py-2 text-right font-semibold text-tinta">
                   {formatearGuarani(Math.round(reporte.totalGeneral.totalFacturado))}
                 </td>
@@ -138,16 +132,6 @@ export default async function ImprimirEnviosPage({
                   ))}
                 </Fragment>
               ))}
-              <tr className="border-t-2 border-linea">
-                <td className="py-1.5 font-semibold text-tinta">Retiro en el local</td>
-                <td className="py-1.5 text-right text-tinta-media">{reporte.retiro.cantidadPedidos}</td>
-                <td className="py-1.5 text-right text-tinta-suave">—</td>
-                <td className="py-1.5 text-right text-tinta-media">
-                  {formatearGuarani(Math.round(reporte.retiro.totalFacturado))}
-                </td>
-                <td className="py-1.5 text-right text-tinta-suave">—</td>
-                <td className="py-1.5 text-right text-tinta-suave">—</td>
-              </tr>
             </tbody>
           </table>
         </>

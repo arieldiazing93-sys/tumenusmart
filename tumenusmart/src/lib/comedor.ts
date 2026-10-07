@@ -244,6 +244,8 @@ export type LineaDeCobro = {
   costoProducto: number | null;
   costoAgregados: number | null;
   precioAgregados: number;
+  /** true en el costo de envío de un delivery: no recibe nada del descuento general (ver desglosarIva). */
+  sinDescuento?: boolean;
 };
 
 /**

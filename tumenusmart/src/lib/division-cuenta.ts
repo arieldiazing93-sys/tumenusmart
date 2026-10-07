@@ -155,6 +155,9 @@ export function repartirProporcional(monto: number, pesos: number[]): number[] {
 /**
  * Reparte lo que descontó una línea (de cada insumo) en proporción a `factores` (que suman 1): la última parte se lleva el resto.
  * También lo usa la cancelación de ALGUNAS unidades de un producto (4 se quedan, 1 se cancela y se devuelve su parte al stock).
+ *
+ * Cada parte (menos la última) se redondea a 3 decimales, que es la precisión del stock: lo que se devuelve al cancelar una parte es
+ * justo lo que se le saca a la línea, sin un redondeo posterior que sume o reste 0,001. La última parte es lo que falta, exacto.
  */
 export function repartirConsumo(consumo: ConsumoGuardado[], factores: number[]): ConsumoGuardado[][] {
   const n = factores.length;
@@ -162,7 +165,7 @@ export function repartirConsumo(consumo: ConsumoGuardado[], factores: number[]):
   for (const c of consumo) {
     let acumulado = 0;
     for (let i = 0; i < n; i++) {
-      const cantidad = i === n - 1 ? Math.max(0, redondear(c.cantidad - acumulado, 6)) : redondear(c.cantidad * factores[i], 6);
+      const cantidad = i === n - 1 ? Math.max(0, redondear(c.cantidad - acumulado, 6)) : redondear(c.cantidad * factores[i], 3);
       acumulado += cantidad;
       salida[i].push({ insumoId: c.insumoId, almacenId: c.almacenId, cantidad });
     }

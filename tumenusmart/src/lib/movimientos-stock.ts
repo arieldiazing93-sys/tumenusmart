@@ -60,21 +60,47 @@ function consumoPorLinea(lineas: LineaArmada[], almacenPorDefecto: string | null
   const resultado: ConsumoDeLinea[] = [];
   for (const linea of lineas) {
     const motivo = textoDeLinea(linea);
-    const mapa = new Map<string, { insumoId: string; almacenId: string | null; cantidad: number }>();
-    for (const c of linea.consumo) {
-      const almacenId = c.almacenId ?? almacenPorDefecto;
-      const clave = `${c.insumoId}|${almacenId ?? ""}`;
-      const cantidad = c.cantidad * linea.cantidad;
-      const actual = mapa.get(clave);
-      if (actual) actual.cantidad += cantidad;
-      else mapa.set(clave, { insumoId: c.insumoId, almacenId, cantidad });
-    }
-    for (const c of mapa.values()) {
-      const cantidad = redondear3(c.cantidad);
-      if (cantidad !== 0) resultado.push({ insumoId: c.insumoId, almacenId: c.almacenId, cantidad, motivo });
-    }
+    for (const c of consumoDeUnaLinea(linea, almacenPorDefecto)) resultado.push({ ...c, motivo });
   }
   return resultado;
+}
+
+/** Lo que consume UNA línea vendida, por insumo y almacén (con su cantidad ya multiplicada y a 3 decimales). */
+function consumoDeUnaLinea(
+  linea: LineaArmada,
+  almacenPorDefecto: string | null
+): { insumoId: string; almacenId: string | null; cantidad: number }[] {
+  const mapa = new Map<string, { insumoId: string; almacenId: string | null; cantidad: number }>();
+  for (const c of linea.consumo) {
+    const almacenId = c.almacenId ?? almacenPorDefecto;
+    const clave = `${c.insumoId}|${almacenId ?? ""}`;
+    const cantidad = c.cantidad * linea.cantidad;
+    const actual = mapa.get(clave);
+    if (actual) actual.cantidad += cantidad;
+    else mapa.set(clave, { insumoId: c.insumoId, almacenId, cantidad });
+  }
+  const filas: { insumoId: string; almacenId: string | null; cantidad: number }[] = [];
+  for (const c of mapa.values()) {
+    const cantidad = redondear3(c.cantidad);
+    if (cantidad !== 0) filas.push({ insumoId: c.insumoId, almacenId: c.almacenId, cantidad });
+  }
+  return filas;
+}
+
+/**
+ * Lo que descuenta cada línea, tal como lo va a descontar `registrarConsumoVenta` (mismo cálculo, mismo redondeo a 3 decimales),
+ * para guardarlo en el producto de una cuenta de mesa o de delivery. Así lo que se devuelve al cancelar el producto —entero, o por
+ * partes— suma EXACTAMENTE lo que bajó del stock: si se guardara el número sin redondear, una cantidad con 4 decimales (0,0375 kg)
+ * devolvía 0,001 de más o de menos. Devuelve una lista por línea, en el mismo orden.
+ */
+export async function consumosGuardablesPorLinea(
+  db: Db,
+  storeId: string,
+  lineas: LineaArmada[]
+): Promise<{ insumoId: string; almacenId: string | null; cantidad: number }[][]> {
+  const hayConsumoSinAlmacen = lineas.some((l) => l.consumo.some((c) => !c.almacenId));
+  const almacenPorDefecto = hayConsumoSinAlmacen ? await almacenPrincipalId(db, storeId) : null;
+  return lineas.map((l) => consumoDeUnaLinea(l, almacenPorDefecto));
 }
 
 /** Suma por insumo (de todos los almacenes): lo que baja el espejo `Insumo.stockActual`. */

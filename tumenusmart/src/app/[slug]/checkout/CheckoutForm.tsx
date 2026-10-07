@@ -373,7 +373,8 @@ export function CheckoutForm({
           <p className="rotulo">Entrega y pago</p>
 
           <Campo etiqueta="Método de pago" ayuda="Lo coordinás directamente con el local">
-            <Segmentado opciones={metodosDisponibles} valor={metodoPago} onChange={setMetodoPago} />
+            {/* Tarjetas rectangulares de a dos por fila, como las de Entrega: con cuatro formas de pago quedan en dos filas. */}
+            <Segmentado opciones={metodosDisponibles} valor={metodoPago} onChange={setMetodoPago} dosColumnas />
           </Campo>
 
           <div>

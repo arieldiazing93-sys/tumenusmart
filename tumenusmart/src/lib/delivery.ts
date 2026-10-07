@@ -86,6 +86,8 @@ export function lineaDeEnvio(costoEnvio: number): LineaDeCobro | null {
     costoProducto: 0,
     costoAgregados: 0,
     precioAgregados: 0,
+    // El descuento es sobre los productos: el envío se cobra completo (también en la factura).
+    sinDescuento: true,
   };
 }
 

@@ -88,16 +88,6 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  hoja.addRow([
-    "Retiro en el local",
-    "",
-    reporte.retiro.cantidadPedidos,
-    "",
-    Math.round(reporte.retiro.totalFacturado),
-    "",
-    "",
-  ]);
-
   hoja.addRow([]);
   filaTitulo(
     hoja,

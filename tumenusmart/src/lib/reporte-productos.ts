@@ -3,7 +3,7 @@ import { PEDIDO_REAL, type RangoFecha } from "./estadisticas";
 import { costoDelProducto } from "./costo-receta";
 import { aplanarReceta } from "./insumo-elaborado";
 import { cargarElaborados } from "./cargar-elaborados";
-import { factorDeDescuento } from "./descuento-venta";
+import { factorDeDescuentoDeProductos, totalDeEnvio } from "./descuento-venta";
 import { TASAS_IVA } from "./iva";
 
 /**
@@ -203,8 +203,14 @@ export async function calcularReporteProductosVendidos(
         opcionesTexto: true,
         // La línea de "Costo de envío" de una venta de delivery: no es un producto, sale aparte.
         esEnvio: true,
-        // Para repartir entre los ítems el descuento general de la cuenta.
-        ventaPos: { select: { total: true, descuento: true } },
+        // Para repartir entre los ítems el descuento general de la cuenta (con el envío aparte: no se descuenta).
+        ventaPos: {
+          select: {
+            total: true,
+            descuento: true,
+            items: { where: { esEnvio: true }, select: { precioUnitario: true, cantidad: true } },
+          },
+        },
         product: {
           select: {
             costo: true,
@@ -279,7 +285,10 @@ export async function calcularReporteProductosVendidos(
     ...items.map((i) => ({ ...i, factorDescuento: 1, esEnvio: false })),
     ...itemsPos.map(({ ventaPos, ...i }) => ({
       ...i,
-      factorDescuento: factorDeDescuento(Number(ventaPos.total), Number(ventaPos.descuento)),
+      // El descuento es sobre los productos: la línea de envío entra completa y los productos se reparten el descuento entre ellos.
+      factorDescuento: i.esEnvio
+        ? 1
+        : factorDeDescuentoDeProductos(Number(ventaPos.total), Number(ventaPos.descuento), totalDeEnvio(ventaPos.items)),
     })),
   ];
 

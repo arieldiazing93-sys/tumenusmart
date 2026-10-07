@@ -14,7 +14,8 @@ import type { ContextoDelivery, CuentaDeliveryFila } from "./tipos-delivery";
 
 /** En la zona de envío: "todavía no se sabe". No es lo mismo que no haber elegido nada: eso no deja seguir. */
 const COORDINAR = "__coordinar__";
-const ROTULO = "text-[0.72rem] font-semibold uppercase tracking-rotulo text-tinta-suave";
+/** El título de cada bloque del formulario: en negrita y más grande que el resto, para que se vea dónde empieza cada parte. */
+const ROTULO = "text-[0.95rem] font-bold uppercase tracking-rotulo text-tinta";
 const CAJA = "flex flex-col gap-3 rounded-xl border-2 border-azul/50 bg-superficie p-3.5";
 
 /**
@@ -195,7 +196,9 @@ export function AbrirCuentaDeliveryPanel({
       ancho="ancho"
     >
       <div className="flex min-h-0 flex-1 flex-col">
-        <div className="flex flex-1 flex-col gap-4 overflow-y-auto px-4 py-4">
+        {/* Los campos donde se escribe van con un gris claro (se distinguen de la caja blanca): vale para todos los de este panel,
+            también los de los datos de factura. */}
+        <div className="flex flex-1 flex-col gap-4 overflow-y-auto px-4 py-4 [&_input]:!bg-papel-hundido [&_select]:!bg-papel-hundido [&_textarea]:!bg-papel-hundido">
           {/* ---------------------------------------------------------------- 1 · el cliente */}
           <section className={CAJA}>
             <p className={ROTULO}>1 · El cliente</p>
@@ -221,7 +224,7 @@ export function AbrirCuentaDeliveryPanel({
                   <span className="mt-1.5 block text-[0.78rem] font-medium text-exito">Cliente conocido: ya pidió antes.</span>
                 )}
                 {estadoCliente === "nuevo" && (
-                  <span className="mt-1.5 block text-[0.78rem] text-tinta-suave">Cliente nuevo: se guarda al crear la cuenta.</span>
+                  <span className="mt-1.5 block text-[0.8rem] font-semibold text-azul">Este cliente no existe: cargá sus datos.</span>
                 )}
               </Campo>
               <Campo etiqueta="Nombre">
@@ -253,10 +256,7 @@ export function AbrirCuentaDeliveryPanel({
           {/* ---------------------------------------------------------------- 2 · la dirección */}
           <section className={CAJA}>
             <p className={ROTULO}>2 · La dirección</p>
-            <Campo
-              etiqueta="Dirección"
-              ayuda="Calle, número y referencia, o pegá tal cual el enlace de Google Maps que el cliente mandó por WhatsApp: es lo que ve el repartidor."
-            >
+            <Campo etiqueta="Dirección">
               <Entrada
                 value={direccion}
                 onChange={(e) => setDireccion(e.target.value)}
@@ -273,13 +273,6 @@ export function AbrirCuentaDeliveryPanel({
                 </p>
               ) : null}
             </Campo>
-
-            {!edita && (
-              <p className="text-[0.76rem] leading-snug text-tinta-suave">
-                La dirección no se completa sola: el cliente puede pedir desde otro lugar cada vez. Cargala siempre de nuevo, igual que la
-                zona y el envío.
-              </p>
-            )}
           </section>
 
           {/* ---------------------------------------------------------------- 3 · el costo de envío de la zona */}

@@ -21,12 +21,7 @@ const MINUTOS_NUEVO = 3;
 /** Cuántos pedidos como máximo trae el historial de una consulta (un tramo muy largo se acota). */
 const MAXIMO_HISTORIAL = 400;
 
-const FILTROS: { valor: string; texto: string }[] = [
-  { valor: "hoy", texto: "Hoy" },
-  { valor: "ayer", texto: "Ayer" },
-  { valor: "7dias", texto: "7 días" },
-  { valor: "mes", texto: "Este mes" },
-];
+/** El historial muestra el día de hoy o el tramo de fechas que se elija: no hay otros atajos. */
 
 function hora(d: Date): string {
   return d.toLocaleTimeString("es-PY", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: ZONA_NEGOCIO });
@@ -136,7 +131,6 @@ export default async function RepartidorPage({
   const canceladas = cerradas.filter((c) => c.estado === "anulada").length;
 
   const ahora = Date.now();
-  const generadoEn = new Date(ahora).toISOString();
   const textoTramo =
     dia(rango.gte) === dia(new Date(rango.lt.getTime() - 1)) ? dia(rango.gte) : `${dia(rango.gte)} al ${dia(new Date(rango.lt.getTime() - 1))}`;
 
@@ -148,10 +142,10 @@ export default async function RepartidorPage({
           ? "No tenés pedidos asignados en este momento."
           : `Tenés ${pendientes.length} ${pendientes.length === 1 ? "pedido" : "pedidos"} para entregar.`}
       </p>
-      {/* Se actualiza sola cada minuto: cuando la caja te asigna un pedido, aparece acá sin que hagas nada (y en el acto, con
-          "Actualizar" o al volver a abrir la pantalla). */}
+      {/* Se actualiza sola cada minuto (y en el acto al volver a la pantalla): cuando la caja te asigna un pedido, aparece acá sin que
+          hagas nada. A propósito sin contador ni botón a la vista: no le dibuja nada al repartidor. */}
       <div className="mb-5">
-        <RefrescarCada segundos={SEGUNDOS_ACTUALIZAR} generadoEn={generadoEn} />
+        <RefrescarCada segundos={SEGUNDOS_ACTUALIZAR} />
       </div>
 
       <div className="flex flex-col gap-4">
@@ -224,12 +218,11 @@ export default async function RepartidorPage({
       {/* --------------------------------------------------------------------------------------------- historial */}
       <section className="mt-8">
         <h2 className="mb-2 text-sm font-semibold text-neutral-700">Mi historial</h2>
+        {/* Hoy, o un tramo a elección: no hay más atajos. */}
         <div className="mb-3 flex flex-wrap items-center gap-1.5">
-          {FILTROS.map((f) => (
-            <Link key={f.valor} href={`/repartidor/${id}?fecha=${f.valor}`} className={clasesBoton(fechaActiva === f.valor ? "principal" : "suave", "sm")}>
-              {f.texto}
-            </Link>
-          ))}
+          <Link href={`/repartidor/${id}?fecha=hoy`} className={clasesBoton(fechaActiva === "hoy" ? "principal" : "suave", "sm")}>
+            Hoy
+          </Link>
         </div>
         {/* Un tramo a elección: desde y hasta (el día "hasta" entra completo). */}
         <form method="get" className="mb-3 flex flex-wrap items-end gap-2">

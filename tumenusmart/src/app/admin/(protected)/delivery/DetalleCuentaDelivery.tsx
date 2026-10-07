@@ -48,12 +48,6 @@ type GrupoDeCuenta = {
 
 type Dialogo = { tipo: "anular"; grupo: GrupoDeCuenta } | { tipo: "cancelar" } | { tipo: "descuento" } | null;
 
-/** "Pedido 1", "Pedidos 1 y 2", "Pedidos 1, 2 y 3". */
-function textoDePedidos(rondas: number[]): string {
-  if (rondas.length === 1) return `Pedido ${rondas[0]}`;
-  return `Pedidos ${rondas.slice(0, -1).join(", ")} y ${rondas[rondas.length - 1]}`;
-}
-
 /**
  * Todo lo que compone la cuenta de un delivery (los datos del cliente y la entrega, los productos cargados, su descuento y su total
  * con el envío) y, arriba, lo que la caja puede hacer con ella: cargar productos, dar un descuento, corregir los datos, imprimir la
@@ -283,24 +277,9 @@ export function DetalleCuentaDelivery({
                 </button>
               )}
             </div>
-            {puedeMarcar && !sinProductos && (
-              <p className="text-[0.72rem] text-tinta-suave">
-                Para cancelar un producto (o solo algunas unidades), marcalo en la lista y tocá “Cancelar producto”.
-              </p>
-            )}
-            {!sinProductos && (abierta || porCobrar) && (
-              <p className="text-[0.72rem] text-tinta-suave">
-                Una cuenta con productos no se cancela mientras se atiende: se cobra y, si hace falta, se cancela la venta desde el
-                Historial de cuentas.
-              </p>
-            )}
+            {/* Solo se avisa lo que de verdad impide hacer algo (sin impresora, sin turno); las explicaciones de siempre se sacaron. */}
             {!contexto.imprimirCuenta.ok && contexto.imprimirCuenta.motivo && (abierta || porCobrar) && (
               <p className="text-[0.72rem] text-tinta-suave">No se puede imprimir desde acá: {contexto.imprimirCuenta.motivo}</p>
-            )}
-            {contexto.puedeCobrar && abierta && (
-              <p className="text-[0.72rem] font-medium text-amarillo-oscuro">
-                Para cobrar, primero imprimí la cuenta: “Cobrar cuenta” aparece cuando la cuenta ya está impresa.
-              </p>
             )}
             {contexto.puedeCobrar && porCobrar && !contexto.cobro.ok && contexto.cobro.sinTurno && (
               <p className="text-[0.72rem] font-medium text-amarillo-oscuro">
@@ -309,11 +288,6 @@ export function DetalleCuentaDelivery({
             )}
             {contexto.puedeCobrar && porCobrar && !contexto.cobro.ok && !contexto.cobro.sinTurno && contexto.cobro.motivo && (
               <p className="text-[0.72rem] text-tinta-suave">No se puede cobrar desde acá: {contexto.cobro.motivo}</p>
-            )}
-            {porCobrar && (
-              <p className="text-[0.72rem] text-tinta-suave">
-                Para cargar más productos, dar un descuento, corregir los datos o cancelar un producto, primero reabrí la cuenta.
-              </p>
             )}
           </div>
         ) : (
@@ -324,50 +298,31 @@ export function DetalleCuentaDelivery({
 
         {/* ------------------------------------------------------------ el repartidor: asignarlo ya lo manda a trabajar */}
         {contexto.puedeGestionar && (
-          <div className="flex flex-col gap-1.5 rounded-lg border-2 border-amarillo/60 bg-amarillo-luz/40 p-2.5">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className={ROTULO}>Repartidor</p>
-              <Pastilla color={cuenta.repartidor ? "azul" : "neutro"} punto>
-                {cuenta.repartidor ? `🛵 ${cuenta.repartidor}` : "Sin repartidor"}
-              </Pastilla>
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              {/* Es lo que falta para que el pedido salga: en amarillo se ve de un vistazo (igual que "personal" en el POS). */}
-              <select
-                value={cuenta.repartidorId ?? ""}
-                disabled={pendiente}
-                onChange={(e) => {
-                  const nuevo = e.target.value;
-                  ejecutar(
-                    () => asignarRepartidorDelivery(cuenta.id, nuevo),
-                    () => setAviso(nuevo ? "Repartidor asignado: el pedido ya le aparece en su enlace." : "Se le sacó el pedido al repartidor.")
-                  );
-                }}
-                aria-label="Repartidor"
-                className="rounded-lg border-2 border-amarillo bg-amarillo-campo px-3 py-2 text-[0.88rem] font-semibold text-tinta focus:outline-none focus:ring-2 focus:ring-amarillo/40 disabled:opacity-50"
-              >
-                <option value="">Sin repartidor</option>
-                {contexto.repartidores.map((r) => (
-                  <option key={r.id} value={r.id}>
-                    {r.nombre}
-                  </option>
-                ))}
-                {/* Un repartidor que ya no está activo se sigue viendo en la cuenta que ya tenía. */}
-                {cuenta.repartidorId && !contexto.repartidores.some((r) => r.id === cuenta.repartidorId) && (
-                  <option value={cuenta.repartidorId}>{cuenta.repartidor ?? "Repartidor"}</option>
-                )}
-              </select>
-            </div>
-            <p className="text-[0.72rem] text-tinta-suave">
-              {cuenta.asignadaEn && cuenta.repartidor ? (
-                <>
-                  Asignada a las <HoraDe iso={cuenta.asignadaEn} />.{" "}
-                </>
-              ) : null}
-              {cuenta.repartidor
-                ? "Le aparece al instante en su enlace; cuando se cobre la cuenta, ahí mismo ve con qué método de pago se cerró."
-                : "Al asignarlo, el pedido le aparece al instante en su enlace: no hay que marcar nada más."}
-            </p>
+          // Compacto, en UNA fila: el rótulo y el selector (sin leyendas ni pastilla aparte: el selector ya dice quién es).
+          <div className="flex items-center gap-2 rounded-lg border-2 border-amarillo/60 bg-amarillo-luz/40 px-2.5 py-1.5">
+            <p className={`${ROTULO} flex-none`}>Repartidor</p>
+            {/* Es lo que falta para que el pedido salga: en amarillo se ve de un vistazo (igual que "personal" en el POS). */}
+            <select
+              value={cuenta.repartidorId ?? ""}
+              disabled={pendiente}
+              onChange={(e) => {
+                const nuevo = e.target.value;
+                ejecutar(() => asignarRepartidorDelivery(cuenta.id, nuevo));
+              }}
+              aria-label="Repartidor"
+              className="min-w-0 flex-1 rounded-lg border-2 border-amarillo bg-amarillo-campo px-2.5 py-1 text-[0.85rem] font-semibold text-tinta focus:outline-none focus:ring-2 focus:ring-amarillo/40 disabled:opacity-50"
+            >
+              <option value="">Sin repartidor</option>
+              {contexto.repartidores.map((r) => (
+                <option key={r.id} value={r.id}>
+                  {r.nombre}
+                </option>
+              ))}
+              {/* Un repartidor que ya no está activo se sigue viendo en la cuenta que ya tenía. */}
+              {cuenta.repartidorId && !contexto.repartidores.some((r) => r.id === cuenta.repartidorId) && (
+                <option value={cuenta.repartidorId}>{cuenta.repartidor ?? "Repartidor"}</option>
+              )}
+            </select>
           </div>
         )}
 
@@ -396,7 +351,6 @@ export function DetalleCuentaDelivery({
             <tbody className="divide-y divide-linea-fina">
               {grupos.map((g) => {
                 const marcado = seleccionado?.clave === g.clave;
-                const primera = g.filas[0];
                 return (
                   <tr
                     key={g.clave}
@@ -423,16 +377,6 @@ export function DetalleCuentaDelivery({
                       {g.opciones && <p className="text-[0.76rem] text-tinta-media">+ {g.opciones}</p>}
                       {g.quitados && <p className="text-[0.76rem] text-peligro">{g.quitados}</p>}
                       {g.nota && <p className="text-[0.76rem] text-tinta-media">“{g.nota}”</p>}
-                      <p className="text-[0.7rem] text-tinta-suave">
-                        {textoDePedidos(g.rondas)}
-                        {g.rondas.length === 1 && (
-                          <>
-                            {" "}
-                            · <HoraDe iso={primera.enviadoEn} />
-                            {primera.cargadoPor ? ` · ${primera.cargadoPor}` : ""}
-                          </>
-                        )}
-                      </p>
                     </td>
                     <td className="cifra py-1 text-right text-[0.86rem] font-medium">{formatearGuarani(g.importe)}</td>
                   </tr>
@@ -445,8 +389,6 @@ export function DetalleCuentaDelivery({
                 <td className="cifra py-1 pr-2 text-[0.86rem] font-semibold">1</td>
                 <td className="py-1 pr-2 text-[0.86rem] leading-snug">
                   <p>🛵 Costo de envío</p>
-                  <p className="text-[0.76rem] text-tinta-media">Zona: {cuenta.zonaNombre}</p>
-                  <p className="text-[0.7rem] text-tinta-suave">No lleva descuento</p>
                 </td>
                 <td className="cifra py-1 text-right text-[0.86rem] font-medium">{formatearGuarani(cuenta.costoEnvio)}</td>
               </tr>
@@ -581,11 +523,6 @@ function PieDeCuenta({ cuenta }: { cuenta: CuentaDeliveryFila }) {
   const im = cuenta.impuestos;
   const descuento = cuenta.descuento;
   const hayDescuento = t.descuento > 0;
-  const detalleIva = [
-    im.iva10 > 0 ? `IVA 10 %: ${formatearGuarani(im.iva10)}` : null,
-    im.iva5 > 0 ? `IVA 5 %: ${formatearGuarani(im.iva5)}` : null,
-    im.exento > 0 ? `Exento: ${formatearGuarani(im.exento)}` : null,
-  ].filter(Boolean);
 
   return (
     <div className="rounded-lg border-2 border-azul/50 bg-azul-luz/30 px-2.5 py-1.5 sm:ml-auto sm:w-full sm:max-w-[16rem]">
@@ -615,14 +552,9 @@ function PieDeCuenta({ cuenta }: { cuenta: CuentaDeliveryFila }) {
           <dd className="cifra font-normal text-tinta">{formatearGuarani(t.envio)}</dd>
         </div>
 
-        <div>
-          <div className="flex items-baseline justify-between gap-3">
-            <dt className={ROTULO_PIE}>Impuestos (IVA)</dt>
-            <dd className="cifra font-normal text-tinta">{formatearGuarani(im.total)}</dd>
-          </div>
-          <p className="text-[0.66rem] leading-tight text-tinta-suave">
-            {detalleIva.length > 0 ? `${detalleIva.join(" · ")} · incluidos en el precio` : "Incluidos en el precio"}
-          </p>
+        <div className="flex items-baseline justify-between gap-3">
+          <dt className={ROTULO_PIE}>Impuestos (IVA)</dt>
+          <dd className="cifra font-normal text-tinta">{formatearGuarani(im.total)}</dd>
         </div>
 
         <div className="mt-0.5 flex items-baseline justify-between gap-3 border-t border-azul/40 pt-1">

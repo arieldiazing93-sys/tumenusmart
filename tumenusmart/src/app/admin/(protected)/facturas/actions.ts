@@ -503,6 +503,7 @@ export async function remitirFactura(
         descuento: true,
         formaPago: true,
         fechaVencimientoCredito: true,
+        tipoEntrega: true,
         items: {
           select: {
             productId: true,
@@ -511,6 +512,8 @@ export async function remitirFactura(
             precioUnitario: true,
             cantidad: true,
             iva: true,
+            // La línea de "Costo de envío" de un delivery: no recibe descuento y no cuenta como servicio ni mercadería.
+            esEnvio: true,
             product: { select: { unidadMedida: true, esServicio: true } },
           },
         },
@@ -527,7 +530,7 @@ export async function remitirFactura(
     // descuento general de la cuenta, si tuvo: los ítems guardan el precio sin
     // descuento, y el IVA tiene que salir sobre lo que se cobró.
     const desglose = desglosarIva(
-      venta.items.map((i) => ({ precioUnitario: Number(i.precioUnitario), cantidad: i.cantidad, iva: i.iva })),
+      venta.items.map((i) => ({ precioUnitario: Number(i.precioUnitario), cantidad: i.cantidad, iva: i.iva, sinDescuento: i.esEnvio })),
       Number(venta.descuento)
     );
 
@@ -602,11 +605,12 @@ export async function remitirFactura(
         const itemsComprobante: ItemFuente[] = venta.items.map((i) => ({
           productId: i.productId,
           descripcion: descripcionDeItem(i.nombreProducto, i.opcionesTexto),
-          unidadMedida: i.product?.unidadMedida ?? null,
-          esServicio: i.product?.esServicio ?? false,
+          unidadMedida: i.esEnvio ? "unidad" : (i.product?.unidadMedida ?? null),
+          esServicio: i.esEnvio ? null : (i.product?.esServicio ?? false),
           cantidad: i.cantidad,
           precioUnitario: Number(i.precioUnitario),
           iva: i.iva,
+          sinDescuento: i.esEnvio,
         }));
         await crearComprobante(tx, {
           storeId,
@@ -619,7 +623,8 @@ export async function remitirFactura(
             razonSocial,
             email: email || null,
           },
-          presencia: "presencial",
+          // Un delivery se factura "a domicilio", igual que la factura que se remite.
+          presencia: venta.tipoEntrega === "delivery" ? "domicilio" : "presencial",
           condicion: venta.formaPago === "a_credito" ? "credito" : "contado",
           fechaVencimientoCredito: venta.fechaVencimientoCredito,
           items: itemsComprobante,
