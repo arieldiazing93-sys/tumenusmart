@@ -1544,9 +1544,18 @@ model VentaPosItem {
   /// true en la línea "Costo de envío" de una venta de delivery: suma al total y a la factura, pero no es un producto (los reportes
   /// por producto la muestran aparte y el ranking la deja afuera).
   esEnvio        Boolean  @default(false)
+  /// La promoción (ver Promocion) que se le aplicó a esta línea, si alguna. Sin relación a propósito: si después se borra la promoción, lo ya
+  /// vendido queda igual y el reporte de Promociones lo muestra como "promoción eliminada".
+  promocionId    String?
+  /// true en la parte REGALADA de una promoción por volumen (precio 0, o solo los agregados).
+  cortesia       Boolean  @default(false)
+  /// El precio de UNA unidad antes de la promoción (con agregados). Con `precioUnitario` dice cuánto se descontó o se regaló en la línea:
+  /// (precioAntesPromo − precioUnitario) × cantidad. Null en las líneas sin promoción (y en las anteriores a este campo).
+  precioAntesPromo Decimal? @db.Decimal(10, 2)
 
   @@index([storeId])
   @@index([ventaPosId])
+  @@index([promocionId])
 }
 
 /// Un documento fiscal emitido: hoy la Factura Autoimpresor; mañana la factura
@@ -2835,6 +2844,8 @@ model ItemCuentaMesa {
   promocionId    String?
   /// true en la parte REGALADA de una promoción por volumen (precio 0, o solo los agregados): igual baja stock y cuenta como entregada.
   cortesia       Boolean @default(false)
+  /// El precio de UNA unidad antes de la promoción (con agregados): pasa a la venta al cobrar, para el reporte de Promociones.
+  precioAntesPromo Decimal? @db.Decimal(10, 2)
 
   /// "activo" | "anulado"
   estado          String    @default("activo")
@@ -2997,6 +3008,8 @@ model ItemCuentaDelivery {
   promocionId    String?
   /// true en la parte REGALADA de una promoción por volumen (precio 0, o solo los agregados): igual baja stock y cuenta como entregada.
   cortesia       Boolean @default(false)
+  /// El precio de UNA unidad antes de la promoción (con agregados): pasa a la venta al cobrar, para el reporte de Promociones.
+  precioAntesPromo Decimal? @db.Decimal(10, 2)
 
   /// "activo" | "anulado"
   estado          String    @default("activo")

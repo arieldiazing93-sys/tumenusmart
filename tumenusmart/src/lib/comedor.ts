@@ -246,6 +246,10 @@ export type LineaDeCobro = {
   precioAgregados: number;
   /** true en el costo de envío de un delivery: no recibe nada del descuento general (ver desglosarIva). */
   sinDescuento?: boolean;
+  /** La promoción que se le aplicó a la línea (ver promociones.ts), si alguna, si es la parte regalada y a qué precio estaba antes. */
+  promocionId?: string | null;
+  cortesia?: boolean;
+  precioAntesPromo?: number | null;
 };
 
 /**
@@ -254,20 +258,25 @@ export type LineaDeCobro = {
  * que se ve en el pie de la cuenta (impuestos incluidos) es lo que después sale en la factura.
  */
 export function lineasDeCobro<T extends LineaDeCobro>(items: T[]): T[] {
-  return sumarLineasIguales(items, (l) =>
-    claveDeLinea(
-      {
-        productId: l.productId,
-        nombre: l.nombreProducto,
-        opciones: l.opcionesTexto,
-        precioUnitario: l.precioUnitario,
-        iva: l.iva,
-        costoProducto: l.costoProducto,
-        costoAgregados: l.costoAgregados,
-        precioAgregados: l.precioAgregados,
-      },
-      false
-    )
+  return sumarLineasIguales(
+    items,
+    (l) =>
+      claveDeLinea(
+        {
+          productId: l.productId,
+          nombre: l.nombreProducto,
+          opciones: l.opcionesTexto,
+          precioUnitario: l.precioUnitario,
+          iva: l.iva,
+          costoProducto: l.costoProducto,
+          costoAgregados: l.costoAgregados,
+          precioAgregados: l.precioAgregados,
+        },
+        false
+      ) +
+      // La promoción también cuenta: dos líneas con el mismo precio pero de promociones distintas (o una regalada y otra no) no se juntan,
+      // porque el reporte de Promociones tiene que saber cuánto se descontó o se regaló en cada una.
+      `\u0001${l.promocionId ?? ""}\u0001${l.cortesia ? 1 : 0}\u0001${l.precioAntesPromo ?? ""}`
   );
 }
 

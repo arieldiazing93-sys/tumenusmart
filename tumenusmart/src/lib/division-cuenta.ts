@@ -57,6 +57,8 @@ export type LineaBase = {
   /** Costo por unidad de la línea (null = no se conocía). */
   costoProducto?: number | null;
   costoAgregados?: number | null;
+  /** El precio por unidad antes de una promoción (null = la línea no tuvo promoción): el reporte de Promociones lo necesita. */
+  precioAntesPromo?: number | null;
   /** Los insumos que descontó la línea (por su cantidad), para devolverlos si se cancela. */
   consumo?: ConsumoGuardado[];
 };
@@ -81,6 +83,8 @@ export type LineaDeParte = {
   precioAgregados: number;
   costoProducto: number | null;
   costoAgregados: number | null;
+  /** El precio por unidad antes de la promoción. Si la línea se rearma con otro precio (una fracción que no es exacta), se reparte igual que el importe. */
+  precioAntesPromo: number | null;
   consumo: ConsumoGuardado[];
   /** Lo que vale la línea, en guaraníes enteros (cantidad × precio, redondeado: da justo ese entero). */
   importe: number;
@@ -302,6 +306,7 @@ function lineaIntacta(l: LineaBase, accion: AccionDeLinea): LineaDeParte {
     precioAgregados: l.precioAgregados ?? 0,
     costoProducto: l.costoProducto ?? null,
     costoAgregados: l.costoAgregados ?? null,
+    precioAntesPromo: l.precioAntesPromo ?? null,
     consumo: l.consumo ?? [],
     importe: importeDeLinea(l),
   };
@@ -347,6 +352,7 @@ function lineaDeParteIgual(
         // El costo es por unidad y la unidad no cambió: solo hay menos unidades.
         costoProducto: origen.costoProducto ?? null,
         costoAgregados: origen.costoAgregados ?? null,
+        precioAntesPromo: origen.precioAntesPromo ?? null,
         consumo,
         importe: parte,
       };
@@ -363,6 +369,8 @@ function lineaDeParteIgual(
     precioAgregados: precio > 0 ? redondear((agregados / precio) * parte, 2) : 0,
     costoProducto: origen.costoProducto == null ? null : redondear(origen.costoProducto * origen.cantidad * factor, 2),
     costoAgregados: origen.costoAgregados == null ? null : redondear(origen.costoAgregados * origen.cantidad * factor, 2),
+    // Lo que valía antes de la promoción esa porción (igual que el costo): todas las porciones suman lo que valía la línea entera.
+    precioAntesPromo: origen.precioAntesPromo == null ? null : redondear(origen.precioAntesPromo * origen.cantidad * factor, 2),
     consumo,
     importe: parte,
   };

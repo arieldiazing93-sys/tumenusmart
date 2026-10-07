@@ -11,7 +11,7 @@ import { validarPagosDeVenta } from "@/lib/pago-venta";
 import { claveDiaAsuncion } from "@/lib/timezone";
 import { formatearGuarani, formatearNumero } from "@/lib/format";
 import { registrarBitacora } from "@/lib/bitacora";
-import { armarPedido, type LineaPedida, type ProductoBase } from "@/lib/precio-pedido";
+import { armarPedido, type LineaArmada, type LineaPedida, type ProductoBase } from "@/lib/precio-pedido";
 import { devolverConsumo, registrarConsumoVenta, revertirMovimientosVenta } from "@/lib/movimientos-stock";
 import { leerConsumoGuardado } from "@/lib/comedor";
 import { costoDelProducto } from "@/lib/costo-receta";
@@ -466,7 +466,8 @@ export async function registrarVenta(turnoId: string, datos: DatosVenta): Promis
   // `armarPedido` devuelve las líneas en el mismo orden en que se pidieron, así que
   // se cruzan por posición. Solo cuenta para servicios y solo con una cita de por
   // medio: en cualquier otro caso el precio es siempre el de la carta.
-  let filas = armado.lineas;
+  // Las líneas finales: las del pedido y, si una promoción se les aplicó, con su marca (qué promoción, si es la regalada y a qué precio estaba).
+  let filas: (LineaArmada & { promocionId?: string; cortesia?: boolean; precioAntesPromo?: number })[] = armado.lineas;
   let subtotal = armado.subtotal;
   if (datos.citaId) {
     for (const it of datos.items) {
@@ -676,6 +677,10 @@ export async function registrarVenta(turnoId: string, datos: DatosVenta): Promis
             costoProducto: f.costoProducto,
             costoAgregados: f.costoAgregados,
             precioAgregados: f.precioAgregados,
+            // Para el reporte de Promociones: cuál se aplicó, si es la parte regalada y el precio de antes.
+            promocionId: f.promocionId ?? null,
+            cortesia: f.cortesia === true,
+            precioAntesPromo: f.precioAntesPromo ?? null,
           })),
         },
       },

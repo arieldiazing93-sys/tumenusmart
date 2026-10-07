@@ -125,6 +125,7 @@ export async function dividirCuenta(cuentaId: string, datos: DatosDivision): Pro
         precioAgregados: Number(f.precioAgregados),
         costoProducto: f.costoProducto == null ? null : Number(f.costoProducto),
         costoAgregados: f.costoAgregados == null ? null : Number(f.costoAgregados),
+        precioAntesPromo: f.precioAntesPromo == null ? null : Number(f.precioAntesPromo),
         consumo: leerConsumoGuardado(f.consumo),
       }));
       const pedido = descuentoDeCuenta(cuenta);
@@ -218,6 +219,7 @@ export async function dividirCuenta(cuentaId: string, datos: DatosDivision): Pro
                 precioAgregados: l.precioAgregados,
                 costoProducto: l.costoProducto,
                 costoAgregados: l.costoAgregados,
+                precioAntesPromo: l.precioAntesPromo,
                 consumo: l.consumo as unknown as Prisma.InputJsonValue,
               },
             });
@@ -248,6 +250,7 @@ export async function dividirCuenta(cuentaId: string, datos: DatosDivision): Pro
               // La parte nueva sigue siendo de la misma promoción (y de cortesía, si lo era).
               promocionId: fila.promocionId,
               cortesia: fila.cortesia,
+              precioAntesPromo: l.precioAntesPromo,
               estado: "activo",
               enviadoEn: fila.enviadoEn,
             });

@@ -306,6 +306,7 @@ export async function guardarRonda(datos: DatosRonda): Promise<ResultadoRonda> {
             // La promoción que se le aplicó y si es la parte regalada.
             promocionId: l.promocionId ?? null,
             cortesia: l.cortesia === true,
+            precioAntesPromo: l.precioAntesPromo ?? null,
           })),
         });
 

@@ -215,6 +215,7 @@ async function anularParteDeItem(
       // Conserva la promoción y si era la parte regalada: la fila cancelada es el rastro de lo que había.
       promocionId: item.promocionId,
       cortesia: item.cortesia,
+      precioAntesPromo: item.precioAntesPromo,
       estado: "anulado",
       anuladoPor: quien,
       anuladoEn: ahora,
@@ -929,6 +930,10 @@ export async function pagarCuenta(cuentaId: string, datos: DatosCobroCuenta): Pr
       costoProducto: i.costoProducto == null ? null : Number(i.costoProducto),
       costoAgregados: i.costoAgregados == null ? null : Number(i.costoAgregados),
       precioAgregados: Number(i.precioAgregados),
+      // La promoción de la línea: pasa a la venta, para el reporte de Promociones.
+      promocionId: i.promocionId,
+      cortesia: i.cortesia,
+      precioAntesPromo: i.precioAntesPromo == null ? null : Number(i.precioAntesPromo),
     }))
   );
   const totales = totalesDeCuenta(filas, descuentoDeCuenta(cuenta));
@@ -1096,6 +1101,9 @@ export async function pagarCuenta(cuentaId: string, datos: DatosCobroCuenta): Pr
               costoProducto: f.costoProducto,
               costoAgregados: f.costoAgregados,
               precioAgregados: f.precioAgregados,
+              promocionId: f.promocionId ?? null,
+              cortesia: f.cortesia === true,
+              precioAntesPromo: f.precioAntesPromo ?? null,
             })),
           },
         },

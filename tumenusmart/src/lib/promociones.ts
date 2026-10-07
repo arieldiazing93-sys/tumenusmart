@@ -125,6 +125,8 @@ export type LineaConPromo<T> = T & {
   promocionId?: string;
   /** true en la parte regalada de una promoción por volumen. */
   cortesia?: boolean;
+  /** El precio de UNA unidad antes de la promoción (con agregados): con él, el reporte sabe cuánto se descontó o se regaló. */
+  precioAntesPromo?: number;
 };
 
 /** Lo ya pedido en la cuenta, por grupo de promoción: cuántas unidades cuentan y cuántas ya se regalaron. */
@@ -229,6 +231,7 @@ export function aplicarPromociones<T extends LineaDePromo>(
         precioAgregados: agregadosNuevo,
         opcionesTexto: agregarTexto(l.opcionesTexto, `Promo ${p.nombre}`),
         promocionId: p.id,
+        precioAntesPromo: l.precioUnitario,
         origen: i,
       });
       sumarAhorro(p, (l.precioUnitario - unitario) * l.cantidad);
@@ -238,7 +241,7 @@ export function aplicarPromociones<T extends LineaDePromo>(
     // por volumen
     const gratis = regalosPorLinea.get(i) ?? 0;
     const pagadas = l.cantidad - gratis;
-    if (pagadas > 0) salida.push({ ...l, cantidad: pagadas, promocionId: p.id, origen: i });
+    if (pagadas > 0) salida.push({ ...l, cantidad: pagadas, promocionId: p.id, precioAntesPromo: l.precioUnitario, origen: i });
     if (gratis > 0) {
       const precio = precioDeCortesia(l, p);
       salida.push({
@@ -248,6 +251,7 @@ export function aplicarPromociones<T extends LineaDePromo>(
         precioAgregados: precio,
         opcionesTexto: agregarTexto(l.opcionesTexto, `Cortesía ${p.nombre}`),
         promocionId: p.id,
+        precioAntesPromo: l.precioUnitario,
         cortesia: true,
         origen: i,
       });
