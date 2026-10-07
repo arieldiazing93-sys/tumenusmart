@@ -355,7 +355,7 @@ export function DetalleCuentaDelivery({
         {/* ------------------------------------------------------------ el repartidor: asignarlo ya lo manda a trabajar */}
         {contexto.puedeGestionar && (
           // Compacto, en UNA fila: el rótulo y el selector (sin leyendas ni pastilla aparte: el selector ya dice quién es).
-          <div className="flex items-center gap-2 rounded-lg border-2 border-amarillo/60 bg-amarillo-luz/40 px-2.5 py-1.5">
+          <div className="flex w-fit max-w-full items-center gap-2 rounded-lg border-2 border-amarillo/60 bg-amarillo-luz/40 px-2.5 py-1.5">
             <p className={`${ROTULO} flex-none`}>Repartidor</p>
             {/* Es lo que falta para que el pedido salga: en amarillo se ve de un vistazo (igual que "personal" en el POS). */}
             <select
@@ -366,7 +366,7 @@ export function DetalleCuentaDelivery({
                 ejecutar(() => asignarRepartidorDelivery(cuenta.id, nuevo));
               }}
               aria-label="Repartidor"
-              className="min-w-0 flex-1 rounded-lg border-2 border-amarillo bg-amarillo-campo px-2.5 py-1 text-[0.85rem] font-semibold text-tinta focus:outline-none focus:ring-2 focus:ring-amarillo/40 disabled:opacity-50"
+              className="w-44 min-w-0 max-w-full rounded-lg border-2 border-amarillo bg-amarillo-campo px-2.5 py-1 text-[0.85rem] font-semibold text-tinta focus:outline-none focus:ring-2 focus:ring-amarillo/40 disabled:opacity-50"
             >
               <option value="">Sin repartidor</option>
               {contexto.repartidores.map((r) => (
