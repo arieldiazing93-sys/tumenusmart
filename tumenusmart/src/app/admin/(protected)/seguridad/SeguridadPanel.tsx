@@ -1,28 +1,48 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { MensajeError, Pastilla, Tarjeta, clasesBoton } from "@/components/ui";
-import { EVENTOS_DE_SEGURIDAD, type EventoSeguridad } from "@/lib/seguridad";
+import { EVENTOS_DE_SEGURIDAD, PERFILES_DE_SEGURIDAD, etiquetaDePerfil, type EventoSeguridad, type PerfilDeSeguridad } from "@/lib/seguridad";
 import { guardarSeguridad } from "./actions";
 
+const ORDEN = EVENTOS_DE_SEGURIDAD.map((e) => e.id);
+
+function mismos(a: EventoSeguridad[], b: EventoSeguridad[]): boolean {
+  return a.length === b.length && a.every((x) => b.includes(x));
+}
+
 /**
- * La lista de acciones que se pueden proteger, con una casilla cada una (como "Eventos de seguridad" de los sistemas de restaurante), y
- * quién puede dar la contraseña. Se guarda con un botón: nada cambia hasta tocarlo.
+ * Cada evento que se puede proteger, con tres casillas (como la matriz de permisos de los sistemas de restaurante):
+ *  - "Pide contraseña": al hacerlo, el sistema exige la contraseña de un usuario autorizado.
+ *  - Administrador: siempre puede autorizarlo (tildada y fija).
+ *  - Caja: si el perfil Caja puede autorizarlo con su propia contraseña.
+ * Abajo, qué perfil tiene cada persona (se asigna en Empleados). Se guarda con un botón: nada cambia hasta tocarlo.
  */
-export function SeguridadPanel({ activos, autorizantes }: { activos: string[]; autorizantes: { id: string; nombre: string }[] }) {
+export function SeguridadPanel({
+  activos,
+  permisosCaja,
+  personas,
+}: {
+  activos: string[];
+  permisosCaja: string[];
+  personas: { id: string; nombre: string; perfil: PerfilDeSeguridad }[];
+}) {
   const router = useRouter();
   const [pendiente, iniciar] = useTransition();
-  const guardados = EVENTOS_DE_SEGURIDAD.map((e) => e.id).filter((id) => activos.includes(id));
-  const [elegidos, setElegidos] = useState<EventoSeguridad[]>(guardados);
+  const guardadosPide = ORDEN.filter((id) => activos.includes(id));
+  const guardadosCaja = ORDEN.filter((id) => permisosCaja.includes(id));
+  const [pide, setPide] = useState<EventoSeguridad[]>(guardadosPide);
+  const [caja, setCaja] = useState<EventoSeguridad[]>(guardadosCaja);
   const [error, setError] = useState<string | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
 
-  const hayCambios = elegidos.length !== guardados.length || elegidos.some((e) => !guardados.includes(e));
+  const hayCambios = !mismos(pide, guardadosPide) || !mismos(caja, guardadosCaja);
 
-  function alternar(id: EventoSeguridad) {
+  function alternar(lista: EventoSeguridad[], poner: (l: EventoSeguridad[]) => void, id: EventoSeguridad) {
     setAviso(null);
-    setElegidos((previos) => (previos.includes(id) ? previos.filter((e) => e !== id) : [...previos, id]));
+    poner(lista.includes(id) ? lista.filter((e) => e !== id) : [...lista, id]);
   }
 
   function guardar() {
@@ -30,12 +50,12 @@ export function SeguridadPanel({ activos, autorizantes }: { activos: string[]; a
     setAviso(null);
     iniciar(async () => {
       try {
-        const r = await guardarSeguridad(elegidos);
+        const r = await guardarSeguridad(pide, caja);
         if (!r.ok) {
           setError(r.error);
           return;
         }
-        setAviso(elegidos.length > 0 ? "Listo: esas acciones ahora piden la contraseña de un usuario autorizado." : "Listo: ninguna acción pide contraseña.");
+        setAviso(pide.length > 0 ? "Listo: esas acciones ahora piden la contraseña de un usuario autorizado." : "Listo: ninguna acción pide contraseña.");
         router.refresh();
       } catch {
         setError("No se pudo guardar. Revisá la conexión y probá de nuevo.");
@@ -46,21 +66,46 @@ export function SeguridadPanel({ activos, autorizantes }: { activos: string[]; a
   return (
     <div className="flex max-w-3xl flex-col gap-4">
       <Tarjeta className="flex flex-col gap-3 !border-2 !border-azul/50">
-        <p className="rotulo text-[0.78rem] font-bold">Pedir contraseña de un usuario autorizado para estos eventos</p>
+        <div>
+          <p className="rotulo text-[0.78rem] font-bold">Eventos de seguridad</p>
+          <p className="mt-1 text-[0.8rem] leading-snug text-tinta-suave">
+            Tildá “Pide contraseña” en lo que querés proteger. Después elegí si el perfil Caja puede dar esa autorización con su propia contraseña (si no, solo la da un
+            Administrador). Quien está en la caja escribe la contraseña de quien autoriza; si es incorrecta, la acción no se hace.
+          </p>
+        </div>
+
         <div className="flex flex-col gap-2.5">
           {EVENTOS_DE_SEGURIDAD.map((e) => (
-            <label key={e.id} className="flex cursor-pointer items-start gap-2.5 rounded-lg border border-linea px-3 py-2.5 hover:border-azul/40">
-              <input
-                type="checkbox"
-                checked={elegidos.includes(e.id)}
-                onChange={() => alternar(e.id)}
-                className="mt-0.5 h-4 w-4 flex-none accent-azul"
-              />
-              <span className="min-w-0">
-                <span className="block text-[0.92rem] font-semibold text-tinta">{e.etiqueta}</span>
-                <span className="block text-[0.78rem] leading-snug text-tinta-suave">{e.detalle}</span>
-              </span>
-            </label>
+            <div key={e.id} className="rounded-lg border border-linea px-3 py-2.5">
+              <p className="text-[0.92rem] font-semibold text-tinta">{e.etiqueta}</p>
+              <p className="text-[0.78rem] leading-snug text-tinta-suave">{e.detalle}</p>
+              <div className="mt-2 flex flex-wrap gap-x-5 gap-y-1.5">
+                <label className="flex cursor-pointer items-center gap-2 text-[0.84rem] font-medium text-tinta">
+                  <input
+                    type="checkbox"
+                    aria-label={`${e.etiqueta}: pide contraseña`}
+                    checked={pide.includes(e.id)}
+                    onChange={() => alternar(pide, setPide, e.id)}
+                    className="h-4 w-4 accent-azul"
+                  />
+                  Pide contraseña
+                </label>
+                <label className="flex items-center gap-2 text-[0.84rem] text-tinta-suave">
+                  <input type="checkbox" aria-label={`${e.etiqueta}: Administrador puede autorizar`} checked disabled readOnly className="h-4 w-4 accent-azul" />
+                  Administrador puede autorizar
+                </label>
+                <label className="flex cursor-pointer items-center gap-2 text-[0.84rem] font-medium text-tinta">
+                  <input
+                    type="checkbox"
+                    aria-label={`${e.etiqueta}: Caja puede autorizar`}
+                    checked={caja.includes(e.id)}
+                    onChange={() => alternar(caja, setCaja, e.id)}
+                    className="h-4 w-4 accent-azul"
+                  />
+                  Caja puede autorizar
+                </label>
+              </div>
+            </div>
           ))}
         </div>
 
@@ -75,25 +120,43 @@ export function SeguridadPanel({ activos, autorizantes }: { activos: string[]; a
         </div>
       </Tarjeta>
 
-      <Tarjeta className="flex flex-col gap-2">
-        <p className="rotulo text-[0.78rem] font-bold">Quién puede autorizar</p>
-        {autorizantes.length > 0 ? (
-          <div className="flex flex-wrap gap-1.5">
-            {autorizantes.map((a) => (
-              <Pastilla key={a.id} color="azul">
-                {a.nombre}
-              </Pastilla>
-            ))}
-          </div>
-        ) : (
+      <Tarjeta className="flex flex-col gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="rotulo text-[0.78rem] font-bold">Perfiles de seguridad</p>
+          <Link href="/admin/empleados" className={clasesBoton("navegar", "sm")}>
+            Asignar perfiles en Empleados
+          </Link>
+        </div>
+        <div className="flex flex-col gap-2">
+          {PERFILES_DE_SEGURIDAD.map((p) => {
+            const gente = personas.filter((x) => x.perfil === p.id);
+            return (
+              <div key={p.id} className="rounded-lg border border-linea px-3 py-2.5">
+                <p className="text-[0.9rem] font-semibold text-tinta">{p.etiqueta}</p>
+                <p className="text-[0.78rem] leading-snug text-tinta-suave">{p.detalle}</p>
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {gente.length > 0 ? (
+                    gente.map((x) => (
+                      <Pastilla key={x.id} color={p.id === "administrador" ? "azul" : "amarillo"}>
+                        {x.nombre}
+                      </Pastilla>
+                    ))
+                  ) : (
+                    <span className="text-[0.78rem] text-tinta-suave">Nadie tiene este perfil.</span>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        {!personas.some((x) => x.perfil === "administrador") && (
           <p className="rounded-lg bg-peligro-luz px-3 py-2 text-[0.82rem] font-medium text-peligro">
-            No hay ningún usuario dueño activo: sin él nadie puede dar la contraseña.
+            No hay ningún usuario {etiquetaDePerfil("administrador")} activo: sin él nadie puede dar la contraseña de lo que Caja no autoriza.
           </p>
         )}
         <p className="text-[0.78rem] leading-snug text-tinta-suave">
-          La contraseña que se pide es la de un usuario dueño de este local (la misma con la que entra al panel). Se escribe cada vez que se hace una de las
-          acciones tildadas, aunque quien está en la caja sea el mismo dueño. Con 5 contraseñas incorrectas seguidas el cuadro se bloquea 3 minutos, y
-          todo queda en la Bitácora (módulo Seguridad): quién pidió qué, quién lo autorizó y los intentos fallidos.
+          La contraseña que se pide es la de entrar al panel de quien autoriza. El dueño siempre es Administrador; a cada empleado se le asigna el perfil al
+          crearlo o después, en Empleados. Con 5 contraseñas incorrectas seguidas el cuadro se bloquea 3 minutos, y todo queda en la Bitácora (módulo Seguridad).
         </p>
       </Tarjeta>
     </div>

@@ -2,7 +2,15 @@ import { prisma } from "./prisma";
 import { passwordCoincide } from "./auth";
 import { registrarBitacora } from "./bitacora";
 import { pedirIntentoDePin, resolverIntentoDePin } from "./limite-pin";
-import { TEXTOS_AUTORIZACION, buscarAutorizante, etiquetaDeEvento, pideClave, type EventoSeguridad } from "./seguridad";
+import {
+  TEXTOS_AUTORIZACION,
+  buscarAutorizante,
+  etiquetaDeEvento,
+  perfilDeUsuario,
+  pideClave,
+  puedeAutorizar,
+  type EventoSeguridad,
+} from "./seguridad";
 
 /**
  * La parte de Seguridad que corre en el servidor (ver seguridad.ts): comprueba si el evento está protegido en el local y, si lo está,
@@ -16,7 +24,8 @@ import { TEXTOS_AUTORIZACION, buscarAutorizante, etiquetaDeEvento, pideClave, ty
  * Devuelve `requiereClave: true` cuando falta o no es correcta: la pantalla muestra el cuadro de la contraseña (ver
  * src/components/Autorizacion.tsx) y vuelve a llamar a la misma acción con la contraseña escrita. Sin esa marca, el error es otro.
  *
- * Quién autoriza: los usuarios activos del local con rol de dueño. Se prueba la contraseña escrita contra cada uno. El freno contra
+ * Quién autoriza: los usuarios activos del local cuyo PERFIL DE SEGURIDAD puede autorizar ese evento (el administrador —el dueño— todos;
+ * caja, los que el dueño le tildó). Se prueba la contraseña escrita contra cada uno de ellos. El freno contra
  * la adivinanza es el mismo de los PIN (limite-pin.ts): se cuenta el intento ANTES de mirar la contraseña, 5 errores bloquean 3 minutos
  * a todo el local y un acierto no borra los errores de los demás. Todo queda en la Bitácora (módulo Seguridad): quién pidió qué y
  * quién lo autorizó, los intentos fallidos y los bloqueos.
@@ -35,7 +44,7 @@ export async function exigirAutorizacion(
   evento: EventoSeguridad,
   clave: unknown
 ): Promise<ResultadoAutorizacion> {
-  const local = await prisma.store.findUnique({ where: { id: storeId }, select: { seguridadEventos: true } });
+  const local = await prisma.store.findUnique({ where: { id: storeId }, select: { seguridadEventos: true, seguridadPermisosCaja: true } });
   // El evento no está protegido (o el local no existe: lo demás de la acción ya lo dirá): nada que pedir.
   if (!local || !pideClave(local.seguridadEventos, evento)) return { ok: true, autorizo: null };
 
@@ -50,11 +59,14 @@ export async function exigirAutorizacion(
   const intento = await pedirIntentoDePin("autorizacion", storeId);
   if (!intento.ok) return { ok: false, error: TEXTOS_AUTORIZACION.bloqueado(intento.minutos), requiereClave: true };
 
+  // Los usuarios del local que pueden dar ESTA autorización, según su perfil de seguridad (el administrador siempre; caja solo si se le tildó).
   const usuarios = await prisma.usuario.findMany({
-    where: { storeId, activo: true, rol: "local" },
-    select: { id: true, nombre: true, email: true, passwordHash: true },
+    where: { storeId, activo: true, rol: { in: ["local", "empleado"] } },
+    select: { id: true, nombre: true, email: true, passwordHash: true, rol: true, perfilSeguridad: true },
   });
-  const autorizantes = usuarios.map((u) => ({ id: u.id, nombre: u.nombre?.trim() || u.email, passwordHash: u.passwordHash }));
+  const autorizantes = usuarios
+    .filter((u) => puedeAutorizar(perfilDeUsuario(u.rol, u.perfilSeguridad), local.seguridadPermisosCaja, evento))
+    .map((u) => ({ id: u.id, nombre: u.nombre?.trim() || u.email, passwordHash: u.passwordHash }));
 
   const encontrado = clave.length > LARGO_MAXIMO_CLAVE ? null : await buscarAutorizante(clave, autorizantes, passwordCoincide);
   const resultado = await resolverIntentoDePin("autorizacion", storeId, encontrado !== null, intento.n);

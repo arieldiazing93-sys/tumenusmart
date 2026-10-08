@@ -97,7 +97,7 @@ function DialogoClave({ pedido }: { pedido: Pedido }) {
     <Modal titulo="Hace falta una autorización" onCerrar={cancelar}>
       <form onSubmit={enviar} className="flex flex-col gap-3">
         <p className="text-[0.88rem] leading-snug text-tinta-media">
-          Esta acción pide la contraseña de un usuario autorizado (el dueño). Si no la tenés, avisale para que la escriba él.
+          Esta acción pide la contraseña de un usuario autorizado (un administrador o quien tenga ese permiso). Si no la tenés, avisale para que la escriba.
         </p>
         <Campo etiqueta="Contraseña de quien autoriza *">
           <Entrada

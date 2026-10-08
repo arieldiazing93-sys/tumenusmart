@@ -91,6 +91,8 @@ model Store {
   /// Seguridad (Ajustes): los eventos que piden la contraseña de un usuario autorizado (el dueño) antes de hacerse: "descuentos",
   /// "cancelar_productos", "cancelaciones", "reabrir_cuentas". Vacío = no se pide nada. Ver src/lib/seguridad.ts.
   seguridadEventos        String[]  @default([])
+  /// Los eventos que el perfil de seguridad "Caja" puede AUTORIZAR con su propia contraseña (el perfil "Administrador" siempre puede todos).
+  seguridadPermisosCaja   String[]  @default([])
   /// Contra la adivinanza de la contraseña de autorización (mismo freno que los PIN, ver src/lib/limite-pin.ts).
   intentosAutorizacion    Int       @default(0)
   bloqueoAutorizacionHasta DateTime?
@@ -453,6 +455,10 @@ model Usuario {
   store   Store?  @relation(fields: [storeId], references: [id], onDelete: Cascade)
 
   activo Boolean @default(true)
+
+  /// Perfil de seguridad: "administrador" (puede autorizar todos los eventos de Ajustes → Seguridad) o "caja" (solo los que el dueño le tildó).
+  /// Nulo = el que le toca por su rol: el dueño ("local") es administrador y un empleado es caja. Ver src/lib/seguridad.ts.
+  perfilSeguridad String?
 
   /// Queda en true cuando la contraseña la generó el sistema o la restableció
   /// un administrador. Mientras esté así, el panel le insiste al usuario que

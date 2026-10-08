@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { idLocalActual } from "@/lib/local-actual";
 import { cifrarPassword, exigirPermiso, generarPassword } from "@/lib/auth";
 import { registrarBitacora } from "@/lib/bitacora";
+import { esPerfilDeSeguridad, etiquetaDePerfil } from "@/lib/seguridad";
 
 function normalizarEmail(valor: string): string {
   return valor.trim().toLowerCase();
@@ -40,6 +41,10 @@ export async function crearEmpleado(formData: FormData): Promise<ResultadoCrearE
 
   const email = normalizarEmail(String(formData.get("email") ?? ""));
   const nombre = String(formData.get("nombre") ?? "").trim();
+  // El perfil de seguridad (quién puede dar la autorización de los eventos de Ajustes → Seguridad): Caja si no viene nada.
+  const perfilCrudo = String(formData.get("perfilSeguridad") ?? "caja");
+  if (!esPerfilDeSeguridad(perfilCrudo)) return { ok: false, error: "El perfil de seguridad no es válido" };
+  const perfilSeguridad = perfilCrudo;
 
   if (!email.includes("@") || email.length < 5) {
     return { ok: false, error: "Escribí un correo válido" };
@@ -62,6 +67,7 @@ export async function crearEmpleado(formData: FormData): Promise<ResultadoCrearE
       nombre,
       rol: "empleado", // forzado, nunca del formulario
       storeId, // forzado al local de quien lo crea
+      perfilSeguridad,
       passwordHash: await cifrarPassword(password),
       debeCambiarPassword: true,
     },
@@ -75,9 +81,9 @@ export async function crearEmpleado(formData: FormData): Promise<ResultadoCrearE
   await registrarBitacora(storeId, sesion, {
     modulo: "empleados",
     accion: "empleado_creado",
-    descripcion: `Dio de alta al empleado ${nombre} (${email}).`,
+    descripcion: `Dio de alta al empleado ${nombre} (${email}) con el perfil de seguridad ${etiquetaDePerfil(perfilSeguridad)}.`,
     entidad: "Usuario",
-    detalle: { empleado: nombre, correo: email },
+    detalle: { empleado: nombre, correo: email, perfilSeguridad },
   });
 
   revalidatePath("/admin/empleados");
@@ -118,6 +124,38 @@ export async function alternarActivoEmpleado(
   });
 
   revalidatePath("/admin/empleados");
+  return { ok: true };
+}
+
+/**
+ * Cambia el perfil de seguridad de un empleado: Administrador (puede dar la autorización de todos los eventos de Ajustes → Seguridad) o
+ * Caja (solo los que el dueño tildó para ese perfil). No toca lo que la persona ve ni puede hacer en el panel: eso es su rol.
+ */
+export async function cambiarPerfilSeguridadEmpleado(id: string, perfil: string): Promise<ResultadoAccionEmpleado> {
+  const sesion = await exigirPermiso("empleados.gestionar");
+  const storeId = await idLocalActual();
+
+  if (!esPerfilDeSeguridad(perfil)) return { ok: false, error: "El perfil de seguridad no es válido" };
+
+  // El `storeId` y el rol en el where NO son decorativos: sin ellos se podría cambiar el perfil de alguien de otro local, o del dueño.
+  const resultado = await prisma.usuario.updateMany({
+    where: { id, storeId, rol: "empleado" },
+    data: { perfilSeguridad: perfil },
+  });
+  if (resultado.count === 0) return { ok: false, error: "Ese empleado no es de tu local" };
+
+  const empleado = await prisma.usuario.findFirst({ where: { id, storeId }, select: { nombre: true, email: true } });
+  await registrarBitacora(storeId, sesion, {
+    modulo: "seguridad",
+    accion: "perfil_seguridad_cambiado",
+    descripcion: `Le dio el perfil de seguridad ${etiquetaDePerfil(perfil)} al empleado ${empleado?.nombre ?? empleado?.email ?? ""}.`,
+    entidad: "Usuario",
+    entidadId: id,
+    detalle: { empleado: empleado?.nombre ?? null, correo: empleado?.email ?? null, perfilSeguridad: perfil },
+  });
+
+  revalidatePath("/admin/empleados");
+  revalidatePath("/admin/seguridad");
   return { ok: true };
 }
 

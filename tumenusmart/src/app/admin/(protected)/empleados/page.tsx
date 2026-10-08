@@ -3,6 +3,7 @@ import { pantallaConPermiso } from "@/lib/auth";
 import { idLocalActual } from "@/lib/local-actual";
 import { ZONA_NEGOCIO } from "@/lib/timezone";
 import { Cabecera } from "@/components/ui";
+import { perfilDeUsuario } from "@/lib/seguridad";
 import { GestionEmpleados, type EmpleadoFila } from "./GestionEmpleados";
 
 export const dynamic = "force-dynamic";
@@ -24,6 +25,7 @@ export default async function EmpleadosPage() {
         email: true,
         activo: true,
         ultimoIngreso: true,
+        perfilSeguridad: true,
       },
     }),
   ]);
@@ -33,6 +35,7 @@ export default async function EmpleadosPage() {
     nombre: e.nombre,
     email: e.email,
     activo: e.activo,
+    perfil: perfilDeUsuario("empleado", e.perfilSeguridad),
     ultimoIngreso: e.ultimoIngreso
       ? e.ultimoIngreso.toLocaleString("es-PY", {
           timeZone: ZONA_NEGOCIO,

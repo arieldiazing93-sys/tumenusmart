@@ -1,9 +1,11 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Boton, Campo, Entrada, Pastilla, Tarjeta, Vacio, clasesBoton } from "@/components/ui";
+import { Boton, Campo, Entrada, Pastilla, Selector, Tarjeta, Vacio, clasesBoton } from "@/components/ui";
+import { PERFILES_DE_SEGURIDAD, esPerfilDeSeguridad, etiquetaDePerfil, type PerfilDeSeguridad } from "@/lib/seguridad";
 import {
   alternarActivoEmpleado,
+  cambiarPerfilSeguridadEmpleado,
   crearEmpleado,
   restablecerPasswordEmpleado,
 } from "./actions";
@@ -13,6 +15,8 @@ export type EmpleadoFila = {
   nombre: string | null;
   email: string;
   activo: boolean;
+  /** Quién puede dar la autorización de los eventos de Ajustes → Seguridad: administrador (todos) o caja (los que se tilden). */
+  perfil: PerfilDeSeguridad;
   ultimoIngreso: string | null;
 };
 
@@ -110,7 +114,7 @@ export function GestionEmpleados({
           ni ver la facturación.
         </p>
 
-        <form action={alCrear} className="mt-4 grid gap-3 sm:grid-cols-[1fr_1fr_auto]">
+        <form action={alCrear} className="mt-4 grid gap-3 sm:grid-cols-[1fr_1fr_11rem_auto]">
           <Campo etiqueta="Nombre">
             <Entrada name="nombre" required placeholder="Ej: Carlos Giménez" autoComplete="off" />
           </Campo>
@@ -123,12 +127,26 @@ export function GestionEmpleados({
               autoComplete="off"
             />
           </Campo>
+          <Campo etiqueta="Perfil de seguridad">
+            <Selector name="perfilSeguridad" defaultValue="caja">
+              {PERFILES_DE_SEGURIDAD.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.etiqueta}
+                </option>
+              ))}
+            </Selector>
+          </Campo>
           <div className="flex items-end">
             <Boton tono="nuevo" type="submit" disabled={pendiente} className="w-full sm:w-auto">
               {pendiente ? "Creando…" : "Crear empleado"}
             </Boton>
           </div>
         </form>
+
+        <p className="mt-2 text-[0.78rem] leading-snug text-tinta-suave">
+          El perfil de seguridad decide quién puede dar la contraseña de autorización de lo que protegiste en Ajustes → Seguridad (descuentos, cancelaciones…):
+          el Administrador puede con todo y Caja solo con lo que le hayas tildado. Se puede cambiar después, en la lista.
+        </p>
 
         {error && <p className="mt-2 text-[0.82rem] text-peligro">{error}</p>}
       </Tarjeta>
@@ -154,6 +172,21 @@ function FilaEmpleado({ empleado }: { empleado: EmpleadoFila }) {
   const [pendiente, iniciar] = useTransition();
   const [nuevaPassword, setNuevaPassword] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [perfil, setPerfil] = useState<PerfilDeSeguridad>(empleado.perfil);
+
+  function cambiarPerfil(valor: string) {
+    if (!esPerfilDeSeguridad(valor) || valor === perfil) return;
+    const anterior = perfil;
+    setError(null);
+    setPerfil(valor);
+    iniciar(async () => {
+      const resultado = await cambiarPerfilSeguridadEmpleado(empleado.id, valor);
+      if (!resultado.ok) {
+        setPerfil(anterior);
+        setError(resultado.error);
+      }
+    });
+  }
 
   return (
     <div className="rounded-xl border border-linea bg-white px-4 py-3">
@@ -161,6 +194,7 @@ function FilaEmpleado({ empleado }: { empleado: EmpleadoFila }) {
         <div className="min-w-0">
           <p className="flex flex-wrap items-center gap-2 text-[0.9rem] font-semibold tracking-titular">
             {empleado.nombre || empleado.email}
+            <Pastilla color={perfil === "administrador" ? "azul" : "amarillo"}>{etiquetaDePerfil(perfil)}</Pastilla>
             {!empleado.activo && <Pastilla color="neutro">Sin acceso</Pastilla>}
           </p>
           <p className="text-[0.8rem] text-tinta-suave">
@@ -170,7 +204,20 @@ function FilaEmpleado({ empleado }: { empleado: EmpleadoFila }) {
           </p>
         </div>
 
-        <div className="flex flex-none items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 sm:flex-none">
+          <Selector
+            aria-label={`Perfil de seguridad de ${empleado.nombre || empleado.email}`}
+            value={perfil}
+            disabled={pendiente}
+            onChange={(ev) => cambiarPerfil(ev.target.value)}
+            className="!w-auto !py-1.5 text-[0.82rem]"
+          >
+            {PERFILES_DE_SEGURIDAD.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.etiqueta}
+              </option>
+            ))}
+          </Selector>
           <button
             type="button"
             disabled={pendiente}
