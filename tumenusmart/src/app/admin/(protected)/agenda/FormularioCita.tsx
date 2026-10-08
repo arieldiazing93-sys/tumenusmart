@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Area, Campo, Entrada, MensajeError, Selector, clasesBoton } from "@/components/ui";
 import { IconoWhatsapp } from "@/components/iconos";
+import { useAutorizacion } from "@/components/Autorizacion";
 import { ESTADOS_CITA, diaLargo, estadoDeCita, urlAgenda, type ParametrosAgenda } from "@/lib/agenda";
 import {
   duracionDeServicios,
@@ -81,6 +82,8 @@ export function FormularioCita({
 }) {
   const router = useRouter();
   const [pendiente, iniciar] = useTransition();
+  // El cuadro que pide la contraseña de un usuario autorizado cuando anular el cobro está protegido (Ajustes → Seguridad).
+  const { autorizar, dialogo: dialogoClave } = useAutorizacion();
   const [error, setError] = useState<string | null>(null);
   const [choque, setChoque] = useState<string | null>(null);
   // Mover el turno de una cita ya cobrada (el cliente pagó pero no puede ir ese día): el día y la hora nuevos.
@@ -374,7 +377,7 @@ export function FormularioCita({
     setError(null);
     iniciar(async () => {
       try {
-        const r = await anularCobroCita(id, motivoAnulacion);
+        const r = await autorizar((clave) => anularCobroCita(id, motivoAnulacion, clave));
         if (!r.ok) {
           setError(r.error);
           return;
@@ -983,6 +986,7 @@ export function FormularioCita({
           </div>
         )}
       </div>
+      {dialogoClave}
     </form>
   );
 }

@@ -33,6 +33,7 @@ export const MODULOS_BITACORA = [
   { valor: "comedor", etiqueta: "Servicio comedor" },
   { valor: "delivery", etiqueta: "Servicio delivery" },
   { valor: "configuracion", etiqueta: "Configuración" },
+  { valor: "seguridad", etiqueta: "Seguridad" },
 ] as const;
 
 export type ModuloBitacora = (typeof MODULOS_BITACORA)[number]["valor"];

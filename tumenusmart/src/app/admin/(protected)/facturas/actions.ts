@@ -19,7 +19,8 @@ import { esDeMesAnterior, nombreDelMes } from "@/lib/mes-fiscal";
 import { registrarBitacora } from "@/lib/bitacora";
 import { cancelarVenta } from "../pos/actions";
 
-export type ResultadoCancelarFactura = { ok: true } | { ok: false; error: string };
+/** `requiereClave`: cancelar la cuenta junto con la factura está protegido (Ajustes → Seguridad) y falta la contraseña de un usuario autorizado, o no es correcta. */
+export type ResultadoCancelarFactura = { ok: true } | { ok: false; error: string; requiereClave?: true };
 
 export type ItemDetalleFactura = {
   nombreProducto: string;
@@ -171,7 +172,9 @@ export async function cancelarFactura(
   motivo: string,
   tambienCuenta: boolean,
   /** El dueño vio la alerta de "factura de un mes ya cerrado" y aceptó anularla igual. */
-  confirmoMesAnterior = false
+  confirmoMesAnterior = false,
+  /** La contraseña de un usuario autorizado, si cancelar la cuenta está protegido en Ajustes → Seguridad (solo cuenta con `tambienCuenta`). */
+  autorizacion?: string
 ): Promise<ResultadoCancelarFactura> {
   // Mismo permiso que la pantalla de Facturas — es información y una acción
   // del dueño, no del día a día de un cajero.
@@ -230,7 +233,7 @@ export async function cancelarFactura(
     // Los pedidos del módulo Pedidos ya no existen (se eliminó): solo queda la venta del Punto de Venta.
     const resultado =
       origen === "venta"
-        ? await cancelarVenta(id, motivo)
+        ? await cancelarVenta(id, motivo, autorizacion)
         : ({ ok: false, error: "Los pedidos ya no existen en el sistema: no se puede cancelar este." } as const);
     if (!resultado.ok) return resultado;
     await anotarEnBitacora();

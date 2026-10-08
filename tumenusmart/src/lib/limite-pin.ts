@@ -20,7 +20,8 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "./prisma";
 import { MAXIMO_INTENTOS_PIN, MINUTOS_BLOQUEO_PIN } from "./asistencia";
 
-export type EspacioDePin = "mozos" | "asistencia";
+/** "autorizacion": la contraseña del usuario autorizado que piden las acciones protegidas (ver seguridad.ts): mismo freno, mismas reglas. */
+export type EspacioDePin = "mozos" | "asistencia" | "autorizacion";
 
 /** Cuánto tiempo sin intentos hace falta para que el conteo de errores vuelva a cero. */
 const MINUTOS_VENTANA = 10;
@@ -31,6 +32,11 @@ const COLUMNAS = {
     intentos: "intentosPinAsistencia",
     bloqueo: "bloqueoAsistenciaHasta",
     ultimo: "ultimoIntentoPinAsistenciaEn",
+  },
+  autorizacion: {
+    intentos: "intentosAutorizacion",
+    bloqueo: "bloqueoAutorizacionHasta",
+    ultimo: "ultimoIntentoAutorizacionEn",
   },
 } as const;
 

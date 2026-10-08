@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Boton, Cabecera, Campo, Entrada, Tarjeta, clasesBoton } from "@/components/ui";
 import { Segmentado } from "@/components/Segmentado";
+import { useAutorizacion } from "@/components/Autorizacion";
 import { formatearGuarani } from "@/lib/format";
 import { calcularDescuento, textoPorcentaje } from "@/lib/descuento-venta";
 import { resolverDescuentoConTipos, type TipoDescuentoDef } from "@/lib/tipos-descuento";
@@ -128,6 +129,8 @@ export function PantallaVenta({
   carta: { nombre: string; url: string } | null;
 }) {
   const router = useRouter();
+  // El cuadro que pide la contraseña de un usuario autorizado cuando el descuento está protegido (Ajustes → Seguridad).
+  const { autorizar, dialogo: dialogoClave, pidiendoClave } = useAutorizacion();
   // Los precios de ESTE momento: si un producto tiene un precio de promoción (de lunes a viernes de 18 a 20, por ejemplo), acá ya
   // viene con el precio que vale ahora, y cambia solo cuando empieza o termina la franja. Es el mismo precio que cobra el servidor.
   const { categorias, gruposMitad, promociones, ahora, refrescar: refrescarPrecios } = usePromosVigentes(categoriasBase, gruposBase, promocionesBase);
@@ -431,7 +434,10 @@ export function PantallaVenta({
     // para siempre en "Cobrando…" sin decir nada.
     let r: Awaited<ReturnType<typeof registrarVenta>>;
     try {
-      r = await registrarVenta(turnoId, {
+      // Si el descuento está protegido en Ajustes → Seguridad, el servidor responde `requiereClave` y `autorizar` abre el cuadro de la
+      // contraseña y repite la venta con ella (sin haber guardado nada antes).
+      r = await autorizar((clave) => registrarVenta(turnoId, {
+      autorizacion: clave,
       pagos,
       tipoEntrega,
       clienteNombre,
@@ -460,7 +466,7 @@ export function PantallaVenta({
             }
           : { productId: i.productId, opcionIds: i.agregadoIds, cantidad: i.cantidad }
       ),
-      });
+      }));
     } catch {
       setCobrando(false);
       setError(
@@ -1244,7 +1250,15 @@ export function PantallaVenta({
           permiteCredito={ventasACredito}
           bloqueClienteCredito={bloqueClienteCredito}
           creditoListo={creditoListo}
-          hayModalEncima={mostrarModalClienteFiscal || mostrarModalClienteRapido}
+          hayModalEncima={mostrarModalClienteFiscal || mostrarModalClienteRapido || pidiendoClave}
+          // Con la cuenta en cero se dice qué comprobante sale: la factura se emite (en cero) solo si se eligió "Factura" antes de confirmar el pedido.
+          comprobanteEnCero={
+            comprobanteTipo === "factura"
+              ? registroFiscal === "con"
+                ? "Factura en cero (con registro fiscal)"
+                : "Factura en cero (Consumidor Final)"
+              : "Ticket (sin factura). Para facturarla, volvé y elegí Factura en “Comprobante”."
+          }
           onCerrar={() => setMostrarCobro(false)}
           onCobrar={confirmarCobro}
         />
@@ -1289,6 +1303,9 @@ export function PantallaVenta({
           onAgregar={confirmarAgregadosProducto}
         />
       )}
+
+      {/* La contraseña de un usuario autorizado, cuando el descuento está protegido (Ajustes → Seguridad). */}
+      {dialogoClave}
     </div>
   );
 }

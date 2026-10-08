@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { MensajeError, Pastilla, Tarjeta, clasesBoton } from "@/components/ui";
+import { useAutorizacion } from "@/components/Autorizacion";
 import { formatearCantidad, formatearGuarani, formatearNumero } from "@/lib/format";
 import { agruparPorClave, claveDeLinea, importeDeLinea, repartirEnFilas, textoEstadoCuenta } from "@/lib/comedor";
 import { textoPorcentaje } from "@/lib/descuento-venta";
@@ -83,6 +84,8 @@ export function DetalleCuentaDelivery({
   const [error, setError] = useState<string | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
   const [dialogo, setDialogo] = useState<Dialogo>(null);
+  // El cuadro que pide la contraseña de un usuario autorizado cuando la acción está protegida (Ajustes → Seguridad).
+  const { autorizar, dialogo: dialogoClave } = useAutorizacion();
   const [cargando, setCargando] = useState(false);
   const [editando, setEditando] = useState(false);
   // El producto marcado en la lista (para cancelarlo con el botón de arriba).
@@ -155,7 +158,7 @@ export function DetalleCuentaDelivery({
 
   function reabrir() {
     ejecutar(
-      () => reabrirCuentaDelivery(cuenta.id),
+      () => autorizar((clave) => reabrirCuentaDelivery(cuenta.id, clave)),
       () => setAviso("La cuenta se reabrió: ya se le pueden cargar más productos.")
     );
   }
@@ -495,7 +498,7 @@ export function DetalleCuentaDelivery({
               cuantas === dialogo.grupo.cantidad
                 ? dialogo.grupo.filas.map((f) => ({ itemId: f.id, cantidad: f.cantidad }))
                 : repartirEnFilas(dialogo.grupo.filas, cuantas);
-            const r = await anularProductosDelivery(cuenta.id, partes, motivo);
+            const r = await autorizar((clave) => anularProductosDelivery(cuenta.id, partes, motivo, clave));
             if (r.ok) {
               setSeleccionadaClave(null);
               router.refresh();
@@ -511,7 +514,7 @@ export function DetalleCuentaDelivery({
           confirmar="Cerrar cuenta"
           onCerrar={() => setDialogo(null)}
           onConfirmar={async (motivo) => {
-            const r = await cancelarCuentaDelivery(cuenta.id, motivo);
+            const r = await autorizar((clave) => cancelarCuentaDelivery(cuenta.id, motivo, clave));
             if (r.ok) router.refresh();
             return r;
           }}
@@ -537,7 +540,7 @@ export function DetalleCuentaDelivery({
           subtotal={t.subtotal}
           envio={t.envio}
           tipos={contexto.tiposDescuento}
-          onAplicar={(d, motivo) => aplicarDescuentoDelivery(cuenta.id, d, motivo)}
+          onAplicar={(d, motivo) => autorizar((clave) => aplicarDescuentoDelivery(cuenta.id, d, motivo, clave))}
           onCerrar={() => setDialogo(null)}
           onListo={() => {
             setDialogo(null);
@@ -579,6 +582,9 @@ export function DetalleCuentaDelivery({
           }}
         />
       )}
+
+      {/* La contraseña de un usuario autorizado, cuando la acción está protegida (Ajustes → Seguridad). Va al final: queda por encima del resto. */}
+      {dialogoClave}
     </div>
   );
 }

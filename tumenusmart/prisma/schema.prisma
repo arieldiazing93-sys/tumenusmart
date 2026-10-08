@@ -88,6 +88,13 @@ model Store {
   bloqueoMozosHasta     DateTime?
   /// Cuándo fue el último intento de PIN: pasado un rato sin intentos el conteo arranca de cero (ver src/lib/limite-pin.ts).
   ultimoIntentoPinMozosEn DateTime?
+  /// Seguridad (Ajustes): los eventos que piden la contraseña de un usuario autorizado (el dueño) antes de hacerse: "descuentos",
+  /// "cancelar_productos", "cancelaciones", "reabrir_cuentas". Vacío = no se pide nada. Ver src/lib/seguridad.ts.
+  seguridadEventos        String[]  @default([])
+  /// Contra la adivinanza de la contraseña de autorización (mismo freno que los PIN, ver src/lib/limite-pin.ts).
+  intentosAutorizacion    Int       @default(0)
+  bloqueoAutorizacionHasta DateTime?
+  ultimoIntentoAutorizacionEn DateTime?
   /// El correlativo de las cuentas de mesa del local (la próxima es este número + 1).
   contadorCuentasMesa   Int       @default(0)
   /// El correlativo de las cuentas de delivery del local (la próxima es este número + 1).

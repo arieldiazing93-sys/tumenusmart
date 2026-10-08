@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Campo, Entrada, MensajeError, Pastilla, Tarjeta, clasesBoton } from "@/components/ui";
 import { Modal } from "@/components/Modal";
+import { useAutorizacion } from "@/components/Autorizacion";
 import { Segmentado } from "@/components/Segmentado";
 import { formatearCantidad, formatearGuarani, formatearNumero } from "@/lib/format";
 import { agruparPorClave, claveDeLinea, importeDeLinea, repartirEnFilas, textoEstadoCuenta } from "@/lib/comedor";
@@ -70,6 +71,8 @@ export function DetalleCuenta({
   const [error, setError] = useState<string | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
   const [dialogo, setDialogo] = useState<Dialogo>(null);
+  // El cuadro que pide la contraseña de un usuario autorizado cuando la acción está protegida (Ajustes → Seguridad).
+  const { autorizar, dialogo: dialogoClave } = useAutorizacion();
   const [cargando, setCargando] = useState(false);
   const [dividiendo, setDividiendo] = useState(false);
   // El producto marcado en la lista (para cancelarlo con el botón de arriba).
@@ -135,7 +138,7 @@ export function DetalleCuenta({
 
   function reabrir() {
     ejecutar(
-      () => reabrirCuenta(cuenta.id),
+      () => autorizar((clave) => reabrirCuenta(cuenta.id, clave)),
       () => setAviso("La cuenta se reabrió: ya se le pueden cargar más productos.")
     );
   }
@@ -411,7 +414,7 @@ export function DetalleCuenta({
               cuantas === dialogo.grupo.cantidad
                 ? dialogo.grupo.filas.map((f) => ({ itemId: f.id, cantidad: f.cantidad }))
                 : repartirEnFilas(dialogo.grupo.filas, cuantas);
-            const r = await anularProductos(cuenta.id, partes, motivo);
+            const r = await autorizar((clave) => anularProductos(cuenta.id, partes, motivo, clave));
             if (r.ok) {
               setSeleccionadaClave(null);
               router.refresh();
@@ -427,7 +430,7 @@ export function DetalleCuenta({
           confirmar="Cerrar cuenta"
           onCerrar={() => setDialogo(null)}
           onConfirmar={async (motivo) => {
-            const r = await cancelarCuenta(cuenta.id, motivo);
+            const r = await autorizar((clave) => cancelarCuenta(cuenta.id, motivo, clave));
             if (r.ok) router.refresh();
             return r;
           }}
@@ -439,7 +442,7 @@ export function DetalleCuenta({
           descuento={cuenta.descuento}
           subtotal={cuenta.totales.subtotal}
           tipos={contexto.tiposDescuento}
-          onAplicar={(d, motivo) => aplicarDescuento(cuenta.id, d, motivo)}
+          onAplicar={(d, motivo) => autorizar((clave) => aplicarDescuento(cuenta.id, d, motivo, clave))}
           onCerrar={() => setDialogo(null)}
           onListo={() => {
             setDialogo(null);
@@ -481,6 +484,9 @@ export function DetalleCuenta({
           }}
         />
       )}
+
+      {/* La contraseña de un usuario autorizado, cuando la acción está protegida (Ajustes → Seguridad). Va al final: queda por encima del resto. */}
+      {dialogoClave}
     </div>
   );
 }

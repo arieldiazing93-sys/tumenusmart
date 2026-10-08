@@ -23,6 +23,7 @@ import { DURACION_MINIMA_CITA } from "@/lib/agenda-cita";
 import { calcularDescuento, type DescuentoPedido } from "@/lib/descuento-venta";
 import { resolverDescuentoConTipos } from "@/lib/tipos-descuento";
 import { cargarTiposDescuento } from "@/lib/tipos-descuento-servidor";
+import { exigirAutorizacion } from "@/lib/seguridad-servidor";
 import { SIN_REGISTRO_FISCAL } from "@/lib/tipo-cliente";
 import { SELECCION_PROMOCIONES, precioEnPosicion, segundoDeSemanaAsuncion, tramosDeFilas } from "@/lib/precio-promocion";
 import { aplicarPromociones } from "@/lib/promociones";
@@ -91,7 +92,8 @@ export type ResultadoVenta =
   | { ok: true; ventaId: string; total: number; areasImpresion: string[] }
   /** `sinTurno`: el turno de caja ya no está abierto; la pantalla manda directo a abrirlo (ver src/lib/turno-requerido.ts). */
   /** `precioCambio`: el total que tenía la pantalla ya no es el que corresponde (entró o salió una promoción de precio); la pantalla se recalcula. */
-  | { ok: false; error: string; sinTurno?: true; precioCambio?: true };
+  /** `requiereClave`: la acción está protegida (Ajustes → Seguridad) y falta la contraseña de un usuario autorizado, o no es correcta. */
+  | { ok: false; error: string; sinTurno?: true; precioCambio?: true; requiereClave?: true };
 
 export type ItemVentaInput =
   | {
@@ -140,6 +142,8 @@ export type DatosVenta = {
   /** Descuento general de la cuenta (porcentaje o monto). Sin esto, o con valor 0, no hay descuento.
    *  El monto real lo calcula el servidor sobre el subtotal — ver calcularDescuento. */
   descuento?: DescuentoPedido;
+  /** La contraseña de un usuario autorizado, cuando el descuento está protegido en Ajustes → Seguridad (ver seguridad.ts). La pide la pantalla al recibir `requiereClave`. */
+  autorizacion?: string;
   /** Solo si se paga "a_credito": en cuántos días vence lo que debe el cliente (0 a 365; por defecto 30). */
   creditoDias?: number;
   /**
@@ -517,6 +521,12 @@ export async function registrarVenta(turnoId: string, datos: DatosVenta): Promis
   const descuento = calcularDescuento(subtotal, descuentoResuelto.descuento);
   if (!descuento.ok) return { ok: false, error: descuento.error };
   const total = subtotal - descuento.monto;
+  // Seguridad (Ajustes): un descuento en el mostrador pide contraseña si el local lo protegió. Se exige antes de tocar nada. (El cobro de una
+  // cita de la Agenda trae su propio descuento y todavía no lo pide.)
+  if (descuento.monto > 0 && !datos.citaId) {
+    const clave = await exigirAutorizacion(storeId, sesion, "descuentos", datos.autorizacion);
+    if (!clave.ok) return clave;
+  }
   // Una cuenta en cero (cortesía) no tiene nada que cobrar: a crédito no corresponde.
   if (esCredito && total <= 0) {
     return { ok: false, error: "Una cuenta en cero (cortesía) no se carga a crédito. Elegí otra forma de pago." };
@@ -1043,7 +1053,8 @@ export async function buscarClientePorIdentificacion(numero: string): Promise<Re
   return { ok: true, nombre: cliente.nombre, tipoIdentificacion: cliente.tipoIdentificacion };
 }
 
-export type ResultadoCancelarVenta = { ok: true } | { ok: false; error: string };
+/** `requiereClave`: la cancelación está protegida (Ajustes → Seguridad) y falta la contraseña de un usuario autorizado, o no es correcta. */
+export type ResultadoCancelarVenta = { ok: true } | { ok: false; error: string; requiereClave?: true };
 
 /**
  * Anula una cuenta ya cobrada.
@@ -1055,7 +1066,7 @@ export type ResultadoCancelarVenta = { ok: true } | { ok: false; error: string }
  * quede registro". No borra nada, de todos modos: queda marcada como
  * cancelada, con quién y por qué, nunca se elimina la fila.
  */
-export async function cancelarVenta(ventaId: string, motivo: string): Promise<ResultadoCancelarVenta> {
+export async function cancelarVenta(ventaId: string, motivo: string, autorizacion?: string): Promise<ResultadoCancelarVenta> {
   const sesion = await exigirPermiso("pos.vender");
   const storeId = await idLocalActual();
   const db = prismaDelLocal(storeId);
@@ -1087,6 +1098,11 @@ export async function cancelarVenta(ventaId: string, motivo: string): Promise<Re
       error: "El turno de esta cuenta ya está cerrado. Una vez cerrado el turno, la cuenta no se puede cancelar.",
     };
   }
+
+  // Seguridad (Ajustes): si las cancelaciones piden contraseña, se exige acá, antes de tocar nada. Es la única puerta: la usan el
+  // Historial de cuentas, Facturas ("cancelar todo") y el cobro de una cita, que le pasan la contraseña que se escribió.
+  const clave = await exigirAutorizacion(storeId, sesion, "cancelaciones", autorizacion);
+  if (!clave.ok) return clave;
 
   const identidad = sesion.nombre?.trim() || sesion.email;
   const ahora = new Date();

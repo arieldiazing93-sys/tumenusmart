@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Boton } from "@/components/ui";
 import { Segmentado } from "@/components/Segmentado";
+import { useAutorizacion } from "@/components/Autorizacion";
 import { esDeMesAnterior, nombreDelMes } from "@/lib/mes-fiscal";
 import { cancelarFactura } from "./actions";
 
@@ -38,6 +39,8 @@ export function CancelarFacturaBoton({
   const [entiendoElAviso, setEntiendoElAviso] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [cancelando, setCancelando] = useState(false);
+  // El cuadro que pide la contraseña de un usuario autorizado cuando cancelar la cuenta está protegido (Ajustes → Seguridad).
+  const { autorizar, dialogo: dialogoClave } = useAutorizacion();
 
   const fechaFactura = new Date(fecha);
   const mesAnterior = esDeMesAnterior(fechaFactura);
@@ -47,7 +50,9 @@ export function CancelarFacturaBoton({
     if (!puedeConfirmar) return;
     setCancelando(true);
     setError(null);
-    const r = await cancelarFactura(origen, id, motivo, tambienCuenta === "si", mesAnterior && entiendoElAviso);
+    const r = await autorizar((clave) =>
+      cancelarFactura(origen, id, motivo, tambienCuenta === "si", mesAnterior && entiendoElAviso, clave)
+    );
     setCancelando(false);
     if (!r.ok) {
       setError(r.error);
@@ -68,6 +73,7 @@ export function CancelarFacturaBoton({
     <div
       className={`rounded-xl border border-peligro/25 bg-peligro-luz p-3 text-left ${mesAnterior ? "w-full" : "w-72"}`}
     >
+      {dialogoClave}
       {mesAnterior && (
         <div
           role="alert"

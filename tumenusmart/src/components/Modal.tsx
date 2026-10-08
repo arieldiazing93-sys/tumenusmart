@@ -3,6 +3,9 @@
 import { useEffect, useRef, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 
+/** Las ventanas abiertas ahora, de la más vieja a la más nueva: Escape solo le hace caso a la última. */
+const ventanasAbiertas: object[] = [];
+
 /**
  * Una ventana centrada con un velo oscuro detrás, para formularios cortos (un
  * nombre, una confirmación). Para formularios largos se usa el PanelLateral.
@@ -29,8 +32,11 @@ export function Modal({
   });
 
   useEffect(() => {
+    // Con una ventana abierta encima de otra (el cuadro de la contraseña sobre el de un descuento), Escape cierra solo la de arriba.
+    const yo = {};
+    ventanasAbiertas.push(yo);
     const alTeclear = (e: KeyboardEvent) => {
-      if (e.key === "Escape") cerrar.current();
+      if (e.key === "Escape" && ventanasAbiertas[ventanasAbiertas.length - 1] === yo) cerrar.current();
     };
     window.addEventListener("keydown", alTeclear);
 
@@ -39,6 +45,8 @@ export function Modal({
 
     return () => {
       window.removeEventListener("keydown", alTeclear);
+      const lugar = ventanasAbiertas.indexOf(yo);
+      if (lugar >= 0) ventanasAbiertas.splice(lugar, 1);
       document.body.style.overflow = overflowAnterior;
     };
   }, []);

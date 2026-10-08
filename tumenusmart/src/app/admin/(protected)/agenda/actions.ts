@@ -33,7 +33,8 @@ export type ResultadoCobroCita =
   | { ok: true; ventaId: string; total: number }
   /** `sinTurno`: no hay turno de caja abierto; la pantalla manda directo a abrirlo (ver src/lib/turno-requerido.ts). */
   | { ok: false; error: string; sinTurno?: true };
-export type ResultadoSimple = { ok: true } | { ok: false; error: string };
+/** `requiereClave`: la acción está protegida (Ajustes → Seguridad) y falta la contraseña de un usuario autorizado, o no es correcta. */
+export type ResultadoSimple = { ok: true } | { ok: false; error: string; requiereClave?: true };
 
 const LARGO_MAXIMO_NOMBRE = 80;
 
@@ -588,7 +589,7 @@ export async function cobrarCita(citaId: string, datos: DatosCita, cobro: DatosC
  * del punto de venta —con sus reglas: solo mientras el turno de caja sigue abierto— y la
  * cita vuelve a quedar sin cobrar.
  */
-export async function anularCobroCita(citaId: string, motivo: string): Promise<ResultadoSimple> {
+export async function anularCobroCita(citaId: string, motivo: string, autorizacion?: string): Promise<ResultadoSimple> {
   const sesion = await exigirPermiso("pos.vender");
   const storeId = await idLocalActual();
   const db = prismaDelLocal(storeId);
@@ -603,7 +604,7 @@ export async function anularCobroCita(citaId: string, motivo: string): Promise<R
   if (limpio.length < 3) return { ok: false, error: "Escribí por qué se anula el cobro." };
 
   // cancelarVenta devuelve la cita a "sin cobrar" en la misma transacción.
-  const anulada = await cancelarVenta(cita.ventaPosId, limpio);
+  const anulada = await cancelarVenta(cita.ventaPosId, limpio, autorizacion);
   if (!anulada.ok) return anulada;
 
   await registrarBitacora(storeId, sesion, {

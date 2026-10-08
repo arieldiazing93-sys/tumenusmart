@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Boton, clasesBoton } from "@/components/ui";
+import { useAutorizacion } from "@/components/Autorizacion";
 import { cancelarVenta } from "../../actions";
 
 /**
@@ -38,12 +39,14 @@ export function CancelarVentaBoton({
   const [motivo, setMotivo] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [cancelando, setCancelando] = useState(false);
+  // El cuadro que pide la contraseña de un usuario autorizado cuando cancelar está protegido (Ajustes → Seguridad).
+  const { autorizar, dialogo: dialogoClave } = useAutorizacion();
 
   async function cancelar() {
     if (!motivo.trim()) return;
     setCancelando(true);
     setError(null);
-    const r = await cancelarVenta(ventaId, motivo);
+    const r = await autorizar((clave) => cancelarVenta(ventaId, motivo, clave));
     setCancelando(false);
     if (!r.ok) {
       setError(r.error);
@@ -100,6 +103,7 @@ export function CancelarVentaBoton({
           Volver
         </Boton>
       </div>
+      {dialogoClave}
     </div>
   );
 }

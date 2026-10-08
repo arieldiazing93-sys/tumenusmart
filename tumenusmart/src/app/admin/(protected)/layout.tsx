@@ -230,6 +230,9 @@ function armarGrupos(hayIdeaSinVer: boolean, rol: string, ventasACredito: boolea
         // Los descuentos con nombre y porcentaje fijo que se eligen al vender (Cortesía 100 %, Tarjeta 20 %…).
         { href: "/admin/tipos-descuento", label: "Tipos de descuentos", icono: "configuracion" as const,
           ver: conPermiso("configuracion.editar") },
+        // Qué acciones piden la contraseña de un usuario autorizado (descuentos, cancelaciones…): el control del dueño sobre la caja.
+        { href: "/admin/seguridad", label: "Seguridad", icono: "cuenta" as const,
+          ver: conPermiso("configuracion.editar") },
         // Todo lo que se configura del Servicio comedor, por bloques: los mozos con su enlace, las mesas del salón y las
         // reglas del mozo. Cada bloque nuevo que se agregue a esta configuración se suma acá, dentro de este submenú.
         { href: "/admin/comedor/mozos", label: "Configuración servicio comedor", icono: "configuracion" as const,

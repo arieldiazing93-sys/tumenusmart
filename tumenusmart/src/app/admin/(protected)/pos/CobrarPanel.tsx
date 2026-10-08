@@ -59,6 +59,7 @@ export function CobrarPanel({
   bloqueClienteCredito,
   creditoListo,
   hayModalEncima,
+  comprobanteEnCero,
   onCerrar,
   onCobrar,
 }: {
@@ -81,6 +82,8 @@ export function CobrarPanel({
   creditoListo: boolean;
   /** Si hay otro cuadro abierto encima (crear cliente): Escape cierra ese, no este panel. */
   hayModalEncima: boolean;
+  /** Con la cuenta en cero (cortesía): qué comprobante va a salir ("Factura en cero (Consumidor Final)", "Ticket (sin factura)"), para que no haya dudas. */
+  comprobanteEnCero?: string;
   onCerrar: () => void;
   /**
    * Cómo se paga: una fila, o varias si se divide. `creditoDias` solo viene cuando se paga "a_credito";
@@ -233,6 +236,11 @@ export function CobrarPanel({
               <p className="mt-1 text-[0.8rem] leading-snug text-tinta-media">
                 No se cobra nada: la venta se registra igual, así baja el stock de lo que se usó. Si hace falta, la factura se anula después.
               </p>
+              {comprobanteEnCero && (
+                <p className="mt-2 rounded-md bg-white/70 px-2.5 py-1.5 text-[0.8rem] text-tinta-media">
+                  Comprobante: <strong className="text-tinta">{comprobanteEnCero}</strong>
+                </p>
+              )}
             </div>
           ) : (
           <div>

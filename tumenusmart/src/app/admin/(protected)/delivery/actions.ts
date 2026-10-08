@@ -20,6 +20,7 @@ import { extraerUbicacion } from "@/lib/ubicacion-mapa";
 import { calcularDescuento, textoPorcentaje } from "@/lib/descuento-venta";
 import { resolverDescuentoConTipos } from "@/lib/tipos-descuento";
 import { cargarTiposDescuento } from "@/lib/tipos-descuento-servidor";
+import { exigirAutorizacion } from "@/lib/seguridad-servidor";
 import { claveDiaAsuncion } from "@/lib/timezone";
 import { formatearCantidad, formatearGuarani, formatearNumero } from "@/lib/format";
 import { repartirConsumo } from "@/lib/division-cuenta";
@@ -56,7 +57,8 @@ import { turnoAbierto } from "../pos/turno-actual";
  * de una acción del servidor).
  */
 
-type Resultado = { ok: true } | { ok: false; error: string };
+/** `requiereClave`: la acción está protegida (Ajustes → Seguridad) y falta la contraseña de un usuario autorizado, o no es correcta. */
+type Resultado = { ok: true } | { ok: false; error: string; requiereClave?: true };
 
 /** Desde Vercel hasta la base cada consulta tarda: las transacciones largas necesitan más que los 5 s de fábrica. */
 const OPCIONES_TX = { timeout: 15_000, maxWait: 10_000 } as const;
@@ -707,7 +709,8 @@ async function recortarCortesias(
 export async function anularProductosDelivery(
   cuentaId: string,
   partes: { itemId: string; cantidad?: number }[],
-  motivo: string
+  motivo: string,
+  autorizacion?: string
 ): Promise<Resultado> {
   const sesion = await exigirPermiso("delivery.gestionar");
   const storeId = await idLocalActual();
@@ -729,6 +732,10 @@ export async function anularProductosDelivery(
       return { ok: false, error: "La cantidad a cancelar tiene que ser mayor a cero." };
     }
   }
+
+  // Seguridad (Ajustes): si cancelar productos pide contraseña, se exige acá, antes de tocar nada.
+  const clave = await exigirAutorizacion(storeId, sesion, "cancelar_productos", autorizacion);
+  if (!clave.ok) return clave;
 
   let resumen = "";
   let canceladas = 0;
@@ -795,12 +802,16 @@ export async function anularProductosDelivery(
  * justo la forma de que una cuenta desaparezca sin dejar plata en la caja. Se cobra, y si hace falta se cancela la venta desde el
  * Historial de cuentas (que devuelve el stock y deja el rastro). Los productos se cancelan de a uno (con motivo).
  */
-export async function cancelarCuentaDelivery(cuentaId: string, motivo: string): Promise<Resultado> {
+export async function cancelarCuentaDelivery(cuentaId: string, motivo: string, autorizacion?: string): Promise<Resultado> {
   const sesion = await exigirPermiso("delivery.gestionar");
   const storeId = await idLocalActual();
   const razon = limpiarMotivo(motivo);
   if (!razon) return { ok: false, error: MENSAJE_MOTIVO };
   const quien = nombreDe(sesion);
+
+  // Seguridad (Ajustes): si las cancelaciones piden contraseña, se exige acá, antes de tocar nada.
+  const clave = await exigirAutorizacion(storeId, sesion, "cancelaciones", autorizacion);
+  if (!clave.ok) return clave;
 
   let resumen = "";
   try {
@@ -872,7 +883,8 @@ export type DatosDescuentoDelivery = { tipo: "porcentaje" | "monto"; valor: numb
 export async function aplicarDescuentoDelivery(
   cuentaId: string,
   descuento: DatosDescuentoDelivery | null,
-  motivo: string
+  motivo: string,
+  autorizacion?: string
 ): Promise<Resultado> {
   const sesion = await exigirPermiso("delivery.gestionar");
   const storeId = await idLocalActual();
@@ -893,6 +905,12 @@ export async function aplicarDescuentoDelivery(
     );
     if (!resuelto.ok) return { ok: false, error: resuelto.error };
     efectivo = resuelto.descuento ? { tipo: resuelto.descuento.tipo, valor: resuelto.descuento.valor } : null;
+  }
+
+  // Seguridad (Ajustes): dar o cambiar un descuento pide contraseña si el local lo protegió (quitarlo no). Se exige antes de tocar nada.
+  if (efectivo) {
+    const clave = await exigirAutorizacion(storeId, sesion, "descuentos", autorizacion);
+    if (!clave.ok) return clave;
   }
 
   let descripcion = "";
@@ -1014,9 +1032,13 @@ export async function imprimirCuentaDelivery(cuentaId: string): Promise<Resultad
 }
 
 /** Vuelve a abrir una cuenta que ya se había impreso, para poder cargarle más productos o corregir sus datos. */
-export async function reabrirCuentaDelivery(cuentaId: string): Promise<Resultado> {
+export async function reabrirCuentaDelivery(cuentaId: string, autorizacion?: string): Promise<Resultado> {
   const sesion = await exigirPermiso("delivery.gestionar");
   const storeId = await idLocalActual();
+
+  // Seguridad (Ajustes): si reabrir cuentas pide contraseña, se exige acá, antes de tocar nada.
+  const clave = await exigirAutorizacion(storeId, sesion, "reabrir_cuentas", autorizacion);
+  if (!clave.ok) return clave;
 
   const cuenta = await prisma.cuentaDelivery.findFirst({
     where: { id: String(cuentaId), storeId },
