@@ -37,6 +37,34 @@ export function UrlPublicaField({ slug }: { slug: string }) {
   const propuesto = normalizarSlug(texto);
   const cambia = propuesto !== slug && propuesto.length >= 2;
 
+  // "Copiar dirección": copia la dirección completa (con https://) para pegarla en WhatsApp, un cartel o donde haga falta.
+  const [copiado, setCopiado] = useState<"copiado" | "fallo" | null>(null);
+  async function copiar() {
+    const direccion = `${window.location.origin}/${slug}`;
+    let listo = false;
+    try {
+      await navigator.clipboard.writeText(direccion);
+      listo = true;
+    } catch {
+      // Sin permiso del portapapeles (por ejemplo, una página sin https): se prueba con el método viejo.
+      try {
+        const auxiliar = document.createElement("textarea");
+        auxiliar.value = direccion;
+        auxiliar.setAttribute("readonly", "");
+        auxiliar.style.position = "fixed";
+        auxiliar.style.opacity = "0";
+        document.body.appendChild(auxiliar);
+        auxiliar.select();
+        listo = document.execCommand("copy");
+        document.body.removeChild(auxiliar);
+      } catch {
+        listo = false;
+      }
+    }
+    setCopiado(listo ? "copiado" : "fallo");
+    if (listo) setTimeout(() => setCopiado(null), 2500);
+  }
+
   async function guardar() {
     setGuardando(true);
     setError(null);
@@ -53,7 +81,7 @@ export function UrlPublicaField({ slug }: { slug: string }) {
   }
 
   return (
-    <div className="rounded-xl border border-linea bg-white p-4">
+    <div className="rounded-xl border border-azul/40 bg-white p-4">
       <p className="text-sm font-medium text-tinta-media">Dirección de la carta</p>
 
       <p className="mt-1 break-all font-mono text-[0.95rem] text-tinta">
@@ -61,16 +89,31 @@ export function UrlPublicaField({ slug }: { slug: string }) {
       </p>
 
       {!abierto ? (
-        <div className="mt-3">
-          <Boton tono="navegar" tam="sm" onClick={() => setAbierto(true)}>
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          {/* type="button": esto vive dentro del formulario de Datos del negocio y sin eso cada botón lo enviaría. */}
+          <Boton type="button" tono="navegar" tam="sm" onClick={copiar}>
+            {copiado === "copiado" ? "¡Dirección copiada!" : "Copiar dirección"}
+          </Boton>
+          <Boton type="button" tono="navegar" tam="sm" onClick={() => setAbierto(true)}>
             Cambiar dirección
           </Boton>
+          {copiado === "fallo" && (
+            <span role="alert" className="text-[0.8rem] font-medium text-peligro">
+              No se pudo copiar solo: seleccioná la dirección de arriba y copiala.
+            </span>
+          )}
         </div>
       ) : (
         <div className="mt-3">
           <input
             value={texto}
             onChange={(e) => setTexto(e.target.value)}
+            onKeyDown={(e) => {
+              // Enter acá no debe enviar todo el formulario de Datos del negocio: guarda solo la dirección.
+              if (e.key !== "Enter") return;
+              e.preventDefault();
+              if (cambia && !guardando) void guardar();
+            }}
             autoFocus
             aria-label="Nueva dirección de la carta"
             className="w-full rounded-lg border border-linea px-3 py-2"
@@ -99,10 +142,11 @@ export function UrlPublicaField({ slug }: { slug: string }) {
           )}
 
           <div className="mt-3 flex gap-2">
-            <Boton tono="navegar" onClick={guardar} disabled={!cambia || guardando} tam="sm">
+            <Boton type="button" tono="navegar" onClick={guardar} disabled={!cambia || guardando} tam="sm">
               {guardando ? "Guardando…" : "Guardar dirección"}
             </Boton>
             <Boton
+              type="button"
               tono="fantasma"
               tam="sm"
               onClick={() => {

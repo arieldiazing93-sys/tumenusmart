@@ -90,7 +90,7 @@ export function PausaPedidosToggle({
   return (
     <div
       className={`rounded-lg border p-4 ${
-        activo ? "border-aviso/30 bg-aviso-luz" : "border-linea bg-white"
+        activo ? "border-aviso/30 bg-aviso-luz" : "border-azul/40 bg-white"
       }`}
     >
       <div className="flex flex-wrap items-center justify-between gap-3">

@@ -49,7 +49,7 @@ export default async function AdminConfiguracionPage() {
         <GuardadoToast />
       </Suspense>
 
-      <Tarjeta>
+      <Tarjeta className="!border-2 !border-azul/50">
         <h2 className="mb-4 text-[1.15rem] font-semibold tracking-titular text-tinta">Datos del negocio</h2>
 
         <form action={actualizarStore} className="flex flex-col gap-3">
@@ -203,7 +203,7 @@ export default async function AdminConfiguracionPage() {
         </form>
       </Tarjeta>
 
-      <Tarjeta>
+      <Tarjeta className="!border-2 !border-azul/50">
         <h2 className="mb-4 text-[1.15rem] font-semibold tracking-titular text-tinta">Disponibilidad</h2>
         <div className="flex flex-col gap-4">
           <PausaPedidosToggle
@@ -211,7 +211,7 @@ export default async function AdminConfiguracionPage() {
             mensaje={store?.mensajePausa ?? null}
           />
 
-          <div className="rounded-lg border border-linea bg-white p-4">
+          <div className="rounded-lg border border-azul/40 bg-white p-4">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
               <p className="text-[0.95rem] font-semibold tracking-titular text-tinta">Horario de atención</p>
               <Link
@@ -264,7 +264,7 @@ export default async function AdminConfiguracionPage() {
         </div>
       </Tarjeta>
 
-      <Tarjeta>
+      <Tarjeta className="!border-2 !border-azul/50">
         <h2 className="mb-1 text-[1.15rem] font-semibold tracking-titular text-tinta">
           Formas de pago y de entrega
         </h2>
@@ -339,7 +339,7 @@ export default async function AdminConfiguracionPage() {
         </form>
       </Tarjeta>
 
-      <Tarjeta>
+      <Tarjeta className="!border-2 !border-azul/50">
         <h2 className="mb-1 text-[1.15rem] font-semibold tracking-titular text-tinta">
           Reservas de mesa
         </h2>
@@ -362,7 +362,7 @@ export default async function AdminConfiguracionPage() {
         </form>
       </Tarjeta>
 
-      <Tarjeta>
+      <Tarjeta className="!border-2 !border-azul/50">
         <h2 className="mb-1 text-[1.15rem] font-semibold tracking-titular text-tinta">
           Ventas a crédito
         </h2>
@@ -382,7 +382,7 @@ export default async function AdminConfiguracionPage() {
         </form>
       </Tarjeta>
 
-      <Tarjeta>
+      <Tarjeta className="!border-2 !border-azul/50">
         <h2 className="mb-1 text-[1.15rem] font-semibold tracking-titular text-tinta">Fidelización</h2>
         <p className="mb-4 text-sm text-tinta-media">
           Cada N pedidos entregados de un mismo cliente le dan derecho a un premio.
@@ -450,7 +450,7 @@ export default async function AdminConfiguracionPage() {
         </form>
       </Tarjeta>
 
-      <Tarjeta>
+      <Tarjeta className="!border-2 !border-azul/50">
         <h2 className="mb-1 text-[1.15rem] font-semibold tracking-titular text-tinta">Zonas de envío</h2>
         <p className="mb-4 text-sm text-tinta-media">
           Solo aplican si más abajo, en "Envío y ubicación", elegiste "Por zonas con precio
@@ -476,7 +476,7 @@ export default async function AdminConfiguracionPage() {
         </div>
       </Tarjeta>
 
-      <Tarjeta>
+      <Tarjeta className="!border-2 !border-azul/50">
         <h2 className="mb-4 text-[1.15rem] font-semibold tracking-titular text-tinta">
           Envío y ubicación
         </h2>
