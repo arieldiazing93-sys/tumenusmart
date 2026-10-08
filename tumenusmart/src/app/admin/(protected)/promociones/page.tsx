@@ -3,7 +3,8 @@ import { puede } from "@/lib/permisos";
 import { prismaDelLocal } from "@/lib/prisma-local";
 import { idLocalActual } from "@/lib/local-actual";
 import { cargarPromociones } from "@/lib/promociones-servidor";
-import { Cabecera } from "@/components/ui";
+import Link from "next/link";
+import { Cabecera, clasesBoton } from "@/components/ui";
 import { PromocionesMaestroDetalle } from "./PromocionesMaestroDetalle";
 
 export const dynamic = "force-dynamic";
@@ -17,6 +18,7 @@ export default async function PromocionesPage() {
   // El empleado ve qué promociones hay, pero no las toca.
   const sesion = await pantallaConPermiso("productos.ver");
   const puedeEditar = puede(sesion.rol, "productos.editar");
+  const puedeVerReporte = puede(sesion.rol, "estadisticas.ver");
 
   // Todas las consultas de acá abajo quedan atadas a este local.
   const db = prismaDelLocal(await idLocalActual());
@@ -42,6 +44,14 @@ export default async function PromocionesPage() {
       <Cabecera
         titulo="Promociones"
         bajada="Descuentos y promociones por volumen (“2 por 1”) que rigen en los días y horas que elijas, para los productos que elijas. Se aplican solas en el mostrador, el comedor, el delivery y la tablet del mozo."
+        acciones={
+          // Cuánto se descontó y se regaló con cada una: solo para quien puede ver las estadísticas.
+          puedeVerReporte ? (
+            <Link href="/admin/reporte-promociones" className={clasesBoton("navegar", "sm")}>
+              Ver reporte
+            </Link>
+          ) : undefined
+        }
       />
 
       <PromocionesMaestroDetalle

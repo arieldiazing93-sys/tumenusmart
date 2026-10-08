@@ -16,6 +16,18 @@ export type FilaDeDia = {
 
 const DIAS_CORTOS = ["D", "L", "M", "X", "J", "V", "S"];
 
+// La hoja de días en una línea por día (pantallas anchas): el nombre, el inicio, el día del fin (el que sobra se estira) y la hora del fin.
+const COLUMNAS = "sm:grid-cols-[9.25rem_7.25rem_minmax(0,1fr)_7.25rem]";
+const TITULO_COLUMNA = "text-[0.68rem] font-semibold uppercase tracking-rotulo text-tinta-suave";
+// En el celular cada campo lleva su título chiquito arriba; en pantallas anchas lo reemplaza el de la fila de arriba (queda para lectores de pantalla).
+const TITULO_EN_CELULAR = "mb-0.5 block text-[0.68rem] font-semibold text-tinta-suave sm:sr-only";
+// Campos más bajos que los normales (el "!" gana sobre el relleno de siempre).
+const CAMPO_COMPACTO = "!px-2 !py-1 !text-[0.84rem]";
+// Las horas, en el celular: menos relleno y sin el ícono del reloj (que se toca igual en el campo), para que entre "18:00:00" completo.
+const CAMPO_HORA = `${CAMPO_COMPACTO} max-sm:!px-1.5 max-sm:[&::-webkit-calendar-picker-indicator]:hidden`;
+// En el celular, tres columnas por día: la del medio (el día del fin) un poco más ancha.
+const COLUMNAS_CELULAR = "grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)_minmax(0,1fr)]";
+
 export function filaVacia(dia: number): FilaDeDia {
   return { dia, aplica: false, horaInicio: "00:00:00", diaFin: dia, horaFin: "23:59:59" };
 }
@@ -131,12 +143,22 @@ export function FranjasPromocion({ filas, onChange }: { filas: FilaDeDia[]; onCh
             </button>
           )}
         </div>
+        {/* Los títulos de las columnas, una sola vez arriba (en el celular cada campo lleva el suyo chiquito). */}
+        <div aria-hidden="true" className={`hidden gap-2 border border-transparent px-2.5 sm:grid ${COLUMNAS}`}>
+          <span />
+          <span className={TITULO_COLUMNA}>Inicio</span>
+          <span className={TITULO_COLUMNA}>Fin (día)</span>
+          <span className={TITULO_COLUMNA}>Fin (hora)</span>
+        </div>
         {filas.map((f) => (
+          // Una sola línea por día en pantallas anchas; en el celular, el nombre del día arriba y los tres campos abajo.
           <div
             key={f.dia}
-            className={`campos-grises rounded-lg border p-3 transition-colors ${f.aplica ? "border-azul/40 bg-white" : "border-linea bg-papel-suave"}`}
+            className={`campos-grises grid ${COLUMNAS_CELULAR} items-end gap-x-2 gap-y-1 rounded-lg border px-2.5 py-1.5 transition-colors sm:items-center ${COLUMNAS} ${
+              f.aplica ? "border-azul/40 bg-white" : "border-linea bg-papel-suave"
+            }`}
           >
-            <label className="flex cursor-pointer items-center gap-2 text-[0.9rem] font-semibold text-tinta">
+            <label className="col-span-3 flex cursor-pointer items-center gap-2 text-[0.88rem] font-semibold text-tinta sm:col-span-1">
               <input
                 type="checkbox"
                 checked={f.aplica}
@@ -145,36 +167,44 @@ export function FranjasPromocion({ filas, onChange }: { filas: FilaDeDia[]; onCh
               />
               Aplica {NOMBRES_DIA[f.dia]}
             </label>
-            <div className={`mt-2 grid grid-cols-2 gap-3 sm:grid-cols-3 ${f.aplica ? "" : "pointer-events-none opacity-50"}`}>
-              <Campo etiqueta="Inicio">
-                <Entrada
-                  type="time"
-                  step={1}
-                  value={f.horaInicio}
-                  disabled={!f.aplica}
-                  onChange={(e) => cambiar(f.dia, { horaInicio: e.target.value })}
-                />
-              </Campo>
-              <Campo etiqueta="Fin (día)">
-                <Selector value={f.diaFin} disabled={!f.aplica} onChange={(e) => cambiar(f.dia, { diaFin: Number(e.target.value) })}>
-                  {DIAS_ORDENADOS.map((d) => (
-                    <option key={d} value={d}>
-                      {NOMBRES_DIA[d]}
-                      {d === f.dia ? "" : d === (f.dia + 1) % 7 ? " (día siguiente)" : ""}
-                    </option>
-                  ))}
-                </Selector>
-              </Campo>
-              <Campo etiqueta="Fin (hora)">
-                <Entrada
-                  type="time"
-                  step={1}
-                  value={f.horaFin}
-                  disabled={!f.aplica}
-                  onChange={(e) => cambiar(f.dia, { horaFin: e.target.value })}
-                />
-              </Campo>
-            </div>
+            <label className={`block min-w-0 ${f.aplica ? "" : "opacity-50"}`}>
+              <span className={TITULO_EN_CELULAR}>Inicio</span>
+              <Entrada
+                type="time"
+                step={1}
+                value={f.horaInicio}
+                disabled={!f.aplica}
+                onChange={(e) => cambiar(f.dia, { horaInicio: e.target.value })}
+                className={CAMPO_HORA}
+              />
+            </label>
+            <label className={`block min-w-0 ${f.aplica ? "" : "opacity-50"}`}>
+              <span className={TITULO_EN_CELULAR}>Fin (día)</span>
+              <Selector
+                value={f.diaFin}
+                disabled={!f.aplica}
+                onChange={(e) => cambiar(f.dia, { diaFin: Number(e.target.value) })}
+                className={CAMPO_COMPACTO}
+              >
+                {DIAS_ORDENADOS.map((d) => (
+                  <option key={d} value={d}>
+                    {NOMBRES_DIA[d]}
+                    {d === f.dia ? "" : d === (f.dia + 1) % 7 ? " (día siguiente)" : ""}
+                  </option>
+                ))}
+              </Selector>
+            </label>
+            <label className={`block min-w-0 ${f.aplica ? "" : "opacity-50"}`}>
+              <span className={TITULO_EN_CELULAR}>Fin (hora)</span>
+              <Entrada
+                type="time"
+                step={1}
+                value={f.horaFin}
+                disabled={!f.aplica}
+                onChange={(e) => cambiar(f.dia, { horaFin: e.target.value })}
+                className={CAMPO_HORA}
+              />
+            </label>
           </div>
         ))}
       </div>

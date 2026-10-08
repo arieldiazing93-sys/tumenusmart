@@ -185,6 +185,9 @@ function armarGrupos(hayIdeaSinVer: boolean, rol: string, ventasACredito: boolea
         // Cuánto se descontó y cuánto se regaló con cada promoción (Mi carta → Promociones), por canal y por producto.
         { href: "/admin/reporte-promociones", label: "Promociones", icono: "estadisticas" as const,
           ver: conPermiso("estadisticas.ver") },
+        // Cuentas canceladas, productos cancelados y descuentos, con quién autorizó cada uno: el control del dueño sobre la caja.
+        { href: "/admin/reporte-cancelaciones", label: "Cancelaciones y descuentos", icono: "cierre" as const,
+          ver: conPermiso("estadisticas.ver") },
         // Lo que vendió cada mozo del Servicio comedor, con descuentos y cancelaciones: el control del dueño sobre el salón.
         { href: "/admin/reporte-mozos", label: "Mozos", icono: "usuarios" as const,
           ver: conPermiso("estadisticas.ver") },

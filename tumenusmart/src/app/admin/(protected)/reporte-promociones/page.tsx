@@ -1,5 +1,5 @@
 import { pantallaConPermiso } from "@/lib/auth";
-import { Cabecera, Cifra, Tabla, Td, Th, Tr, Vacio } from "@/components/ui";
+import { Cabecera, Cifra, Tabla, Td, Th, Tr, Vacio, clasesBoton } from "@/components/ui";
 import { idLocalActual } from "@/lib/local-actual";
 import { formatearCantidad, formatearGuarani } from "@/lib/format";
 import { calcularRangoFecha, type FiltroFecha } from "@/lib/rango-fecha";
@@ -39,11 +39,24 @@ export default async function ReportePromocionesPage({
   const t = reporte.totales;
   const productos = reporte.productos.slice(0, MAXIMO_PRODUCTOS_EN_PANTALLA);
 
+  function querystringActual() {
+    const params = new URLSearchParams();
+    params.set("fecha", fechaActiva);
+    if (fechaActiva === "rango" && desde) params.set("desde", desde);
+    if (fechaActiva === "rango" && hasta) params.set("hasta", hasta);
+    return params.toString();
+  }
+
   return (
     <div className="flex flex-col gap-4">
       <Cabecera
         titulo="Reporte de promociones"
         bajada="Cuánto se descontó y cuánto se regaló con cada promoción, en el mostrador, el comedor y el delivery."
+        acciones={
+          <a href={`/admin/reporte-promociones/exportar?${querystringActual()}`} className={clasesBoton("principal", "sm")}>
+            Descargar Excel
+          </a>
+        }
       />
 
       {/* El filtro de fechas: se adapta al celular (atajos que se deslizan, rango en dos campos lado a lado). */}
@@ -112,7 +125,7 @@ export default async function ReportePromocionesPage({
             <tfoot>
               <tr className="bg-papel-suave">
                 <Td className="font-semibold text-tinta">Total</Td>
-                <Td />
+                <Td>{null}</Td>
                 <Td className="cifra text-right font-semibold text-tinta">{t.ventas}</Td>
                 <Td className="cifra text-right font-semibold text-tinta">{formatearCantidad(t.unidades)}</Td>
                 <Td className="cifra text-right font-semibold text-tinta">{formatearCantidad(t.regaladas)}</Td>
@@ -187,8 +200,8 @@ export default async function ReportePromocionesPage({
           <p className="text-[0.78rem] leading-snug text-tinta-suave">
             Cuenta las ventas cobradas del período (las anuladas no) por el día en que se cobraron. “Vendido” es lo cobrado de las líneas con
             promoción, antes del descuento general de la cuenta. “Descontado” es lo que se rebajó con las promociones por descuento y
-            “Regalado”, lo que valían a precio de lista las unidades de cortesía. * El costo es parcial: a algún producto regalado le falta
-            el costo en su receta.
+            “Regalado”, lo que valían a precio de lista las unidades de cortesía.
+            {t.costoIncompleto && " * El costo es parcial: a algún producto regalado le falta el costo en su receta."}
             {reporte.lineasSinPrecioAnterior > 0 &&
               ` Hay ${reporte.lineasSinPrecioAnterior} ${reporte.lineasSinPrecioAnterior === 1 ? "línea" : "líneas"} sin el precio de antes (cargadas antes de este reporte): su ahorro no se cuenta.`}
           </p>
