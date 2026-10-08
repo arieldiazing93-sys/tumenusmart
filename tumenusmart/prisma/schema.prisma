@@ -207,6 +207,7 @@ model Store {
   horariosCategoria CategoriaHorario[]
   preciosPromocion  PrecioPromocion[]
   promociones      Promocion[]
+  tiposDescuento   TipoDescuento[]
   promocionesDias  PromocionDia[]
   promocionesProductos PromocionProducto[]
   usuarios         Usuario[]
@@ -589,6 +590,23 @@ model PromocionDia {
   horaFin     String
 
   @@unique([promocionId, diaInicio])
+  @@index([storeId])
+}
+
+/// Un TIPO DE DESCUENTO que crea el dueño en Ajustes: un nombre y un porcentaje fijo ("Cortesía" 100 %, "Tarjeta" 20 %). Al descontar una cuenta
+/// por porcentaje se elige uno. El 100 % (cortesía: la cuenta queda en cero) solo sale de uno de estos tipos. Ver src/lib/tipos-descuento.ts.
+model TipoDescuento {
+  id         String   @id @default(cuid())
+  storeId    String
+  store      Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  nombre     String
+  /// Mayor a 0 y hasta 100.
+  porcentaje Decimal  @db.Decimal(5, 2)
+  activo     Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([storeId, nombre])
   @@index([storeId])
 }
 
@@ -1393,6 +1411,9 @@ model VentaPos {
   /// Solo si el descuento se cargó como porcentaje (ej. 10): para imprimir
   /// "DESCUENTO 10%". Null si fue un monto fijo o no hubo descuento.
   descuentoPorcentaje Decimal? @db.Decimal(5, 2)
+  /// El tipo de descuento de Ajustes que se eligió ("Cortesía", "Tarjeta"…), solo en el mostrador (en las cuentas del comedor y el delivery el
+  /// concepto es el motivo de la cuenta). Texto y no una relación: si después se borra el tipo, lo vendido queda igual.
+  descuentoConcepto String?
   registradoPor String
   creadoEn      DateTime @default(now())
   items         VentaPosItem[]

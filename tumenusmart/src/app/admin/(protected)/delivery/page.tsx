@@ -6,6 +6,7 @@ import { prismaDelLocal } from "@/lib/prisma-local";
 import { estacionActual } from "@/lib/estacion-actual";
 import { diasParaVencer } from "@/lib/factura-pos";
 import { cargarCatalogoDeVenta } from "@/lib/catalogo-venta";
+import { cargarTiposDescuento } from "@/lib/tipos-descuento-servidor";
 import { formatearGuarani } from "@/lib/format";
 import { SIN_REGISTRO_FISCAL } from "@/lib/tipo-cliente";
 import { SEGUNDOS_LATIDO_IMPRESION, descuentoDeCuenta, impuestosDeCuenta, lineasDeCobro } from "@/lib/comedor";
@@ -149,6 +150,7 @@ export default async function DeliveryPage() {
     categorias: [],
     gruposMitad: [],
     promociones: [],
+    tiposDescuento: [],
     zonas: [],
     repartidores: [],
     imprimirCuenta: { ok: false, motivo: "" },
@@ -172,6 +174,7 @@ export default async function DeliveryPage() {
       categorias: catalogo.categorias,
       gruposMitad: catalogo.gruposMitad,
       promociones: catalogo.promociones,
+      tiposDescuento: await cargarTiposDescuento(db),
       zonas: zonas.map((z) => ({ id: z.id, nombre: z.nombre, costoEnvio: Number(z.costoEnvio) })),
       repartidores,
     };

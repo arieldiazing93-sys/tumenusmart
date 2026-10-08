@@ -25,6 +25,7 @@ export const MODELOS_POR_LOCAL = new Set([
   "Promocion",
   "PromocionDia",
   "PromocionProducto",
+  "TipoDescuento",
   "FacturaReemplazada",
   "IdeaSemanal",
   "Pago",

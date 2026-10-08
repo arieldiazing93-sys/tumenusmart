@@ -7,6 +7,7 @@ import { Boton, Cabecera, Campo, Entrada, Tarjeta, clasesBoton } from "@/compone
 import { Segmentado } from "@/components/Segmentado";
 import { formatearGuarani } from "@/lib/format";
 import { calcularDescuento, textoPorcentaje } from "@/lib/descuento-venta";
+import { resolverDescuentoConTipos, type TipoDescuentoDef } from "@/lib/tipos-descuento";
 import { FORMA_PAGO_A_CREDITO } from "@/lib/turno-pos";
 import { rutaParaAbrirTurno } from "@/lib/turno-requerido";
 import type { PagoCobro } from "@/lib/pago-venta";
@@ -82,6 +83,7 @@ export function PantallaVenta({
   categorias: categoriasBase,
   gruposMitad: gruposBase,
   promociones: promocionesBase,
+  tiposDescuento = [],
   puedeFacturar,
   diasParaVencerTimbrado,
   facturaObligatoria,
@@ -97,6 +99,8 @@ export function PantallaVenta({
   gruposMitad: GrupoMitad[];
   /** Las promociones activas (por descuento y por volumen): se aplican según el día y la hora, igual que las aplica el servidor al cobrar. */
   promociones: PromoDef[];
+  /** Los tipos de descuento de Ajustes (Cortesía 100 %, Tarjeta 20 %…): al descontar por porcentaje se elige uno. */
+  tiposDescuento: TipoDescuentoDef[];
   /** Si la estación de este turno tiene un punto de expedición vigente. */
   puedeFacturar: boolean;
   /** Días hasta que venza el timbrado de esa estación, o null si no aplica. */
@@ -171,6 +175,9 @@ export function PantallaVenta({
   const [conDescuento, setConDescuento] = useState<"no" | "si">("no");
   const [tipoDescuento, setTipoDescuento] = useState<"porcentaje" | "monto">("porcentaje");
   const [valorDescuento, setValorDescuento] = useState("");
+  // El tipo de descuento de Ajustes elegido de la lista (Cortesía, Tarjeta…); null = un porcentaje escrito a mano.
+  const [tipoDescuentoId, setTipoDescuentoId] = useState<string | null>(null);
+  const tipoElegido = tipoDescuentoId ? (tiposDescuento.find((t) => t.id === tipoDescuentoId) ?? null) : null;
 
   // Suma, no pisa: un mismo producto puede estar en el carrito varias veces
   // con distintos agregados (líneas distintas), y el número sobre la
@@ -221,9 +228,17 @@ export function PantallaVenta({
   // ve acá es el que se cobra.
   const descuentoPedido =
     conDescuento === "si" && valorDescuento.trim() !== ""
-      ? { tipo: tipoDescuento, valor: Number(valorDescuento.replace(",", ".")) }
+      ? {
+          tipo: tipoDescuento,
+          valor: Number(valorDescuento.replace(",", ".")),
+          ...(tipoDescuentoId ? { tipoDescuentoId } : {}),
+        }
       : undefined;
-  const descuento = calcularDescuento(subtotal, descuentoPedido);
+  // Con un tipo de descuento elegido vale su porcentaje; el 100 % (cuenta en cero) solo sale de un tipo: la misma regla que aplica el servidor.
+  const descuentoResuelto = resolverDescuentoConTipos(descuentoPedido, tiposDescuento);
+  const descuento = descuentoResuelto.ok
+    ? calcularDescuento(subtotal, descuentoResuelto.descuento)
+    : ({ ok: false, error: descuentoResuelto.error } as const);
   const descuentoInvalido = !descuento.ok;
   const descuentoMonto = descuento.ok ? descuento.monto : 0;
   const total = subtotal - descuentoMonto;
@@ -321,6 +336,7 @@ export function PantallaVenta({
     setCarrito([]);
     setConDescuento("no");
     setValorDescuento("");
+    setTipoDescuentoId(null);
     setError(null);
   }
 
@@ -897,6 +913,8 @@ export function PantallaVenta({
                       onChange={(v) => {
                         setTipoDescuento(v);
                         setValorDescuento("");
+                        // Un tipo de descuento es siempre un porcentaje: al pasar a monto se suelta.
+                        setTipoDescuentoId(null);
                       }}
                       className="w-32 flex-none"
                     />
@@ -908,16 +926,57 @@ export function PantallaVenta({
                       placeholder={tipoDescuento === "porcentaje" ? "Ej: 10" : "Ej: 5000"}
                       aria-label={tipoDescuento === "porcentaje" ? "Porcentaje de descuento" : "Monto del descuento en guaraníes"}
                       value={valorDescuento}
+                      readOnly={!!tipoElegido}
                       onChange={(e) => setValorDescuento(e.target.value)}
                       invalido={descuentoInvalido}
                     />
                   </div>
+                  {/* Los tipos de descuento de Ajustes: al elegir uno, el porcentaje sale de él ("Otro porcentaje" es escribirlo a mano). */}
+                  {tipoDescuento === "porcentaje" && tiposDescuento.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5">
+                      {tiposDescuento.map((t) => (
+                        <button
+                          key={t.id}
+                          type="button"
+                          aria-pressed={tipoDescuentoId === t.id}
+                          onClick={() => {
+                            setTipoDescuentoId(t.id);
+                            setValorDescuento(String(t.porcentaje));
+                          }}
+                          className={`rounded-lg border px-2.5 py-1.5 text-[0.8rem] font-medium transition-colors ${
+                            tipoDescuentoId === t.id
+                              ? "border-azul bg-azul-luz text-azul-oscuro"
+                              : "border-linea text-tinta-media hover:border-azul/40"
+                          }`}
+                        >
+                          {t.nombre} · {textoPorcentaje(t.porcentaje)} %
+                        </button>
+                      ))}
+                      <button
+                        type="button"
+                        aria-pressed={tipoDescuentoId === null}
+                        onClick={() => {
+                          setTipoDescuentoId(null);
+                          setValorDescuento("");
+                        }}
+                        className={`rounded-lg border px-2.5 py-1.5 text-[0.8rem] font-medium transition-colors ${
+                          tipoDescuentoId === null
+                            ? "border-azul bg-azul-luz text-azul-oscuro"
+                            : "border-linea text-tinta-media hover:border-azul/40"
+                        }`}
+                      >
+                        Otro porcentaje
+                      </button>
+                    </div>
+                  )}
                   {!descuento.ok ? (
                     <p className="text-[0.76rem] font-medium text-peligro">{descuento.error}</p>
                   ) : descuentoMonto > 0 ? (
                     <p className="text-[0.76rem] font-medium text-exito">
                       Se descuenta {formatearGuarani(descuentoMonto)}
                       {descuento.porcentaje != null && ` (${textoPorcentaje(descuento.porcentaje)} %)`} de toda la cuenta.
+                      {tipoElegido && ` Tipo: ${tipoElegido.nombre}.`}
+                      {total <= 0 && " La cuenta queda en cero (cortesía): se vende igual y baja el stock."}
                     </p>
                   ) : (
                     <p className="text-[0.74rem] text-tinta-suave">

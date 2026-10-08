@@ -9,6 +9,7 @@ import { estacionActual } from "@/lib/estacion-actual";
 import { nombreCompleto } from "@/lib/agenda-personal";
 import { diasParaVencer } from "@/lib/factura-pos";
 import { cargarCatalogoDeVenta } from "@/lib/catalogo-venta";
+import { cargarTiposDescuento } from "@/lib/tipos-descuento-servidor";
 import { turnoAbierto } from "./turno-actual";
 import { PantallaVenta } from "./PantallaVenta";
 import { EstacionNoVinculada } from "./EstacionNoVinculada";
@@ -83,6 +84,8 @@ export default async function PosPage() {
   // La carta lista para vender, con los precios normales y las promociones de cada producto y agregado (mismo armado que usan el
   // comedor, el delivery y el mozo — ver catalogo-venta.ts). La pantalla resuelve sola qué precio vale en cada momento.
   const { categorias: categoriasVenta, gruposMitad, promociones } = await cargarCatalogoDeVenta(db);
+  // Los tipos de descuento de Ajustes (Cortesía, Tarjeta…) que se pueden elegir al descontar por porcentaje.
+  const tiposDescuento = await cargarTiposDescuento(db);
 
   return (
     <PantallaVenta
@@ -90,6 +93,7 @@ export default async function PosPage() {
       categorias={categoriasVenta}
       gruposMitad={gruposMitad}
       promociones={promociones}
+      tiposDescuento={tiposDescuento}
       puedeFacturar={puedeFacturar}
       diasParaVencerTimbrado={diasParaVencerTimbrado}
       facturaObligatoria={store?.facturaObligatoria ?? false}

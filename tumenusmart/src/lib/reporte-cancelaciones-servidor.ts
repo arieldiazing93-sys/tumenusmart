@@ -13,8 +13,8 @@ import type { FilaRegistro, TipoRegistro } from "./reporte-cancelaciones";
  *    productos ya cancelados, así que lo cancelado es lo que se había cargado) y las ventas ya cobradas que después se anularon. Quien
  *    autorizó es quien cerró la cuenta o anuló la venta.
  *  - PRODUCTOS CANCELADOS: los productos de las cuentas del comedor y del delivery que se anularon, por el día en que se anularon.
- *  - DESCUENTOS: las ventas cobradas (no anuladas) con descuento general. Quien lo autorizó es quien lo puso en la cuenta (comedor y
- *    delivery); en el mostrador, el cajero que hizo la venta.
+ *  - DESCUENTOS: las ventas cobradas (no anuladas) con descuento general (incluidas las cortesías: descuento del 100 %, venta en cero).
+ *    Quien lo autorizó es quien lo puso en la cuenta (comedor y delivery); en el mostrador, el cajero que hizo la venta.
  */
 
 const gs = (n: number) => Math.round(n);
@@ -135,7 +135,10 @@ async function productosCancelados(db: PrismaLocal, rango: RangoFecha): Promise<
 async function descuentos(db: PrismaLocal, rango: RangoFecha): Promise<FilaRegistro[]> {
   const ventas = await db.ventaPos.findMany({
     where: { creadoEn: { gte: rango.gte, lt: rango.lt }, cancelada: false, descuento: { gt: 0 } },
-    select: { id: true, numero: true, total: true, descuento: true, descuentoPorcentaje: true, registradoPor: true, tipoEntrega: true, creadoEn: true },
+    select: {
+      id: true, numero: true, total: true, descuento: true, descuentoPorcentaje: true, descuentoConcepto: true,
+      registradoPor: true, tipoEntrega: true, creadoEn: true,
+    },
   });
   const ids = ventas.map((v) => v.id);
   // El motivo y quién puso el descuento están en la cuenta del comedor o del delivery de donde salió la venta (en el mostrador no hay cuenta).
@@ -162,7 +165,8 @@ async function descuentos(db: PrismaLocal, rango: RangoFecha): Promise<FilaRegis
       cantidad: null,
       monto: gs(Number(v.descuento)),
       cobrado: gs(Number(v.total)),
-      motivo: textoOpcional(cuenta?.descuentoMotivo),
+      // En una cuenta del comedor o del delivery, el motivo que dejó quien puso el descuento; en el mostrador, el tipo de descuento elegido.
+      motivo: textoOpcional(cuenta?.descuentoMotivo) ?? textoOpcional(v.descuentoConcepto),
       // Quien puso el descuento en la cuenta; en el mostrador, el cajero que hizo la venta.
       autorizo: textoOpcional(cuenta?.descuentoPor) ?? textoOpcional(v.registradoPor),
       cargo: null,

@@ -8,6 +8,7 @@ import { Segmentado } from "@/components/Segmentado";
 import { formatearCantidad, formatearGuarani, formatearNumero } from "@/lib/format";
 import { agruparPorClave, claveDeLinea, importeDeLinea, repartirEnFilas, textoEstadoCuenta } from "@/lib/comedor";
 import { calcularDescuento, textoPorcentaje } from "@/lib/descuento-venta";
+import type { TipoDescuentoDef } from "@/lib/tipos-descuento";
 import { rutaParaAbrirTurno } from "@/lib/turno-requerido";
 import { anularProductos, aplicarDescuento, cancelarCuenta, imprimirCuenta, reabrirCuenta } from "./actions";
 import type { ContextoCaja, CuentaCajaFila, ItemCuentaFila } from "./ComedorCaja";
@@ -224,7 +225,7 @@ export function DetalleCuenta({
                   type="button"
                   // Se cobra recién después de imprimir la cuenta (queda "por cobrar"). Sin turno de caja abierto no se cobra: el
                   // botón lleva directo a abrirlo y, al abrirlo, se vuelve acá.
-                  disabled={pendiente || !porCobrar || (!contexto.cobro.ok && !contexto.cobro.sinTurno) || !!t.descuentoInvalido || t.total <= 0}
+                  disabled={pendiente || !porCobrar || (!contexto.cobro.ok && !contexto.cobro.sinTurno) || !!t.descuentoInvalido || t.subtotal <= 0}
                   title={!porCobrar ? "Primero imprimí la cuenta" : undefined}
                   onClick={() => (contexto.cobro.ok ? onCobrar() : router.push(rutaParaAbrirTurno("/admin/comedor")))}
                   className={clasesBoton("navegar", "sm")}
@@ -437,6 +438,7 @@ export function DetalleCuenta({
           titulo={`Descuento · mesa ${cuenta.mesa}`}
           descuento={cuenta.descuento}
           subtotal={cuenta.totales.subtotal}
+          tipos={contexto.tiposDescuento}
           onAplicar={(d, motivo) => aplicarDescuento(cuenta.id, d, motivo)}
           onCerrar={() => setDialogo(null)}
           onListo={() => {
@@ -750,6 +752,7 @@ export function DialogoDescuento({
   descuento,
   subtotal,
   envio = 0,
+  tipos = [],
   onAplicar,
   onCerrar,
   onListo,
@@ -761,25 +764,58 @@ export function DialogoDescuento({
   subtotal: number;
   /** El costo de envío de un delivery (0 en una mesa). */
   envio?: number;
-  /** Guarda el descuento (o lo quita con `null`). */
-  onAplicar: (descuento: { tipo: "porcentaje" | "monto"; valor: number } | null, motivo: string) => Promise<{ ok: true } | { ok: false; error: string }>;
+  /** Los tipos de descuento de Ajustes (Cortesía 100 %, Tarjeta 20 %…): al elegir "Porcentaje" se ofrecen para elegir uno. */
+  tipos?: TipoDescuentoDef[];
+  /** Guarda el descuento (o lo quita con `null`). Con un tipo elegido va su `tipoDescuentoId`: el porcentaje sale de él. */
+  onAplicar: (
+    descuento: { tipo: "porcentaje" | "monto"; valor: number; tipoDescuentoId?: string } | null,
+    motivo: string
+  ) => Promise<{ ok: true } | { ok: false; error: string }>;
   onCerrar: () => void;
   onListo: () => void;
 }) {
   const [tipo, setTipo] = useState<"porcentaje" | "monto">(descuento?.tipo ?? "porcentaje");
   const [valorTexto, setValorTexto] = useState(descuento ? String(descuento.valor).replace(".", ",") : "");
   const [motivo, setMotivo] = useState(descuento?.motivo ?? "");
+  // El tipo de descuento elegido de la lista; si la cuenta ya tenía uno del 100 %, ese queda marcado (los demás porcentajes se editan a mano).
+  const [tipoId, setTipoId] = useState<string | null>(() =>
+    descuento && descuento.tipo === "porcentaje" && descuento.valor >= 100 ? (tipos.find((t) => t.porcentaje === descuento.valor)?.id ?? null) : null
+  );
   const [error, setError] = useState<string | null>(null);
   const [pendiente, iniciar] = useTransition();
+  const tipoElegido = tipoId ? (tipos.find((t) => t.id === tipoId) ?? null) : null;
+  const ofreceTipos = tipo === "porcentaje" && tipos.length > 0;
 
   const valor = parseFloat(valorTexto.replace(",", "."));
   const calculado = Number.isFinite(valor) && valor > 0 ? calcularDescuento(subtotal, { tipo, valor }) : null;
   // Un 0 es "sin descuento": reemplaza al que ya tenía la cuenta y la deja en su monto original (para corregir uno mal puesto).
   const esCero = Number.isFinite(valor) && valor === 0;
+  // La cuenta queda en cero (cortesía): descuento del 100 % y, en un delivery, sin costo de envío.
+  const quedaEnCero = !!calculado && calculado.ok && subtotal - calculado.monto + envio <= 0;
+
+  /** Elige un tipo de la lista (o "Otro porcentaje" con null): el porcentaje y el motivo salen del tipo. */
+  function elegirTipo(nuevo: TipoDescuentoDef | null) {
+    // El motivo se completa con el nombre del tipo mientras esté vacío o sea el del tipo anterior; si ya escribieron algo propio, no se pisa.
+    const motivoDelAnterior = tipoElegido?.nombre ?? "";
+    const puedePisarMotivo = motivo.trim() === "" || motivo.trim() === motivoDelAnterior;
+    setError(null);
+    setTipoId(nuevo?.id ?? null);
+    if (nuevo) {
+      setValorTexto(String(nuevo.porcentaje).replace(".", ","));
+      if (puedePisarMotivo) setMotivo(nuevo.nombre);
+    } else {
+      setValorTexto("");
+      if (puedePisarMotivo) setMotivo("");
+    }
+  }
 
   function guardar() {
-    if (esCero) {
+    if (esCero && !tipoId) {
       quitar();
+      return;
+    }
+    if (tipo === "porcentaje" && valor >= 100 && !tipoId) {
+      setError("El 100 % se da eligiendo un tipo de descuento de 100 % (por ejemplo Cortesía). Se crea en Ajustes → Tipos de descuentos.");
       return;
     }
     if (!calculado || !calculado.ok || calculado.monto <= 0) {
@@ -793,7 +829,7 @@ export function DialogoDescuento({
     setError(null);
     iniciar(async () => {
       try {
-        const r = await onAplicar({ tipo, valor }, motivo);
+        const r = await onAplicar(tipoId ? { tipo, valor, tipoDescuentoId: tipoId } : { tipo, valor }, motivo);
         if (!r.ok) {
           setError(r.error);
           return;
@@ -830,21 +866,62 @@ export function DialogoDescuento({
             { value: "monto", label: "Monto (Gs.)" },
           ]}
           valor={tipo}
-          onChange={setTipo}
+          onChange={(nuevo) => {
+            setTipo(nuevo);
+            // Un tipo de descuento es siempre un porcentaje: al pasar a monto se suelta.
+            if (nuevo === "monto" && tipoId) {
+              setTipoId(null);
+              setValorTexto("");
+            }
+          }}
           color="tinta"
         />
+        {/* Los tipos de descuento de Ajustes: al elegir uno, el porcentaje (y el motivo) salen de él. "Otro porcentaje" es escribirlo a mano. */}
+        {ofreceTipos && (
+          <div>
+            <p className="mb-1.5 text-[0.82rem] font-semibold text-tinta">Tipo de descuento</p>
+            <div className="flex flex-wrap gap-1.5">
+              {tipos.map((t) => (
+                <button
+                  key={t.id}
+                  type="button"
+                  aria-pressed={tipoId === t.id}
+                  onClick={() => elegirTipo(t)}
+                  className={`rounded-lg border px-3 py-1.5 text-[0.84rem] font-medium transition-colors ${
+                    tipoId === t.id ? "border-azul bg-azul-luz text-azul-oscuro" : "border-linea text-tinta-media hover:border-azul/40"
+                  }`}
+                >
+                  {t.nombre} · {textoPorcentaje(t.porcentaje)} %
+                </button>
+              ))}
+              <button
+                type="button"
+                aria-pressed={tipoId === null}
+                onClick={() => elegirTipo(null)}
+                className={`rounded-lg border px-3 py-1.5 text-[0.84rem] font-medium transition-colors ${
+                  tipoId === null ? "border-azul bg-azul-luz text-azul-oscuro" : "border-linea text-tinta-media hover:border-azul/40"
+                }`}
+              >
+                Otro porcentaje
+              </button>
+            </div>
+          </div>
+        )}
         <Campo
           etiqueta={tipo === "porcentaje" ? "Porcentaje de descuento *" : "Monto a descontar *"}
           ayuda={
-            descuento
-              ? "Escribí el nuevo valor y se reemplaza el descuento anterior. Con 0 la cuenta vuelve a su monto original."
-              : undefined
+            tipoElegido
+              ? `El porcentaje lo da el tipo “${tipoElegido.nombre}”. Para otro valor, elegí “Otro porcentaje”.`
+              : descuento
+                ? "Escribí el nuevo valor y se reemplaza el descuento anterior. Con 0 la cuenta vuelve a su monto original."
+                : undefined
           }
         >
           <Entrada
             autoFocus
             inputMode="decimal"
             value={valorTexto}
+            readOnly={!!tipoElegido}
             onChange={(e) => setValorTexto(e.target.value)}
             placeholder={tipo === "porcentaje" ? "10" : "5000"}
           />
@@ -875,6 +952,11 @@ export function DialogoDescuento({
           </span>
         </div>
 
+        {quedaEnCero && (
+          <p className="rounded-lg bg-exito-luz px-3 py-2 text-[0.8rem] font-medium leading-snug text-exito">
+            Cuenta en cero (cortesía): se vende y se factura en cero, y los productos igual bajan el stock. Si hace falta, la factura se anula después.
+          </p>
+        )}
         {error && <MensajeError>{error}</MensajeError>}
         <div className="flex flex-wrap justify-end gap-2">
           {descuento && (

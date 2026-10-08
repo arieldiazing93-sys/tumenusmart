@@ -6,7 +6,7 @@ export function ImprimirBoton() {
     <button
       type="button"
       onClick={() => window.print()}
-      className={`print:hidden ${clasesBoton("principal")}`}
+      className={`print:hidden ${clasesBoton("navegar")}`}
     >
       🖨 Imprimir / Guardar como PDF
     </button>

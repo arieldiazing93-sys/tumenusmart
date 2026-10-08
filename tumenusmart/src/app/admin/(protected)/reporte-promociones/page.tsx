@@ -8,12 +8,10 @@ import { FiltroFechaReporte } from "@/components/FiltroFechaReporte";
 
 export const dynamic = "force-dynamic";
 
+// Los tres períodos que se usan: hoy, este mes y un rango de fechas (el rango lo trae el propio filtro, aparte de los atajos).
 const FILTROS_FECHA: { value: FiltroFecha; label: string }[] = [
   { value: "hoy", label: "Hoy" },
-  { value: "ayer", label: "Ayer" },
-  { value: "7dias", label: "Últimos 7 días" },
   { value: "mes", label: "Este mes" },
-  { value: "mesAnterior", label: "Mes anterior" },
 ];
 
 const MAXIMO_PRODUCTOS_EN_PANTALLA = 50;
@@ -53,9 +51,19 @@ export default async function ReportePromocionesPage({
         titulo="Reporte de promociones"
         bajada="Cuánto se descontó y cuánto se regaló con cada promoción, en el mostrador, el comedor y el delivery."
         acciones={
-          <a href={`/admin/reporte-promociones/exportar?${querystringActual()}`} className={clasesBoton("principal", "sm")}>
-            Descargar Excel
-          </a>
+          <>
+            <a href={`/admin/reporte-promociones/exportar?${querystringActual()}`} className={clasesBoton("navegar", "sm")}>
+              Descargar Excel
+            </a>
+            <a
+              href={`/admin/reporte-promociones/imprimir?${querystringActual()}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={clasesBoton("navegar", "sm")}
+            >
+              Ver reporte / PDF
+            </a>
+          </>
         }
       />
 

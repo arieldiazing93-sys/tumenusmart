@@ -7,6 +7,7 @@ import { prismaDelLocal } from "@/lib/prisma-local";
 import { estacionActual } from "@/lib/estacion-actual";
 import { diasParaVencer } from "@/lib/factura-pos";
 import { cargarCatalogoDeVenta } from "@/lib/catalogo-venta";
+import { cargarTiposDescuento } from "@/lib/tipos-descuento-servidor";
 import { formatearGuarani } from "@/lib/format";
 import {
   ESTADOS_CUENTA_ABIERTA,
@@ -140,6 +141,7 @@ export default async function ComedorPage() {
     categorias: [],
     gruposMitad: [],
     promociones: [],
+    tiposDescuento: [],
     apertura: { mozos: [], mesas: [], sectores: [], mesasOcupadas: [] },
     imprimirCuenta: { ok: false, motivo: "" },
     cobro: { ok: false, motivo: "" },
@@ -169,6 +171,7 @@ export default async function ComedorPage() {
       categorias: catalogo.categorias,
       gruposMitad: catalogo.gruposMitad,
       promociones: catalogo.promociones,
+      tiposDescuento: await cargarTiposDescuento(db),
       apertura: {
         mozos: mozos.map((m) => ({ id: m.id, nombre: nombre(m) })),
         mesas: mesasCargadas.map((m) => ({ nombre: m.nombre, sectorId: m.sectorId, ocupada: ocupadas.has(m.clave) })),

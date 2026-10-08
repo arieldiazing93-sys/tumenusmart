@@ -18,6 +18,8 @@ import { SIN_REGISTRO_FISCAL } from "@/lib/tipo-cliente";
 import { limpiarTexto, validarDatosFiscales } from "@/lib/datos-fiscales";
 import { extraerUbicacion } from "@/lib/ubicacion-mapa";
 import { calcularDescuento, textoPorcentaje } from "@/lib/descuento-venta";
+import { resolverDescuentoConTipos } from "@/lib/tipos-descuento";
+import { cargarTiposDescuento } from "@/lib/tipos-descuento-servidor";
 import { claveDiaAsuncion } from "@/lib/timezone";
 import { formatearCantidad, formatearGuarani, formatearNumero } from "@/lib/format";
 import { repartirConsumo } from "@/lib/division-cuenta";
@@ -859,7 +861,8 @@ export async function cancelarCuentaDelivery(cuentaId: string, motivo: string): 
 //  Descuento
 // ---------------------------------------------------------------------------------------------------------------------
 
-export type DatosDescuentoDelivery = { tipo: "porcentaje" | "monto"; valor: number };
+/** `tipoDescuentoId`: el tipo de descuento de Ajustes que se eligió (Cortesía, Tarjeta…): el porcentaje sale de él y no de `valor`. */
+export type DatosDescuentoDelivery = { tipo: "porcentaje" | "monto"; valor: number; tipoDescuentoId?: string };
 
 /**
  * Pone (o, con `null`, quita) el descuento general de la cuenta. Va con motivo. El monto en guaraníes se calcula acá, sobre lo que
@@ -877,11 +880,19 @@ export async function aplicarDescuentoDelivery(
 
   // Un descuento de 0 es "sin descuento": reemplaza al que la cuenta tenía y la deja en su monto original (sirve para corregir uno
   // mal puesto: se escribe 0 y se guarda). No pide motivo, igual que quitarlo.
-  const sinDescuento = !descuento || Number(descuento.valor) === 0;
+  const sinDescuento = !descuento || (Number(descuento.valor) === 0 && !descuento.tipoDescuentoId);
   const razon = sinDescuento ? null : limpiarMotivo(motivo);
-  if (descuento && Number(descuento.valor) !== 0) {
+  // Lo que se calcula de verdad: con un tipo de descuento elegido, SU porcentaje (el 100 % de una cortesía solo sale de un tipo).
+  let efectivo: { tipo: "porcentaje" | "monto"; valor: number } | null = null;
+  if (descuento && !sinDescuento) {
     if (descuento.tipo !== "porcentaje" && descuento.tipo !== "monto") return { ok: false, error: "El descuento no es válido." };
     if (!razon) return { ok: false, error: MENSAJE_MOTIVO };
+    const resuelto = resolverDescuentoConTipos(
+      { tipo: descuento.tipo, valor: Number(descuento.valor), tipoDescuentoId: descuento.tipoDescuentoId },
+      await cargarTiposDescuento(prismaDelLocal(storeId))
+    );
+    if (!resuelto.ok) return { ok: false, error: resuelto.error };
+    efectivo = resuelto.descuento ? { tipo: resuelto.descuento.tipo, valor: resuelto.descuento.valor } : null;
   }
 
   let descripcion = "";
@@ -894,7 +905,7 @@ export async function aplicarDescuentoDelivery(
       if (!cuenta) throw new ErrorDeUsuario("No encontré esa cuenta.");
       if (cuenta.estado !== "abierta") throw new ErrorDeUsuario(textoNoEditable(cuenta.estado));
 
-      if (!descuento || Number(descuento.valor) === 0) {
+      if (!efectivo) {
         await tx.cuentaDelivery.update({
           where: { id: cuenta.id },
           data: { descuentoTipo: null, descuentoValor: null, descuentoMotivo: null, descuentoPor: null },
@@ -907,15 +918,15 @@ export async function aplicarDescuentoDelivery(
         select: { cantidad: true, precioUnitario: true },
       });
       const subtotal = totalDeLineas(activos.map((i) => ({ precioUnitario: Number(i.precioUnitario), cantidad: i.cantidad })));
-      const calculado = calcularDescuento(subtotal, { tipo: descuento.tipo, valor: Number(descuento.valor) });
+      const calculado = calcularDescuento(subtotal, { tipo: efectivo.tipo, valor: efectivo.valor });
       if (!calculado.ok) throw new ErrorDeUsuario(calculado.error);
       if (calculado.monto <= 0) throw new ErrorDeUsuario("Escribí un descuento mayor a cero.");
 
       await tx.cuentaDelivery.update({
         where: { id: cuenta.id },
         data: {
-          descuentoTipo: descuento.tipo,
-          descuentoValor: Number(descuento.valor),
+          descuentoTipo: efectivo.tipo,
+          descuentoValor: efectivo.valor,
           descuentoMotivo: razon,
           descuentoPor: quien,
         },
@@ -938,7 +949,7 @@ export async function aplicarDescuentoDelivery(
     descripcion,
     entidad: "CuentaDelivery",
     entidadId: String(cuentaId),
-    detalle: descuento && !sinDescuento ? { tipo: descuento.tipo, valor: descuento.valor, motivo: razon } : {},
+    detalle: efectivo ? { tipo: efectivo.tipo, valor: efectivo.valor, motivo: razon, conTipo: !!descuento?.tipoDescuentoId } : {},
   });
   refrescar();
   return { ok: true };
@@ -1153,7 +1164,8 @@ export async function emitirFacturaDelivery(cuentaId: string, datos: DatosFactur
     return { ok: false, error: `El descuento ya no corresponde a esta cuenta (${totales.descuentoInvalido}) Quitalo o cambialo.` };
   }
   const total = totales.total;
-  if (total <= 0) return { ok: false, error: "El total tiene que ser mayor a cero." };
+  // Un total en cero es válido cuando es una cortesía (descuento del 100 %): se vende y se factura en cero, y si hace falta se anula la factura.
+  if (!Number.isFinite(total) || total < 0) return { ok: false, error: "El total de la cuenta no es válido." };
   const envio = lineaDeEnvio(totales.envio);
   const filasVenta = envio ? [...filas, envio] : filas;
 
@@ -1530,7 +1542,8 @@ export async function pagarCuentaDelivery(cuentaId: string, datos: DatosCobroDel
     return { ok: false, error: `El descuento ya no corresponde a esta cuenta (${totales.descuentoInvalido}) Quitalo o cambialo.` };
   }
   const total = totales.total;
-  if (total <= 0) return { ok: false, error: "El total tiene que ser mayor a cero." };
+  // Un total en cero es válido cuando es una cortesía (descuento del 100 %): se vende y se factura en cero, y si hace falta se anula la factura.
+  if (!Number.isFinite(total) || total < 0) return { ok: false, error: "El total de la cuenta no es válido." };
   const envio = lineaDeEnvio(totales.envio);
   const filasVenta = envio ? [...filas, envio] : filas;
 
@@ -1568,6 +1581,8 @@ export async function pagarCuentaDelivery(cuentaId: string, datos: DatosCobroDel
       };
     }
     if (!store?.ventasACredito) return { ok: false, error: "Este local no vende a crédito. Se activa en Configuración." };
+    // Una cuenta en cero (cortesía) no tiene nada que cobrar después: a crédito no corresponde.
+    if (total <= 0) return { ok: false, error: "Una cuenta en cero (cortesía) no se carga a crédito. Elegí otra forma de pago." };
     const diasPedidos = Math.round(Number(datos.creditoDias ?? 30));
     const dias = Number.isFinite(diasPedidos) ? Math.min(Math.max(diasPedidos, 0), 365) : 30;
     // El vencimiento es un día (no una hora): se guarda a medianoche UTC, como las demás fechas de día.

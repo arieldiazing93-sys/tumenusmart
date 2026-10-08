@@ -7,6 +7,7 @@ import type { ImpuestosDeCuenta } from "@/lib/comedor";
 import type { TotalesDeDelivery } from "@/lib/delivery";
 import type { CategoriaVenta, GrupoMitadVenta } from "@/lib/catalogo-venta";
 import type { PromoDef } from "@/lib/promociones";
+import type { TipoDescuentoDef } from "@/lib/tipos-descuento";
 
 export type ItemDeliveryFila = {
   id: string;
@@ -70,6 +71,8 @@ export type ContextoDelivery = {
   gruposMitad: GrupoMitadVenta[];
   /** Las promociones activas (por descuento y por volumen) para mostrarlas al cargar productos. */
   promociones: PromoDef[];
+  /** Los tipos de descuento de Ajustes (Cortesía 100 %, Tarjeta 20 %…) para elegir al dar un descuento. */
+  tiposDescuento: TipoDescuentoDef[];
   /** Las zonas de envío activas (con su costo) para abrir una cuenta. */
   zonas: { id: string; nombre: string; costoEnvio: number }[];
   /** Los repartidores activos. */

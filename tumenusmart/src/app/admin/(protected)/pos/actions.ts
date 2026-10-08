@@ -21,6 +21,8 @@ import { desglosarIva, formatearNumeroFactura } from "@/lib/factura-pos";
 import { anularComprobantes, crearComprobante, descripcionDeItem } from "@/lib/comprobante";
 import { DURACION_MINIMA_CITA } from "@/lib/agenda-cita";
 import { calcularDescuento, type DescuentoPedido } from "@/lib/descuento-venta";
+import { resolverDescuentoConTipos } from "@/lib/tipos-descuento";
+import { cargarTiposDescuento } from "@/lib/tipos-descuento-servidor";
 import { SIN_REGISTRO_FISCAL } from "@/lib/tipo-cliente";
 import { SELECCION_PROMOCIONES, precioEnPosicion, segundoDeSemanaAsuncion, tramosDeFilas } from "@/lib/precio-promocion";
 import { aplicarPromociones } from "@/lib/promociones";
@@ -509,9 +511,16 @@ export async function registrarVenta(turnoId: string, datos: DatosVenta): Promis
   // Descuento general: se calcula acá sobre el subtotal recalculado, nunca con
   // un monto que venga del navegador. `total` es lo que se cobra, ya con el
   // descuento restado — de ahí salen el cierre de turno y todos los reportes.
-  const descuento = calcularDescuento(subtotal, datos.descuento);
+  // Con un tipo de descuento de Ajustes elegido (Cortesía, Tarjeta…), vale SU porcentaje; el 100 % (la cuenta queda en cero) solo sale de un tipo.
+  const descuentoResuelto = resolverDescuentoConTipos(datos.descuento, datos.descuento ? await cargarTiposDescuento(db) : []);
+  if (!descuentoResuelto.ok) return { ok: false, error: descuentoResuelto.error };
+  const descuento = calcularDescuento(subtotal, descuentoResuelto.descuento);
   if (!descuento.ok) return { ok: false, error: descuento.error };
   const total = subtotal - descuento.monto;
+  // Una cuenta en cero (cortesía) no tiene nada que cobrar: a crédito no corresponde.
+  if (esCredito && total <= 0) {
+    return { ok: false, error: "Una cuenta en cero (cortesía) no se carga a crédito. Elegí otra forma de pago." };
+  }
 
   // El cajero vio un total en pantalla. Si el servidor calcula otro (una promoción de precio empezó o terminó justo entre medio), no se
   // cobra a ciegas: se avisa y la pantalla se vuelve a calcular con los precios de ahora.
@@ -648,6 +657,8 @@ export async function registrarVenta(turnoId: string, datos: DatosVenta): Promis
         total,
         descuento: descuento.monto,
         descuentoPorcentaje: descuento.porcentaje,
+        // El nombre del tipo de descuento elegido (Cortesía…), para el reporte de Cancelaciones y descuentos.
+        descuentoConcepto: descuento.monto > 0 ? descuentoResuelto.concepto : null,
         registradoPor,
         clienteNombre,
         clienteTelefono,
@@ -819,7 +830,7 @@ export async function registrarVenta(turnoId: string, datos: DatosVenta): Promis
       descuento.monto > 0
         ? `con un descuento de ${formatearGuarani(descuento.monto)}${
             descuento.porcentaje != null ? ` (${descuento.porcentaje}%)` : ""
-          }`
+          }${descuentoResuelto.concepto ? ` — ${descuentoResuelto.concepto}` : ""}`
         : null,
       esCredito ? "a crédito" : null,
     ].filter(Boolean);
@@ -833,6 +844,7 @@ export async function registrarVenta(turnoId: string, datos: DatosVenta): Promis
         venta: formatearNumero(numero),
         subtotal,
         descuento: descuento.monto,
+        concepto_descuento: descuentoResuelto.concepto,
         total,
         a_credito: esCredito,
         cliente: clienteNombre ?? datos.facturaRazonSocial ?? null,

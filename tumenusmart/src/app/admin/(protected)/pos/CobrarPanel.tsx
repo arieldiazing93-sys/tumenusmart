@@ -95,6 +95,8 @@ export function CobrarPanel({
   const [montoRecibido, setMontoRecibido] = useState("");
   const [creditoDias, setCreditoDias] = useState(String(DIAS_CREDITO_POR_DEFECTO));
   const esCredito = formaPago === FORMA_PAGO_A_CREDITO;
+  // Una cuenta en cero (cortesía, descuento del 100 %): no hay nada que cobrar, así que no se pregunta cómo paga.
+  const enCero = !(total > 0);
 
   // Pago dividido.
   const [dividiendo, setDividiendo] = useState(false);
@@ -152,6 +154,11 @@ export function CobrarPanel({
 
   function cobrar() {
     const asignado = pideAsignar ? personalId : undefined;
+    if (enCero) {
+      // Una sola fila en cero: la venta se registra (baja el stock, se factura si corresponde) sin cobrar nada.
+      onCobrar([{ forma: "efectivo", monto: 0 }], undefined, asignado);
+      return;
+    }
     if (dividiendo) {
       onCobrar(lineas.map((l) => ({ forma: l.forma, monto: parseFloat(l.monto) || 0 })), undefined, asignado);
       return;
@@ -220,6 +227,14 @@ export function CobrarPanel({
           )}
 
           {/* ---------- cómo paga ---------- */}
+          {enCero ? (
+            <div className="rounded-xl border border-exito/30 bg-exito-luz p-3.5">
+              <p className="text-[0.88rem] font-semibold text-exito">Cuenta en cero (cortesía)</p>
+              <p className="mt-1 text-[0.8rem] leading-snug text-tinta-media">
+                No se cobra nada: la venta se registra igual, así baja el stock de lo que se usó. Si hace falta, la factura se anula después.
+              </p>
+            </div>
+          ) : (
           <div>
             <div className="mb-2 flex items-center justify-between gap-2">
               <p className="text-[0.82rem] font-semibold text-tinta">{dividiendo ? "Dividir el pago" : "Método de pago"}</p>
@@ -436,6 +451,7 @@ export function CobrarPanel({
               </>
             )}
           </div>
+          )}
         </div>
 
         {/* ---------- pie fijo: siempre a la vista, aunque el panel se deslice ---------- */}
@@ -463,9 +479,11 @@ export function CobrarPanel({
               >
                 {cobrando
                   ? "Guardando…"
-                  : !dividiendo && esCredito
-                    ? "Registrar venta a crédito"
-                    : `Cobrar ${formatearGuarani(total)}`}
+                  : enCero
+                    ? "Registrar cuenta en cero"
+                    : !dividiendo && esCredito
+                      ? "Registrar venta a crédito"
+                      : `Cobrar ${formatearGuarani(total)}`}
               </button>
             </div>
           </div>

@@ -10,12 +10,10 @@ import { FiltroFechaReporte } from "@/components/FiltroFechaReporte";
 
 export const dynamic = "force-dynamic";
 
+// Los tres períodos que se usan: hoy, este mes y un rango de fechas (el rango lo trae el propio filtro, aparte de los atajos).
 const FILTROS_FECHA: { value: FiltroFecha; label: string }[] = [
   { value: "hoy", label: "Hoy" },
-  { value: "ayer", label: "Ayer" },
-  { value: "7dias", label: "Últimos 7 días" },
   { value: "mes", label: "Este mes" },
-  { value: "mesAnterior", label: "Mes anterior" },
 ];
 
 const MAXIMO_FILAS_EN_PANTALLA = 300;
@@ -65,9 +63,19 @@ export default async function ReporteCancelacionesPage({
         titulo="Cancelaciones y descuentos"
         bajada="Las cuentas canceladas, los productos cancelados y los descuentos, con la persona que autorizó cada uno y el motivo que dejó."
         acciones={
-          <a href={`/admin/reporte-cancelaciones/exportar?${querystringActual()}`} className={clasesBoton("principal", "sm")}>
-            Descargar Excel
-          </a>
+          <>
+            <a href={`/admin/reporte-cancelaciones/exportar?${querystringActual()}`} className={clasesBoton("navegar", "sm")}>
+              Descargar Excel
+            </a>
+            <a
+              href={`/admin/reporte-cancelaciones/imprimir?${querystringActual()}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={clasesBoton("navegar", "sm")}
+            >
+              Ver reporte / PDF
+            </a>
+          </>
         }
       />
 
@@ -106,7 +114,7 @@ export default async function ReporteCancelacionesPage({
           </Selector>
         </Campo>
         <div className="flex items-end">
-          <button type="submit" className={`w-full sm:w-auto ${clasesBoton("principal")}`}>
+          <button type="submit" className={`w-full sm:w-auto ${clasesBoton("navegar")}`}>
             Ver reporte
           </button>
         </div>

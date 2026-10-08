@@ -11,7 +11,12 @@
  * casos el resultado es un monto entero de guaraníes.
  */
 
-export type DescuentoPedido = { tipo: "porcentaje" | "monto"; valor: number };
+export type DescuentoPedido = {
+  tipo: "porcentaje" | "monto";
+  valor: number;
+  /** El tipo de descuento de Ajustes que se eligió (Cortesía, Tarjeta 20 %…): el servidor usa SU porcentaje, no el `valor` que llegó. */
+  tipoDescuentoId?: string;
+};
 
 export type ResultadoDescuento =
   | {
@@ -27,9 +32,12 @@ export type ResultadoDescuento =
  * Calcula el descuento sobre un subtotal.
  *
  * Sin pedido, o con valor 0, no hay descuento (no es un error: el campo puede
- * estar tildado y vacío mientras el cajero todavía escribe). Nunca puede
- * llegar al total: una venta gratis no es un descuento, y una factura de
- * cero guaraníes no se puede emitir.
+ * estar tildado y vacío mientras el cajero todavía escribe).
+ *
+ * Un PORCENTAJE puede llegar hasta el 100 % (una cortesía: la cuenta queda en cero, se vende y se factura igual y después se anula la
+ * factura, así el stock baja). Esta función solo calcula; que un 100 % lo pida alguien con un tipo de descuento de Ajustes (y no
+ * escribiéndolo a mano) lo exige quien guarda el descuento: ver `resolverDescuentoConTipos` en tipos-descuento.ts. Un MONTO fijo sigue
+ * siendo menor al total.
  */
 export function calcularDescuento(
   subtotal: number,
@@ -46,14 +54,18 @@ export function calcularDescuento(
   if (pedido.tipo === "porcentaje") {
     // Dos decimales como máximo: es lo que se guarda y lo que se imprime.
     const porcentaje = Math.round(valor * 100) / 100;
-    if (porcentaje >= 100) return { ok: false, error: "El descuento tiene que ser menor al 100 %." };
+    if (porcentaje > 100) return { ok: false, error: "El descuento no puede pasar del 100 %." };
     const monto = Math.round((subtotal * porcentaje) / 100);
-    if (monto >= subtotal) return { ok: false, error: "El descuento tiene que ser menor al total de la venta." };
     return { ok: true, monto, porcentaje: monto > 0 ? porcentaje : null };
   }
 
   const monto = Math.round(valor);
-  if (monto >= subtotal) return { ok: false, error: "El descuento tiene que ser menor al total de la venta." };
+  if (monto >= subtotal) {
+    return {
+      ok: false,
+      error: "El descuento por monto tiene que ser menor al total de la venta. Para regalar la cuenta usá un tipo de descuento del 100 % (Cortesía).",
+    };
+  }
   return { ok: true, monto, porcentaje: null };
 }
 

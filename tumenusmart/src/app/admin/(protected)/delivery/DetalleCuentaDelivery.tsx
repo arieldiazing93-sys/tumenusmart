@@ -279,7 +279,7 @@ export function DetalleCuentaDelivery({
               {contexto.puedeCobrar && porCobrar && !cuenta.factura && (
                 <button
                   type="button"
-                  disabled={pendiente || !contexto.facturaRapida.ok || sinProductos || !!t.descuentoInvalido || t.total <= 0}
+                  disabled={pendiente || !contexto.facturaRapida.ok || sinProductos || !!t.descuentoInvalido || t.subtotal <= 0}
                   title={contexto.facturaRapida.ok ? "Emite e imprime solo la factura, sin cobrar" : contexto.facturaRapida.motivo}
                   onClick={onFacturar}
                   className={clasesBoton("navegar", "sm")}
@@ -307,7 +307,7 @@ export function DetalleCuentaDelivery({
                   type="button"
                   // Se cobra recién después de imprimir la cuenta (queda "por cobrar"). Sin turno de caja abierto no se cobra: el
                   // botón lleva directo a abrirlo y, al abrirlo, se vuelve acá.
-                  disabled={pendiente || (!contexto.cobro.ok && !contexto.cobro.sinTurno) || !!t.descuentoInvalido || t.total <= 0}
+                  disabled={pendiente || (!contexto.cobro.ok && !contexto.cobro.sinTurno) || !!t.descuentoInvalido || t.subtotal <= 0}
                   onClick={() => (contexto.cobro.ok ? onCobrar() : router.push(rutaParaAbrirTurno("/admin/delivery")))}
                   // Del mismo celeste que los demás botones de la fila (pedido del dueño): ninguno va en naranja.
                   className={clasesBoton("navegar", "sm")}
@@ -536,6 +536,7 @@ export function DetalleCuentaDelivery({
           descuento={cuenta.descuento}
           subtotal={t.subtotal}
           envio={t.envio}
+          tipos={contexto.tiposDescuento}
           onAplicar={(d, motivo) => aplicarDescuentoDelivery(cuenta.id, d, motivo)}
           onCerrar={() => setDialogo(null)}
           onListo={() => {
