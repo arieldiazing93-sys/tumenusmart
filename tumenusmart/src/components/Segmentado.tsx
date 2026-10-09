@@ -30,6 +30,7 @@ export function Segmentado<T extends string>({
   className = "",
   color = "brand",
   dosColumnas = false,
+  uniforme = false,
 }: {
   opciones: { value: T; label: string; sublabel?: string }[];
   valor: T;
@@ -38,9 +39,16 @@ export function Segmentado<T extends string>({
   color?: ColorSegmentado;
   /** Las opciones en tarjetas de a dos por fila (cuatro opciones = dos filas), en vez de todas en una sola línea. */
   dosColumnas?: boolean;
+  /**
+   * Todas las tarjetas del mismo tamaño: mismo ancho, el mismo alto (el de la más alta, con o sin segunda línea) y el texto
+   * centrado. Es lo que pide el checkout público, donde "Efectivo" (una línea) al lado de "Tarjeta débito · POS al recibir"
+   * (dos líneas) se veía desparejo. `dosColumnas` ya lo trae.
+   */
+  uniforme?: boolean;
 }) {
+  const parejas = dosColumnas || uniforme;
   return (
-    <div className={`${dosColumnas ? "grid grid-cols-2" : "flex"} gap-3 ${className}`}>
+    <div className={`${dosColumnas ? "grid auto-rows-fr grid-cols-2" : "flex"} gap-3 ${className}`}>
       {opciones.map((o) => {
         const activo = o.value === valor;
         return (
@@ -49,7 +57,9 @@ export function Segmentado<T extends string>({
             type="button"
             onClick={() => onChange(o.value)}
             aria-pressed={activo}
-            className={`flex-1 rounded-lg border px-3 py-2 text-[0.85rem] font-medium transition-colors duration-150 ${
+            className={`${
+              parejas ? "flex min-h-[3.5rem] min-w-0 flex-col items-center justify-center break-words text-center" : ""
+            } flex-1 rounded-lg border px-3 py-2 text-[0.85rem] font-medium transition-colors duration-150 ${
               activo ? ESTILOS_ACTIVO[color] : "border-linea text-tinta-media hover:border-brand/40"
             }`}
           >

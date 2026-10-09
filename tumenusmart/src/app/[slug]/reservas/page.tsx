@@ -1,5 +1,5 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
-import { VolverAlMenu } from "@/components/Volver";
 import { prisma } from "@/lib/prisma";
 import { claveDiaAsuncion, horaAsuncion } from "@/lib/timezone";
 import { diasCerrados, NOMBRES_DIA } from "@/lib/horario-atencion";
@@ -37,25 +37,38 @@ export default async function ReservasPage({
   const cerrados = diasCerrados(horariosAtencion);
 
   return (
-    <main className="mx-auto max-w-2xl px-4 py-8">
-      <VolverAlMenu slug={slug} />
-      <h1 className="mb-1 mt-5 text-[1.35rem] font-semibold tracking-titular">Reservar mesa</h1>
-      <p className="mb-2 text-[0.85rem] text-tinta-suave">{store.nombre}</p>
+    <main className="mx-auto max-w-2xl px-4 pb-48 pt-4">
+      {/* Arriba: el botón redondo para volver a la carta (azul: navegar) y el título con el nombre del local. */}
+      <header className="flex items-center gap-3">
+        <Link
+          href={`/${slug}`}
+          aria-label="Volver a la carta"
+          className="flex h-11 w-11 flex-none items-center justify-center rounded-full bg-azul-luz text-[1.25rem] leading-none text-azul-oscuro transition-all hover:bg-azul hover:text-white active:scale-90"
+        >
+          ←
+        </Link>
+        <div className="min-w-0">
+          <p className="truncate text-[0.7rem] font-semibold uppercase tracking-rotulo text-tinta-suave">{store.nombre}</p>
+          <h1 className="text-[1.6rem] font-semibold leading-tight tracking-titular text-tinta">Reservar mesa</h1>
+        </div>
+      </header>
+
       {cerrados.length > 0 && (
-        <p className="mb-6 text-[0.85rem] text-tinta-media">
-          Cerramos los{" "}
-          <strong>{cerrados.map((d) => NOMBRES_DIA[d]).join(", ")}</strong>.
+        <p className="mt-5 rounded-2xl bg-aviso-luz px-4 py-3 text-[0.88rem] text-aviso">
+          Cerramos los <strong>{cerrados.map((d) => NOMBRES_DIA[d]).join(", ")}</strong>.
         </p>
       )}
 
-      <ReservaForm
-        slug={slug}
-        horariosPorTurno={horariosPorTurno}
-        hoy={claveDiaAsuncion(new Date())}
-        horaActual={horaAsuncion(new Date())}
-        diasCerrados={cerrados}
-        nombresDia={NOMBRES_DIA}
-      />
+      <div className="mt-5">
+        <ReservaForm
+          slug={slug}
+          horariosPorTurno={horariosPorTurno}
+          hoy={claveDiaAsuncion(new Date())}
+          horaActual={horaAsuncion(new Date())}
+          diasCerrados={cerrados}
+          nombresDia={NOMBRES_DIA}
+        />
+      </div>
     </main>
   );
 }

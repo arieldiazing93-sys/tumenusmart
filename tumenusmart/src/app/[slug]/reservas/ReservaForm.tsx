@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { crearReserva } from "./actions";
 import { TURNOS, MOTIVOS_RESERVA } from "@/lib/reservas";
-import { Tarjeta, Campo, Entrada, Selector, Aviso } from "@/components/ui";
+import { Campo, Entrada, Selector } from "@/components/ui";
 import { Segmentado } from "@/components/Segmentado";
 import { BotonEnviar } from "@/components/BotonEnviar";
 
@@ -26,6 +26,10 @@ type Props = {
   diasCerrados: number[];
   nombresDia: string[];
 };
+
+/** Cada bloque del formulario: blanco, esquinas amplias y sombra suave (el título va aparte, grande). */
+const BLOQUE = "flex flex-col gap-4 rounded-2xl bg-superficie p-4 shadow-sm ring-1 ring-linea";
+const TITULO = "text-[1.15rem] font-semibold tracking-titular text-tinta";
 
 /** Día de la semana (0 = domingo) de una fecha "YYYY-MM-DD". */
 function diaSemanaDe(clave: string): number | null {
@@ -209,10 +213,10 @@ export function ReservaForm({
   const horariosDelTurno = turno ? horariosPorTurno[turno] ?? [] : [];
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-      <fieldset disabled={enviando} className="flex flex-col gap-4">
-        <Tarjeta className="flex flex-col gap-4">
-          <p className="rotulo">Cuándo</p>
+    <form onSubmit={handleSubmit} className="flex flex-col gap-5">
+      <fieldset disabled={enviando} className="flex flex-col gap-5">
+        <section className={BLOQUE}>
+          <h2 className={TITULO}>¿Cuándo?</h2>
 
           <Campo etiqueta="Fecha">
             <Entrada
@@ -222,7 +226,7 @@ export function ReservaForm({
               value={fecha}
               invalido={campoInvalido === "fecha"}
               key={campoInvalido === "fecha" ? `sac-${intento}` : "fecha"}
-              className={campoInvalido === "fecha" ? "animate-[sacudir_0.32s_ease]" : ""}
+              className={`!h-12 !rounded-xl ${campoInvalido === "fecha" ? "animate-[sacudir_0.32s_ease]" : ""}`}
               onChange={(e) => {
                 setFecha(e.target.value);
                 // Cambiar de fecha puede dejar inválido el horario ya elegido
@@ -231,7 +235,7 @@ export function ReservaForm({
               }}
             />
             {diaElegidoCerrado && diaDeLaFecha != null && (
-              <p className="mt-1.5 text-[0.78rem] font-medium text-peligro">
+              <p className="mt-1.5 text-[0.82rem] font-medium text-peligro">
                 Los {nombresDia[diaDeLaFecha].toLowerCase()} el local está cerrado — elegí otra
                 fecha.
               </p>
@@ -245,7 +249,7 @@ export function ReservaForm({
                 onClick={() => cambiarPersonas(personas - 1)}
                 disabled={personas <= 1}
                 aria-label="Menos personas"
-                className="h-12 w-12 flex-none rounded-lg border border-linea text-xl font-semibold text-tinta-media transition-colors hover:border-brand/40 disabled:opacity-40"
+                className="flex h-12 w-12 flex-none items-center justify-center rounded-full bg-papel-hundido text-2xl font-semibold text-tinta transition-all hover:bg-brand-light active:scale-90 disabled:opacity-40"
               >
                 −
               </button>
@@ -267,23 +271,23 @@ export function ReservaForm({
                 }}
                 onFocus={(e) => e.target.select()}
                 aria-label="Cantidad de personas"
-                className="h-12 text-center text-lg"
+                className="!h-12 !rounded-xl text-center !text-xl font-bold"
               />
 
               <button
                 type="button"
                 onClick={() => cambiarPersonas(personas + 1)}
                 aria-label="Más personas"
-                className="h-12 w-12 flex-none rounded-lg border border-linea text-xl font-semibold text-tinta-media transition-colors hover:border-brand/40"
+                className="flex h-12 w-12 flex-none items-center justify-center rounded-full bg-brand text-2xl font-semibold text-white shadow-sm transition-all hover:bg-brand-dark active:scale-90"
               >
                 +
               </button>
             </div>
           </Campo>
-        </Tarjeta>
+        </section>
 
-        <Tarjeta className="flex flex-col gap-3">
-          <p className="rotulo">Turno y horario</p>
+        <section className={BLOQUE}>
+          <h2 className={TITULO}>Turno y horario</h2>
           <div
             key={campoInvalido === "turno" ? `sac-${intento}` : "turno"}
             className={campoInvalido === "turno" ? "animate-[sacudir_0.32s_ease]" : ""}
@@ -292,20 +296,21 @@ export function ReservaForm({
               opciones={TURNOS.map((t) => ({ value: t.value, label: t.label }))}
               valor={turno ?? ""}
               onChange={elegirTurno}
+              uniforme
             />
           </div>
 
           {turno && (
             <div className="animate-[subir_0.4s_cubic-bezier(0.22,0.7,0.3,1)]">
               {horariosDelTurno.length === 0 ? (
-                <p className="text-[0.85rem] text-tinta-suave">
+                <p className="text-[0.88rem] text-tinta-suave">
                   Todavía no hay horarios cargados para este turno. Probá con otro turno.
                 </p>
               ) : (
                 <>
                   <div
                     key={campoInvalido === "horario" ? `sac-${intento}` : "horarios"}
-                    className={`flex flex-wrap gap-2 ${
+                    className={`grid grid-cols-3 gap-2.5 sm:grid-cols-4 ${
                       campoInvalido === "horario" ? "animate-[sacudir_0.32s_ease]" : ""
                     }`}
                   >
@@ -327,14 +332,12 @@ export function ReservaForm({
                                 : undefined
                           }
                           onClick={() => setHorario(h)}
-                          className={`rounded-full border px-3 py-1.5 text-[0.85rem] transition-colors duration-150 ${
+                          className={`cifra flex min-h-[3rem] flex-col items-center justify-center rounded-xl px-1 text-[0.95rem] font-semibold leading-tight transition-all duration-150 ${
                             bloqueado
-                              ? `cursor-not-allowed border-linea-fina text-tinta-suave/60 ${
-                                  paso ? "line-through" : ""
-                                }`
+                              ? `cursor-not-allowed bg-papel-hundido/60 text-tinta-suave/60 ${paso ? "line-through" : ""}`
                               : horario === h
-                                ? "border-brand bg-brand text-white"
-                                : "border-linea text-tinta-media hover:border-brand/40"
+                                ? "bg-brand text-white shadow-media"
+                                : "bg-superficie text-tinta ring-1 ring-linea hover:ring-brand/60 active:scale-95"
                           }`}
                         >
                           {h}
@@ -344,11 +347,11 @@ export function ReservaForm({
                             cupo?.lugaresLibres != null &&
                             cupo.lugaresLibres <= 10 && (
                               <span
-                                className={`ml-1.5 text-[0.68rem] ${
+                                className={`text-[0.66rem] font-medium ${
                                   bloqueado
                                     ? "text-tinta-suave/60"
                                     : horario === h
-                                      ? "text-white/80"
+                                      ? "text-white/85"
                                       : "text-aviso"
                                 }`}
                               >
@@ -363,13 +366,13 @@ export function ReservaForm({
                   </div>
 
                   {cargandoCupos && (
-                    <p className="mt-2 text-[0.76rem] text-tinta-suave">
+                    <p className="mt-2.5 text-[0.78rem] text-tinta-suave">
                       Consultando disponibilidad...
                     </p>
                   )}
 
                   {esHoy && horariosDelTurno.every(horarioYaPaso) && (
-                    <p className="mt-2 text-[0.85rem] text-aviso">
+                    <p className="mt-2.5 text-[0.88rem] text-aviso">
                       Todos los horarios de este turno ya pasaron por hoy. Elegí otro turno u
                       otra fecha.
                     </p>
@@ -379,7 +382,7 @@ export function ReservaForm({
                     horariosDelTurno.length > 0 &&
                     horariosDelTurno.every((h) => horarioYaPaso(h) || sinLugar(h)) &&
                     !horariosDelTurno.every(horarioYaPaso) && (
-                      <p className="mt-2 text-[0.85rem] text-aviso">
+                      <p className="mt-2.5 text-[0.88rem] text-aviso">
                         No quedan lugares en este turno para {personas}{" "}
                         {personas === 1 ? "persona" : "personas"}. Probá otro turno, otra fecha,
                         o consultanos por WhatsApp.
@@ -389,13 +392,13 @@ export function ReservaForm({
               )}
             </div>
           )}
-        </Tarjeta>
+        </section>
 
-        <Tarjeta className="flex flex-col gap-4">
-          <p className="rotulo">Tus datos</p>
+        <section className={BLOQUE}>
+          <h2 className={TITULO}>Tus datos</h2>
 
           <Campo etiqueta="Motivo">
-            <Selector value={motivo} onChange={(e) => setMotivo(e.target.value)}>
+            <Selector value={motivo} onChange={(e) => setMotivo(e.target.value)} className="!h-12 !rounded-xl">
               {MOTIVOS_RESERVA.map((m) => (
                 <option key={m.value} value={m.value}>
                   {m.label}
@@ -410,6 +413,7 @@ export function ReservaForm({
               value={nombre}
               onChange={(e) => setNombre(e.target.value)}
               placeholder="Tu nombre"
+              className="!h-12 !rounded-xl"
             />
           </Campo>
 
@@ -419,6 +423,7 @@ export function ReservaForm({
               value={telefono}
               onChange={(e) => setTelefono(e.target.value)}
               placeholder="0981 234 567"
+              className="!h-12 !rounded-xl"
             />
           </Campo>
 
@@ -428,21 +433,31 @@ export function ReservaForm({
               value={correo}
               onChange={(e) => setCorreo(e.target.value)}
               placeholder="nombre@correo.com"
+              className="!h-12 !rounded-xl"
             />
           </Campo>
-        </Tarjeta>
+        </section>
       </fieldset>
 
-      {error && <Aviso color="peligro">{error}</Aviso>}
-
-      <BotonEnviar
-        enviando={enviando}
-        disabled={diaElegidoCerrado}
-        enviandoTexto="Generando reserva..."
-        className="w-full"
-      >
-        Reservar
-      </BotonEnviar>
+      {/* Abajo, siempre a la vista: el aviso de lo que falte y el botón para reservar, sobre una base sólida con un difuminado arriba. */}
+      <div className="pointer-events-none fixed bottom-0 left-1/2 z-20 w-full max-w-2xl -translate-x-1/2">
+        <div aria-hidden="true" className="h-8 bg-gradient-to-t from-papel-suave to-transparent" />
+        <div className="pointer-events-auto bg-papel-suave px-4 pb-4">
+          {error && (
+            <div role="alert" className="mb-2.5 rounded-xl bg-peligro-luz px-3.5 py-2.5 text-[0.86rem] font-medium text-peligro">
+              {error}
+            </div>
+          )}
+          <BotonEnviar
+            enviando={enviando}
+            disabled={diaElegidoCerrado}
+            enviandoTexto="Generando reserva..."
+            className="w-full !h-14 !rounded-2xl shadow-alta"
+          >
+            Reservar
+          </BotonEnviar>
+        </div>
+      </div>
     </form>
   );
 }

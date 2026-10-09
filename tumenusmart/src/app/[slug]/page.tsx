@@ -61,7 +61,7 @@ export default async function CatalogoPage({
   const store = await localPorSlug(slug);
   const storeId = store.id;
 
-  const [categoriasCrudas, destacados, estadoTienda, paginaReservas, promociones] = await Promise.all([
+  const [categoriasCrudas, destacados, estadoTienda, promociones] = await Promise.all([
     prisma.category.findMany({
       where: { storeId, activa: true },
       orderBy: { orden: "asc" },
@@ -95,10 +95,6 @@ export default async function CatalogoPage({
       include: { promociones: SELECCION_PROMOCIONES },
     }),
     obtenerEstadoTienda(storeId),
-    // La Reserva de turnos (barberías, salones) es una página pública aparte, con su
-    // propia dirección (no necesariamente el mismo slug que el menú) — si el negocio la
-    // tiene habilitada, se linkea desde acá igual que "Reservar mesa".
-    prisma.paginaReservas.findUnique({ where: { storeId }, select: { habilitada: true, slug: true } }),
     // Las Promociones activas (por descuento y por volumen): ver src/lib/promociones.ts.
     cargarPromociones(prismaDelLocal(storeId)),
   ]);
@@ -241,26 +237,17 @@ export default async function CatalogoPage({
           {/*
             Reservar mesa va DEBAJO del estado de apertura: primero de qué local se trata, después si está abierto y
             recién entonces qué se puede hacer. Solo aparece si el local reserva mesas con anticipación — hay
-            locales que solo hacen delivery/retiro y no tienen mesas físicas.
+            locales que solo hacen delivery/retiro y no tienen mesas físicas. Acá NO va "Reservar turno": la página de turnos
+            (peluquerías, salones) es otro servicio con su propio enlace y no se ofrece desde el menú digital.
           */}
-          {(store.aceptaReservas || paginaReservas?.habilitada) && (
-            <div className="mt-4 flex flex-wrap gap-2.5">
-              {store.aceptaReservas && (
-                <Link
-                  href={`/${slug}/reservas`}
-                  className="inline-flex h-12 flex-1 items-center justify-center rounded-2xl bg-azul px-5 text-[0.92rem] font-semibold text-white shadow-media transition-all hover:bg-azul-oscuro active:scale-[0.98]"
-                >
-                  Reservar mesa
-                </Link>
-              )}
-              {paginaReservas?.habilitada && (
-                <Link
-                  href={`/turnos/${paginaReservas.slug}`}
-                  className="inline-flex h-12 flex-1 items-center justify-center rounded-2xl bg-brand px-5 text-[0.92rem] font-semibold text-white shadow-media transition-all hover:bg-brand-dark active:scale-[0.98]"
-                >
-                  Reservar turno
-                </Link>
-              )}
+          {store.aceptaReservas && (
+            <div className="mt-4">
+              <Link
+                href={`/${slug}/reservas`}
+                className="inline-flex h-12 w-full items-center justify-center rounded-2xl bg-azul px-5 text-[0.92rem] font-semibold text-white shadow-media transition-all hover:bg-azul-oscuro active:scale-[0.98]"
+              >
+                Reservar mesa
+              </Link>
             </div>
           )}
         </header>

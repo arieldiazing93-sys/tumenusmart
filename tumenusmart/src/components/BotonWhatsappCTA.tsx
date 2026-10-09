@@ -38,7 +38,7 @@ export function BotonWhatsappCTA({
       target="_blank"
       rel="noopener noreferrer"
       onClick={registrar}
-      className={`inline-flex items-center gap-2.5 rounded-full px-7 py-3.5 text-[0.95rem] font-semibold shadow-media transition-[background-color,opacity] duration-150 hover:opacity-90 ${
+      className={`flex h-14 w-full items-center justify-center gap-2.5 rounded-2xl px-6 text-[1rem] font-semibold shadow-alta transition-[background-color,opacity,transform] duration-150 hover:opacity-90 active:scale-[0.98] ${
         enviado ? "bg-tinta-suave text-papel" : "bg-[#25D366] text-white"
       }`}
     >

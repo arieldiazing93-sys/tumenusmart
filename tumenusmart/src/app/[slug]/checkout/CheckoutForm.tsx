@@ -379,7 +379,7 @@ export function CheckoutForm({
 
           <div>
             <span className="mb-1.5 block text-[0.82rem] font-semibold text-tinta">Entrega</span>
-            <Segmentado opciones={entregasDisponibles} valor={tipoEntrega} onChange={setTipoEntrega} />
+            <Segmentado opciones={entregasDisponibles} valor={tipoEntrega} onChange={setTipoEntrega} uniforme />
           </div>
 
           {tipoEntrega === "delivery" && (
