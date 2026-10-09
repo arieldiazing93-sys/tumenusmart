@@ -242,6 +242,7 @@ model Store {
   certificadosFirma    CertificadoFirma[]
   configFacturacionElectronica ConfigFacturacionElectronica?
   documentosElectronicos DocumentoElectronico[]
+  eventosElectronicos  EventoElectronico[]
   optionGroups         OptionGroup[]
   optionGroupProductos OptionGroupProduct[]
   productOptionGroups  ProductOptionGroup[]
@@ -1394,6 +1395,11 @@ model PuntoExpedicion {
   // lee primero y se incrementa después, porque entre esas dos operaciones
   // dos ventas en simultáneo podrían agarrar el mismo número).
   ultimoNumeroFactura Int @default(0)
+
+  /// El tipo de timbrado de este punto: "autoimpresor" (talonario autorizado por la DNIT, con vencimiento) o "electronico"
+  /// (facturación electrónica SIFEN: el timbrado no vence y cada factura se firma). Todos los puntos activos de un local
+  /// son del mismo tipo.
+  modalidad    String        @default("autoimpresor")
 
   activo       Boolean       @default(true)
   createdAt    DateTime      @default(now())
@@ -3228,10 +3234,17 @@ model DocumentoElectronico {
   firmadoEn         DateTime @default(now())
   firmadoPor        String
 
-  // --- Envío a la DNIT (siguiente etapa) ---
+  // --- Envío a la DNIT ---
+  /// Cuándo se intentó enviar por primera vez (puede haber llegado aunque no se haya recibido la respuesta).
   enviadoEn        DateTime?
+  /// El primer código y todos los mensajes que devolvió la DNIT en su protocolo de respuesta.
   respuestaCodigo  String?
   respuestaMensaje String?
+  /// Número de transacción (protocolo de autorización) con que la DNIT lo aprobó, y cuándo lo procesó.
+  protocoloAutorizacion String?
+  procesadoEn      DateTime?
+  /// El último problema de comunicación (sin conexión, error del servidor…): se reintenta solo.
+  errorEnvio       String?
   intentos         Int       @default(0)
   proximoIntentoEn DateTime?
 
@@ -3240,4 +3253,60 @@ model DocumentoElectronico {
 
   @@index([storeId, estado])
   @@index([storeId, createdAt])
+  @@index([estado, proximoIntentoEn])
+
+  eventos EventoElectronico[]
+}
+
+/// Un evento del emisor ante la DNIT: la CANCELACIÓN de un documento ya aprobado (hasta 48 horas después de su aprobación) o la
+/// INUTILIZACIÓN de números de una numeración que no se usaron (por ejemplo, el de un documento rechazado). Se crea "pendiente"
+/// sin firmar; la tarea programada lo firma y lo envía cuando corresponde (una cancelación espera a que el documento esté aprobado).
+model EventoElectronico {
+  id      String @id @default(cuid())
+  storeId String
+  store   Store  @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  /// "cancelacion" | "inutilizacion".
+  tipo String
+
+  /// Cancelación: el documento y su CDC (copiado).
+  documentoId String?
+  documento   DocumentoElectronico? @relation(fields: [documentoId], references: [id], onDelete: SetNull)
+  cdc         String?
+
+  /// Inutilización: de qué numeración y qué rango de números (ambos incluidos).
+  timbrado        String?
+  establecimiento String?
+  punto           String?
+  numeroDesde     Int?
+  numeroHasta     Int?
+  /// Tipo de documento (1 = factura electrónica).
+  tipoDocumento   Int?
+
+  /// Por qué (5 a 500 caracteres en una cancelación, 5 a 150 en una inutilización).
+  motivo String
+
+  /// "pendiente" | "aprobado" | "rechazado" | "omitido" (ya no hace falta: el documento fue rechazado o ya estaba cancelado).
+  estado String @default("pendiente")
+
+  /// El identificador del evento y el XML tal como se firmó y se envió.
+  idEvento   String?
+  xmlFirmado String?
+
+  enviadoEn             DateTime?
+  procesadoEn           DateTime?
+  protocoloAutorizacion String?
+  respuestaCodigo       String?
+  respuestaMensaje      String?
+  errorEnvio            String?
+  intentos              Int       @default(0)
+  proximoIntentoEn      DateTime?
+
+  creadoPor String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([storeId, estado])
+  @@index([estado, proximoIntentoEn])
+  @@index([documentoId])
 }

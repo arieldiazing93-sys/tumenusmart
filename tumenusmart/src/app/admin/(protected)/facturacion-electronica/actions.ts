@@ -4,7 +4,10 @@ import { revalidatePath } from "next/cache";
 import { exigirPermiso } from "@/lib/auth";
 import { idLocalActual } from "@/lib/local-actual";
 import { registrarBitacora } from "@/lib/bitacora";
-import { firmarFactura, guardarCertificado, guardarConfiguracion, quitarCertificado, type ResultadoFirmar } from "@/lib/sifen/servidor";
+import { enviarDocumento, enviarEvento } from "@/lib/sifen/envio";
+import { solicitarInutilizacion } from "@/lib/sifen/solicitudes";
+import { prisma } from "@/lib/prisma";
+import { firmarFactura, guardarCertificado, guardarConfiguracion, obtenerDocumentoFirmado, quitarCertificado, type ResultadoFirmar } from "@/lib/sifen/servidor";
 
 export type ResultadoSimple = { ok: true; avisos?: string[] } | { ok: false; error: string };
 
@@ -102,4 +105,83 @@ export async function firmarFacturaElectronica(origen: "pedido" | "venta", id: s
     revalidatePath("/admin/facturacion-electronica");
   }
   return resultado;
+}
+
+export type ResultadoEnviarAhora = { ok: true; mensaje: string; estado: string } | { ok: false; error: string };
+
+/**
+ * Envía a la DNIT un documento pendiente sin esperar a la tarea programada (que lo hace sola cada minuto). Sirve para probar
+ * la conexión y para insistir cuando hubo un problema de comunicación.
+ */
+export async function enviarDocumentoAhora(documentoId: string): Promise<ResultadoEnviarAhora> {
+  const sesion = await exigirPermiso("facturacion.configurar");
+  if (typeof documentoId !== "string" || documentoId === "") return { ok: false, error: "Documento inválido." };
+  const storeId = await idLocalActual();
+  const r = await enviarDocumento(storeId, documentoId);
+  if (!r.ok) {
+    return { ok: false, error: r.motivo === "comunicacion" ? `No se pudo enviar ahora: ${r.mensaje}. Se reintenta solo.` : r.mensaje };
+  }
+  await registrarBitacora(storeId, sesion, {
+    modulo: "facturacion_electronica",
+    accion: r.estado === "rechazado" ? "documento_rechazado" : "documento_aprobado",
+    descripcion: `Envió a la DNIT el documento electrónico: ${r.estado === "rechazado" ? "RECHAZADO" : r.estado === "aprobado" ? "aprobado" : "aprobado con observación"}${r.mensaje ? ` (${r.mensaje})` : ""}.`,
+    entidad: "DocumentoElectronico",
+    entidadId: documentoId,
+    detalle: { estado: r.estado, protocolo: r.protocolo },
+  });
+  revalidatePath("/admin/facturacion-electronica");
+  return { ok: true, estado: r.estado, mensaje: r.mensaje };
+}
+
+export type ResultadoPedirEvento = { ok: true; mensaje: string } | { ok: false; error: string };
+
+/**
+ * Avisa a la DNIT que el número de un documento RECHAZADO no se va a usar (inutilización de numeración), para que la numeración
+ * no quede con un hueco. Después se vuelve a emitir la factura con el número siguiente. Solo vale para un documento rechazado.
+ */
+export async function pedirInutilizacionDeDocumento(documentoId: string): Promise<ResultadoPedirEvento> {
+  const sesion = await exigirPermiso("facturacion.configurar");
+  if (typeof documentoId !== "string" || documentoId === "") return { ok: false, error: "Documento inválido." };
+  const storeId = await idLocalActual();
+  const doc = await obtenerDocumentoFirmado(storeId, documentoId);
+  if (!doc) return { ok: false, error: "Ese documento no existe." };
+  if (doc.vistaPrevia || doc.estado !== "rechazado") return { ok: false, error: "Solo se puede inutilizar el número de un documento rechazado por la DNIT." };
+  const comprobante = await prisma.comprobante.findFirst({
+    where: { id: doc.comprobanteId, storeId },
+    select: { timbrado: true, establecimiento: true, punto: true, correlativo: true, numero: true },
+  });
+  if (!comprobante) return { ok: false, error: "No se encontró el comprobante de ese documento." };
+  const r = await solicitarInutilizacion(prisma, {
+    storeId,
+    timbrado: comprobante.timbrado,
+    establecimiento: comprobante.establecimiento,
+    punto: comprobante.punto,
+    desde: comprobante.correlativo,
+    hasta: comprobante.correlativo,
+    tipoDocumento: 1,
+    motivo: `Documento ${comprobante.numero} rechazado por la DNIT`,
+    creadoPor: sesion.nombre?.trim() || sesion.email,
+  });
+  if (!r.creada) return { ok: false, error: r.motivo };
+  await registrarBitacora(storeId, sesion, {
+    modulo: "facturacion_electronica",
+    accion: "inutilizacion_pedida",
+    descripcion: `Pidió inutilizar el número ${comprobante.numero} (documento rechazado por la DNIT).`,
+    entidad: "EventoElectronico",
+    entidadId: r.eventoId,
+    detalle: { numero: comprobante.numero, cdc: doc.cdc },
+  });
+  revalidatePath("/admin/facturacion-electronica");
+  return { ok: true, mensaje: "Pedido. Se envía a la DNIT en un minuto." };
+}
+
+/** Envía a la DNIT un evento pendiente sin esperar a la tarea programada. */
+export async function enviarEventoAhora(eventoId: string): Promise<ResultadoEnviarAhora> {
+  await exigirPermiso("facturacion.configurar");
+  if (typeof eventoId !== "string" || eventoId === "") return { ok: false, error: "Evento inválido." };
+  const storeId = await idLocalActual();
+  const r = await enviarEvento(storeId, eventoId);
+  revalidatePath("/admin/facturacion-electronica");
+  if (!r.ok) return { ok: false, error: r.motivo === "comunicacion" ? `No se pudo enviar ahora: ${r.mensaje}. Se reintenta solo.` : r.mensaje };
+  return { ok: true, estado: r.estado, mensaje: r.mensaje };
 }

@@ -7,6 +7,7 @@
 <script src="https://cdn.jsdelivr.net/npm/node-forge@1.3.1/dist/forge.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
 <script src="/banco/muestras-p12.js"></script>
+<script src="/banco/base-falsa.js"></script>
 <script src="/banco/cargador.js"></script>
 </head>
 <body>
@@ -27,6 +28,9 @@
       await correr("prueba-base.js");
       await correr("prueba-qr.js");
       await correr("prueba-firma.js");
+      await correr("prueba-emision.js");
+      await correr("prueba-envio.js");
+      await correr("prueba-eventos.js");
       await correr("prueba-documento.js");
     } catch (e) {
       window.__fallas++;

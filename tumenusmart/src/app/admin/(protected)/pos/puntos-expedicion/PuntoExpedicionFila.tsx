@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { Tarjeta, Campo, Entrada, Pastilla, clasesBoton } from "@/components/ui";
 import { diasParaVencer, DIAS_AVISO_VENCIMIENTO } from "@/lib/factura-pos";
+import { esElectronico } from "@/lib/modalidad-punto";
 import { actualizarPuntoExpedicion, alternarActivoPuntoExpedicion } from "./actions";
 
 type Props = {
@@ -16,6 +17,7 @@ type Props = {
   razonSocialEmisor: string;
   rucEmisor: string;
   ultimoNumeroFactura: number;
+  modalidad: string;
   activo: boolean;
 };
 
@@ -35,15 +37,26 @@ export function PuntoExpedicionFila({
   razonSocialEmisor,
   rucEmisor,
   ultimoNumeroFactura,
+  modalidad,
   activo,
 }: Props) {
   const [pending, startTransition] = useTransition();
   const [editando, setEditando] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const electronico = esElectronico(modalidad);
+  // El timbrado electrónico no vence: nunca está vencido ni "por vencer".
   const dias = diasParaVencer(new Date(timbradoHasta));
-  const vencido = dias < 0;
-  const porVencer = !vencido && dias <= DIAS_AVISO_VENCIMIENTO;
+  const vencido = !electronico && dias < 0;
+  const porVencer = !electronico && !vencido && dias <= DIAS_AVISO_VENCIMIENTO;
+
+  function alternarActivo() {
+    setError(null);
+    startTransition(async () => {
+      const resultado = await alternarActivoPuntoExpedicion(id, !activo);
+      if (!resultado.ok) setError(resultado.error);
+    });
+  }
 
   function guardar(formData: FormData) {
     setError(null);
@@ -80,15 +93,17 @@ export function PuntoExpedicionFila({
           <Campo etiqueta="Punto de expedición">
             <Entrada name="puntoExpedicion" required defaultValue={puntoExpedicion} maxLength={3} />
           </Campo>
-          <Campo etiqueta="N° de timbrado">
+          <Campo etiqueta={electronico ? "N° de timbrado electrónico" : "N° de timbrado"}>
             <Entrada name="numeroTimbrado" required defaultValue={numeroTimbrado} />
           </Campo>
-          <Campo etiqueta="Vigente desde">
+          <Campo etiqueta={electronico ? "Inicio de vigencia del timbrado" : "Vigente desde"}>
             <Entrada type="date" name="timbradoDesde" required defaultValue={timbradoDesde} />
           </Campo>
-          <Campo etiqueta="Vence">
-            <Entrada type="date" name="timbradoHasta" required defaultValue={timbradoHasta} />
-          </Campo>
+          {!electronico && (
+            <Campo etiqueta="Vence">
+              <Entrada type="date" name="timbradoHasta" required defaultValue={timbradoHasta} />
+            </Campo>
+          )}
           <div className="col-span-2 flex items-center gap-2 sm:col-span-3">
             <button type="submit" disabled={pending} className={clasesBoton("navegar", "sm")}>
               Guardar
@@ -118,6 +133,9 @@ export function PuntoExpedicionFila({
         <div>
           <span className="font-medium">
             {nombre} <span className="text-tinta-suave">({establecimiento}-{puntoExpedicion})</span>
+            <span className="ml-2 align-middle">
+              <Pastilla color={electronico ? "azul" : "neutro"}>{electronico ? "Electrónico" : "Autoimpresor"}</Pastilla>
+            </span>
             {!activo && (
               <span className="ml-2 align-middle">
                 <Pastilla color="amarillo" punto>
@@ -130,8 +148,10 @@ export function PuntoExpedicionFila({
             {razonSocialEmisor} · RUC {rucEmisor}
           </p>
           <p className="text-[0.8rem] text-tinta-media">
-            Timbrado {numeroTimbrado} · vigente {fechaCorta(timbradoDesde)} – {fechaCorta(timbradoHasta)} ·{" "}
-            {ultimoNumeroFactura} factura(s) emitida(s)
+            {electronico
+              ? `Timbrado electrónico ${numeroTimbrado} · desde ${fechaCorta(timbradoDesde)} · sin vencimiento`
+              : `Timbrado ${numeroTimbrado} · vigente ${fechaCorta(timbradoDesde)} – ${fechaCorta(timbradoHasta)}`}{" "}
+            · {ultimoNumeroFactura} factura(s) emitida(s)
           </p>
         </div>
 
@@ -144,13 +164,14 @@ export function PuntoExpedicionFila({
           <button
             type="button"
             disabled={pending}
-            onClick={() => startTransition(() => alternarActivoPuntoExpedicion(id, !activo))}
+            onClick={alternarActivo}
             className={clasesBoton(activo ? "peligro" : "nuevo", "sm")}
           >
             {activo ? "Desactivar" : "Reactivar"}
           </button>
         </div>
       </div>
+      {error && <p className="mt-2 text-xs text-peligro">{error}</p>}
     </div>
   );
 }

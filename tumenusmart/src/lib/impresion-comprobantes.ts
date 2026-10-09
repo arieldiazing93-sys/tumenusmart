@@ -46,13 +46,15 @@ export async function imprimirComprobante(
     const nombreImpresora = indicada !== null ? decodeURIComponent(indicada) || null : impresoraPorDefecto;
     if (!nombreImpresora) return { ok: false, motivo: "sin_impresora" };
     const texto = await r.text();
+    // La factura electrónica lleva el QR como imagen: se manda como bytes y no como texto.
+    const binario = r.headers.get("X-Binario") === "1";
     try {
       await conectarQz();
     } catch (e) {
       return { ok: false, motivo: "sin_qz", detalle: String(e) };
     }
     // Una tras otra: la cola de QZ las mantiene en orden y sin mezclarse.
-    for (let i = 0; i < copias; i++) await imprimirTexto(nombreImpresora, texto);
+    for (let i = 0; i < copias; i++) await imprimirTexto(nombreImpresora, texto, binario);
     return { ok: true };
   } catch (e) {
     return { ok: false, motivo: "error", detalle: String(e) };

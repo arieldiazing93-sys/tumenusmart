@@ -10,6 +10,9 @@ import { SIN_REGISTRO_FISCAL, etiquetaTipoIdentificacion } from "@/lib/tipo-clie
 import { ZONA_NEGOCIO } from "@/lib/timezone";
 import { armarDocumento, centrado, filaEtiqueta, filaTabla, negrita, separador } from "@/lib/escpos";
 import { cabeceraImpresoraFactura, copiasDeImpresion, impresoraParaFactura } from "@/lib/copias-impresion";
+import { construirKude } from "@/lib/sifen/kude";
+import { kudeAEscpos } from "@/lib/sifen/kude-escpos";
+import { documentoElectronicoDeVenta } from "@/lib/sifen/servidor";
 
 export const dynamic = "force-dynamic";
 
@@ -40,6 +43,24 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   ]);
 
   if (!venta) return new NextResponse("No encontrado", { status: 404 });
+
+  // Factura electrónica: el comprobante impreso es el KuDE, armado desde el documento firmado (con su código QR como imagen).
+  // Lleva bytes (la imagen), así que se avisa con `X-Binario` para que se mande a la impresora como bytes y no como texto.
+  if (!venta.cancelada && !venta.facturaAnulada) {
+    const documento = await documentoElectronicoDeVenta(db, venta.id);
+    if (documento) {
+      const copias = await copiasDeImpresion(db, { documento: "factura" });
+      const impresoraFactura = await impresoraParaFactura(db);
+      return new NextResponse(kudeAEscpos(construirKude(documento.xmlFirmado)), {
+        headers: {
+          "Content-Type": "text/plain; charset=utf-8",
+          "X-Copias": String(copias),
+          "X-Binario": "1",
+          ...cabeceraImpresoraFactura(impresoraFactura),
+        },
+      });
+    }
+  }
 
   // Una factura anulada sola (cuenta viva) ya no cuenta como vigente para
   // imprimir — cae al bloque informal, con el aviso de más abajo.

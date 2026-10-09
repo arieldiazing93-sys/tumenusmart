@@ -7,8 +7,11 @@ import { prismaDelLocal } from "@/lib/prisma-local";
 import { prisma } from "@/lib/prisma";
 import { registrarBitacora } from "@/lib/bitacora";
 import { DEPARTAMENTOS, faltantesEmisor, normalizarEmisor } from "@/lib/emisor-fiscal";
+import { FIN_TIMBRADO_ELECTRONICO, normalizarModalidad, type ModalidadPunto } from "@/lib/modalidad-punto";
+import { calcularDvRuc, separarRuc } from "@/lib/sifen-codigos";
 import { ciudadesDelDistrito, distritosDelDepartamento, resolverUbicacion, type OpcionGeografica } from "@/lib/sifen/geografia";
 import type { Prisma } from "@prisma/client";
+import type { PrismaLocal } from "@/lib/prisma-local";
 
 export type ResultadoPuntoExpedicion = { ok: true } | { ok: false; error: string };
 
@@ -23,9 +26,27 @@ type DatosPuntoExpedicion = {
   timbradoHasta: Date;
   razonSocialEmisor: string;
   rucEmisor: string;
+  modalidad: ModalidadPunto;
 };
 
-function leerDatos(formData: FormData): { datos: DatosPuntoExpedicion } | { error: string } {
+/**
+ * Todos los puntos ACTIVOS de un local son del mismo tipo de timbrado (autoimpresor o electrónico). Devuelve el motivo si
+ * `modalidad` choca con los otros puntos activos (sin contar `exceptoId`), o null si no hay conflicto.
+ */
+async function conflictoDeModalidad(db: PrismaLocal, modalidad: ModalidadPunto, exceptoId?: string): Promise<string | null> {
+  const activos = await db.puntoExpedicion.findMany({
+    where: { activo: true, ...(exceptoId ? { id: { not: exceptoId } } : {}) },
+    select: { modalidad: true },
+  });
+  if (activos.some((p) => normalizarModalidad(p.modalidad) !== modalidad)) {
+    return "Todos los puntos de expedición activos del local tienen que ser del mismo tipo de timbrado (autoimpresor o electrónico). Para cambiar de tipo, desactivá primero los puntos del otro tipo.";
+  }
+  return null;
+}
+
+/** `modalidadFija`: al editar, el tipo de timbrado de un punto no se cambia (se crea otro punto). */
+function leerDatos(formData: FormData, modalidadFija?: ModalidadPunto): { datos: DatosPuntoExpedicion } | { error: string } {
+  const modalidad = modalidadFija ?? normalizarModalidad(formData.get("modalidad"));
   const nombre = String(formData.get("nombre") ?? "").trim();
   const establecimiento = String(formData.get("establecimiento") ?? "").trim();
   const puntoExpedicion = String(formData.get("puntoExpedicion") ?? "").trim();
@@ -47,12 +68,26 @@ function leerDatos(formData: FormData): { datos: DatosPuntoExpedicion } | { erro
   if (!rucEmisor) return { error: "El RUC del emisor es obligatorio." };
 
   const timbradoDesde = new Date(timbradoDesdeTexto);
-  const timbradoHasta = new Date(timbradoHastaTexto);
+  // El timbrado electrónico no vence: se guarda una fecha lejana para que lo que compara contra el vencimiento siga igual.
+  const timbradoHasta = modalidad === "electronico" ? FIN_TIMBRADO_ELECTRONICO : new Date(timbradoHastaTexto);
   if (isNaN(timbradoDesde.getTime()) || isNaN(timbradoHasta.getTime())) {
-    return { error: "Las fechas de vigencia del timbrado son obligatorias." };
+    return {
+      error: modalidad === "electronico" ? "La fecha de inicio de vigencia del timbrado es obligatoria." : "Las fechas de vigencia del timbrado son obligatorias.",
+    };
   }
   if (timbradoHasta <= timbradoDesde) {
     return { error: "El vencimiento tiene que ser posterior al inicio de vigencia." };
+  }
+
+  if (modalidad === "electronico") {
+    // El timbrado electrónico es de 8 dígitos y el RUC del emisor tiene que ir con su dígito verificador: la DNIT rechaza
+    // todo documento con alguno de los dos mal. En el ambiente de pruebas el timbrado es el RUC sin dígito.
+    if (!/^\d{8}$/.test(numeroTimbrado)) return { error: "El timbrado electrónico tiene que tener 8 dígitos." };
+    const ruc = separarRuc(rucEmisor);
+    if (!/^[1-9]\d{2,7}$/.test(ruc.numero) || !ruc.dv) return { error: "El RUC del emisor tiene que llevar su dígito verificador, por ejemplo 80012345-0." };
+    if (Number(ruc.dv) !== calcularDvRuc(ruc.numero)) {
+      return { error: `El dígito verificador del RUC no es correcto: para ${ruc.numero} es ${calcularDvRuc(ruc.numero)}.` };
+    }
   }
 
   return {
@@ -65,6 +100,7 @@ function leerDatos(formData: FormData): { datos: DatosPuntoExpedicion } | { erro
       timbradoHasta,
       razonSocialEmisor,
       rucEmisor,
+      modalidad,
     },
   };
 }
@@ -81,6 +117,8 @@ export async function crearPuntoExpedicion(formData: FormData): Promise<Resultad
 
   const leido = leerDatos(formData);
   if ("error" in leido) return { ok: false, error: leido.error };
+  const conflicto = await conflictoDeModalidad(prisma, leido.datos.modalidad);
+  if (conflicto) return { ok: false, error: conflicto };
 
   await prisma.puntoExpedicion.create({ data: { ...leido.datos, storeId: idLocal } });
   revalidatePath("/admin/pos/puntos-expedicion");
@@ -94,7 +132,10 @@ export async function actualizarPuntoExpedicion(
   await exigirPermiso("pos.gestionarEstaciones");
   const prisma = prismaDelLocal(await idLocalActual());
 
-  const leido = leerDatos(formData);
+  const existente = await prisma.puntoExpedicion.findFirst({ where: { id }, select: { modalidad: true } });
+  if (!existente) return { ok: false, error: "Ese punto de expedición ya no existe." };
+
+  const leido = leerDatos(formData, normalizarModalidad(existente.modalidad));
   if ("error" in leido) return { ok: false, error: leido.error };
 
   await prisma.puntoExpedicion.update({ where: { id }, data: leido.datos });
@@ -105,14 +146,23 @@ export async function actualizarPuntoExpedicion(
 /**
  * Sin borrar: una vez que un punto de expedición emitió facturas, borrarlo
  * dejaría esos comprobantes sin de dónde salió su timbrado — mismo criterio
- * que Productos/Estaciones. Se desactiva nomás.
+ * que Productos/Estaciones. Se desactiva nomás. Reactivar uno de otro tipo que los
+ * demás puntos activos no se permite (un local factura con un solo tipo de timbrado).
  */
-export async function alternarActivoPuntoExpedicion(id: string, activo: boolean) {
+export async function alternarActivoPuntoExpedicion(id: string, activo: boolean): Promise<ResultadoPuntoExpedicion> {
   await exigirPermiso("pos.gestionarEstaciones");
   const prisma = prismaDelLocal(await idLocalActual());
 
+  if (activo) {
+    const punto = await prisma.puntoExpedicion.findFirst({ where: { id }, select: { modalidad: true } });
+    if (!punto) return { ok: false, error: "Ese punto de expedición ya no existe." };
+    const conflicto = await conflictoDeModalidad(prisma, normalizarModalidad(punto.modalidad), id);
+    if (conflicto) return { ok: false, error: conflicto };
+  }
+
   await prisma.puntoExpedicion.update({ where: { id }, data: { activo } });
   revalidatePath("/admin/pos/puntos-expedicion");
+  return { ok: true };
 }
 
 /**

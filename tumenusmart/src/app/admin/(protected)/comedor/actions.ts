@@ -14,6 +14,8 @@ import { validarPagosDeVenta } from "@/lib/pago-venta";
 import { FORMA_PAGO_A_CREDITO } from "@/lib/turno-pos";
 import { desglosarIva, formatearNumeroFactura } from "@/lib/factura-pos";
 import { crearComprobante, descripcionDeItem } from "@/lib/comprobante";
+import { esElectronico } from "@/lib/modalidad-punto";
+import { ErrorFacturaElectronica, problemaParaEmitirElectronico } from "@/lib/sifen/servidor";
 import { SIN_REGISTRO_FISCAL } from "@/lib/tipo-cliente";
 import { calcularDescuento, textoPorcentaje } from "@/lib/descuento-venta";
 import { resolverDescuentoConTipos } from "@/lib/tipos-descuento";
@@ -941,6 +943,11 @@ export async function pagarCuenta(cuentaId: string, datos: DatosCobroCuenta): Pr
     if (!puntoExpedicion.activo || puntoExpedicion.timbradoHasta < new Date()) {
       return { ok: false, error: "El timbrado de este punto de expedición está vencido. No se puede emitir factura." };
     }
+    // Timbrado electrónico: la factura se firma al cobrar, así que antes se comprueba que el certificado y el resto estén listos.
+    if (esElectronico(puntoExpedicion.modalidad)) {
+      const problema = await problemaParaEmitirElectronico(storeId);
+      if (problema) return { ok: false, error: problema };
+    }
   }
 
   // ------------------------------------------------------------------------- la cuenta y lo que vale
@@ -1202,7 +1209,7 @@ export async function pagarCuenta(cuentaId: string, datos: DatosCobroCuenta): Pr
       return venta.id;
     }, OPCIONES_TX);
   } catch (e) {
-    if (e instanceof ErrorDeUsuario) return { ok: false, error: e.message };
+    if (e instanceof ErrorDeUsuario || e instanceof ErrorFacturaElectronica) return { ok: false, error: e.message };
     console.error("[comedor] pagarCuenta falló", e);
     return {
       ok: false,

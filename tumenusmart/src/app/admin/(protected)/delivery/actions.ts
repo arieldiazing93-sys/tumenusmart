@@ -14,6 +14,8 @@ import { validarPagosDeVenta } from "@/lib/pago-venta";
 import { FORMA_PAGO_A_CREDITO } from "@/lib/turno-pos";
 import { desglosarIva, formatearNumeroFactura } from "@/lib/factura-pos";
 import { anularComprobantes, crearComprobante, descripcionDeItem } from "@/lib/comprobante";
+import { esElectronico } from "@/lib/modalidad-punto";
+import { ErrorFacturaElectronica, problemaParaEmitirElectronico } from "@/lib/sifen/servidor";
 import { SIN_REGISTRO_FISCAL } from "@/lib/tipo-cliente";
 import { limpiarTexto, validarDatosFiscales } from "@/lib/datos-fiscales";
 import { extraerUbicacion } from "@/lib/ubicacion-mapa";
@@ -1131,6 +1133,13 @@ export async function emitirFacturaDelivery(cuentaId: string, datos: DatosFactur
   if (!puntoExpedicion.activo || puntoExpedicion.timbradoHasta < new Date()) {
     return { ok: false, error: "El timbrado de este punto de expedición está vencido. No se puede emitir factura." };
   }
+  // La factura electrónica lleva adentro la forma de pago y se firma al emitirla: no se puede sacar antes de cobrar.
+  if (esElectronico(puntoExpedicion.modalidad)) {
+    return {
+      ok: false,
+      error: "Con facturación electrónica la factura se emite al cobrar la cuenta, cuando ya se sabe la forma de pago. Cobrá la cuenta con factura.",
+    };
+  }
 
   // A quién se factura: "Sin Nombre" (Consumidor Final) o los datos ya revisados (texto limpio).
   if (!datos?.facturaTipoIdentificacion) return { ok: false, error: "Elegí con o sin registro fiscal." };
@@ -1525,6 +1534,11 @@ export async function pagarCuentaDelivery(cuentaId: string, datos: DatosCobroDel
     if (!puntoExpedicion.activo || puntoExpedicion.timbradoHasta < new Date()) {
       return { ok: false, error: "El timbrado de este punto de expedición está vencido. No se puede emitir factura." };
     }
+    // Timbrado electrónico: la factura se firma al cobrar, así que antes se comprueba que el certificado y el resto estén listos.
+    if (esElectronico(puntoExpedicion.modalidad)) {
+      const problema = await problemaParaEmitirElectronico(storeId);
+      if (problema) return { ok: false, error: problema };
+    }
   }
 
   // ------------------------------------------------------------------------- la cuenta y lo que vale
@@ -1795,7 +1809,7 @@ export async function pagarCuentaDelivery(cuentaId: string, datos: DatosCobroDel
       return venta.id;
     }, OPCIONES_TX);
   } catch (e) {
-    if (e instanceof ErrorDeUsuario) return { ok: false, error: e.message };
+    if (e instanceof ErrorDeUsuario || e instanceof ErrorFacturaElectronica) return { ok: false, error: e.message };
     console.error("[delivery] pagarCuentaDelivery falló", e);
     return {
       ok: false,

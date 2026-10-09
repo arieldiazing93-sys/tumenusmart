@@ -114,6 +114,39 @@ function signedInfoCanonico(escrito: string, canonizacion: "exclusiva" | "inclus
 //  Firmar
 // ---------------------------------------------------------------------------
 
+/**
+ * El bloque <Signature> de una referencia: el resumen (SHA-256) del texto canónico de lo firmado, la firma RSA-SHA256 de
+ * SignedInfo y el certificado. Lo usan tanto los documentos (la referencia es el CDC) como los eventos (la referencia es el
+ * Id del evento): la firma es la misma, cambia qué se firma.
+ */
+export async function firmarReferencia(
+  idReferencia: string,
+  canonicoReferenciado: string,
+  material: MaterialFirma,
+  canonizacion: "exclusiva" | "inclusiva" = "exclusiva"
+): Promise<{ firmaXml: string; digestValue: string; signatureValue: string }> {
+  // 1. El resumen (SHA-256) de lo firmado, en su forma canónica.
+  const digestValue = aBase64(await sha256(utf8(canonicoReferenciado)));
+
+  // 2. La firma RSA-SHA256 de SignedInfo canónico.
+  const escrito = signedInfoEscrito(idReferencia, digestValue, canonizacion);
+  const clave = await crypto.subtle.importKey(
+    "pkcs8",
+    comoBuffer(material.clavePrivadaPkcs8),
+    { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+  const signatureValue = aBase64(
+    new Uint8Array(await crypto.subtle.sign("RSASSA-PKCS1-v1_5", clave, comoBuffer(utf8(signedInfoCanonico(escrito, canonizacion)))))
+  );
+
+  const firmaXml =
+    `<Signature xmlns="${NS_DSIG}">${escrito}<SignatureValue>${signatureValue}</SignatureValue>` +
+    `<KeyInfo><X509Data><X509Certificate>${material.certificadoBase64.replace(/\s+/g, "")}</X509Certificate></X509Data></KeyInfo></Signature>`;
+  return { firmaXml, digestValue, signatureValue };
+}
+
 export type DocumentoFirmado = {
   /** El archivo completo (<rDE>…) firmado y con el QR. */
   xml: string;
@@ -151,27 +184,8 @@ export async function firmarDocumento(
   const cuentas = controlarCalculos(de);
   if (cuentas.length > 0) throw new Error(`Las cuentas del documento no cierran: ${cuentas[0]}`);
 
-  const canonizacion = opciones.canonizacionSignedInfo ?? "exclusiva";
-
-  // 1. El resumen (SHA-256) del DE canónico.
-  const digestValue = aBase64(await sha256(utf8(canonizarDE(de))));
-
-  // 2. La firma RSA-SHA256 de SignedInfo canónico.
-  const escrito = signedInfoEscrito(cdc, digestValue, canonizacion);
-  const clave = await crypto.subtle.importKey(
-    "pkcs8",
-    comoBuffer(material.clavePrivadaPkcs8),
-    { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
-    false,
-    ["sign"]
-  );
-  const signatureValue = aBase64(
-    new Uint8Array(await crypto.subtle.sign("RSASSA-PKCS1-v1_5", clave, comoBuffer(utf8(signedInfoCanonico(escrito, canonizacion)))))
-  );
-
-  const firmaXml =
-    `<Signature xmlns="${NS_DSIG}">${escrito}<SignatureValue>${signatureValue}</SignatureValue>` +
-    `<KeyInfo><X509Data><X509Certificate>${material.certificadoBase64.replace(/\s+/g, "")}</X509Certificate></X509Data></KeyInfo></Signature>`;
+  // 1 y 2. El resumen del DE canónico y la firma de SignedInfo.
+  const { firmaXml, digestValue, signatureValue } = await firmarReferencia(cdc, canonizarDE(de), material, opciones.canonizacionSignedInfo ?? "exclusiva");
 
   // 3. El QR, que lleva el DigestValue (por eso va después de firmar y fuera de lo firmado).
   const receptor = (de.gDatGralOpe as Nodo).gDatRec as Nodo;
@@ -233,23 +247,38 @@ export type ResultadoVerificacion = { valida: true; cdc: string } | { valida: fa
  * (eso lo hace la DNIT). Sirve de autocontrol antes de enviar y para detectar un documento tocado después de firmado.
  */
 export async function verificarFirmaXml(xml: string): Promise<ResultadoVerificacion> {
-  const tomar = (patron: RegExp): string | null => {
-    const m = patron.exec(xml);
-    return m ? m[1] : null;
-  };
   const inicioDe = xml.indexOf("<DE Id=");
   const finDe = xml.indexOf("</DE>");
   if (inicioDe < 0 || finDe < 0) return { valida: false, motivo: "No se encontró el grupo <DE>" };
   const deEscrito = xml.slice(inicioDe, finDe + "</DE>".length);
-  const cdc = tomar(/<DE Id="(\d{44})">/);
-  const referencia = tomar(/<Reference URI="#(\d{44})">/);
+  const cdc = /<DE Id="(\d{44})">/.exec(xml)?.[1] ?? null;
+  const referencia = /<Reference URI="#(\d{44})">/.exec(xml)?.[1] ?? null;
   if (!cdc || cdc !== referencia) return { valida: false, motivo: "La referencia de la firma no apunta al CDC del documento" };
+  const canonico = `<DE xmlns="${NAMESPACE_SIFEN}" xmlns:xsi="${NS_XSI}" Id=` + deEscrito.slice("<DE Id=".length);
+  return verificarReferencia(xml, cdc, canonico, "El documento fue modificado después de firmarse (el resumen no coincide)");
+}
 
+/** Lo mismo para un evento (cancelación, inutilización): la referencia firmada es el <rEve Id="…">. */
+export async function verificarFirmaEvento(xml: string): Promise<ResultadoVerificacion> {
+  const inicio = xml.indexOf("<rEve Id=");
+  const fin = xml.indexOf("</rEve>");
+  if (inicio < 0 || fin < 0) return { valida: false, motivo: "No se encontró el grupo <rEve>" };
+  const escrito = xml.slice(inicio, fin + "</rEve>".length);
+  const id = /<rEve Id="(\d{1,10})">/.exec(xml)?.[1] ?? null;
+  const referencia = /<Reference URI="#(\d{1,10})">/.exec(xml)?.[1] ?? null;
+  if (!id || id !== referencia) return { valida: false, motivo: "La referencia de la firma no apunta al identificador del evento" };
+  const canonico = `<rEve xmlns="${NAMESPACE_SIFEN}" Id=` + escrito.slice("<rEve Id=".length);
+  return verificarReferencia(xml, id, canonico, "El evento fue modificado después de firmarse (el resumen no coincide)");
+}
+
+async function verificarReferencia(xml: string, id: string, canonico: string, mensajeResumen: string): Promise<ResultadoVerificacion> {
+  const tomar = (patron: RegExp): string | null => {
+    const m = patron.exec(xml);
+    return m ? m[1] : null;
+  };
   const digestEscrito = tomar(/<DigestValue>([^<]+)<\/DigestValue>/);
-  const digestCalculado = aBase64(
-    await sha256(utf8(`<DE xmlns="${NAMESPACE_SIFEN}" xmlns:xsi="${NS_XSI}" Id=` + deEscrito.slice("<DE Id=".length)))
-  );
-  if (digestEscrito !== digestCalculado) return { valida: false, motivo: "El documento fue modificado después de firmarse (el resumen no coincide)" };
+  const digestCalculado = aBase64(await sha256(utf8(canonico)));
+  if (digestEscrito !== digestCalculado) return { valida: false, motivo: mensajeResumen };
 
   const inicioSi = xml.indexOf("<SignedInfo>");
   const finSi = xml.indexOf("</SignedInfo>");
@@ -274,7 +303,7 @@ export async function verificarFirmaXml(xml: string): Promise<ResultadoVerificac
       comoBuffer(deBase64(firma)),
       comoBuffer(utf8(signedInfoCanonico(signedInfoEscrito, canonizacion)))
     );
-    return correcta ? { valida: true, cdc } : { valida: false, motivo: "La firma no corresponde al certificado (SignedInfo alterado)" };
+    return correcta ? { valida: true, cdc: id } : { valida: false, motivo: "La firma no corresponde al certificado (SignedInfo alterado)" };
   } catch (e) {
     return { valida: false, motivo: "No se pudo verificar la firma: " + (e instanceof Error ? e.message : String(e)) };
   }

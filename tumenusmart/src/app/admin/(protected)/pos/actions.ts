@@ -19,6 +19,8 @@ import { aplanarReceta } from "@/lib/insumo-elaborado";
 import { cargarElaborados } from "@/lib/cargar-elaborados";
 import { desglosarIva, formatearNumeroFactura } from "@/lib/factura-pos";
 import { anularComprobantes, crearComprobante, descripcionDeItem } from "@/lib/comprobante";
+import { esElectronico } from "@/lib/modalidad-punto";
+import { ErrorFacturaElectronica, problemaParaEmitirElectronico } from "@/lib/sifen/servidor";
 import { DURACION_MINIMA_CITA } from "@/lib/agenda-cita";
 import { calcularDescuento, type DescuentoPedido } from "@/lib/descuento-venta";
 import { resolverDescuentoConTipos } from "@/lib/tipos-descuento";
@@ -298,6 +300,11 @@ export async function registrarVenta(turnoId: string, datos: DatosVenta): Promis
     }
     if (!puntoExpedicion.activo || puntoExpedicion.timbradoHasta < new Date()) {
       return { ok: false, error: "El timbrado de este punto de expedición está vencido. No se puede emitir factura." };
+    }
+    // Timbrado electrónico: la factura se firma al vender, así que antes se comprueba que el certificado y el resto estén listos.
+    if (esElectronico(puntoExpedicion.modalidad)) {
+      const problema = await problemaParaEmitirElectronico(storeId);
+      if (problema) return { ok: false, error: problema };
     }
   }
 
@@ -826,11 +833,14 @@ export async function registrarVenta(turnoId: string, datos: DatosVenta): Promis
     .catch((e: unknown) => {
       // La cita se cobró (o se canceló) en el mismo instante desde otra pantalla.
       if (e instanceof Error && e.message === CITA_NO_COBRABLE) return null;
+      // La factura electrónica no se pudo emitir: la venta se deshizo (con su número) y se le dice por qué a quien cobra.
+      if (e instanceof ErrorFacturaElectronica) return { errorFactura: e.message };
       throw e;
     });
   if (ventaCreada === null) {
     return { ok: false, error: "Esa cita ya se cobró o se canceló mientras tanto. Actualizá la pantalla." };
   }
+  if (typeof ventaCreada === "object") return { ok: false, error: ventaCreada.errorFactura };
   const ventaId = ventaCreada;
 
   // Solo lo que conviene poder revisar después: las ventas con descuento y las

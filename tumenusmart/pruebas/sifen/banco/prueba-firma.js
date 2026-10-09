@@ -220,6 +220,37 @@
   let errKude = 0; for (const roto of ["", "<rDE></rDE>", F.xml.replace(/<gTotSub>[\s\S]*<\/gTotSub>/, "")]) { try { kude.construirKude(roto); } catch { errKude++; } }
   igual(errKude, 3, "un archivo vacío, sin documento o sin totales no arma un KuDE");
 
+  window.log("== El KuDE para la impresora térmica (ESC/POS con el QR como imagen)");
+  const kudeEsc = await C.cargar("src/lib/sifen/kude-escpos");
+  const bytesEsc = kudeEsc.kudeAEscpos(M);
+  ok([...bytesEsc].every((ch) => ch.charCodeAt(0) <= 0xff), "todo el trabajo son bytes (ningún carácter pasa de 255): se puede mandar en base64");
+  ok(bytesEsc.startsWith("\x1B\x40") && bytesEsc.endsWith("\x1D\x56\x00"), "empieza con el reinicio de la impresora y termina con el corte");
+  const texto80 = bytesEsc.replace(/\x1D\x76\x30\x00[\s\S]*?(?=\x1B\x61\x00)/g, "");
+  ok(texto80.includes(M.cdcAgrupado.split(" ").slice(0, 6).join(" ")) && texto80.includes(M.cdcAgrupado.split(" ").slice(6).join(" ")), "el CDC sale en grupos de cuatro, repartido en dos renglones");
+  ok(texto80.includes("KuDE de Factura Electronica") && texto80.includes("N: 001-001-0000047") && texto80.includes("TOTAL A PAGAR") && texto80.includes(M.totales.totalOperacion) && texto80.includes("Timbrado N: 80012345"), "trae el título, el número, el timbrado y el total");
+  const sinCorteDeLinea = texto80.split("\n").filter((r) => r.replace(/\x1B[Ea][\x00-\x01]/g, "").replace(/[\x00-\x1F]/g, "").length > 40);
+  ok(sinCorteDeLinea.length === 0, "ningún renglón de texto pasa de los 40 caracteres de la cinta" + (sinCorteDeLinea.length ? " -> " + JSON.stringify(sinCorteDeLinea[0]) : ""));
+  // La imagen: se reconstruye el bitmap con los comandos GS v 0 y se lee con jsQR.
+  function bitmapDe(bytes) {
+    let i = 0; const bandas = []; let ancho = 0;
+    while ((i = bytes.indexOf("\x1D\x76\x30\x00", i)) >= 0) {
+      const xb = bytes.charCodeAt(i + 4) + 256 * bytes.charCodeAt(i + 5), filas = bytes.charCodeAt(i + 6) + 256 * bytes.charCodeAt(i + 7);
+      ancho = xb * 8; const ini = i + 8;
+      for (let f = 0; f < filas; f++) bandas.push(bytes.slice(ini + f * xb, ini + (f + 1) * xb));
+      i = ini + xb * filas;
+    }
+    return { filas: bandas, ancho };
+  }
+  const bm = bitmapDe(bytesEsc);
+  ok(bm.filas.length > 300 && bm.ancho >= 300, "la imagen del QR tiene el tamaño esperado (" + bm.ancho + " × " + bm.filas.length + " puntos)");
+  const alto = bm.filas.length, esc = 2, W = bm.ancho * esc, H = alto * esc;
+  const px = new Uint8ClampedArray(W * H * 4).fill(255);
+  bm.filas.forEach((fila, y) => { for (let x = 0; x < bm.ancho; x++) { if ((fila.charCodeAt(x >> 3) >> (7 - (x & 7))) & 1) for (let a = 0; a < esc; a++) for (let b = 0; b < esc; b++) { const k = ((y * esc + a) * W + x * esc + b) * 4; px[k] = px[k + 1] = px[k + 2] = 0; } } });
+  const leidoImp = window.jsQR(px, W, H);
+  ok(leidoImp && leidoImp.data === M.urlQr, "jsQR lee el QR tal como lo imprimiría la impresora y devuelve la dirección exacta del documento");
+  const largo = kudeEsc.kudeAEscpos(kude.construirKude((await firma.firmarDocumento(armar.armarDE(comprobante([item("x", "Plato con un nombre larguísimo de ñandú á la crema con 🍕 y un texto aún más largo todavía", 10000, 2, "gravado10")]), [{ forma: "efectivo", monto: 20000 }], { ...OPC, ambiente: "produccion" }).de, material, { ...QR, produccion: true })).xml));
+  ok([...largo].every((ch) => ch.charCodeAt(0) <= 0xff) && largo.includes("Plato con un nombre") && !largo.includes("🍕") && !/[^\x00-\xFF]/.test(largo), "un nombre largo, con ñ, tildes y emoji se parte en renglones y sale solo con caracteres de la impresora");
+
   window.log("\naciertos: " + window.__aciertos + " · fallas: " + window.__fallas);
   window.__listo = true;
 })().catch((e) => { document.getElementById("salida").textContent += "\nERROR: " + (e && e.stack || e); window.__listo = true; window.__fallas = (window.__fallas || 0) + 1; });

@@ -69,6 +69,11 @@ function escaparTexto(s: string): string {
   return limpiarTextoXml(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
+/** El texto de un valor listo para ir dentro de una etiqueta (sin caracteres de control, con &, < y > escapados). */
+export function escaparTextoXml(s: string): string {
+  return escaparTexto(s);
+}
+
 function escaparAtributo(s: string): string {
   return escaparTexto(s).replace(/"/g, "&quot;");
 }
@@ -318,7 +323,7 @@ export function validarContraEsquema(rde: Nodo, opciones: OpcionesValidacion = {
 //  Leer el XML (el camino inverso de aXmlRDE)
 // ---------------------------------------------------------------------------
 
-type ElementoXml = {
+export type ElementoXml = {
   nombre: string;
   atributos: Record<string, string>;
   hijos: ElementoXml[];
@@ -339,9 +344,13 @@ function desescapar(s: string): string {
   });
 }
 
-/** Un lector de XML mínimo, para los archivos que escribe este mismo módulo: elementos, atributos y texto (sin DTD ni CDATA). */
-function leerElementos(xml: string): ElementoXml {
-  const patron = /<\?[\s\S]*?\?>|<!--[\s\S]*?-->|<\/([^\s>]+)\s*>|<([^\s/>]+)((?:\s+[^\s=/>]+\s*=\s*(?:"[^"]*"|'[^']*'))*)\s*(\/?)>|([^<]+)/g;
+/**
+ * Un lector de XML mínimo, para los archivos que escribe este mismo módulo y las respuestas de los servicios de la DNIT:
+ * elementos, atributos, texto y CDATA. No admite DTD (ni entidades propias): un documento con DOCTYPE se rechaza, así no hay
+ * forma de que una respuesta ajena haga leer archivos ni explotar la memoria con entidades anidadas.
+ */
+export function leerElementos(xml: string): ElementoXml {
+  const patron = /<\?[\s\S]*?\?>|<!--[\s\S]*?-->|<\/([^\s>]+)\s*>|<([^\s/>]+)((?:\s+[^\s=/>]+\s*=\s*(?:"[^"]*"|'[^']*'))*)\s*(\/?)>|<!\[CDATA\[([\s\S]*?)\]\]>|([^<]+)/g;
   const raiz: ElementoXml = { nombre: "#raiz", atributos: {}, hijos: [], texto: "", desde: 0, hasta: xml.length };
   const pila: ElementoXml[] = [raiz];
   let m: RegExpExecArray | null;
@@ -363,8 +372,11 @@ function leerElementos(xml: string): ElementoXml {
       actual.hijos.push(elemento);
       if (m[4] !== "/") pila.push(elemento);
     } else if (m[5] !== undefined) {
-      if (actual === raiz && m[5].trim() !== "") throw new Error("El XML no se pudo leer (hay texto fuera del documento)");
-      actual.texto += desescapar(m[5]);
+      if (actual === raiz) throw new Error("El XML no se pudo leer (hay texto fuera del documento)");
+      actual.texto += m[5];
+    } else if (m[6] !== undefined) {
+      if (actual === raiz && m[6].trim() !== "") throw new Error("El XML no se pudo leer (hay texto fuera del documento)");
+      actual.texto += desescapar(m[6]);
     }
   }
   if (ultimo !== xml.length) throw new Error("El XML no se pudo leer (termina de forma inesperada)");
@@ -401,4 +413,35 @@ export function leerXmlRDE(xml: string): Nodo {
   const rde = raiz.hijos.find((h) => h.nombre === "rDE");
   if (!rde || raiz.hijos.length !== 1) throw new Error("El archivo no es un documento electrónico (<rDE>)");
   return aNodoXml(xml, rde, "rDE") as Nodo;
+}
+
+// ---------------------------------------------------------------------------
+//  Ayudas para leer respuestas (SOAP y protocolos de la DNIT)
+// ---------------------------------------------------------------------------
+
+/** El nombre de una etiqueta sin su prefijo de espacio de nombres: "env:Body" → "Body". */
+export function nombreLocal(nombre: string): string {
+  const i = nombre.indexOf(":");
+  return i >= 0 ? nombre.slice(i + 1) : nombre;
+}
+
+/** El primer elemento con ese nombre (sin prefijo) dentro de `desde`, buscando en profundidad; null si no hay. */
+export function buscarElemento(desde: ElementoXml, nombre: string): ElementoXml | null {
+  for (const hijo of desde.hijos) {
+    if (nombreLocal(hijo.nombre) === nombre) return hijo;
+    const dentro = buscarElemento(hijo, nombre);
+    if (dentro) return dentro;
+  }
+  return null;
+}
+
+/** Todos los elementos con ese nombre (sin prefijo) que sean hijos DIRECTOS de `desde`. */
+export function hijosConNombre(desde: ElementoXml, nombre: string): ElementoXml[] {
+  return desde.hijos.filter((h) => nombreLocal(h.nombre) === nombre);
+}
+
+/** El texto de un elemento sin espacios en las puntas, o null si no existe o está vacío. */
+export function textoDeElemento(el: ElementoXml | null | undefined): string | null {
+  const t = el?.texto.trim();
+  return t ? t : null;
 }

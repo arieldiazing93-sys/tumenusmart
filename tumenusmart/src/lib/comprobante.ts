@@ -15,6 +15,10 @@
 import type { Prisma, PrismaClient } from "@prisma/client";
 import { formatearNumeroFactura, repartirDescuentoEnLineas } from "./factura-pos";
 import { emisorDesdeFila } from "./emisor-fiscal";
+import { esElectronico } from "./modalidad-punto";
+import type { ComprobanteParaDocumento, PagoParaDocumento } from "./documento-electronico";
+import { ErrorFacturaElectronica, firmarDocumentoAlVender } from "./sifen/servidor";
+import { solicitarCancelacion } from "./sifen/solicitudes";
 
 type Db = PrismaClient | Prisma.TransactionClient;
 
@@ -32,6 +36,8 @@ export type PuntoParaComprobante = {
   timbradoHasta: Date;
   razonSocialEmisor: string;
   rucEmisor: string;
+  /** "autoimpresor" | "electronico": el tipo de timbrado del punto. Con "electronico" la factura se firma al emitirla. */
+  modalidad: string;
 };
 
 /** Una línea tal como sale de la venta o del pedido, antes de repartirle el descuento. */
@@ -168,12 +174,35 @@ export type DatosNuevoComprobante = {
   emitidoPor: string;
 };
 
+/**
+ * Cómo se pagó la venta, para el documento electrónico (la forma de pago va dentro de la factura). Solo se lee de la base
+ * cuando la factura es al contado; a crédito el documento lleva el plazo y no las formas de pago.
+ */
+async function pagosDeLaVenta(db: Db, datos: DatosNuevoComprobante): Promise<PagoParaDocumento[]> {
+  if (datos.condicion === "credito") return [];
+  if ("ventaPosId" in datos.origen) {
+    const filas = await db.pagoVenta.findMany({
+      where: { ventaPosId: datos.origen.ventaPosId },
+      orderBy: { orden: "asc" },
+      select: { forma: true, monto: true },
+    });
+    return filas.map((p) => ({ forma: p.forma, monto: Number(p.monto) }));
+  }
+  if ("cuentaDeliveryId" in datos.origen) {
+    // La factura rápida sale ANTES de cobrar: todavía no se sabe cómo se paga, y la factura electrónica lo lleva adentro.
+    throw new ErrorFacturaElectronica("Con facturación electrónica la factura del delivery se emite al cobrar la cuenta, cuando ya se sabe la forma de pago.");
+  }
+  throw new ErrorFacturaElectronica("Esta factura no se puede emitir de forma electrónica desde un pedido: usá una venta del punto de venta.");
+}
+
 /** Guarda el comprobante con sus líneas. Devuelve su id y su número ("001-001-0000001"). */
 export async function crearComprobante(db: Db, datos: DatosNuevoComprobante): Promise<{ id: string; numero: string }> {
   const { punto, receptor } = datos;
   const items = repartirDescuento(datos.items, datos.descuento);
   const totales = totalesDeItems(items);
   const numero = formatearNumeroFactura(punto.establecimiento, punto.puntoExpedicion, datos.correlativo);
+  const electronico = esElectronico(punto.modalidad);
+  const fechaEmision = datos.fechaEmision ?? new Date();
 
   // Los datos del emisor que pide la factura electrónica (dirección,
   // actividades…), si el local los cargó: se copian al comprobante para que
@@ -182,14 +211,14 @@ export async function crearComprobante(db: Db, datos: DatosNuevoComprobante): Pr
   const emisor = await db.emisorFiscal.findUnique({ where: { storeId: datos.storeId } });
   const emisorDatos = emisor ? (emisorDesdeFila(emisor) as unknown as Prisma.InputJsonValue) : null;
 
-  return db.comprobante.create({
+  const creado = await db.comprobante.create({
     data: {
       storeId: datos.storeId,
       ventaPosId: "ventaPosId" in datos.origen ? datos.origen.ventaPosId : null,
       orderId: "orderId" in datos.origen ? datos.origen.orderId : null,
       cuentaDeliveryId: "cuentaDeliveryId" in datos.origen ? datos.origen.cuentaDeliveryId : null,
       tipo: "factura",
-      modalidad: "autoimpresor",
+      modalidad: electronico ? "electronico" : "autoimpresor",
       puntoExpedicionId: punto.id,
       timbrado: punto.numeroTimbrado,
       timbradoDesde: punto.timbradoDesde,
@@ -198,7 +227,7 @@ export async function crearComprobante(db: Db, datos: DatosNuevoComprobante): Pr
       punto: punto.puntoExpedicion,
       correlativo: datos.correlativo,
       numero,
-      fechaEmision: datos.fechaEmision ?? new Date(),
+      fechaEmision,
       tipoTransaccion: tipoTransaccionDe(datos.items),
       emisorRuc: punto.rucEmisor,
       emisorRazonSocial: punto.razonSocialEmisor,
@@ -236,6 +265,51 @@ export async function crearComprobante(db: Db, datos: DatosNuevoComprobante): Pr
     },
     select: { id: true, numero: true },
   });
+
+  // Local con timbrado electrónico: la factura se firma en este mismo momento y dentro de la misma transacción de la venta.
+  // Así el comprobante impreso (con su código QR, que depende de la firma) sale al instante, y no queda una venta facturada
+  // sin su documento. Si algo falla (falta el certificado, datos del emisor incompletos…) la venta entera se deshace.
+  if (electronico) {
+    const pagos = await pagosDeLaVenta(db, datos);
+    const paraDocumento: ComprobanteParaDocumento = {
+      tipo: "factura",
+      modalidad: "electronico",
+      tipoEmision: "normal",
+      timbrado: punto.numeroTimbrado,
+      timbradoDesde: punto.timbradoDesde,
+      establecimiento: punto.establecimiento,
+      punto: punto.puntoExpedicion,
+      correlativo: datos.correlativo,
+      numero,
+      fechaEmision,
+      tipoTransaccion: tipoTransaccionDe(datos.items),
+      moneda: "PYG",
+      emisorRuc: punto.rucEmisor,
+      emisorRazonSocial: punto.razonSocialEmisor,
+      emisorDatos: emisorDatos,
+      receptorTipoIdentificacion: receptor.tipoIdentificacion,
+      receptorNumeroIdentificacion: receptor.numeroIdentificacion,
+      receptorRazonSocial: receptor.razonSocial,
+      receptorEmail: receptor.email,
+      presencia: datos.presencia,
+      condicion: datos.condicion,
+      fechaVencimientoCredito: datos.fechaVencimientoCredito,
+      total: totales.total,
+      items: items.map((it) => ({
+        codigo: it.productId,
+        descripcion: it.descripcion,
+        unidadMedida: it.unidadMedida,
+        cantidad: it.cantidad,
+        precioUnitario: it.precioUnitario,
+        descuento: it.descuento,
+        total: it.total,
+        iva: it.iva,
+      })),
+    };
+    await firmarDocumentoAlVender(db, datos.storeId, creado.id, paraDocumento, pagos, datos.emitidoPor);
+  }
+
+  return creado;
 }
 
 /** El pedazo de `where` que dice de qué cuenta es el comprobante. */
@@ -263,6 +337,12 @@ export async function anularComprobantes(
     motivo: string | null;
   }
 ): Promise<void> {
+  // Los comprobantes electrónicos que se anulan: la DNIT tiene que enterarse (evento de cancelación). Solo se deja pedido; la tarea
+  // programada lo firma y lo envía cuando el documento esté aprobado (y dentro de las 48 horas que da la DNIT).
+  const electronicos = await db.comprobante.findMany({
+    where: { storeId: datos.storeId, ...filtroDeOrigen(datos.origen), estado: "vigente", modalidad: "electronico" },
+    select: { documentoElectronico: { select: { id: true } } },
+  });
   await db.comprobante.updateMany({
     where: {
       storeId: datos.storeId,
@@ -271,6 +351,11 @@ export async function anularComprobantes(
     },
     data: { estado: "anulado", anuladoPor: datos.por, anuladoEn: datos.en, motivoAnulacion: datos.motivo },
   });
+  for (const c of electronicos) {
+    if (c.documentoElectronico) {
+      await solicitarCancelacion(db, { storeId: datos.storeId, documentoId: c.documentoElectronico.id, motivo: datos.motivo, creadoPor: datos.por });
+    }
+  }
 }
 
 /** El último comprobante anulado de una venta o pedido: el que va a reemplazar una remisión. */

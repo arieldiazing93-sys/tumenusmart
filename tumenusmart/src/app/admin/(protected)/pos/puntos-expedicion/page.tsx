@@ -10,6 +10,7 @@ import { FacturaObligatoriaToggle } from "./FacturaObligatoriaToggle";
 import { EmisorFiscalForm } from "./EmisorFiscalForm";
 import { emisorDesdeFila } from "@/lib/emisor-fiscal";
 import { completarUbicacionEmisor } from "@/lib/sifen/geografia";
+import { normalizarModalidad } from "@/lib/modalidad-punto";
 
 export const dynamic = "force-dynamic";
 
@@ -26,16 +27,20 @@ export default async function PuntosExpedicionPage() {
     prismaGlobal.emisorFiscal.findUnique({ where: { storeId: idLocal } }),
   ]);
 
+  // Un local factura con un solo tipo de timbrado: el de sus puntos activos (null si todavía no tiene ninguno).
+  const puntoActivo = puntos.find((p) => p.activo);
+  const modalidadDelLocal = puntoActivo ? normalizarModalidad(puntoActivo.modalidad) : null;
+
   return (
     <div>
       <Cabecera
         titulo="Puntos de expedición"
-        bajada="Los puntos de expedición que la DNIT autorizó para Factura Autoimpresor — cada uno con su propio timbrado y numeración. Se asignan a las estaciones en Estaciones."
+        bajada="Los puntos de expedición que la DNIT autorizó, cada uno con su propio timbrado y numeración: autoimpresor o electrónico (SIFEN). Un local usa un solo tipo. Se asignan a las estaciones en Estaciones."
       />
 
       <FacturaObligatoriaToggle obligatoria={store?.facturaObligatoria ?? false} />
 
-      <CrearPuntoExpedicionForm />
+      <CrearPuntoExpedicionForm modalidadDelLocal={modalidadDelLocal} />
 
       <EmisorFiscalForm inicial={completarUbicacionEmisor(emisorDesdeFila(emisorFila))} />
 
@@ -53,6 +58,7 @@ export default async function PuntosExpedicionPage() {
             razonSocialEmisor={p.razonSocialEmisor}
             rucEmisor={p.rucEmisor}
             ultimoNumeroFactura={p.ultimoNumeroFactura}
+            modalidad={p.modalidad}
             activo={p.activo}
           />
         ))}

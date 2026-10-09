@@ -4,7 +4,9 @@ import { Aviso, BotonEnlace, Cabecera, Pastilla, Tabla, Td, Th, Tarjeta, Tr, Vac
 import { formatearGuarani } from "@/lib/format";
 import { ZONA_NEGOCIO } from "@/lib/timezone";
 import { cdcParaMostrar } from "@/lib/sifen/cdc";
-import { estadoFacturacionElectronica, listarDocumentos } from "@/lib/sifen/servidor";
+import { estadoFacturacionElectronica, listarDocumentos, resumenDeEnvios } from "@/lib/sifen/servidor";
+import { BotonEnviarAhora } from "./BotonEnviarAhora";
+import { BotonEnviarEventoAhora, BotonInutilizar } from "./BotonesEvento";
 import { CertificadoForm } from "./CertificadoForm";
 import { ConfiguracionForm } from "./ConfiguracionForm";
 
@@ -20,8 +22,15 @@ const ETIQUETA_ESTADO: Record<string, string> = {
   aprobado: "Aprobado",
   aprobado_con_observacion: "Aprobado con observación",
   rechazado: "Rechazado",
-  cancelado: "Cancelado",
+  cancelado: "Cancelado en la DNIT",
   inutilizado: "Inutilizado",
+};
+
+const ETIQUETA_EVENTO: Record<string, string> = {
+  pendiente: "pendiente",
+  aprobado: "aprobada",
+  rechazado: "rechazada",
+  omitido: "no hacía falta",
 };
 
 function Punto({ ok, children }: { ok: boolean; children: React.ReactNode }) {
@@ -38,7 +47,7 @@ function Punto({ ok, children }: { ok: boolean; children: React.ReactNode }) {
 export default async function FacturacionElectronicaPage() {
   await pantallaConPermiso("facturacion.configurar");
   const storeId = await idLocalActual();
-  const [estado, documentos] = await Promise.all([estadoFacturacionElectronica(storeId), listarDocumentos(storeId, 20)]);
+  const [estado, documentos, envios] = await Promise.all([estadoFacturacionElectronica(storeId), listarDocumentos(storeId, 20), resumenDeEnvios(storeId)]);
   const c = estado.certificado;
   const listo = estado.falta.length === 0;
 
@@ -77,9 +86,15 @@ export default async function FacturacionElectronicaPage() {
             <Punto ok={estado.tieneCsc}>Código de seguridad del contribuyente (CSC) {estado.tieneCsc ? "cargado" : "sin cargar"}</Punto>
           </ul>
           <p className="mt-3 text-[0.78rem] text-tinta-suave">
-            Ambiente actual: <strong className="text-tinta">{estado.ambiente === "produccion" ? "Producción" : "Pruebas"}</strong>. Todavía no se envía nada a
-            la DNIT: por ahora el sistema arma, firma y guarda el documento, y se puede ver su comprobante impreso (KuDE).
+            Ambiente actual: <strong className="text-tinta">{estado.ambiente === "produccion" ? "Producción" : "Pruebas"}</strong>. El sistema arma y firma cada
+            factura al venderla y la envía sola a la DNIT (cada minuto); si no hay conexión, reintenta. Se puede ver su comprobante impreso (KuDE).
           </p>
+          {(envios.pendientes > 0 || envios.rechazados > 0) && (
+            <p className={`mt-2 rounded-lg px-3 py-2 text-[0.82rem] ${envios.rechazados > 0 ? "bg-peligro-luz text-peligro" : "bg-aviso-luz text-aviso"}`}>
+              {envios.pendientes > 0 && `${envios.pendientes} documento(s) esperan ser enviados a la DNIT. `}
+              {envios.rechazados > 0 && `${envios.rechazados} documento(s) fueron RECHAZADOS por la DNIT: hay que corregir el motivo y volver a emitir la factura.`}
+            </p>
+          )}
         </Tarjeta>
 
         {!estado.boveda && (
@@ -189,13 +204,39 @@ export default async function FacturacionElectronicaPage() {
                     <Td className="text-right tabular-nums">{formatearGuarani(d.total)}</Td>
                     <Td>
                       <div className="flex flex-wrap gap-1">
-                        <Pastilla color={d.estado === "rechazado" ? "peligro" : d.estado === "firmado" ? "azul" : "exito"}>{ETIQUETA_ESTADO[d.estado] ?? d.estado}</Pastilla>
+                        <Pastilla color={d.estado === "rechazado" ? "peligro" : d.estado === "firmado" ? (d.vistaPrevia ? "azul" : "amarillo") : "exito"}>
+                          {d.estado === "firmado" && !d.vistaPrevia ? "Pendiente de envío" : (ETIQUETA_ESTADO[d.estado] ?? d.estado)}
+                        </Pastilla>
                         {d.vistaPrevia && <Pastilla color="amarillo">Vista previa</Pastilla>}
                         {d.ambiente === "pruebas" && <Pastilla color="neutro">Pruebas</Pastilla>}
                       </div>
+                      {/* Lo que dijo la DNIT, o por qué todavía no se pudo enviar (se reintenta solo). */}
+                      {d.estado === "firmado" && !d.vistaPrevia && d.errorEnvio && (
+                        <p className="mt-1 max-w-[20rem] text-[0.72rem] leading-snug text-aviso">
+                          {d.errorEnvio}
+                          {d.proximoIntentoEn ? ` · Reintento: ${fechaHora(d.proximoIntentoEn)}` : ""}
+                        </p>
+                      )}
+                      {d.respuestaMensaje && (d.estado === "rechazado" || d.estado === "aprobado_con_observacion") && (
+                        <p className={`mt-1 max-w-[20rem] text-[0.72rem] leading-snug ${d.estado === "rechazado" ? "text-peligro" : "text-tinta-media"}`}>{d.respuestaMensaje}</p>
+                      )}
+                      {d.protocoloAutorizacion && <p className="mt-1 text-[0.72rem] text-tinta-suave">Protocolo {d.protocoloAutorizacion}</p>}
+                      {/* Cancelaciones e inutilizaciones pedidas a la DNIT sobre este documento. */}
+                      {d.eventos.map((e) => (
+                        <div key={e.id} className="mt-1.5 flex flex-wrap items-start gap-1.5 text-[0.72rem] leading-snug">
+                          <Pastilla color={e.estado === "aprobado" ? "exito" : e.estado === "rechazado" ? "peligro" : e.estado === "omitido" ? "neutro" : "amarillo"}>
+                            {e.tipo === "cancelacion" ? "Cancelación" : "Inutilización"}: {ETIQUETA_EVENTO[e.estado] ?? e.estado}
+                          </Pastilla>
+                          {e.estado === "pendiente" && e.errorEnvio && <span className="max-w-[16rem] text-aviso">{e.errorEnvio}</span>}
+                          {(e.estado === "rechazado" || e.estado === "omitido") && e.respuestaMensaje && <span className="max-w-[16rem] text-tinta-media">{e.respuestaMensaje}</span>}
+                          {e.estado === "pendiente" && <BotonEnviarEventoAhora eventoId={e.id} />}
+                        </div>
+                      ))}
                     </Td>
                     <Td>
-                      <div className="flex flex-wrap gap-1.5">
+                      <div className="flex flex-wrap items-start gap-1.5">
+                        {d.estado === "firmado" && !d.vistaPrevia && <BotonEnviarAhora documentoId={d.id} />}
+                        {d.estado === "rechazado" && !d.vistaPrevia && !d.eventos.some((e) => e.tipo === "inutilizacion" && e.estado !== "rechazado") && <BotonInutilizar documentoId={d.id} />}
                         <a href={`/admin/facturacion-electronica/xml/${d.id}`} className={clasesBoton("navegar", "sm")}>
                           XML
                         </a>

@@ -9,6 +9,9 @@ import { esVentaACredito, etiquetaFormaPagoPos } from "@/lib/turno-pos";
 import { SIN_REGISTRO_FISCAL, etiquetaTipoIdentificacion } from "@/lib/tipo-cliente";
 import { ZONA_NEGOCIO } from "@/lib/timezone";
 import { ImprimirAuto } from "@/components/ImprimirAuto";
+import { ESTILOS_KUDE, Kude } from "@/components/Kude";
+import { construirKude, type ModeloKude } from "@/lib/sifen/kude";
+import { documentoElectronicoDeVenta } from "@/lib/sifen/servidor";
 import { VolverAutomatico } from "@/components/VolverAutomatico";
 
 export const dynamic = "force-dynamic";
@@ -132,6 +135,42 @@ export default async function TicketVentaPosPage({
   ]);
 
   if (!venta) notFound();
+
+  // Factura electrónica: el comprobante es el KuDE, armado desde el documento firmado (no el talonario autoimpresor).
+  if (!venta.cancelada && !venta.facturaAnulada) {
+    const documento = await documentoElectronicoDeVenta(db, venta.id);
+    let modeloKude: ModeloKude | null = null;
+    try {
+      modeloKude = documento ? construirKude(documento.xmlFirmado) : null;
+    } catch {
+      modeloKude = null;
+    }
+    if (modeloKude) {
+      return (
+        <>
+          <style dangerouslySetInnerHTML={{ __html: ESTILOS_KUDE.cinta }} />
+          <div id="comprobante-imprimible" className="mx-auto max-w-[75mm]">
+            {!esSilencioso ? (
+              <ImprimirAuto volverA={volverAlPos ? "/admin/pos" : undefined} />
+            ) : (
+              volverAlPos && <VolverAutomatico a="/admin/pos" segundos={2} />
+            )}
+            {areasFallidas.length > 0 && (
+              <div className="mb-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-center text-xs text-amber-800 print:hidden">
+                <p className="mb-1 font-medium">No se imprimió sola la comanda de:</p>
+                {areasFallidas.map((a) => (
+                  <a key={a.id} href={`/admin/pos/venta/${venta.id}/comanda?area=${a.id}`} target="_blank" rel="noopener noreferrer" className="mr-2 underline">
+                    {a.nombre}
+                  </a>
+                ))}
+              </div>
+            )}
+            <Kude modelo={modeloKude} formato="cinta" />
+          </div>
+        </>
+      );
+    }
+  }
 
   // Una factura anulada sola (cuenta viva) ya no cuenta como vigente para
   // imprimir — cae al bloque informal, con el aviso de más abajo.

@@ -9,6 +9,7 @@ import { cargarCatalogoDeVenta } from "@/lib/catalogo-venta";
 import { cargarTiposDescuento } from "@/lib/tipos-descuento-servidor";
 import { formatearGuarani } from "@/lib/format";
 import { SIN_REGISTRO_FISCAL } from "@/lib/tipo-cliente";
+import { esElectronico } from "@/lib/modalidad-punto";
 import { SEGUNDOS_LATIDO_IMPRESION, descuentoDeCuenta, impuestosDeCuenta, lineasDeCobro } from "@/lib/comedor";
 import { ESTADOS_DELIVERY_ABIERTA, lineaDeEnvio, totalesDeDelivery } from "@/lib/delivery";
 import { BotonEnlace, Cabecera, Pastilla } from "@/components/ui";
@@ -193,7 +194,7 @@ export default async function DeliveryPage() {
         select: {
           areaTicketId: true,
           impresoras: { select: { areaImpresionId: true, nombreImpresora: true } },
-          puntoExpedicion: { select: { activo: true, timbradoHasta: true } },
+          puntoExpedicion: { select: { activo: true, timbradoHasta: true, modalidad: true } },
         },
       });
       const impresoraDelTicket = datos?.areaTicketId
@@ -217,7 +218,12 @@ export default async function DeliveryPage() {
         ...contexto,
         facturaRapida: !puedeCobrar
           ? { ok: false, motivo: "No tenés permiso para facturar." }
-          : puntoVigente && puntoDeFactura
+          : puntoVigente && puntoDeFactura && esElectronico(puntoDeFactura.modalidad)
+            ? {
+                ok: false,
+                motivo: "Con facturación electrónica la factura se emite al cobrar la cuenta, cuando ya se sabe la forma de pago.",
+              }
+            : puntoVigente && puntoDeFactura
             ? { ok: true, diasParaVencerTimbrado: diasParaVencer(puntoDeFactura.timbradoHasta), nombreImpresoraTicket: impresoraDelTicket }
             : { ok: false, motivo: "Esta estación no tiene un punto de expedición vigente: no puede emitir facturas." },
       };

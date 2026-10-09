@@ -83,12 +83,12 @@ export async function listarImpresoras(): Promise<string[]> {
  * un string simple en el array de datos ya se interpreta como
  * `{type: 'raw', format: 'command', flavor: 'plain'}`.
  */
-export function imprimirTexto(nombreImpresora: string, texto: string): Promise<void> {
+export function imprimirTexto(nombreImpresora: string, texto: string, binario = false): Promise<void> {
   // Una impresión por vez en toda la pantalla: mandar varios trabajos juntos a la misma impresora física los mezcla en su
   // buffer y salen líneas superpuestas. Pasa de verdad cuando la impresión automática de comandas (que corre en segundo
   // plano) y el ticket de un cobro coinciden en la misma impresora. Cada trabajo espera a que termine el anterior; que uno
   // falle no frena a los que siguen (el error le llega solo a quien lo pidió).
-  const tarea = colaDeImpresion.then(() => imprimirConLimite(nombreImpresora, texto));
+  const tarea = colaDeImpresion.then(() => imprimirConLimite(nombreImpresora, texto, binario));
   colaDeImpresion = tarea.catch(() => {});
   return tarea;
 }
@@ -101,7 +101,7 @@ const LIMITE_IMPRESION_MS = 25_000;
  * pidiendo dónde guardar un archivo (las impresoras "PDF" lo hacen) dejaría el trabajo colgado, y como las impresiones van de
  * a una, también a todas las que vienen detrás. Pasado el límite se da por fallado y sigue lo que viene.
  */
-async function imprimirConLimite(nombreImpresora: string, texto: string): Promise<void> {
+async function imprimirConLimite(nombreImpresora: string, texto: string, binario: boolean): Promise<void> {
   let reloj: ReturnType<typeof setTimeout> | undefined;
   const limite = new Promise<never>((_, rechazar) => {
     reloj = setTimeout(
@@ -118,7 +118,8 @@ async function imprimirConLimite(nombreImpresora: string, texto: string): Promis
     await conectarQz();
     const qz = await cargarQz();
     const config = qz.configs.create(nombreImpresora);
-    await qz.print(config, [texto]);
+    // Con imagen (el QR de la factura electrónica) el trabajo lleva bytes de cualquier valor: va en base64 para que ninguno se altere.
+    await qz.print(config, binario ? [{ type: "raw", format: "command", flavor: "base64", data: btoa(texto) }] : [texto]);
   })();
   // Si el límite gana, el envío sigue por su cuenta: su error (si lo hay) ya no le importa a nadie y no debe quedar sin atender.
   enviar.catch(() => {});

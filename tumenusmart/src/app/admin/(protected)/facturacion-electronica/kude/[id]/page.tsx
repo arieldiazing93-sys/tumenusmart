@@ -5,7 +5,7 @@ import { BotonEnlace } from "@/components/ui";
 import { ImprimirAuto } from "@/components/ImprimirAuto";
 import { construirKude, type ModeloKude } from "@/lib/sifen/kude";
 import { obtenerDocumentoFirmado } from "@/lib/sifen/servidor";
-import { ESTILOS_KUDE, Kude, type FormatoKude } from "../Kude";
+import { ESTILOS_KUDE, Kude, type FormatoKude } from "@/components/Kude";
 
 export const dynamic = "force-dynamic";
 

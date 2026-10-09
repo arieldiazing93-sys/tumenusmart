@@ -15,7 +15,8 @@ import {
   type ItemFuente,
 } from "@/lib/comprobante";
 import { armarDE, armarRDE } from "@/lib/sifen/armar-de";
-import { cargarFactura } from "@/lib/sifen/servidor";
+import { cargarFactura, problemaParaEmitirElectronico } from "@/lib/sifen/servidor";
+import { esElectronico } from "@/lib/modalidad-punto";
 import { aXmlRDE } from "@/lib/sifen/xml";
 import { esDeMesAnterior, nombreDelMes } from "@/lib/mes-fiscal";
 import { registrarBitacora } from "@/lib/bitacora";
@@ -485,6 +486,11 @@ export async function remitirFactura(
       error:
         "Esta computadora no tiene un punto de expedición vigente — no se puede generar una factura nueva desde acá.",
     };
+  }
+  // Timbrado electrónico: la factura nueva se firma al emitirla, así que antes se comprueba que el certificado y el resto estén listos.
+  if (esElectronico(pe.modalidad)) {
+    const problema = await problemaParaEmitirElectronico(storeId);
+    if (problema) return { ok: false, error: problema };
   }
 
   const identidad = sesion.nombre?.trim() || sesion.email;

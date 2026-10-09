@@ -12,6 +12,7 @@
  *  - Toda lectura y escritura lleva el local explícito: un negocio nunca ve el certificado ni los documentos de otro.
  */
 
+import type { Prisma, PrismaClient } from "@prisma/client";
 import { prisma } from "../prisma";
 import { prismaDelLocal, type PrismaLocal } from "../prisma-local";
 import { emisorDesdeFila, faltantesEmisor } from "../emisor-fiscal";
@@ -19,7 +20,7 @@ import { separarRuc } from "../sifen-codigos";
 import type { ComprobanteParaDocumento, PagoParaDocumento } from "../documento-electronico";
 import { armarDE, type ResultadoDE } from "./armar-de";
 import { cifrarSecreto, descifrarSecreto, leerCertificadoP12 } from "./certificado";
-import { deBase64, firmarDocumento, pemADer, verificarFirmaXml, type MaterialFirma } from "./firma";
+import { deBase64, firmarDocumento, pemADer, verificarFirmaXml, type DocumentoFirmado, type MaterialFirma } from "./firma";
 
 export type Ambiente = "pruebas" | "produccion";
 
@@ -298,16 +299,21 @@ export type ResultadoFirmar =
   | { ok: true; documentoId: string; cdc: string; vistaPrevia: boolean; ambiente: Ambiente; avisos: string[] }
   | { ok: false; error: string; faltantes?: string[] };
 
-type MaterialCargado = { material: MaterialFirma; huella: string; csc: string; idCsc: string; ambiente: Ambiente };
+export type MaterialCargado = { material: MaterialFirma; huella: string; csc: string; idCsc: string; ambiente: Ambiente };
+
+/**
+ * El cliente de la base con el que se lee y se guarda. Al vender es el `tx` de la transacción de la venta: con la conexión
+ * única de cada copia del servidor (connection_limit=1) NO se puede consultar el cliente global mientras una transacción
+ * está abierta (esperaría una conexión que la propia transacción tiene ocupada), así que todo va por el mismo cliente.
+ */
+export type Db = PrismaClient | Prisma.TransactionClient;
 
 /** Descifra lo necesario para firmar. Devuelve un texto claro si falta algo. */
-async function cargarMaterial(storeId: string): Promise<{ ok: true; datos: MaterialCargado } | { ok: false; error: string }> {
+export async function cargarMaterial(db: Db, storeId: string): Promise<{ ok: true; datos: MaterialCargado } | { ok: false; error: string }> {
   const maestra = claveMaestra();
   if (!maestra) return { ok: false, error: MENSAJE_SIN_BOVEDA };
-  const [certificado, config] = await Promise.all([
-    prisma.certificadoFirma.findFirst({ where: { storeId, activo: true }, orderBy: { createdAt: "desc" } }),
-    prisma.configFacturacionElectronica.findUnique({ where: { storeId } }),
-  ]);
+  const certificado = await db.certificadoFirma.findFirst({ where: { storeId, activo: true }, orderBy: { createdAt: "desc" } });
+  const config = await db.configFacturacionElectronica.findUnique({ where: { storeId } });
   if (!certificado || !certificado.clavePrivadaCifrada) return { ok: false, error: "Todavía no hay un certificado digital cargado." };
   if (certificado.validoHasta.getTime() < Date.now()) return { ok: false, error: "El certificado digital está vencido: cargá uno vigente." };
   if (!config?.cscCifrado || !config.idCsc) return { ok: false, error: "Todavía no está cargado el código de seguridad (CSC)." };
@@ -331,6 +337,75 @@ async function cargarMaterial(storeId: string): Promise<{ ok: true; datos: Mater
 }
 
 /**
+ * Solo la clave de firma y el certificado (sin el código de seguridad CSC, que únicamente hace falta para el QR de un
+ * documento): lo que necesitan los eventos (cancelación, inutilización).
+ */
+export async function cargarClaveDeFirma(db: Db, storeId: string): Promise<{ ok: true; material: MaterialFirma; huella: string } | { ok: false; error: string }> {
+  const maestra = claveMaestra();
+  if (!maestra) return { ok: false, error: MENSAJE_SIN_BOVEDA };
+  const certificado = await db.certificadoFirma.findFirst({ where: { storeId, activo: true }, orderBy: { createdAt: "desc" } });
+  if (!certificado || !certificado.clavePrivadaCifrada) return { ok: false, error: "Todavía no hay un certificado digital cargado." };
+  if (certificado.validoHasta.getTime() < Date.now()) return { ok: false, error: "El certificado digital está vencido: cargá uno vigente." };
+  try {
+    const pem = await descifrarSecreto(certificado.clavePrivadaCifrada, maestra, storeId);
+    return { ok: true, material: { clavePrivadaPkcs8: pemADer(pem), certificadoBase64: certificado.certificadoBase64 }, huella: certificado.huellaSha256 };
+  } catch {
+    return { ok: false, error: "No se pudo abrir el certificado guardado. Volvé a cargarlo (puede haber cambiado la clave del servidor)." };
+  }
+}
+
+/** El certificado y su clave en PEM, para presentarse ante los servicios de la DNIT (autenticación mutua de la conexión). */
+export async function cargarMaterialTls(
+  db: Db,
+  storeId: string
+): Promise<{ ok: true; certificadoPem: string; clavePem: string } | { ok: false; error: string }> {
+  const maestra = claveMaestra();
+  if (!maestra) return { ok: false, error: MENSAJE_SIN_BOVEDA };
+  const certificado = await db.certificadoFirma.findFirst({ where: { storeId, activo: true }, orderBy: { createdAt: "desc" } });
+  if (!certificado || !certificado.clavePrivadaCifrada) return { ok: false, error: "Todavía no hay un certificado digital cargado." };
+  if (certificado.validoHasta.getTime() < Date.now()) return { ok: false, error: "El certificado digital está vencido: cargá uno vigente." };
+  try {
+    const clavePem = await descifrarSecreto(certificado.clavePrivadaCifrada, maestra, storeId);
+    const base64 = certificado.certificadoBase64.replace(/\s+/g, "");
+    const hoja = `-----BEGIN CERTIFICATE-----\n${base64.replace(/(.{64})/g, "$1\n").trimEnd()}\n-----END CERTIFICATE-----\n`;
+    return { ok: true, certificadoPem: hoja + textos(certificado.cadenaPem).join("\n"), clavePem };
+  } catch {
+    return { ok: false, error: "No se pudo abrir el certificado guardado. Volvé a cargarlo (puede haber cambiado la clave del servidor)." };
+  }
+}
+
+type Generado =
+  | { ok: true; firmado: DocumentoFirmado; avisos: string[]; ambiente: Ambiente; huella: string }
+  | { ok: false; error: string; faltantes?: string[] };
+
+/**
+ * Arma el documento electrónico de un comprobante, lo firma con el certificado de la bóveda y comprueba la firma antes de
+ * devolverlo. Es el único camino por el que se genera un documento firmado (a mano desde Facturas o al vender).
+ */
+async function generarDocumento(db: Db, storeId: string, comprobante: ComprobanteParaDocumento, pagos: PagoParaDocumento[]): Promise<Generado> {
+  const cargado = await cargarMaterial(db, storeId);
+  if (!cargado.ok) return cargado;
+  const { material, huella, csc, idCsc, ambiente } = cargado.datos;
+
+  const armado: ResultadoDE = armarDE(comprobante, pagos, { ambiente, fechaFirma: new Date() });
+  if (!armado.de || !armado.cdc || armado.faltantes.length > 0) {
+    return { ok: false, error: "Faltan datos para armar el documento.", faltantes: armado.faltantes };
+  }
+
+  let firmado: DocumentoFirmado;
+  try {
+    firmado = await firmarDocumento(armado.de, material, { csc, idCsc, produccion: ambiente === "produccion" });
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "No se pudo firmar el documento." };
+  }
+  // Autocontrol: lo que se guarda tiene que verificar con el certificado que lo firmó.
+  const control = await verificarFirmaXml(firmado.xml);
+  if (!control.valida) return { ok: false, error: `La firma no pasó el autocontrol: ${control.motivo}` };
+
+  return { ok: true, firmado, avisos: armado.avisos, ambiente, huella };
+}
+
+/**
  * Arma, firma y guarda el documento electrónico de una factura. Si la factura salió como autoimpresor es solo una "vista
  * previa firmada" (`vistaPrevia`): sirve para probar la firma y el KuDE, y nunca se envía a la DNIT. Un documento ya
  * enviado no se vuelve a firmar.
@@ -346,24 +421,9 @@ export async function firmarFactura(storeId: string, origen: "pedido" | "venta",
     return { ok: false, error: "Este documento ya fue enviado a la DNIT: no se puede firmar de nuevo." };
   }
 
-  const cargado = await cargarMaterial(storeId);
-  if (!cargado.ok) return cargado;
-  const { material, huella, csc, idCsc, ambiente } = cargado.datos;
-
-  const armado: ResultadoDE = armarDE(factura.datos, factura.pagos, { ambiente, fechaFirma: new Date() });
-  if (!armado.de || !armado.cdc || armado.faltantes.length > 0) {
-    return { ok: false, error: "Faltan datos para armar el documento.", faltantes: armado.faltantes };
-  }
-
-  let firmado;
-  try {
-    firmado = await firmarDocumento(armado.de, material, { csc, idCsc, produccion: ambiente === "produccion" });
-  } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "No se pudo firmar el documento." };
-  }
-  // Autocontrol: lo que se guarda tiene que verificar con el certificado que lo firmó.
-  const control = await verificarFirmaXml(firmado.xml);
-  if (!control.valida) return { ok: false, error: `La firma no pasó el autocontrol: ${control.motivo}` };
+  const g = await generarDocumento(prisma, storeId, factura.datos, factura.pagos);
+  if (!g.ok) return g;
+  const { firmado, ambiente } = g;
 
   const vistaPrevia = factura.comprobante.modalidad !== "electronico";
   const datos = {
@@ -374,7 +434,7 @@ export async function firmarFactura(storeId: string, origen: "pedido" | "venta",
     xmlFirmado: firmado.xml,
     digestValue: firmado.digestValue,
     urlQr: firmado.urlQr,
-    huellaCertificado: huella,
+    huellaCertificado: g.huella,
     firmadoEn: new Date(),
     firmadoPor: quien.nombre?.trim() || quien.email,
   };
@@ -382,7 +442,70 @@ export async function firmarFactura(storeId: string, origen: "pedido" | "venta",
     ? await prisma.documentoElectronico.update({ where: { id: existente.id }, data: datos })
     : await prisma.documentoElectronico.create({ data: { ...datos, storeId, comprobanteId: factura.comprobante.id } });
 
-  return { ok: true, documentoId: guardado.id, cdc: firmado.cdc, vistaPrevia, ambiente, avisos: armado.avisos };
+  return { ok: true, documentoId: guardado.id, cdc: firmado.cdc, vistaPrevia, ambiente, avisos: g.avisos };
+}
+
+// ---------------------------------------------------------------------------
+//  Emitir al vender (local con timbrado electrónico)
+// ---------------------------------------------------------------------------
+
+
+/**
+ * Un error de la facturación electrónica con un texto pensado para quien está en la caja. Si ocurre al vender, la venta
+ * entera se deshace (también el número de factura que consumió): no queda una venta facturada sin su documento firmado.
+ */
+export class ErrorFacturaElectronica extends Error {
+  constructor(mensaje: string) {
+    super(mensaje);
+    this.name = "ErrorFacturaElectronica";
+  }
+}
+
+/**
+ * ¿Está todo listo para emitir una factura electrónica en este local? Devuelve el motivo en palabras de la caja, o null si
+ * sí. Se mira ANTES de empezar la venta, para no frenar a un cliente en el último paso.
+ */
+export async function problemaParaEmitirElectronico(storeId: string): Promise<string | null> {
+  const estado = await estadoFacturacionElectronica(storeId);
+  if (estado.falta.length === 0) return null;
+  return `No se puede emitir factura electrónica todavía: falta ${estado.falta.join("; ")}. Se completa en Configuración de facturas → Facturación electrónica.`;
+}
+
+/**
+ * Firma el documento electrónico de una factura recién creada y lo guarda, DENTRO de la misma transacción que la venta y el
+ * número consumido: o quedan los tres o ninguno. `datos` y `pagos` son los de la propia venta (no se vuelven a leer).
+ */
+export async function firmarDocumentoAlVender(
+  db: Db,
+  storeId: string,
+  comprobanteId: string,
+  datos: ComprobanteParaDocumento,
+  pagos: PagoParaDocumento[],
+  firmadoPor: string
+): Promise<{ documentoId: string; cdc: string }> {
+  const g = await generarDocumento(db, storeId, datos, pagos);
+  if (!g.ok) {
+    const detalle = g.faltantes && g.faltantes.length > 0 ? ` ${g.faltantes.join("; ")}.` : "";
+    throw new ErrorFacturaElectronica(`No se pudo emitir la factura electrónica: ${g.error}${detalle}`);
+  }
+  const creado = await db.documentoElectronico.create({
+    data: {
+      storeId,
+      comprobanteId,
+      cdc: g.firmado.cdc,
+      ambiente: g.ambiente,
+      vistaPrevia: false,
+      estado: "firmado",
+      xmlFirmado: g.firmado.xml,
+      digestValue: g.firmado.digestValue,
+      urlQr: g.firmado.urlQr,
+      huellaCertificado: g.huella,
+      firmadoEn: new Date(),
+      firmadoPor,
+    },
+    select: { id: true },
+  });
+  return { documentoId: creado.id, cdc: g.firmado.cdc };
 }
 
 // ---------------------------------------------------------------------------
@@ -398,6 +521,16 @@ export type DocumentoResumen = {
   firmadoEn: Date;
   numero: string;
   total: number;
+  /** Lo que contestó la DNIT (códigos y mensajes), si ya contestó. */
+  respuestaMensaje: string | null;
+  protocoloAutorizacion: string | null;
+  /** El último problema de comunicación al enviar, y cuándo se reintenta. */
+  errorEnvio: string | null;
+  proximoIntentoEn: Date | null;
+  intentos: number;
+  /** Para pedir la inutilización del número de un documento rechazado. */
+  numeracion: { timbrado: string; establecimiento: string; punto: string; correlativo: number };
+  eventos: { id: string; tipo: string; estado: string; respuestaMensaje: string | null; errorEnvio: string | null; proximoIntentoEn: Date | null }[];
 };
 
 export async function listarDocumentos(storeId: string, limite = 20): Promise<DocumentoResumen[]> {
@@ -405,7 +538,24 @@ export async function listarDocumentos(storeId: string, limite = 20): Promise<Do
     where: { storeId },
     orderBy: { firmadoEn: "desc" },
     take: limite,
-    select: { id: true, cdc: true, ambiente: true, vistaPrevia: true, estado: true, firmadoEn: true, comprobante: { select: { numero: true, total: true } } },
+    select: {
+      id: true,
+      cdc: true,
+      ambiente: true,
+      vistaPrevia: true,
+      estado: true,
+      firmadoEn: true,
+      respuestaMensaje: true,
+      protocoloAutorizacion: true,
+      errorEnvio: true,
+      proximoIntentoEn: true,
+      intentos: true,
+      comprobante: { select: { numero: true, total: true, timbrado: true, establecimiento: true, punto: true, correlativo: true } },
+      eventos: {
+        orderBy: { createdAt: "asc" },
+        select: { id: true, tipo: true, estado: true, respuestaMensaje: true, errorEnvio: true, proximoIntentoEn: true },
+      },
+    },
   });
   return filas.map((f) => ({
     id: f.id,
@@ -416,10 +566,44 @@ export async function listarDocumentos(storeId: string, limite = 20): Promise<Do
     firmadoEn: f.firmadoEn,
     numero: f.comprobante.numero,
     total: Number(f.comprobante.total),
+    respuestaMensaje: f.respuestaMensaje,
+    protocoloAutorizacion: f.protocoloAutorizacion,
+    errorEnvio: f.errorEnvio,
+    proximoIntentoEn: f.proximoIntentoEn,
+    intentos: f.intentos,
+    numeracion: {
+      timbrado: f.comprobante.timbrado,
+      establecimiento: f.comprobante.establecimiento,
+      punto: f.comprobante.punto,
+      correlativo: f.comprobante.correlativo,
+    },
+    eventos: f.eventos,
   }));
+}
+
+/**
+ * El documento electrónico firmado de la factura vigente de una venta (null si la venta no se facturó de forma electrónica).
+ * `db` es el cliente del local.
+ */
+export async function documentoElectronicoDeVenta(db: PrismaLocal, ventaPosId: string): Promise<{ id: string; xmlFirmado: string; estado: string; vistaPrevia: boolean } | null> {
+  const comprobante = await db.comprobante.findFirst({
+    where: { ventaPosId, estado: "vigente", modalidad: "electronico" },
+    orderBy: { createdAt: "desc" },
+    select: { documentoElectronico: { select: { id: true, xmlFirmado: true, estado: true, vistaPrevia: true } } },
+  });
+  return comprobante?.documentoElectronico ?? null;
 }
 
 /** El documento firmado de un local (null si no existe o es de otro local). */
 export async function obtenerDocumentoFirmado(storeId: string, id: string) {
   return prisma.documentoElectronico.findFirst({ where: { id, storeId } });
+}
+
+/** Cuántos documentos reales (no vistas previas) esperan ser enviados y cuántos rechazó la DNIT. */
+export async function resumenDeEnvios(storeId: string): Promise<{ pendientes: number; rechazados: number }> {
+  const [pendientes, rechazados] = await Promise.all([
+    prisma.documentoElectronico.count({ where: { storeId, estado: "firmado", vistaPrevia: false } }),
+    prisma.documentoElectronico.count({ where: { storeId, estado: "rechazado", vistaPrevia: false } }),
+  ]);
+  return { pendientes, rechazados };
 }
