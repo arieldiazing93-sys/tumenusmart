@@ -432,7 +432,7 @@ export default async function PortadaPage() {
         </section>
 
         {/* ---------------- para quién ---------------- */}
-        <section className="py-16 lg:py-24">
+        <section className="bg-papel-suave py-16 lg:py-24">
           <div className="mx-auto max-w-6xl px-5 sm:px-8">
             <div className="max-w-[56ch]">
               <span className="rotulo">Para quién es</span>
@@ -456,56 +456,6 @@ export default async function PortadaPage() {
                 </div>
               ))}
             </div>
-          </div>
-        </section>
-
-        {/* ---------------- la cuenta ---------------- */}
-        <section id="cuenta" className="scroll-mt-16 bg-papel-suave py-16 lg:py-24">
-          <div className="mx-auto max-w-6xl px-5 sm:px-8">
-            <span className="rotulo">Sin comisiones por venta</span>
-            <h2 className={`${H2} max-w-[26ch]`}>
-              Un restaurante que factura Gs. 30 millones al mes le regala seis a la plataforma.
-            </h2>
-            <p className="mt-4 max-w-[60ch] text-[1.04rem] text-tinta-media">
-              Las aplicaciones de delivery cobran entre 15 % y 30 % de cada pedido. No es una cuota: es un
-              porcentaje que crece justo cuando al local le empieza a ir bien.
-            </p>
-
-            <div className="mt-10 grid gap-4 md:grid-cols-2">
-              <div className="rounded-2xl border border-linea bg-superficie p-6 sm:p-8">
-                <p className="font-mono text-[0.68rem] uppercase tracking-[0.15em] text-tinta-suave">
-                  Plataforma con comisión · 20 %
-                </p>
-                <p className="cifra mt-4 text-[clamp(2rem,4.6vw,2.9rem)] font-semibold leading-none">
-                  Gs. 6.000.000
-                </p>
-                <p className="mt-2 text-[0.9rem] text-tinta-suave">por mes — y sube cada mes que vendas más</p>
-                <p className="mt-5 text-[0.94rem] text-tinta-media">
-                  Y el cliente es de la plataforma, no tuyo: su teléfono no lo ves nunca, así que no podés hacerlo
-                  volver.
-                </p>
-              </div>
-
-              <div className="rounded-2xl border border-brand-tinte bg-brand-light p-6 sm:p-8">
-                <p className="font-mono text-[0.68rem] uppercase tracking-[0.15em] text-brand-texto">TuMenuSmart</p>
-                <p className="mt-4 text-[clamp(2rem,4.6vw,2.9rem)] font-semibold leading-none tracking-titular text-brand">
-                  Cuota fija
-                </p>
-                <p className="mt-2 text-[0.9rem] text-brand-texto">El mismo importe vendas lo que vendas</p>
-                <p className="mt-5 text-[0.94rem] text-tinta-media">
-                  El pedido entra por tu WhatsApp. El teléfono del cliente queda en tu base de datos, y el sistema
-                  te avisa cuando alguno deja de pedir.
-                </p>
-                <a href={linkVentas} target="_blank" rel="noopener noreferrer" className={`${BOTON} mt-6`}>
-                  Pedir el precio
-                </a>
-              </div>
-            </div>
-
-            <p className="mt-5 text-[0.84rem] text-tinta-suave">
-              Ejemplo con una comisión del 20 % sobre Gs. 30.000.000 mensuales, que es el rango que cobran las
-              plataformas de delivery. Nuestra cuota no varía con la facturación del local.
-            </p>
           </div>
         </section>
 
@@ -663,7 +613,6 @@ export default async function PortadaPage() {
 
         <div className="border-t border-linea">
           <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-5 py-5 pb-8 text-[0.84rem] text-tinta-suave sm:px-8">
-            <span>TuMenuSmart · Asunción, Paraguay</span>
             <span className="cifra">tumenusmart.com</span>
           </div>
         </div>

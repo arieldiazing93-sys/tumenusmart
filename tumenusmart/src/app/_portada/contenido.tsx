@@ -297,11 +297,6 @@ export const PREGUNTAS: { pregunta: string; respuesta: string }[] = [
       "Estamos preparando la conexión con SIFEN a través de un proveedor autorizado. Hoy el sistema emite facturas con timbrado; escribinos y te contamos en qué etapa está.",
   },
   {
-    pregunta: "¿Mis datos están seguros?",
-    respuesta:
-      "Cada negocio ve únicamente lo suyo: los datos están separados por local. Los accesos tienen perfiles, las acciones sensibles piden contraseña y todo queda registrado en una bitácora.",
-  },
-  {
     pregunta: "¿Pueden usarlo varias personas a la vez?",
     respuesta:
       "Sí. La caja, los mozos, los repartidores y el personal entran desde sus propios dispositivos, cada uno con lo que le corresponde ver, y todos trabajan sobre los mismos datos.",
