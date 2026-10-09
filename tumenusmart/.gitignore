@@ -7,3 +7,6 @@ node_modules
 
 # Salida de las pruebas (se regenera con tsc)
 pruebas/compilado/
+
+# Validador XSD que baja pruebas/sifen/probar.ps1 la primera vez
+pruebas/sifen/.cache/

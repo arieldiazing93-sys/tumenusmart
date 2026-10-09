@@ -5,18 +5,18 @@ import { clasesBoton } from "@/components/ui";
 import { obtenerDocumentoElectronico, type ResultadoDocumentoElectronico } from "./actions";
 
 /**
- * "Datos para factura electrónica": el comprobante armado tal como lo pide
- * SIFEN (con los nombres de campo del esquema de la DNIT) y la lista de lo que
- * todavía falta cargar. Sirve para ver, y para mostrarle a un proveedor de
- * factura electrónica, exactamente qué datos se le pueden dar. No envía nada.
+ * "Datos para factura electrónica": el comprobante armado como documento
+ * electrónico completo de SIFEN (con los nombres de campo del esquema de la
+ * DNIT, su CDC y su XML) y la lista de lo que todavía falta cargar o corregir.
+ * No firma ni envía nada.
  */
 export function DatosFacturaElectronica({ origen, id }: { origen: "pedido" | "venta"; id: string }) {
   const [pendiente, iniciar] = useTransition();
   const [resultado, setResultado] = useState<ResultadoDocumentoElectronico | null>(null);
-  const [copiado, setCopiado] = useState(false);
+  const [copiado, setCopiado] = useState<"json" | "xml" | null>(null);
 
   function cargar() {
-    setCopiado(false);
+    setCopiado(null);
     iniciar(async () => {
       try {
         setResultado(await obtenerDocumentoElectronico(origen, id));
@@ -26,10 +26,10 @@ export function DatosFacturaElectronica({ origen, id }: { origen: "pedido" | "ve
     });
   }
 
-  function copiar(texto: string) {
+  function copiar(texto: string, que: "json" | "xml") {
     navigator.clipboard.writeText(texto).then(
-      () => setCopiado(true),
-      () => setCopiado(false)
+      () => setCopiado(que),
+      () => setCopiado(null)
     );
   }
 
@@ -87,15 +87,26 @@ export function DatosFacturaElectronica({ origen, id }: { origen: "pedido" | "ve
           <div>
             <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
               <p className="text-[0.7rem] font-semibold uppercase tracking-rotulo text-tinta-suave">
-                Documento (formato SIFEN)
+                Documento (formato SIFEN){resultado.cdc ? ` · CDC ${resultado.cdc}` : ""}
               </p>
-              <button
-                type="button"
-                onClick={() => copiar(JSON.stringify(resultado.documento, null, 2))}
-                className={clasesBoton("suave", "sm")}
-              >
-                {copiado ? "Copiado ✓" : "Copiar JSON"}
-              </button>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => copiar(JSON.stringify(resultado.documento, null, 2), "json")}
+                  className={clasesBoton("suave", "sm")}
+                >
+                  {copiado === "json" ? "Copiado ✓" : "Copiar JSON"}
+                </button>
+                {resultado.xml && (
+                  <button
+                    type="button"
+                    onClick={() => copiar(resultado.xml ?? "", "xml")}
+                    className={clasesBoton("suave", "sm")}
+                  >
+                    {copiado === "xml" ? "Copiado ✓" : "Copiar XML (sin firmar)"}
+                  </button>
+                )}
+              </div>
             </div>
             <pre className="max-h-72 overflow-auto rounded-lg border border-linea bg-papel-suave p-3 text-[0.72rem] leading-snug text-tinta">
               {JSON.stringify(resultado.documento, null, 2)}

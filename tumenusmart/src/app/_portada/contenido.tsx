@@ -294,7 +294,7 @@ export const PREGUNTAS: { pregunta: string; respuesta: string }[] = [
   {
     pregunta: "¿Y la factura electrónica (SIFEN)?",
     respuesta:
-      "Estamos preparando la conexión con SIFEN a través de un proveedor autorizado. Hoy el sistema emite facturas con timbrado; escribinos y te contamos en qué etapa está.",
+      "Estamos construyendo la facturación electrónica (SIFEN) dentro del propio sistema. Hoy emite facturas con timbrado; escribinos y te contamos en qué etapa está.",
   },
   {
     pregunta: "¿Pueden usarlo varias personas a la vez?",

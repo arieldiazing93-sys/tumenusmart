@@ -14,7 +14,8 @@ import {
   ultimoComprobanteAnulado,
   type ItemFuente,
 } from "@/lib/comprobante";
-import { armarDocumentoElectronico } from "@/lib/documento-electronico";
+import { armarDE, armarRDE } from "@/lib/sifen/armar-de";
+import { aXmlRDE } from "@/lib/sifen/xml";
 import { esDeMesAnterior, nombreDelMes } from "@/lib/mes-fiscal";
 import { registrarBitacora } from "@/lib/bitacora";
 import { cancelarVenta } from "../pos/actions";
@@ -832,6 +833,10 @@ export type ResultadoDocumentoElectronico =
       modalidad: string;
       estado: string;
       documento: Record<string, unknown>;
+      /** El CDC que tendría el documento (en la vista previa cambia cada vez: el código de seguridad es al azar). */
+      cdc: string | null;
+      /** El archivo XML del documento, todavía sin firma ni código QR. Null si no se pudo armar. */
+      xml: string | null;
       /** Lo que hay que completar antes de poder emitir. */
       faltantes: string[];
       /** Cosas a tener en cuenta que no frenan. */
@@ -842,8 +847,8 @@ export type ResultadoDocumentoElectronico =
 /**
  * Arma el Documento Electrónico de SIFEN de una factura, a partir de su
  * Comprobante (la foto fiscal que se guarda al emitirla), y dice qué le falta
- * para poder emitirse electrónico. No envía nada a nadie: es la vista previa
- * de los datos que recibiría un proveedor de factura electrónica.
+ * para poder emitirse electrónico. No firma ni envía nada a nadie: es la vista
+ * previa del documento completo (con su CDC y su XML) tal como saldría hoy.
  */
 export async function obtenerDocumentoElectronico(
   origen: "pedido" | "venta",
@@ -884,7 +889,7 @@ export async function obtenerDocumentoElectronico(
     pagos = forma ? [{ forma, monto: Number(comprobante.total) }] : [];
   }
 
-  const resultado = armarDocumentoElectronico(
+  const resultado = armarDE(
     {
       tipo: comprobante.tipo,
       modalidad: comprobante.modalidad,
@@ -920,7 +925,9 @@ export async function obtenerDocumentoElectronico(
         iva: i.iva,
       })),
     },
-    pagos
+    pagos,
+    // Vista previa: con el nombre real del emisor (no el texto del ambiente de pruebas) y firmada "ahora".
+    { ambiente: "produccion", fechaFirma: new Date() }
   );
 
   return {
@@ -928,7 +935,9 @@ export async function obtenerDocumentoElectronico(
     numero: comprobante.numero,
     modalidad: comprobante.modalidad,
     estado: comprobante.estado,
-    documento: resultado.documento,
+    documento: resultado.de ?? {},
+    cdc: resultado.cdc,
+    xml: resultado.de ? aXmlRDE(armarRDE(resultado.de)) : null,
     faltantes: resultado.faltantes,
     avisos: resultado.avisos,
   };
