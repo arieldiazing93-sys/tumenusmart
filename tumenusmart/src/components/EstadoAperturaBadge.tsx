@@ -45,7 +45,7 @@ export function EstadoAperturaBadge({ estado }: { estado: EstadoTienda }) {
 
   return (
     <span
-      className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[0.8rem] font-semibold ${
+      className={`inline-flex items-center gap-1.5 rounded-full border px-3.5 py-2 text-[0.84rem] font-semibold ${
         abierto
           ? "border-exito/25 bg-exito-luz text-exito"
           : "border-linea bg-papel-suave text-tinta-media"

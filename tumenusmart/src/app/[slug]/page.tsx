@@ -200,105 +200,55 @@ export default async function CatalogoPage({
       })),
   }));
 
-  // Las tres dudas que tiene cualquiera antes de mirar la carta: si está
-
   return (
     <>
-      {/*
-        Banner de marca, igual para todos los locales — no es algo que el
-        dueño suba ni edite. Es identidad de la plataforma, como el "powered
-        by" que ya usan otras apps de pedidos.
-
-        Va AFUERA de <main> a propósito, como hermano antes que ella, y no
-        adentro con un margen negativo para "escaparse" de su padding. Ese
-        margen negativo dependía de que se cancelara justo contra el padding
-        de arriba de todos sus ancestros (colapso de márgenes) — algo frágil
-        que en el navegador del celular no siempre daba el mismo resultado y
-        dejaba un hueco arriba del banner. Como primer elemento de la página,
-        ahora no hay nada de qué "escaparse": arranca pegado al borde
-        superior real de la pantalla, siempre.
-
-        El wrapper de acá abajo repite el mismo ancho máximo y centrado que
-        <main>, pero sin su padding lateral: así el banner queda del mismo
-        ancho que el resto del contenido en pantallas anchas (en vez de
-        estirarse a todo el monitor) y edge-to-edge en el celular (donde el
-        viewport ya es más angosto que ese máximo).
-      */}
-      <div className="mx-auto max-w-2xl">
-        <div className="flex h-9 items-center justify-center bg-brand px-4 text-center text-white">
-          <Link
-            href="/"
-            // El -mr compensa el espacio que "tracking" agrega DESPUÉS de la
-            // última letra: sin esto, el texto se ve corrido a la izquierda
-            // del centro real del banner (el espacio de más queda del lado
-            // derecho, así que el centrado automático lo cuenta de más).
-            className="mr-[-0.14em] text-[0.7rem] font-medium uppercase tracking-[0.14em] text-white/75 hover:text-white hover:underline"
-          >
-            Desarrollado por tumenusmart.com
-          </Link>
+      <main className="mx-auto max-w-2xl pb-40">
+        {/* ---------- portada: el color del local, con círculos suaves de adorno ---------- */}
+        <div className="relative h-32 overflow-hidden bg-brand sm:rounded-b-3xl">
+          <span aria-hidden="true" className="absolute -right-10 -top-14 h-48 w-48 rounded-full bg-white/10" />
+          <span aria-hidden="true" className="absolute -left-12 top-14 h-40 w-40 rounded-full bg-white/10" />
+          <span aria-hidden="true" className="absolute right-28 top-16 h-20 w-20 rounded-full bg-black/10" />
         </div>
-      </div>
 
-      <main className="mx-auto max-w-2xl px-4 pb-32">
-      {/* ---------- cabecera del local ---------- */}
-      <header className="animate-[subir_0.5s_cubic-bezier(0.22,0.7,0.3,1)]">
-        {/*
-          Los datos del local van en su propia tarjeta, igual que "Tus datos"
-          en el checkout — no sueltos sobre el fondo de la página. Separada
-          del banner con espacio de sobra: solapada (como estaba antes, con
-          un margen negativo) se leía como si las esquinas de la tarjeta le
-          pisaran el texto de abajo al banner.
-        */}
-        <div className="relative mt-4 rounded-xl border border-linea bg-superficie p-4 shadow-media">
-          <div className="flex items-center gap-3.5">
-            {store.logoUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={store.logoUrl}
-                alt={store.nombre}
-                width={96}
-                height={96}
-                decoding="async"
-                className="h-24 w-24 flex-none rounded-2xl object-cover"
-              />
-            ) : (
-              <span
-                aria-hidden="true"
-                className="flex h-24 w-24 flex-none items-center justify-center rounded-2xl bg-brand-light text-2xl font-bold tracking-titular text-brand"
-              >
-                {store.nombre.slice(0, 2).toUpperCase()}
-              </span>
-            )}
-            <div className="min-w-0 flex-1">
-              <h1 className="truncate text-[1.4rem] font-semibold tracking-titular">
-                {store.nombre}
-              </h1>
-              {store.direccion && (
-                <p className="truncate text-[0.82rem] text-tinta-suave">{store.direccion}</p>
-              )}
-            </div>
-          </div>
+        {/* ---------- cabecera del local: el logo sube sobre la portada ---------- */}
+        <header className="relative -mt-12 px-4 animate-[subir_0.5s_cubic-bezier(0.22,0.7,0.3,1)]">
+          {store.logoUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={store.logoUrl}
+              alt={store.nombre}
+              width={96}
+              height={96}
+              decoding="async"
+              className="h-24 w-24 rounded-3xl border-4 border-papel-suave bg-superficie object-cover shadow-media"
+            />
+          ) : (
+            <span
+              aria-hidden="true"
+              className="flex h-24 w-24 items-center justify-center rounded-3xl border-4 border-papel-suave bg-brand-light text-3xl font-bold tracking-titular text-brand-texto shadow-media"
+            >
+              {store.nombre.slice(0, 2).toUpperCase()}
+            </span>
+          )}
+
+          <h1 className="mt-3 text-[1.75rem] font-semibold leading-tight tracking-titular text-tinta">{store.nombre}</h1>
+          {store.direccion && <p className="mt-0.5 text-[0.9rem] text-tinta-suave">{store.direccion}</p>}
 
           <div className="mt-3">
             <EstadoAperturaBadge estado={estadoTienda} />
           </div>
 
           {/*
-            Reservar mesa va DEBAJO del estado de apertura, no arriba a la
-            derecha. Antes competía por el mismo renglón que el nombre del
-            local y le quitaba ancho al logo. Y el orden de lectura ahora es
-            el que corresponde: primero de qué local se trata, después si
-            está abierto, y recién entonces qué se puede hacer.
-
-            Solo aparece si el local reserva mesas con anticipación — hay
+            Reservar mesa va DEBAJO del estado de apertura: primero de qué local se trata, después si está abierto y
+            recién entonces qué se puede hacer. Solo aparece si el local reserva mesas con anticipación — hay
             locales que solo hacen delivery/retiro y no tienen mesas físicas.
           */}
           {(store.aceptaReservas || paginaReservas?.habilitada) && (
-            <div className="mt-3.5 flex flex-wrap gap-2">
+            <div className="mt-4 flex flex-wrap gap-2.5">
               {store.aceptaReservas && (
                 <Link
                   href={`/${slug}/reservas`}
-                  className="inline-flex items-center rounded-xl bg-azul px-5 py-2.5 text-[0.88rem] font-semibold text-white shadow-media transition-colors hover:bg-azul-oscuro"
+                  className="inline-flex h-12 flex-1 items-center justify-center rounded-2xl bg-azul px-5 text-[0.92rem] font-semibold text-white shadow-media transition-all hover:bg-azul-oscuro active:scale-[0.98]"
                 >
                   Reservar mesa
                 </Link>
@@ -306,39 +256,50 @@ export default async function CatalogoPage({
               {paginaReservas?.habilitada && (
                 <Link
                   href={`/turnos/${paginaReservas.slug}`}
-                  className="inline-flex items-center rounded-xl bg-brand px-5 py-2.5 text-[0.88rem] font-semibold text-white shadow-media transition-colors hover:bg-brand-dark"
+                  className="inline-flex h-12 flex-1 items-center justify-center rounded-2xl bg-brand px-5 text-[0.92rem] font-semibold text-white shadow-media transition-all hover:bg-brand-dark active:scale-[0.98]"
                 >
                   Reservar turno
                 </Link>
               )}
             </div>
           )}
+        </header>
+
+        <div className="px-4">
+          <div className="mt-5">
+            <AvisoTienda estado={estadoTienda} />
+          </div>
+
+          <CarruselDestacados
+            productos={destacados.map((p) => ({
+              id: p.id,
+              nombre: p.nombre,
+              ...precioPublico(p),
+              imagenUrl: p.imagenUrl,
+            }))}
+          />
+
+          {categorias.length === 0 ? (
+            <p className="py-14 text-center text-[0.9rem] text-tinta-suave">
+              Este negocio todavía está cargando su carta.
+            </p>
+          ) : (
+            <Carta categorias={categorias} estilo={store.estiloCarta} />
+          )}
+
+          {/* La firma de la plataforma, al pie (antes iba en una franja arriba de todo, donde le sacaba lugar al local). */}
+          <p className="mt-12 text-center">
+            <Link
+              href="/"
+              className="-mr-[0.14em] inline-block py-1.5 font-mono text-[0.74rem] font-semibold uppercase leading-tight tracking-[0.14em] text-tinta-suave transition-colors hover:text-tinta hover:underline"
+            >
+              Desarrollado por tumenusmart.com
+            </Link>
+          </p>
         </div>
-      </header>
-
-      <div className="mt-5">
-        <AvisoTienda estado={estadoTienda} />
-      </div>
-
-      <CarruselDestacados
-        productos={destacados.map((p) => ({
-          id: p.id,
-          nombre: p.nombre,
-          ...precioPublico(p),
-          imagenUrl: p.imagenUrl,
-        }))}
-      />
-
-      {categorias.length === 0 ? (
-        <p className="py-14 text-center text-[0.9rem] text-tinta-suave">
-          Este negocio todavía está cargando su carta.
-        </p>
-      ) : (
-        <Carta categorias={categorias} estilo={store.estiloCarta} />
-      )}
+      </main>
 
       <CartBar />
-      </main>
     </>
   );
 }

@@ -14,7 +14,7 @@ export function AvisoTienda({ estado }: { estado: EstadoTienda }) {
   if (!motivo) return null;
 
   return (
-    <div className="rounded-xl border border-aviso/30 bg-aviso-luz p-4">
+    <div className="rounded-2xl border border-aviso/30 bg-aviso-luz p-4 shadow-sm">
       <p className="text-[0.9rem] font-semibold text-aviso">
         {estado.pausado ? "Pedidos pausados" : "Cerrado en este momento"}
       </p>

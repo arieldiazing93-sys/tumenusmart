@@ -19,23 +19,21 @@ type Producto = {
  * Antes esto era un carrusel de a uno, con flechas para pasar. Se cambió por
  * una tira porque en el celular deslizar es más natural que apretar una flecha,
  * y porque mostrar tres a la vez deja comparar — que es justo lo que hace el
- * cliente cuando todavía no decidió qué va a pedir.
+ * cliente cuando todavía no decidió qué va a pedir. Al tocar uno, la carta baja hasta ese producto.
  */
 export function CarruselDestacados({ productos }: { productos: Producto[] }) {
   if (productos.length === 0) return null;
 
   return (
-    <section className="mt-6 border-y border-linea-fina py-5">
-      <p className="text-center font-mono text-[0.98rem] font-bold uppercase tracking-[0.1em] text-brand">
-        Los más pedidos
-      </p>
+    <section className="mt-7" aria-label="Los más pedidos">
+      <h2 className="text-[1.25rem] font-semibold tracking-titular text-tinta">Los más pedidos</h2>
 
-      <div className="-mx-4 mt-2.5 flex gap-2.5 overflow-x-auto px-4 pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div className="-mx-4 mt-3 flex gap-3 overflow-x-auto px-4 pb-2 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {productos.map((p) => (
           <a
             key={p.id}
             href={`#producto-${p.id}`}
-            className="w-[136px] flex-none overflow-hidden rounded-xl border border-linea bg-superficie transition-colors hover:border-brand"
+            className="w-40 flex-none overflow-hidden rounded-2xl bg-superficie shadow-sm ring-1 ring-linea transition-all active:scale-[0.98]"
           >
             {p.imagenUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
@@ -44,25 +42,25 @@ export function CarruselDestacados({ productos }: { productos: Producto[] }) {
                 alt={p.nombre}
                 loading="lazy"
                 decoding="async"
-                className="h-20 w-full object-cover"
+                className="h-28 w-full object-cover"
               />
             ) : (
               <span
                 aria-hidden="true"
-                className="flex h-20 w-full items-center justify-center bg-papel-hundido text-tinta-suave/35"
+                className="flex h-28 w-full items-center justify-center bg-papel-hundido text-tinta-suave/35"
               >
                 <IconoFoto />
               </span>
             )}
-            <span className="block px-2 pb-2.5 pt-1.5">
-              <span className="block text-[0.78rem] font-semibold leading-tight tracking-titular">
+            <span className="block p-3">
+              <span className="line-clamp-2 block text-[0.9rem] font-semibold leading-tight tracking-titular text-tinta">
                 {p.nombre}
               </span>
-              <span className="cifra mt-1 block text-[0.75rem] text-tinta-media">
+              <span className="cifra mt-1.5 block text-[0.92rem] font-bold text-brand-texto">
                 {formatearGuarani(p.precio)}
               </span>
               {(p.enPromocion || p.etiquetaPromo) && (
-                <span className="mt-1 inline-block rounded-full bg-exito-luz px-1.5 py-0.5 text-[0.6rem] font-bold uppercase tracking-rotulo text-exito">
+                <span className="mt-1.5 inline-block rounded-full bg-exito-luz px-2 py-0.5 text-[0.62rem] font-bold uppercase tracking-rotulo text-exito">
                   {p.etiquetaPromo ?? "Promo"}
                 </span>
               )}

@@ -6,34 +6,15 @@ import { useEffect, useRef, useState } from "react";
 import { useCart } from "./CartProvider";
 import { formatearGuarani } from "@/lib/format";
 
-/** Mismo estilo de trazo que el resto de los íconos de la app: sin relleno,
- * salvo las ruedas, que van sólidas para que el carrito se lea de un
- * vistazo incluso a este tamaño chico. */
-function IconoCarrito() {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.7"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-      className="h-[18px] w-[18px] flex-none"
-    >
-      <path d="M2.5 3h2.4l2.2 11.4a2 2 0 0 0 2 1.6h7.9a2 2 0 0 0 1.96-1.6L20.5 7H6" />
-      <circle cx="9" cy="20" r="1.4" fill="currentColor" stroke="none" />
-      <circle cx="18" cy="20" r="1.4" fill="currentColor" stroke="none" />
-    </svg>
-  );
-}
-
 /**
  * La barra del carrito, siempre a la vista con el total.
  *
  * Da un saltito cada vez que el total cambia. No es adorno: es el acuse de
  * recibo de que lo que tocó el cliente entró. Sin esa confirmación, la gente
  * toca dos veces y termina con el doble de lo que quería.
+ *
+ * Es un botón grande y flotante: a la izquierda cuántos ítems lleva, en el medio qué hace y a la derecha cuánto sale. Detrás
+ * tiene una base sólida (con un difuminado arriba) para que la carta no se transparente por debajo del texto.
  */
 export function CartBar() {
   const { cantidadTotal, subtotal } = useCart();
@@ -54,32 +35,25 @@ export function CartBar() {
   if (cantidadTotal === 0) return null;
 
   return (
-    <div className="fixed inset-x-0 bottom-0 z-30 border-t border-linea bg-papel/96 px-4 pb-5 pt-3 backdrop-blur">
-      {/*
-        Un botón centrado, no una barra de lado a lado.
-
-        Antes ocupaba todo el ancho con el texto a un extremo y el total al
-        otro, y en el celular esos dos datos quedaban tan separados que había
-        que mirar dos veces para juntarlos. Como pastilla centrada se lee de
-        una: qué es, cuánto llevás y cuánto sale, en ese orden.
-      */}
-      <Link
-        href={`/${slug}/carrito`}
-        className={`mx-auto flex w-fit max-w-full items-center justify-center gap-2.5 rounded-full bg-brand px-6 py-3 text-white transition-transform active:scale-[0.98] ${
-          saltando ? "animate-[saltito_0.42s_ease]" : ""
-        }`}
+    <div className="pointer-events-none fixed inset-x-0 bottom-0 z-30">
+      <div aria-hidden="true" className="mx-auto h-8 max-w-2xl bg-gradient-to-t from-papel-suave to-transparent" />
+      <div
+        className="pointer-events-auto mx-auto max-w-2xl bg-papel-suave px-4 pt-1"
+        style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom, 0px))" }}
       >
-        <IconoCarrito />
-        <span className="text-[0.92rem] font-semibold">Ver mi pedido</span>
-        <span aria-hidden="true" className="text-white/45">·</span>
-        <span className="whitespace-nowrap text-[0.82rem] font-medium text-white/85">
-          {cantidadTotal} {cantidadTotal === 1 ? "ítem" : "ítems"}
-        </span>
-        <span aria-hidden="true" className="text-white/45">·</span>
-        <span className="cifra whitespace-nowrap text-[0.92rem] font-semibold">
-          {formatearGuarani(subtotal)}
-        </span>
-      </Link>
+        <Link
+          href={`/${slug}/carrito`}
+          className={`flex h-14 w-full items-center gap-3 rounded-2xl bg-brand px-4 text-white shadow-alta transition-transform active:scale-[0.98] ${
+            saltando ? "animate-[saltito_0.42s_ease]" : ""
+          }`}
+        >
+          <span className="flex h-8 min-w-8 items-center justify-center rounded-full bg-white/20 px-2 text-[0.9rem] font-bold">
+            {cantidadTotal}
+          </span>
+          <span className="flex-1 text-left text-[0.98rem] font-semibold">Ver mi pedido</span>
+          <span className="cifra whitespace-nowrap text-[1.05rem] font-bold">{formatearGuarani(subtotal)}</span>
+        </Link>
+      </div>
     </div>
   );
 }
