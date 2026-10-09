@@ -38,61 +38,68 @@ export function PinMozo({ token, nombreLocal }: { token: string; nombreLocal: st
     });
   }
 
+  // Teclas suaves sobre el fondo oscuro: sin marcos, con un toque que se hunde y se aclara.
   const claseTecla =
-    "flex h-16 items-center justify-center rounded-xl border-2 border-azul/50 bg-superficie text-[1.5rem] font-semibold text-tinta transition-all active:scale-95 active:bg-azul-luz disabled:opacity-50";
+    "flex h-[4.25rem] items-center justify-center rounded-2xl bg-white/[0.07] text-[1.7rem] font-semibold text-white transition-all active:scale-95 active:bg-white/20 disabled:opacity-40";
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center px-5 py-8">
-      <p className="text-center text-[0.8rem] font-semibold uppercase tracking-rotulo text-tinta-suave">{nombreLocal}</p>
-      <h1 className="mt-1 text-center text-[1.5rem] font-semibold tracking-titular text-tinta">Servicio comedor</h1>
-      <p className="mt-1 text-center text-[0.9rem] text-tinta-media">Poné tu PIN para entrar.</p>
+    <main className="min-h-screen bg-noche text-noche-tinta">
+      <div className="mx-auto flex min-h-screen max-w-sm flex-col justify-center px-6 py-8">
+        <span
+          aria-hidden="true"
+          className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-brand text-[1.4rem] font-bold tracking-titular text-white shadow-media"
+        >
+          {nombreLocal.slice(0, 2).toUpperCase()}
+        </span>
+        <p className="mt-4 text-center text-[0.74rem] font-semibold uppercase tracking-rotulo text-noche-suave">{nombreLocal}</p>
+        <h1 className="mt-1 text-center text-[1.7rem] font-semibold tracking-titular text-white">Servicio comedor</h1>
+        <p className="mt-1 text-center text-[0.92rem] text-noche-suave">Poné tu PIN para entrar.</p>
 
-      <div aria-live="polite" className="my-6 flex h-6 items-center justify-center gap-3">
-        {Array.from({ length: LARGO_MAXIMO }).map((_, i) => (
-          <span
-            key={i}
-            className={`h-3.5 w-3.5 rounded-full border-2 ${
-              i < pin.length ? "border-brand bg-brand" : "border-linea"
-            }`}
-          />
-        ))}
-      </div>
+        <div aria-live="polite" className="my-7 flex h-6 items-center justify-center gap-3.5">
+          {Array.from({ length: LARGO_MAXIMO }).map((_, i) => (
+            <span
+              key={i}
+              className={`h-4 w-4 rounded-full transition-all ${i < pin.length ? "scale-110 bg-brand" : "bg-white/15"}`}
+            />
+          ))}
+        </div>
 
-      {error && (
-        <p role="alert" className="mb-4 rounded-lg bg-peligro-luz px-3 py-2 text-center text-[0.85rem] font-medium text-peligro">
-          {error}
-        </p>
-      )}
+        {error && (
+          <p role="alert" className="mb-4 rounded-xl bg-peligro-luz px-3.5 py-2.5 text-center text-[0.88rem] font-medium text-peligro">
+            {error}
+          </p>
+        )}
 
-      <div className="grid grid-cols-3 gap-3">
-        {TECLAS.map((t) => (
-          <button key={t} type="button" onClick={() => tocar(t)} disabled={entrando} className={claseTecla}>
-            {t}
+        <div className="grid grid-cols-3 gap-3">
+          {TECLAS.map((t) => (
+            <button key={t} type="button" onClick={() => tocar(t)} disabled={entrando} className={claseTecla}>
+              {t}
+            </button>
+          ))}
+          <button
+            type="button"
+            onClick={() => {
+              setError(null);
+              setPin((actual) => actual.slice(0, -1));
+            }}
+            disabled={entrando || pin.length === 0}
+            aria-label="Borrar un número"
+            className={claseTecla}
+          >
+            ⌫
           </button>
-        ))}
-        <button
-          type="button"
-          onClick={() => {
-            setError(null);
-            setPin((actual) => actual.slice(0, -1));
-          }}
-          disabled={entrando || pin.length === 0}
-          aria-label="Borrar un número"
-          className={claseTecla}
-        >
-          ⌫
-        </button>
-        <button type="button" onClick={() => tocar("0")} disabled={entrando} className={claseTecla}>
-          0
-        </button>
-        <button
-          type="button"
-          onClick={entrar}
-          disabled={entrando || pin.length < PIN_MOZO_MINIMO}
-          className="flex h-16 items-center justify-center rounded-xl bg-brand text-[1rem] font-semibold text-white transition-all active:scale-95 disabled:opacity-50"
-        >
-          {entrando ? "…" : "Entrar"}
-        </button>
+          <button type="button" onClick={() => tocar("0")} disabled={entrando} className={claseTecla}>
+            0
+          </button>
+          <button
+            type="button"
+            onClick={entrar}
+            disabled={entrando || pin.length < PIN_MOZO_MINIMO}
+            className="flex h-[4.25rem] items-center justify-center rounded-2xl bg-brand text-[1.05rem] font-semibold text-white shadow-media transition-all active:scale-95 disabled:opacity-40"
+          >
+            {entrando ? "…" : "Entrar"}
+          </button>
+        </div>
       </div>
     </main>
   );
