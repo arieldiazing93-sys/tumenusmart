@@ -98,20 +98,21 @@ export function PasoFechaHora({
 
   if (error) return <p className="rounded-lg bg-peligro-luz p-3 text-[0.88rem] text-peligro">{error}</p>;
 
+  // Un día del mes: elegido = relleno del color del negocio; con horas = blanco con aro; sin horas = apagado.
   const claseDia = (d: string, elegido: boolean, activo: boolean) =>
-    `flex h-12 w-full items-center justify-center rounded-xl border text-[1rem] font-semibold transition-colors ${
+    `flex h-12 w-full items-center justify-center rounded-2xl text-[1rem] font-semibold transition-all ${
       elegido
-        ? "border-brand bg-brand text-white"
+        ? "bg-brand text-white shadow-media"
         : activo
-          ? "border-linea bg-superficie text-tinta hover:border-brand"
-          : "border-transparent bg-papel-hundido text-tinta-suave"
+          ? "bg-superficie text-tinta ring-1 ring-linea hover:ring-brand/60 active:scale-95"
+          : "bg-papel-hundido/60 text-tinta-suave/60"
     }`;
 
   return (
     <div>
       {/* ---------- semana o mes, mes y flechas ---------- */}
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div role="tablist" aria-label="Ver por" className="flex rounded-xl bg-papel-hundido p-1">
+        <div role="tablist" aria-label="Ver por" className="flex rounded-2xl bg-papel-hundido p-1">
           {(["semana", "mes"] as const).map((v) => (
             <button
               key={v}
@@ -119,7 +120,7 @@ export function PasoFechaHora({
               role="tab"
               aria-selected={vista === v}
               onClick={() => setVista(v)}
-              className={`rounded-lg px-4 py-2 text-[0.85rem] font-semibold transition-colors ${
+              className={`rounded-xl px-4 py-2 text-[0.85rem] font-semibold transition-all ${
                 vista === v ? "bg-superficie text-tinta shadow-sm" : "text-tinta-media"
               }`}
             >
@@ -129,7 +130,7 @@ export function PasoFechaHora({
         </div>
 
         <div className="flex items-center gap-1.5">
-          <span className="rounded-xl bg-papel-hundido px-3.5 py-2 text-[0.85rem] font-semibold text-tinta">
+          <span className="rounded-xl bg-brand-light px-3.5 py-2 text-[0.85rem] font-semibold text-brand-texto">
             {NOMBRES_MES[mes - 1]} {anio}
           </span>
           {/* Sin adónde ir, la flecha no se ve (invisible y no solo apagada; sigue ocupando su lugar
@@ -166,6 +167,7 @@ export function PasoFechaHora({
         <div className="mt-4 grid grid-cols-7 gap-1.5 sm:gap-2">
           {semana.filter(diaVisible).map((d) => {
             const activo = hayHoras(d);
+            const elegido = dia === d;
             const nombre = diaCorto(d);
             return (
               <button
@@ -173,12 +175,20 @@ export function PasoFechaHora({
                 type="button"
                 disabled={!activo}
                 onClick={() => setDia(d)}
-                aria-pressed={dia === d}
+                aria-pressed={elegido}
                 aria-label={`${nombre} ${numeroDeDia(d)}${activo ? "" : ", sin horarios"}`}
-                className="flex flex-col items-center gap-1.5"
+                className={`flex flex-col items-center gap-0.5 rounded-2xl px-1 py-2.5 transition-all ${
+                  elegido
+                    ? "bg-brand text-white shadow-media"
+                    : activo
+                      ? "bg-superficie text-tinta ring-1 ring-linea hover:ring-brand/60 active:scale-95"
+                      : "bg-papel-hundido/60 text-tinta-suave/60"
+                }`}
               >
-                <span className={claseDia(d, dia === d, activo)}>{dias === null ? "·" : numeroDeDia(d)}</span>
-                <span className="text-[0.72rem] text-tinta-media">{nombre.charAt(0).toUpperCase() + nombre.slice(1)}</span>
+                <span className={`text-[0.68rem] font-semibold uppercase ${elegido ? "text-white/80" : "text-tinta-suave"}`}>
+                  {nombre}
+                </span>
+                <span className="cifra text-[1.2rem] font-bold leading-tight">{dias === null ? "·" : numeroDeDia(d)}</span>
               </button>
             );
           })}
@@ -219,22 +229,25 @@ export function PasoFechaHora({
 
       {/* ---------- las horas ---------- */}
       {dias === null ? (
-        <div className="mt-5 flex flex-wrap gap-2.5" aria-busy="true" aria-label="Buscando horarios">
+        <div className="mt-6 grid grid-cols-3 gap-2.5 sm:grid-cols-4" aria-busy="true" aria-label="Buscando horarios">
           {Array.from({ length: 8 }, (_, i) => (
-            <span key={i} className="h-10 w-20 animate-pulse rounded-full bg-papel-hundido" />
+            <span key={i} className="h-12 animate-pulse rounded-xl bg-papel-hundido" />
           ))}
         </div>
       ) : Object.keys(dias).length === 0 ? (
-        <p className="mt-6 rounded-xl border border-dashed border-linea bg-papel-suave px-5 py-8 text-center text-[0.88rem] text-tinta-media">
+        <p className="mt-6 rounded-2xl border border-dashed border-linea bg-papel-suave px-5 py-8 text-center text-[0.9rem] text-tinta-media">
           Este profesional no tiene horarios disponibles en los próximos {DIAS_ADELANTE} días.
         </p>
       ) : (
         grupos.map(
           (g) =>
             g.horas.length > 0 && (
-              <section key={g.momento} className="mt-5">
-                <h3 className="mb-2.5 text-[0.92rem] font-semibold text-tinta">{TITULOS[g.momento]}</h3>
-                <div className="flex flex-wrap gap-2.5">
+              <section key={g.momento} className="mt-6">
+                <h3 className="mb-3 flex items-center gap-3 text-[0.95rem] font-semibold text-tinta">
+                  {TITULOS[g.momento]}
+                  <span aria-hidden="true" className="h-px flex-1 bg-linea" />
+                </h3>
+                <div className="grid grid-cols-3 gap-2.5 sm:grid-cols-4">
                   {g.horas.map((h) => {
                     const elegida = dia !== null && fecha === dia && hora === h;
                     return (
@@ -243,10 +256,10 @@ export function PasoFechaHora({
                         type="button"
                         onClick={() => dia && onElegir(dia, h)}
                         aria-pressed={elegida}
-                        className={`cifra rounded-full border px-4 py-2.5 text-[0.9rem] font-medium transition-colors ${
+                        className={`cifra h-12 rounded-xl text-[0.95rem] font-semibold transition-all active:scale-95 ${
                           elegida
-                            ? "border-brand bg-brand text-white"
-                            : "border-linea bg-superficie text-tinta hover:border-brand"
+                            ? "bg-brand text-white shadow-media"
+                            : "bg-superficie text-tinta ring-1 ring-linea hover:ring-brand/60"
                         }`}
                       >
                         {h}

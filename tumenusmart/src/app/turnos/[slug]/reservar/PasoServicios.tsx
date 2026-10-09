@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { formatearGuarani } from "@/lib/format";
 import { MAX_SERVICIOS_POR_CITA, type CategoriaPublica, type ServicioPublico } from "@/lib/reserva-cliente";
 import { textoDuracion } from "@/lib/servicios-agenda";
+import { IconoBuscar, IconoCheck, IconoChevron, IconoReloj } from "../Iconos";
 
 /** Sin tildes ni mayúsculas, para que "barba" encuentre "Bárbara". */
 function sinTildes(texto: string): string {
@@ -20,7 +21,7 @@ export function textoPrecioServicio(s: Pick<ServicioPublico, "precio" | "tipoPre
 
 /**
  * Paso 1: elegir uno o varios servicios. Están agrupados por categoría (que se
- * pueden cerrar) y hay un buscador. Un servicio se marca con su casilla.
+ * pueden cerrar) y hay un buscador. Cada servicio es una tarjeta que se marca al tocarla.
  */
 export function PasoServicios({
   categorias,
@@ -57,7 +58,7 @@ export function PasoServicios({
 
   if (categorias.length === 0) {
     return (
-      <p className="rounded-xl border border-dashed border-linea bg-papel-suave px-5 py-10 text-center text-[0.9rem] text-tinta-media">
+      <p className="rounded-2xl border border-dashed border-linea bg-papel-suave px-5 py-10 text-center text-[0.9rem] text-tinta-media">
         Todavía no hay servicios disponibles para reservar. Comunicate directamente con el negocio.
       </p>
     );
@@ -66,96 +67,69 @@ export function PasoServicios({
   return (
     <div>
       <div className="relative">
-        <svg
-          viewBox="0 0 24 24"
-          width={16}
-          height={16}
-          fill="none"
-          stroke="currentColor"
-          strokeWidth={2}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          aria-hidden="true"
-          className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-tinta-suave"
-        >
-          <circle cx="11" cy="11" r="7" />
-          <path d="m21 21-4.3-4.3" />
-        </svg>
+        <IconoBuscar tam={18} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-tinta-suave" />
         <input
           type="search"
           value={busqueda}
           onChange={(e) => setBusqueda(e.target.value)}
           placeholder="Buscar servicios…"
           aria-label="Buscar servicios"
-          className="w-full rounded-xl border border-linea bg-superficie py-3 pr-3 text-[0.9rem] text-tinta placeholder:text-tinta-suave focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/15"
-          style={{ paddingLeft: "2.5rem" }}
+          className="h-12 w-full rounded-2xl bg-papel-hundido pr-4 text-[0.95rem] text-tinta ring-1 ring-transparent placeholder:text-tinta-suave focus:bg-superficie focus:outline-none focus:ring-2 focus:ring-brand"
+          style={{ paddingLeft: "2.75rem" }}
         />
       </div>
 
-      {aviso && <p className="mt-3 text-[0.82rem] font-medium text-peligro">{aviso}</p>}
+      {aviso && <p className="mt-3 text-[0.84rem] font-medium text-peligro">{aviso}</p>}
 
       {visibles.length === 0 ? (
-        <p className="mt-6 text-center text-[0.88rem] text-tinta-media">Ningún servicio coincide con esa búsqueda.</p>
+        <p className="mt-6 text-center text-[0.9rem] text-tinta-media">Ningún servicio coincide con esa búsqueda.</p>
       ) : (
-        <div className="mt-2">
+        <div>
           {visibles.map((c) => (
-            <details key={c.id} open className="group mt-4 first:mt-2">
-              {/* La franja de cada categoría va de borde a borde y toma el color que el negocio eligió
-                  en Apariencia (un tinte suave de ese color, que sirve igual en tema claro y oscuro). */}
-              <summary className="-mx-4 flex cursor-pointer list-none items-center gap-3 border-y border-brand/25 bg-brand/15 px-4 py-3.5 [&::-webkit-details-marker]:hidden">
-                <span aria-hidden="true" className="h-5 w-1 flex-none rounded-full bg-brand" />
-                <span className="min-w-0 flex-1 truncate text-[0.98rem] font-semibold text-tinta">{c.nombre}</span>
-                <span className="cifra flex-none rounded-full bg-brand px-2 py-0.5 text-[0.72rem] font-semibold text-white">
+            <details key={c.id} open className="group mt-6 first:mt-5">
+              <summary className="flex cursor-pointer list-none items-center gap-2.5 px-1 pb-2.5 [&::-webkit-details-marker]:hidden">
+                <span className="min-w-0 flex-1 truncate text-[1.12rem] font-semibold tracking-titular text-tinta">{c.nombre}</span>
+                <span className="cifra flex-none rounded-full bg-brand-light px-2.5 py-0.5 text-[0.74rem] font-semibold text-brand-texto">
                   {c.servicios.length}
                 </span>
-                <svg
-                  viewBox="0 0 24 24"
-                  width={18}
-                  height={18}
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  aria-hidden="true"
-                  className="text-tinta-suave transition-transform duration-200 group-open:rotate-180"
-                >
-                  <path d="m6 9 6 6 6-6" />
-                </svg>
+                <IconoChevron className="text-tinta-suave transition-transform duration-200 group-open:rotate-180" />
               </summary>
-              <ul>
+              <ul className="flex flex-col gap-2.5">
                 {c.servicios.map((s) => {
                   const marcado = elegidos.includes(s.id);
                   return (
                     <li key={s.id}>
                       <label
-                        className={`block cursor-pointer rounded-lg px-2 py-2 transition-colors ${
-                          marcado ? "bg-brand/10" : "hover:bg-papel-suave"
+                        className={`flex cursor-pointer items-center gap-3 rounded-2xl p-3.5 shadow-sm transition-all active:scale-[0.99] ${
+                          marcado ? "bg-brand/5 ring-2 ring-brand" : "bg-superficie ring-1 ring-linea hover:ring-brand/50"
                         }`}
                       >
+                        <input
+                          type="checkbox"
+                          checked={marcado}
+                          onChange={() => alternar(s.id)}
+                          aria-label={`Elegir ${s.nombre}`}
+                          className="peer sr-only"
+                        />
                         {s.imagenUrl && (
                           // eslint-disable-next-line @next/next/no-img-element
-                          <img
-                            src={s.imagenUrl}
-                            alt=""
-                            className="aspect-[4/3] w-full rounded-lg border border-linea object-cover object-top"
-                          />
+                          <img src={s.imagenUrl} alt="" className="h-[4.5rem] w-[4.5rem] flex-none rounded-xl object-cover object-top" />
                         )}
-                        <span className="flex items-center gap-3 py-1.5">
-                          <span className="min-w-0 flex-1">
-                            <span className="block text-[0.95rem] font-medium text-tinta">{s.nombre}</span>
-                            <span className="block text-[0.8rem] text-tinta-suave">{textoDuracion(s.duracionMin)}</span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block text-[1rem] font-semibold leading-snug text-tinta">{s.nombre}</span>
+                          <span className="mt-0.5 flex items-center gap-1.5 text-[0.82rem] text-tinta-suave">
+                            <IconoReloj tam={14} />
+                            {textoDuracion(s.duracionMin)}
                           </span>
-                          <span className="cifra flex-none text-[0.88rem] font-medium text-tinta">
-                            {textoPrecioServicio(s)}
-                          </span>
-                          <input
-                            type="checkbox"
-                            checked={marcado}
-                            onChange={() => alternar(s.id)}
-                            aria-label={`Elegir ${s.nombre}`}
-                            className="h-5 w-5 flex-none accent-brand"
-                          />
+                          <span className="cifra mt-1 block text-[0.95rem] font-bold text-brand-texto">{textoPrecioServicio(s)}</span>
+                        </span>
+                        <span
+                          aria-hidden="true"
+                          className={`flex h-7 w-7 flex-none items-center justify-center rounded-full border-2 transition-all peer-focus-visible:ring-2 peer-focus-visible:ring-brand peer-focus-visible:ring-offset-2 ${
+                            marcado ? "border-brand bg-brand text-white" : "border-linea text-transparent"
+                          }`}
+                        >
+                          <IconoCheck tam={16} />
                         </span>
                       </label>
                     </li>

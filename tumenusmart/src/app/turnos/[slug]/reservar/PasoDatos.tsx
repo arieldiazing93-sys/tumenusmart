@@ -6,14 +6,15 @@ import { formatearGuarani } from "@/lib/format";
 import type { CampoFormulario } from "@/lib/pagina-reservas";
 import type { DatosCliente, PersonalPublico } from "@/lib/reserva-cliente";
 import { textoDuracion } from "@/lib/servicios-agenda";
+import { IconoCalendario } from "../Iconos";
 
 const CAMPO =
-  "w-full rounded-xl border border-linea bg-superficie px-3.5 py-3 text-[0.92rem] text-tinta " +
-  "placeholder:text-tinta-suave focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/15";
+  "h-12 w-full rounded-xl bg-superficie px-4 text-[0.95rem] text-tinta ring-1 ring-linea " +
+  "placeholder:text-tinta-suave focus:outline-none focus:ring-2 focus:ring-brand";
 
 function Etiqueta({ texto, opcional }: { texto: string; opcional: boolean }) {
   return (
-    <span className="mb-1.5 block text-[0.86rem] font-medium text-tinta">
+    <span className="mb-1.5 block text-[0.88rem] font-semibold text-tinta">
       {texto}
       {opcional && <span className="font-normal text-tinta-suave"> (opcional)</span>}
     </span>
@@ -59,63 +60,61 @@ export function PasoDatos({
 
   return (
     <div>
-      {/* ---------- resumen ---------- */}
-      <div className="flex items-center gap-3 py-2">
-        <AvatarPersonal
-          nombre={resumen.profesional.nombre}
-          fotoUrl={resumen.profesional.fotoUrl}
-          indice={0}
-          className="h-11 w-11 text-[0.9rem]"
-        />
-        <div className="min-w-0">
-          <p className="truncate text-[0.95rem] font-semibold text-tinta">{resumen.profesional.nombre}</p>
-          {resumen.profesional.profesion && (
-            <p className="truncate text-[0.8rem] text-tinta-suave">{resumen.profesional.profesion}</p>
-          )}
+      {/* ---------- resumen: con quién, cuándo, qué y cuánto, en una tarjeta con el color del negocio ---------- */}
+      <section aria-label="Resumen de la cita" className="rounded-2xl bg-brand-light/70 p-4 ring-1 ring-brand/15">
+        <div className="flex items-center gap-3">
+          <AvatarPersonal
+            nombre={resumen.profesional.nombre}
+            fotoUrl={resumen.profesional.fotoUrl}
+            indice={0}
+            className="h-14 w-14 text-[1.05rem]"
+          />
+          <div className="min-w-0">
+            <p className="truncate text-[1.05rem] font-semibold tracking-titular text-tinta">{resumen.profesional.nombre}</p>
+            {resumen.profesional.profesion && (
+              <p className="truncate text-[0.84rem] text-tinta-media">{resumen.profesional.profesion}</p>
+            )}
+          </div>
         </div>
-      </div>
 
-      <div className="flex items-center gap-3 border-t border-linea py-3.5">
-        <span
-          aria-hidden="true"
-          className="flex h-11 w-11 flex-none items-center justify-center rounded-full bg-brand-light text-brand-texto"
-        >
-          <svg viewBox="0 0 24 24" width={18} height={18} fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
-            <rect x="3" y="4" width="18" height="18" rx="2" />
-            <path d="M16 2v4M8 2v4M3 10h18" />
-          </svg>
-        </span>
-        <div>
-          <p className="text-[0.8rem] text-tinta-suave">{resumen.fechaTexto}</p>
-          <p className="cifra text-[0.95rem] font-semibold text-tinta">
-            {resumen.horaInicio} – {resumen.horaFin}
-          </p>
+        <div className="mt-3.5 flex items-center gap-3 rounded-xl bg-superficie px-3.5 py-3">
+          <span
+            aria-hidden="true"
+            className="flex h-10 w-10 flex-none items-center justify-center rounded-full bg-brand text-white"
+          >
+            <IconoCalendario tam={18} />
+          </span>
+          <div>
+            <p className="text-[0.84rem] text-tinta-media">{resumen.fechaTexto}</p>
+            <p className="cifra text-[1.05rem] font-bold text-tinta">
+              {resumen.horaInicio} – {resumen.horaFin}
+            </p>
+          </div>
         </div>
-      </div>
 
-      <div className="border-t border-linea py-3.5">
-        <h3 className="mb-2.5 text-[1rem] font-semibold text-tinta">Servicios</h3>
-        <ul className="flex flex-col gap-3">
+        <h3 className="mb-2 mt-4 text-[0.78rem] font-semibold uppercase tracking-rotulo text-tinta-media">Servicios</h3>
+        <ul className="flex flex-col gap-2.5">
           {resumen.servicios.map((s, i) => (
             <li key={i} className="flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <p className="text-[0.9rem] text-tinta">
+                <p className="text-[0.92rem] font-medium text-tinta">
                   {s.categoria}, {s.nombre}
                 </p>
-                <p className="text-[0.8rem] text-tinta-suave">{textoDuracion(s.duracionMin)}</p>
+                <p className="text-[0.8rem] text-tinta-media">{textoDuracion(s.duracionMin)}</p>
               </div>
-              <span className="cifra flex-none text-[0.9rem] font-medium text-tinta">{formatearGuarani(s.precio)}</span>
+              <span className="cifra flex-none text-[0.92rem] font-semibold text-tinta">{formatearGuarani(s.precio)}</span>
             </li>
           ))}
         </ul>
-        <div className="mt-3.5 flex items-center justify-between border-t border-linea pt-3.5">
+        <div className="mt-3.5 flex items-center justify-between border-t border-brand/20 pt-3.5">
           <span className="text-[0.95rem] font-semibold text-tinta">Precio total</span>
-          <span className="cifra text-[1.05rem] font-bold text-tinta">{formatearGuarani(resumen.total)}</span>
+          <span className="cifra text-[1.25rem] font-bold text-tinta">{formatearGuarani(resumen.total)}</span>
         </div>
-      </div>
+      </section>
 
       {/* ---------- datos del cliente ---------- */}
-      <div className="flex flex-col gap-4 border-t border-linea pt-5">
+      <h3 className="mb-3 mt-7 text-[1.1rem] font-semibold tracking-titular text-tinta">Tus datos</h3>
+      <div className="flex flex-col gap-4">
         {nombre && (
           <label className="block">
             <Etiqueta texto={nombre.etiqueta} opcional={nombre.opcional} />

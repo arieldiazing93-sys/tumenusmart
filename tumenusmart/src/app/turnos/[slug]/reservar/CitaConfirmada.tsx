@@ -74,14 +74,14 @@ export function CitaConfirmada({
 
         <Link
           href={`/turnos/${slug}/reservar`}
-          className="mt-6 flex h-12 w-full items-center justify-center rounded-xl bg-brand text-[0.95rem] font-semibold text-white transition-colors hover:bg-brand-dark active:scale-[0.99]"
+          className="mt-6 flex h-14 w-full items-center justify-center rounded-2xl bg-brand text-[1rem] font-semibold text-white shadow-alta transition-all hover:bg-brand-dark active:scale-[0.98]"
         >
           Reservar de nuevo
         </Link>
 
         <Link
           href={`/turnos/${slug}`}
-          className="mt-3 flex h-12 w-full items-center justify-center rounded-xl border border-linea bg-superficie text-[0.92rem] font-semibold text-tinta transition-colors hover:border-brand"
+          className="mt-3 flex h-14 w-full items-center justify-center rounded-2xl bg-superficie text-[0.95rem] font-semibold text-tinta shadow-sm ring-1 ring-linea transition-all hover:ring-brand active:scale-[0.98]"
         >
           Volver a la página
         </Link>
@@ -93,14 +93,14 @@ export function CitaConfirmada({
     <div className="flex flex-col items-center px-1 pt-4 text-center">
       <span
         aria-hidden="true"
-        className="flex h-16 w-16 items-center justify-center rounded-full bg-brand text-white"
+        className="flex h-20 w-20 animate-[entradaExito_0.5s_cubic-bezier(0.22,0.7,0.3,1)_both] items-center justify-center rounded-full bg-brand text-white shadow-media ring-8 ring-brand-light"
       >
         <svg viewBox="0 0 24 24" width={30} height={30} fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round">
           <path d="M20 6 9 17l-5-5" />
         </svg>
       </span>
 
-      <h2 className="mt-4 text-[1.3rem] font-semibold tracking-titular text-tinta">¡Cita creada!</h2>
+      <h2 className="mt-5 text-[1.5rem] font-semibold tracking-titular text-tinta">¡Cita creada!</h2>
       {pendienteDeEnvio ? (
         // Todo el texto va en el color de aviso (que no cambia con el tema claro u oscuro de la página) para
         // que se lea igual sobre el fondo ámbar.
@@ -143,16 +143,16 @@ export function CitaConfirmada({
         </p>
       )}
 
-      <div className="mt-6 w-full rounded-xl border border-linea bg-superficie p-4 text-left">
-        <p className="text-[0.78rem] text-tinta-suave">Cita {cita.codigo}</p>
-        <p className="mt-1 text-[1rem] font-semibold text-tinta">{cita.fechaTexto}</p>
-        <p className="cifra text-[0.95rem] text-tinta-media">
+      <div className="mt-6 w-full rounded-2xl bg-superficie p-5 text-left shadow-sm ring-1 ring-linea">
+        <p className="cifra text-[0.74rem] font-semibold uppercase tracking-rotulo text-tinta-suave">Cita {cita.codigo}</p>
+        <p className="mt-2 text-[1.2rem] font-semibold tracking-titular text-tinta">{cita.fechaTexto}</p>
+        <p className="cifra text-[1.05rem] font-semibold text-brand-texto">
           {cita.horaInicio} – {cita.horaFin}
         </p>
-        <p className="mt-2 text-[0.88rem] text-tinta-media">Con {cita.profesional}</p>
-        <div className="mt-3 flex items-center justify-between border-t border-linea pt-3">
-          <span className="text-[0.9rem] font-semibold text-tinta">Total</span>
-          <span className="cifra text-[1rem] font-bold text-tinta">{formatearGuarani(cita.total)}</span>
+        <p className="mt-2 text-[0.9rem] text-tinta-media">Con {cita.profesional}</p>
+        <div className="mt-4 flex items-center justify-between border-t border-dashed border-linea pt-4">
+          <span className="text-[0.95rem] font-semibold text-tinta">Total</span>
+          <span className="cifra text-[1.15rem] font-bold text-tinta">{formatearGuarani(cita.total)}</span>
         </div>
       </div>
 
@@ -178,7 +178,7 @@ export function CitaConfirmada({
                   // Sin conexión con el servidor: el cliente igual llega a WhatsApp, y el negocio tiene el mensaje.
                 });
             }}
-            className="flex h-12 w-full items-center justify-center gap-2.5 rounded-xl bg-brand text-[0.95rem] font-semibold text-white shadow-media transition-colors hover:bg-brand-dark active:scale-[0.99]"
+            className="flex h-14 w-full items-center justify-center gap-2.5 rounded-2xl bg-brand text-[1rem] font-semibold text-white shadow-alta transition-all hover:bg-brand-dark active:scale-[0.98]"
           >
             <IconoWhatsapp tam={20} />
             {enviado ? "Volver a abrir WhatsApp" : "Enviar por WhatsApp"}
@@ -188,7 +188,7 @@ export function CitaConfirmada({
 
       <Link
         href={`/turnos/${slug}`}
-        className="mt-3 flex h-12 w-full items-center justify-center rounded-xl border border-linea bg-superficie text-[0.92rem] font-semibold text-tinta transition-colors hover:border-brand"
+        className="mt-3 flex h-14 w-full items-center justify-center rounded-2xl bg-superficie text-[0.95rem] font-semibold text-tinta shadow-sm ring-1 ring-linea transition-all hover:ring-brand active:scale-[0.98]"
       >
         Volver a la página
       </Link>

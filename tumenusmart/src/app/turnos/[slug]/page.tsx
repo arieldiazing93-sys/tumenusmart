@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { cache } from "react";
+import { cache, type ReactNode } from "react";
 import { prisma } from "@/lib/prisma";
 import { estaSuspendido } from "@/lib/local-por-slug";
 import { iniciales } from "@/lib/agenda";
@@ -20,6 +20,7 @@ import {
 } from "@/components/IconosRedes";
 import { CarruselGaleria } from "./CarruselGaleria";
 import { CompartirBoton } from "./CompartirBoton";
+import { IconoCalendario, IconoChevron, IconoReloj } from "./Iconos";
 import { variablesDePagina } from "./marco";
 
 export const dynamic = "force-dynamic";
@@ -43,26 +44,14 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 }
 
 function Chevron() {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      width={18}
-      height={18}
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={2}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-      className="flex-none text-tinta-suave transition-transform duration-200 group-open:rotate-180"
-    >
-      <path d="m6 9 6 6 6-6" />
-    </svg>
-  );
+  return <IconoChevron className="text-tinta-suave transition-transform duration-200 group-open:rotate-180" />;
 }
 
 const SUMMARY =
-  "flex cursor-pointer list-none items-center gap-2 px-4 py-3.5 text-[0.92rem] font-semibold text-tinta [&::-webkit-details-marker]:hidden";
+  "flex cursor-pointer list-none items-center gap-2 px-4 py-4 text-[0.95rem] font-semibold text-tinta [&::-webkit-details-marker]:hidden";
+
+/** Un botón de la fila de contacto: el círculo con su icono y, abajo, qué hace. */
+type Accion = { nombre: string; href: string; icono: ReactNode; externo: boolean };
 
 /** "09:00–20:00", o "Cerrado". */
 function textoDelDia(h: HorarioDia | undefined): string {
@@ -154,145 +143,151 @@ export default async function PaginaPublicaReservas({ params }: { params: Promis
     },
   ].filter((r) => r.enlace);
 
-  const CONTACTO =
-    "flex h-10 w-10 items-center justify-center rounded-full border border-linea bg-superficie text-tinta-media transition-colors hover:border-brand hover:text-brand";
+  // La fila de contacto: llamar, correo y las redes, cada una con su nombre debajo.
+  const acciones: Accion[] = [];
+  if (pagina.telefono) {
+    acciones.push({ nombre: "Llamar", href: `tel:+${pagina.telefono}`, icono: <IconoTelefono tam={20} />, externo: false });
+  }
+  if (pagina.email) {
+    acciones.push({ nombre: "Correo", href: `mailto:${pagina.email}`, icono: <IconoCorreo tam={20} />, externo: false });
+  }
+  for (const r of redes) {
+    acciones.push({ nombre: r.nombre, href: r.enlace as string, icono: r.icono, externo: true });
+  }
 
   return (
     <div data-tema={tema} style={estilo} className="min-h-screen bg-papel-suave text-tinta">
-      <main className="relative mx-auto min-h-screen w-full max-w-xl bg-papel pb-32 sm:border-x sm:border-linea">
-        {/* ---------- cabecera: la foto de perfil, grande y centrada ---------- */}
-        <div
-          className="relative px-5 pb-1 pt-10"
-          style={{ backgroundImage: "linear-gradient(to bottom, rgb(var(--brand-light)), transparent)" }}
-        >
+      <main className="relative mx-auto min-h-screen w-full max-w-xl bg-papel pb-44 sm:shadow-alta">
+        {/* ---------- portada: el color del negocio, con círculos suaves de adorno ---------- */}
+        <div className="relative h-36 overflow-hidden bg-brand sm:h-44">
+          <span aria-hidden="true" className="absolute -right-10 -top-14 h-48 w-48 rounded-full bg-white/10" />
+          <span aria-hidden="true" className="absolute -left-12 top-16 h-40 w-40 rounded-full bg-white/10" />
+          <span aria-hidden="true" className="absolute right-24 top-20 h-20 w-20 rounded-full bg-black/10" />
           <div className="absolute right-3 top-3">
             <CompartirBoton nombre={pagina.nombre} />
           </div>
-          <div className="flex flex-col items-center text-center">
-            <div className="flex h-44 w-44 flex-none items-center justify-center overflow-hidden rounded-full border-[5px] border-papel bg-brand-light text-[3.4rem] font-semibold text-brand-texto shadow-md sm:h-52 sm:w-52 sm:text-[4rem]">
-              {pagina.fotoUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={pagina.fotoUrl} alt={pagina.nombre} className="h-full w-full object-cover" />
-              ) : (
-                iniciales(pagina.nombre)
-              )}
-            </div>
-            <h1 className="mt-4 text-[1.5rem] font-semibold leading-tight tracking-titular text-tinta">{pagina.nombre}</h1>
-            {pagina.industria && <p className="text-[0.95rem] text-tinta-media">{pagina.industria}</p>}
-            {pagina.telefono && (
-              <p className="cifra mt-1 text-[0.85rem] text-tinta-suave">{formatearTelefonoPersonal(pagina.telefono)}</p>
-            )}
-          </div>
         </div>
 
-        <div className="px-5">
-          {/* ---------- contacto y redes, centrados ---------- */}
-          {(pagina.telefono || pagina.email || redes.length > 0) && (
-            <ul className="mt-4 flex flex-wrap justify-center gap-2.5">
-              {pagina.telefono && (
-                <li>
-                  <a href={`tel:+${pagina.telefono}`} aria-label="Llamar" className={CONTACTO}>
-                    <IconoTelefono tam={18} />
-                  </a>
-                </li>
-              )}
-              {pagina.email && (
-                <li>
-                  <a href={`mailto:${pagina.email}`} aria-label="Enviar un correo" className={CONTACTO}>
-                    <IconoCorreo tam={18} />
-                  </a>
-                </li>
-              )}
-              {redes.map((r) => (
-                <li key={r.nombre}>
+        {/* ---------- el perfil, subiendo sobre la portada ---------- */}
+        <div className="relative -mt-14 px-5">
+          <div className="flex h-28 w-28 flex-none items-center justify-center overflow-hidden rounded-full border-4 border-papel bg-brand-light text-[2.4rem] font-semibold text-brand-texto shadow-media sm:h-32 sm:w-32 sm:text-[2.8rem]">
+            {pagina.fotoUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={pagina.fotoUrl} alt={pagina.nombre} className="h-full w-full object-cover" />
+            ) : (
+              iniciales(pagina.nombre)
+            )}
+          </div>
+          <h1 className="mt-3 text-[1.75rem] font-semibold leading-tight tracking-titular text-tinta">{pagina.nombre}</h1>
+          {pagina.industria && <p className="mt-0.5 text-[1rem] text-tinta-media">{pagina.industria}</p>}
+
+          <div className="mt-4 flex flex-wrap items-center gap-2">
+            {horarios && (
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-brand-light px-3 py-1.5 text-[0.82rem] font-semibold text-brand-texto">
+                <IconoReloj tam={15} />
+                {hoy?.trabaja ? `Hoy ${textoDelDia(hoy)}` : "Cerrado hoy"}
+              </span>
+            )}
+            {pagina.telefono && (
+              <span className="cifra text-[0.85rem] text-tinta-suave">{formatearTelefonoPersonal(pagina.telefono)}</span>
+            )}
+          </div>
+
+          {/* ---------- contacto y redes ---------- */}
+          {acciones.length > 0 && (
+            <ul className="mt-5 flex flex-wrap gap-x-2 gap-y-3">
+              {acciones.map((a) => (
+                <li key={a.nombre}>
                   <a
-                    href={r.enlace ?? undefined}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    aria-label={r.nombre}
-                    title={r.nombre}
-                    className="flex h-10 w-10 items-center justify-center rounded-full bg-brand-light text-brand-texto transition-transform active:scale-95"
+                    href={a.href}
+                    {...(a.externo ? { target: "_blank", rel: "noopener noreferrer" } : {})}
+                    aria-label={a.nombre}
+                    className="group flex w-14 flex-col items-center gap-1.5"
                   >
-                    {r.icono}
+                    <span className="flex h-12 w-12 items-center justify-center rounded-full bg-brand-light text-brand-texto transition-all group-hover:bg-brand group-hover:text-white group-active:scale-90">
+                      {a.icono}
+                    </span>
+                    <span className="max-w-full truncate text-[0.72rem] font-medium text-tinta-media">{a.nombre}</span>
                   </a>
                 </li>
               ))}
             </ul>
           )}
 
-          {/* ---------- acerca de y horario ---------- */}
-          <div className="mt-5 flex flex-col gap-2.5">
-            {pagina.descripcion && (
-              <details className="group rounded-xl border border-linea bg-superficie" open>
-                <summary className={SUMMARY}>
-                  <span className="flex-1">Acerca de</span>
-                  <Chevron />
-                </summary>
-                <p className="whitespace-pre-line border-t border-linea px-4 py-3.5 text-[0.9rem] leading-relaxed text-tinta-media">
-                  {pagina.descripcion}
-                </p>
-              </details>
-            )}
+          {/* ---------- acerca de ---------- */}
+          {pagina.descripcion && (
+            <section className="mt-7" aria-label="Acerca de">
+              <h2 className="mb-2 text-[1.1rem] font-semibold tracking-titular text-tinta">Acerca de</h2>
+              <p className="whitespace-pre-line text-[0.95rem] leading-relaxed text-tinta-media">{pagina.descripcion}</p>
+            </section>
+          )}
 
-            {horarios && (
-              <details className="group rounded-xl border border-linea bg-superficie">
-                <summary className={SUMMARY}>
-                  <span className="flex-1">Horario</span>
-                  <span className="cifra text-[0.8rem] font-medium text-tinta-media">Hoy {textoDelDia(hoy)}</span>
-                  <Chevron />
-                </summary>
-                <ul className="divide-y divide-linea-fina border-t border-linea px-4">
-                  {horarios.map((h) => {
-                    const esHoy = h.diaSemana === diaSemanaAsuncion();
-                    return (
-                      <li
-                        key={h.diaSemana}
-                        className={`flex items-baseline justify-between gap-3 py-2.5 text-[0.88rem] ${
-                          esHoy ? "font-semibold text-tinta" : "text-tinta-media"
-                        }`}
-                      >
-                        <span>{nombreDeDia(h.diaSemana)}</span>
-                        <span className="text-right">
-                          <span className={`cifra ${h.trabaja ? "" : "text-tinta-suave"}`}>{textoDelDia(h)}</span>
-                          {h.trabaja && h.descansa && (
-                            <span className="cifra block text-[0.74rem] font-normal text-tinta-suave">
-                              Descanso {h.descansoInicio} – {h.descansoFin}
-                            </span>
-                          )}
-                        </span>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </details>
-            )}
-          </div>
+          {/* ---------- horario ---------- */}
+          {horarios && (
+            <details className="group mt-6 rounded-2xl bg-superficie shadow-sm ring-1 ring-linea">
+              <summary className={SUMMARY}>
+                <span className="flex-1">Horario</span>
+                <span className="cifra text-[0.8rem] font-medium text-tinta-media">Hoy {textoDelDia(hoy)}</span>
+                <Chevron />
+              </summary>
+              <ul className="divide-y divide-linea-fina border-t border-linea px-4">
+                {horarios.map((h) => {
+                  const esHoy = h.diaSemana === diaSemanaAsuncion();
+                  return (
+                    <li
+                      key={h.diaSemana}
+                      className={`flex items-baseline justify-between gap-3 py-3 text-[0.9rem] ${
+                        esHoy ? "font-semibold text-tinta" : "text-tinta-media"
+                      }`}
+                    >
+                      <span className="flex items-center gap-2">
+                        {nombreDeDia(h.diaSemana)}
+                        {esHoy && (
+                          <span className="rounded-full bg-brand-light px-2 py-0.5 text-[0.68rem] font-semibold text-brand-texto">Hoy</span>
+                        )}
+                      </span>
+                      <span className="text-right">
+                        <span className={`cifra ${h.trabaja ? "" : "text-tinta-suave"}`}>{textoDelDia(h)}</span>
+                        {h.trabaja && h.descansa && (
+                          <span className="cifra block text-[0.74rem] font-normal text-tinta-suave">
+                            Descanso {h.descansoInicio} – {h.descansoFin}
+                          </span>
+                        )}
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+            </details>
+          )}
 
           {/* ---------- galería ---------- */}
           {galeria.length > 0 && (
-            <section className="mt-7" aria-label="Galería">
-              <h2 className="mb-3 text-[1.05rem] font-semibold tracking-titular text-tinta">Galería</h2>
+            <section className="mt-8" aria-label="Galería">
+              <h2 className="mb-3 text-[1.1rem] font-semibold tracking-titular text-tinta">Galería</h2>
               <CarruselGaleria items={galeria} />
             </section>
           )}
         </div>
 
-        {/* ---------- crear cita: fija abajo ---------- */}
-        <div className="fixed bottom-0 left-1/2 z-20 w-full max-w-xl -translate-x-1/2 border-t border-linea bg-papel/95 backdrop-blur sm:border-x">
-          <div className="px-5 pb-4 pt-3">
+        {/* ---------- crear cita: fija abajo, flotando sobre un difuminado ---------- */}
+        <div className="pointer-events-none fixed bottom-0 left-1/2 z-20 w-full max-w-xl -translate-x-1/2">
+          <div aria-hidden="true" className="h-10 bg-gradient-to-t from-papel to-transparent" />
+          <div className="pointer-events-auto bg-papel px-4 pb-3">
             <Link
               href={`/turnos/${pagina.slug}/reservar`}
-              className="flex h-12 w-full items-center justify-center rounded-xl bg-brand text-[0.95rem] font-semibold text-white transition-colors hover:bg-brand-dark active:scale-[0.99]"
+              className="flex h-14 w-full items-center justify-center gap-2.5 rounded-2xl bg-brand text-[1rem] font-semibold text-white shadow-alta transition-all hover:bg-brand-dark active:scale-[0.98]"
             >
+              <IconoCalendario tam={20} />
               Crear cita
             </Link>
             {/* Tipografía distinta del resto (la monoespaciada del sistema), en mayúsculas y en el grosor más
                 fuerte que se carga. El -mr compensa el espacio que "tracking" agrega después de la última
                 letra, para que el texto quede centrado de verdad. */}
-            <p className="mt-1.5 text-center">
+            <p className="mt-1 text-center">
               <Link
                 href="/"
-                className="-mr-[0.14em] inline-block py-1.5 font-mono text-[0.82rem] font-semibold uppercase leading-tight tracking-[0.14em] text-tinta-media transition-colors hover:text-tinta hover:underline"
+                className="-mr-[0.14em] inline-block py-1.5 font-mono text-[0.78rem] font-semibold uppercase leading-tight tracking-[0.14em] text-tinta-media transition-colors hover:text-tinta hover:underline"
               >
                 Desarrollado por tumenusmart.com
               </Link>

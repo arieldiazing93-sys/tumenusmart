@@ -17,6 +17,7 @@ import {
 } from "@/lib/reserva-cliente";
 import { textoDuracion } from "@/lib/servicios-agenda";
 import { crearCitaPublica } from "../actions";
+import { IconoAtras } from "../Iconos";
 import { CitaConfirmada } from "./CitaConfirmada";
 import { PasoDatos } from "./PasoDatos";
 import { PasoFechaHora } from "./PasoFechaHora";
@@ -31,6 +32,8 @@ const TITULOS: Record<Paso, string> = {
   3: "Elegí día y hora",
   4: "Tus datos",
 };
+/** El nombre corto de cada paso, debajo de la barra de avance. */
+const ETIQUETAS_PASOS = ["Servicios", "Profesional", "Horario", "Datos"];
 
 /**
  * La reserva paso a paso, como una app: 1) servicios, 2) profesional, 3) día y
@@ -172,53 +175,57 @@ export function AsistenteReserva({
   }
 
   const BOTON =
-    "flex h-12 w-full items-center justify-center rounded-xl bg-brand text-[0.95rem] font-semibold text-white " +
-    "transition-colors hover:bg-brand-dark active:scale-[0.99] disabled:pointer-events-none disabled:opacity-45";
+    "flex h-14 w-full items-center justify-center rounded-2xl bg-brand text-[1rem] font-semibold text-white shadow-alta " +
+    "transition-all hover:bg-brand-dark active:scale-[0.98] disabled:pointer-events-none disabled:opacity-45 disabled:shadow-none";
+  const BOTON_VOLVER =
+    "flex h-10 w-10 flex-none items-center justify-center rounded-full bg-papel-hundido text-tinta transition-all hover:bg-brand-light active:scale-90";
 
   return (
-    <div className="mx-auto flex min-h-screen w-full max-w-xl flex-col bg-papel sm:border-x sm:border-linea">
-      {/* ---------- arriba: volver, título y avance ---------- */}
+    <div className="mx-auto flex min-h-screen w-full max-w-xl flex-col bg-papel sm:shadow-alta">
+      {/* ---------- arriba: volver, en qué paso va y la barra de avance ---------- */}
       <header className="sticky top-0 z-20 bg-papel/95 px-4 pb-3 pt-3 backdrop-blur">
-        <div className="relative flex h-10 items-center justify-center">
+        <div className="flex items-center gap-3">
           {paso === 1 ? (
-            <Link
-              href={`/turnos/${slug}`}
-              aria-label="Volver a la página"
-              className="absolute left-0 flex h-10 w-10 items-center justify-center rounded-full text-[1.4rem] text-tinta transition-colors hover:bg-papel-hundido"
-            >
-              ‹
+            <Link href={`/turnos/${slug}`} aria-label="Volver a la página" className={BOTON_VOLVER}>
+              <IconoAtras />
             </Link>
           ) : (
-            <button
-              type="button"
-              onClick={atras}
-              aria-label="Volver al paso anterior"
-              className="absolute left-0 flex h-10 w-10 items-center justify-center rounded-full text-[1.4rem] text-tinta transition-colors hover:bg-papel-hundido"
-            >
-              ‹
+            <button type="button" onClick={atras} aria-label="Volver al paso anterior" className={BOTON_VOLVER}>
+              <IconoAtras />
             </button>
           )}
-          <h1 className="text-[1rem] font-semibold tracking-titular text-tinta">{TITULOS[paso]}</h1>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-[0.7rem] font-semibold uppercase tracking-rotulo text-tinta-suave">
+              {negocio} · Paso {paso} de 4
+            </p>
+            <h1 className="truncate text-[1.2rem] font-semibold leading-tight tracking-titular text-tinta">{TITULOS[paso]}</h1>
+          </div>
         </div>
         <div
-          className="mt-2 grid grid-cols-4 gap-2"
+          className="mt-3 grid grid-cols-4 gap-2"
           role="progressbar"
           aria-valuemin={1}
           aria-valuemax={4}
           aria-valuenow={paso}
           aria-label={`Paso ${paso} de 4`}
         >
-          {[1, 2, 3, 4].map((n) => (
-            <span
-              key={n}
-              className={`h-1 rounded-full transition-colors duration-200 ${n <= paso ? "bg-brand" : "bg-brand-light"}`}
-            />
+          {ETIQUETAS_PASOS.map((etiqueta, i) => (
+            <div key={etiqueta}>
+              <span
+                className={`block h-1.5 rounded-full transition-colors duration-200 ${i + 1 <= paso ? "bg-brand" : "bg-brand-light"}`}
+              />
+              <span
+                className={`mt-1.5 block truncate text-[0.7rem] font-semibold ${i + 1 === paso ? "text-tinta" : "text-tinta-suave"}`}
+              >
+                {etiqueta}
+              </span>
+            </div>
           ))}
         </div>
       </header>
 
       {/* ---------- el paso ---------- */}
-      <main className="flex-1 px-4 pb-44 pt-2">
+      <main className="flex-1 px-4 pb-56 pt-3">
         {paso === 1 && <PasoServicios categorias={categorias} elegidos={servicioIds} onCambiar={cambiarServicios} />}
 
         {paso === 2 && (
@@ -268,20 +275,23 @@ export function AsistenteReserva({
         )}
       </main>
 
-      {/* ---------- abajo: el botón, siempre a la vista ---------- */}
-      <footer className="fixed bottom-0 left-1/2 z-20 w-full max-w-xl -translate-x-1/2 border-t border-linea bg-papel/95 backdrop-blur sm:border-x">
-        <div className="px-4 pb-4 pt-3">
-          {paso === 1 && elegidos.length > 0 && (
-            <p className="cifra mb-2 text-center text-[0.8rem] text-tinta-media">
-              {elegidos.length === 1 ? "1 servicio" : `${elegidos.length} servicios`} · {textoDuracion(duracion)} ·{" "}
-              {formatearGuarani(total)}
-            </p>
+      {/* ---------- abajo: lo elegido y el botón, siempre a la vista ---------- */}
+      <footer className="pointer-events-none fixed bottom-0 left-1/2 z-20 w-full max-w-xl -translate-x-1/2">
+        <div aria-hidden="true" className="h-8 bg-gradient-to-t from-papel to-transparent" />
+        <div className="pointer-events-auto bg-papel px-4 pb-4">
+          {paso < 4 && elegidos.length > 0 && (
+            <div className="mb-2 flex items-center justify-between gap-3 rounded-2xl bg-superficie px-4 py-2.5 shadow-media ring-1 ring-linea">
+              <span className="cifra text-[0.82rem] text-tinta-media">
+                {elegidos.length === 1 ? "1 servicio" : `${elegidos.length} servicios`} · {textoDuracion(duracion)}
+              </span>
+              <span className="cifra text-[1rem] font-bold text-tinta">{formatearGuarani(total)}</span>
+            </div>
           )}
 
           {paso === 4 ? (
             <>
               {error && (
-                <div role="alert" className="mb-2.5 rounded-lg bg-peligro-luz px-3 py-2 text-[0.84rem] font-medium text-peligro">
+                <div role="alert" className="mb-2.5 rounded-xl bg-peligro-luz px-3.5 py-2.5 text-[0.86rem] font-medium text-peligro">
                   {error}
                   {horarioOcupado && (
                     <button type="button" onClick={elegirOtraHora} className="ml-2 font-semibold underline">
