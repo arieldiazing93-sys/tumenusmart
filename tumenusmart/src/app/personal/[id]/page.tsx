@@ -25,7 +25,7 @@ import { claveDiaAsuncion, fechaAsuncionDesdeTexto } from "@/lib/timezone";
 
 /** Los botones chicos de "Hoy" y las flechas, de un vistazo (mismo criterio que Citas del panel). */
 const BOTON =
-  "inline-flex h-8 items-center justify-center rounded-lg border px-2.5 text-[0.78rem] font-semibold transition-colors duration-150";
+  "inline-flex h-10 items-center justify-center rounded-full border px-3.5 text-[0.82rem] font-semibold transition-colors duration-150";
 const BOTON_NEUTRO = `${BOTON} border-linea bg-superficie text-tinta`;
 const BOTON_HOY = `${BOTON} border-azul/35 bg-azul-luz px-3 text-azul-oscuro`;
 
@@ -158,23 +158,26 @@ export default async function TrabajoDelPersonalPage({
   }
 
   const cifrasPeriodo = [
-    { rotulo: "Clientes atendidos", valor: String(trabajosPeriodo.length), tono: "neutro" as const },
-    { rotulo: "Cobrado", valor: formatearGuarani(cobradoPeriodo), tono: "neutro" as const },
-    { rotulo: "Comisión servicio", valor: formatearGuarani(comisionPeriodo), tono: "exito" as const },
-    { rotulo: "Comisión producto", valor: formatearGuarani(comisionProductoPeriodo), tono: "exito" as const },
+    // Lo cobrado es lo que más se mira: va primero, a todo el ancho y en grande.
+    { rotulo: "Cobrado", valor: formatearGuarani(cobradoPeriodo), tono: "marca" as const, principal: true },
+    { rotulo: "Clientes atendidos", valor: String(trabajosPeriodo.length), tono: "neutro" as const, principal: false },
     {
       rotulo: "Canceladas",
       valor: String(canceladasPeriodo),
       // Sin cancelaciones no hay nada que avisar: la tarjeta queda neutra, no en rojo.
       tono: canceladasPeriodo > 0 ? ("peligro" as const) : ("neutro" as const),
+      principal: false,
     },
+    { rotulo: "Comisión servicio", valor: formatearGuarani(comisionPeriodo), tono: "exito" as const, principal: false },
+    { rotulo: "Comisión producto", valor: formatearGuarani(comisionProductoPeriodo), tono: "exito" as const, principal: false },
   ];
   // El fondo de cada tarjeta dice de qué se trata de un vistazo: ni tan fuerte como un
   // cartel de aviso, ni tan débil que no se note al lado de las otras tres.
   const TONOS_TARJETA = {
-    neutro: { tarjeta: "border-linea bg-papel-hundido", valor: "text-tinta", rotulo: "text-tinta-suave" },
-    exito: { tarjeta: "border-exito/40 bg-exito-tinte", valor: "text-exito", rotulo: "text-exito/75" },
-    peligro: { tarjeta: "border-peligro/40 bg-peligro-tinte", valor: "text-peligro", rotulo: "text-peligro/75" },
+    neutro: { tarjeta: "bg-superficie shadow-sm ring-1 ring-linea", valor: "text-tinta", rotulo: "text-tinta-suave" },
+    marca: { tarjeta: "bg-brand-light ring-1 ring-brand/20", valor: "text-brand-texto", rotulo: "text-brand-texto/80" },
+    exito: { tarjeta: "bg-exito-luz ring-1 ring-exito/20", valor: "text-exito", rotulo: "text-exito/80" },
+    peligro: { tarjeta: "bg-peligro-luz ring-1 ring-peligro/25", valor: "text-peligro", rotulo: "text-peligro/80" },
   } as const;
 
   /** La dirección de esta misma página con esos cambios; lo que no se cambia se mantiene. */
@@ -225,145 +228,164 @@ export default async function TrabajoDelPersonalPage({
         : "Todavía no tenés trabajos confirmados. Cuando se cobre una cita tuya, aparece acá.";
 
   return (
-    <main className="mx-auto min-h-screen max-w-md bg-superficie px-4 py-6">
+    <main className="mx-auto min-h-screen max-w-md bg-papel-suave pb-10">
       <AutoRefresh segundos={30} />
 
-      <header className="flex items-center gap-3">
-        <AvatarPersonal
-          nombre={`${miembro.nombre} ${miembro.apellido ?? ""}`.trim()}
-          fotoUrl={miembro.fotoUrl}
-          className="h-14 w-14 text-[1.1rem]"
-        />
-        <div className="min-w-0">
-          <h1 className="truncate text-[1.25rem] font-semibold tracking-titular text-tinta">Hola, {miembro.nombre} 👋</h1>
-          <p className="truncate text-[0.85rem] text-tinta-media">
-            {[miembro.profesion, nombreNegocio].filter(Boolean).join(" · ") || "Tu trabajo confirmado"}
-          </p>
+      {/* ---------- arriba: quién es, qué le toca y sus tres números ---------- */}
+      <header className="rounded-b-3xl bg-noche px-4 pb-5 pt-6 text-noche-tinta shadow-media">
+        <div className="flex items-center gap-3.5">
+          <AvatarPersonal
+            nombre={`${miembro.nombre} ${miembro.apellido ?? ""}`.trim()}
+            fotoUrl={miembro.fotoUrl}
+            className="h-16 w-16 text-[1.2rem] ring-2 ring-white/20"
+          />
+          <div className="min-w-0">
+            <p className="truncate text-[0.7rem] font-semibold uppercase tracking-rotulo text-noche-suave">
+              {nombreNegocio || "Mi trabajo"}
+            </p>
+            <h1 className="truncate text-[1.5rem] font-semibold leading-tight tracking-titular text-white">Hola, {miembro.nombre}</h1>
+            {miembro.profesion && <p className="truncate text-[0.85rem] text-noche-suave">{miembro.profesion}</p>}
+          </div>
         </div>
+
+        <p className="mt-4 text-[0.92rem] leading-snug text-noche-tinta">{mensaje}</p>
+
+        <ul className="mt-4 grid grid-cols-3 gap-2.5">
+          {cifras.map((c) => (
+            <li key={c.rotulo} className="rounded-2xl bg-white/10 px-3 py-3 text-center">
+              <p className="cifra text-[1.8rem] font-bold leading-none text-white">{c.valor}</p>
+              <p className="mt-1.5 text-[0.72rem] font-medium text-noche-suave">{c.rotulo}</p>
+            </li>
+          ))}
+        </ul>
       </header>
 
-      <p className="mt-5 text-[0.9rem] text-tinta-media">{mensaje}</p>
+      <div className="px-4">
+        <BuscarClienteFoto personalId={id} />
 
-      <ul className="mt-3 grid grid-cols-3 gap-2">
-        {cifras.map((c) => (
-          <li key={c.rotulo} className="rounded-xl border border-linea bg-superficie px-3 py-3 text-center">
-            <p className="cifra text-[1.5rem] font-semibold leading-none text-tinta">{c.valor}</p>
-            <p className="mt-1.5 text-[0.7rem] font-medium text-tinta-suave">{c.rotulo}</p>
-          </li>
-        ))}
-      </ul>
-
-      <BuscarClienteFoto personalId={id} />
-
-      {deHoy.length > 0 && (
-        <section className="mt-6">
-          <h2 className="mb-2 text-[0.8rem] font-semibold uppercase tracking-wide text-tinta-suave">Hoy</h2>
-          <ul className="flex flex-col gap-2">
-            {deHoy.map((t) => (
-              <li key={t.id} className="rounded-xl border border-linea border-l-4 border-l-exito bg-superficie p-3.5">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="truncate text-[0.95rem] font-semibold text-tinta">{t.cliente}</p>
-                    {t.servicios && <p className="text-[0.82rem] leading-snug text-tinta-media">{t.servicios}</p>}
+        {deHoy.length > 0 && (
+          <section className="mt-7">
+            <h2 className="mb-3 flex items-baseline justify-between gap-3 text-[1.25rem] font-semibold tracking-titular text-tinta">
+              Hoy
+              <span className="text-[0.8rem] font-medium text-tinta-suave">
+                {deHoy.length} {deHoy.length === 1 ? "trabajo" : "trabajos"}
+              </span>
+            </h2>
+            <ul className="flex flex-col gap-3">
+              {deHoy.map((t) => (
+                <li key={t.id} className="flex gap-3 rounded-2xl bg-superficie p-3.5 shadow-sm ring-1 ring-linea">
+                  <span className="cifra flex h-14 w-16 flex-none items-center justify-center rounded-xl bg-exito-luz text-[1.15rem] font-bold text-exito">
+                    {t.hora}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-[1rem] font-semibold tracking-titular text-tinta">{t.cliente}</p>
+                    {t.servicios && <p className="text-[0.84rem] leading-snug text-tinta-media">{t.servicios}</p>}
+                    <div className="mt-1.5 flex items-center justify-between gap-2 text-[0.82rem]">
+                      <span className="font-semibold text-exito">✓ Confirmado</span>
+                      <span className="cifra font-bold text-tinta">{formatearGuarani(t.total)}</span>
+                    </div>
                   </div>
-                  <span className="cifra flex-none text-[0.85rem] text-tinta-suave">{t.hora}</span>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+
+        {proximos.size > 0 && (
+          <section className="mt-7">
+            <h2 className="mb-3 text-[1.25rem] font-semibold tracking-titular text-tinta">Próximos días</h2>
+            <div className="flex flex-col gap-4">
+              {[...proximos.entries()].map(([dia, lista]) => (
+                <div key={dia}>
+                  <p className="mb-1.5 px-1 text-[0.82rem] font-semibold text-tinta-media">
+                    {dia === manana ? `Mañana · ${diaLargo(dia)}` : diaLargo(dia)}
+                  </p>
+                  <ul className="flex flex-col overflow-hidden rounded-2xl bg-superficie shadow-sm ring-1 ring-linea">
+                    {lista.map((t) => (
+                      <li
+                        key={t.id}
+                        className="flex items-center gap-3 border-b border-linea-fina px-3.5 py-3 text-[0.88rem] last:border-b-0"
+                      >
+                        <span className="cifra flex-none rounded-lg bg-papel-hundido px-2 py-1 text-[0.82rem] font-semibold text-tinta">
+                          {t.hora}
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate font-semibold text-tinta">{t.cliente}</span>
+                          {t.servicios && <span className="block truncate text-[0.8rem] text-tinta-media">{t.servicios}</span>}
+                        </span>
+                        <span className="cifra flex-none font-bold text-tinta">{formatearGuarani(t.total)}</span>
+                      </li>
+                    ))}
+                  </ul>
                 </div>
-                <div className="mt-2 flex items-center justify-between text-[0.8rem]">
-                  <span className="font-medium text-exito">✓ Confirmado</span>
-                  <span className="cifra font-semibold text-tinta">{formatearGuarani(t.total)}</span>
-                </div>
-              </li>
-            ))}
+              ))}
+            </div>
+          </section>
+        )}
+
+        <section className="mt-8">
+          <h2 className="mb-3 text-[1.25rem] font-semibold tracking-titular text-tinta">Tus números</h2>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <Link href={hrefPeriodo({ fecha: hoy })} className={BOTON_HOY}>
+              Hoy
+            </Link>
+            <Link
+              href={hrefPeriodo({ fecha: fechaVecina(vista, fechaPedida, -1) })}
+              aria-label="Período anterior"
+              className={`${BOTON_NEUTRO} w-10 px-0 text-[1.1rem]`}
+            >
+              ‹
+            </Link>
+            <Link
+              href={hrefPeriodo({ fecha: fechaVecina(vista, fechaPedida, 1) })}
+              aria-label="Período siguiente"
+              className={`${BOTON_NEUTRO} w-10 px-0 text-[1.1rem]`}
+            >
+              ›
+            </Link>
+            <div role="tablist" aria-label="Ver por" className="flex w-full rounded-full bg-papel-hundido p-1">
+              {VISTAS_AGENDA.map((v) => (
+                <Link
+                  key={v.valor}
+                  href={hrefPeriodo({ vista: v.valor })}
+                  role="tab"
+                  aria-selected={v.valor === vista}
+                  className={`flex h-9 flex-1 items-center justify-center rounded-full px-3.5 text-[0.82rem] font-semibold transition-colors duration-150 ${
+                    v.valor === vista ? "bg-superficie text-azul-oscuro shadow-sm ring-1 ring-azul/25" : "text-tinta-media"
+                  }`}
+                >
+                  {v.etiqueta}
+                </Link>
+              ))}
+            </div>
+          </div>
+
+          <p className="mt-3 text-[1rem] font-semibold tracking-titular text-tinta">{tituloAgenda(vista, fechaPedida)}</p>
+
+          <ul className="mt-3 grid grid-cols-2 gap-2.5">
+            {cifrasPeriodo.map((c) => {
+              const t = TONOS_TARJETA[c.tono];
+              return (
+                <li
+                  key={c.rotulo}
+                  className={`min-w-0 rounded-2xl px-3.5 py-3.5 ${t.tarjeta} ${c.principal ? "col-span-2 py-4" : ""}`}
+                >
+                  <p
+                    className={`cifra truncate font-bold leading-none ${t.valor} ${c.principal ? "text-[1.8rem]" : "text-[1.2rem]"}`}
+                    title={c.valor}
+                  >
+                    {c.valor}
+                  </p>
+                  <p className={`mt-1.5 truncate text-[0.76rem] font-medium ${t.rotulo}`}>{c.rotulo}</p>
+                </li>
+              );
+            })}
           </ul>
         </section>
-      )}
 
-      {proximos.size > 0 && (
-        <section className="mt-6">
-          <h2 className="mb-2 text-[0.8rem] font-semibold uppercase tracking-wide text-tinta-suave">Próximos días</h2>
-          <div className="flex flex-col gap-3">
-            {[...proximos.entries()].map(([dia, lista]) => (
-              <div key={dia}>
-                <p className="mb-1 text-[0.8rem] font-semibold text-tinta-media">
-                  {dia === manana ? `Mañana · ${diaLargo(dia)}` : diaLargo(dia)}
-                </p>
-                <ul className="flex flex-col overflow-hidden rounded-xl border border-linea">
-                  {lista.map((t) => (
-                    <li
-                      key={t.id}
-                      className="flex items-center justify-between gap-3 border-b border-linea-fina bg-superficie px-3 py-2.5 text-[0.85rem] last:border-b-0"
-                    >
-                      <span className="min-w-0 truncate">
-                        <span className="cifra text-tinta-suave">{t.hora}</span>{" "}
-                        <span className="font-medium text-tinta">{t.cliente}</span>
-                        {t.servicios && <span className="text-tinta-media"> · {t.servicios}</span>}
-                      </span>
-                      <span className="cifra flex-none font-semibold text-tinta">{formatearGuarani(t.total)}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
-
-      <section className="mt-6">
-        <h2 className="mb-2 text-[0.8rem] font-semibold uppercase tracking-wide text-tinta-suave">Tus números</h2>
-
-        <div className="flex flex-wrap items-center gap-1.5">
-          <Link href={hrefPeriodo({ fecha: hoy })} className={BOTON_HOY}>
-            Hoy
-          </Link>
-          <Link
-            href={hrefPeriodo({ fecha: fechaVecina(vista, fechaPedida, -1) })}
-            aria-label="Período anterior"
-            className={`${BOTON_NEUTRO} w-8 px-0`}
-          >
-            ‹
-          </Link>
-          <Link
-            href={hrefPeriodo({ fecha: fechaVecina(vista, fechaPedida, 1) })}
-            aria-label="Período siguiente"
-            className={`${BOTON_NEUTRO} w-8 px-0`}
-          >
-            ›
-          </Link>
-          <div role="tablist" aria-label="Ver por" className="ml-auto flex rounded-lg bg-papel-hundido p-0.5">
-            {VISTAS_AGENDA.map((v) => (
-              <Link
-                key={v.valor}
-                href={hrefPeriodo({ vista: v.valor })}
-                role="tab"
-                aria-selected={v.valor === vista}
-                className={`flex h-7 items-center justify-center rounded-md px-2.5 text-[0.76rem] font-semibold transition-colors duration-150 ${
-                  v.valor === vista ? "bg-superficie text-azul-oscuro shadow-sm" : "text-tinta-media"
-                }`}
-              >
-                {v.etiqueta}
-              </Link>
-            ))}
-          </div>
-        </div>
-
-        <p className="mt-2.5 text-[0.85rem] font-medium text-tinta">{tituloAgenda(vista, fechaPedida)}</p>
-
-        <ul className="mt-2.5 grid grid-cols-2 gap-2">
-          {cifrasPeriodo.map((c) => {
-            const t = TONOS_TARJETA[c.tono];
-            return (
-              <li key={c.rotulo} className={`min-w-0 rounded-xl border px-3 py-3 ${t.tarjeta}`}>
-                <p className={`cifra truncate text-[1.05rem] font-semibold leading-none ${t.valor}`} title={c.valor}>
-                  {c.valor}
-                </p>
-                <p className={`mt-1.5 truncate text-[0.72rem] font-medium ${t.rotulo}`}>{c.rotulo}</p>
-              </li>
-            );
-          })}
-        </ul>
-      </section>
-
-      <p className="mt-8 text-center text-[0.72rem] text-tinta-suave">Se actualiza sola. Solo ves lo tuyo.</p>
+        <p className="mt-8 text-center text-[0.74rem] text-tinta-suave">Se actualiza sola. Solo ves lo tuyo.</p>
+      </div>
     </main>
   );
 }

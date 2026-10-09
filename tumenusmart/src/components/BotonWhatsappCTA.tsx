@@ -50,5 +50,5 @@ export function BotonWhatsappCTA({
 
   // El que salta es este contenedor y no el botón: así el botón conserva su propio efecto al apretarlo. Deja de saltar
   // apenas se lo toca.
-  return llamar && !enviado ? <div className="animate-llamar">{boton}</div> : boton;
+  return llamar && !enviado ? <div className="w-full animate-llamar">{boton}</div> : boton;
 }

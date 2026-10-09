@@ -23,14 +23,16 @@ const REM_POR_HORA = 5;
 /** El ancho de la columna de las horas, a la izquierda. */
 const ANCHO_HORAS = "3.25rem";
 /**
- * El ancho mínimo de cada día: si no entran, la semana se desliza de costado (con su propia
- * barra horizontal, igual que la vertical). Más ancho que un turno solo porque cuando dos
- * citas de personas distintas coinciden en el mismo horario, se reparten el ancho del día
- * entre sí (ver `repartirCarriles`) — con poco ancho cada una queda ilegible.
+ * El ancho de cada día de la semana depende de cuántos turnos coinciden en su peor momento (sus "carriles", ver
+ * `repartirCarriles`): un día sin turnos o con uno por vez es angosto, y uno con dos o tres citas a la misma hora se
+ * ensancha para que cada una se lea. Así, con poca gente a la vez, la semana entera entra en pantalla sin deslizarla de
+ * costado; si igual no entra, se desliza (con su propia barra horizontal, igual que la vertical).
  */
-const ANCHO_MIN_DIA = "14rem";
-/** Un turno muy corto igual se dibuja con este alto, para que se pueda leer y tocar. */
-const REM_MINIMO_TURNO = 1.75;
+const REM_DIA_SIN_CHOQUES = 7.5;
+/** Lo que se le suma al ancho de un día por cada turno que coincide en el mismo horario. */
+const REM_POR_CARRIL = 7;
+/** El alto mínimo de un turno: el de uno de 15 minutos (lo más corto que hay), así nunca se pisa con el que le sigue. */
+const REM_MINIMO_TURNO = 1.25;
 /** Las rayas diagonales de lo que queda fuera del horario de trabajo. */
 const RAYADO = {
   backgroundImage:
@@ -95,6 +97,25 @@ export function VistaHoras({
   const alto = horasEnteras * REM_POR_HORA;
   const { minutos: minutosAhora } = partesLocales(ahora);
 
+  // Los turnos de cada día ya repartidos en carriles, y con eso el ancho de cada columna.
+  const turnosPorDia = new Map(dias.map((dia) => [dia, repartirCarriles(locales.filter((c) => c.dia === dia))]));
+  const remMinimoDe = (dia: string) => {
+    const carriles = Math.max(1, ...(turnosPorDia.get(dia) ?? []).map((c) => c.carriles));
+    return carriles === 1 ? REM_DIA_SIN_CHOQUES : carriles * REM_POR_CARRIL;
+  };
+  const columnas = dias.map((dia) => {
+    const min = remMinimoDe(dia);
+    return { min, peso: Math.max(1, Math.round(min / REM_DIA_SIN_CHOQUES)) };
+  });
+  const remTotalDias = columnas.reduce((suma, c) => suma + c.min, 0);
+
+  // Las líneas de las horas (marcadas) y de las medias horas (suaves) dentro de cada día: sin ellas cuesta ver a qué hora cae cada turno.
+  const LINEAS_DE_HORAS = {
+    backgroundImage:
+      `repeating-linear-gradient(to bottom, rgb(var(--linea)) 0, rgb(var(--linea)) 1px, transparent 1px, transparent ${REM_POR_HORA}rem), ` +
+      `repeating-linear-gradient(to bottom, transparent 0, transparent ${REM_POR_HORA / 2}rem, rgb(var(--linea-fina)) ${REM_POR_HORA / 2}rem, rgb(var(--linea-fina)) calc(${REM_POR_HORA / 2}rem + 1px), transparent calc(${REM_POR_HORA / 2}rem + 1px), transparent ${REM_POR_HORA}rem)`,
+  };
+
   // A dónde dejar corrido el calendario al abrirlo: una hora antes de ahora si
   // se está viendo hoy; si no, el primer turno que haya.
   let enfocar = 0;
@@ -111,8 +132,10 @@ export function VistaHoras({
       <div
         className="grid"
         style={{
-          gridTemplateColumns: `${ANCHO_HORAS} repeat(${n}, minmax(${n === 1 ? "0px" : ANCHO_MIN_DIA}, 1fr))`,
-          minWidth: n === 1 ? undefined : `calc(${ANCHO_HORAS} + ${n} * ${ANCHO_MIN_DIA})`,
+          gridTemplateColumns: `${ANCHO_HORAS} ${columnas
+            .map((c) => `minmax(${n === 1 ? "0px" : `${c.min}rem`}, ${n === 1 ? 1 : c.peso}fr)`)
+            .join(" ")}`,
+          minWidth: n === 1 ? undefined : `calc(${ANCHO_HORAS} + ${remTotalDias}rem)`,
         }}
       >
         {/* ---------- cabecera: queda fija arriba al deslizar ---------- */}
@@ -122,8 +145,8 @@ export function VistaHoras({
           return (
             <div
               key={dia}
-              className={`sticky top-0 z-30 flex items-center justify-center border-b border-l border-linea px-1 py-1.5 ${
-                esHoy ? "bg-azul-luz" : "bg-superficie"
+              className={`sticky top-0 z-30 flex items-center justify-center border-b border-l border-linea px-1 py-2 ${
+                esHoy ? "border-t-2 border-t-azul bg-azul-luz" : "bg-superficie"
               }`}
             >
               {n === 1 ? (
@@ -135,12 +158,12 @@ export function VistaHoras({
                   {diaLargo(dia)}
                 </p>
               ) : (
-                // El día y su número en una sola línea ("LUN 21"): la cabecera queda baja.
+                // El día arriba y su número abajo, en un círculo (azul si es hoy): se lee de un vistazo qué día es cada columna.
                 <Link
                   href={urlAgenda(parametros, { vista: "dia", fecha: dia })}
                   scroll={false}
                   aria-label={`Ver ${diaLargo(dia)}`}
-                  className="group flex items-center gap-1.5"
+                  className="group flex flex-col items-center gap-0.5"
                 >
                   <span
                     className={`text-[0.68rem] font-semibold uppercase tracking-wide ${
@@ -150,8 +173,8 @@ export function VistaHoras({
                     {diaCorto(dia)}
                   </span>
                   <span
-                    className={`flex h-6 min-w-6 items-center justify-center rounded-full px-1 text-[0.9rem] font-semibold transition-colors ${
-                      esHoy ? "bg-azul text-white" : "text-tinta group-hover:bg-papel-hundido"
+                    className={`flex h-8 min-w-8 items-center justify-center rounded-full px-1 text-[1.1rem] font-semibold leading-none transition-colors ${
+                      esHoy ? "bg-azul text-white shadow-sm" : "text-tinta group-hover:bg-papel-hundido"
                     }`}
                   >
                     {numeroDeDia(dia)}
@@ -183,7 +206,7 @@ export function VistaHoras({
         {/* ---------- un día por columna ---------- */}
         {dias.map((dia) => {
           const esHoy = dia === hoy;
-          const delDia = repartirCarriles(locales.filter((c) => c.dia === dia));
+          const delDia = turnosPorDia.get(dia) ?? [];
 
           // Lo ya pasado, apenas más apagado: el día entero si es anterior a hoy, o hasta ahora si es hoy.
           const remPasado =
@@ -201,7 +224,7 @@ export function VistaHoras({
             <div
               key={dia}
               className="relative border-l border-linea bg-superficie"
-              style={{ height: `${alto}rem` }}
+              style={{ height: `${alto}rem`, ...LINEAS_DE_HORAS }}
             >
               {franjas.map((f, i) => (
                 <div
@@ -233,7 +256,11 @@ export function VistaHoras({
 
               {delDia.map((c, indice) => {
                 const estado = estadoDeCita(c.estado);
+                // El turno mide lo que dura (con un mínimo para poder tocarlo) y se recorta ahí: antes crecía con su texto y un
+                // turno de media hora se veía de casi una hora, pisando al siguiente. Cuanto más alto, más datos muestra.
                 const remAlto = Math.max(((c.hasta - c.desde) / 60) * REM_POR_HORA, REM_MINIMO_TURNO);
+                const nivel = remAlto < 2.2 ? 1 : remAlto < 3.4 ? 2 : remAlto < 4.6 ? 3 : 4;
+                const textoHoras = `${horaDeMinutos(c.desde)} – ${horaDeMinutos(c.hasta)}`;
                 const izquierda = (c.carril / c.carriles) * 100;
                 return (
                   // Tocar el turno abre su detalle a la derecha (y desde ahí se cobra).
@@ -253,10 +280,10 @@ export function VistaHoras({
                     ]
                       .filter(Boolean)
                       .join(" · ")}
-                    className={`animate-bloque absolute z-10 rounded-md border border-l-4 px-1.5 py-1 text-[0.7rem] leading-tight shadow-sm transition-[transform,box-shadow] duration-150 hover:z-20 hover:-translate-y-px hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand ${estado.bloque}`}
+                    className={`animate-bloque absolute z-10 overflow-hidden rounded-lg border border-l-4 px-2 ${nivel === 1 ? "py-0.5" : "py-1"} text-[0.72rem] leading-tight shadow-sm transition-[transform,box-shadow] duration-150 hover:z-20 hover:-translate-y-px hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand ${estado.bloque}`}
                     style={{
                       top: `${((c.desde - rango.inicio) / 60) * REM_POR_HORA}rem`,
-                      minHeight: `${remAlto}rem`,
+                      height: `${remAlto}rem`,
                       left: `calc(${izquierda.toFixed(3)}% + 2px)`,
                       width: `calc(${(100 / c.carriles).toFixed(3)}% - 4px)`,
                       // Los turnos entran apenas escalonados al abrir el calendario.
@@ -272,13 +299,21 @@ export function VistaHoras({
                         ✓
                       </span>
                     )}
-                    <p className="cifra truncate font-semibold">
-                      {horaDeMinutos(c.desde)} – {horaDeMinutos(c.hasta)}
+                    {/* Primero quién es (lo que se busca con la vista), después la hora y el resto, según cuánto lugar haya. */}
+                    <p className="truncate pr-3 text-[0.78rem] font-semibold">
+                      {nivel === 1 ? `${horaDeMinutos(c.desde)} · ${c.clienteNombre}` : c.clienteNombre}
                     </p>
-                    <p className="truncate font-medium">{c.clienteNombre}</p>
-                    {c.serviciosTexto && <p className="truncate opacity-90">{c.serviciosTexto}</p>}
-                    {c.precio != null && <p className="cifra truncate">{formatearGuarani(c.precio)}</p>}
-                    {mostrarPersonal && <p className="truncate opacity-80">{c.personalNombre}</p>}
+                    {nivel >= 2 && (
+                      <p className="truncate tabular-nums opacity-90">
+                        {textoHoras}
+                        {nivel === 2 && c.serviciosTexto ? ` · ${c.serviciosTexto}` : ""}
+                        {mostrarPersonal ? ` · ${c.personalNombre}` : ""}
+                      </p>
+                    )}
+                    {nivel >= 3 && c.serviciosTexto && <p className="truncate opacity-90">{c.serviciosTexto}</p>}
+                    {nivel >= 4 && c.precio != null && (
+                      <p className="mt-0.5 truncate font-semibold tabular-nums">{formatearGuarani(c.precio)}</p>
+                    )}
                   </Link>
                 );
               })}

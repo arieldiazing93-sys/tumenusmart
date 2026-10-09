@@ -70,7 +70,7 @@ export function VistaMes({
               aria-label={`${diaLargo(c.fecha)}: ${
                 lista.length === 0 ? "sin turnos" : lista.length === 1 ? "1 turno" : `${lista.length} turnos`
               }`}
-              className={`flex min-h-[4.75rem] min-w-0 flex-col gap-1 p-1 transition-colors sm:min-h-[7rem] sm:p-1.5 ${
+              className={`flex min-h-[4.75rem] min-w-0 flex-col gap-1 p-1 transition-colors sm:min-h-[8rem] sm:p-2 ${
                 esHoy
                   ? "bg-azul-luz hover:bg-azul-tinte/60"
                   : c.enMes
@@ -79,26 +79,24 @@ export function VistaMes({
               }`}
             >
               <span
-                className={`ml-auto flex h-6 min-w-6 flex-none items-center justify-center rounded-full px-1 text-[0.78rem] font-semibold ${
-                  esHoy ? "bg-azul text-white" : c.enMes ? "text-tinta" : "text-tinta-suave"
+                className={`flex h-7 min-w-7 flex-none items-center justify-center self-start rounded-full px-1 text-[0.85rem] font-semibold ${
+                  esHoy ? "bg-azul text-white shadow-sm" : c.enMes ? "text-tinta" : "text-tinta-suave/70"
                 }`}
               >
                 {c.dia}
               </span>
 
               {/* Pantalla grande: la hora y el nombre de los primeros turnos. */}
-              <ul className="hidden min-w-0 flex-col gap-0.5 sm:flex">
+              <ul className="hidden min-w-0 flex-col gap-1 sm:flex">
                 {lista.slice(0, TURNOS_POR_DIA).map((t) => {
                   const estado = estadoDeCita(t.estado);
                   return (
+                    // Cada turno es una etiqueta con el color de su estado (la misma franja del calendario por hora).
                     <li
                       key={t.id}
-                      className={`flex min-w-0 items-center gap-1.5 text-[0.7rem] ${
-                        estado.valor === "cancelada" ? "text-tinta-suave line-through" : "text-tinta"
-                      }`}
+                      className={`flex min-w-0 items-center gap-1.5 rounded-md border border-l-[3px] px-1.5 py-0.5 text-[0.7rem] leading-tight ${estado.bloque}`}
                     >
-                      <span className={`h-2 w-2 flex-none rounded-full ${estado.punto}`} />
-                      <span className="cifra flex-none text-tinta-media">
+                      <span className="flex-none font-semibold tabular-nums">
                         {horaDeMinutos(partesLocales(t.inicio).minutos)}
                       </span>
                       <span className="truncate font-medium">{t.clienteNombre}</span>
@@ -106,7 +104,7 @@ export function VistaMes({
                   );
                 })}
                 {lista.length > TURNOS_POR_DIA && (
-                  <li className="text-[0.68rem] font-semibold text-azul-oscuro">
+                  <li className="w-fit rounded-md bg-azul-luz px-1.5 py-0.5 text-[0.68rem] font-semibold text-azul-oscuro">
                     +{lista.length - TURNOS_POR_DIA} más
                   </li>
                 )}

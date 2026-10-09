@@ -50,10 +50,8 @@ export function BuscarClienteFoto({ personalId }: { personalId: string }) {
   }
 
   return (
-    <section className="mt-6">
-      <h2 className="mb-2 text-[0.8rem] font-semibold uppercase tracking-wide text-tinta-suave">
-        Último peinado de un cliente
-      </h2>
+    <section className="mt-7">
+      <h2 className="mb-3 text-[1.25rem] font-semibold tracking-titular text-tinta">Último peinado de un cliente</h2>
 
       {!elegido && (
         <>
@@ -64,9 +62,9 @@ export function BuscarClienteFoto({ personalId }: { personalId: string }) {
               value={telefono}
               onChange={(e) => setTelefono(e.target.value)}
               placeholder="Teléfono del cliente"
-              className="w-full rounded-lg border border-linea bg-superficie px-3 py-2 text-[0.88rem]"
+              className="h-12 w-full min-w-0 rounded-xl bg-superficie px-4 text-[0.95rem] text-tinta shadow-sm ring-1 ring-linea placeholder:text-tinta-suave focus:outline-none focus:ring-2 focus:ring-brand"
             />
-            <button type="submit" disabled={buscando} className={clasesBoton("navegar", "md")}>
+            <button type="submit" disabled={buscando} className={`${clasesBoton("navegar", "md")} !h-12 !rounded-xl`}>
               {buscando ? "Buscando…" : "Buscar"}
             </button>
           </form>
@@ -74,18 +72,18 @@ export function BuscarClienteFoto({ personalId }: { personalId: string }) {
           {error && <p className="mt-2 text-[0.8rem] font-medium text-peligro">{error}</p>}
 
           {resultados && (
-            <ul className="mt-2.5 flex flex-col gap-1.5">
+            <ul className="mt-3 flex flex-col gap-2.5">
               {resultados.length === 0 ? (
-                <li className="rounded-lg border border-dashed border-linea bg-papel-suave px-3 py-4 text-center text-[0.82rem] text-tinta-media">
+                <li className="rounded-2xl border border-dashed border-linea bg-superficie px-3 py-5 text-center text-[0.86rem] text-tinta-media">
                   Ningún cliente de este negocio tiene ese teléfono.
                 </li>
               ) : (
                 resultados.map((c) => (
                   <li
                     key={c.id}
-                    className="flex items-center gap-3 rounded-lg border border-linea bg-superficie p-2.5"
+                    className="flex items-center gap-3 rounded-2xl bg-superficie p-3 shadow-sm ring-1 ring-linea"
                   >
-                    <div className="flex h-11 w-11 flex-none items-center justify-center overflow-hidden rounded-full border border-linea bg-papel-suave">
+                    <div className="flex h-12 w-12 flex-none items-center justify-center overflow-hidden rounded-full bg-papel-hundido ring-1 ring-linea">
                       {c.fotoUrl ? (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img src={c.fotoUrl} alt="" className="h-full w-full object-cover" />
@@ -97,7 +95,7 @@ export function BuscarClienteFoto({ personalId }: { personalId: string }) {
                       <span className="block truncate text-[0.88rem] font-semibold text-tinta">{c.nombre}</span>
                       <span className="block text-[0.76rem] text-tinta-suave">{c.telefono ?? "—"}</span>
                     </span>
-                    <button type="button" onClick={() => setElegido(c)} className={clasesBoton("navegar", "sm")}>
+                    <button type="button" onClick={() => setElegido(c)} className={`${clasesBoton("navegar", "md")} !rounded-xl`}>
                       Ver
                     </button>
                   </li>
@@ -166,7 +164,7 @@ function FichaFotoCliente({
   }
 
   return (
-    <div className="rounded-xl border border-linea bg-superficie p-3.5">
+    <div className="rounded-2xl bg-superficie p-4 shadow-sm ring-1 ring-linea">
       <div className="flex items-center justify-between gap-2">
         <button type="button" onClick={onVolver} className={clasesBoton("navegar", "sm")}>
           ← Atrás
@@ -182,7 +180,7 @@ function FichaFotoCliente({
         </button>
       </div>
 
-      <p className="mt-2 text-[0.95rem] font-semibold text-tinta">{cliente.nombre}</p>
+      <p className="mt-3 text-[1.1rem] font-semibold tracking-titular text-tinta">{cliente.nombre}</p>
       <p className="text-[0.78rem] text-tinta-suave">{cliente.telefono ?? "—"}</p>
 
       {cliente.fotoUrl ? (
@@ -194,15 +192,15 @@ function FichaFotoCliente({
         <img
           src={cliente.fotoUrl}
           alt={`Último peinado de ${cliente.nombre}`}
-          className="mt-3 max-h-[70vh] w-full rounded-lg border border-linea bg-papel-suave object-contain"
+          className="mt-3 max-h-[70vh] w-full rounded-2xl bg-papel-hundido object-contain"
         />
       ) : (
-        <div className="mt-3 flex h-64 w-full items-center justify-center rounded-lg border border-linea bg-papel-suave">
+        <div className="mt-3 flex h-64 w-full items-center justify-center rounded-2xl bg-papel-hundido">
           <span className="px-4 text-center text-[0.82rem] text-tinta-suave">Todavía no tiene una foto cargada</span>
         </div>
       )}
 
-      <label className={`mt-3 block w-full cursor-pointer text-center ${clasesBoton("principal", "md")}`}>
+      <label className={`mt-3 flex w-full cursor-pointer items-center justify-center text-center ${clasesBoton("principal", "lg")} !h-12 !rounded-xl`}>
         {subiendo ? "Subiendo…" : cliente.fotoUrl ? "Cambiar foto" : "Subir foto de cómo quedó"}
         <input
           ref={inputRef}

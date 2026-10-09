@@ -6,7 +6,7 @@ import dynamic from "next/dynamic";
 import { useCart } from "@/components/CartProvider";
 import { formatearGuarani } from "@/lib/format";
 import { distanciaKm, encontrarZonaPorDistancia } from "@/lib/geo";
-import { Tarjeta, Campo, Entrada, Aviso } from "@/components/ui";
+import { Campo, Entrada, Aviso } from "@/components/ui";
 import { Segmentado } from "@/components/Segmentado";
 import { BotonEnviar } from "@/components/BotonEnviar";
 import { BotonWhatsappCTA } from "@/components/BotonWhatsappCTA";
@@ -29,6 +29,13 @@ const TIPOS_ENTREGA: { value: TipoEntrega; label: string; sublabel?: string }[] 
   { value: "delivery", label: "Delivery" },
   { value: "retiro", label: "Retiro en el local" },
 ];
+
+/** Cada bloque del formulario: blanco, esquinas amplias y sombra suave (el título va aparte, grande). */
+const BLOQUE = "flex flex-col gap-4 rounded-2xl bg-superficie p-4 shadow-sm ring-1 ring-linea";
+const TITULO = "text-[1.15rem] font-semibold tracking-titular text-tinta";
+
+/** Lo que se pidió, guardado al armar el mensaje (el carrito se vacía al enviarlo y la pantalla final lo sigue mostrando). */
+type ResumenPedido = { lineas: { texto: string; monto: number }[]; entrega: string; pago: string; total: string };
 
 type Props = {
   /** nombre del local en la URL (para volver a la carta) */
@@ -122,6 +129,7 @@ export function CheckoutForm({
   const [enlace, setEnlace] = useState<string | null>(null);
   /** El cliente ya tocó el botón de WhatsApp (el carrito se vació en ese momento). */
   const [enviado, setEnviado] = useState(false);
+  const [resumen, setResumen] = useState<ResumenPedido | null>(null);
   const [error, setError] = useState<string | null>(null);
   // Qué campo disparó el último error, para resaltarlo — no todo el aviso
   // sirve de igual manera si el ojo no sabe dónde corregir.
@@ -229,6 +237,12 @@ export function CheckoutForm({
       costoEnvio: tipoEntrega === "delivery" ? costoEnvio : 0,
       total,
     });
+    setResumen({
+      lineas: items.map((i) => ({ texto: `${i.cantidad} × ${i.nombreProducto}`, monto: precioUnitario(i) * i.cantidad })),
+      entrega: tipoEntrega === "delivery" ? "Delivery" : "Retiro en el local",
+      pago: METODOS_PAGO_PEDIDO.find((m) => m.value === metodoPago)?.label ?? metodoPago,
+      total: formatearGuarani(total) + (tipoEntrega === "delivery" && !zonaEncontrada && envioModo === "zonas" && hayUbicacionLocal ? " + envío" : ""),
+    });
     setEnlace(construirLinkWhatsapp(whatsappNumero, mensaje));
     window.scrollTo({ top: 0 });
   }
@@ -237,12 +251,15 @@ export function CheckoutForm({
   if (enlace) {
     return (
       <div className="flex flex-col items-center px-1 pt-2 text-center">
-        <span aria-hidden="true" className="flex h-16 w-16 items-center justify-center rounded-full bg-brand text-white">
-          <svg viewBox="0 0 24 24" width={30} height={30} fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round">
+        <span
+          aria-hidden="true"
+          className="flex h-20 w-20 animate-[entradaExito_0.5s_cubic-bezier(0.22,0.7,0.3,1)_both] items-center justify-center rounded-full bg-brand text-white shadow-media ring-8 ring-brand-light"
+        >
+          <svg viewBox="0 0 24 24" width={34} height={34} fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round">
             <path d="M20 6 9 17l-5-5" />
           </svg>
         </span>
-        <h2 className="mt-4 text-[1.3rem] font-semibold tracking-titular text-tinta">
+        <h2 className="mt-5 text-[1.5rem] font-semibold tracking-titular text-tinta">
           {enviado ? "¡Pedido enviado!" : "Tu pedido está listo"}
         </h2>
 
@@ -259,7 +276,7 @@ export function CheckoutForm({
           </div>
         )}
 
-        <div className="mt-6 flex w-full justify-center">
+        <div className="mt-5 w-full max-w-sm">
           <BotonWhatsappCTA
             link={enlace}
             yaEnviado={false}
@@ -272,11 +289,40 @@ export function CheckoutForm({
           />
         </div>
 
+        {/* Lo que se pidió, como un ticket (se guarda al armar el mensaje: el carrito se vacía al enviarlo). */}
+        {resumen && (
+          <section aria-label="Resumen del pedido" className="mt-6 w-full max-w-sm rounded-2xl bg-superficie p-5 text-left shadow-sm ring-1 ring-linea">
+            <p className="text-[0.74rem] font-semibold uppercase tracking-rotulo text-tinta-suave">Tu pedido</p>
+            <ul className="mt-2.5 flex flex-col gap-1.5">
+              {resumen.lineas.map((l, i) => (
+                <li key={i} className="flex justify-between gap-3 text-[0.9rem]">
+                  <span className="min-w-0 text-tinta">{l.texto}</span>
+                  <span className="cifra flex-none font-medium text-tinta-media">{formatearGuarani(l.monto)}</span>
+                </li>
+              ))}
+            </ul>
+            <div className="mt-3 flex flex-col gap-1.5 border-t border-dashed border-linea pt-3 text-[0.86rem] text-tinta-media">
+              <div className="flex justify-between gap-3">
+                <span>Entrega</span>
+                <span className="text-right font-medium text-tinta">{resumen.entrega}</span>
+              </div>
+              <div className="flex justify-between gap-3">
+                <span>Pago</span>
+                <span className="text-right font-medium text-tinta">{resumen.pago}</span>
+              </div>
+              <div className="mt-1 flex items-baseline justify-between gap-3">
+                <span className="text-[0.95rem] font-semibold text-tinta">Total</span>
+                <span className="cifra text-[1.2rem] font-bold text-tinta">{resumen.total}</span>
+              </div>
+            </div>
+          </section>
+        )}
+
         {!enviado && (
           <button
             type="button"
             onClick={() => setEnlace(null)}
-            className="mt-4 text-[0.88rem] font-medium text-tinta-media underline-offset-2 hover:text-tinta hover:underline"
+            className="mt-5 text-[0.9rem] font-semibold text-tinta-media underline-offset-2 hover:text-tinta hover:underline"
           >
             Corregir mi pedido
           </button>
@@ -285,7 +331,7 @@ export function CheckoutForm({
         {enviado && (
           <Link
             href={`/${slug}`}
-            className="mt-6 flex h-12 w-full max-w-sm items-center justify-center rounded-xl border border-linea bg-superficie text-[0.92rem] font-semibold text-tinta transition-colors hover:border-brand"
+            className="mt-6 flex h-14 w-full max-w-sm items-center justify-center rounded-2xl bg-superficie text-[0.95rem] font-semibold text-tinta shadow-sm ring-1 ring-linea transition-all hover:ring-brand active:scale-[0.98]"
           >
             Volver al menú
           </Link>
@@ -295,16 +341,17 @@ export function CheckoutForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-      <fieldset className="flex flex-col gap-4">
-        <Tarjeta className="flex flex-col gap-4">
-          <p className="rotulo">Tus datos</p>
+    <form onSubmit={handleSubmit} className="flex flex-col gap-5">
+      <fieldset className="flex flex-col gap-5">
+        <section className={BLOQUE}>
+          <h2 className={TITULO}>Tus datos</h2>
           <Campo etiqueta="Nombre">
             <Entrada
               required
               value={nombre}
               onChange={(e) => setNombre(e.target.value)}
               placeholder="Tu nombre"
+              className="!h-12 !rounded-xl"
             />
           </Campo>
           <Campo etiqueta="Teléfono (WhatsApp)">
@@ -313,12 +360,13 @@ export function CheckoutForm({
               value={telefono}
               onChange={(e) => setTelefono(e.target.value)}
               placeholder="0981 234 567"
+              className="!h-12 !rounded-xl"
             />
           </Campo>
-        </Tarjeta>
+        </section>
 
-        <Tarjeta className="flex flex-col gap-4">
-          <p className="rotulo">Comprobante</p>
+        <section className={BLOQUE}>
+          <h2 className={TITULO}>Comprobante</h2>
           <Segmentado
             opciones={[
               { value: "ticket", label: "Ticket" },
@@ -326,15 +374,16 @@ export function CheckoutForm({
             ]}
             valor={comprobanteTipo}
             onChange={setComprobanteTipo}
+            uniforme
           />
 
           {comprobanteTipo === "factura" && (
             <div
               key={campoInvalido === "factura" ? `sac-${intento}` : "factura"}
-              className={`flex flex-col gap-3 rounded-lg border p-3 ${
+              className={`flex flex-col gap-3 rounded-2xl p-3.5 ${
                 campoInvalido === "factura"
-                  ? "animate-[sacudir_0.32s_ease] border-peligro/50 bg-peligro-luz/30"
-                  : "border-linea bg-papel-suave"
+                  ? "animate-[sacudir_0.32s_ease] bg-peligro-luz/40 ring-2 ring-peligro/50"
+                  : "bg-papel-suave ring-1 ring-linea"
               }`}
             >
               <Campo etiqueta="Razón social">
@@ -343,6 +392,7 @@ export function CheckoutForm({
                   value={facturaRazonSocial}
                   onChange={(e) => setFacturaRazonSocial(e.target.value)}
                   placeholder="Nombre de la empresa o del titular"
+                  className="!h-12 !rounded-xl"
                 />
               </Campo>
               <Campo etiqueta="RUC">
@@ -351,6 +401,7 @@ export function CheckoutForm({
                   value={facturaRuc}
                   onChange={(e) => setFacturaRuc(e.target.value)}
                   placeholder="80012345-6"
+                  className="!h-12 !rounded-xl"
                 />
               </Campo>
               <Campo etiqueta="Correo electrónico" ayuda="Opcional">
@@ -359,21 +410,22 @@ export function CheckoutForm({
                   value={facturaEmail}
                   onChange={(e) => setFacturaEmail(e.target.value)}
                   placeholder="nombre@correo.com"
+                  className="!h-12 !rounded-xl"
                 />
               </Campo>
-              <p className="text-[0.78rem] leading-snug text-tinta-media">
+              <p className="text-[0.8rem] leading-snug text-tinta-media">
                 Estos datos van en el mensaje de WhatsApp que vas a enviar al local. Ellos los revisan y cargan uno por uno para que
                 la factura salga sin errores, así que escribilos con cuidado.
               </p>
             </div>
           )}
-        </Tarjeta>
+        </section>
 
-        <Tarjeta className="flex flex-col gap-4">
-          <p className="rotulo">Entrega y pago</p>
+        <section className={BLOQUE}>
+          <h2 className={TITULO}>Entrega y pago</h2>
 
           <Campo etiqueta="Método de pago" ayuda="Lo coordinás directamente con el local">
-            {/* Tarjetas rectangulares de a dos por fila, como las de Entrega: con cuatro formas de pago quedan en dos filas. */}
+            {/* Tarjetas del mismo tamaño, de a dos por fila: con cuatro formas de pago quedan en dos filas. */}
             <Segmentado opciones={metodosDisponibles} valor={metodoPago} onChange={setMetodoPago} dosColumnas />
           </Campo>
 
@@ -391,10 +443,10 @@ export function CheckoutForm({
                 >
                   <div
                     key={campoInvalido === "ubicacion" ? `sac-${intento}` : "mapa"}
-                    className={`overflow-hidden rounded-xl ${
+                    className={`overflow-hidden rounded-2xl ${
                       campoInvalido === "ubicacion"
                         ? "animate-[sacudir_0.32s_ease] ring-2 ring-peligro/50"
-                        : ""
+                        : "ring-1 ring-linea"
                     }`}
                   >
                     <MapPicker
@@ -411,7 +463,7 @@ export function CheckoutForm({
                   </div>
                 </Campo>
                 {fueraDeCobertura && (
-                  <p className="mt-2 text-[0.82rem] text-aviso">
+                  <p className="mt-2 text-[0.84rem] text-aviso">
                     Tu ubicación está fuera de las zonas con precio automático — el local va a
                     coordinar el costo de envío directamente con vos por WhatsApp.
                   </p>
@@ -426,47 +478,58 @@ export function CheckoutForm({
                   value={direccion}
                   onChange={(e) => setDireccion(e.target.value)}
                   placeholder="Casa, depto, entre calles, portón de color..."
+                  className="!h-12 !rounded-xl"
                 />
               </Campo>
             </>
           )}
-        </Tarjeta>
+        </section>
 
-        <div className="rounded-xl border border-linea bg-papel-suave p-4">
-          <div className="flex justify-between text-[0.88rem] text-tinta-media">
+        {/* El total, bien a la vista: lo que lleva, el envío y cuánto es. */}
+        <section aria-label="Resumen de lo que pagás" className="rounded-2xl bg-brand-light/70 p-4 ring-1 ring-brand/15">
+          <div className="flex justify-between text-[0.92rem] text-tinta-media">
             <span>Subtotal</span>
-            <span className="cifra">{formatearGuarani(subtotal)}</span>
+            <span className="cifra font-medium text-tinta">{formatearGuarani(subtotal)}</span>
           </div>
           {tipoEntrega === "delivery" && (
-            <div className="flex justify-between text-[0.88rem] text-tinta-media">
+            <div className="mt-1 flex justify-between text-[0.92rem] text-tinta-media">
               <span>Envío</span>
-              <span className="cifra">{textoEnvio}</span>
+              <span className="cifra font-medium text-tinta">{textoEnvio}</span>
             </div>
           )}
-          <div className="mt-1.5 flex justify-between border-t border-linea pt-1.5 text-[0.95rem] font-semibold text-tinta">
-            <span>Total</span>
-            <span className="cifra">
+          <div className="mt-2.5 flex items-baseline justify-between border-t border-brand/20 pt-2.5 text-tinta">
+            <span className="text-[1rem] font-semibold">Total</span>
+            <span className="cifra text-[1.4rem] font-bold">
               {formatearGuarani(total)}
               {tipoEntrega === "delivery" && !zonaEncontrada && envioModo === "zonas" && hayUbicacionLocal
                 ? " + envío"
                 : ""}
             </span>
           </div>
-        </div>
+        </section>
       </fieldset>
 
-      {error && <Aviso color="peligro">{error}</Aviso>}
-
-      <BotonEnviar enviando={false} disabled={!aceptaPedidos} className="w-full">
-        {aceptaPedidos ? (
-          <>
-            <IconoWhatsapp tam={26} />
-            Armar mi pedido para enviar
-          </>
-        ) : (
-          "No disponible en este momento"
-        )}
-      </BotonEnviar>
+      {/* Abajo, siempre a la vista: el aviso de lo que falte y el botón para armar el pedido, sobre una base sólida con un difuminado arriba. */}
+      <div className="pointer-events-none fixed bottom-0 left-1/2 z-20 w-full max-w-2xl -translate-x-1/2">
+        <div aria-hidden="true" className="h-8 bg-gradient-to-t from-papel-suave to-transparent" />
+        <div className="pointer-events-auto bg-papel-suave px-4 pb-4">
+          {error && (
+            <div role="alert" className="mb-2.5 rounded-xl bg-peligro-luz px-3.5 py-2.5 text-[0.86rem] font-medium text-peligro">
+              {error}
+            </div>
+          )}
+          <BotonEnviar enviando={false} disabled={!aceptaPedidos} className="w-full !h-14 !rounded-2xl shadow-alta">
+            {aceptaPedidos ? (
+              <>
+                <IconoWhatsapp tam={26} />
+                Armar mi pedido para enviar
+              </>
+            ) : (
+              "No disponible en este momento"
+            )}
+          </BotonEnviar>
+        </div>
+      </div>
     </form>
   );
 }
