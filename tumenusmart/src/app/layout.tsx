@@ -27,9 +27,9 @@ const mono = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "TuMenuSmart — Pedidos por WhatsApp para restaurantes",
+  title: "TuMenuSmart — Punto de venta, stock, asistencia y turnos",
   description:
-    "Carta digital propia para cada restaurante, con reservas de mesa y pedidos que llegan por WhatsApp. Sin comisiones por venta.",
+    "Un solo sistema para tu negocio: punto de venta con factura, control de stock, asistencia del personal y reserva de turnos. Sin comisiones por venta.",
 };
 
 // El carrito ya no vive acá: pasó al layout de cada local, porque cada
