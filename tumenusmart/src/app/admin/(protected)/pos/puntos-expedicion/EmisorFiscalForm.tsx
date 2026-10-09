@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { Campo, Entrada, Selector, Tarjeta, clasesBoton } from "@/components/ui";
+import type { OpcionGeografica } from "@/lib/sifen/geografia";
 import {
   DEPARTAMENTOS,
   MAX_ACTIVIDADES,
@@ -10,7 +11,10 @@ import {
   type ActividadEconomica,
   type DatosEmisor,
 } from "@/lib/emisor-fiscal";
-import { guardarEmisorFiscal } from "./actions";
+import { guardarEmisorFiscal, listarCiudades, listarDistritos } from "./actions";
+
+/** La tabla oficial de la DNIT trae los 17 departamentos y Capital; los códigos 19 y 20 del esquema no tienen distritos. */
+const DEPARTAMENTOS_CON_DISTRITOS = 18;
 
 /** Un campo de texto en el estado del formulario: siempre string, "" = sin cargar. */
 type Estado = {
@@ -88,9 +92,71 @@ export function EmisorFiscalForm({ inicial }: { inicial: DatosEmisor }) {
 
   const faltan = faltantesEmisor(aDatos(estado));
 
+  // Las listas de distritos y de ciudades salen de la tabla oficial de la DNIT y se piden al servidor a medida que se
+  // elige: la tabla completa pesa demasiado para mandarla entera al celular.
+  const [distritos, setDistritos] = useState<OpcionGeografica[]>([]);
+  const [ciudades, setCiudades] = useState<OpcionGeografica[]>([]);
+  const [cargandoDistritos, setCargandoDistritos] = useState(false);
+  const [cargandoCiudades, setCargandoCiudades] = useState(false);
+
+  useEffect(() => {
+    let vigente = true;
+    if (!estado.departamento) {
+      setDistritos([]);
+      return;
+    }
+    setCargandoDistritos(true);
+    listarDistritos(estado.departamento)
+      .then((lista) => {
+        if (vigente) setDistritos(lista);
+      })
+      .catch(() => {
+        if (vigente) setDistritos([]);
+      })
+      .finally(() => {
+        if (vigente) setCargandoDistritos(false);
+      });
+    return () => {
+      vigente = false;
+    };
+  }, [estado.departamento]);
+
+  useEffect(() => {
+    let vigente = true;
+    if (!estado.distritoCodigo) {
+      setCiudades([]);
+      return;
+    }
+    setCargandoCiudades(true);
+    listarCiudades(Number(estado.distritoCodigo))
+      .then((lista) => {
+        if (vigente) setCiudades(lista);
+      })
+      .catch(() => {
+        if (vigente) setCiudades([]);
+      })
+      .finally(() => {
+        if (vigente) setCargandoCiudades(false);
+      });
+    return () => {
+      vigente = false;
+    };
+  }, [estado.distritoCodigo]);
+
   function cambiar<K extends keyof Estado>(campo: K, valor: Estado[K]) {
     setGuardado(false);
     setEstado((previo) => ({ ...previo, [campo]: valor }));
+  }
+
+  /** Al cambiar de departamento se borran el distrito y la ciudad: ya no corresponden. */
+  function cambiarDepartamento(clave: string) {
+    setGuardado(false);
+    setEstado((previo) => ({ ...previo, departamento: clave, distritoCodigo: "", distrito: "", ciudadCodigo: "", ciudad: "" }));
+  }
+
+  function cambiarDistrito(codigo: string) {
+    setGuardado(false);
+    setEstado((previo) => ({ ...previo, distritoCodigo: codigo, distrito: "", ciudadCodigo: "", ciudad: "" }));
   }
 
   function cambiarActividad(indice: number, cambios: Partial<ActividadEconomica>) {
@@ -203,36 +269,46 @@ export function EmisorFiscalForm({ inicial }: { inicial: DatosEmisor }) {
                 <Entrada value={estado.complemento} onChange={(e) => cambiar("complemento", e.target.value)} />
               </Campo>
             </div>
-            <Campo etiqueta="Departamento">
-              <Selector value={estado.departamento} onChange={(e) => cambiar("departamento", e.target.value)}>
-                <option value="">Elegí…</option>
-                {DEPARTAMENTOS.map((d) => (
-                  <option key={d.clave} value={d.clave}>
-                    {d.etiqueta}
+            <div className="sm:col-span-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <Campo etiqueta="Departamento">
+                <Selector value={estado.departamento} onChange={(e) => cambiarDepartamento(e.target.value)}>
+                  <option value="">Elegí…</option>
+                  {DEPARTAMENTOS.filter((d) => d.codigoSifen <= DEPARTAMENTOS_CON_DISTRITOS || d.clave === estado.departamento).map((d) => (
+                    <option key={d.clave} value={d.clave}>
+                      {d.etiqueta}
+                    </option>
+                  ))}
+                </Selector>
+              </Campo>
+              <Campo etiqueta="Distrito" ayuda="Lista oficial de la DNIT">
+                <Selector value={estado.distritoCodigo} disabled={!estado.departamento} onChange={(e) => cambiarDistrito(e.target.value)}>
+                  <option value="">
+                    {!estado.departamento ? "Primero el departamento" : cargandoDistritos ? "Cargando…" : "Elegí…"}
                   </option>
-                ))}
-              </Selector>
-            </Campo>
-            <Campo etiqueta="Distrito (nombre)">
-              <Entrada value={estado.distrito} maxLength={30} onChange={(e) => cambiar("distrito", e.target.value)} />
-            </Campo>
-            <Campo etiqueta="Ciudad (código)" ayuda="De la Tabla 2.1 de la DNIT">
-              <Entrada
-                inputMode="numeric"
-                value={estado.ciudadCodigo}
-                onChange={(e) => cambiar("ciudadCodigo", e.target.value)}
-              />
-            </Campo>
-            <Campo etiqueta="Ciudad (nombre)">
-              <Entrada value={estado.ciudad} maxLength={30} onChange={(e) => cambiar("ciudad", e.target.value)} />
-            </Campo>
-            <Campo etiqueta="Distrito (código)" ayuda="Opcional">
-              <Entrada
-                inputMode="numeric"
-                value={estado.distritoCodigo}
-                onChange={(e) => cambiar("distritoCodigo", e.target.value)}
-              />
-            </Campo>
+                  {distritos.map((d) => (
+                    <option key={d.codigo} value={String(d.codigo)}>
+                      {d.nombre}
+                    </option>
+                  ))}
+                </Selector>
+              </Campo>
+              <Campo etiqueta="Ciudad o localidad" ayuda="Lista oficial de la DNIT">
+                <Selector
+                  value={estado.ciudadCodigo}
+                  disabled={!estado.distritoCodigo}
+                  onChange={(e) => cambiar("ciudadCodigo", e.target.value)}
+                >
+                  <option value="">
+                    {!estado.distritoCodigo ? "Primero el distrito" : cargandoCiudades ? "Cargando…" : "Elegí…"}
+                  </option>
+                  {ciudades.map((c) => (
+                    <option key={c.codigo} value={String(c.codigo)}>
+                      {c.nombre}
+                    </option>
+                  ))}
+                </Selector>
+              </Campo>
+            </div>
           </div>
 
           <div>

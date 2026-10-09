@@ -14,6 +14,8 @@ sección o la nota de donde sale.
 |---|---|
 | `xsd/` | Copia de los esquemas OFICIALES (DE_v150, DE_Types_v150, Paises, Departamentos, Monedas, Unidades de medida, xmldsig, siRecepDE_v150). |
 | `generar-esquema.ps1` | Lee esos XSD y genera `src/lib/sifen/esquema-de.generated.ts` (estructura, orden, obligatoriedad y formato de cada campo). |
+| `tablas/` | El **Código de Referencia Geográfica** oficial de e-Kuatia (departamentos, distritos y ciudades, actualización de noviembre de 2025; MD5 `0d817dee1a6a0c307a8fd25140c4f9be`, idéntico al publicado). |
+| `generar-geografia.ps1` | Lee ese Excel (sin Excel ni Node) y genera `src/lib/sifen/geografia.generated.ts` con 18 departamentos, 272 distritos y 6.766 ciudades. |
 | `probar.ps1` | Corre TODAS las pruebas con Microsoft Edge sin ventana (no hace falta Node). |
 | `banco/` | Las pruebas y el cargador de módulos que usa `probar.ps1`. |
 
@@ -39,6 +41,10 @@ Qué comprueba:
    validador y libxml2 tienen que coincidir en rechazarlo.
 
 ## Cuando la DNIT publique una versión nueva
+
+Tabla geográfica: bajar el nuevo `.xlsx` de https://www.dnit.gov.py/web/e-kuatia/tablas-y-codificaciones a `pruebas/sifen/tablas/` (y actualizar el nombre en `generar-geografia.ps1`) y correr `powershell -ExecutionPolicy Bypass -File pruebas\sifen\generar-geografia.ps1`. El checksum PDF que publica la DNIT es de 2023 y no coincide con ningún Excel actual: no sirve para verificar.
+
+Esquemas XML:
 
 1. Bajar los XSD nuevos a `pruebas/sifen/xsd/` (y actualizar los nombres en `generar-esquema.ps1` si cambian de versión).
 2. `powershell -ExecutionPolicy Bypass -File pruebas\sifen\generar-esquema.ps1`

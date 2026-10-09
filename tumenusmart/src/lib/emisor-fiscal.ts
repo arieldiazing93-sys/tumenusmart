@@ -254,7 +254,7 @@ export function faltantesEmisor(datos: DatosEmisor | null): string[] {
   if (!d.direccion) falta.push("Dirección del establecimiento");
   if (!d.numeroCasa) falta.push("Número de casa (0 si no tiene)");
   if (!d.departamento) falta.push("Departamento");
-  if (!d.ciudadCodigo || !d.ciudad) falta.push("Ciudad (código y nombre, de la Tabla 2.1 de la DNIT)");
+  if (!d.ciudadCodigo) falta.push("Ciudad (elegila de la lista oficial de la DNIT)");
   if (!d.telefono) falta.push("Teléfono");
   if (!d.email) falta.push("Correo electrónico");
   if (d.actividades.length === 0) falta.push("Al menos una actividad económica");

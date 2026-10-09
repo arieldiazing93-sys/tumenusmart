@@ -6,7 +6,8 @@ import { idLocalActual } from "@/lib/local-actual";
 import { prismaDelLocal } from "@/lib/prisma-local";
 import { prisma } from "@/lib/prisma";
 import { registrarBitacora } from "@/lib/bitacora";
-import { faltantesEmisor, normalizarEmisor } from "@/lib/emisor-fiscal";
+import { DEPARTAMENTOS, faltantesEmisor, normalizarEmisor } from "@/lib/emisor-fiscal";
+import { ciudadesDelDistrito, distritosDelDepartamento, resolverUbicacion, type OpcionGeografica } from "@/lib/sifen/geografia";
 import type { Prisma } from "@prisma/client";
 
 export type ResultadoPuntoExpedicion = { ok: true } | { ok: false; error: string };
@@ -159,6 +160,22 @@ export async function guardarEmisorFiscal(entrada: Record<string, unknown>): Pro
   if (!validado.ok) return { ok: false, error: validado.error };
   const d = validado.datos;
 
+  // El distrito y la ciudad salen de la tabla oficial de la DNIT a partir del código de la ciudad: la DNIT compara
+  // los nombres con esa tabla y que departamento, distrito y ciudad estén relacionados. Lo escrito a mano no se usa.
+  if (d.ciudadCodigo !== null) {
+    const departamento = DEPARTAMENTOS.find((x) => x.clave === d.departamento);
+    const r = resolverUbicacion({
+      departamentoCodigo: departamento?.codigoSifen ?? null,
+      distritoCodigo: d.distritoCodigo,
+      ciudadCodigo: d.ciudadCodigo,
+    });
+    if (!r.ok) return { ok: false, error: r.error };
+    d.departamento = DEPARTAMENTOS.find((x) => x.codigoSifen === r.ubicacion.departamentoCodigo)?.clave ?? d.departamento;
+    d.distritoCodigo = r.ubicacion.distritoCodigo;
+    d.distrito = r.ubicacion.distritoNombre;
+    d.ciudad = r.ubicacion.ciudadNombre;
+  }
+
   const datos = {
     tipoContribuyente: d.tipoContribuyente,
     tipoRegimen: d.tipoRegimen,
@@ -195,4 +212,20 @@ export async function guardarEmisorFiscal(entrada: Record<string, unknown>): Pro
 
   revalidatePath("/admin/pos/puntos-expedicion");
   return { ok: true };
+}
+
+/**
+ * Los distritos de un departamento, de la tabla oficial de la DNIT, para el formulario de datos del emisor. Se piden
+ * por acción (y no se mandan todos juntos) porque la tabla completa pesa unos 220 KB.
+ */
+export async function listarDistritos(departamentoClave: string): Promise<OpcionGeografica[]> {
+  await exigirPermiso("pos.gestionarEstaciones");
+  const departamento = DEPARTAMENTOS.find((d) => d.clave === departamentoClave);
+  return departamento ? distritosDelDepartamento(departamento.codigoSifen) : [];
+}
+
+/** Las ciudades y localidades de un distrito (sin las de nombre demasiado largo para el documento). */
+export async function listarCiudades(distritoCodigo: number): Promise<OpcionGeografica[]> {
+  await exigirPermiso("pos.gestionarEstaciones");
+  return Number.isInteger(distritoCodigo) ? ciudadesDelDistrito(distritoCodigo) : [];
 }

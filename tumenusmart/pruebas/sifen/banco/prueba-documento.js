@@ -11,6 +11,8 @@
   const E = await C.cargar("src/lib/sifen/esquema-de.generated");
   const emi = await C.cargar("src/lib/emisor-fiscal");
   const cod = await C.cargar("src/lib/sifen-codigos");
+  const geo = await C.cargar("src/lib/sifen/geografia");
+  const geoDatos = await C.cargar("src/lib/sifen/geografia.generated");
 
   // ------------------------------------------------------------------ el validador independiente (libxml2)
   const { validateXML } = await import("/xmllint/index-browser.mjs");
@@ -25,7 +27,7 @@
   // ------------------------------------------------------------------ datos de ejemplo
   const dv = (n) => cod.calcularDvRuc(String(n));
   const RUC = "80012345";
-  const emisorDatos = { tipoContribuyente: "persona_juridica", tipoRegimen: null, nombreFantasia: "Lo de Fabri", denominacionSucursal: "Casa central", telefono: "0981123456", email: "fabri@correo.com.py", direccion: "Av. Mariscal López", numeroCasa: "1234", complemento: null, departamento: "central", distritoCodigo: 1, distrito: "ASUNCION", ciudadCodigo: 1, ciudad: "ASUNCION (DISTRITO)", actividades: [{ codigo: "56101", descripcion: "Restaurantes y parrillas" }] };
+  const emisorDatos = { tipoContribuyente: "persona_juridica", tipoRegimen: null, nombreFantasia: "Lo de Fabri", denominacionSucursal: "Casa central", telefono: "0981123456", email: "fabri@correo.com.py", direccion: "Av. Mariscal López", numeroCasa: "1234", complemento: null, departamento: "capital", distritoCodigo: 1, distrito: "escrito a mano", ciudadCodigo: 1, ciudad: "escrita a mano", actividades: [{ codigo: "56101", descripcion: "Restaurantes y parrillas" }] };
   const item = (codigo, descripcion, precio, cantidad, iva, descuento = 0, unidadMedida = "unidad") => ({ codigo, descripcion, unidadMedida, cantidad, precioUnitario: precio, descuento, total: precio * cantidad - descuento, iva });
   const comprobante = (items, extra = {}) => ({
     tipo: "factura", modalidad: "electronico", tipoEmision: "normal", timbrado: "12345678", timbradoDesde: new Date("2026-01-01T03:00:00Z"),
@@ -158,6 +160,50 @@
   igual(prod.de.gDatGralOpe.gEmis.dNomEmi, "Gastronomía Fabri S.A.", "en producción es la razón social real");
   const sinAnio = armar.armarDE({ ...base(), items: [item("p", "Almuerzo", 30000, 1, "gravado10", 40000)], total: -10000 }, pg, OPC);
   ok(sinAnio.faltantes.length > 0, "una línea que cobra más de lo que vale se marca");
+
+  // =================================================================================== D2. la dirección sale de la tabla oficial
+  window.log("== Dirección del emisor: departamento, distrito y ciudad de la tabla oficial de la DNIT");
+  igual([geoDatos.DEPARTAMENTOS_GEO.length, geoDatos.DISTRITOS_GEO.length, geoDatos.CIUDADES_GEO.length], [18, 272, 6766], "la tabla tiene 18 departamentos, 272 distritos y 6.766 ciudades y localidades (noviembre de 2025)");
+  const depPorCodigo = new Map(geoDatos.DEPARTAMENTOS_GEO.map(([c, n]) => [c, n])); const disPorCodigo = new Map(geoDatos.DISTRITOS_GEO.map(([c, d, n]) => [c, { d, n }]));
+  igual(geoDatos.DISTRITOS_GEO.filter(([, d]) => !depPorCodigo.has(d)).length + geoDatos.CIUDADES_GEO.filter(([, d]) => !disPorCodigo.has(d)).length, 0, "todo distrito pertenece a un departamento que existe y toda ciudad a un distrito que existe");
+  igual(new Set(geoDatos.CIUDADES_GEO.map(([c]) => c)).size, geoDatos.CIUDADES_GEO.length, "los códigos de ciudad no se repiten");
+  igual(emi.DEPARTAMENTOS.filter((d) => d.codigoSifen <= 18 && depPorCodigo.get(d.codigoSifen) !== d.descripcionSifen).map((d) => d.clave), [], "los 18 departamentos de la tabla se llaman igual que en el esquema de SIFEN (mismos códigos)");
+  const okAsu = geo.resolverUbicacion({ departamentoCodigo: 1, distritoCodigo: 1, ciudadCodigo: 1 });
+  igual(okAsu.ok && [okAsu.ubicacion.departamentoNombre, okAsu.ubicacion.distritoNombre, okAsu.ubicacion.ciudadNombre], ["CAPITAL", "ASUNCION (DISTRITO)", "ASUNCION (DISTRITO)"], "Asunción: Capital / ASUNCION (DISTRITO) / ASUNCION (DISTRITO)");
+  const soloCiudad = geo.resolverUbicacion({ departamentoCodigo: null, distritoCodigo: null, ciudadCodigo: 1 });
+  ok(soloCiudad.ok && soloCiudad.ubicacion.departamentoCodigo === 1 && soloCiudad.ubicacion.distritoCodigo === 1, "con solo la ciudad se deducen el distrito y el departamento");
+  const rel = geo.resolverUbicacion({ departamentoCodigo: 12, distritoCodigo: null, ciudadCodigo: 1 });
+  ok(!rel.ok && rel.error.includes("CAPITAL") && rel.error.includes("CENTRAL"), "la ciudad de Asunción en el departamento Central: se rechaza y dice dónde está de verdad");
+  ok(!geo.resolverUbicacion({ departamentoCodigo: 1, distritoCodigo: 2, ciudadCodigo: 1 }).ok, "un distrito que no es el de la ciudad: se rechaza");
+  ok(!geo.resolverUbicacion({ departamentoCodigo: null, distritoCodigo: null, ciudadCodigo: 999999 }).ok && !geo.resolverUbicacion({ departamentoCodigo: null, distritoCodigo: null, ciudadCodigo: null }).ok, "una ciudad que no existe o sin elegir: se rechaza");
+  const larga = geo.resolverUbicacion({ departamentoCodigo: null, distritoCodigo: null, ciudadCodigo: 6531 });
+  ok(!larga.ok && larga.error.includes("30 caracteres"), "una localidad de más de 30 caracteres de nombre se rechaza con un mensaje claro");
+  ok(!geo.ciudadesDelDistrito(281).some((c) => c.codigo === 6531) && geo.ciudadesDelDistrito(281).length > 0, "y no se ofrece en la lista de ciudades del distrito (que sí tiene otras)");
+  ok(geo.distritosDelDepartamento(12).length >= 15 && geo.distritosDelDepartamento(12).every((d, i, a) => i === 0 || a[i - 1].nombre.localeCompare(d.nombre, "es") <= 0), "Central tiene 15 distritos o más, en orden alfabético");
+  const dGeo = armar.armarDE(comprobante([item("p", "Almuerzo", 30000, 1, "gravado10")]), [{ forma: "efectivo", monto: 30000 }], OPC);
+  igual([dGeo.faltantes, dGeo.de.gDatGralOpe.gEmis.cDepEmi, dGeo.de.gDatGralOpe.gEmis.dDesDepEmi, dGeo.de.gDatGralOpe.gEmis.dDesDisEmi, dGeo.de.gDatGralOpe.gEmis.dDesCiuEmi], [[], 1, "CAPITAL", "ASUNCION (DISTRITO)", "ASUNCION (DISTRITO)"], "el documento usa los nombres oficiales aunque se hayan escrito otros a mano");
+  const malDep = armar.armarDE(comprobante([item("p", "Almuerzo", 30000, 1, "gravado10")], { emisorDatos: { ...emisorDatos, departamento: "central" } }), [{ forma: "efectivo", monto: 30000 }], OPC);
+  ok(malDep.faltantes.some((f) => f.includes("CAPITAL") && f.includes("CENTRAL")) && !malDep.faltantes.some((f) => f.includes("/gEmis/")), "emisor con ciudad y departamento que no se relacionan: un solo aviso claro");
+  const sinDepartamento = armar.armarDE(comprobante([item("p", "Almuerzo", 30000, 1, "gravado10")], { emisorDatos: { ...emisorDatos, departamento: null } }), [{ forma: "efectivo", monto: 30000 }], OPC);
+  igual([sinDepartamento.faltantes.length, sinDepartamento.de.gDatGralOpe.gEmis.dDesDepEmi], [1, "CAPITAL"], "sin departamento cargado se deduce de la ciudad (y el único faltante es el del propio dato del emisor)");
+  const completado = geo.completarUbicacionEmisor({ ...emi.EMISOR_VACIO, ciudadCodigo: 1, departamento: null, distritoCodigo: null, distrito: null, ciudad: null, actividades: [] });
+  igual([completado.departamento, completado.distritoCodigo, completado.distrito, completado.ciudad], ["capital", 1, "ASUNCION (DISTRITO)", "ASUNCION (DISTRITO)"], "completarUbicacionEmisor rellena departamento, distrito y nombres desde la ciudad");
+  // cada ciudad que se ofrece en pantalla sirve para un documento válido (nombres con ñ, apóstrofos, comas, barras…)
+  const ofrecidas = geoDatos.CIUDADES_GEO.filter(([, , n]) => n.length <= 30).map(([c, d]) => [c, d]);
+  let malasGeo = 0; const ejemplosMalos = []; const departamentoDe = (d2) => emi.DEPARTAMENTOS.find((d) => d.codigoSifen === disPorCodigo.get(d2).d).clave;
+  for (let i = 0; i < ofrecidas.length; i += 7) {
+    const [cod2, dis2] = ofrecidas[i];
+    const r = armar.armarDE(comprobante([item("p", "Almuerzo", 30000, 1, "gravado10")], { emisorDatos: { ...emisorDatos, departamento: departamentoDe(dis2), distritoCodigo: dis2, ciudadCodigo: cod2 } }), [{ forma: "efectivo", monto: 30000 }], OPC);
+    if (r.faltantes.length) { malasGeo++; if (ejemplosMalos.length < 3) ejemplosMalos.push(cod2 + ": " + r.faltantes[0]); }
+  }
+  igual(malasGeo, 0, "una de cada siete de las " + ofrecidas.length + " ciudades ofrecidas arma un documento sin faltantes" + (ejemplosMalos.length ? " -> " + ejemplosMalos.join(" ;; ") : ""));
+  let invalidasXsd = 0; const ejemplosXsd = [];
+  for (let i = 0; i < ofrecidas.length; i += 97) {
+    const [cod2, dis2] = ofrecidas[i];
+    const r = await completo(comprobante([item("p", "Almuerzo", 30000, 1, "gravado10")], { emisorDatos: { ...emisorDatos, departamento: departamentoDe(dis2), distritoCodigo: dis2, ciudadCodigo: cod2 } }), [{ forma: "efectivo", monto: 30000 }]);
+    const v = await xsd(r.texto); if (!v.valid) { invalidasXsd++; if (ejemplosXsd.length < 3) ejemplosXsd.push(cod2 + ": " + v.errors[0].message.slice(0, 160)); }
+  }
+  igual(invalidasXsd, 0, "y una de cada 97 validada con libxml2 contra los XSD oficiales (" + Math.ceil(ofrecidas.length / 97) + " ciudades)" + (ejemplosXsd.length ? " -> " + ejemplosXsd.join(" ;; ") : ""));
 
   // =================================================================================== E. los descriptores son los del esquema
   window.log("== Los textos descriptivos coinciden con los del esquema oficial");

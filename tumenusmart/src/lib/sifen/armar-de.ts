@@ -35,6 +35,7 @@ import {
 import { ZONA_NEGOCIO, claveDiaAsuncion } from "../timezone";
 import { construirCdc, generarCodigoSeguridad } from "./cdc";
 import { controlarCalculos } from "./controlar";
+import { resolverUbicacion } from "./geografia";
 import { validarContraEsquema, validarSimple, type Nodo } from "./xml";
 
 // ---------------------------------------------------------------------------
@@ -217,6 +218,14 @@ export function armarDE(c: ComprobanteParaDocumento, pagos: PagoParaDocumento[],
   if (nombreEmisor.length < 4) faltantes.push("La razón social del emisor tiene que tener al menos 4 caracteres");
 
   const departamento = DEPARTAMENTOS.find((d) => d.clave === emisor.departamento);
+  // Distrito y ciudad salen de la tabla oficial de la DNIT a partir del código de la ciudad: la DNIT compara los NOMBRES
+  // con esa tabla (D111 a D116), así que lo escrito a mano nunca se usa si el código es válido.
+  const resolucion =
+    emisor.ciudadCodigo !== null
+      ? resolverUbicacion({ departamentoCodigo: departamento?.codigoSifen ?? null, distritoCodigo: emisor.distritoCodigo, ciudadCodigo: emisor.ciudadCodigo })
+      : null;
+  if (resolucion && !resolucion.ok) faltantes.push(resolucion.error);
+  const ubicacion = resolucion && resolucion.ok ? resolucion.ubicacion : null;
   const tipoContEmisor = emisor.tipoContribuyente === "persona_juridica" ? 2 : emisor.tipoContribuyente === "persona_fisica" ? 1 : null;
   if (emisor.email) {
     const m = validarSimple("tEmail", emisor.email);
@@ -233,12 +242,12 @@ export function armarDE(c: ComprobanteParaDocumento, pagos: PagoParaDocumento[],
     dDirEmi: emisor.direccion ?? undefined,
     dNumCas: emisor.numeroCasa ?? undefined,
     dCompDir1: emisor.complemento ?? undefined,
-    cDepEmi: departamento?.codigoSifen,
-    dDesDepEmi: departamento?.descripcionSifen,
-    cDisEmi: emisor.distritoCodigo ?? undefined,
-    dDesDisEmi: emisor.distrito ?? undefined,
-    cCiuEmi: emisor.ciudadCodigo ?? undefined,
-    dDesCiuEmi: emisor.ciudad ?? undefined,
+    cDepEmi: departamento?.codigoSifen ?? ubicacion?.departamentoCodigo,
+    dDesDepEmi: departamento?.descripcionSifen ?? ubicacion?.departamentoNombre,
+    cDisEmi: ubicacion?.distritoCodigo ?? emisor.distritoCodigo ?? undefined,
+    dDesDisEmi: ubicacion?.distritoNombre ?? emisor.distrito ?? undefined,
+    cCiuEmi: ubicacion?.ciudadCodigo ?? emisor.ciudadCodigo ?? undefined,
+    dDesCiuEmi: ubicacion?.ciudadNombre ?? emisor.ciudad ?? undefined,
     dTelEmi: emisor.telefono ?? undefined,
     dEmailE: emisor.email ?? undefined,
     dDenSuc: emisor.denominacionSucursal ?? undefined,
@@ -526,7 +535,7 @@ export function armarDE(c: ComprobanteParaDocumento, pagos: PagoParaDocumento[],
   // Lo que el esquema oficial rechazaría y no se explicó arriba con un mensaje propio (los datos del emisor ya
   // se explicaron con sus nombres de pantalla).
   for (const e of validarContraEsquema({ dVerFor: 150, DE: de }, { sinFirma: true })) {
-    if (faltanEmisor.length > 0 && e.ruta.includes("/gEmis/")) continue;
+    if ((faltanEmisor.length > 0 || (resolucion && !resolucion.ok)) && e.ruta.includes("/gEmis/")) continue;
     faltantes.push(`${e.ruta.replace(/^\/rDE\//, "")}: ${e.mensaje}`);
   }
 

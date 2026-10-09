@@ -9,6 +9,7 @@ import { PuntoExpedicionFila } from "./PuntoExpedicionFila";
 import { FacturaObligatoriaToggle } from "./FacturaObligatoriaToggle";
 import { EmisorFiscalForm } from "./EmisorFiscalForm";
 import { emisorDesdeFila } from "@/lib/emisor-fiscal";
+import { completarUbicacionEmisor } from "@/lib/sifen/geografia";
 
 export const dynamic = "force-dynamic";
 
@@ -36,7 +37,7 @@ export default async function PuntosExpedicionPage() {
 
       <CrearPuntoExpedicionForm />
 
-      <EmisorFiscalForm inicial={emisorDesdeFila(emisorFila)} />
+      <EmisorFiscalForm inicial={completarUbicacionEmisor(emisorDesdeFila(emisorFila))} />
 
       <div className="flex flex-col gap-2">
         {puntos.map((p) => (
