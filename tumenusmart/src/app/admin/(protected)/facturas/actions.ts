@@ -15,6 +15,7 @@ import {
   type ItemFuente,
 } from "@/lib/comprobante";
 import { armarDE, armarRDE } from "@/lib/sifen/armar-de";
+import { cargarFactura } from "@/lib/sifen/servidor";
 import { aXmlRDE } from "@/lib/sifen/xml";
 import { esDeMesAnterior, nombreDelMes } from "@/lib/mes-fiscal";
 import { registrarBitacora } from "@/lib/bitacora";
@@ -859,73 +860,19 @@ export async function obtenerDocumentoElectronico(
   const db = prismaDelLocal(storeId);
 
   // El más nuevo: si hubo remisión, el vigente; si no, el último que tuvo.
-  const comprobante = await db.comprobante.findFirst({
-    where: origen === "venta" ? { ventaPosId: id } : { orderId: id },
-    orderBy: { createdAt: "desc" },
-    include: { items: { orderBy: { orden: "asc" } } },
-  });
-  if (!comprobante) {
+  const factura = await cargarFactura(db, origen, id);
+  if (!factura) {
     return {
       ok: false,
       error:
         "Esta factura es anterior a los comprobantes y no tiene su registro completo. Con las facturas nuevas sí aparece.",
     };
   }
-
-  let pagos: { forma: string; monto: number }[] = [];
-  if (origen === "venta") {
-    const filas = await db.pagoVenta.findMany({
-      where: { ventaPosId: id },
-      orderBy: { orden: "asc" },
-      select: { forma: true, monto: true },
-    });
-    pagos = filas.map((p) => ({ forma: p.forma, monto: Number(p.monto) }));
-  } else {
-    const pedido = await db.order.findUnique({
-      where: { id },
-      select: { cobroMetodo: true, formaPagoPos: true },
-    });
-    const forma = pedido?.cobroMetodo ?? pedido?.formaPagoPos ?? null;
-    pagos = forma ? [{ forma, monto: Number(comprobante.total) }] : [];
-  }
+  const comprobante = factura.comprobante;
 
   const resultado = armarDE(
-    {
-      tipo: comprobante.tipo,
-      modalidad: comprobante.modalidad,
-      tipoEmision: comprobante.tipoEmision,
-      timbrado: comprobante.timbrado,
-      timbradoDesde: comprobante.timbradoDesde,
-      establecimiento: comprobante.establecimiento,
-      punto: comprobante.punto,
-      correlativo: comprobante.correlativo,
-      numero: comprobante.numero,
-      fechaEmision: comprobante.fechaEmision,
-      tipoTransaccion: comprobante.tipoTransaccion,
-      moneda: comprobante.moneda,
-      emisorRuc: comprobante.emisorRuc,
-      emisorRazonSocial: comprobante.emisorRazonSocial,
-      emisorDatos: comprobante.emisorDatos,
-      receptorTipoIdentificacion: comprobante.receptorTipoIdentificacion,
-      receptorNumeroIdentificacion: comprobante.receptorNumeroIdentificacion,
-      receptorRazonSocial: comprobante.receptorRazonSocial,
-      receptorEmail: comprobante.receptorEmail,
-      presencia: comprobante.presencia,
-      condicion: comprobante.condicion,
-      fechaVencimientoCredito: comprobante.fechaVencimientoCredito,
-      total: Number(comprobante.total),
-      items: comprobante.items.map((i) => ({
-        codigo: i.codigo,
-        descripcion: i.descripcion,
-        unidadMedida: i.unidadMedida,
-        cantidad: Number(i.cantidad),
-        precioUnitario: Number(i.precioUnitario),
-        descuento: Number(i.descuento),
-        total: Number(i.total),
-        iva: i.iva,
-      })),
-    },
-    pagos,
+    factura.datos,
+    factura.pagos,
     // Vista previa: con el nombre real del emisor (no el texto del ambiente de pruebas) y firmada "ahora".
     { ambiente: "produccion", fechaFirma: new Date() }
   );

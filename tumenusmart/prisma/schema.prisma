@@ -239,6 +239,9 @@ model Store {
   comprobantes         Comprobante[]
   comprobanteItems     ComprobanteItem[]
   emisorFiscal         EmisorFiscal?
+  certificadosFirma    CertificadoFirma[]
+  configFacturacionElectronica ConfigFacturacionElectronica?
+  documentosElectronicos DocumentoElectronico[]
   optionGroups         OptionGroup[]
   optionGroupProductos OptionGroupProduct[]
   productOptionGroups  ProductOptionGroup[]
@@ -1715,6 +1718,9 @@ model Comprobante {
 
   items ComprobanteItem[]
 
+  /// El documento electrónico firmado de este comprobante (si se llegó a firmar).
+  documentoElectronico DocumentoElectronico?
+
   @@index([storeId, fechaEmision])
   @@index([storeId, numero])
   @@index([ventaPosId])
@@ -3130,4 +3136,108 @@ model MarcacionAsistencia {
 
   @@index([storeId, dia])
   @@index([colaboradorId, fecha])
+}
+
+// ===========================================================================
+//  Facturación electrónica (SIFEN)
+// ===========================================================================
+
+/// El certificado digital del contribuyente (el .p12 que entrega el prestador de servicios de certificación) con el que
+/// se firman las facturas electrónicas. Quien tiene su clave privada puede emitir facturas a nombre del contribuyente:
+/// la clave NUNCA se guarda en claro. Se lee el .p12 una vez, la contraseña del archivo se descarta y la clave queda
+/// cifrada con AES-256-GCM (clave maestra en la variable de entorno CERTIFICADOS_CLAVE), atada a este local.
+/// Un solo certificado activo por local; los reemplazados quedan de registro, sin su clave.
+model CertificadoFirma {
+  id      String @id @default(cuid())
+  storeId String
+  store   Store  @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  activo Boolean @default(true)
+
+  /// Titular y emisor del certificado, tal como figuran en él.
+  sujeto String
+  emisor String
+  /// El RUC que lleva el certificado (sin el dígito) y su dígito verificador.
+  ruc    String?
+  dv     String?
+  validoDesde DateTime
+  validoHasta DateTime
+  /// SHA-256 del certificado en DER (hexadecimal): identifica cuál se usó para firmar cada documento.
+  huellaSha256 String
+  bitsClave    Int
+  usoFirmaDigital         Boolean
+  /// null = el certificado no declara usos extendidos.
+  usoAutenticacionCliente Boolean?
+  /// Lo que se le avisó al cargarlo (vence pronto, no trae el RUC…): lista de textos.
+  avisos Json?
+
+  /// El certificado del contribuyente (DER en base64) y su cadena de confianza (PEM): son públicos.
+  certificadoBase64 String
+  cadenaPem         Json?
+  /// La clave privada (PKCS#8) cifrada: "v1.<iv>.<cifrado>". Nula en los certificados reemplazados.
+  clavePrivadaCifrada String?
+
+  subidoPor String
+  createdAt DateTime @default(now())
+
+  @@index([storeId, activo])
+}
+
+/// La configuración de la facturación electrónica del local: a qué ambiente de la DNIT apunta y el código de seguridad
+/// del contribuyente (CSC) que firma el QR. Uno por local.
+model ConfigFacturacionElectronica {
+  id      String @id @default(cuid())
+  storeId String @unique
+  store   Store  @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  /// "pruebas" (sifen-test) | "produccion".
+  ambiente String @default("pruebas")
+  /// IdCSC (4 dígitos) y el CSC (32 caracteres) cifrado igual que la clave privada.
+  idCsc      String?
+  cscCifrado String?
+
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+}
+
+/// Un documento electrónico firmado: el XML tal como se firmó (es lo que vale), su CDC y en qué estado está ante la DNIT.
+/// Uno por comprobante.
+model DocumentoElectronico {
+  id      String @id @default(cuid())
+  storeId String
+  store   Store  @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  comprobanteId String      @unique
+  comprobante   Comprobante @relation(fields: [comprobanteId], references: [id], onDelete: Cascade)
+
+  /// Código de Control (44 dígitos): identifica el documento en toda la DNIT.
+  cdc      String @unique
+  /// "pruebas" | "produccion" (el de la configuración al firmar).
+  ambiente String
+  /// true = firma de prueba sobre una factura que salió como autoimpresor: nunca se envía a la DNIT.
+  vistaPrevia Boolean @default(true)
+  /// "firmado" | "enviado" | "aprobado" | "aprobado_con_observacion" | "rechazado" | "cancelado" | "inutilizado".
+  estado   String @default("firmado")
+
+  /// El archivo <rDE> completo, firmado y con su QR.
+  xmlFirmado        String
+  digestValue       String
+  urlQr             String
+  /// SHA-256 del certificado con el que se firmó.
+  huellaCertificado String
+  firmadoEn         DateTime @default(now())
+  firmadoPor        String
+
+  // --- Envío a la DNIT (siguiente etapa) ---
+  enviadoEn        DateTime?
+  respuestaCodigo  String?
+  respuestaMensaje String?
+  intentos         Int       @default(0)
+  proximoIntentoEn DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([storeId, estado])
+  @@index([storeId, createdAt])
 }

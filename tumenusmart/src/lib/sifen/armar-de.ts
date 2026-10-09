@@ -36,7 +36,7 @@ import { ZONA_NEGOCIO, claveDiaAsuncion } from "../timezone";
 import { construirCdc, generarCodigoSeguridad } from "./cdc";
 import { controlarCalculos } from "./controlar";
 import { resolverUbicacion } from "./geografia";
-import { validarContraEsquema, validarSimple, type Nodo } from "./xml";
+import { limpiarTextoXml, validarContraEsquema, validarSimple, type Nodo } from "./xml";
 
 // ---------------------------------------------------------------------------
 //  Constantes y descripciones (el texto de cada código, tal cual lo define el esquema)
@@ -155,6 +155,21 @@ function limpiarDocumento(valor: string): string {
   return valor.replace(/[.\s]/g, "");
 }
 
+/**
+ * Un texto escrito por una persona (nombre, dirección, descripción de un producto) en una sola línea: el esquema de la
+ * DNIT no admite saltos de línea en estos campos (patrón ".+"), y un nombre pegado desde otra aplicación puede traerlos.
+ * Sin caracteres de control, con los espacios repetidos juntos y sin espacios en las puntas.
+ */
+function linea(valor: string): string {
+  return limpiarTextoXml(valor).replace(/\s+/g, " ").trim();
+}
+
+function lineaOpcional(valor: string | null | undefined): string | undefined {
+  if (valor === null || valor === undefined) return undefined;
+  const limpio = linea(valor);
+  return limpio === "" ? undefined : limpio;
+}
+
 // ---------------------------------------------------------------------------
 //  El documento
 // ---------------------------------------------------------------------------
@@ -210,7 +225,7 @@ export function armarDE(c: ComprobanteParaDocumento, pagos: PagoParaDocumento[],
     );
   }
 
-  const nombreEmisor = op.ambiente === "pruebas" ? NOMBRE_EMISOR_PRUEBAS : c.emisorRazonSocial.trim();
+  const nombreEmisor = op.ambiente === "pruebas" ? NOMBRE_EMISOR_PRUEBAS : linea(c.emisorRazonSocial);
   const nombreDeclarado = c.emisorRazonSocial.trim().toLowerCase();
   if (op.ambiente === "produccion" && (nombreDeclarado === NOMBRE_EMISOR_PRUEBAS.toLowerCase() || nombreDeclarado === NOMBRE_EMISOR_PRUEBAS_MANUAL.toLowerCase())) {
     faltantes.push("El nombre del emisor no puede ser el texto del ambiente de pruebas cuando se emite en producción");
@@ -238,10 +253,10 @@ export function armarDE(c: ComprobanteParaDocumento, pagos: PagoParaDocumento[],
     iTipCont: tipoContEmisor ?? undefined,
     cTipReg: emisor.tipoRegimen ?? undefined,
     dNomEmi: nombreEmisor,
-    dNomFanEmi: emisor.nombreFantasia ?? undefined,
-    dDirEmi: emisor.direccion ?? undefined,
-    dNumCas: emisor.numeroCasa ?? undefined,
-    dCompDir1: emisor.complemento ?? undefined,
+    dNomFanEmi: lineaOpcional(emisor.nombreFantasia),
+    dDirEmi: lineaOpcional(emisor.direccion),
+    dNumCas: lineaOpcional(emisor.numeroCasa),
+    dCompDir1: lineaOpcional(emisor.complemento),
     cDepEmi: departamento?.codigoSifen ?? ubicacion?.departamentoCodigo,
     dDesDepEmi: departamento?.descripcionSifen ?? ubicacion?.departamentoNombre,
     cDisEmi: ubicacion?.distritoCodigo ?? emisor.distritoCodigo ?? undefined,
@@ -250,7 +265,7 @@ export function armarDE(c: ComprobanteParaDocumento, pagos: PagoParaDocumento[],
     dDesCiuEmi: ubicacion?.ciudadNombre ?? emisor.ciudad ?? undefined,
     dTelEmi: emisor.telefono ?? undefined,
     dEmailE: emisor.email ?? undefined,
-    dDenSuc: emisor.denominacionSucursal ?? undefined,
+    dDenSuc: lineaOpcional(emisor.denominacionSucursal),
     gActEco: emisor.actividades.map((a) => ({ cActEco: a.codigo, dDesActEco: a.descripcion })),
   };
 
@@ -287,7 +302,7 @@ export function armarDE(c: ComprobanteParaDocumento, pagos: PagoParaDocumento[],
     return {
       dCodInt: codigoInterno(f.it.codigo, f.it.descripcion),
       // Guía de Pruebas de la DNIT: en el ambiente de pruebas el primer ítem lleva el texto de "sin valor fiscal".
-      dDesProSer: op.ambiente === "pruebas" && indice === 0 ? NOMBRE_EMISOR_PRUEBAS : f.it.descripcion.trim(),
+      dDesProSer: op.ambiente === "pruebas" && indice === 0 ? NOMBRE_EMISOR_PRUEBAS : linea(f.it.descripcion),
       cUniMed: unidad,
       dDesUniMed: DESCRIPCION_UNIDAD_MEDIDA[unidad] ?? "UNI",
       dCantProSer: f.it.cantidad,
@@ -362,7 +377,7 @@ export function armarDE(c: ComprobanteParaDocumento, pagos: PagoParaDocumento[],
   if (esInnominado && dTotOpe >= LIMITE_INNOMINADO) {
     faltantes.push(`No se puede facturar a "Sin Nombre" desde ${LIMITE_INNOMINADO.toLocaleString("es-PY")} Gs.: hay que identificar al comprador (Decreto 872/2023).`);
   }
-  const nombreReceptor = (c.receptorRazonSocial ?? "").trim();
+  const nombreReceptor = linea(c.receptorRazonSocial ?? "");
   if (!esInnominado && nombreReceptor.length < 4) faltantes.push("La razón social o el nombre del comprador tiene que tener al menos 4 caracteres");
 
   let emailReceptor: string | undefined;

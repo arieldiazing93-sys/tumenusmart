@@ -10,3 +10,11 @@ pruebas/compilado/
 
 # Validador XSD que baja pruebas/sifen/probar.ps1 la primera vez
 pruebas/sifen/.cache/
+
+# Certificados digitales: NUNCA al repositorio (su clave privada permite facturar a nombre del negocio).
+# La única excepción es el certificado de MENTIRA para probar la pantalla.
+*.p12
+*.pfx
+*.key
+*.pem
+!pruebas/sifen/muestras/certificado-de-prueba.p12

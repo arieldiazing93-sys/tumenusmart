@@ -41,8 +41,32 @@ export function textoDeValor(v: string | number | boolean): string {
   return typeof v === "number" ? numeroATexto(v) : String(v);
 }
 
+/**
+ * XML 1.0 no admite los caracteres de control ni las parejas de sustitución sueltas, y un retorno de carro se convierte
+ * en salto de línea al leer el archivo. Como la firma digital se calcula sobre el texto exacto, hay que dejar el texto
+ * como quedaría después de leerlo: si no, quien verifica obtiene bytes distintos y la firma "se rompe".
+ */
+export function limpiarTextoXml(s: string): string {
+  const sinControl = s.replace(/\r\n?/g, "\n").replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F￾￿]/g, "");
+  let salida = "";
+  for (let i = 0; i < sinControl.length; i++) {
+    const c = sinControl.charCodeAt(i);
+    if (c >= 0xd800 && c <= 0xdbff) {
+      const siguiente = sinControl.charCodeAt(i + 1);
+      if (siguiente >= 0xdc00 && siguiente <= 0xdfff) {
+        salida += sinControl[i] + sinControl[i + 1];
+        i++;
+      }
+      // una mitad suelta se descarta
+    } else if (c < 0xdc00 || c > 0xdfff) {
+      salida += sinControl[i];
+    }
+  }
+  return salida;
+}
+
 function escaparTexto(s: string): string {
-  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  return limpiarTextoXml(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
 function escaparAtributo(s: string): string {
@@ -288,4 +312,93 @@ export function validarContraEsquema(rde: Nodo, opciones: OpcionesValidacion = {
   const errores: ErrorEsquema[] = [];
   validarElemento(errores, "/rDE", "rDE", rde, opciones);
   return errores;
+}
+
+// ---------------------------------------------------------------------------
+//  Leer el XML (el camino inverso de aXmlRDE)
+// ---------------------------------------------------------------------------
+
+type ElementoXml = {
+  nombre: string;
+  atributos: Record<string, string>;
+  hijos: ElementoXml[];
+  texto: string;
+  /** Dónde empieza y termina el elemento (con sus etiquetas) en el texto original. */
+  desde: number;
+  hasta: number;
+};
+
+function desescapar(s: string): string {
+  return s.replace(/&(#x[0-9a-fA-F]+|#\d+|amp|lt|gt|quot|apos);/g, (_m, e: string) => {
+    if (e === "amp") return "&";
+    if (e === "lt") return "<";
+    if (e === "gt") return ">";
+    if (e === "quot") return '"';
+    if (e === "apos") return "'";
+    return String.fromCodePoint(e[1] === "x" ? parseInt(e.slice(2), 16) : parseInt(e.slice(1), 10));
+  });
+}
+
+/** Un lector de XML mínimo, para los archivos que escribe este mismo módulo: elementos, atributos y texto (sin DTD ni CDATA). */
+function leerElementos(xml: string): ElementoXml {
+  const patron = /<\?[\s\S]*?\?>|<!--[\s\S]*?-->|<\/([^\s>]+)\s*>|<([^\s/>]+)((?:\s+[^\s=/>]+\s*=\s*(?:"[^"]*"|'[^']*'))*)\s*(\/?)>|([^<]+)/g;
+  const raiz: ElementoXml = { nombre: "#raiz", atributos: {}, hijos: [], texto: "", desde: 0, hasta: xml.length };
+  const pila: ElementoXml[] = [raiz];
+  let m: RegExpExecArray | null;
+  let ultimo = 0;
+  while ((m = patron.exec(xml))) {
+    if (m.index !== ultimo) throw new Error("El XML no se pudo leer (hay texto fuera de lugar)");
+    ultimo = patron.lastIndex;
+    const actual = pila[pila.length - 1];
+    if (m[1] !== undefined) {
+      if (pila.length === 1 || actual.nombre !== m[1]) throw new Error(`El XML no se pudo leer (se cierra <${m[1]}> sin abrirse)`);
+      actual.hasta = patron.lastIndex;
+      pila.pop();
+    } else if (m[2] !== undefined) {
+      const atributos: Record<string, string> = {};
+      const reAtr = /([^\s=]+)\s*=\s*(?:"([^"]*)"|'([^']*)')/g;
+      let a: RegExpExecArray | null;
+      while ((a = reAtr.exec(m[3] ?? ""))) atributos[a[1]] = desescapar(a[2] ?? a[3] ?? "");
+      const elemento: ElementoXml = { nombre: m[2], atributos, hijos: [], texto: "", desde: m.index, hasta: patron.lastIndex };
+      actual.hijos.push(elemento);
+      if (m[4] !== "/") pila.push(elemento);
+    } else if (m[5] !== undefined) {
+      if (actual === raiz && m[5].trim() !== "") throw new Error("El XML no se pudo leer (hay texto fuera del documento)");
+      actual.texto += desescapar(m[5]);
+    }
+  }
+  if (ultimo !== xml.length) throw new Error("El XML no se pudo leer (termina de forma inesperada)");
+  if (pila.length !== 1) throw new Error(`El XML no se pudo leer (falta cerrar <${pila[pila.length - 1].nombre}>)`);
+  return raiz;
+}
+
+function aNodoXml(xml: string, elemento: ElementoXml, tipo: string): Valor {
+  const complejo = COMPLEJOS[tipo];
+  if (!complejo) {
+    // La firma digital se conserva como texto XML, tal cual está en el archivo.
+    if (tipo === "ds:Signature") return xml.slice(elemento.desde, elemento.hasta);
+    return elemento.texto;
+  }
+  const nodo: Nodo = {};
+  for (const a of complejo.attr ?? []) {
+    if (elemento.atributos[a.n] !== undefined) nodo["@" + a.n] = elemento.atributos[a.n];
+  }
+  for (const el of complejo.el) {
+    const hijos = elemento.hijos.filter((h) => h.nombre === el.n);
+    if (hijos.length === 0) continue;
+    nodo[el.n] = el.max === 1 ? aNodoXml(xml, hijos[0], el.t) : hijos.map((h) => aNodoXml(xml, h, el.t));
+  }
+  return nodo;
+}
+
+/**
+ * Lee un archivo <rDE> (el que escribe `aXmlRDE`) y devuelve el mismo árbol { dVerFor, DE, Signature, gCamFuFD }. Todos los
+ * valores quedan como texto; la firma, como el texto XML que tenía. Sirve para armar la representación gráfica (KuDE)
+ * desde el documento firmado y para verificar que lo guardado sea lo que se escribió.
+ */
+export function leerXmlRDE(xml: string): Nodo {
+  const raiz = leerElementos(xml);
+  const rde = raiz.hijos.find((h) => h.nombre === "rDE");
+  if (!rde || raiz.hijos.length !== 1) throw new Error("El archivo no es un documento electrónico (<rDE>)");
+  return aNodoXml(xml, rde, "rDE") as Nodo;
 }

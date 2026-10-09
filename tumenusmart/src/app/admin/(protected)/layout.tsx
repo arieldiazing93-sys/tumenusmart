@@ -220,6 +220,9 @@ function armarGrupos(hayIdeaSinVer: boolean, rol: string, ventasACredito: boolea
           ver: conPermiso("pos.gestionarEstaciones") },
         { href: "/admin/pos/areas-impresion", label: "Áreas de impresión", icono: "configuracion" as const,
           ver: conPermiso("pos.gestionarEstaciones") },
+        // El certificado digital, el código de seguridad (CSC) y los documentos firmados de la factura electrónica (SIFEN).
+        { href: "/admin/facturacion-electronica", label: "Facturación electrónica", icono: "configuracion" as const,
+          ver: conPermiso("facturacion.configurar") },
       ],
     },
     {

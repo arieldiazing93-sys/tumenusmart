@@ -266,6 +266,7 @@
       const rde = armar.armarRDE(res.de, firmaFalsa(res.cdc), "https://ekuatia.set.gov.py/consultas-test/qr?" + "x".repeat(150));
       const e1 = xml.validarContraEsquema(rde); const e2 = ctl.controlarCalculos(res.de);
       if (e1.length) motivo = "esquema: " + e1[0].ruta + " " + e1[0].mensaje; else if (e2.length) motivo = "cuentas: " + e2[0];
+      else if (xml.aXmlRDE(xml.leerXmlRDE(xml.aXmlRDE(rde))) !== xml.aXmlRDE(rde)) motivo = "leer el XML y volver a escribirlo no da el mismo archivo";
       else if (n % 10 === 0) { conLibxml++; const r2 = await xsd(xml.aXmlRDE(rde)); if (!r2.valid) { invalidosLibxml++; motivo = "libxml2: " + r2.errors[0].message.slice(0, 200); } }
     }
     if (motivo) { fallas++; if (detalle.length < 5) detalle.push("#" + n + " " + motivo); }

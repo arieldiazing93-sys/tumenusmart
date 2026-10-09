@@ -4,8 +4,8 @@
  * Está hecho a mano en vez de sumar una librería para no agregar
  * dependencias nuevas al proyecto. Cubre lo que necesitamos: modo byte
  * (URLs), nivel de corrección de errores M (recupera ~15%, buen margen
- * para un cartel impreso que se ensucia o se raya) y versiones 1 a 15,
- * que alcanzan de sobra para cualquier URL de un negocio.
+ * para un cartel impreso que se ensucia o se raya) y versiones 1 a 20,
+ * que alcanzan de sobra para cualquier URL de un negocio y para el QR de la factura electrónica (unos 400 bytes).
  *
  * La salida es una matriz de booleanos: true = módulo negro.
  */
@@ -64,7 +64,7 @@ function codewordsCorreccion(datos: number[], cantidad: number): number[] {
 }
 
 // ---------------------------------------------------------------------------
-// Tablas del estándar (nivel de corrección M, versiones 1 a 15)
+// Tablas del estándar (nivel de corrección M, versiones 1 a 20)
 // ---------------------------------------------------------------------------
 
 type EspecificacionVersion = {
@@ -96,6 +96,11 @@ const VERSIONES: EspecificacionVersion[] = [
   { total: 532, ecPorBloque: 22, bloques1: 8, datos1: 37, bloques2: 1, datos2: 38 },
   { total: 581, ecPorBloque: 24, bloques1: 4, datos1: 40, bloques2: 5, datos2: 41 },
   { total: 655, ecPorBloque: 24, bloques1: 5, datos1: 41, bloques2: 5, datos2: 42 },
+  { total: 733, ecPorBloque: 28, bloques1: 7, datos1: 45, bloques2: 3, datos2: 46 },
+  { total: 815, ecPorBloque: 28, bloques1: 10, datos1: 46, bloques2: 1, datos2: 47 },
+  { total: 901, ecPorBloque: 26, bloques1: 9, datos1: 43, bloques2: 4, datos2: 44 },
+  { total: 991, ecPorBloque: 26, bloques1: 3, datos1: 44, bloques2: 11, datos2: 45 },
+  { total: 1085, ecPorBloque: 26, bloques1: 3, datos1: 41, bloques2: 13, datos2: 42 },
 ];
 
 /** Centros de los patrones de alineación, por versión (índice 0 = versión 1). */
@@ -115,6 +120,11 @@ const ALINEACION: number[][] = [
   [6, 34, 62],
   [6, 26, 46, 66],
   [6, 26, 48, 70],
+  [6, 26, 50, 74],
+  [6, 30, 54, 78],
+  [6, 30, 56, 82],
+  [6, 30, 58, 86],
+  [6, 34, 62, 90],
 ];
 
 /** Capacidad de datos en codewords de una versión. */
@@ -422,7 +432,8 @@ function ponerVersion(modulos: boolean[][], tamano: number, version: number): vo
 
   let bch = version << 12;
   for (let i = 5; i >= 0; i--) {
-    if ((bch >>> (12 + i)) & 1) bch ^= 0b1111100100 << i;
+    // Polinomio generador de la información de versión: x^12+x^11+x^10+x^9+x^8+x^5+x^2+1 (0x1F25, 13 bits).
+    if ((bch >>> (12 + i)) & 1) bch ^= 0b1111100100101 << i;
   }
   const info = (version << 12) | bch;
 

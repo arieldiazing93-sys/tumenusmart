@@ -2,21 +2,38 @@
 
 import { useState, useTransition } from "react";
 import { clasesBoton } from "@/components/ui";
+import type { ResultadoFirmar } from "@/lib/sifen/servidor";
+import { firmarFacturaElectronica } from "../facturacion-electronica/actions";
 import { obtenerDocumentoElectronico, type ResultadoDocumentoElectronico } from "./actions";
 
 /**
  * "Datos para factura electrónica": el comprobante armado como documento
  * electrónico completo de SIFEN (con los nombres de campo del esquema de la
  * DNIT, su CDC y su XML) y la lista de lo que todavía falta cargar o corregir.
- * No firma ni envía nada.
+ * Desde acá también se puede firmar el documento con el certificado del negocio
+ * y guardarlo; todavía no se envía a la DNIT.
  */
 export function DatosFacturaElectronica({ origen, id }: { origen: "pedido" | "venta"; id: string }) {
   const [pendiente, iniciar] = useTransition();
+  const [firmando, iniciarFirma] = useTransition();
   const [resultado, setResultado] = useState<ResultadoDocumentoElectronico | null>(null);
+  const [firma, setFirma] = useState<ResultadoFirmar | null>(null);
   const [copiado, setCopiado] = useState<"json" | "xml" | null>(null);
+
+  function firmar() {
+    setFirma(null);
+    iniciarFirma(async () => {
+      try {
+        setFirma(await firmarFacturaElectronica(origen, id));
+      } catch {
+        setFirma({ ok: false, error: "No se pudo firmar el documento. Probá de nuevo." });
+      }
+    });
+  }
 
   function cargar() {
     setCopiado(null);
+    setFirma(null);
     iniciar(async () => {
       try {
         setResultado(await obtenerDocumentoElectronico(origen, id));
@@ -83,6 +100,55 @@ export function DatosFacturaElectronica({ origen, id }: { origen: "pedido" | "ve
               </ul>
             </div>
           )}
+
+          <div className="flex flex-col gap-2 rounded-lg border border-azul/30 bg-azul-luz/40 px-3 py-2.5">
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={firmar}
+                disabled={firmando || resultado.estado === "anulado"}
+                className={clasesBoton("navegar", "sm")}
+              >
+                {firmando ? "Firmando…" : "Firmar y guardar el documento"}
+              </button>
+              <span className="text-[0.78rem] text-tinta-media">
+                Lo firma con el certificado del negocio (Configuración de facturas → Facturación electrónica). Todavía no se envía a la DNIT.
+              </span>
+            </div>
+            {firma && !firma.ok && (
+              <div className="rounded-lg bg-peligro-luz px-3 py-2 text-peligro">
+                <p className="font-medium">{firma.error}</p>
+                {firma.faltantes && firma.faltantes.length > 0 && (
+                  <ul className="mt-1 list-disc pl-5 text-[0.8rem]">
+                    {firma.faltantes.map((f) => (
+                      <li key={f}>{f}</li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
+            {firma && firma.ok && (
+              <div className="rounded-lg bg-exito-luz px-3 py-2 text-exito">
+                <p className="font-medium">
+                  ✓ Documento firmado y guardado{firma.vistaPrevia ? " (vista previa: la factura salió como autoimpresor y no se envía)" : ""}.
+                </p>
+                <p className="mt-0.5 break-all font-mono text-[0.74rem]">CDC {firma.cdc}</p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <a href={`/admin/facturacion-electronica/xml/${firma.documentoId}`} className={clasesBoton("navegar", "sm")}>
+                    Descargar el XML firmado
+                  </a>
+                  <a
+                    href={`/admin/facturacion-electronica/kude/${firma.documentoId}?formato=cinta`}
+                    target="_blank"
+                    rel="noopener"
+                    className={clasesBoton("navegar", "sm")}
+                  >
+                    Ver el comprobante impreso (KuDE)
+                  </a>
+                </div>
+              </div>
+            )}
+          </div>
 
           <div>
             <div className="mb-1 flex flex-wrap items-center justify-between gap-2">

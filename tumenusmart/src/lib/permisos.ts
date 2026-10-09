@@ -74,6 +74,9 @@ export type Permiso =
   | "ideas.ver"
   | "analytics.ver"
   | "configuracion.editar"
+  // Facturación electrónica: subir el certificado digital del contribuyente (con el que se firman las facturas), cargar el
+  // código de seguridad (CSC) y elegir el ambiente. Quien tiene la clave del certificado emite facturas a nombre del negocio: solo el dueño.
+  | "facturacion.configurar"
   // La bitácora del sistema: quién hizo qué. Solo el dueño la ve.
   | "bitacora.ver"
   | "empleados.gestionar"
@@ -152,6 +155,7 @@ const PERMISOS_LOCAL: Permiso[] = [
   "ideas.ver",
   "analytics.ver",
   "configuracion.editar",
+  "facturacion.configurar",
   "bitacora.ver",
   "empleados.gestionar",
   "fidelizacion.gestionar",

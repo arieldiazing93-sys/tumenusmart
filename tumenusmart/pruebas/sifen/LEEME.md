@@ -19,6 +19,8 @@ sección o la nota de donde sale.
 | `probar.ps1` | Corre TODAS las pruebas con Microsoft Edge sin ventana (no hace falta Node). |
 | `banco/` | Las pruebas y el cargador de módulos que usa `probar.ps1`. |
 
+Código que prueban (todo en `src/lib/sifen/`): `xml.ts` (escribir y leer el XML, validar contra el esquema), `cdc.ts`, `qr.ts`, `controlar.ts` (las cuentas), `armar-de.ts` (el documento), `firma.ts` (firma digital XMLDSig), `certificado.ts` (leer el .p12 y la bóveda cifrada), `kude.ts` (el comprobante impreso) y `servidor.ts` (une todo con la base de datos; no se prueba acá porque necesita Prisma).
+
 ## Cómo correr las pruebas
 
 ```powershell
@@ -39,6 +41,18 @@ Qué comprueba:
    diez validada también por libxml2.
 5. **Mutaciones**: se rompe el documento a propósito (campo borrado, texto donde va un número, valor enorme…) y nuestro
    validador y libxml2 tienen que coincidir en rechazarlo.
+6. **Generador de QR** (`prueba-qr.js`): textos de todas las versiones del 1 al 20 y los QR de la factura (hasta 429 bytes),
+   leídos con **jsQR**, un lector independiente. Encontró un error que existía desde antes: ningún QR de versión 7 en
+   adelante se podía leer (la información de versión estaba mal calculada); ya está corregido y probado.
+7. **Firma digital y certificados** (`prueba-firma.js`): se genera un certificado de prueba (con el RUC en el titular) y se
+   firma el documento. La firma la verifican **tres jueces**: la verificación propia, libxml2 (el firmado sigue cumpliendo el
+   esquema) y **xmldsigjs**, otra implementación completa de XMLDSig con su propio canonizador. También: tocar el documento
+   rompe la firma, textos con comillas, saltos de línea, emojis y caracteres de control, la bóveda (cifrar y descifrar,
+   atada al negocio, con otra clave o alterada no abre), el certificado vencido / chico / sin RUC, y el KuDE armado desde el
+   archivo firmado.
+
+Las pantallas (KuDE en cinta y en A4, estado, formularios del certificado y del CSC, botón de firmar en Facturas) se probaron
+aparte con los componentes reales en el banco de React.
 
 ## Cuando la DNIT publique una versión nueva
 
@@ -53,6 +67,11 @@ Esquemas XML:
 
 ## Lo que todavía NO está (ver la memoria del proyecto)
 
-Firma digital, conexión con los servicios de la DNIT (mTLS + SOAP), cola de envíos, eventos (cancelación,
-inutilización), notas de crédito/débito, KuDE, contingencia. Para probar contra el ambiente de pruebas real hace falta el
-certificado digital y el acceso al TEST del contribuyente (guía "Habilitación como Facturador Electrónico").
+Conexión con los servicios de la DNIT (mTLS + SOAP), cola de envíos, eventos (cancelación, inutilización), notas de
+crédito/débito, contingencia, y que el punto de venta emita directamente electrónico (timbrado y numeración electrónicos por
+punto de expedición). Para probar contra el ambiente de pruebas real hace falta el certificado digital y el acceso al TEST del
+contribuyente (guía "Habilitación como Facturador Electrónico").
+
+Dos decisiones que solo se confirman contra el ambiente de pruebas de la DNIT y están aisladas para cambiarlas en un lugar:
+`OpcionesFirma` en `firma.ts` (qué canonización de SignedInfo y si exige una o dos transformaciones) y `NOMBRE_EMISOR_PRUEBAS`
+en `armar-de.ts` (cuál de las dos redacciones oficiales del texto de pruebas acepta).

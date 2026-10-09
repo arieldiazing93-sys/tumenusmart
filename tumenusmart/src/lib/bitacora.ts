@@ -19,6 +19,7 @@ export const MODULOS_BITACORA = [
   { valor: "ventas", etiqueta: "Ventas" },
   { valor: "caja", etiqueta: "Caja y turnos" },
   { valor: "facturas", etiqueta: "Facturas" },
+  { valor: "facturacion_electronica", etiqueta: "Facturación electrónica" },
   { valor: "pedidos", etiqueta: "Pedidos" },
   { valor: "compras", etiqueta: "Compras y pagos" },
   { valor: "stock", etiqueta: "Stock" },
