@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { exigirPermiso } from "@/lib/auth";
 import { registrarBitacora } from "@/lib/bitacora";
+import { descartarImagenes } from "@/lib/imagenes";
 import { idLocalActual } from "@/lib/local-actual";
 import { prisma as prismaGlobal } from "@/lib/prisma";
 import { prismaDelLocal } from "@/lib/prisma-local";
@@ -152,10 +153,12 @@ export async function actualizarPersonal(id: string, formData: FormData): Promis
   const activo = formData.get("activo") === "on";
 
   // Se lee primero (filtrado por local) para saber si existe y si cambió el estado.
-  const anterior = await prisma.miembroPersonal.findFirst({ where: { id }, select: { activo: true } });
+  const anterior = await prisma.miembroPersonal.findFirst({ where: { id }, select: { activo: true, fotoUrl: true } });
   if (!anterior) return { ok: false, error: "No se encontró a esa persona." };
 
   await prisma.miembroPersonal.updateMany({ where: { id }, data: { ...leido.datos, activo } });
+  // Si se cambió o se quitó la foto, la anterior se borra del almacenamiento (si ninguna otra fila la usa).
+  if (anterior.fotoUrl && anterior.fotoUrl !== leido.datos.fotoUrl) await descartarImagenes([anterior.fotoUrl]);
 
   const nombre = nombreCompleto(leido.datos);
   const cambioEstado = anterior.activo !== activo;

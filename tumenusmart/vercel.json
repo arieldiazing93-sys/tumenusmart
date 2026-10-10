@@ -15,6 +15,10 @@
       "schedule": "0 8 * * *"
     },
     {
+      "path": "/api/cron/limpiar-imagenes",
+      "schedule": "30 8 * * *"
+    },
+    {
       "path": "/api/cron/sifen-envios",
       "schedule": "* * * * *"
     }

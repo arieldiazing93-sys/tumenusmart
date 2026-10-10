@@ -32,7 +32,8 @@
         if ("gt" in v && !(x != null && x > v.gt)) return false;
         if ("gte" in v && !(x != null && x >= v.gte)) return false;
         if ("lt" in v && !(x != null && x < v.lt)) return false;
-        if ("not" in v && x === v.not) return false;
+        if ("not" in v && (v.not === null ? x == null : x === v.not)) return false;
+        if ("contains" in v && !(typeof x === "string" && x.includes(v.contains))) return false;
       } else if (v === null) {
         if (x !== null && x !== undefined) return false;
       } else if (x !== v) return false;

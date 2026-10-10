@@ -1,5 +1,6 @@
 "use server";
 
+import { descartarImagenes } from "@/lib/imagenes";
 import { prisma } from "@/lib/prisma";
 import { subirFotoCliente } from "@/lib/supabase-storage";
 
@@ -79,7 +80,7 @@ export async function subirFotoClienteDesdeEnlace(
   const miembro = await miembroActivo(personalId);
   if (!miembro) return { ok: false, error: "Este enlace ya no está activo." };
 
-  const cliente = await prisma.customer.findUnique({ where: { id: clienteId }, select: { storeId: true } });
+  const cliente = await prisma.customer.findUnique({ where: { id: clienteId }, select: { storeId: true, fotoUrl: true } });
   if (!cliente || cliente.storeId !== miembro.storeId) return { ok: false, error: "Cliente no encontrado." };
 
   const archivo = formData.get("archivo");
@@ -88,6 +89,8 @@ export async function subirFotoClienteDesdeEnlace(
   try {
     const url = await subirFotoCliente(archivo);
     await prisma.customer.update({ where: { id: clienteId }, data: { fotoUrl: url } });
+    // El último corte anterior ya no se usa: se borra del almacenamiento (queda solo la foto más reciente).
+    await descartarImagenes([cliente.fotoUrl]);
     return { ok: true, url };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : "No se pudo subir la foto" };

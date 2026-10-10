@@ -4,6 +4,7 @@ import { Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { exigirPermiso } from "@/lib/auth";
 import { registrarBitacora } from "@/lib/bitacora";
+import { descartarImagenes, urlsDeGaleria, urlsQueSeFueron } from "@/lib/imagenes";
 import { idLocalActual } from "@/lib/local-actual";
 import { prisma } from "@/lib/prisma";
 import { sanearDatosPagina, type DatosPagina } from "@/lib/pagina-reservas";
@@ -53,7 +54,7 @@ export async function guardarPaginaReservas(entrada: DatosPagina): Promise<Resul
 
   const anterior = await prisma.paginaReservas.findUnique({
     where: { storeId },
-    select: { slug: true, habilitada: true },
+    select: { slug: true, habilitada: true, fotoUrl: true, bannerUrl: true, galeria: true },
   });
 
   const datos = {
@@ -91,6 +92,16 @@ export async function guardarPaginaReservas(entrada: DatosPagina): Promise<Resul
       return { ok: false, error: `La dirección /turnos/${d.slug} ya la usa otro negocio. Elegí otra.` };
     }
     throw err;
+  }
+
+  // Las fotos que estaban y ya no están (se cambió el perfil, el banner o se sacó una de la galería): se borran del almacenamiento.
+  if (anterior) {
+    await descartarImagenes(
+      urlsQueSeFueron(
+        [anterior.fotoUrl, anterior.bannerUrl, ...urlsDeGaleria(anterior.galeria)],
+        [d.fotoUrl, d.bannerUrl, ...urlsDeGaleria(d.galeria)]
+      )
+    );
   }
 
   const cambios: string[] = [];

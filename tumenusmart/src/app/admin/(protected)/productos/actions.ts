@@ -11,6 +11,7 @@ import { normalizarIva } from "@/lib/iva";
 import { normalizarUnidadMedida, etiquetaUnidadMedida } from "@/lib/unidad-medida";
 import { formatearGuarani } from "@/lib/format";
 import { registrarBitacora } from "@/lib/bitacora";
+import { descartarImagenes } from "@/lib/imagenes";
 import { describirTramo, validarTramos } from "@/lib/precio-promocion";
 
 export type ResultadoFoto = { ok: true; url: string } | { ok: false; error: string };
@@ -182,7 +183,7 @@ export async function actualizarProducto(
   // lo tocaron), se conserva el guardado tal cual en vez de pisarlo con el redondeado.
   const guardado = await prisma.product.findUnique({
     where: { id: productId },
-    select: { precio: true, nombre: true, disponible: true, iva: true },
+    select: { precio: true, nombre: true, disponible: true, iva: true, imagenUrl: true },
   });
   const precioGuardado = guardado ? Number(guardado.precio) : null;
   const precio =
@@ -197,6 +198,8 @@ export async function actualizarProducto(
   const unidadMedida = normalizarUnidadMedida(formData.get("unidadMedida"));
   const almacenId = await leerAlmacen(prisma, formData);
 
+  const imagenUrl = String(formData.get("imagenUrl") ?? "") || null;
+
   // El costo ya no se carga acá: sale de la receta (ver costo-receta.ts). Por
   // eso el `update` no lo toca — un costo cargado a mano antes se conserva.
   await prisma.product.update({
@@ -208,7 +211,7 @@ export async function actualizarProducto(
       almacenId,
       precio,
       descripcion: String(formData.get("descripcion") ?? "") || null,
-      imagenUrl: String(formData.get("imagenUrl") ?? "") || null,
+      imagenUrl,
       disponible: formData.get("disponible") === "on",
       destacado: formData.get("destacado") === "on",
       ingredientes: parsearIngredientes(formData),
@@ -220,6 +223,11 @@ export async function actualizarProducto(
       esServicio: formData.get("esServicio") === "on",
     },
   });
+
+  // Si se cambió o se quitó la foto, la anterior se borra del almacenamiento (si ningún otro producto la usa).
+  if (guardado && guardado.imagenUrl && guardado.imagenUrl !== imagenUrl) {
+    await descartarImagenes([guardado.imagenUrl]);
+  }
 
   // Se anota lo que cambió — sobre todo el precio, que es lo que más importa poder rastrear.
   if (guardado) {
@@ -275,9 +283,11 @@ export async function eliminarProducto(productId: string): Promise<ResultadoProd
 
   const aBorrar = await prisma.product.findUnique({
     where: { id: productId },
-    select: { nombre: true, precio: true, categoryId: true },
+    select: { nombre: true, precio: true, categoryId: true, imagenUrl: true },
   });
   await prisma.product.delete({ where: { id: productId } });
+  // Con el producto se va su foto (si ningún otro producto la usa).
+  await descartarImagenes([aBorrar?.imagenUrl]);
   await registrarBitacora(idLocal, sesion, {
     modulo: "productos",
     accion: "producto_eliminado",

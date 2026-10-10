@@ -111,8 +111,6 @@ export function LogoField({ initialUrl }: { initialUrl: string | null }) {
         </p>
       )}
       {error && <p className="mt-1 text-xs text-peligro">{error}</p>}
-
-      <input type="hidden" name="logoUrl" value={url} />
     </div>
   );
 }

@@ -7,6 +7,7 @@ import { AVISO_PIN_FACIL, horaValida, pinDemasiadoFacil, pinValido } from "@/lib
 import { claveDePin } from "@/lib/asistencia-servidor";
 import { rostroValido } from "@/lib/reconocimiento-facial";
 import { registrarBitacora } from "@/lib/bitacora";
+import { descartarImagenes } from "@/lib/imagenes";
 import { idLocalActual } from "@/lib/local-actual";
 import { prismaDelLocal } from "@/lib/prisma-local";
 import { subirFotoAsistencia } from "@/lib/supabase-storage";
@@ -197,6 +198,11 @@ export async function actualizarColaborador(id: string, formData: FormData): Pro
   } catch (err) {
     if (esPinRepetido(err)) return { ok: false, error: ERROR_PIN_REPETIDO };
     throw err;
+  }
+
+  // La selfie de referencia anterior ya no se usa si se cambió por otra (si se quitó sin poner otra, se conserva la que había).
+  if (datos.fotoUrl && anterior.fotoUrl && datos.fotoUrl !== anterior.fotoUrl) {
+    await descartarImagenes([anterior.fotoUrl]);
   }
 
   const nombre = nombreDe(datos);

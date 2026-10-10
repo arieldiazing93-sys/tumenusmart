@@ -11,6 +11,7 @@ import { normalizarSlug } from "@/lib/alcance-local";
 import { decidirCambioDeUrl } from "@/lib/url-publica";
 import { esHexValido } from "@/lib/color-marca";
 import { registrarBitacora } from "@/lib/bitacora";
+import { descartarImagenes } from "@/lib/imagenes";
 import { normalizarRubro } from "@/lib/pedido-web";
 
 // Dos accesos a la base conviven acá a propósito:
@@ -48,10 +49,14 @@ export async function subirFotoLogo(formData: FormData): Promise<ResultadoLogo> 
   // formulario grande — si no, la imagen se ve cargada en la vista previa
   // pero el negocio se queda sin actualizar hasta que el usuario note que
   // falta guardar el resto del formulario.
+  const storeId = await idLocalActual();
+  const previo = await prisma.store.findUnique({ where: { id: storeId }, select: { logoUrl: true } });
   await prisma.store.update({
-    where: { id: await idLocalActual() },
+    where: { id: storeId },
     data: { logoUrl: url },
   });
+  // El logo anterior ya no se usa: se borra del almacenamiento para que lo reemplazado no se acumule.
+  await descartarImagenes([previo?.logoUrl]);
   refrescarPantallas();
 
   return { ok: true, url };
@@ -59,10 +64,13 @@ export async function subirFotoLogo(formData: FormData): Promise<ResultadoLogo> 
 
 export async function quitarLogoStore(): Promise<void> {
   await exigirPermiso("configuracion.editar");
+  const storeId = await idLocalActual();
+  const previo = await prisma.store.findUnique({ where: { id: storeId }, select: { logoUrl: true } });
   await prisma.store.update({
-    where: { id: await idLocalActual() },
+    where: { id: storeId },
     data: { logoUrl: null },
   });
+  await descartarImagenes([previo?.logoUrl]);
   refrescarPantallas();
 }
 
@@ -83,10 +91,13 @@ export async function subirFotoPortada(formData: FormData): Promise<ResultadoLog
     return { ok: false, error: err instanceof Error ? err.message : "No se pudo subir la imagen" };
   }
 
+  const storeId = await idLocalActual();
+  const previo = await prisma.store.findUnique({ where: { id: storeId }, select: { portadaUrl: true } });
   await prisma.store.update({
-    where: { id: await idLocalActual() },
+    where: { id: storeId },
     data: { portadaUrl: url },
   });
+  await descartarImagenes([previo?.portadaUrl]);
   refrescarPantallas();
 
   return { ok: true, url };
@@ -94,10 +105,13 @@ export async function subirFotoPortada(formData: FormData): Promise<ResultadoLog
 
 export async function quitarPortadaStore(): Promise<void> {
   await exigirPermiso("configuracion.editar");
+  const storeId = await idLocalActual();
+  const previo = await prisma.store.findUnique({ where: { id: storeId }, select: { portadaUrl: true } });
   await prisma.store.update({
-    where: { id: await idLocalActual() },
+    where: { id: storeId },
     data: { portadaUrl: null },
   });
+  await descartarImagenes([previo?.portadaUrl]);
   refrescarPantallas();
 }
 
@@ -369,7 +383,9 @@ export async function actualizarStore(formData: FormData) {
     nombre,
     whatsappNumero,
     direccion: String(formData.get("direccion") ?? "") || null,
-    logoUrl: String(formData.get("logoUrl") ?? "") || null,
+    // El logo NO se guarda desde acá: se guarda solo al subirlo o quitarlo (subirFotoLogo / quitarLogoStore), que además borran la
+    // imagen anterior. Si este formulario también lo escribiera, una pantalla abierta hace rato podría devolver el logo viejo
+    // —ya borrado— y la carta quedaría con una foto rota.
     colorPrimario,
     mensajeSaludo: String(formData.get("mensajeSaludo") ?? "") || null,
     mensajeSaludoReserva: String(formData.get("mensajeSaludoReserva") ?? "") || null,

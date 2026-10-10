@@ -17,6 +17,7 @@ import {
 import { pedirIntentoDePin, resolverIntentoDePin } from "@/lib/limite-pin";
 import { compararRostros, rostroValido, tieneRostro } from "@/lib/reconocimiento-facial";
 import { registrarBitacora } from "@/lib/bitacora";
+import { descartarImagenes } from "@/lib/imagenes";
 import { subirFotoAsistencia } from "@/lib/supabase-storage";
 import { claveDiaAsuncion, horaAsuncion } from "@/lib/timezone";
 
@@ -226,19 +227,25 @@ export async function registrarMarcacion(formData: FormData): Promise<ResultadoM
   const tardanzaMin =
     tipo === "entrada" ? calcularTardanza(colaborador.horaEntrada, colaborador.toleranciaMin, hora) : null;
 
-  await prisma.marcacionAsistencia.create({
-    data: {
-      storeId: local.id,
-      colaboradorId: colaborador.id,
-      tipo,
-      fecha: ahora,
-      dia,
-      fotoUrl,
-      verificada,
-      distanciaRostro,
-      tardanzaMin,
-    },
-  });
+  try {
+    await prisma.marcacionAsistencia.create({
+      data: {
+        storeId: local.id,
+        colaboradorId: colaborador.id,
+        tipo,
+        fecha: ahora,
+        dia,
+        fotoUrl,
+        verificada,
+        distanciaRostro,
+        tardanzaMin,
+      },
+    });
+  } catch (err) {
+    // La foto ya estaba subida y la marcación no se guardó: sin esto quedaría suelta en el almacenamiento.
+    await descartarImagenes([fotoUrl]);
+    throw err;
+  }
 
   return { ok: true, tipo, hora, nombre: colaborador.nombre, tardanzaMin, verificada };
 }

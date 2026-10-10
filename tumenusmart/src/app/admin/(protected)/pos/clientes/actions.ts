@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { Prisma } from "@prisma/client";
 import { exigirPermiso } from "@/lib/auth";
+import { descartarImagenes } from "@/lib/imagenes";
 import { idLocalActual } from "@/lib/local-actual";
 import { prismaDelLocal, siguienteNumeroCliente } from "@/lib/prisma-local";
 import { prisma } from "@/lib/prisma";
@@ -146,7 +147,7 @@ export async function actualizarCliente(
   // El cliente se busca dentro de ESTE local: el id de otro negocio no aparece. Sirve además para dejar en la Bitácora lo que había.
   const antes = await prisma.customer.findFirst({
     where: { id: String(id) },
-    select: { id: true, numero: true, nombre: true, telefono: true, email: true, tipoIdentificacion: true, numeroIdentificacion: true },
+    select: { id: true, numero: true, nombre: true, telefono: true, email: true, tipoIdentificacion: true, numeroIdentificacion: true, fotoUrl: true },
   });
   if (!antes) return { ok: false, error: "No encontré a ese cliente. Actualizá la pantalla." };
 
@@ -176,6 +177,9 @@ export async function actualizarCliente(
     }
     throw err;
   }
+
+  // Si se cambió o se quitó la foto, la anterior se borra del almacenamiento (si ninguna otra fila la usa).
+  if (antes.fotoUrl && antes.fotoUrl !== (fotoUrl || null)) await descartarImagenes([antes.fotoUrl]);
 
   // Solo se anota lo que cambió de verdad (la foto no: no es un dato del cliente que importe en el rastro).
   const cambios: Record<string, { antes: string | null; despues: string | null }> = {};

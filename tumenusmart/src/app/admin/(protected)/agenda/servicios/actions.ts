@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { exigirPermiso } from "@/lib/auth";
 import { registrarBitacora } from "@/lib/bitacora";
 import { formatearGuarani } from "@/lib/format";
+import { descartarImagenes } from "@/lib/imagenes";
 import { normalizarIva } from "@/lib/iva";
 import { idLocalActual } from "@/lib/local-actual";
 import { prisma } from "@/lib/prisma";
@@ -268,7 +269,7 @@ export async function actualizarServicio(servicioId: string, formData: FormData)
       id: true,
       productId: true,
       ocultoEnMenuPublico: true,
-      product: { select: { nombre: true, precio: true, disponible: true } },
+      product: { select: { nombre: true, precio: true, disponible: true, imagenUrl: true } },
     },
   });
   if (!anterior) return { ok: false, error: "Ese servicio ya no existe." };
@@ -308,6 +309,11 @@ export async function actualizarServicio(servicioId: string, formData: FormData)
       data: d.personalIds.map((personalId) => ({ storeId: idLocal, servicioId: anterior.id, personalId })),
     }),
   ]);
+
+  // Si se cambió o se quitó la foto del servicio, la anterior se borra del almacenamiento (si ninguna otra fila la usa).
+  if (anterior.product.imagenUrl && anterior.product.imagenUrl !== d.imagenUrl) {
+    await descartarImagenes([anterior.product.imagenUrl]);
+  }
 
   const cambios: string[] = [];
   const precioAnterior = Number(anterior.product.precio);
@@ -373,7 +379,7 @@ export async function eliminarServicio(servicioId: string): Promise<ResultadoSer
 
   const servicio = await db.servicioAgenda.findFirst({
     where: { id: servicioId },
-    select: { productId: true, product: { select: { nombre: true, precio: true } } },
+    select: { productId: true, product: { select: { nombre: true, precio: true, imagenUrl: true } } },
   });
   if (!servicio) return { ok: false, error: "Ese servicio ya no existe." };
 
@@ -393,6 +399,8 @@ export async function eliminarServicio(servicioId: string): Promise<ResultadoSer
 
   // Borra el producto; la ficha de la agenda y el personal asignado se van con él.
   await db.product.delete({ where: { id: servicio.productId } });
+  // Con el servicio se va su foto (si ninguna otra fila la usa).
+  await descartarImagenes([servicio.product.imagenUrl]);
 
   await registrarBitacora(idLocal, sesion, {
     modulo: "agenda",

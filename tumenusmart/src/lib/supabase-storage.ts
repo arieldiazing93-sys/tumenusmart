@@ -155,3 +155,103 @@ export async function borrarFotosAsistencia(rutas: string[]): Promise<void> {
     throw new Error(`No se pudieron borrar las fotos: ${error.message}`);
   }
 }
+
+// ---------------------------------------------------------------------------------------------------------------------
+//  Descartar imágenes que dejaron de usarse
+// ---------------------------------------------------------------------------------------------------------------------
+
+/**
+ * Las carpetas del bucket de las que se puede borrar una imagen. Las fotos de productos van en la RAÍZ del bucket (sin
+ * carpeta); todo lo demás tiene la suya. Cualquier otra ruta se rechaza: es la barrera para que un dato raro que llegue del
+ * navegador no pueda llevarse otra cosa.
+ */
+const CARPETAS_DESCARTABLES = ["logos/", "portadas/", "personal/", "reservas/", "clientes/", CARPETA_ASISTENCIA];
+
+const NOMBRE_DE_IMAGEN = /^[A-Za-z0-9._-]{1,200}\.(jpg|jpeg|png|webp)$/i;
+
+/** ¿Es una ruta que este sistema pudo haber creado (raíz o una de sus carpetas, con un nombre de imagen)? */
+export function esRutaDeImagenDescartable(ruta: string): boolean {
+  if (!ruta || ruta.includes("..") || ruta.startsWith("/")) return false;
+  const partes = ruta.split("/");
+  if (partes.length === 1) return NOMBRE_DE_IMAGEN.test(partes[0]);
+  if (partes.length === 2) return CARPETAS_DESCARTABLES.includes(`${partes[0]}/`) && NOMBRE_DE_IMAGEN.test(partes[1]);
+  return false;
+}
+
+/**
+ * La ruta dentro del bucket de una imagen de ESTE sistema, a partir de su dirección pública. Devuelve null si la dirección no
+ * es de nuestro almacenamiento (otro servidor, otro bucket) o no tiene la forma de lo que sube este sistema: una foto que un
+ * formulario trajo de afuera nunca se intenta borrar.
+ */
+export function rutaDeImagenPropia(url: string, origenPropio: string | undefined = process.env.SUPABASE_URL): string | null {
+  if (!url || !origenPropio) return null;
+  let direccion: URL;
+  let origen: string;
+  try {
+    direccion = new URL(url);
+    origen = new URL(origenPropio).origin;
+  } catch {
+    return null;
+  }
+  if (direccion.protocol !== "https:" || direccion.origin !== origen) return null;
+  const marca = `/object/public/${NOMBRE_BUCKET}/`;
+  const desde = direccion.pathname.indexOf(marca);
+  if (desde === -1) return null;
+  let ruta = direccion.pathname.slice(desde + marca.length);
+  try {
+    ruta = decodeURIComponent(ruta);
+  } catch {
+    return null;
+  }
+  return esRutaDeImagenDescartable(ruta) ? ruta : null;
+}
+
+/**
+ * La ruta de una dirección guardada en la base, SIN mirar de qué servidor es: sirve para armar la lista de lo que está en uso
+ * (ser generoso acá es lo seguro: de más, una imagen se conserva). No sirve para borrar.
+ */
+export function rutaEnUsoDeUrl(url: string): string | null {
+  const marca = `/object/public/${NOMBRE_BUCKET}/`;
+  const desde = url.indexOf(marca);
+  if (desde === -1) return null;
+  const cruda = url.slice(desde + marca.length).split("?")[0].split("#")[0];
+  try {
+    return decodeURIComponent(cruda) || null;
+  } catch {
+    return cruda || null;
+  }
+}
+
+/** Borra imágenes del bucket. Si alguna ruta no es descartable no borra NINGUNA y falla. Borrar lo que ya no existe no da error. */
+export async function borrarImagenes(rutas: string[]): Promise<void> {
+  if (rutas.length === 0) return;
+  if (rutas.some((r) => !esRutaDeImagenDescartable(r))) {
+    throw new Error("Se intentó borrar un archivo que no es una imagen de este sistema");
+  }
+  const { error } = await clienteAdmin().storage.from(NOMBRE_BUCKET).remove(rutas);
+  if (error) throw new Error(`No se pudieron borrar las imágenes: ${error.message}`);
+}
+
+export type ObjetoDelBucket = { ruta: string; creadoEn: Date | null };
+
+/** Todas las imágenes del bucket (la raíz y las carpetas conocidas) con su fecha de subida. Solo lectura. */
+export async function listarImagenesDelBucket(): Promise<ObjetoDelBucket[]> {
+  const almacen = clienteAdmin().storage.from(NOMBRE_BUCKET);
+  const encontrados: ObjetoDelBucket[] = [];
+  for (const carpeta of ["", ...CARPETAS_DESCARTABLES]) {
+    for (let desde = 0; ; desde += 1000) {
+      const { data, error } = await almacen.list(carpeta.replace(/\/$/, ""), { limit: 1000, offset: desde });
+      if (error) throw new Error(`No se pudo listar el almacenamiento: ${error.message}`);
+      if (!data || data.length === 0) break;
+      for (const o of data) {
+        // Las carpetas aparecen como entradas sin id: no son archivos.
+        if (!o.id) continue;
+        const ruta = `${carpeta}${o.name}`;
+        const fecha = o.created_at ? new Date(o.created_at) : null;
+        encontrados.push({ ruta, creadoEn: fecha && !Number.isNaN(fecha.getTime()) ? fecha : null });
+      }
+      if (data.length < 1000) break;
+    }
+  }
+  return encontrados;
+}
