@@ -24,7 +24,7 @@ export default async function CheckoutPage({
   ]);
 
   return (
-    <main className="mx-auto max-w-2xl px-4 pb-48 pt-4">
+    <main className="mx-auto max-w-2xl px-4 pb-48 pt-4 md:max-w-3xl md:px-6 lg:max-w-5xl">
       {/* Arriba: el botón redondo azul para volver al pedido y el título con el nombre del local. */}
       <header className="flex items-center gap-3">
         <Link

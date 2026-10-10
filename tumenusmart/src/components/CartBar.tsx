@@ -36,14 +36,16 @@ export function CartBar() {
 
   return (
     <div className="pointer-events-none fixed inset-x-0 bottom-0 z-30">
-      <div aria-hidden="true" className="mx-auto h-8 max-w-2xl bg-gradient-to-t from-papel-suave to-transparent" />
+      {/* En el celular es una barra de borde a borde sobre una base sólida; en tablet y pantallas grandes, un botón flotante a la derecha
+          (un botón de un metro de ancho en un monitor no tiene sentido) que sigue el ancho de la carta. */}
+      <div aria-hidden="true" className="mx-auto h-8 max-w-2xl bg-gradient-to-t from-papel-suave to-transparent md:hidden" />
       <div
-        className="pointer-events-auto mx-auto max-w-2xl bg-papel-suave px-4 pt-1"
+        className="pointer-events-auto mx-auto max-w-2xl bg-papel-suave px-4 pt-1 md:pointer-events-none md:max-w-4xl md:bg-transparent md:px-6 lg:max-w-6xl lg:px-8 2xl:max-w-7xl"
         style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom, 0px))" }}
       >
         <Link
           href={`/${slug}/carrito`}
-          className={`flex h-14 w-full items-center gap-3 rounded-2xl bg-brand px-4 text-white shadow-alta transition-transform active:scale-[0.98] ${
+          className={`pointer-events-auto flex h-14 w-full items-center gap-3 rounded-2xl bg-brand px-4 text-white shadow-alta transition-transform active:scale-[0.98] md:ml-auto md:w-[24rem] ${
             saltando ? "animate-[saltito_0.42s_ease]" : ""
           }`}
         >

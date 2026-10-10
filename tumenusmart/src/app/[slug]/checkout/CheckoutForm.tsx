@@ -478,7 +478,8 @@ export function CheckoutForm({
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-5">
-      <fieldset className="flex flex-col gap-5">
+      {/* Una columna en el celular; en notebook y monitor, «Tus datos» y «Comprobante» van lado a lado y el resto ocupa todo el ancho. */}
+      <fieldset className="grid min-w-0 grid-cols-1 gap-5 lg:grid-cols-2 lg:items-start">
         <section className={BLOQUE}>
           <h2 className={TITULO}>Tus datos</h2>
           <Campo etiqueta="Nombre">
@@ -558,7 +559,7 @@ export function CheckoutForm({
           )}
         </section>
 
-        <section className={BLOQUE}>
+        <section className={`${BLOQUE} lg:col-span-2`}>
           <h2 className={TITULO}>Entrega y pago</h2>
 
           <Campo etiqueta="Método de pago" ayuda="Lo coordinás directamente con el local">
@@ -644,7 +645,7 @@ export function CheckoutForm({
         </section>
 
         {/* El total, bien a la vista: lo que lleva, el envío y cuánto es. */}
-        <section aria-label="Resumen de lo que pagás" className="rounded-2xl bg-brand-light/70 p-4 ring-1 ring-brand/15">
+        <section aria-label="Resumen de lo que pagás" className="rounded-2xl bg-brand-light/70 p-4 ring-1 ring-brand/15 lg:col-span-2">
           <div className="flex justify-between text-[0.92rem] text-tinta-media">
             <span>Subtotal</span>
             <span className="cifra font-medium text-tinta">{formatearGuarani(subtotal)}</span>
@@ -668,7 +669,7 @@ export function CheckoutForm({
       </fieldset>
 
       {/* Abajo, siempre a la vista: el aviso de lo que falte y el botón para armar el pedido, sobre una base sólida con un difuminado arriba. */}
-      <div className="pointer-events-none fixed bottom-0 left-1/2 z-20 w-full max-w-2xl -translate-x-1/2">
+      <div className="pointer-events-none fixed bottom-0 left-1/2 z-20 w-full max-w-2xl -translate-x-1/2 md:max-w-3xl lg:max-w-5xl">
         <div aria-hidden="true" className="h-8 bg-gradient-to-t from-papel-suave to-transparent" />
         <div className="pointer-events-auto bg-papel-suave px-4 pb-4">
           {error && (

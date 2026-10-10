@@ -114,9 +114,11 @@ export function Carta({
     <>
       {/* buscador y categorías, pegados arriba */}
       {hayBarra && (
-        <div className="sticky top-0 z-20 -mx-4 border-b border-linea/60 bg-papel-suave/95 px-4 backdrop-blur">
+        // Mismo margen que la página (px-4 / md:px-6 / lg:px-8) para que la barra pegada llegue de borde a borde. En pantalla grande el
+        // buscador y las categorías van en una sola fila.
+        <div className="sticky top-0 z-20 -mx-4 border-b border-linea/60 bg-papel-suave/95 px-4 backdrop-blur md:-mx-6 md:px-6 lg:-mx-8 lg:flex lg:items-center lg:gap-4 lg:px-8">
           {hayBuscador && (
-            <div className="relative mt-3">
+            <div className="relative mt-3 lg:mt-0 lg:w-80 lg:flex-none">
               <IconoBuscarCarta className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-tinta-suave" />
               <input
                 type="search"
@@ -131,7 +133,7 @@ export function Carta({
           )}
 
           {!buscando && categorias.length > 1 && (
-            <div className="flex gap-2 overflow-x-auto py-3 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            <div className="flex gap-2 overflow-x-auto py-3 [-ms-overflow-style:none] [scrollbar-width:none] lg:min-w-0 lg:flex-1 [&::-webkit-scrollbar]:hidden">
               {categorias.map((c) => (
                 <button
                   key={c.id}
@@ -182,7 +184,14 @@ export function Carta({
               </span>
             </div>
 
-            <div className={tarjetas ? "mt-4 flex flex-col gap-5" : "mt-3 flex flex-col gap-3"}>
+            {/* Una columna en el celular; en tablet, notebook y monitor una grilla con varios productos por fila. */}
+            <div
+              className={
+                tarjetas
+                  ? "mt-4 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4"
+                  : "mt-3 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3"
+              }
+            >
               {c.productos.map((p) => (
                 <FilaProducto
                   key={p.id}
@@ -354,7 +363,7 @@ function FilaProducto({
         type="button"
         id={`producto-${producto.id}`}
         onClick={conFicha ? onAbrir : undefined}
-        className="block w-full scroll-mt-40 overflow-hidden rounded-2xl bg-superficie text-left shadow-sm ring-1 ring-linea transition-transform active:scale-[0.99]"
+        className="block h-full w-full scroll-mt-40 overflow-hidden rounded-2xl bg-superficie text-left shadow-sm ring-1 ring-linea transition-transform active:scale-[0.99]"
       >
         <span className="relative block">
           {foto}
@@ -376,7 +385,7 @@ function FilaProducto({
       type="button"
       id={`producto-${producto.id}`}
       onClick={conFicha ? onAbrir : undefined}
-      className="flex w-full scroll-mt-40 items-start gap-3 rounded-2xl bg-superficie p-3.5 text-left shadow-sm ring-1 ring-linea transition-transform active:scale-[0.99]"
+      className="flex h-full w-full scroll-mt-40 items-start gap-3 rounded-2xl bg-superficie p-3.5 text-left shadow-sm ring-1 ring-linea transition-transform active:scale-[0.99]"
     >
       <span className="block min-w-0 flex-1 self-stretch">
         {texto}

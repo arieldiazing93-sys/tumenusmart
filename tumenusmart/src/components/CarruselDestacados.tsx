@@ -28,12 +28,12 @@ export function CarruselDestacados({ productos }: { productos: Producto[] }) {
     <section className="mt-7" aria-label="Los más pedidos">
       <h2 className="text-[1.25rem] font-semibold tracking-titular text-tinta">Los más pedidos</h2>
 
-      <div className="-mx-4 mt-3 flex gap-3 overflow-x-auto px-4 pb-2 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div className="-mx-4 mt-3 flex gap-3 overflow-x-auto px-4 pb-2 [-ms-overflow-style:none] [scrollbar-width:none] md:-mx-6 md:gap-4 md:px-6 lg:-mx-8 lg:px-8 [&::-webkit-scrollbar]:hidden">
         {productos.map((p) => (
           <a
             key={p.id}
             href={`#producto-${p.id}`}
-            className="w-40 flex-none overflow-hidden rounded-2xl bg-superficie shadow-sm ring-1 ring-linea transition-all active:scale-[0.98]"
+            className="w-40 flex-none overflow-hidden rounded-2xl bg-superficie shadow-sm ring-1 ring-linea transition-all active:scale-[0.98] md:w-48"
           >
             {p.imagenUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
@@ -42,7 +42,7 @@ export function CarruselDestacados({ productos }: { productos: Producto[] }) {
                 alt={p.nombre}
                 loading="lazy"
                 decoding="async"
-                className="h-28 w-full object-cover"
+                className="h-28 w-full object-cover md:h-32"
               />
             ) : (
               <span

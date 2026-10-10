@@ -155,7 +155,7 @@ export default function CarritoPage() {
   }
 
   return (
-    <main className="mx-auto max-w-2xl px-4 pb-40 pt-4">
+    <main className="mx-auto max-w-2xl px-4 pb-40 pt-4 md:max-w-3xl md:px-6 lg:max-w-4xl">
       <header className="mb-5 flex items-center gap-3">
         <Link
           href={`/${slug}`}
@@ -191,9 +191,9 @@ export default function CarritoPage() {
 
       {/* Abajo, siempre a la vista: el total y el botón para seguir, sobre una base sólida con un difuminado arriba. */}
       <div className="pointer-events-none fixed inset-x-0 bottom-0 z-20">
-        <div aria-hidden="true" className="mx-auto h-8 max-w-2xl bg-gradient-to-t from-papel-suave to-transparent" />
+        <div aria-hidden="true" className="mx-auto h-8 max-w-2xl bg-gradient-to-t from-papel-suave to-transparent md:max-w-3xl lg:max-w-4xl" />
         <div
-          className="pointer-events-auto mx-auto max-w-2xl bg-papel-suave px-4 pt-1"
+          className="pointer-events-auto mx-auto max-w-2xl bg-papel-suave px-4 pt-1 md:max-w-3xl md:px-6 lg:max-w-4xl"
           style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom, 0px))" }}
         >
           <div className="mb-2.5 flex items-baseline justify-between px-1">

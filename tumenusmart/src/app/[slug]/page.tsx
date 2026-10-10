@@ -198,61 +198,71 @@ export default async function CatalogoPage({
 
   return (
     <>
-      <main className="mx-auto max-w-2xl pb-40">
+      {/* El ancho crece con la pantalla: en el celular una columna angosta, y en tablet, notebook y monitor la carta se ensancha para
+          mostrar varios productos a la vez (una tienda o una distribuidora tiene muchos más productos que un menú de comidas). */}
+      <main className="mx-auto max-w-2xl pb-40 md:max-w-4xl lg:max-w-6xl 2xl:max-w-7xl">
         {/* ---------- portada: el color del local, con círculos suaves de adorno ---------- */}
-        <div className="relative h-32 overflow-hidden bg-brand sm:rounded-b-3xl">
+        <div className="relative h-32 overflow-hidden bg-brand sm:rounded-b-3xl md:h-40">
           <span aria-hidden="true" className="absolute -right-10 -top-14 h-48 w-48 rounded-full bg-white/10" />
           <span aria-hidden="true" className="absolute -left-12 top-14 h-40 w-40 rounded-full bg-white/10" />
           <span aria-hidden="true" className="absolute right-28 top-16 h-20 w-20 rounded-full bg-black/10" />
         </div>
 
         {/* ---------- cabecera del local: el logo sube sobre la portada ---------- */}
-        <header className="relative -mt-12 px-4 animate-[subir_0.5s_cubic-bezier(0.22,0.7,0.3,1)]">
-          {store.logoUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={store.logoUrl}
-              alt={store.nombre}
-              width={96}
-              height={96}
-              decoding="async"
-              className="h-24 w-24 rounded-3xl border-4 border-papel-suave bg-superficie object-cover shadow-media"
-            />
-          ) : (
-            <span
-              aria-hidden="true"
-              className="flex h-24 w-24 items-center justify-center rounded-3xl border-4 border-papel-suave bg-brand-light text-3xl font-bold tracking-titular text-brand-texto shadow-media"
-            >
-              {store.nombre.slice(0, 2).toUpperCase()}
-            </span>
-          )}
-
-          <h1 className="mt-3 text-[1.75rem] font-semibold leading-tight tracking-titular text-tinta">{store.nombre}</h1>
-          {store.direccion && <p className="mt-0.5 text-[0.9rem] text-tinta-suave">{store.direccion}</p>}
-
-          <div className="mt-3">
-            <EstadoAperturaBadge estado={estadoTienda} />
-          </div>
-
-          {/*
-            Reservar mesa va DEBAJO del estado de apertura: primero de qué local se trata, después si está abierto y
-            recién entonces qué se puede hacer. Solo aparece si el local reserva mesas con anticipación — hay
-            locales que solo hacen delivery/retiro y no tienen mesas físicas. Acá NO va "Reservar turno": la página de turnos
-            (peluquerías, salones) es otro servicio con su propio enlace y no se ofrece desde el menú digital.
-          */}
-          {store.aceptaReservas && (
-            <div className="mt-4">
-              <Link
-                href={`/${slug}/reservas`}
-                className="inline-flex h-12 w-full items-center justify-center rounded-2xl bg-azul px-5 text-[0.92rem] font-semibold text-white shadow-media transition-all hover:bg-azul-oscuro active:scale-[0.98]"
+        <header className="relative -mt-12 px-4 animate-[subir_0.5s_cubic-bezier(0.22,0.7,0.3,1)] md:px-6 lg:px-8">
+          {/* En el celular todo va apilado; desde tablet el logo, los datos del local y «Reservar mesa» van en una sola fila. El logo
+              sigue montado sobre la portada y el texto arranca debajo de ella (si no, el nombre quedaría en negro sobre el color del local). */}
+          <div className="md:flex md:items-start md:gap-6">
+            {store.logoUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={store.logoUrl}
+                alt={store.nombre}
+                width={96}
+                height={96}
+                decoding="async"
+                className="h-24 w-24 flex-none rounded-3xl border-4 border-papel-suave bg-superficie object-cover shadow-media"
+              />
+            ) : (
+              <span
+                aria-hidden="true"
+                className="flex h-24 w-24 flex-none items-center justify-center rounded-3xl border-4 border-papel-suave bg-brand-light text-3xl font-bold tracking-titular text-brand-texto shadow-media"
               >
-                Reservar mesa
-              </Link>
+                {store.nombre.slice(0, 2).toUpperCase()}
+              </span>
+            )}
+
+            <div className="md:min-w-0 md:flex-1 md:pt-14">
+              <h1 className="mt-3 text-[1.75rem] font-semibold leading-tight tracking-titular text-tinta md:mt-0 md:text-[2rem]">
+                {store.nombre}
+              </h1>
+              {store.direccion && <p className="mt-0.5 text-[0.9rem] text-tinta-suave">{store.direccion}</p>}
+
+              <div className="mt-3">
+                <EstadoAperturaBadge estado={estadoTienda} />
+              </div>
             </div>
-          )}
+
+            {/*
+              Reservar mesa va DEBAJO del estado de apertura: primero de qué local se trata, después si está abierto y
+              recién entonces qué se puede hacer. Solo aparece si el local reserva mesas con anticipación — hay
+              locales que solo hacen delivery/retiro y no tienen mesas físicas. Acá NO va "Reservar turno": la página de turnos
+              (peluquerías, salones) es otro servicio con su propio enlace y no se ofrece desde el menú digital.
+            */}
+            {store.aceptaReservas && (
+              <div className="mt-4 md:mt-0 md:flex-none md:self-end md:pb-1">
+                <Link
+                  href={`/${slug}/reservas`}
+                  className="inline-flex h-12 w-full items-center justify-center rounded-2xl bg-azul px-5 text-[0.92rem] font-semibold text-white shadow-media transition-all hover:bg-azul-oscuro active:scale-[0.98] md:w-auto md:px-8"
+                >
+                  Reservar mesa
+                </Link>
+              </div>
+            )}
+          </div>
         </header>
 
-        <div className="px-4">
+        <div className="px-4 md:px-6 lg:px-8">
           <div className="mt-5">
             <AvisoTienda estado={estadoTienda} />
           </div>
