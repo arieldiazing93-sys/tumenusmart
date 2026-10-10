@@ -101,6 +101,14 @@ model Store {
   contadorCuentasMesa   Int       @default(0)
   /// El correlativo de las cuentas de delivery del local (la próxima es este número + 1).
   contadorCuentasDelivery Int     @default(0)
+  /// El correlativo de los pedidos que entran por el menú digital (el próximo es este número + 1).
+  contadorPedidosWeb      Int     @default(0)
+  /// Si los pedidos del menú digital entran al sistema (true) o el menú sigue armando el mensaje de WhatsApp (false, como siempre).
+  pedidosWebActivo        Boolean @default(false)
+  /// Aceptar solos los pedidos que llegan con el local abierto: la comanda sale sin que nadie toque nada. Apagado por defecto.
+  pedidosWebAutoAceptar   Boolean @default(false)
+  /// "gastronomia" | "distribuidora" | "tienda": cambia cómo se llaman los pasos del pedido (preparación, armado, retiro…).
+  pedidosWebRubro         String  @default("gastronomia")
   /// Regla del Servicio comedor: si un mozo puede ver y cargar las cuentas que abrió OTRO mozo (true), o solo las suyas
   /// (false). Con false, cada mozo ve en su pantalla únicamente las cuentas que él abrió.
   mozosVenCuentasAjenas Boolean   @default(true)
@@ -285,6 +293,7 @@ model Store {
   itemsCuentaMesa  ItemCuentaMesa[]
   cuentasDelivery  CuentaDelivery[]
   itemsCuentaDelivery ItemCuentaDelivery[]
+  pedidosWeb       PedidoWeb[]
   trabajosImpresion TrabajoImpresion[]
   mesasComedor     MesaComedor[]
   sectoresComedor  SectorComedor[]
@@ -3309,4 +3318,80 @@ model EventoElectronico {
   @@index([storeId, estado])
   @@index([estado, proximoIntentoEn])
   @@index([documentoId])
+}
+
+/// Un pedido que el cliente mandó desde el menú digital y todavía no se convirtió en una cuenta. Llega YA validado (precios
+/// recalculados en el servidor, local abierto, producto disponible) y espera una sola decisión: aceptarlo o rechazarlo. Al aceptarlo
+/// se abre una cuenta de delivery (o de retiro) con sus productos y el pedido sigue por el Servicio delivery: asignar repartidor,
+/// cobrar y facturar. El cobro y la factura NO son pasos del pedido: el cliente ya dejó cómo paga y sus datos de factura.
+model PedidoWeb {
+  id      String @id @default(cuid())
+  storeId String
+  store   Store  @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  /// Correlativo por local (sale de Store.contadorPedidosWeb), el número que ven el cliente y el personal.
+  numero Int
+  /// La llave larga y al azar del enlace público de seguimiento (/<slug>/pedido/<token>): sin ella no se ve nada.
+  token  String @unique
+  /// Lo genera el celular del cliente una vez por envío: si toca dos veces o se corta el internet, no se duplica el pedido.
+  envioId String
+
+  /// "nuevo" (espera que lo acepten) | "aceptado" (en preparación, ya es una cuenta) | "listo" | "entregado" | "rechazado" | "cancelado".
+  estado String @default("nuevo")
+
+  /// "delivery" | "retiro".
+  tipoEntrega     String
+  clienteNombre   String
+  clienteTelefono String
+  /// La referencia que escribió el cliente (en delivery el punto exacto es su ubicación en el mapa).
+  direccion       String?
+  clienteLat      Float?
+  clienteLng      Float?
+  deliveryZoneId  String?
+  zonaNombre      String?
+  /// Lo que se cobra de envío (0 en retiro). Con envío "a coordinar" lo fija quien atiende antes de aceptar.
+  costoEnvio      Decimal @default(0) @db.Decimal(10, 2)
+  envioACoordinar Boolean @default(false)
+  notas           String?
+
+  /// "efectivo" | "transferencia" | "tarjeta_debito" | "tarjeta_credito": lo que el cliente dijo que usa al recibir.
+  metodoPago      String
+  /// "ticket" | "factura".
+  comprobanteTipo String @default("ticket")
+  facturaTipoIdentificacion String?
+  facturaRuc                String?
+  facturaRazonSocial        String?
+  facturaEmail              String?
+
+  /// Lo que pidió, tal como llegó del menú: [{ productId?, mitadYMitad?, opcionIds?, ingredientesQuitados?, cantidad, nota? }].
+  items  Json
+  /// Lo que se muestra de cada línea, con los precios de cuando entró: [{ nombre, cantidad, precioUnitario, detalle }].
+  lineas Json
+  subtotal Decimal @db.Decimal(12, 2)
+  total    Decimal @db.Decimal(12, 2)
+  /// Avisos para quien atiende (stock justo de algún insumo, por ejemplo). No frenan nada.
+  avisos   String[] @default([])
+
+  /// La cuenta de delivery en que se convirtió al aceptarlo.
+  cuentaDeliveryId String?
+  motivoRechazo    String?
+  aceptadoPor      String?
+  aceptadoEn       DateTime?
+  listoEn          DateTime?
+  entregadoEn      DateTime?
+  /// Quién lo cerró (rechazó) y cuándo.
+  resueltoPor      String?
+  resueltoEn       DateTime?
+  /// Huella (no la dirección) de dónde se mandó, para frenar un abuso sin guardar datos de más.
+  ipHash String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([storeId, numero])
+  @@unique([storeId, envioId])
+  @@index([storeId, estado])
+  @@index([storeId, createdAt])
+  @@index([storeId, clienteTelefono, createdAt])
+  @@index([storeId, ipHash, createdAt])
 }

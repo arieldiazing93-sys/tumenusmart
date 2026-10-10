@@ -10,6 +10,7 @@ import {
   guardarFormasPagoEntrega,
   guardarAceptaReservas,
   guardarVentasACredito,
+  guardarPedidosWeb,
 } from "./actions";
 import { ZonaFila } from "./ZonaFila";
 import { CrearZonaForm } from "./CrearZonaForm";
@@ -376,6 +377,38 @@ export default async function AdminConfiguracionPage() {
             <input type="checkbox" name="ventasACredito" defaultChecked={store?.ventasACredito ?? false} />
             Este local vende a crédito
           </label>
+          <button type="submit" className={`self-start ${clasesBoton("navegar")}`}>
+            Guardar
+          </button>
+        </form>
+      </Tarjeta>
+
+      <Tarjeta className="!border-2 !border-azul/50">
+        <h2 className="mb-1 text-[1.15rem] font-semibold tracking-titular text-tinta">Pedidos del menú digital</h2>
+        <p className="mb-4 text-sm text-tinta-media">
+          Activado, el pedido que arma el cliente en tu menú entra directo al sistema: aparece en <strong>Pedidos del menú</strong> con un
+          aviso sonoro y se acepta con un toque (sale la comanda, baja el stock y sigue por el Servicio delivery). El cliente ve en su
+          celular cómo va. Apagado, el menú arma el mensaje de WhatsApp como siempre. El cobro lo hace la caja al entregar.
+        </p>
+        <form action={guardarPedidosWeb} className="flex flex-col gap-3">
+          <label className="flex items-center gap-2 text-sm font-medium text-tinta-media">
+            <input type="checkbox" name="pedidosWebActivo" defaultChecked={store?.pedidosWebActivo ?? false} />
+            Los pedidos del menú digital entran al sistema
+          </label>
+          <label className="flex items-center gap-2 text-sm font-medium text-tinta-media">
+            <input type="checkbox" name="pedidosWebAutoAceptar" defaultChecked={store?.pedidosWebAutoAceptar ?? false} />
+            Aceptarlos solos apenas llegan (con el local abierto)
+          </label>
+          <div className="max-w-sm">
+            <label className="mb-1 block text-sm font-medium text-tinta-media" htmlFor="pedidosWebRubro">
+              Tipo de negocio (cambia cómo se llaman los pasos)
+            </label>
+            <Selector id="pedidosWebRubro" name="pedidosWebRubro" defaultValue={store?.pedidosWebRubro ?? "gastronomia"}>
+              <option value="gastronomia">Gastronomía: en preparación, listo</option>
+              <option value="distribuidora">Distribuidora: armando el pedido, listo para despachar</option>
+              <option value="tienda">Tienda: preparando, listo para retirar</option>
+            </Selector>
+          </div>
           <button type="submit" className={`self-start ${clasesBoton("navegar")}`}>
             Guardar
           </button>

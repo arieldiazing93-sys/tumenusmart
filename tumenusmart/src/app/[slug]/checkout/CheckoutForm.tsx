@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { useCart } from "@/components/CartProvider";
-import { formatearGuarani } from "@/lib/format";
+import { formatearGuarani, formatearNumero } from "@/lib/format";
 import { distanciaKm, encontrarZonaPorDistancia } from "@/lib/geo";
 import { Campo, Entrada, Aviso } from "@/components/ui";
 import { Segmentado } from "@/components/Segmentado";
@@ -14,6 +14,7 @@ import { IconoWhatsapp } from "@/components/iconos";
 import { METODOS_PAGO_PEDIDO, type MetodoPagoPedido } from "@/lib/metodos-pago";
 import { ingredientesQuitadosTexto, opcionesTexto, precioUnitario } from "@/lib/cart-types";
 import { construirLinkWhatsapp, construirMensajePedido } from "@/lib/whatsapp";
+import { enviarPedidoWeb } from "./actions";
 
 // Leaflet usa `window`, así que el mapa se carga solo en el navegador.
 const MapPicker = dynamic(
@@ -59,6 +60,11 @@ type Props = {
   aceptaDelivery: boolean;
   aceptaRetiro: boolean;
   zonas: Zona[];
+  /**
+   * true: el pedido entra al sistema del local (queda registrado y el cliente lo sigue en una pantalla). false: como siempre, se
+   * arma el mensaje de WhatsApp. Lo decide el local en Configuración.
+   */
+  pedidosEnSistema: boolean;
 };
 
 export function CheckoutForm({
@@ -78,6 +84,7 @@ export function CheckoutForm({
   aceptaDelivery,
   aceptaRetiro,
   zonas,
+  pedidosEnSistema,
 }: Props) {
   const { items, subtotal, vaciarCarrito } = useCart();
 
@@ -125,6 +132,13 @@ export function CheckoutForm({
   const [facturaRazonSocial, setFacturaRazonSocial] = useState("");
   const [facturaRuc, setFacturaRuc] = useState("");
   const [facturaEmail, setFacturaEmail] = useState("");
+  // Solo con los pedidos por el sistema: las aclaraciones, la trampa para robots, el identificador del envío (el mismo si se
+  // reintenta, para que un doble toque no duplique el pedido) y lo que devuelve el servidor al recibirlo.
+  const [notas, setNotas] = useState("");
+  const [sitioWeb, setSitioWeb] = useState("");
+  const [enviando, setEnviando] = useState(false);
+  const [envioId] = useState(() => (typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `e${Date.now()}${Math.random().toString(36).slice(2)}`));
+  const [recibido, setRecibido] = useState<{ token: string; numero: number; aceptado: boolean } | null>(null);
   /** El enlace de WhatsApp con el pedido ya escrito: cuando existe, se muestra la pantalla de "enviá tu pedido". */
   const [enlace, setEnlace] = useState<string | null>(null);
   /** El cliente ya tocó el botón de WhatsApp (el carrito se vació en ese momento). */
@@ -177,10 +191,60 @@ export function CheckoutForm({
     textoEnvio = "Fuera de cobertura — a coordinar";
   }
 
+  /** Manda el pedido al servidor: del navegador solo sale QUÉ eligió (productos, agregados, cantidades); los precios los calcula él. */
+  async function enviarAlSistema() {
+    if (enviando) return;
+    setEnviando(true);
+    try {
+      const r = await enviarPedidoWeb(slug, {
+        envioId,
+        nombre: nombre.trim(),
+        telefono: telefono.trim(),
+        tipoEntrega,
+        direccion: tipoEntrega === "delivery" ? direccion.trim() : undefined,
+        clienteLat: tipoEntrega === "delivery" ? clienteLat : null,
+        clienteLng: tipoEntrega === "delivery" ? clienteLng : null,
+        metodoPago,
+        comprobanteTipo,
+        facturaRazonSocial: comprobanteTipo === "factura" ? facturaRazonSocial.trim() : undefined,
+        facturaRuc: comprobanteTipo === "factura" ? facturaRuc.trim() : undefined,
+        facturaEmail: comprobanteTipo === "factura" ? facturaEmail.trim() || undefined : undefined,
+        notas: notas.trim() || undefined,
+        items: items.map((i) => ({
+          productId: i.mitadYMitad ? undefined : i.productId,
+          mitadYMitad: i.mitadYMitad ? { productIdA: i.mitadYMitad.productIdA, productIdB: i.mitadYMitad.productIdB } : undefined,
+          opcionIds: i.opciones.map((o) => o.id),
+          ingredientesQuitados: i.ingredientesQuitados ?? [],
+          cantidad: i.cantidad,
+        })),
+        // Lo que vio en pantalla: si el servidor calcula más, se le avisa antes de tomarlo.
+        totalMostrado: total,
+        sitioWeb,
+      });
+      if (!r.ok) {
+        fallar(r.error, r.campo === "ubicacion" ? "ubicacion" : r.campo === "factura" ? "factura" : undefined);
+        return;
+      }
+      setResumen({
+        lineas: items.map((i) => ({ texto: `${i.cantidad} × ${i.nombreProducto}`, monto: precioUnitario(i) * i.cantidad })),
+        entrega: tipoEntrega === "delivery" ? "Delivery" : "Retiro en el local",
+        pago: METODOS_PAGO_PEDIDO.find((m) => m.value === metodoPago)?.label ?? metodoPago,
+        total: formatearGuarani(r.total),
+      });
+      setRecibido({ token: r.token, numero: r.numero, aceptado: r.aceptado });
+      vaciarCarrito();
+      window.scrollTo({ top: 0 });
+    } catch {
+      fallar("No pudimos enviar tu pedido. Revisá tu conexión y probá de nuevo.");
+    } finally {
+      setEnviando(false);
+    }
+  }
+
   /**
-   * El menú digital NO crea el pedido: arma el mensaje de WhatsApp con todo lo que el cliente eligió y lo escribió (también sus datos
-   * de factura) y se lo manda al local. Quien atiende lo lee y lo carga a mano en el sistema (Pedidos → Nuevo pedido), donde recién
-   * se calculan los precios de verdad, se cobra y se factura. Nada de lo que escribe el cliente llega a un servidor ni a una base.
+   * Con los pedidos por el sistema, el pedido llega al local y queda registrado. Sin eso (el local no lo encendió) el menú NO crea el
+   * pedido: arma el mensaje de WhatsApp con todo lo que el cliente eligió y lo escribió, y se lo manda al local; quien atiende lo carga
+   * a mano. En ese caso nada de lo que escribe el cliente llega a un servidor ni a una base.
    */
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -199,7 +263,7 @@ export function CheckoutForm({
       fallar("Escribí tu nombre y tu teléfono para que el local pueda confirmarte el pedido.");
       return;
     }
-    if (!whatsappNumero.replace(/\D/g, "")) {
+    if (!pedidosEnSistema && !whatsappNumero.replace(/\D/g, "")) {
       fallar("Este local todavía no configuró su WhatsApp: no se puede enviar el pedido por acá.");
       return;
     }
@@ -209,6 +273,12 @@ export function CheckoutForm({
     }
     if (comprobanteTipo === "factura" && (!facturaRazonSocial.trim() || !facturaRuc.trim())) {
       fallar("Para factura necesitamos la razón social y el RUC.", "factura");
+      return;
+    }
+
+    // El pedido entra al sistema del local: se manda al servidor (que recalcula todo) y el cliente lo sigue en su pantalla.
+    if (pedidosEnSistema) {
+      void enviarAlSistema();
       return;
     }
 
@@ -245,6 +315,72 @@ export function CheckoutForm({
     });
     setEnlace(construirLinkWhatsapp(whatsappNumero, mensaje));
     window.scrollTo({ top: 0 });
+  }
+
+  // El pedido ya llegó al local: pantalla final con el número y el enlace para seguirlo.
+  if (recibido) {
+    return (
+      <div className="flex flex-col items-center px-1 pt-2 text-center">
+        <span
+          aria-hidden="true"
+          className="flex h-20 w-20 animate-[entradaExito_0.5s_cubic-bezier(0.22,0.7,0.3,1)_both] items-center justify-center rounded-full bg-brand text-white shadow-media ring-8 ring-brand-light"
+        >
+          <svg viewBox="0 0 24 24" width={34} height={34} fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round">
+            <path d="M20 6 9 17l-5-5" />
+          </svg>
+        </span>
+        <h2 className="mt-5 text-[1.5rem] font-semibold tracking-titular text-tinta">¡Pedido enviado!</h2>
+        <p className="mt-1 text-[0.95rem] font-semibold text-tinta">Pedido {formatearNumero(recibido.numero)}</p>
+        <p className="mt-1.5 max-w-sm text-[0.92rem] leading-snug text-tinta-media">
+          {recibido.aceptado
+            ? `${nombreLocal} ya lo aceptó y lo está preparando.`
+            : `${nombreLocal} lo está revisando y en unos minutos te lo confirma.`}{" "}
+          Podés ver cómo va en la pantalla de seguimiento.
+        </p>
+
+        <Link
+          href={`/${slug}/pedido/${recibido.token}`}
+          className="mt-5 flex h-14 w-full max-w-sm items-center justify-center rounded-2xl bg-brand text-[1rem] font-semibold text-white shadow-alta transition-all active:scale-[0.98]"
+        >
+          Seguir mi pedido
+        </Link>
+
+        {resumen && (
+          <section aria-label="Resumen del pedido" className="mt-6 w-full max-w-sm rounded-2xl bg-superficie p-5 text-left shadow-sm ring-1 ring-linea">
+            <p className="text-[0.74rem] font-semibold uppercase tracking-rotulo text-tinta-suave">Tu pedido</p>
+            <ul className="mt-2.5 flex flex-col gap-1.5">
+              {resumen.lineas.map((l, i) => (
+                <li key={i} className="flex justify-between gap-3 text-[0.9rem]">
+                  <span className="min-w-0 text-tinta">{l.texto}</span>
+                  <span className="cifra flex-none font-medium text-tinta-media">{formatearGuarani(l.monto)}</span>
+                </li>
+              ))}
+            </ul>
+            <div className="mt-3 flex flex-col gap-1.5 border-t border-dashed border-linea pt-3 text-[0.86rem] text-tinta-media">
+              <div className="flex justify-between gap-3">
+                <span>Entrega</span>
+                <span className="text-right font-medium text-tinta">{resumen.entrega}</span>
+              </div>
+              <div className="flex justify-between gap-3">
+                <span>Pago</span>
+                <span className="text-right font-medium text-tinta">{resumen.pago}</span>
+              </div>
+              <div className="mt-1 flex items-baseline justify-between gap-3">
+                <span className="text-[0.95rem] font-semibold text-tinta">Total</span>
+                <span className="cifra text-[1.2rem] font-bold text-tinta">{resumen.total}</span>
+              </div>
+            </div>
+          </section>
+        )}
+
+        <Link
+          href={`/${slug}`}
+          className="mt-4 flex h-12 w-full max-w-sm items-center justify-center rounded-2xl bg-superficie text-[0.92rem] font-semibold text-tinta shadow-sm ring-1 ring-linea transition-all hover:ring-brand active:scale-[0.98]"
+        >
+          Volver al menú
+        </Link>
+      </div>
+    );
   }
 
   // Ya está listo el mensaje: lo único que falta es que el cliente toque el botón y lo mande por WhatsApp.
@@ -414,8 +550,9 @@ export function CheckoutForm({
                 />
               </Campo>
               <p className="text-[0.8rem] leading-snug text-tinta-media">
-                Estos datos van en el mensaje de WhatsApp que vas a enviar al local. Ellos los revisan y cargan uno por uno para que
-                la factura salga sin errores, así que escribilos con cuidado.
+                {pedidosEnSistema
+                  ? "Con estos datos se emite tu factura. Revisá el RUC con cuidado: si no existe, el local no puede facturarte."
+                  : "Estos datos van en el mensaje de WhatsApp que vas a enviar al local. Ellos los revisan y cargan uno por uno para que la factura salga sin errores, así que escribilos con cuidado."}
               </p>
             </div>
           )}
@@ -483,6 +620,27 @@ export function CheckoutForm({
               </Campo>
             </>
           )}
+
+          {pedidosEnSistema && (
+            <>
+              <Campo etiqueta="Aclaraciones para el local" ayuda="Opcional. Por ejemplo: sin cebolla, tocar timbre, traer cambio de 100.000.">
+                <Entrada
+                  value={notas}
+                  onChange={(e) => setNotas(e.target.value)}
+                  maxLength={300}
+                  placeholder="Lo que el local tenga que saber"
+                  className="!h-12 !rounded-xl"
+                />
+              </Campo>
+              {/* La trampa para robots: está fuera de la vista y de la tabulación; una persona nunca lo llena. */}
+              <div aria-hidden="true" className="absolute -left-[9999px] h-0 w-0 overflow-hidden">
+                <label>
+                  No completar
+                  <input type="text" tabIndex={-1} autoComplete="off" value={sitioWeb} onChange={(e) => setSitioWeb(e.target.value)} />
+                </label>
+              </div>
+            </>
+          )}
         </section>
 
         {/* El total, bien a la vista: lo que lleva, el envío y cuánto es. */}
@@ -518,14 +676,20 @@ export function CheckoutForm({
               {error}
             </div>
           )}
-          <BotonEnviar enviando={false} disabled={!aceptaPedidos} className="w-full !h-14 !rounded-2xl shadow-alta">
-            {aceptaPedidos ? (
+          <BotonEnviar enviando={enviando} disabled={!aceptaPedidos || enviando} className="w-full !h-14 !rounded-2xl shadow-alta">
+            {!aceptaPedidos ? (
+              "No disponible en este momento"
+            ) : pedidosEnSistema ? (
+              enviando ? (
+                "Enviando tu pedido…"
+              ) : (
+                "Enviar pedido"
+              )
+            ) : (
               <>
                 <IconoWhatsapp tam={26} />
                 Armar mi pedido para enviar
               </>
-            ) : (
-              "No disponible en este momento"
             )}
           </BotonEnviar>
         </div>

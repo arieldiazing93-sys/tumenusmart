@@ -78,6 +78,7 @@ export const MODELOS_POR_LOCAL = new Set([
   "ItemCuentaMesa",
   "CuentaDelivery",
   "ItemCuentaDelivery",
+  "PedidoWeb",
   "TrabajoImpresion",
   "MesaComedor",
   "SectorComedor",

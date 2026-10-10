@@ -11,6 +11,7 @@ import { normalizarSlug } from "@/lib/alcance-local";
 import { decidirCambioDeUrl } from "@/lib/url-publica";
 import { esHexValido } from "@/lib/color-marca";
 import { registrarBitacora } from "@/lib/bitacora";
+import { normalizarRubro } from "@/lib/pedido-web";
 
 // Dos accesos a la base conviven acá a propósito:
 //
@@ -209,6 +210,43 @@ export async function guardarVentasACredito(formData: FormData): Promise<void> {
   refrescarPantallas();
   revalidatePath("/admin/pos");
   revalidatePath("/admin/pos/cuentas-por-cobrar");
+  redirect("/admin/configuracion?guardado=1");
+}
+
+/**
+ * Los pedidos del menú digital: prendido, el pedido que arma el cliente entra al sistema (una bandeja con aviso sonoro, que se acepta
+ * con un toque) en vez de armar solo un mensaje de WhatsApp. Apagado, el menú se comporta como siempre. `aceptarSolo` acepta los
+ * pedidos apenas llegan (con el local abierto) y `rubro` cambia cómo se llaman los pasos (preparación, armado, retiro…). Apagarlo no
+ * borra nada: los pedidos ya recibidos siguen en su bandeja.
+ */
+export async function guardarPedidosWeb(formData: FormData): Promise<void> {
+  const sesion = await exigirPermiso("configuracion.editar");
+  const storeId = await idLocalActual();
+  const activo = formData.get("pedidosWebActivo") === "on";
+  const aceptarSolo = formData.get("pedidosWebAutoAceptar") === "on";
+  const rubro = normalizarRubro(formData.get("pedidosWebRubro"));
+
+  const antes = await prisma.store.findUnique({
+    where: { id: storeId },
+    select: { pedidosWebActivo: true, pedidosWebAutoAceptar: true, pedidosWebRubro: true },
+  });
+  await prisma.store.update({
+    where: { id: storeId },
+    data: { pedidosWebActivo: activo, pedidosWebAutoAceptar: aceptarSolo, pedidosWebRubro: rubro },
+  });
+  if (!antes || antes.pedidosWebActivo !== activo || antes.pedidosWebAutoAceptar !== aceptarSolo || antes.pedidosWebRubro !== rubro) {
+    await registrarBitacora(storeId, sesion, {
+      modulo: "configuracion",
+      accion: "pedidos_web_configurados",
+      descripcion: `Pedidos del menú digital: ${activo ? "activados" : "desactivados"}${activo ? `, aceptar solo ${aceptarSolo ? "sí" : "no"}, tipo de negocio ${rubro}` : ""}.`,
+      entidad: "Store",
+      entidadId: storeId,
+      detalle: { activo, aceptarSolo, rubro },
+    });
+  }
+
+  refrescarPantallas();
+  revalidatePath("/admin/pedidos-web");
   redirect("/admin/configuracion?guardado=1");
 }
 

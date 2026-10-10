@@ -9,6 +9,7 @@ import { idLocalActual, listarLocales } from "@/lib/local-actual";
 import { ideaDeLaSemana } from "@/lib/idea-semanal";
 import { SelectorLocal } from "./SelectorLocal";
 import { AvisoReservasNuevas } from "./AvisoReservasNuevas";
+import { AvisoPedidosWeb } from "./AvisoPedidosWeb";
 import { MotorImpresion } from "@/components/MotorImpresion";
 import { prismaDelLocal } from "@/lib/prisma-local";
 import { estacionActual } from "@/lib/estacion-actual";
@@ -28,7 +29,7 @@ import { ZONA_NEGOCIO } from "@/lib/timezone";
  * — quien tenga la dirección puede escribirla igual. Lo que de verdad protege
  * son las guardias de cada pantalla y de cada acción del servidor.
  */
-function armarGrupos(hayIdeaSinVer: boolean, rol: string, ventasACredito: boolean): GrupoSecciones[] {
+function armarGrupos(hayIdeaSinVer: boolean, rol: string, ventasACredito: boolean, pedidosWeb: boolean): GrupoSecciones[] {
   const conPermiso = (p: Permiso) => puede(rol, p);
 
   const grupos: GrupoSecciones[] = [
@@ -58,6 +59,10 @@ function armarGrupos(hayIdeaSinVer: boolean, rol: string, ventasACredito: boolea
         // la manda con un repartidor y la cobra. Tercera opción del día a día, después del Punto de venta y el Servicio comedor.
         { href: "/admin/delivery", label: "Servicio delivery", icono: "repartidores" as const,
           ver: conPermiso("delivery.ver") },
+        // Lo que los clientes piden desde el menú digital: entra acá con aviso sonoro, se acepta con un toque y pasa a ser una cuenta
+        // del Servicio delivery. Solo se muestra si el local encendió los pedidos por el sistema (Configuración).
+        { href: "/admin/pedidos-web", label: "Pedidos del menú", icono: "pedidos" as const,
+          ver: pedidosWeb && conPermiso("delivery.ver") },
         // El historial de TODAS las cuentas que se cierran: las ventas del mostrador, las cuentas de mesa y de delivery que se
         // cobran, y las que se cancelaron sin cobrar. Vive acá y no en "Cómo va el negocio": el cajero necesita buscar una cuenta
         // y poder cancelarla en el momento, no solo el dueño repasando el día después.
@@ -314,17 +319,20 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   let vencimientoLocal: Date | null = null;
   // Si el local vende a crédito (Configuración): decide si el menú muestra Cuentas por cobrar.
   let ventasACredito = false;
+  // Si los pedidos del menú digital entran al sistema: aparece su bandeja en el menú y suena el aviso de pedidos nuevos.
+  let pedidosWebActivo = false;
   if (localActualId) {
     const datosLocal = await prisma.store
       .findUnique({
         where: { id: localActualId },
-        select: { estado: true, vencimiento: true, ventasACredito: true },
+        select: { estado: true, vencimiento: true, ventasACredito: true, pedidosWebActivo: true },
       })
       .catch(() => null);
     if (datosLocal) {
       avisoSuscripcion = estadoSuscripcion(datosLocal, new Date(), ZONA_NEGOCIO);
       vencimientoLocal = datosLocal.vencimiento;
       ventasACredito = datosLocal.ventasACredito;
+      pedidosWebActivo = datosLocal.pedidosWebActivo;
     }
   }
 
@@ -386,7 +394,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         <div className="mx-auto flex h-14 max-w-[92rem] items-center gap-3 overflow-hidden px-4">
           <NavPanel
             variante="boton"
-            grupos={armarGrupos(hayIdeaSinVer, sesion.rol, ventasACredito)}
+            grupos={armarGrupos(hayIdeaSinVer, sesion.rol, ventasACredito, pedidosWebActivo)}
             extra={
               esSuper ? <SelectorLocal locales={locales} actual={localActualId} /> : null
             }
@@ -402,6 +410,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
 
           <div className="ml-auto flex min-w-0 items-center gap-2.5">
             {/* La campana del aviso de reservas nuevas (y sus carteles, que se dibujan fuera de la barra). */}
+            {pedidosWebActivo && puede(sesion.rol, "delivery.ver") && <AvisoPedidosWeb />}
             {avisarReservas && <AvisoReservasNuevas />}
 
             {/*
@@ -468,7 +477,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           <NavPanel
             variante="columna"
             plegadaInicial={menuPlegado}
-            grupos={armarGrupos(hayIdeaSinVer, sesion.rol, ventasACredito)}
+            grupos={armarGrupos(hayIdeaSinVer, sesion.rol, ventasACredito, pedidosWebActivo)}
           />
         </aside>
 

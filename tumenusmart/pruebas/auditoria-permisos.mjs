@@ -58,6 +58,14 @@ const EXCEPCIONES = {
     marcarCitaEnviada:
       "solo muestra una cita web ya creada, filtrando por id + local; el id no se puede adivinar",
   },
+  // El envío del pedido desde el menú digital: el cliente no tiene cuenta. El local sale de la dirección del menú (nunca del
+  // navegador) y tiene que tener encendidos los pedidos por el sistema; del navegador solo llega QUÉ eligió y el servidor recalcula
+  // precios, zona y envío. Todo se revisa de nuevo, un reintento no duplica el pedido y hay un tope por teléfono y por dispositivo.
+  "src/app/[slug]/checkout/actions.ts": {
+    enviarPedidoWeb:
+      "el cliente no tiene cuenta; el local sale de la dirección del menú, el servidor recalcula precios y envío, " +
+      "revisa todo de nuevo y frena el abuso por teléfono y por dispositivo",
+  },
   // El celular fijo del Registro de asistencia (/asistencia/<llave>): el personal no tiene cuenta del panel. El local sale
   // de la llave de la dirección (larga y al azar, regenerable) y a la persona la identifica su PIN, con freno a la
   // adivinanza (se bloquea el celular tras varios PIN malos). Cada acción vuelve a resolver el local y busca a la persona

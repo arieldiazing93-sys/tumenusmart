@@ -72,6 +72,14 @@ Qué comprueba:
     También la consulta de punta a punta contra una DNIT simulada: certificado y ambiente de cada local, una respuesta guardada 5 minutos, un tope de 30 consultas por minuto por local
     (nunca un fallo), local sin certificado en silencio, y que sin conexión, con error del servidor o respuesta rara NUNCA se frene una venta.
 
+12. **Pedidos del menú digital** (`prueba-pedido-web.js`, no es de SIFEN pero comparte el banco): lo que llega del navegador se revisa sin
+    confiar en nada (tipos, largos, cantidades, ubicación, RUC con su dígito), los nombres de cada paso según el tipo de negocio
+    (gastronomía, distribuidora, tienda) y todo el recorrido del servidor contra una base en memoria: recibir el pedido (precio, zona y envío
+    los calcula el servidor; un reintento no duplica; tope por teléfono y por dispositivo; avisos de stock), aceptarlo (abre la cuenta del
+    delivery o de retiro y carga los productos; si la carga falla, todo vuelve atrás), aceptar solo, rechazar, «no hay» (quita una línea y
+    recalcula), corregir el RUC, marcar listo y sincronizar con la cuenta cuando se cobra o se cancela desde el Servicio delivery. Y que un
+    local nunca toque los pedidos de otro. El catálogo, el horario y la carga de productos a la cuenta se simulan (tienen sus pruebas).
+
 Las pantallas (KuDE en cinta y en A4, estado y documentos con sus envíos, formularios del certificado y del CSC, puntos de
 expedición con su tipo de timbrado, botón de firmar en Facturas, el cuadro «Nuevo cliente» y «Nueva factura» con la verificación del
 RUC) se probaron aparte con los componentes reales en el banco de React.

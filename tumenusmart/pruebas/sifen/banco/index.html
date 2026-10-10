@@ -26,7 +26,7 @@
     });
     // ?solo=prueba-ruc.js,prueba-envio.js corre solo esas (para no esperar todo mientras se trabaja en una); sin eso, todas.
     const solo = new URLSearchParams(location.search).get("solo");
-    const todas = ["prueba-base.js", "prueba-qr.js", "prueba-firma.js", "prueba-emision.js", "prueba-envio.js", "prueba-eventos.js", "prueba-documento.js", "prueba-ruc.js"];
+    const todas = ["prueba-base.js", "prueba-qr.js", "prueba-firma.js", "prueba-emision.js", "prueba-envio.js", "prueba-eventos.js", "prueba-documento.js", "prueba-ruc.js", "prueba-pedido-web.js"];
     try {
       for (const archivo of solo ? solo.split(",") : todas) await correr(archivo);
     } catch (e) {

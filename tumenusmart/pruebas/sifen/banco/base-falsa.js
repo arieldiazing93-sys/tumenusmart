@@ -14,7 +14,10 @@
   const defectos = {
     eventoElectronico: { estado: "pendiente", intentos: 0, enviadoEn: null, procesadoEn: null, proximoIntentoEn: null, errorEnvio: null },
     documentoElectronico: { estado: "firmado", vistaPrevia: true, intentos: 0, enviadoEn: null, procesadoEn: null, proximoIntentoEn: null, errorEnvio: null },
+    // Un valor puede ser una función: se evalúa en cada fila nueva (la fecha de creación, por ejemplo).
+    pedidoWeb: () => ({ estado: "nuevo", createdAt: new Date(), updatedAt: new Date(), avisos: [], cuentaDeliveryId: null, motivoRechazo: null, envioACoordinar: false, costoEnvio: 0 }),
   };
+  const valoresPorDefecto = (nombre) => (typeof defectos[nombre] === "function" ? defectos[nombre]() : defectos[nombre] || {});
 
   function coincide(fila, donde) {
     if (!donde) return true;
@@ -26,6 +29,8 @@
         if ("in" in v && !v.in.includes(x)) return false;
         if ("lte" in v && !(x != null && x <= v.lte)) return false;
         if ("gt" in v && !(x != null && x > v.gt)) return false;
+        if ("gte" in v && !(x != null && x >= v.gte)) return false;
+        if ("lt" in v && !(x != null && x < v.lt)) return false;
         if ("not" in v && x === v.not) return false;
       } else if (v === null) {
         if (x !== null && x !== undefined) return false;
@@ -60,8 +65,30 @@
       findFirst: async (args) => copia(filtrar(args)[0] ?? null),
       findUnique: async (args) => copia(filtrar(args)[0] ?? null),
       count: async (args) => filtrar(args).length,
-      create: async ({ data }) => { const fila = { id: "id-" + ++contadorId, ...(defectos[nombre] || {}), ...data }; tabla(nombre).push(fila); return copia(fila); },
+      create: async ({ data }) => { const fila = { id: "id-" + ++contadorId, ...valoresPorDefecto(nombre), ...data }; tabla(nombre).push(fila); return copia(fila); },
       update: async ({ where, data }) => { const fila = filtrar({ where })[0]; if (!fila) throw new Error("No existe la fila de " + nombre); aplicarDatos(fila, data); return copia(fila); },
+      // Si existe la fila (por la clave que se pida) la actualiza; si no, la crea. Una clave compuesta ({ storeId_telefono: { storeId, telefono } }) se aplana.
+      upsert: async ({ where, update, create }) => {
+        const claves = Object.values(where);
+        const plano = claves.length === 1 && claves[0] !== null && typeof claves[0] === "object" && !(claves[0] instanceof Date) ? claves[0] : where;
+        const fila = filtrar({ where: plano })[0];
+        if (fila) { aplicarDatos(fila, update || {}); return copia(fila); }
+        const nueva = { id: "id-" + ++contadorId, ...valoresPorDefecto(nombre), ...create };
+        tabla(nombre).push(nueva);
+        return copia(nueva);
+      },
+      // Agrupa por los campos de `by` y cuenta (y suma lo que se pida en _sum).
+      groupBy: async ({ by, where, _sum }) => {
+        const grupos = new Map();
+        for (const f of filtrar({ where })) {
+          const clave = JSON.stringify(by.map((k) => f[k]));
+          if (!grupos.has(clave)) grupos.set(clave, { ...Object.fromEntries(by.map((k) => [k, f[k]])), _count: { _all: 0 }, _sum: {} });
+          const g = grupos.get(clave);
+          g._count._all++;
+          for (const campo of Object.keys(_sum || {})) g._sum[campo] = (g._sum[campo] || 0) + Number(f[campo] || 0);
+        }
+        return [...grupos.values()];
+      },
       updateMany: async ({ where, data }) => { const filas = filtrar({ where }); filas.forEach((f) => aplicarDatos(f, data)); return { count: filas.length }; },
     };
   }
