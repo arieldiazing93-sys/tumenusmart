@@ -95,6 +95,11 @@ export async function subirLogoNegocio(archivo: File): Promise<string> {
   return subirImagen(archivo, "logos/");
 }
 
+/** La foto de portada del menú digital público (la franja ancha de arriba de la carta). */
+export async function subirPortadaNegocio(archivo: File): Promise<string> {
+  return subirImagen(archivo, "portadas/");
+}
+
 export async function subirFotoPersonal(archivo: File): Promise<string> {
   return subirImagen(archivo, "personal/");
 }

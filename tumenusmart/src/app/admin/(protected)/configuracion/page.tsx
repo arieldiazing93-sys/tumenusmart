@@ -16,6 +16,7 @@ import { ZonaFila } from "./ZonaFila";
 import { CrearZonaForm } from "./CrearZonaForm";
 import { StoreLocationField } from "./StoreLocationField";
 import { LogoField } from "./LogoField";
+import { PortadaField } from "./PortadaField";
 import { PaletaColorPicker } from "./PaletaColorPicker";
 import { UrlPublicaField } from "./UrlPublicaField";
 import { GuardadoToast } from "@/components/GuardadoToast";
@@ -91,6 +92,7 @@ export default async function AdminConfiguracionPage() {
           </div>
           {store?.slug && <UrlPublicaField slug={store.slug} />}
           <LogoField initialUrl={store?.logoUrl ?? null} />
+          <PortadaField initialUrl={store?.portadaUrl ?? null} />
 
           <div className="border-t border-linea pt-3">
             <label className="flex items-center gap-2 text-sm font-medium text-tinta-media">

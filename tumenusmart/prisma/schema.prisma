@@ -22,6 +22,8 @@ model Store {
   nombre         String
   whatsappNumero String // formato internacional sin '+', ej: 595981234567
   logoUrl        String?
+  // Foto de portada del menú digital público (la franja de arriba de la carta). Sin foto, la portada es el color de marca.
+  portadaUrl     String?
   // Color de marca del local (hex, ej "#2E7D32") para el menú público — el
   // panel admin sigue siempre naranja, esto es solo lo que ve el cliente del
   // restaurante. Sin valor, el menú público usa el mismo naranja de siempre.

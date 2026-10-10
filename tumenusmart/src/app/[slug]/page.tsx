@@ -201,12 +201,26 @@ export default async function CatalogoPage({
       {/* El ancho crece con la pantalla: en el celular una columna angosta, y en tablet, notebook y monitor la carta se ensancha para
           mostrar varios productos a la vez (una tienda o una distribuidora tiene muchos más productos que un menú de comidas). */}
       <main className="mx-auto max-w-2xl pb-40 md:max-w-4xl lg:max-w-6xl 2xl:max-w-7xl">
-        {/* ---------- portada: el color del local, con círculos suaves de adorno ---------- */}
-        <div className="relative h-32 overflow-hidden bg-brand sm:rounded-b-3xl md:h-40">
-          <span aria-hidden="true" className="absolute -right-10 -top-14 h-48 w-48 rounded-full bg-white/10" />
-          <span aria-hidden="true" className="absolute -left-12 top-14 h-40 w-40 rounded-full bg-white/10" />
-          <span aria-hidden="true" className="absolute right-28 top-16 h-20 w-20 rounded-full bg-black/10" />
-        </div>
+        {/* ---------- portada: la foto que subió el local (Configuración → Portada del menú digital) o, sin foto, el color del
+            local con círculos suaves de adorno. Con foto la franja es más alta: una foto necesita aire para verse. La foto
+            se recorta al centro (object-cover), por eso Configuración recomienda 1600 × 500 con lo importante al medio. ---------- */}
+        {store.portadaUrl ? (
+          <div className="relative h-36 overflow-hidden bg-brand sm:rounded-b-3xl md:h-48 lg:h-56">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={store.portadaUrl}
+              alt=""
+              decoding="async"
+              className="absolute inset-0 h-full w-full object-cover"
+            />
+          </div>
+        ) : (
+          <div className="relative h-32 overflow-hidden bg-brand sm:rounded-b-3xl md:h-40">
+            <span aria-hidden="true" className="absolute -right-10 -top-14 h-48 w-48 rounded-full bg-white/10" />
+            <span aria-hidden="true" className="absolute -left-12 top-14 h-40 w-40 rounded-full bg-white/10" />
+            <span aria-hidden="true" className="absolute right-28 top-16 h-20 w-20 rounded-full bg-black/10" />
+          </div>
+        )}
 
         {/* ---------- cabecera del local: el logo sube sobre la portada ---------- */}
         <header className="relative -mt-12 px-4 animate-[subir_0.5s_cubic-bezier(0.22,0.7,0.3,1)] md:px-6 lg:px-8">

@@ -23,6 +23,8 @@ export type OpcionesCompresion = {
 
 export const PARA_PRODUCTO: OpcionesCompresion = { ladoMaximo: 900, calidad: 0.8 };
 export const PARA_LOGO: OpcionesCompresion = { ladoMaximo: 500, calidad: 0.85 };
+/** La portada del menú digital se ve a todo el ancho de la pantalla: el lado más largo es su ancho recomendado (1600 px). */
+export const PARA_PORTADA: OpcionesCompresion = { ladoMaximo: 1600, calidad: 0.82 };
 
 /** Más grande que esto ni se intenta: sería lentísimo y no es una foto normal. */
 const TAMANO_MAXIMO_ACEPTADO = 25 * 1024 * 1024;

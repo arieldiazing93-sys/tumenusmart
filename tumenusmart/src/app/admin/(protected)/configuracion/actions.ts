@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { prismaDelLocal } from "@/lib/prisma-local";
-import { subirLogoNegocio } from "@/lib/supabase-storage";
+import { subirLogoNegocio, subirPortadaNegocio } from "@/lib/supabase-storage";
 import { idLocalActual } from "@/lib/local-actual";
 import { normalizarSlug } from "@/lib/alcance-local";
 import { decidirCambioDeUrl } from "@/lib/url-publica";
@@ -62,6 +62,41 @@ export async function quitarLogoStore(): Promise<void> {
   await prisma.store.update({
     where: { id: await idLocalActual() },
     data: { logoUrl: null },
+  });
+  refrescarPantallas();
+}
+
+/**
+ * La foto de portada del menú digital. Igual que el logo: devuelve {ok,error} (se llama desde PortadaField, no desde un
+ * <form action>) y se guarda de una, sin esperar al "Guardar" del formulario grande.
+ */
+export async function subirFotoPortada(formData: FormData): Promise<ResultadoLogo> {
+  await exigirPermiso("configuracion.editar");
+  const archivo = formData.get("archivo");
+  if (!(archivo instanceof File)) {
+    return { ok: false, error: "No se recibió ninguna imagen" };
+  }
+  let url: string;
+  try {
+    url = await subirPortadaNegocio(archivo);
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "No se pudo subir la imagen" };
+  }
+
+  await prisma.store.update({
+    where: { id: await idLocalActual() },
+    data: { portadaUrl: url },
+  });
+  refrescarPantallas();
+
+  return { ok: true, url };
+}
+
+export async function quitarPortadaStore(): Promise<void> {
+  await exigirPermiso("configuracion.editar");
+  await prisma.store.update({
+    where: { id: await idLocalActual() },
+    data: { portadaUrl: null },
   });
   refrescarPantallas();
 }
