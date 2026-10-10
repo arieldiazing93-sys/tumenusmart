@@ -95,6 +95,10 @@
   let abierto = true;
   const rondas = [];
   let rondaFalla = null;
+  // Como la ronda real, guarda las líneas de la cuenta con los precios de HOY: el factor simula una promoción que terminó (>1) o un precio
+  // que bajó (<1) entre que el cliente pidió y que alguien aceptó. `cuentaForzada`: la carga ya se había hecho en OTRA cuenta (un reintento).
+  let precioFactor = 1;
+  let cuentaForzada = null;
   S["src/lib/catalogo-pedido"] = { cargarCatalogoParaPedido: async () => catalogo };
   S["src/lib/promociones-servidor"] = { cargarPromociones: async () => [] };
   S["src/lib/estado-tienda"] = {
@@ -105,7 +109,12 @@
     guardarRondaDelivery: async (d) => {
       rondas.push(d);
       if (rondaFalla) return { ok: false, error: rondaFalla };
-      return { ok: true, cuentaId: d.cuentaId, cuentaNumero: 1, ronda: 1, totalEnvio: 0, areas: ["Cocina"], yaEnviado: false };
+      const cuentaId = cuentaForzada ?? d.cuentaId;
+      for (const i of d.items) {
+        const p = catalogo.find((c) => c.id === i.productId);
+        if (p) await BF.db.itemCuentaDelivery.create({ data: { storeId: d.storeId, cuentaId, estado: "activo", productId: p.id, cantidad: i.cantidad, precioUnitario: Math.round(p.precio * precioFactor) } });
+      }
+      return { ok: true, cuentaId, cuentaNumero: 1, ronda: 1, totalEnvio: 0, areas: ["Cocina"], yaEnviado: cuentaForzada != null };
     },
   };
 
@@ -125,7 +134,7 @@
   });
   const sembrar = () => {
     BF.reiniciar();
-    abierto = true; rondas.length = 0; rondaFalla = null;
+    abierto = true; rondas.length = 0; rondaFalla = null; precioFactor = 1; cuentaForzada = null;
     T().store = [{ id: storeId, ...local(), contadorPedidosWeb: 0, contadorCuentasDelivery: 0, contadorClientes: 0 }, { id: "local-2", slug: "otro", contadorPedidosWeb: 0, contadorCuentasDelivery: 0 }];
     T().deliveryZone = [
       { id: "z1", storeId, nombre: "Centro", radioKm: 3, costoEnvio: 8000, activo: true },
@@ -311,6 +320,111 @@
   T().cuentaDelivery[1].estado = "cancelada";
   await servidor.sincronizarPedidosConCuentas(storeId);
   ok(T().pedidoWeb[1].estado === "cancelado", "si la cuenta se cancela desde el delivery, el pedido queda cancelado");
+
+  // ---- los precios cambian entre que el cliente pidió y que alguien aceptó
+  window.log("== Pedido web: el precio que vio el cliente se respeta");
+  const productosDeHoy = () => T().itemCuentaDelivery.reduce((s, i) => s + i.precioUnitario * i.cantidad, 0);
+  sembrar();
+  await crear({ items: [{ productId: "p-pizza", cantidad: 1 }, { productId: "p-gaseosa", cantidad: 2 }] });
+  const idP = T().pedidoWeb[0].id;
+  ok(T().pedidoWeb[0].subtotal === 79000 && Number(T().pedidoWeb[0].total) === 87000, "el cliente vio 79.000 de productos + 8.000 de envío = 87.000");
+  precioFactor = 1.2; // terminó una promoción: hoy todo cuesta 20 % más
+  a = await servidor.aceptarPedidoWeb(storeId, idP, quien);
+  let cu = T().cuentaDelivery[0];
+  ok(a.ok && productosDeHoy() === 94800, "hoy los productos de la cuenta saldrían de 94.800 (" + productosDeHoy() + ")");
+  ok(cu.descuentoTipo === "monto" && Number(cu.descuentoValor) === 15800 && cu.descuentoMotivo.includes("#0001") && cu.descuentoPor === "Pedido web (automático)", "la diferencia (15.800) queda como descuento de la cuenta, con su motivo");
+  ok(productosDeHoy() - Number(cu.descuentoValor) + Number(cu.costoEnvio) === Number(T().pedidoWeb[0].total), "lo que se cobra es exactamente el total que vio el cliente (87.000)");
+  ok(T().pedidoWeb[0].avisos.length === 1 && T().pedidoWeb[0].avisos[0].includes("precios cambiaron") && T().bitacora.some((b) => b.accion === "pedido_web_aceptado" && JSON.stringify(b).includes("15800")), "queda el aviso en el pedido y el ajuste en la bitácora");
+
+  sembrar();
+  await crear({ items: [{ productId: "p-pizza", cantidad: 1 }, { productId: "p-gaseosa", cantidad: 2 }] });
+  precioFactor = 0.9; // hoy cuesta menos
+  a = await servidor.aceptarPedidoWeb(storeId, T().pedidoWeb[0].id, quien);
+  cu = T().cuentaDelivery[0];
+  ok(a.ok && !cu.descuentoTipo && T().pedidoWeb[0].subtotal === productosDeHoy() && Number(T().pedidoWeb[0].total) === productosDeHoy() + 8000 && T().pedidoWeb[0].avisos[0].includes("bajaron"), "si el precio bajó, se cobra el de hoy y el pedido muestra ese total (sin descuento)");
+
+  sembrar();
+  await crear({ items: [{ productId: "p-pizza", cantidad: 1 }, { productId: "p-gaseosa", cantidad: 2 }] });
+  a = await servidor.aceptarPedidoWeb(storeId, T().pedidoWeb[0].id, quien);
+  cu = T().cuentaDelivery[0];
+  ok(a.ok && !cu.descuentoTipo && T().pedidoWeb[0].avisos.length === 0 && T().pedidoWeb[0].subtotal === 79000, "si nada cambió, la cuenta queda igual: sin descuento ni avisos");
+
+  // un reintento de la misma carga: los productos ya estaban en OTRA cuenta; el pedido queda atado a esa y la nueva (vacía) se cancela
+  sembrar();
+  await crear({});
+  cuentaForzada = "cuenta-vieja";
+  a = await servidor.aceptarPedidoWeb(storeId, T().pedidoWeb[0].id, quien);
+  ok(a.ok && a.cuentaId === "cuenta-vieja" && T().pedidoWeb[0].cuentaDeliveryId === "cuenta-vieja" && T().cuentaDelivery[0].estado === "cancelada", "si los productos ya estaban en otra cuenta, el pedido se ata a esa y la repetida se cancela");
+
+  // ---- entregado y cobrado de un toque (la acción de la bandeja, con el cobro del delivery simulado)
+  window.log("== Pedido web: entregado y cobrado de un toque");
+  const cobros = [];
+  const consultasDnit = [];
+  let cobroResultado = null;
+  let dnit = { bloquea: false, mensaje: null };
+  S["src/lib/auth"] = { exigirPermiso: async () => quien };
+  S["src/lib/local-actual"] = { idLocalActual: async () => storeId };
+  S["next/cache"] = { revalidatePath() {} };
+  S["src/app/admin/(protected)/delivery/actions"] = {
+    pagarCuentaDelivery: async (id, d) => { cobros.push({ id, d }); return cobroResultado ?? { ok: true, ventaId: "venta-1", total: d.totalMostrado }; },
+  };
+  S["src/lib/sifen/consulta-ruc"] = { verificarRucEnLaDnit: async (s, ruc) => { consultasDnit.push(ruc); return dnit; } };
+  const acciones = await C.cargar("src/app/admin/(protected)/pedidos-web/actions");
+  const prepararCobro = async (extra = {}, factor = 1) => {
+    sembrar();
+    cobros.length = 0; consultasDnit.length = 0; cobroResultado = null; dnit = { bloquea: false, mensaje: null };
+    await crear({ items: [{ productId: "p-pizza", cantidad: 1 }, { productId: "p-gaseosa", cantidad: 2 }], ...extra });
+    precioFactor = factor;
+    await servidor.aceptarPedidoWeb(storeId, T().pedidoWeb[0].id, quien);
+    // La cuenta con sus productos (la base de prueba no resuelve `include`, así que van como una propiedad de la fila).
+    T().cuentaDelivery[0].items = T().itemCuentaDelivery.map((i, n) => ({
+      productId: i.productId, nombreProducto: i.productId, cantidad: i.cantidad, precioUnitario: i.precioUnitario, iva: "gravado10", opcionesTexto: null,
+      costoProducto: null, costoAgregados: null, precioAgregados: 0, promocionId: null, cortesia: false, precioAntesPromo: null, estado: "activo", ronda: 1, linea: n,
+    }));
+    return T().pedidoWeb[0].id;
+  };
+
+  let idC = await prepararCobro({ metodoPago: "efectivo" });
+  let e = await acciones.entregarYCobrarPedido(idC);
+  ok(e.ok && e.ventaId === "venta-1" && e.total === 87000, "cobra el total del pedido: productos + envío = 87.000 (" + JSON.stringify(e) + ")");
+  ok(cobros.length === 1 && cobros[0].d.pagos.length === 1 && cobros[0].d.pagos[0].forma === "efectivo" && cobros[0].d.pagos[0].monto === 87000 && cobros[0].d.comprobanteTipo === "ticket" && cobros[0].d.totalMostrado === 87000, "con la forma de pago que eligió el cliente, como ticket, y el total que vio");
+  ok(T().pedidoWeb[0].estado === "entregado" && T().pedidoWeb[0].entregadoEn && T().cuentaDelivery[0].estado === "por_cobrar" && T().bitacora.some((b) => b.accion === "pedido_web_entregado"), "el pedido queda entregado, y en la bitácora");
+  ok(consultasDnit.length === 0, "un ticket no consulta la DNIT");
+
+  idC = await prepararCobro({ comprobanteTipo: "factura", facturaRuc: "80069563-1", facturaRazonSocial: "Cliente SA", metodoPago: "transferencia" });
+  e = await acciones.entregarYCobrarPedido(idC);
+  ok(e.ok && cobros[0].d.comprobanteTipo === "factura" && cobros[0].d.facturaTipoIdentificacion === "ruc" && cobros[0].d.facturaNumeroIdentificacion === "80069563-1" && cobros[0].d.facturaRazonSocial === "Cliente SA" && cobros[0].d.pagos[0].forma === "transferencia", "con factura: pasa el RUC y la razón social que dio el cliente, y su forma de pago");
+  ok(consultasDnit.length === 1 && consultasDnit[0] === "80069563-1", "y antes de facturar vuelve a mirar el RUC en la DNIT");
+
+  idC = await prepararCobro({ comprobanteTipo: "factura", facturaRuc: "80069563-1", facturaRazonSocial: "Cliente SA" });
+  dnit = { bloquea: true, mensaje: "El RUC figura como cancelado en la DNIT." };
+  e = await acciones.entregarYCobrarPedido(idC);
+  ok(!e.ok && e.error.includes("cancelado") && e.error.includes("Servicio delivery") && cobros.length === 0, "un RUC que la DNIT rechaza frena el cobro de un toque y manda a corregirlo en la cuenta");
+  ok(T().pedidoWeb[0].estado === "aceptado" && T().cuentaDelivery[0].estado === "abierta", "sin cobrar: el pedido sigue en curso y la cuenta abierta");
+
+  idC = await prepararCobro({});
+  cobroResultado = { ok: false, error: "No hay un turno de caja abierto en esta estación. Abrilo y volvé a cobrar.", sinTurno: true };
+  e = await acciones.entregarYCobrarPedido(idC);
+  ok(!e.ok && e.sinTurno === true && T().pedidoWeb[0].estado === "aceptado" && T().cuentaDelivery[0].estado === "abierta" && !T().cuentaDelivery[0].impresaEn, "sin turno abierto: avisa, no cobra y la cuenta vuelve a como estaba");
+
+  idC = await prepararCobro({});
+  T().store[0].facturaObligatoria = true;
+  e = await acciones.entregarYCobrarPedido(idC);
+  ok(e.ok && cobros[0].d.comprobanteTipo === "factura" && cobros[0].d.facturaNumeroIdentificacion === undefined && !!cobros[0].d.facturaTipoIdentificacion, "un local que exige facturar todo: el «ticket» sale como factura a Consumidor Final");
+
+  idC = await prepararCobro({}, 1.2);
+  e = await acciones.entregarYCobrarPedido(idC);
+  ok(e.ok && cobros[0].d.totalMostrado === 87000 && cobros[0].d.pagos[0].monto === 87000, "aunque los precios hayan cambiado, se cobra el total que el cliente vio (87.000)");
+
+  idC = await prepararCobro({});
+  T().cuentaDelivery[0].estado = "pagada";
+  e = await acciones.entregarYCobrarPedido(idC);
+  ok(!e.ok && e.error.includes("ya estaba cobrada") && T().pedidoWeb[0].estado === "entregado" && cobros.length === 0, "si la cuenta ya se cobró desde el delivery, no cobra dos veces y deja el pedido entregado");
+
+  sembrar();
+  await crear({});
+  e = await acciones.entregarYCobrarPedido(T().pedidoWeb[0].id);
+  ok(!e.ok && e.error.includes("ya no está en curso"), "un pedido que todavía es nuevo no se cobra");
 
   // ---- cada local ve solo lo suyo
   sembrar();

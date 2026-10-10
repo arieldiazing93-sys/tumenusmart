@@ -16,6 +16,7 @@
     documentoElectronico: { estado: "firmado", vistaPrevia: true, intentos: 0, enviadoEn: null, procesadoEn: null, proximoIntentoEn: null, errorEnvio: null },
     // Un valor puede ser una función: se evalúa en cada fila nueva (la fecha de creación, por ejemplo).
     pedidoWeb: () => ({ estado: "nuevo", createdAt: new Date(), updatedAt: new Date(), avisos: [], cuentaDeliveryId: null, motivoRechazo: null, envioACoordinar: false, costoEnvio: 0 }),
+    cuentaDelivery: () => ({ estado: "abierta", descuentoTipo: null, descuentoValor: null, descuentoMotivo: null, descuentoPor: null, impresaEn: null, impresaPor: null, createdAt: new Date() }),
   };
   const valoresPorDefecto = (nombre) => (typeof defectos[nombre] === "function" ? defectos[nombre]() : defectos[nombre] || {});
 

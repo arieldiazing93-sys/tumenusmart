@@ -529,16 +529,91 @@ export async function aceptarPedidoWeb(
     return { ok: false, error: ronda.error };
   }
 
-  await prisma.pedidoWeb.updateMany({ where: { id: pedido.id, storeId }, data: { cuentaDeliveryId: cuenta.id } });
+  // La cuenta del pedido es la que quedó con los productos. Casi siempre es la recién abierta; si esa misma carga ya se había hecho antes
+  // (un intento anterior que se cortó justo después de cargar), los productos están en la otra y la nueva sobra: se cancela vacía.
+  const cuentaFinal = ronda.cuentaId === cuenta.id ? cuenta : { id: ronda.cuentaId, numero: ronda.cuentaNumero };
+  if (cuentaFinal.id !== cuenta.id) {
+    await prisma.cuentaDelivery.updateMany({
+      where: { id: cuenta.id, storeId },
+      data: { estado: "cancelada", cerradaEn: new Date(), cerradaPor: nombreDe(quien), motivoCierre: "Pedido web: cuenta repetida" },
+    });
+  }
+
+  // Lo que el cliente pagará es lo que VIO al pedir (ver `respetarElPrecioVisto`).
+  const ajuste = await respetarElPrecioVisto(storeId, pedido, cuentaFinal.id, costoEnvio);
+
+  await prisma.pedidoWeb.updateMany({
+    where: { id: pedido.id, storeId },
+    data: { cuentaDeliveryId: cuentaFinal.id, ...(ajuste.texto ? { avisos: [ajuste.texto] } : {}) },
+  });
   await registrarBitacora(storeId, quien, {
     modulo: "pedidos",
     accion: "pedido_web_aceptado",
-    descripcion: `Aceptó el pedido web ${formatearNumero(pedido.numero)} de ${pedido.clienteNombre}${opciones.automatico ? " (automático)" : ""}: cuenta ${formatearNumero(cuenta.numero)} de delivery.`,
+    descripcion: `Aceptó el pedido web ${formatearNumero(pedido.numero)} de ${pedido.clienteNombre}${opciones.automatico ? " (automático)" : ""}: cuenta ${formatearNumero(cuentaFinal.numero)} de delivery.${ajuste.texto ? ` ${ajuste.texto}` : ""}`,
     entidad: "PedidoWeb",
     entidadId: pedido.id,
-    detalle: { pedido: pedido.numero, cuenta: cuenta.numero, total: Number(pedido.total), costoEnvio, automatico: !!opciones.automatico },
+    detalle: {
+      pedido: pedido.numero,
+      cuenta: cuentaFinal.numero,
+      total: Number(pedido.total),
+      costoEnvio,
+      automatico: !!opciones.automatico,
+      ...(ajuste.diferencia !== 0 ? { ajustePrecio: ajuste.diferencia } : {}),
+    },
   });
-  return { ok: true, cuentaId: cuenta.id, cuentaNumero: cuenta.numero, areas: ronda.areas };
+  return { ok: true, cuentaId: cuentaFinal.id, cuentaNumero: cuentaFinal.numero, areas: ronda.areas };
+}
+
+/**
+ * Al cargar los productos en la cuenta se vuelven a calcular los precios con lo que rige AHORA, y entre que el cliente pidió y alguien
+ * aceptó pudo pasar un rato (terminó una promoción, cambió un precio). Si no se compara, la cuenta saldría distinta de lo que el
+ * cliente aceptó y vio en su pantalla de seguimiento.
+ *
+ *  - Más cara: se respeta lo que vio. La diferencia queda como un descuento de la cuenta, con su motivo (se ve en la cuenta, en la
+ *    bitácora y en el reporte de descuentos), y se cobra exactamente el total del pedido.
+ *  - Más barata: se cobra lo de hoy y el pedido pasa a mostrar ese total.
+ *
+ * Devuelve la diferencia en guaraníes (positiva = la cuenta salió más cara) y el aviso para quien atiende.
+ */
+async function respetarElPrecioVisto(
+  storeId: string,
+  pedido: { id: string; numero: number; subtotal: unknown },
+  cuentaId: string,
+  costoEnvio: number
+): Promise<{ diferencia: number; texto: string | null }> {
+  const items = await prisma.itemCuentaDelivery.findMany({
+    where: { cuentaId, storeId, estado: "activo" },
+    select: { cantidad: true, precioUnitario: true },
+  });
+  // Sin productos para comparar no se toca nada (nunca se deja un pedido en cero por no encontrar la cuenta).
+  if (items.length === 0) return { diferencia: 0, texto: null };
+  const real = totalDeLineas(items.map((i) => ({ precioUnitario: Number(i.precioUnitario), cantidad: i.cantidad })));
+  const visto = Number(pedido.subtotal);
+  if (!Number.isFinite(real) || !Number.isFinite(visto)) return { diferencia: 0, texto: null };
+  const diferencia = Math.round(real - visto);
+  if (diferencia === 0) return { diferencia: 0, texto: null };
+
+  if (diferencia > 0) {
+    await prisma.cuentaDelivery.updateMany({
+      where: { id: cuentaId, storeId, estado: "abierta" },
+      data: {
+        descuentoTipo: "monto",
+        descuentoValor: diferencia,
+        descuentoMotivo: `Precio del pedido web ${formatearNumero(pedido.numero)}: el cliente lo pidió a ${formatearGuarani(visto)}`.slice(0, 200),
+        descuentoPor: "Pedido web (automático)",
+      },
+    });
+    return {
+      diferencia,
+      texto: `Los precios cambiaron desde que el cliente pidió: se le respetó lo que vio (${formatearGuarani(visto)}); la diferencia de ${formatearGuarani(diferencia)} quedó como descuento.`,
+    };
+  }
+
+  await prisma.pedidoWeb.updateMany({ where: { id: pedido.id, storeId }, data: { subtotal: real, total: real + costoEnvio } });
+  return {
+    diferencia,
+    texto: `Los precios bajaron desde que el cliente pidió: se cobra lo de hoy (${formatearGuarani(real)}, antes ${formatearGuarani(visto)}).`,
+  };
 }
 
 /** Rechaza un pedido nuevo con un motivo (el cliente lo lee en su pantalla de seguimiento). */

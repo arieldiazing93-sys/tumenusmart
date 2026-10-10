@@ -17,6 +17,7 @@ import {
   quitarLineaPedidoWeb,
   rechazarPedidoWeb,
 } from "@/lib/pedido-web-servidor";
+import { verificarRucEnLaDnit } from "@/lib/sifen/consulta-ruc";
 import { pagarCuentaDelivery } from "../delivery/actions";
 
 /**
@@ -155,6 +156,24 @@ export async function entregarYCobrarPedido(pedidoId: string): Promise<Resultado
     return { ok: false, error: `El descuento de la cuenta ya no corresponde (${totales.descuentoInvalido}). Corregilo en el Servicio delivery.` };
   }
 
+  // Un local que exige facturar todo: el «ticket» del cliente se cobra como factura a Consumidor Final.
+  const local = await prisma.store.findUnique({ where: { id: storeId }, select: { facturaObligatoria: true } });
+  const quiereFactura = pedido.comprobanteTipo === "factura" && !!(cuenta.facturaRuc && cuenta.facturaRazonSocial);
+  const comoFactura = quiereFactura || (local?.facturaObligatoria ?? false);
+
+  // El RUC se vuelve a mirar en la DNIT justo antes de facturar. En el cobro completo la pantalla lo hace sola y no deja seguir con un
+  // RUC que la DNIT rechaza; este cobro de un toque no pasa por esa pantalla, así que el mismo freno va acá. Es una ayuda que nunca corta
+  // una venta por sí sola: si la DNIT no contesta o el local no tiene certificado, sigue con el dígito verificador ya controlado.
+  if (quiereFactura && (cuenta.facturaTipoIdentificacion ?? "ruc") === "ruc" && cuenta.facturaRuc) {
+    const dnit = await verificarRucEnLaDnit(storeId, cuenta.facturaRuc);
+    if (dnit.bloquea) {
+      return {
+        ok: false,
+        error: `${dnit.mensaje ?? "La DNIT no acepta facturas a ese RUC."} Corregí los datos de la factura en la cuenta del Servicio delivery y cobrala desde ahí.`,
+      };
+    }
+  }
+
   // El cliente ya vio el total al pedir: la cuenta pasa directo a "por cobrar" sin imprimirla (el cobro lo exige en ese estado).
   const veniaAbierta = cuenta.estado === "abierta";
   if (veniaAbierta) {
@@ -164,10 +183,6 @@ export async function entregarYCobrarPedido(pedidoId: string): Promise<Resultado
     });
   }
 
-  // Un local que exige facturar todo: el «ticket» del cliente se cobra como factura a Consumidor Final.
-  const local = await prisma.store.findUnique({ where: { id: storeId }, select: { facturaObligatoria: true } });
-  const quiereFactura = pedido.comprobanteTipo === "factura" && !!(cuenta.facturaRuc && cuenta.facturaRazonSocial);
-  const comoFactura = quiereFactura || (local?.facturaObligatoria ?? false);
   const r = await pagarCuentaDelivery(cuenta.id, {
     pagos: [{ forma: pedido.metodoPago, monto: totales.total }],
     comprobanteTipo: comoFactura ? "factura" : "ticket",
