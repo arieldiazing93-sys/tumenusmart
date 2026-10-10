@@ -10,6 +10,7 @@
  * Solo para el servidor. Cada consulta lleva el local explícito: usa el certificado y el ambiente de ESE local.
  */
 
+import { prisma } from "../prisma";
 import { prismaDelLocal } from "../prisma-local";
 import { cargarMaterialTls } from "./servidor";
 import { interpretarRespuestaRuc, prepararConsultaRuc, verificacion, type VerificacionRuc } from "./ruc";
@@ -94,7 +95,9 @@ export async function verificarRucEnLaDnit(storeId: string, entrada: string, opc
 
     if (!hayCupo(storeId, ahora.getTime())) return sinConsulta("Se hicieron demasiadas consultas seguidas a la DNIT: esperá un minuto. Se controló solo el dígito verificador.");
 
-    const tls = await cargarMaterialTls(db, storeId);
+    // El cliente común y no el atado al local (`db`): las funciones de servidor.ts lo piden así para poder usarse también dentro de una
+    // transacción. Es lo mismo para esta consulta: ya filtra por `storeId` en cada lectura.
+    const tls = await cargarMaterialTls(prisma, storeId);
     if (!tls.ok) return sinConsulta(`${tls.error} Se controló solo el dígito verificador.`);
 
     const contestacion = await transporte({

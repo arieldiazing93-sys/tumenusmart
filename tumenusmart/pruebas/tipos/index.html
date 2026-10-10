@@ -1,0 +1,283 @@
+<!doctype html>
+<html>
+<head><meta charset="utf-8"><title>tipos</title></head>
+<body>
+<pre id="salida">cargando…</pre>
+<script>
+  const salida = document.getElementById("salida");
+  window.__log = [];
+  const log = (t) => { window.__log.push(t); salida.textContent += "\n" + t; };
+
+  function cargarScript(url) {
+    return new Promise((res, rej) => {
+      const s = document.createElement("script");
+      s.src = url; s.onload = res; s.onerror = () => rej(new Error("no cargó " + url));
+      document.head.appendChild(s);
+    });
+  }
+  async function texto(url) {
+    const r = await fetch(url);
+    if (!r.ok) throw new Error(url + " -> " + r.status);
+    return r.text();
+  }
+
+  // Verificador de tipos SIN Node (ver pruebas/verificar-tipos.ps1). Los tipos de afuera que no se pueden bajar completos (Next, Prisma, Supabase…) se declaran sueltos: valen "cualquier cosa".
+  const STUBS = `
+declare module "@supabase/supabase-js";
+declare module "exceljs";
+declare module "leaflet";
+declare module "leaflet/dist/leaflet.css";
+declare module "next";
+declare module "next/cache";
+declare module "next/dynamic";
+declare module "next/font/google";
+declare module "next/headers";
+declare module "next/link";
+declare module "next/navigation";
+declare module "next/server";
+declare module "util";
+declare module "crypto" { export function randomUUID(): string; export function randomBytes(n: number): any; export function createHmac(a: string, k: any): any; export function timingSafeEqual(a: any, b: any): boolean; export function createHash(a: string): any; }
+declare module "node:crypto" { export function randomUUID(): string; export function randomBytes(n: number): any; export function createHmac(a: string, k: any): any; export function timingSafeEqual(a: any, b: any): boolean; export function createHash(a: string): any; }
+declare module "*.css";
+declare const process: { env: Record<string, string | undefined>; [k: string]: any };
+declare const Buffer: any;
+declare module "@prisma/client" {
+  export namespace Prisma {
+    type TransactionClient = any; type JsonValue = any; type InputJsonValue = any;
+    type MovimientoStockWhereInput = any; type CitaWhereInput = any; type VentaPosWhereInput = any; type StoreSelect = any;
+    type StoreUpdateManyMutationInput = any; type StoreWhereInput = any; type StoreWhereUniqueInput = any; type StoreUpdateInput = any;
+    type MovimientoStockCreateManyInput = any; type ItemCuentaMesaCreateManyInput = any; type TrabajoImpresionWhereInput = any;
+    class PrismaClientKnownRequestError extends Error { code: string; meta?: any }
+  }
+  export class PrismaClient { constructor(...a: any[]); [k: string]: any }
+  export type ItemCuentaMesa = any;
+  export type Store = any; export type Colaborador = any; export type MarcacionAsistencia = any;
+}
+`;
+
+  window.__listo = (async () => {
+    try {
+      log("bajando el compilador…");
+      await cargarScript("https://cdn.jsdelivr.net/npm/typescript@5.5.4/lib/typescript.js");
+      const ts = window.ts;
+      log("TypeScript " + ts.version);
+
+      const files = new Map();
+      // Las bibliotecas estándar de TypeScript.
+      const listadoTs = await (await fetch("https://data.jsdelivr.com/v1/packages/npm/typescript@5.5.4?structure=flat")).json();
+      const libs = listadoTs.files.map((f) => f.name).filter((n) => /^\/lib\/lib\.[^/]+\.d\.ts$/.test(n));
+      await Promise.all(libs.map(async (n) => files.set("/typescript" + n, await texto("https://cdn.jsdelivr.net/npm/typescript@5.5.4" + n))));
+      log("bibliotecas: " + libs.length);
+
+      // Los tipos de React.
+      const tipos = {
+        "/proj/node_modules/@types/react/index.d.ts": "https://cdn.jsdelivr.net/npm/@types/react@19.0.2/index.d.ts",
+        "/proj/node_modules/@types/react/global.d.ts": "https://cdn.jsdelivr.net/npm/@types/react@19.0.2/global.d.ts",
+        "/proj/node_modules/@types/react/jsx-runtime.d.ts": "https://cdn.jsdelivr.net/npm/@types/react@19.0.2/jsx-runtime.d.ts",
+        "/proj/node_modules/csstype/index.d.ts": "https://cdn.jsdelivr.net/npm/csstype@3.1.3/index.d.ts",
+        "/proj/node_modules/@types/prop-types/index.d.ts": "https://cdn.jsdelivr.net/npm/@types/prop-types@15.7.12/index.d.ts",
+        "/proj/node_modules/@types/react-dom/index.d.ts": "https://cdn.jsdelivr.net/npm/@types/react-dom@19.0.2/index.d.ts",
+      };
+      for (const [ruta, url] of Object.entries(tipos)) files.set(ruta, await texto(url));
+      files.set("/proj/node_modules/@types/react/package.json", JSON.stringify({ name: "@types/react", version: "18.3.12", types: "index.d.ts" }));
+      files.set("/proj/node_modules/@types/react-dom/package.json", JSON.stringify({ name: "@types/react-dom", version: "18.3.1", types: "index.d.ts" }));
+      files.set("/proj/node_modules/csstype/package.json", JSON.stringify({ name: "csstype", version: "3.1.3", types: "index.d.ts" }));
+      files.set("/proj/node_modules/@types/prop-types/package.json", JSON.stringify({ name: "@types/prop-types", version: "15.7.12", types: "index.d.ts" }));
+      files.set("/proj/stubs.d.ts", STUBS);
+      {
+        const lf = await (await fetch("https://data.jsdelivr.com/v1/packages/npm/@types/node-forge@1.3.11?structure=flat")).json();
+        const dts = lf.files.map((f) => f.name).filter((n) => /.d.ts$/.test(n) || /package.json$/.test(n));
+        await Promise.all(dts.map(async (n) => files.set("/proj/node_modules/@types/node-forge" + n, await texto("https://cdn.jsdelivr.net/npm/@types/node-forge@1.3.11" + n))));
+        log("tipos de node-forge: " + dts.length);
+      }
+
+      // El código del proyecto.
+      const lista = await (await fetch("/__lista")).json();
+      let n = 0;
+      for (let i = 0; i < lista.length; i += 40) {
+        await Promise.all(lista.slice(i, i + 40).map(async (p) => { files.set("/proj/" + p, await texto("/f/" + p.split("/").map(encodeURIComponent).join("/"))); n++; }));
+      }
+      log("archivos del proyecto: " + n);
+
+      // Para cada paquete de afuera sin tipos descargados, se declara lo que el proyecto le importa: todo vale "cualquier cosa".
+      const REAL = new Set(["react", "react-dom", "node-forge"]);
+      const pedidos = {};
+      const reImport = /import\s+(?:type\s+)?([^;"']*?)\s+from\s+["']([^"']+)["']/g;
+      for (const [ruta, txt] of files) {
+        if (!ruta.startsWith("/proj/src/")) continue;
+        let m;
+        while ((m = reImport.exec(txt))) {
+          const mod = m[2];
+          if (mod.startsWith(".") || mod.startsWith("@/") || REAL.has(mod)) continue;
+          const info = (pedidos[mod] = pedidos[mod] || { nombres: new Set(), porDefecto: false });
+          const clausula = m[1].trim();
+          const llaves = /\{([^}]*)\}/.exec(clausula);
+          const antes = clausula.replace(/\{[^}]*\}/, "").replace(/,/g, " ").trim();
+          if (antes && !antes.startsWith("*")) info.porDefecto = true;
+          if (llaves) for (const parte of llaves[1].split(",")) { const p = parte.trim().replace(/^type\s+/, "").split(/\s+as\s+/)[0].trim(); if (p) info.nombres.add(p); }
+        }
+      }
+      let stubsGenerados = "";
+      for (const [mod, info] of Object.entries(pedidos)) {
+        if (mod === "@prisma/client" || mod === "crypto" || mod === "node:crypto" || mod === "next/navigation") continue;
+        const nombres = [...info.nombres].filter((n) => /^[A-Za-z_$][\w$]*$/.test(n));
+        stubsGenerados += `declare module "${mod}" {\n` + nombres.map((n) => `  export const ${n}: any;\n  export type ${n} = any;\n`).join("") + (info.porDefecto ? "  const _porDefecto: any;\n  export default _porDefecto;\n" : "") + "}\n";
+      }
+      // El cliente de Prisma: se arma desde schema.prisma. Cada modelo tiene su fila tipada (los campos de verdad) y sus métodos
+      // (findMany, create…); las relaciones valen "cualquier cosa". No distingue select/include, pero sí los nombres de los campos.
+      const esquema = await texto("/f/prisma/schema.prisma");
+      const modelosPrisma = [];
+      let actual = null;
+      for (const linea of esquema.split("\n")) {
+        const m = /^model\s+(\w+)\s*\{/.exec(linea);
+        if (m) { actual = { nombre: m[1], campos: [], unicos: [] }; continue; }
+        if (actual && /^\}/.test(linea)) { modelosPrisma.push(actual); actual = null; continue; }
+        if (actual) {
+          const t = linea.trim();
+          if (!t || t.startsWith("//")) continue;
+          if (t.startsWith("@@")) { const u = /^@@(?:unique|id)\(\[([^\]]+)\]/.exec(t); if (u) actual.unicos.push(u[1].split(",").map((x) => x.trim()).join("_")); continue; }
+          const f = /^(\w+)\s+(\w+)(\[\])?(\?)?/.exec(t);
+          if (f) actual.campos.push({ nombre: f[1], tipo: f[2], lista: !!f[3], opcional: !!f[4], conDefecto: /@default|@updatedAt/.test(t) });
+        }
+      }
+      const nombresDeModelos = new Set(modelosPrisma.map((m) => m.nombre));
+      const ESCALARES = { String: "string", Int: "number", Float: "number", Decimal: "Decimal", Boolean: "boolean", DateTime: "Date", Json: "any", BigInt: "bigint", Bytes: "any" };
+      const filaDe = (m) =>
+        "{ " +
+        m.campos
+          .map((c) => {
+            if (nombresDeModelos.has(c.tipo)) return `${c.nombre}: ${c.lista ? "any[]" : "any"}`;
+            const base = ESCALARES[c.tipo] || "string";
+            const t = c.lista ? `${base}[]` : base;
+            return `${c.nombre}: ${c.opcional ? t + " | null" : t}`;
+          })
+          .join("; ") +
+        " }";
+      const minuscula = (s) => s[0].toLowerCase() + s.slice(1);
+      const tipoEsc = (c) => { const b = ESCALARES[c.tipo] || "string"; if (b === "any" || b === "Decimal" || c.lista) return "any"; return b === "Date" ? "(Date | string)" : b; };
+      const entradas = modelosPrisma.map((m) => {
+        const esc = m.campos.filter((c) => !nombresDeModelos.has(c.tipo));
+        const rel = m.campos.filter((c) => nombresDeModelos.has(c.tipo));
+        const hayRel = rel.length > 0;
+        const filtro = esc.map((c) => { const t = tipoEsc(c); const n = c.opcional ? `${t} | null` : t; return t === "any" ? `${c.nombre}?: any` : `${c.nombre}?: ${n} | FiltroDe<${n}>`; });
+        const where = `type ${m.nombre}Where = { ${[...filtro, ...rel.map((r) => r.nombre + "?: any"), ...m.unicos.map((u) => u + "?: any"), `OR?: ${m.nombre}Where[]`, `AND?: ${m.nombre}Where | ${m.nombre}Where[]`, `NOT?: ${m.nombre}Where | ${m.nombre}Where[]`].join("; ")} };`;
+        const crear = esc.map((c) => { const t = tipoEsc(c); const n = c.opcional ? `${t} | null` : t; const obligatorio = !c.opcional && !c.lista && !c.conDefecto && !(hayRel && /Id$/.test(c.nombre)); return `${c.nombre}${obligatorio ? "" : "?"}: ${t === "any" ? "any" : n}`; });
+        const create = `type ${m.nombre}Create = { ${[...crear, ...rel.map((r) => r.nombre + "?: any")].join("; ")} };`;
+        const upd = esc.map((c) => { const t = tipoEsc(c); if (t === "any") return `${c.nombre}?: any`; const n = c.opcional ? `${t} | null` : t; return `${c.nombre}?: ${n} | { set?: ${n}; increment?: number; decrement?: number; multiply?: number; divide?: number }`; });
+        const update = `type ${m.nombre}Update = { ${[...upd, ...rel.map((r) => r.nombre + "?: any")].join("; ")} };`;
+        return "  " + where + "\n  " + create + "\n  " + update;
+      }).join("\n");
+      const delegados = modelosPrisma
+        .map(
+          (m) => `    ${minuscula(m.nombre)}: Delegado<${m.nombre}, ${m.nombre}Where, ${m.nombre}Create, ${m.nombre}Update>;`
+        )
+        .join("\n");
+      const modelos = modelosPrisma.map((m) => m.nombre);
+      const prismaStub = `declare module "@prisma/client" {
+  export interface Decimal { toNumber(): number; toString(): string; toFixed(d?: number): string; plus(x: any): Decimal; minus(x: any): Decimal; times(x: any): Decimal; div(x: any): Decimal; }
+  type FiltroDe<T> = { equals?: T; in?: T[]; notIn?: T[]; lt?: T; lte?: T; gt?: T; gte?: T; not?: T | FiltroDe<T>; contains?: string; startsWith?: string; endsWith?: string; mode?: "insensitive" | "default" };
+  type ArgsFind<W> = { where?: W; orderBy?: any; take?: number; skip?: number; select?: any; include?: any; distinct?: any; cursor?: any };
+  interface Delegado<R, W, C, U> {
+    findMany(args?: ArgsFind<W>): Promise<R[]>; findFirst(args?: ArgsFind<W>): Promise<R | null>; findUnique(args: { where: W; select?: any; include?: any }): Promise<R | null>;
+    findFirstOrThrow(args?: ArgsFind<W>): Promise<R>; findUniqueOrThrow(args: { where: W; select?: any; include?: any }): Promise<R>;
+    create(args: { data: C; select?: any; include?: any }): Promise<R>; update(args: { where: W; data: U; select?: any; include?: any }): Promise<R>;
+    upsert(args: { where: W; create: C; update: U; select?: any; include?: any }): Promise<R>; delete(args: { where: W; select?: any; include?: any }): Promise<R>;
+    createMany(args: { data: C | C[]; skipDuplicates?: boolean }): Promise<{ count: number }>; updateMany(args: { where?: W; data: U }): Promise<{ count: number }>; deleteMany(args?: { where?: W }): Promise<{ count: number }>;
+    count(args?: { where?: W; select?: any; orderBy?: any; take?: number; skip?: number; cursor?: any }): Promise<number>; aggregate(args: any): Promise<any>; groupBy(args: any): Promise<any[]>;
+  }
+${entradas}  export namespace Prisma {
+    type TransactionClient = Omit<PrismaClient, "$transaction" | "$extends" | "$connect" | "$disconnect">;
+    type JsonValue = any; type InputJsonValue = any; type Decimal = import("@prisma/client").Decimal;
+    type MovimientoStockWhereInput = any; type CitaWhereInput = any; type VentaPosWhereInput = any; type StoreSelect = any;
+    type StoreUpdateManyMutationInput = any; type StoreWhereInput = any; type StoreWhereUniqueInput = any; type StoreUpdateInput = any;
+    type MovimientoStockCreateManyInput = any; type ItemCuentaMesaCreateManyInput = any; type TrabajoImpresionWhereInput = any;
+    class PrismaClientKnownRequestError extends Error { code: string; meta?: any }
+  }
+  export class PrismaClient {
+    constructor(...a: any[]);
+${delegados}
+    $transaction<T>(fn: (tx: Prisma.TransactionClient) => Promise<T>, opts?: any): Promise<T>;
+    $transaction<T extends readonly unknown[]>(ops: readonly [...T]): Promise<{ [K in keyof T]: Awaited<T[K]> }>;
+    $queryRaw(...a: any[]): Promise<any>; $executeRaw(...a: any[]): Promise<any>; $queryRawUnsafe(...a: any[]): Promise<any>;
+    $extends(...a: any[]): ClienteExtendido; $connect(): Promise<void>; $disconnect(): Promise<void>;
+    readonly __marca: "base";
+  }
+  export interface ClienteExtendido {
+    readonly __marca: "ext";
+${delegados}
+    $transaction<T>(fn: (tx: ClienteExtendidoTx) => Promise<T>, opts?: any): Promise<T>;
+    $transaction<T extends readonly unknown[]>(ops: readonly [...T]): Promise<{ [K in keyof T]: Awaited<T[K]> }>;
+    $queryRaw(...a: any[]): Promise<any>; $executeRaw(...a: any[]): Promise<any>; $queryRawUnsafe(...a: any[]): Promise<any>;
+    $extends(...a: any[]): ClienteExtendido; $connect(): Promise<void>; $disconnect(): Promise<void>;
+  }
+  export type ClienteExtendidoTx = Omit<ClienteExtendido, "$transaction" | "$extends" | "$connect" | "$disconnect">;
+${modelosPrisma.map((m) => `  export type ${m.nombre} = ${filaDe(m)};`).join("\n")}
+}
+`;
+      // redirect y notFound NO vuelven (cortan la función): sin eso, TypeScript cree que el código sigue y marca "puede ser null".
+      const nextNavegacion = `declare module "next/navigation" {
+  export function notFound(): never; export function redirect(url: string, type?: any): never; export function permanentRedirect(url: string, type?: any): never;
+  export const useRouter: any; export const usePathname: any; export const useSearchParams: any; export const useParams: any; export const useSelectedLayoutSegment: any;
+  export type ReadonlyURLSearchParams = any;
+}
+`;
+      const nodeStub = nextNavegacion + `declare module "crypto" { export function randomUUID(): string; export function randomBytes(n: number): any; export function createHmac(a: string, k: any): any; export function timingSafeEqual(a: any, b: any): boolean; export function createHash(a: string): any; }
+declare module "node:crypto" { export function randomUUID(): string; export function randomBytes(n: number): any; export function createHmac(a: string, k: any): any; export function timingSafeEqual(a: any, b: any): boolean; export function createHash(a: string): any; }
+declare module "*.css";
+declare const process: { env: Record<string, string | undefined>; [k: string]: any };
+declare const Buffer: any; type Buffer = any;
+`;
+      files.set("/proj/stubs.d.ts", stubsGenerados + prismaStub + nodeStub);
+      log("paquetes de afuera declarados: " + Object.keys(pedidos).length + "; modelos de Prisma: " + modelos.length);
+
+      const dirs = new Set(["/", "/proj", "/typescript", "/typescript/lib"]);
+      for (const f of files.keys()) { let d = f.substring(0, f.lastIndexOf("/")); while (d && !dirs.has(d)) { dirs.add(d); d = d.substring(0, d.lastIndexOf("/")); } }
+
+      const opciones = {
+        target: ts.ScriptTarget.ES2017,
+        lib: ["lib.dom.d.ts", "lib.dom.iterable.d.ts", "lib.esnext.d.ts"],
+        strict: true, noEmit: true, esModuleInterop: true, skipLibCheck: true,
+        module: ts.ModuleKind.ESNext, moduleResolution: ts.ModuleResolutionKind.Bundler,
+        resolveJsonModule: true, isolatedModules: true, jsx: ts.JsxEmit.Preserve, allowJs: false,
+        baseUrl: "/proj", paths: { "@/*": ["./src/*"] }, types: [],
+      };
+      const host = {
+        getSourceFile: (nombre, lang) => (files.has(nombre) ? ts.createSourceFile(nombre, files.get(nombre), lang) : undefined),
+        getDefaultLibFileName: () => "/typescript/lib/lib.d.ts",
+        getDefaultLibLocation: () => "/typescript/lib",
+        writeFile: () => {},
+        getCurrentDirectory: () => "/proj",
+        getCanonicalFileName: (f) => f,
+        useCaseSensitiveFileNames: () => true,
+        getNewLine: () => "\n",
+        fileExists: (f) => files.has(f),
+        readFile: (f) => files.get(f),
+        directoryExists: (d) => dirs.has(d),
+        getDirectories: () => [],
+        realpath: (f) => f,
+      };
+      const raices = [...files.keys()].filter((f) => f.startsWith("/proj/src/") || f === "/proj/stubs.d.ts");
+      log("revisando " + raices.length + " archivos…");
+      const t0 = performance.now();
+      const programa = ts.createProgram({ rootNames: raices, options: opciones, host });
+      const todas = ts.getPreEmitDiagnostics(programa);
+      log("listo en " + Math.round((performance.now() - t0) / 1000) + " s; diagnósticos: " + todas.length);
+      window.__diags = todas
+        .filter((d) => d.file && d.file.fileName.startsWith("/proj/src/"))
+        .map((d) => {
+          const { line, character } = d.file.getLineAndCharacterOfPosition(d.start || 0);
+          return { f: d.file.fileName.replace("/proj/", ""), l: line + 1, c: character + 1, code: d.code, m: ts.flattenDiagnosticMessageText(d.messageText, "\n").slice(0, 400) };
+        });
+      window.__stubDiags = todas.filter((d) => d.file && !d.file.fileName.startsWith("/proj/src/")).slice(0, 12).map((d) => { const { line } = d.file.getLineAndCharacterOfPosition(d.start || 0); const lineas = d.file.text.split("\n"); return d.file.fileName + ":" + (line + 1) + " " + ts.flattenDiagnosticMessageText(d.messageText, " ").slice(0, 200) + " ## " + (lineas[line] || "").slice(0, 200); });
+      window.__globales = todas.filter((d) => !d.file).map((d) => ts.flattenDiagnosticMessageText(d.messageText, "\n"));
+      log("errores en src: " + window.__diags.length);
+    } catch (e) {
+      log("ERROR: " + (e && e.stack || e));
+    }
+    // Le avisa el resultado a verificar-tipos.ps1.
+    try { await fetch("/resultado", { method: "POST", body: JSON.stringify({ diags: window.__diags || [], stub: window.__stubDiags || [], globales: window.__globales || [], log: window.__log }) }); } catch (e) { /* abierto a mano: no hay quien escuche */ }
+    window.__fin = true;
+  })();
+</script>
+</body>
+</html>

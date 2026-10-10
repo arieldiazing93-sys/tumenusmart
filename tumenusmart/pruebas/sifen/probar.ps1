@@ -90,7 +90,8 @@ try {
   }
 } finally {
   $servidor.Stop()
-  & taskkill /PID $proceso.Id /T /F 2>&1 | Out-Null
+  # Si Edge (o alguno de sus procesos hijos) ya terminó, taskkill se queja: no es un problema de las pruebas.
+  try { & taskkill /PID $proceso.Id /T /F 2>&1 | Out-Null } catch { }
   Start-Sleep -Milliseconds 500
   Remove-Item -LiteralPath $perfil -Recurse -Force -ErrorAction SilentlyContinue
 }

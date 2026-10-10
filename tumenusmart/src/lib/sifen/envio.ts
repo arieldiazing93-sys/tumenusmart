@@ -165,7 +165,7 @@ export async function enviarDocumento(storeId: string, documentoId: string, opci
   if (doc.vistaPrevia) return { ok: false, motivo: "no_corresponde", mensaje: "Es una vista previa de una factura autoimpresor: no se envía a la DNIT." };
   if (doc.estado !== "firmado") return { ok: false, motivo: "no_corresponde", mensaje: `El documento ya está en estado «${doc.estado}»: no hace falta enviarlo.` };
 
-  const tls = await cargarMaterialTls(db, storeId);
+  const tls = await cargarMaterialTls(prisma, storeId);
   if (!tls.ok) return registrarFalloDeComunicacion(storeId, doc, tls.error, ahora, false);
   const credenciales = { certificadoPem: tls.certificadoPem, clavePem: tls.clavePem };
   const ambiente: AmbienteWs = doc.ambiente === "produccion" ? "produccion" : "pruebas";
@@ -324,7 +324,7 @@ export async function enviarEvento(storeId: string, eventoId: string, opciones: 
   let xml = ev.xmlFirmado;
   let idEvento = ev.idEvento;
   if (!xml) {
-    const material = await cargarClaveDeFirma(db, storeId);
+    const material = await cargarClaveDeFirma(prisma, storeId);
     if (!material.ok) return registrarFalloDeEvento(storeId, ev, material.error, ahora, false);
     try {
       const firmado =
@@ -357,7 +357,7 @@ export async function enviarEvento(storeId: string, eventoId: string, opciones: 
   }
 
   // ---- enviarlo
-  const tls = await cargarMaterialTls(db, storeId);
+  const tls = await cargarMaterialTls(prisma, storeId);
   if (!tls.ok) return registrarFalloDeEvento(storeId, ev, tls.error, ahora, false);
   let contestacion: Contestacion;
   try {
