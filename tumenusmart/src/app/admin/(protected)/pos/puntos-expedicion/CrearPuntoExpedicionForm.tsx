@@ -74,7 +74,7 @@ export function CrearPuntoExpedicionForm({ modalidadDelLocal }: { modalidadDelLo
             <Entrada name="razonSocialEmisor" required placeholder="Nombre del negocio o del titular" />
           </Campo>
           <Campo etiqueta="RUC del emisor" ayuda={electronico ? "Con su dígito verificador" : undefined}>
-            <Entrada name="rucEmisor" required placeholder="80012345-6" />
+            <Entrada name="rucEmisor" required placeholder="80012345-0" />
           </Campo>
         </div>
         <Campo etiqueta="Establecimiento" ayuda="3 dígitos">

@@ -100,7 +100,7 @@ export function receptorSifen(tipoIdentificacion: string): { naturaleza: 1 | 2; 
 }
 
 /**
- * Separa un RUC paraguayo "80012345-6" en número y dígito verificador
+ * Separa un RUC paraguayo "80012345-0" en número y dígito verificador
  * (dRucRec y dDVRec). Sin guion, el dígito queda vacío.
  */
 export function separarRuc(ruc: string): { numero: string; dv: string } {

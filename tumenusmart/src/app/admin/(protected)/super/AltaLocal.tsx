@@ -176,7 +176,7 @@ export function AltaLocal({
 
       <label className="flex flex-col gap-1 text-sm text-tinta-media">
         RUC
-        <input name="ruc" placeholder="80012345-6" className={CAMPO} />
+        <input name="ruc" placeholder="80012345-0" className={CAMPO} />
         <span className="text-xs text-tinta-suave">Opcional — para facturación.</span>
       </label>
 

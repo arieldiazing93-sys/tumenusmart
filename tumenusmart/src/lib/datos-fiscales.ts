@@ -7,7 +7,7 @@
  *
  * NO verifica los datos contra la DNIT ni calcula el dígito verificador del RUC: esa comparación la hace la caja en la página de
  * la DNIT antes de cargar nada (y lo resuelve con el cliente por WhatsApp o por llamada). Acá solo se revisa lo mínimo para que la
- * factura salga completa: que el número tenga la forma correcta (el RUC con su dígito: 80012345-6, que la factura electrónica
+ * factura salga completa: que el número tenga la forma correcta (el RUC con su dígito: 80012345-0, que la factura electrónica
  * exige), una razón social de al menos 4 letras (SIFEN) y un correo con forma de correo.
  */
 
@@ -44,7 +44,7 @@ function errorDelNumero(tipo: string, numero: string): string | null {
   if (!numero) return "Escribí el número de documento.";
   if (numero.length > NUMERO_LARGO_MAXIMO) return "El número de documento es demasiado largo.";
   if (tipo === "ruc" && !/^[0-9A-Za-z]{3,12}-\d$/.test(numero)) {
-    return "El RUC se escribe con su dígito verificador, así: 80012345-6.";
+    return "El RUC se escribe con su dígito verificador, así: 80012345-0.";
   }
   if (tipo === "cedula" && !/^\d{3,10}$/.test(numero)) return "La cédula son solo números (sin puntos).";
   if (tipo !== "ruc" && tipo !== "cedula" && !/^[0-9A-Za-z.\- ]{3,30}$/.test(numero)) {

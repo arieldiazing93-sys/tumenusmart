@@ -9,7 +9,9 @@ import { formatearGuarani } from "@/lib/format";
 import { rutaParaAbrirTurno } from "@/lib/turno-requerido";
 import { TIPOS_IDENTIFICACION_FISCAL } from "@/lib/tipo-cliente";
 import { FORMAS_PAGO_POS, type FormaPagoPos } from "@/lib/turno-pos";
+import { pareceRucConDigito } from "@/lib/sifen/ruc";
 import { buscarClientePorIdentificacion } from "../pos/actions";
+import { AvisoRucDnit, useVerificacionRuc } from "../pos/AvisoRucDnit";
 import { EntradaConLupa } from "../pos/EntradaConLupa";
 import { BloqueCita, Conmutador } from "./BloqueCita";
 import { IconoBillete } from "./IconosAgenda";
@@ -53,6 +55,8 @@ export function SeccionCobro({
   const [pagaCon, setPagaCon] = useState("");
   const [buscando, setBuscando] = useState(false);
   const [avisoBusqueda, setAvisoBusqueda] = useState<string | null>(null);
+  // El RUC del cliente contra la DNIT (existe / razón social / estado): una ayuda que solo frena si la DNIT lo va a rechazar.
+  const { verificacion: verifRuc, verificando: verificandoRuc, verificar: verificarRuc, limpiar: limpiarVerifRuc } = useVerificacionRuc();
 
   const esFactura = valor.comprobanteTipo === "factura";
   const vuelto = valor.forma === "efectivo" ? (parseFloat(pagaCon) || 0) - total : 0;
@@ -64,6 +68,12 @@ export function SeccionCobro({
     setAvisoBusqueda(null);
     try {
       const r = await buscarClientePorIdentificacion(numero);
+      // Aunque ya sea cliente, se vuelve a mirar en la DNIT: su RUC pudo suspenderse desde la última vez. No espera ni frena la búsqueda.
+      if (pareceRucConDigito(numero) && (!r.ok || r.tipoIdentificacion === "ruc")) {
+        void verificarRuc(numero).then((v) => onCambio({ rucBloqueado: v?.bloquea ? (v.mensaje ?? "La DNIT no acepta facturas a ese RUC.") : null }));
+      } else {
+        limpiarVerifRuc();
+      }
       if (r.ok) {
         onCambio({ razonSocial: r.nombre, tipoIdentificacion: r.tipoIdentificacion });
         setAvisoBusqueda("Cliente encontrado.");
@@ -225,16 +235,18 @@ export function SeccionCobro({
                   <EntradaConLupa
                     value={valor.numeroIdentificacion}
                     onChange={(e) => {
-                      onCambio({ numeroIdentificacion: e.target.value });
+                      onCambio({ numeroIdentificacion: e.target.value, rucBloqueado: null });
                       setAvisoBusqueda(null);
+                      limpiarVerifRuc();
                     }}
                     onBuscar={buscarCliente}
                     buscando={buscando}
                     etiquetaBoton="Buscar cliente por RUC o cédula"
-                    placeholder="80012345-6"
+                    placeholder="80012345-0"
                   />
                 </Campo>
                 {avisoBusqueda && <p className="-mt-1 text-[0.76rem] text-tinta-media">{avisoBusqueda}</p>}
+                <AvisoRucDnit verificacion={verifRuc} verificando={verificandoRuc} />
                 <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
                   <Campo etiqueta="Tipo">
                     <Selector

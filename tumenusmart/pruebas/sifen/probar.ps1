@@ -5,7 +5,8 @@
 #
 # Necesita Edge (viene con Windows) e internet (baja Babel y, la primera vez, el validador XSD a pruebas\sifen\.cache).
 # Sale con codigo 0 si pasa todo y 1 si algo falla. Tarda unos cuatro minutos: valida miles de documentos.
-param([int]$Puerto = 8769, [int]$EsperaSegundos = 900)
+#   -Solo prueba-ruc.js        corre solo esa(s) prueba(s) (separadas por coma) en vez de todas
+param([int]$Puerto = 8769, [int]$EsperaSegundos = 900, [string]$Solo = "")
 
 $ErrorActionPreference = "Stop"
 $raiz = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
@@ -56,7 +57,7 @@ $servidor.Prefixes.Add("http://localhost:$Puerto/")
 $servidor.Start()
 
 $perfil = Join-Path ([IO.Path]::GetTempPath()) ("sifen-edge-" + [guid]::NewGuid().ToString("N"))
-$proceso = Start-Process $edge -ArgumentList @("--headless=new", "--disable-gpu", "--no-first-run", "--user-data-dir=`"$perfil`"", "http://localhost:$Puerto/") -PassThru
+$proceso = Start-Process $edge -ArgumentList @("--headless=new", "--disable-gpu", "--no-first-run", "--user-data-dir=`"$perfil`"", $(if ($Solo) { "http://localhost:$Puerto/?solo=$Solo" } else { "http://localhost:$Puerto/" })) -PassThru
 
 $resultado = $null
 $limite = (Get-Date).AddSeconds($EsperaSegundos)

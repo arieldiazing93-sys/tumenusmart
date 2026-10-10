@@ -4,7 +4,7 @@
  *
  * Fuente: Manual Técnico SIFEN v150, sección 7.5, y Nota Técnica 16. El certificado lo usa el sistema para dos cosas:
  * firmar cada documento y autenticarse ante la DNIT (conexión con autenticación mutua). Tiene que ser un certificado
- * cualificado con el RUC del contribuyente (persona jurídica: en el número de serie del titular, "RUC80012345-6"; persona
+ * cualificado con el RUC del contribuyente (persona jurídica: en el número de serie del titular, "RUC80012345-0"; persona
  * física: en el nombre alternativo), clave RSA de 2048 bits o más, uso de firma digital y, para conectarse, el uso de
  * autenticación de cliente.
  *
@@ -88,10 +88,10 @@ export function leerCertificadoP12(pfxBase64: string, clave: string): ResultadoC
   const derHoja = forge.asn1.toDer(forge.pki.certificateToAsn1(hoja)).getBytes();
   const avisos: string[] = [];
 
-  // El RUC va como texto "RUC80012345-6" dentro del certificado (titular o nombre alternativo): se lo busca en todo el DER.
+  // El RUC va como texto "RUC80012345-0" dentro del certificado (titular o nombre alternativo): se lo busca en todo el DER.
   const coincidenciaRuc = /RUC\s*(\d{3,8})\s*-\s*(\d)/i.exec(derHoja);
   if (!coincidenciaRuc) {
-    avisos.push('No se encontró el RUC dentro del certificado (debería figurar como "RUC80012345-6"): la DNIT lo exige para aceptar la firma.');
+    avisos.push('No se encontró el RUC dentro del certificado (debería figurar como "RUC80012345-0"): la DNIT lo exige para aceptar la firma.');
   }
 
   const uso = hoja.getExtension("keyUsage") as Record<string, unknown> | null;

@@ -113,7 +113,7 @@ export function repartirEnEnteros(partes: number[]): number[] {
   return resultado;
 }
 
-/** El RUC sin su dígito verificador ("80012345-6" → "80012345"). */
+/** El RUC sin su dígito verificador ("80012345-0" → "80012345"). */
 export function rucSinDv(ruc: string | null | undefined): string {
   const limpio = (ruc ?? "").trim();
   return limpio.split("-")[0].replace(/\s+/g, "");

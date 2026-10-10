@@ -218,7 +218,7 @@ export function armarDE(c: ComprobanteParaDocumento, pagos: PagoParaDocumento[],
   if (!/^[1-9]\d{2,7}$/.test(rucEmisor.numero)) {
     faltantes.push(`El RUC del emisor tiene que tener entre 3 y 8 dígitos, sin ceros adelante (tiene "${rucEmisor.numero}")`);
   } else if (!rucEmisor.dv) {
-    faltantes.push("El RUC del emisor no tiene el dígito verificador (formato 80012345-6)");
+    faltantes.push("El RUC del emisor no tiene el dígito verificador (formato 80012345-0)");
   } else if (Number(rucEmisor.dv) !== calcularDvRuc(rucEmisor.numero)) {
     faltantes.push(
       `El dígito verificador del RUC del emisor (${rucEmisor.dv}) no coincide con el que da el módulo 11 (${calcularDvRuc(rucEmisor.numero)}): la DNIT lo rechaza`
@@ -393,7 +393,7 @@ export function armarDE(c: ComprobanteParaDocumento, pagos: PagoParaDocumento[],
     if (!/^[1-9]\d{2,7}$/.test(rucRec.numero)) {
       faltantes.push(`El RUC del comprador tiene que tener entre 3 y 8 dígitos (tiene "${rucRec.numero}")`);
     } else if (!rucRec.dv) {
-      faltantes.push("El RUC del comprador no tiene el dígito verificador (formato 80012345-6)");
+      faltantes.push("El RUC del comprador no tiene el dígito verificador (formato 80012345-0)");
     } else if (Number(rucRec.dv) !== calcularDvRuc(rucRec.numero)) {
       faltantes.push(`El dígito verificador del RUC del comprador (${rucRec.dv}) no coincide con el que da el módulo 11 (${calcularDvRuc(rucRec.numero)})`);
     }

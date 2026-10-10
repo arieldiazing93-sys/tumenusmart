@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { Boton, Campo, Entrada, Selector, MensajeError } from "@/components/ui";
 import { TIPOS_IDENTIFICACION_FISCAL } from "@/lib/tipo-cliente";
+import { AvisoRucDnit, useVerificacionDeCliente } from "./AvisoRucDnit";
 
 export type DatosClienteFiscal = {
   numeroIdentificacion: string;
@@ -24,6 +25,10 @@ export type DatosClienteFiscal = {
  * incrementa cuando el cliente se crea de verdad.
  *
  * Hoja desde abajo en el celular, cuadro centrado en pantallas más anchas.
+ *
+ * Con tipo RUC, en cuanto el número está completo (80012345-0) se verifica solo contra la DNIT: trae la razón social, completa el
+ * dígito verificador si faltaba y, si el RUC no existe o está en un estado que la DNIT rechaza, no deja guardarlo (la factura
+ * saldría rechazada). Si la DNIT no contesta no estorba: queda el control del dígito verificador de siempre.
  */
 export function ClienteFiscalModal({
   numeroInicial,
@@ -41,6 +46,13 @@ export function ClienteFiscalModal({
   const [razonSocial, setRazonSocial] = useState("");
   const [email, setEmail] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const { verificacion, verificando, verificarAhora, usarNombreDeLaDnit } = useVerificacionDeCliente({
+    tipo,
+    numero,
+    razonSocial,
+    ponerNumero: setNumero,
+    ponerRazonSocial: setRazonSocial,
+  });
 
   useEffect(() => {
     function alTeclado(e: KeyboardEvent) {
@@ -50,8 +62,30 @@ export function ClienteFiscalModal({
     return () => window.removeEventListener("keydown", alTeclado);
   }, [onCerrar]);
 
-  function guardar() {
-    if (!numero.trim() || !razonSocial.trim()) {
+  async function guardar() {
+    const n = numero.trim();
+    if (!n) {
+      setError("Completá el número y la razón social.");
+      return;
+    }
+    let razon = razonSocial.trim();
+    let numeroFinal = n;
+    if (tipo === "ruc") {
+      if (verificando) {
+        setError("Esperá un instante: se está verificando el RUC en la DNIT.");
+        return;
+      }
+      // Si todavía no se verificó (se apretó Guardar enseguida, o falta el dígito verificador), se verifica ahora.
+      let v = verificacion;
+      if (!v && /^[1-9]\d{4,7}(-\d)?$/.test(n)) v = await verificarAhora(n, false);
+      if (v?.bloquea) {
+        setError(v.mensaje ?? "La DNIT no acepta facturas a ese RUC.");
+        return;
+      }
+      if (v && (v.resultado === "encontrado" || v.resultado === "no_disponible") && v.rucCompleto) numeroFinal = v.rucCompleto;
+      if (!razon && v?.resultado === "encontrado" && v.razonSocial) razon = v.razonSocial;
+    }
+    if (!razon) {
       setError("Completá el número y la razón social.");
       return;
     }
@@ -60,9 +94,9 @@ export function ClienteFiscalModal({
       return;
     }
     onGuardar({
-      numeroIdentificacion: numero.trim(),
+      numeroIdentificacion: numeroFinal,
       tipoIdentificacion: tipo,
-      razonSocial: razonSocial.trim(),
+      razonSocial: razon,
       email: email.trim(),
     });
   }
@@ -120,13 +154,40 @@ export function ClienteFiscalModal({
             </Selector>
           </Campo>
 
-          <Campo etiqueta="N° de RUC / Cédula / etc.">
-            <Entrada
-              value={numero}
-              onChange={(e) => setNumero(e.target.value)}
-              placeholder="80012345-6"
-            />
-          </Campo>
+          <div>
+            <Campo etiqueta="N° de RUC / Cédula / etc.">
+              <Entrada
+                value={numero}
+                onChange={(e) => {
+                  setNumero(e.target.value);
+                  setError(null);
+                }}
+                placeholder="80012345-0"
+              />
+            </Campo>
+            {tipo === "ruc" && (
+              <>
+                <AvisoRucDnit verificacion={verificacion} verificando={verificando} conRazonSocial={false} />
+                {verificacion?.resultado === "encontrado" && verificacion.razonSocial && razonSocial.trim() !== verificacion.razonSocial && (
+                  <div className="mt-1.5">
+                    <Boton tono="navegar" tam="sm" onClick={usarNombreDeLaDnit}>
+                      Usar el nombre de la DNIT
+                    </Boton>
+                  </div>
+                )}
+                <div className="mt-2">
+                  <Boton
+                    tono="navegar"
+                    tam="sm"
+                    disabled={verificando || !numero.trim()}
+                    onClick={() => void verificarAhora(numero.trim(), true)}
+                  >
+                    {verificando ? "Verificando…" : "Verificar en la DNIT"}
+                  </Boton>
+                </div>
+              </>
+            )}
+          </div>
 
           <Campo etiqueta="Nombre / Razón social">
             <Entrada

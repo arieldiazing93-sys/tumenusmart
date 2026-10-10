@@ -31,7 +31,7 @@ export function CrearProveedorForm({ onCreado }: { onCreado: (proveedorId: strin
           <Entrada name="razonSocial" placeholder="Ej: Distribuidora Central S.A." />
         </Campo>
         <Campo etiqueta="RUC (opcional)">
-          <Entrada name="ruc" placeholder="Ej: 80012345-6" />
+          <Entrada name="ruc" placeholder="Ej: 80012345-0" />
         </Campo>
         <Campo etiqueta="Teléfono (opcional)">
           <Entrada name="telefono" placeholder="Ej: 0981234567" />

@@ -16,6 +16,8 @@ import { imprimirComprobante, type ResultadoImpresion } from "@/lib/impresion-co
 import { CobrarPanel } from "../pos/CobrarPanel";
 import { EntradaConLupa } from "../pos/EntradaConLupa";
 import { ClienteFiscalModal, type DatosClienteFiscal } from "../pos/ClienteFiscalModal";
+import { AvisoRucDnit, useVerificacionRuc } from "../pos/AvisoRucDnit";
+import { pareceRucConDigito } from "@/lib/sifen/ruc";
 import { buscarClientePorIdentificacion, buscarClientePorTelefono } from "../pos/actions";
 import { pagarCuenta } from "./actions";
 import type { ContextoCaja, CuentaCajaFila } from "./ComedorCaja";
@@ -68,6 +70,8 @@ export function PagarCuentaPanel({
   const [encontrado, setEncontrado] = useState(false);
   const [esNuevo, setEsNuevo] = useState(false);
   const [buscando, setBuscando] = useState(false);
+  // El RUC del cliente contra la DNIT (existe / razón social / estado): una ayuda que solo frena si la DNIT lo va a rechazar.
+  const { verificacion: verifRuc, verificando: verificandoRuc, verificar: verificarRuc, limpiar: limpiarVerifRuc } = useVerificacionRuc();
   const [modalCliente, setModalCliente] = useState(false);
 
   // Para una venta a crédito: a quién se le cobra después (nombre y teléfono; con factura con registro fiscal alcanza su RUC).
@@ -123,6 +127,9 @@ export function PagarCuentaPanel({
     setEncontrado(false);
     try {
       const r = await buscarClientePorIdentificacion(n);
+      // Aunque ya sea cliente, se vuelve a mirar en la DNIT: su RUC pudo suspenderse desde la última vez. No espera ni frena la búsqueda.
+      if (pareceRucConDigito(n) && (!r.ok || r.tipoIdentificacion === "ruc")) void verificarRuc(n);
+      else limpiarVerifRuc();
       if (r.ok) {
         setRazonSocial(r.nombre);
         setTipoId(r.tipoIdentificacion);
@@ -149,6 +156,11 @@ export function PagarCuentaPanel({
     setError(null);
     if (conRegistro && (!numero.trim() || !razonSocial.trim())) {
       setError("Para factura con registro fiscal hacen falta el número y la razón social.");
+      return;
+    }
+    // La DNIT rechaza las facturas a un RUC que no existe o está cancelado/suspendido: mejor frenarlo acá que emitir una rechazada.
+    if (conRegistro && verifRuc?.bloquea) {
+      setError(verifRuc.mensaje ?? "La DNIT no acepta facturas a ese RUC.");
       return;
     }
     if (conPropina && !propinaValida) {
@@ -524,13 +536,15 @@ export function PagarCuentaPanel({
                               setEsNuevo(false);
                               setEncontrado(false);
                               setEmail("");
+                              limpiarVerifRuc();
                             }}
                             onBuscar={() => void buscarCliente()}
                             buscando={buscando}
                             etiquetaBoton="Buscar cliente por RUC o cédula"
-                            placeholder="80012345-6"
+                            placeholder="80012345-0"
                           />
                         </Campo>
+                        <AvisoRucDnit verificacion={verifRuc} verificando={verificandoRuc} />
                         {encontrado ? (
                           <div className="flex flex-col items-start gap-1 rounded-lg bg-white px-3 py-2">
                             <DatoDelCliente etiqueta="Razón social" valor={razonSocial} />
@@ -619,6 +633,9 @@ export function PagarCuentaPanel({
             setTipoId(datos.tipoIdentificacion);
             setRazonSocial(datos.razonSocial);
             setEmail(datos.email);
+            // El cuadro ya lo verificó (la respuesta quedó guardada unos minutos): acá se vuelve a mostrar el resultado bajo el campo.
+            limpiarVerifRuc();
+            if (datos.tipoIdentificacion === "ruc" && pareceRucConDigito(datos.numeroIdentificacion)) void verificarRuc(datos.numeroIdentificacion);
             setModalCliente(false);
           }}
         />

@@ -2,13 +2,14 @@
  * Los mensajes de los servicios web de la DNIT (SIFEN): cómo se arma lo que se envía y cómo se lee lo que contestan.
  *
  * Fuente: Manual Técnico v150, capítulos 7 (estándares: SOAP 1.2, Document/Literal, TLS 1.2 con autenticación mutua),
- * 8 y 9 (servicios y sus protocolos) y los esquemas oficiales WS_SiRecepDE_v150.xsd, protProcesDE_v150.xsd y
- * WS_SiConsDE_v141.xsd, contra los que se validan estos mensajes en las pruebas.
+ * 8 y 9 (servicios y sus protocolos) y los esquemas oficiales WS_SiRecepDE_v150.xsd, protProcesDE_v150.xsd,
+ * WS_SiConsDE_v141.xsd y WS_SiConsRUC_v141.xsd, contra los que se validan estos mensajes en las pruebas.
  *
  * Es puro (sin red ni base de datos): arma y lee texto. El envío de verdad está en `transporte.ts` y la lógica de estados
  * y reintentos en `envio.ts`.
  */
 
+import { ESTADOS_RUC } from "./ruc";
 import { NAMESPACE_SIFEN, buscarElemento, hijosConNombre, leerElementos, textoDeElemento, type ElementoXml } from "./xml";
 
 export type AmbienteWs = "pruebas" | "produccion";
@@ -59,6 +60,14 @@ export function cuerpoRecepcionDE(dId: number, xmlRde: string): string {
 /** Consulta de un documento por su CDC. */
 export function cuerpoConsultaDE(dId: number, cdc: string): string {
   return `<rEnviConsDeRequest xmlns="${NAMESPACE_SIFEN}"><dId>${dId}</dId><dCDC>${cdc}</dCDC></rEnviConsDeRequest>`;
+}
+
+/**
+ * Consulta de los datos y el estado de un RUC (Manual 9.6, WS_SiConsRUC_v141.xsd). `ruc` va SIN el dígito verificador, de 5 a 8
+ * caracteres (el esquema lo exige así).
+ */
+export function cuerpoConsultaRuc(dId: number, ruc: string): string {
+  return `<rEnviConsRUC xmlns="${NAMESPACE_SIFEN}"><dId>${dId}</dId><dRUCCons>${ruc}</dRUCCons></rEnviConsRUC>`;
 }
 
 /** Registro de un evento (cancelación, inutilización…): <rEnviEventoDe> con el evento ya firmado dentro de <dEvReg>. */
@@ -207,6 +216,52 @@ export function leerRespuestaConsulta(xml: string): RespuestaConsulta {
     protocoloAutorizacion: protocolo,
     existe: codigo === "0422",
   };
+}
+
+export type RespuestaConsultaRuc =
+  | {
+      tipo: "consulta";
+      /** 0500 = el RUC no existe; 0501 = el RUC del certificado no tiene permiso para este servicio; 0502 = encontrado (Manual, tabla H). */
+      codigo: string | null;
+      mensaje: string | null;
+      /** Solo cuando el código es 0502. */
+      contenido: {
+        /** El RUC consultado, sin dígito verificador. */
+        ruc: string | null;
+        razonSocial: string | null;
+        /** ACT, SUS, SAD, BLQ, CAN o CDE. */
+        estadoCodigo: string | null;
+        estadoTexto: string | null;
+        /** dRUCFactElec: S = es facturador electrónico, N = no lo es. */
+        facturadorElectronico: boolean | null;
+      } | null;
+    }
+  | { tipo: "falla"; motivo: string }
+  | { tipo: "ilegible"; motivo: string };
+
+/** La respuesta de la consulta de RUC: <rResEnviConsRUC> con <xContRUC> cuando lo encontró. */
+export function leerRespuestaConsultaRuc(xml: string): RespuestaConsultaRuc {
+  const leida = leerRaiz(xml);
+  if ("error" in leida) return { tipo: "ilegible", motivo: leida.error };
+  const falla = leerFallaSoap(leida.raiz);
+  if (falla) return { tipo: "falla", motivo: falla };
+  const respuesta = buscarElemento(leida.raiz, "rResEnviConsRUC") ?? buscarElemento(leida.raiz, "rEnviConsRUCResponse");
+  if (!respuesta) return { tipo: "ilegible", motivo: "La respuesta no trae el resultado de la consulta de RUC" };
+  const codigo = textoDeElemento(buscarElemento(respuesta, "dCodRes"));
+  const cont = buscarElemento(respuesta, "xContRUC");
+  let contenido: Extract<RespuestaConsultaRuc, { tipo: "consulta" }>["contenido"] = null;
+  if (cont) {
+    const estadoCodigo = textoDeElemento(buscarElemento(cont, "dCodEstCons"))?.toUpperCase() ?? null;
+    const factElec = textoDeElemento(buscarElemento(cont, "dRUCFactElec"))?.toUpperCase();
+    contenido = {
+      ruc: textoDeElemento(buscarElemento(cont, "dRUCCons")),
+      razonSocial: textoDeElemento(buscarElemento(cont, "dRazCons")),
+      estadoCodigo,
+      estadoTexto: textoDeElemento(buscarElemento(cont, "dDesEstCons")) ?? (estadoCodigo ? ESTADOS_RUC[estadoCodigo] ?? null : null),
+      facturadorElectronico: factElec === "S" ? true : factElec === "N" ? false : null,
+    };
+  }
+  return { tipo: "consulta", codigo, mensaje: textoDeElemento(buscarElemento(respuesta, "dMsgRes")), contenido };
 }
 
 /** La respuesta del registro de un evento: <rRetEnviEventoDe> con uno o más <gResProcEVe>. */

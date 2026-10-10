@@ -96,7 +96,7 @@ export function CamposFiscalesCliente({
           Número de documento
         </label>
         <span className="mb-1.5 block text-[0.78rem] text-tinta-suave">
-          {ficha.tipo === "ruc" ? "Con su dígito verificador: 80012345-6" : "Tocá la lupa para ver si ya está en el sistema"}
+          {ficha.tipo === "ruc" ? "Con su dígito verificador: 80012345-0" : "Tocá la lupa para ver si ya está en el sistema"}
         </span>
         <div className="flex items-center gap-2">
           <Entrada
@@ -114,7 +114,7 @@ export function CamposFiscalesCliente({
                 buscar();
               }
             }}
-            placeholder="80012345-6"
+            placeholder="80012345-0"
             maxLength={30}
             autoComplete="off"
             className="min-w-0 flex-1"

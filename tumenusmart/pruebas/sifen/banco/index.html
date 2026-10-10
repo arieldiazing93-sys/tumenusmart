@@ -24,14 +24,11 @@
       document.body.appendChild(s);
       const t = setInterval(() => { if (window.__listo) { clearInterval(t); ok(); } }, 200);
     });
+    // ?solo=prueba-ruc.js,prueba-envio.js corre solo esas (para no esperar todo mientras se trabaja en una); sin eso, todas.
+    const solo = new URLSearchParams(location.search).get("solo");
+    const todas = ["prueba-base.js", "prueba-qr.js", "prueba-firma.js", "prueba-emision.js", "prueba-envio.js", "prueba-eventos.js", "prueba-documento.js", "prueba-ruc.js"];
     try {
-      await correr("prueba-base.js");
-      await correr("prueba-qr.js");
-      await correr("prueba-firma.js");
-      await correr("prueba-emision.js");
-      await correr("prueba-envio.js");
-      await correr("prueba-eventos.js");
-      await correr("prueba-documento.js");
+      for (const archivo of solo ? solo.split(",") : todas) await correr(archivo);
     } catch (e) {
       window.__fallas++;
       window.log("ERROR: " + e);

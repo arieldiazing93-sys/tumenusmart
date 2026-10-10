@@ -8,6 +8,7 @@ import { TIPOS_IDENTIFICACION_FISCAL, etiquetaTipoIdentificacion } from "@/lib/t
 import { formatearGuarani, formatearNumero } from "@/lib/format";
 import { ZONA_NEGOCIO } from "@/lib/timezone";
 import { imprimirComprobante } from "@/lib/impresion-comprobantes";
+import { AvisoRucDnit, useVerificacionDeCliente } from "../../pos/AvisoRucDnit";
 import {
   buscarClientesFiscales,
   buscarParaRemision,
@@ -48,6 +49,15 @@ export function NuevaFacturaForm({
   const [numeroIdentificacion, setNumeroIdentificacion] = useState("");
   const [razonSocial, setRazonSocial] = useState("");
   const [email, setEmail] = useState("");
+  // El RUC contra la DNIT: se verifica solo al elegir o escribir un cliente con RUC completo. Es justo el caso de esta pantalla (el RUC
+  // venía mal cargado), así que si la DNIT dice que no existe o está suspendido, no se deja generar otra factura que volvería rechazada.
+  const { verificacion, verificando, verificarAhora, usarNombreDeLaDnit } = useVerificacionDeCliente({
+    tipo: tipoIdentificacion,
+    numero: numeroIdentificacion,
+    razonSocial,
+    ponerNumero: setNumeroIdentificacion,
+    ponerRazonSocial: setRazonSocial,
+  });
 
   // --- Paso 2: pedido/venta a remitir ---
   const [origen, setOrigen] = useState<"pedido" | "venta">("pedido");
@@ -141,7 +151,8 @@ export function NuevaFacturaForm({
   }
 
   const clienteListo = !!razonSocial.trim() && !!numeroIdentificacion.trim();
-  const puedeGenerar = clienteListo && !!resumen && !!motivo.trim();
+  const rucBloqueado = tipoIdentificacion === "ruc" && !!verificacion?.bloquea;
+  const puedeGenerar = clienteListo && !!resumen && !!motivo.trim() && !rucBloqueado && !verificando;
 
   return (
     <div className="flex flex-col gap-5">
@@ -165,6 +176,7 @@ export function NuevaFacturaForm({
                 Buscar otro
               </Boton>
             </div>
+            {tipoIdentificacion === "ruc" && <AvisoRucDnit verificacion={verificacion} verificando={verificando} conRazonSocial={false} />}
           </div>
         ) : (
           <>
@@ -223,9 +235,28 @@ export function NuevaFacturaForm({
                     ))}
                   </Selector>
                 </Campo>
-                <Campo etiqueta="N° de RUC / Cédula / etc.">
-                  <Entrada value={numeroIdentificacion} onChange={(e) => setNumeroIdentificacion(e.target.value)} />
-                </Campo>
+                <div>
+                  <Campo etiqueta="N° de RUC / Cédula / etc.">
+                    <Entrada value={numeroIdentificacion} onChange={(e) => setNumeroIdentificacion(e.target.value)} />
+                  </Campo>
+                  {tipoIdentificacion === "ruc" && (
+                    <>
+                      <AvisoRucDnit verificacion={verificacion} verificando={verificando} conRazonSocial={false} />
+                      {verificacion?.resultado === "encontrado" && verificacion.razonSocial && razonSocial.trim() !== verificacion.razonSocial && (
+                        <div className="mt-1.5">
+                          <Boton tono="navegar" tam="sm" onClick={usarNombreDeLaDnit}>
+                            Usar el nombre de la DNIT
+                          </Boton>
+                        </div>
+                      )}
+                      <div className="mt-2">
+                        <Boton tono="navegar" tam="sm" disabled={verificando || !numeroIdentificacion.trim()} onClick={() => void verificarAhora(numeroIdentificacion.trim(), true)}>
+                          {verificando ? "Verificando…" : "Verificar en la DNIT"}
+                        </Boton>
+                      </div>
+                    </>
+                  )}
+                </div>
                 <Campo etiqueta="Razón social">
                   <Entrada value={razonSocial} onChange={(e) => setRazonSocial(e.target.value)} autoFocus />
                 </Campo>
@@ -320,6 +351,7 @@ export function NuevaFacturaForm({
           </div>
 
           {errorEnvio && <MensajeError>{errorEnvio}</MensajeError>}
+          {rucBloqueado && <MensajeError>{verificacion?.mensaje ?? "La DNIT no acepta facturas a ese RUC."}</MensajeError>}
 
           <Boton tono="nuevo" onClick={generar} disabled={!puedeGenerar || enviando} tam="lg">
             {enviando ? "Generando…" : "Generar factura nueva"}

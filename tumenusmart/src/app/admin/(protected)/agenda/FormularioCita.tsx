@@ -245,6 +245,9 @@ export function FormularioCita({
       ) {
         return "Para la factura con registro fiscal hacen falta el número y la razón social.";
       }
+      if (comprobanteFinal === "factura" && datosCobro.registroFiscal === "con" && datosCobro.rucBloqueado) {
+        return datosCobro.rucBloqueado;
+      }
     }
     return null;
   }

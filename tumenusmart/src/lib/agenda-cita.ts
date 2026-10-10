@@ -148,6 +148,8 @@ export type DatosCobro = {
   numeroIdentificacion: string;
   razonSocial: string;
   email: string;
+  /** Si la DNIT dijo que ese RUC no existe o está en un estado que ella rechaza: el motivo, para no emitir una factura que va a volver rechazada. */
+  rucBloqueado?: string | null;
 };
 
 // ---------------------------------------------------------------------------

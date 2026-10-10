@@ -62,7 +62,7 @@ const ETIQUETAS_CORTAS: Record<TipoIdentificacionFiscal, string> = {
 };
 
 /**
- * La etiqueta corta para poner delante del número ("RUC: 80012345-6",
+ * La etiqueta corta para poner delante del número ("RUC: 80012345-0",
  * "CI: 4987017"), en pantallas donde "Cédula de identidad" ocuparía de más.
  */
 export function etiquetaCortaTipoIdentificacion(valor: string): string {

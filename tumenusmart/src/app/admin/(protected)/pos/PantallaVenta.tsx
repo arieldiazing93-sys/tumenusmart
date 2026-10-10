@@ -19,6 +19,8 @@ import { MovimientosCajaBoton } from "./caja/MovimientosCajaBoton";
 import { CompartirCarta } from "../CompartirCarta";
 import { EntradaConLupa } from "./EntradaConLupa";
 import { ClienteFiscalModal, type DatosClienteFiscal } from "./ClienteFiscalModal";
+import { AvisoRucDnit, useVerificacionRuc } from "./AvisoRucDnit";
+import { pareceRucConDigito } from "@/lib/sifen/ruc";
 import { ClienteRapidoModal } from "./ClienteRapidoModal";
 import { MitadYMitadPickerPos } from "./MitadYMitadPickerPos";
 import { AgregadosPickerPos } from "./AgregadosPickerPos";
@@ -164,6 +166,8 @@ export function PantallaVenta({
   const [clienteFiscalEsNuevo, setClienteFiscalEsNuevo] = useState(false);
   const [clienteFiscalEncontrado, setClienteFiscalEncontrado] = useState(false);
   const [buscandoClienteFiscal, setBuscandoClienteFiscal] = useState(false);
+  // El RUC del cliente contra la DNIT (existe / razón social / estado): una ayuda que solo frena si la DNIT lo va a rechazar.
+  const { verificacion: verifRuc, verificando: verificandoRuc, verificar: verificarRuc, limpiar: limpiarVerifRuc } = useVerificacionRuc();
   const [mostrarModalClienteFiscal, setMostrarModalClienteFiscal] = useState(false);
   // Crear un cliente por teléfono (venta a crédito con ticket): nombre + teléfono.
   const [mostrarModalClienteRapido, setMostrarModalClienteRapido] = useState(false);
@@ -371,6 +375,9 @@ export function PantallaVenta({
     setClienteFiscalEncontrado(false);
     const r = await buscarClientePorIdentificacion(numero);
     setBuscandoClienteFiscal(false);
+    // Aunque ya sea cliente, se vuelve a mirar en la DNIT: su RUC pudo suspenderse desde la última vez. No espera ni frena la búsqueda.
+    if (pareceRucConDigito(numero) && (!r.ok || r.tipoIdentificacion === "ruc")) void verificarRuc(numero);
+    else limpiarVerifRuc();
     if (r.ok) {
       setFacturaRazonSocial(r.nombre);
       setFacturaTipoIdentificacionElegido(r.tipoIdentificacion);
@@ -401,6 +408,7 @@ export function PantallaVenta({
       setFacturaEmail("");
       setClienteFiscalEncontrado(false);
       setClienteFiscalEsNuevo(false);
+      limpiarVerifRuc();
     }
   }
 
@@ -413,6 +421,11 @@ export function PantallaVenta({
       (!facturaNumeroIdentificacion.trim() || !facturaRazonSocial.trim())
     ) {
       setError("Para factura con registro fiscal hacen falta el número y la razón social.");
+      return;
+    }
+    // La DNIT rechaza las facturas a un RUC que no existe o está cancelado/suspendido: mejor frenarlo acá que emitir una rechazada.
+    if (comprobanteTipo === "factura" && registroFiscal === "con" && verifRuc?.bloquea) {
+      setError(verifRuc.mensaje ?? "La DNIT no acepta facturas a ese RUC.");
       return;
     }
     // A crédito hay que saber a quién cobrarle después: el nombre y una forma
@@ -593,6 +606,7 @@ export function PantallaVenta({
                 setClienteFiscalEsNuevo(false);
                 setClienteFiscalEncontrado(false);
                 setFacturaEmail("");
+                limpiarVerifRuc();
               }}
               onKeyDown={(e) => {
                 if (e.key !== "Enter") return;
@@ -609,6 +623,7 @@ export function PantallaVenta({
               {buscandoClienteFiscal ? "Buscando…" : "Buscar cliente"}
             </Boton>
           </div>
+          <AvisoRucDnit verificacion={verifRuc} verificando={verificandoRuc} />
           {clienteFiscalEsNuevo ? (
             <>
               <p className="text-[0.78rem] font-medium text-aviso">No existe ningún cliente con ese número.</p>
@@ -1082,13 +1097,15 @@ export function PantallaVenta({
                             setClienteFiscalEsNuevo(false);
                             setClienteFiscalEncontrado(false);
                             setFacturaEmail("");
+                            limpiarVerifRuc();
                           }}
                           onBuscar={buscarClienteFiscal}
                           buscando={buscandoClienteFiscal}
                           etiquetaBoton="Buscar cliente por RUC o cédula"
-                          placeholder="80012345-6"
+                          placeholder="80012345-0"
                         />
                       </Campo>
+                      <AvisoRucDnit verificacion={verifRuc} verificando={verificandoRuc} />
                       {clienteFiscalEncontrado ? (
                         <div className="flex flex-col items-start gap-1 rounded-lg bg-white px-3 py-2">
                           <DatoDelCliente etiqueta="Razón social" valor={facturaRazonSocial} />
@@ -1288,6 +1305,9 @@ export function PantallaVenta({
             setFacturaTipoIdentificacionElegido(datos.tipoIdentificacion);
             setFacturaRazonSocial(datos.razonSocial);
             setFacturaEmail(datos.email);
+            // El cuadro ya lo verificó (la respuesta quedó guardada unos minutos): acá se vuelve a mostrar el resultado bajo el campo.
+            limpiarVerifRuc();
+            if (datos.tipoIdentificacion === "ruc" && pareceRucConDigito(datos.numeroIdentificacion)) void verificarRuc(datos.numeroIdentificacion);
             setMostrarModalClienteFiscal(false);
           }}
         />

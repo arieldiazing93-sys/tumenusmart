@@ -400,7 +400,7 @@ export function CheckoutForm({
                   required
                   value={facturaRuc}
                   onChange={(e) => setFacturaRuc(e.target.value)}
-                  placeholder="80012345-6"
+                  placeholder="80012345-0"
                   className="!h-12 !rounded-xl"
                 />
               </Campo>

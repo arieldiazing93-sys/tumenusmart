@@ -12,20 +12,22 @@ sección o la nota de donde sale.
 
 | Archivo | Para qué |
 |---|---|
-| `xsd/` | Copia de los esquemas OFICIALES: el documento (DE_v150 y sus tipos), la firma (xmldsig), los servicios web (WS_SiRecepDE, WS_SiConsDE, WS_SiRecepEvento y sus protocolos de respuesta) y los eventos (Evento_v150). |
+| `xsd/` | Copia de los esquemas OFICIALES: el documento (DE_v150 y sus tipos), la firma (xmldsig), los servicios web (WS_SiRecepDE, WS_SiConsDE, WS_SiConsRUC, WS_SiRecepEvento y sus protocolos de respuesta) y los eventos (Evento_v150). |
 | `generar-esquema.ps1` | Lee esos XSD y genera `src/lib/sifen/esquema-de.generated.ts` (estructura, orden, obligatoriedad y formato de cada campo). |
 | `tablas/` | El **Código de Referencia Geográfica** oficial de e-Kuatia (departamentos, distritos y ciudades, actualización de noviembre de 2025; MD5 `0d817dee1a6a0c307a8fd25140c4f9be`, idéntico al publicado). |
 | `generar-geografia.ps1` | Lee ese Excel (sin Excel ni Node) y genera `src/lib/sifen/geografia.generated.ts` con 18 departamentos, 272 distritos y 6.766 ciudades. |
 | `probar.ps1` | Corre TODAS las pruebas con Microsoft Edge sin ventana (no hace falta Node). |
 | `banco/` | Las pruebas y el cargador de módulos que usa `probar.ps1`. |
 
-Código que prueban (todo en `src/lib/sifen/`): `xml.ts` (escribir y leer el XML, validar contra el esquema), `cdc.ts`, `qr.ts`, `controlar.ts` (las cuentas), `armar-de.ts` (el documento), `firma.ts` (firma digital XMLDSig de documentos y eventos), `certificado.ts` (leer el .p12 y la bóveda cifrada), `kude.ts` y `kude-escpos.ts` (el comprobante impreso en pantalla y en la impresora térmica), `ws.ts` (los mensajes SOAP de los servicios de la DNIT), `envio.ts` (estados, reintentos y cola de envío de documentos y eventos), `eventos.ts` y `solicitudes.ts` (cancelación e inutilización), `comprobante.ts` (emite y firma al vender) y `servidor.ts` (bóveda y firma con la base de datos). `transporte.ts` (la conexión real con la DNIT) no se puede probar acá: las pruebas la reemplazan por una DNIT simulada. Las pruebas usan una base de datos en memoria (`banco/base-falsa.js`).
+Código que prueban (todo en `src/lib/sifen/`): `xml.ts` (escribir y leer el XML, validar contra el esquema), `cdc.ts`, `qr.ts`, `controlar.ts` (las cuentas), `armar-de.ts` (el documento), `firma.ts` (firma digital XMLDSig de documentos y eventos), `certificado.ts` (leer el .p12 y la bóveda cifrada), `kude.ts` y `kude-escpos.ts` (el comprobante impreso en pantalla y en la impresora térmica), `ws.ts` (los mensajes SOAP de los servicios de la DNIT), `envio.ts` (estados, reintentos y cola de envío de documentos y eventos), `eventos.ts` y `solicitudes.ts` (cancelación e inutilización), `ruc.ts` y `consulta-ruc.ts` (verificar el RUC del comprador en la DNIT), `comprobante.ts` (emite y firma al vender) y `servidor.ts` (bóveda y firma con la base de datos). `transporte.ts` (la conexión real con la DNIT) no se puede probar acá: las pruebas la reemplazan por una DNIT simulada. Las pruebas usan una base de datos en memoria (`banco/base-falsa.js`).
 
 ## Cómo correr las pruebas
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File pruebas\sifen\probar.ps1
 ```
+
+Para correr solo una prueba mientras se trabaja en ella (en vez de todas): `-Solo prueba-ruc.js` (varias, separadas por coma).
 
 Necesita Edge e internet (baja Babel y, la primera vez, el validador XSD a `pruebas\sifen\.cache`). Tarda unos cuatro
 minutos. Sale con código 0 si pasa todo.
@@ -63,9 +65,16 @@ Qué comprueba:
     los dos jueces de firma; el plazo de 48 horas, la espera cuando el documento todavía no fue aprobado, los rechazos de la DNIT
     (4004, 4009, 4065, 4003/4066 como «ya hecho») y que anular una factura electrónica deje pedida su cancelación.
 
+11. **Verificar el RUC en la DNIT** (`prueba-ruc.js`): el servicio siConsRUC (Manual 9.6). El mensaje y las respuestas de ejemplo se validan
+    contra `WS_SiConsRUC_v141.xsd` con libxml2; se lee cada respuesta (0500 no existe, 0501 sin permiso, 0502 con los seis estados), y se
+    prueba qué se le avisa al cajero y qué se **frena**: solo lo que la DNIT rechazaría con sus validaciones 1306 (el RUC del comprador no
+    existe), 1307/1308 (estado cancelado, cancelado definitivo o suspensión temporal) y 1309 (dígito verificador mal, que ni se consulta).
+    También la consulta de punta a punta contra una DNIT simulada: certificado y ambiente de cada local, una respuesta guardada 5 minutos, un tope de 30 consultas por minuto por local
+    (nunca un fallo), local sin certificado en silencio, y que sin conexión, con error del servidor o respuesta rara NUNCA se frene una venta.
+
 Las pantallas (KuDE en cinta y en A4, estado y documentos con sus envíos, formularios del certificado y del CSC, puntos de
-expedición con su tipo de timbrado, botón de firmar en Facturas) se probaron aparte con los componentes reales en el banco de
-React.
+expedición con su tipo de timbrado, botón de firmar en Facturas, el cuadro «Nuevo cliente» y «Nueva factura» con la verificación del
+RUC) se probaron aparte con los componentes reales en el banco de React.
 
 ## Cuando la DNIT publique una versión nueva
 
@@ -92,4 +101,6 @@ Decisiones que solo se confirman contra el ambiente de pruebas de la DNIT y est�
 - `urlsDelServicio` en `ws.ts`: el manual publica las direcciones con «.wsdl»; el envío prueba esa y, si contesta 404/405,
   la misma sin «.wsdl».
 - Si la DNIT firma/verifica el documento dentro del sobre SOAP (que agrega su propio espacio de nombres) igual que sin él.
+- Que el servicio de consulta de RUC conteste con el certificado del emisor (la DNIT contesta 0501 si ese RUC no tiene permiso para
+  usarlo) y cómo se comporta el ambiente de pruebas con los RUC reales. La consulta masiva de RUC (Nota Técnica 11) no se usa.
 - Que la impresora térmica de la caja entienda el comando de imagen en bloques (`GS v 0`) con el que sale el QR.

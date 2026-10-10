@@ -269,7 +269,7 @@ export function FichaLocalModal({
                     />
                   </Campo>
                   <Campo etiqueta="RUC">
-                    <Entrada name="ruc" defaultValue={ficha.ruc ?? ""} placeholder="80012345-6" />
+                    <Entrada name="ruc" defaultValue={ficha.ruc ?? ""} placeholder="80012345-0" />
                   </Campo>
                 </div>
               </Seccion>

@@ -18,6 +18,8 @@ export type Peticion = {
   /** El certificado del contribuyente (y su cadena) y su clave privada, en PEM. */
   certificadoPem: string;
   clavePem: string;
+  /** Cuánto esperar la respuesta antes de darla por caída (por defecto 30 s). Las consultas que atiende un cajero esperando usan menos. */
+  tiempoLimiteMs?: number;
 };
 
 export type Contestacion = { status: number; cuerpo: string; url: string };
@@ -61,7 +63,8 @@ function publicar(url: string, p: Peticion): Promise<Contestacion> {
         respuesta.on("error", rechazar);
       }
     );
-    pedido.setTimeout(TIEMPO_LIMITE_MS, () => pedido.destroy(new Error(`La DNIT no respondió en ${TIEMPO_LIMITE_MS / 1000} segundos`)));
+    const limite = p.tiempoLimiteMs ?? TIEMPO_LIMITE_MS;
+    pedido.setTimeout(limite, () => pedido.destroy(new Error(`La DNIT no respondió en ${limite / 1000} segundos`)));
     pedido.on("error", rechazar);
     pedido.end(cuerpo);
   });
