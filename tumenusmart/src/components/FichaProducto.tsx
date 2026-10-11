@@ -332,7 +332,7 @@ export function FichaProducto({
               type="button"
               onClick={() => setCantidad((c) => Math.max(1, c - 1))}
               aria-label="Quitar uno"
-              className="h-10 w-10 rounded-full text-xl text-tinta transition-colors hover:bg-superficie disabled:opacity-40"
+              className="h-10 w-10 rounded-full bg-peligro text-xl text-white transition-opacity hover:opacity-90 disabled:opacity-40"
               disabled={cantidad <= 1}
             >
               −
@@ -344,7 +344,7 @@ export function FichaProducto({
               type="button"
               onClick={() => setCantidad((c) => c + 1)}
               aria-label="Sumar uno"
-              className="h-10 w-10 rounded-full text-xl text-tinta transition-colors hover:bg-superficie"
+              className="h-10 w-10 rounded-full bg-brand text-xl text-white transition-colors hover:bg-brand-dark"
             >
               +
             </button>

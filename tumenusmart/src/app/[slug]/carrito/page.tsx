@@ -95,7 +95,9 @@ function FilaCarrito({
                 <button
                   type="button"
                   aria-label="Uno menos"
-                  className="flex h-9 w-9 items-center justify-center rounded-full text-[1.25rem] text-tinta transition-colors hover:bg-superficie"
+                  // Rojo y sólido, como el «+» (que va en el color del local): antes era un círculo claro sobre fondo claro y no
+                  // se notaba que era un botón.
+                  className="flex h-9 w-9 items-center justify-center rounded-full bg-peligro text-[1.25rem] text-white transition-opacity hover:opacity-90 active:scale-95"
                   onClick={() => actualizarCantidad(item.key, item.cantidad - 1)}
                 >
                   −
