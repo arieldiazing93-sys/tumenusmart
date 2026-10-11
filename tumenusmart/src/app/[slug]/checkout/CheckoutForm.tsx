@@ -139,6 +139,9 @@ export function CheckoutForm({
   const [enviando, setEnviando] = useState(false);
   const [envioId] = useState(() => (typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `e${Date.now()}${Math.random().toString(36).slice(2)}`));
   const [recibido, setRecibido] = useState<{ token: string; numero: number; aceptado: boolean } | null>(null);
+  // Con los pedidos por el sistema, además del registro se arma el aviso por WhatsApp al local (con el número de pedido). `abierto`:
+  // el navegador ya abrió WhatsApp solo; si no, el botón de la pantalla final lo abre con un toque.
+  const [avisoWsp, setAvisoWsp] = useState<{ enlace: string; abierto: boolean } | null>(null);
   /** El enlace de WhatsApp con el pedido ya escrito: cuando existe, se muestra la pantalla de "enviá tu pedido". */
   const [enlace, setEnlace] = useState<string | null>(null);
   /** El cliente ya tocó el botón de WhatsApp (el carrito se vació en ese momento). */
@@ -192,8 +195,11 @@ export function CheckoutForm({
   }
 
   /** Manda el pedido al servidor: del navegador solo sale QUÉ eligió (productos, agregados, cantidades); los precios los calcula él. */
-  async function enviarAlSistema() {
-    if (enviando) return;
+  async function enviarAlSistema(ventanaWsp: Window | null) {
+    if (enviando) {
+      ventanaWsp?.close();
+      return;
+    }
     setEnviando(true);
     try {
       const r = await enviarPedidoWeb(slug, {
@@ -222,9 +228,58 @@ export function CheckoutForm({
         sitioWeb,
       });
       if (!r.ok) {
+        ventanaWsp?.close();
         fallar(r.error, r.campo === "ubicacion" ? "ubicacion" : r.campo === "factura" ? "factura" : undefined);
         return;
       }
+
+      // El aviso por WhatsApp al local, con el número del pedido y el total que calculó el servidor.
+      if (whatsappNumero.replace(/\D/g, "")) {
+        const envio = tipoEntrega === "delivery" ? costoEnvio : 0;
+        const mensaje = construirMensajePedido({
+          numero: r.numero,
+          saludo,
+          clienteNombre: nombre.trim(),
+          clienteTelefono: telefono.trim(),
+          tipoEntrega,
+          direccion: tipoEntrega === "delivery" ? direccion.trim() : null,
+          zonaNombre: tipoEntrega === "delivery" ? zonaEncontrada?.nombre ?? null : null,
+          clienteLat: tipoEntrega === "delivery" ? clienteLat : null,
+          clienteLng: tipoEntrega === "delivery" ? clienteLng : null,
+          metodoPagoReferencia: metodoPago,
+          comprobanteTipo,
+          facturaRazonSocial: comprobanteTipo === "factura" ? facturaRazonSocial.trim() : null,
+          facturaRuc: comprobanteTipo === "factura" ? facturaRuc.trim() : null,
+          facturaEmail: comprobanteTipo === "factura" ? facturaEmail.trim() || null : null,
+          notas: notas.trim() || null,
+          items: items.map((i) => ({
+            nombreProducto: i.nombreProducto,
+            cantidad: i.cantidad,
+            precioUnitario: precioUnitario(i),
+            opcionesTexto: opcionesTexto(i) || null,
+            ingredientesQuitadosTexto: ingredientesQuitadosTexto(i) || null,
+          })),
+          subtotal: Math.max(0, r.total - envio),
+          costoEnvio: envio,
+          total: r.total,
+        });
+        const enlaceWsp = construirLinkWhatsapp(whatsappNumero, mensaje);
+        let abierto = false;
+        if (ventanaWsp && !ventanaWsp.closed) {
+          try {
+            // La ventana se abrió con el toque (los navegadores no dejan abrir una después de esperar al servidor): acá se la lleva a WhatsApp.
+            ventanaWsp.opener = null;
+            ventanaWsp.location.href = enlaceWsp;
+            abierto = true;
+          } catch {
+            abierto = false;
+          }
+        }
+        setAvisoWsp({ enlace: enlaceWsp, abierto });
+      } else {
+        ventanaWsp?.close();
+      }
+
       setResumen({
         lineas: items.map((i) => ({ texto: `${i.cantidad} × ${i.nombreProducto}`, monto: precioUnitario(i) * i.cantidad })),
         entrega: tipoEntrega === "delivery" ? "Delivery" : "Retiro en el local",
@@ -235,6 +290,7 @@ export function CheckoutForm({
       vaciarCarrito();
       window.scrollTo({ top: 0 });
     } catch {
+      ventanaWsp?.close();
       fallar("No pudimos enviar tu pedido. Revisá tu conexión y probá de nuevo.");
     } finally {
       setEnviando(false);
@@ -278,7 +334,10 @@ export function CheckoutForm({
 
     // El pedido entra al sistema del local: se manda al servidor (que recalcula todo) y el cliente lo sigue en su pantalla.
     if (pedidosEnSistema) {
-      void enviarAlSistema();
+      // Se abre ya, con el toque, una ventana en blanco para WhatsApp: después de esperar al servidor el navegador no deja abrir
+      // ventanas nuevas. Si el pedido sale bien se la lleva al aviso; si falla, se cierra.
+      const ventanaWsp = whatsappNumero.replace(/\D/g, "") ? window.open("", "_blank") : null;
+      void enviarAlSistema(ventanaWsp);
       return;
     }
 
@@ -337,6 +396,26 @@ export function CheckoutForm({
             : `${nombreLocal} lo está revisando y en unos minutos te lo confirma.`}{" "}
           Podés ver cómo va en la pantalla de seguimiento.
         </p>
+
+        {/* El aviso por WhatsApp al local: el pedido ya está en el sistema; esto hace que además le llegue al WhatsApp del negocio.
+            WhatsApp no deja mandar el mensaje solo: el cliente tiene que tocar «Enviar» en su WhatsApp. */}
+        {avisoWsp && (
+          <div className="mt-5 w-full max-w-sm text-left">
+            {avisoWsp.abierto ? (
+              <p className="mb-2 text-center text-[0.86rem] leading-snug text-tinta-media">
+                Se abrió WhatsApp con tu pedido: tocá <strong>Enviar</strong> allá para que {nombreLocal} lo reciba también por ese medio.
+                Si no se abrió, tocá el botón.
+              </p>
+            ) : (
+              <div className="mb-3">
+                <Aviso titulo="Un paso más" color="aviso">
+                  Tocá el botón y enviá el aviso por WhatsApp a {nombreLocal}, así lo recibe también por ahí.
+                </Aviso>
+              </div>
+            )}
+            <BotonWhatsappCTA link={avisoWsp.enlace} yaEnviado={avisoWsp.abierto} llamar={!avisoWsp.abierto} onEnviar={() => undefined} />
+          </div>
+        )}
 
         <Link
           href={`/${slug}/pedido/${recibido.token}`}

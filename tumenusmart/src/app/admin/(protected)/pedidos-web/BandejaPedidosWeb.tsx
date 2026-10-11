@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Boton, Campo, Entrada, MensajeError, Pastilla, clasesBoton, type ColorEstado } from "@/components/ui";
+import { MaestroDetalle } from "@/components/MaestroDetalle";
 import { Segmentado } from "@/components/Segmentado";
 import { formatearGuarani, formatearNumero } from "@/lib/format";
 import { METODOS_PAGO_PEDIDO } from "@/lib/metodos-pago";
@@ -43,6 +44,33 @@ function haceCuanto(iso: string, ahora: number | null): string {
   return `hace ${horas} h ${minutos % 60} min`;
 }
 
+/** La fila de la lista: el pedido más `activo` (los cerrados de hoy se ven apagados). */
+type PedidoLista = PedidoWebFila & { activo: boolean };
+
+/** El estado, con las palabras del rubro del local (gastronomía: «En preparación», «Listo»…). */
+function textoDeEstado(p: PedidoWebFila, rubro: RubroPedido): string {
+  const e = etiquetasPersonal(rubro, p.tipoEntrega);
+  switch (p.estado) {
+    case "nuevo":
+      return "Nuevo";
+    case "aceptado":
+      return e.preparando;
+    case "listo":
+      return e.listo;
+    case "entregado":
+      return e.entregado;
+    case "rechazado":
+      return "Rechazado";
+    default:
+      return "Cancelado";
+  }
+}
+
+/**
+ * Los pedidos del menú, como el Servicio delivery: a la izquierda la lista (el pedido, quién lo hizo, cuánto hace, su estado, el total
+ * y el botón Ver) y a la derecha todo el detalle del pedido que se abre, con los botones para atenderlo. Arriba van los nuevos (esperan
+ * una decisión), después los que están en curso y al final lo que se cerró hoy, apagado.
+ */
 export function BandejaPedidosWeb({
   abiertos,
   cerrados,
@@ -67,9 +95,14 @@ export function BandejaPedidosWeb({
 
   const nuevos = abiertos.filter((p) => p.estado === "nuevo");
   const enCurso = abiertos.filter((p) => p.estado !== "nuevo");
+  const items: PedidoLista[] = [
+    ...nuevos.map((p) => ({ ...p, activo: true })),
+    ...enCurso.map((p) => ({ ...p, activo: true })),
+    ...cerrados.map((p) => ({ ...p, activo: false })),
+  ];
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-4">
       {aceptaSolo && (
         <p className="rounded-xl bg-azul-luz px-4 py-3 text-[0.86rem] text-azul-oscuro">
           Los pedidos se aceptan solos apenas llegan. Los que quedan acá como «nuevos» necesitan una persona (por ejemplo, el envío es a
@@ -77,51 +110,52 @@ export function BandejaPedidosWeb({
         </p>
       )}
 
-      <section aria-label="Pedidos nuevos" className="flex flex-col gap-3">
-        <h2 className="text-[0.74rem] font-semibold uppercase tracking-rotulo text-tinta-suave">Nuevos ({nuevos.length})</h2>
-        {nuevos.length === 0 ? (
-          <p className="rounded-xl border border-dashed border-linea px-4 py-6 text-center text-[0.9rem] text-tinta-suave">
-            No hay pedidos nuevos. Cuando entre uno, suena el aviso y aparece acá.
-          </p>
-        ) : (
-          nuevos.map((p) => <TarjetaPedido key={p.id} pedido={p} rubro={rubro} ahora={ahora} puedeGestionar={puedeGestionar} puedeCobrar={puedeCobrar} />)
-        )}
-      </section>
+      <p className="flex flex-wrap items-center gap-2 text-[0.82rem] text-tinta-media">
+        <Pastilla color={nuevos.length > 0 ? "amarillo" : "neutro"} punto={nuevos.length > 0}>
+          Nuevos {nuevos.length}
+        </Pastilla>
+        <Pastilla color="azul">En curso {enCurso.length}</Pastilla>
+        <Pastilla color="neutro">Cerrados hoy {cerrados.length}</Pastilla>
+      </p>
 
-      <section aria-label="Pedidos en curso" className="flex flex-col gap-3">
-        <h2 className="text-[0.74rem] font-semibold uppercase tracking-rotulo text-tinta-suave">En curso ({enCurso.length})</h2>
-        {enCurso.length === 0 ? (
-          <p className="rounded-xl border border-dashed border-linea px-4 py-6 text-center text-[0.9rem] text-tinta-suave">
-            No hay pedidos en preparación.
-          </p>
-        ) : (
-          enCurso.map((p) => <TarjetaPedido key={p.id} pedido={p} rubro={rubro} ahora={ahora} puedeGestionar={puedeGestionar} puedeCobrar={puedeCobrar} />)
+      <MaestroDetalle
+        items={items}
+        cerrarSiDesaparece
+        textoVacio="Todavía no entró ningún pedido del menú. Cuando entre uno, suena el aviso y aparece acá."
+        textoPlaceholder="Hacé doble clic en un pedido, o tocá Ver, para ver todo lo que pidió el cliente y atenderlo: aceptarlo, avisar que está listo o cobrarlo."
+        columnas={[
+          {
+            titulo: "Pedido",
+            celda: (p) => (
+              <div className="flex flex-col gap-0.5">
+                <span className="text-[0.95rem] font-semibold text-tinta">
+                  {formatearNumero(p.numero)} · {p.clienteNombre}
+                </span>
+                <span className="text-[0.74rem] text-tinta-suave">
+                  {p.tipoEntrega === "retiro" ? "Retiro" : "Delivery"}
+                  {ahora != null && p.estado !== "entregado" && p.estado !== "rechazado" && p.estado !== "cancelado"
+                    ? ` · ${haceCuanto(p.creadoEn, ahora)}`
+                    : ""}
+                </span>
+                <span className="mt-0.5 flex flex-wrap items-center gap-1">
+                  <Pastilla color={COLOR_ESTADO[p.estado]} punto={p.estado === "nuevo"}>
+                    {textoDeEstado(p, rubro)}
+                  </Pastilla>
+                  {p.cuentaNumero != null && <Pastilla color="azul">Cuenta {formatearNumero(p.cuentaNumero)}</Pastilla>}
+                </span>
+              </div>
+            ),
+          },
+          {
+            titulo: "Total",
+            derecha: true,
+            celda: (p) => <span className="cifra whitespace-nowrap font-semibold text-tinta">{formatearGuarani(p.total)}</span>,
+          },
+        ]}
+        renderPanel={(p) => (
+          <TarjetaPedido pedido={p} rubro={rubro} ahora={ahora} puedeGestionar={puedeGestionar} puedeCobrar={puedeCobrar} />
         )}
-      </section>
-
-      {cerrados.length > 0 && (
-        <details className="rounded-xl border border-linea bg-superficie p-4">
-          <summary className="cursor-pointer text-[0.9rem] font-semibold text-tinta">Cerrados hoy ({cerrados.length})</summary>
-          <ul className="mt-3 flex flex-col divide-y divide-linea">
-            {cerrados.map((p) => {
-              const e = etiquetasPersonal(rubro, p.tipoEntrega);
-              const texto = p.estado === "entregado" ? e.entregado : p.estado === "rechazado" ? "Rechazado" : "Cancelado";
-              return (
-                <li key={p.id} className="flex flex-wrap items-center justify-between gap-2 py-2 text-[0.88rem]">
-                  <span className="min-w-0 text-tinta">
-                    <strong>{formatearNumero(p.numero)}</strong> · {p.clienteNombre}
-                    {p.estado === "rechazado" && p.motivoRechazo ? <span className="text-tinta-suave"> · {p.motivoRechazo}</span> : null}
-                  </span>
-                  <span className="flex items-center gap-2">
-                    <span className="cifra font-medium text-tinta-media">{formatearGuarani(p.total)}</span>
-                    <Pastilla color={COLOR_ESTADO[p.estado]}>{texto}</Pastilla>
-                  </span>
-                </li>
-              );
-            })}
-          </ul>
-        </details>
-      )}
+      />
     </div>
   );
 }

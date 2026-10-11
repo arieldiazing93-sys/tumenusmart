@@ -12,8 +12,9 @@ import { BandejaPedidosWeb } from "./BandejaPedidosWeb";
 export const dynamic = "force-dynamic";
 
 /**
- * Los pedidos que entran por el menú digital. Arriba los nuevos (esperan una decisión: aceptarlos o rechazarlos), después los que
- * están en curso y, al final, lo que se cerró hoy. Lo que se acepta se vuelve una cuenta del Servicio delivery. Se actualiza solo.
+ * Los pedidos que entran por el menú digital, como el Servicio delivery: a la izquierda la lista (los nuevos arriba, esperando una
+ * decisión; después los que están en curso y, al final, lo que se cerró hoy) y a la derecha el detalle del pedido que se abre. Lo que
+ * se acepta se vuelve una cuenta del Servicio delivery. Se actualiza solo.
  */
 export default async function PedidosWebPage() {
   const sesion = await pantallaConPermiso("delivery.ver");
@@ -55,7 +56,7 @@ export default async function PedidosWebPage() {
     <div className="flex flex-col gap-5">
       <Cabecera
         titulo="Pedidos del menú"
-        bajada="Lo que tus clientes piden desde el menú digital. Aceptás con un toque y sale la comanda; después sigue por el Servicio delivery."
+        bajada="Lo que tus clientes piden desde el menú digital. Abrí un pedido para verlo y aceptarlo con un toque: sale la comanda y después sigue por el Servicio delivery."
         acciones={
           <span className="flex flex-wrap items-center gap-2">
             <RefrescarCada segundos={10} generadoEn={generadoEn} />
