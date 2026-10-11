@@ -14,6 +14,7 @@ import { IconoWhatsapp } from "@/components/iconos";
 import { METODOS_PAGO_PEDIDO, type MetodoPagoPedido } from "@/lib/metodos-pago";
 import { ingredientesQuitadosTexto, opcionesTexto, precioUnitario } from "@/lib/cart-types";
 import { construirLinkWhatsapp, construirMensajePedido } from "@/lib/whatsapp";
+import { guardarPedidoReciente } from "@/lib/pedidos-recientes";
 import { enviarPedidoWeb } from "./actions";
 
 // Leaflet usa `window`, así que el mapa se carga solo en el navegador.
@@ -238,6 +239,8 @@ export function CheckoutForm({
         const envio = tipoEntrega === "delivery" ? costoEnvio : 0;
         const mensaje = construirMensajePedido({
           numero: r.numero,
+          // El enlace queda en el chat de WhatsApp: si el cliente retrocede o cierra la pestaña, desde ahí vuelve a su pedido.
+          linkSeguimiento: `${window.location.origin}/${slug}/pedido/${r.token}`,
           saludo,
           clienteNombre: nombre.trim(),
           clienteTelefono: telefono.trim(),
@@ -287,6 +290,8 @@ export function CheckoutForm({
         total: formatearGuarani(r.total),
       });
       setRecibido({ token: r.token, numero: r.numero, aceptado: r.aceptado });
+      // Queda anotado en este navegador para poder volver a «Ver mi pedido» desde el menú si retrocede.
+      guardarPedidoReciente(slug, { token: r.token, numero: r.numero });
       vaciarCarrito();
       window.scrollTo({ top: 0 });
     } catch {

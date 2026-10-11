@@ -308,6 +308,8 @@ const nombreDe = (q: QuienHizo): string => (q.nombre?.trim() || q.email).slice(0
 /** El pedido tal como lo ve la pantalla de la caja. */
 export type PedidoWebFila = {
   id: string;
+  /** La llave del enlace de seguimiento del cliente (el personal la usa para mandarle el enlace por WhatsApp). */
+  token: string;
   numero: number;
   estado: EstadoPedidoWeb;
   tipoEntrega: TipoEntregaPedido;
@@ -343,6 +345,7 @@ export type PedidoWebFila = {
 export function filaDePedido(
   p: {
     id: string;
+    token: string;
     numero: number;
     estado: string;
     tipoEntrega: string;
@@ -377,6 +380,7 @@ export function filaDePedido(
   const lineas = Array.isArray(p.lineas) ? (p.lineas as LineaVisible[]) : [];
   return {
     id: p.id,
+    token: p.token,
     numero: p.numero,
     estado: p.estado as EstadoPedidoWeb,
     tipoEntrega: p.tipoEntrega === "retiro" ? "retiro" : "delivery",

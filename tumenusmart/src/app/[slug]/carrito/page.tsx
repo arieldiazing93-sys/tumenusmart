@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { useCart } from "@/components/CartProvider";
+import { PedidosRecientes } from "@/components/PedidosRecientes";
 import { VolverAlMenu } from "@/components/Volver";
 import {
   precioUnitario,
@@ -161,6 +162,8 @@ export default function CarritoPage() {
         <h1 className="mt-5 text-[1.35rem] font-semibold tracking-titular text-tinta">Tu pedido está vacío</h1>
         <p className="mt-1.5 mb-6 text-[0.95rem] text-tinta-suave">Todavía no agregaste nada a tu pedido.</p>
         <VolverAlMenu slug={slug} texto="Ver la carta" className="!h-12 !rounded-2xl px-6" />
+        {/* Si ya envió un pedido desde este navegador: desde acá vuelve a su seguimiento. */}
+        <PedidosRecientes slug={slug} className="mt-8 w-full max-w-sm text-left" />
       </main>
     );
   }

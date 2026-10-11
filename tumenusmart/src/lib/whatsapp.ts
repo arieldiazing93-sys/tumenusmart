@@ -107,7 +107,7 @@ export function construirMensajePedido(datos: DatosMensaje): string {
 
   if (datos.linkSeguimiento) {
     lineas.push("");
-    lineas.push(campo("Seguí tu pedido acá", datos.linkSeguimiento));
+    lineas.push(campo("Seguimiento del pedido", datos.linkSeguimiento));
   }
 
   return lineas.join("\n");

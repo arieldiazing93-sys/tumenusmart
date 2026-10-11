@@ -436,6 +436,43 @@
   x = await servidor.quitarLineaPedidoWeb(storeId, "ajeno", 0, quien);
   ok(!x.ok, "ni quitarle productos");
 
+  // ---- el rastro del pedido: el enlace va en el WhatsApp y el navegador se acuerda de los pedidos recientes
+  window.log("== Pedido web: el cliente no pierde el rastro de su pedido");
+  const wsp = await C.cargar("src/lib/whatsapp");
+  const mensaje = wsp.construirMensajePedido({
+    numero: 7, clienteNombre: "Juan", tipoEntrega: "retiro", metodoPagoReferencia: "efectivo", items: [{ nombreProducto: "Pizza", cantidad: 1, precioUnitario: 55000 }],
+    subtotal: 55000, costoEnvio: 0, total: 55000, linkSeguimiento: "https://tumenusmart.com/lafogata/pedido/TOKEN-LARGO-DEL-PEDIDO-123",
+  });
+  ok(mensaje.includes("Pedido #0007") && mensaje.includes("*Seguimiento del pedido:* https://tumenusmart.com/lafogata/pedido/TOKEN-LARGO-DEL-PEDIDO-123"), "el mensaje de WhatsApp lleva el número de pedido y el enlace para verlo");
+  ok(!wsp.construirMensajePedido({ clienteNombre: "Juan", tipoEntrega: "retiro", metodoPagoReferencia: "efectivo", items: [], subtotal: 0, costoEnvio: 0, total: 0 }).includes("Seguimiento del pedido"), "sin enlace de seguimiento, esa línea no sale");
+
+  const rec = await C.cargar("src/lib/pedidos-recientes");
+  const T0 = 1_800_000_000_000;
+  const tok = (n) => "T".repeat(20) + String(n).padStart(4, "0");
+  let lista = rec.sumarReciente([], { token: tok(1), numero: 1 }, T0);
+  lista = rec.sumarReciente(lista, { token: tok(2), numero: 2 }, T0 + 1000);
+  igual(lista.map((p) => p.numero), [2, 1], "el pedido más reciente va primero");
+  lista = rec.sumarReciente(lista, { token: tok(1), numero: 1 }, T0 + 2000);
+  igual(lista.map((p) => p.numero), [1, 2], "volver a anotar un pedido no lo repite: sube al principio");
+  for (let i = 3; i <= 9; i++) lista = rec.sumarReciente(lista, { token: tok(i), numero: i }, T0 + i * 1000);
+  ok(lista.length === 5 && lista[0].numero === 9, "se guardan como mucho 5");
+  const crudo = [
+    { token: tok(1), numero: 1, en: T0 },
+    { token: tok(2), numero: 2, en: T0 - 49 * 3600 * 1000 },
+    { token: "corto", numero: 3, en: T0 },
+    { token: tok(4), numero: -4, en: T0 },
+    { token: tok(5), numero: 5, en: T0 + 10 * 3600 * 1000 },
+    "basura", null, { token: tok(6), numero: 6 },
+  ];
+  igual(rec.depurarRecientes(crudo, T0).map((p) => p.numero), [1], "se descarta lo vencido (más de 48 h), lo mal formado y lo del futuro");
+  igual(rec.depurarRecientes("no es una lista", T0), [], "y si lo guardado no es una lista, no hay recientes");
+  try { localStorage.removeItem("tumenusmart:pedidos:lafogata"); } catch {}
+  rec.guardarPedidoReciente("lafogata", { token: tok(7), numero: 7 });
+  rec.guardarPedidoReciente("lafogata", { token: tok(8), numero: 8 });
+  igual(rec.leerPedidosRecientes("lafogata").map((p) => p.numero), [8, 7], "se guardan y se leen del navegador (los más nuevos primero)");
+  igual(rec.leerPedidosRecientes("otro-local"), [], "y cada local ve solo los suyos");
+  try { localStorage.removeItem("tumenusmart:pedidos:lafogata"); } catch {}
+
   window.log("\naciertos: " + window.__aciertos + " · fallas: " + window.__fallas);
   window.__listo = true;
 })().catch((e) => { document.getElementById("salida").textContent += "\nERROR: " + (e && e.stack || e); window.__listo = true; window.__fallas = (window.__fallas || 0) + 1; });

@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { CartBar } from "@/components/CartBar";
+import { FirmaPlataforma } from "@/components/FirmaPlataforma";
+import { PedidosRecientes } from "@/components/PedidosRecientes";
 import { CarruselDestacados } from "@/components/CarruselDestacados";
 import { AvisoTienda } from "@/components/AvisoTienda";
 import { EstadoAperturaBadge } from "@/components/EstadoAperturaBadge";
@@ -280,6 +282,9 @@ export default async function CatalogoPage({
         </header>
 
         <div className="px-4 md:px-6 lg:px-8">
+          {/* Si el cliente ya hizo un pedido desde este navegador: el camino de vuelta a su seguimiento. */}
+          <PedidosRecientes slug={slug} className="mt-5" />
+
           <div className="mt-5">
             <AvisoTienda estado={estadoTienda} />
           </div>
@@ -305,14 +310,7 @@ export default async function CatalogoPage({
           )}
 
           {/* La firma de la plataforma, al pie (antes iba en una franja arriba de todo, donde le sacaba lugar al local). */}
-          <p className="mt-12 text-center">
-            <Link
-              href="/"
-              className="-mr-[0.14em] inline-block py-1.5 font-mono text-[0.74rem] font-semibold uppercase leading-tight tracking-[0.14em] text-tinta-suave transition-colors hover:text-tinta hover:underline"
-            >
-              Desarrollado por tumenusmart.com
-            </Link>
-          </p>
+          <FirmaPlataforma />
         </div>
       </main>
 

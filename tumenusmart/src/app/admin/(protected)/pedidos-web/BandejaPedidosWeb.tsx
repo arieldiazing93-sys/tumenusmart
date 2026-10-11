@@ -11,6 +11,7 @@ import { METODOS_PAGO_PEDIDO } from "@/lib/metodos-pago";
 import { etiquetasPersonal, type EstadoPedidoWeb, type RubroPedido } from "@/lib/pedido-web";
 import type { PedidoWebFila } from "@/lib/pedido-web-servidor";
 import { pareceRucConDigito } from "@/lib/sifen/ruc";
+import { normalizarTelefonoParaWhatsapp } from "@/lib/whatsapp";
 import { enlaceDeMapa } from "@/lib/ubicacion-mapa";
 import { rutaParaAbrirTurno } from "@/lib/turno-requerido";
 import { AvisoRucDnit, useVerificacionDeCliente, useVerificacionRuc } from "../pos/AvisoRucDnit";
@@ -78,6 +79,8 @@ export function BandejaPedidosWeb({
   puedeGestionar,
   puedeCobrar,
   aceptaSolo,
+  slug = "",
+  nombreLocal = "",
 }: {
   abiertos: PedidoWebFila[];
   cerrados: PedidoWebFila[];
@@ -85,6 +88,9 @@ export function BandejaPedidosWeb({
   puedeGestionar: boolean;
   puedeCobrar: boolean;
   aceptaSolo: boolean;
+  /** La dirección del menú y el nombre del local: para armar el WhatsApp que se le manda al cliente con su enlace de seguimiento. */
+  slug?: string;
+  nombreLocal?: string;
 }) {
   const [ahora, setAhora] = useState<number | null>(null);
   useEffect(() => {
@@ -131,13 +137,12 @@ export function BandejaPedidosWeb({
                 <span className="text-[0.95rem] font-semibold text-tinta">
                   {formatearNumero(p.numero)} · {p.clienteNombre}
                 </span>
-                <span className="text-[0.74rem] text-tinta-suave">
-                  {p.tipoEntrega === "retiro" ? "Retiro" : "Delivery"}
-                  {ahora != null && p.estado !== "entregado" && p.estado !== "rechazado" && p.estado !== "cancelado"
-                    ? ` · ${haceCuanto(p.creadoEn, ahora)}`
-                    : ""}
-                </span>
+                {ahora != null && p.estado !== "entregado" && p.estado !== "rechazado" && p.estado !== "cancelado" && (
+                  <span className="text-[0.74rem] text-tinta-suave">{haceCuanto(p.creadoEn, ahora)}</span>
+                )}
                 <span className="mt-0.5 flex flex-wrap items-center gap-1">
+                  {/* Retiro o delivery en lila: se distingue de un vistazo en la lista, igual que en el detalle. */}
+                  <Pastilla color="violeta">{p.tipoEntrega === "retiro" ? "Retiro" : "Delivery"}</Pastilla>
                   <Pastilla color={COLOR_ESTADO[p.estado]} punto={p.estado === "nuevo"}>
                     {textoDeEstado(p, rubro)}
                   </Pastilla>
@@ -153,7 +158,15 @@ export function BandejaPedidosWeb({
           },
         ]}
         renderPanel={(p) => (
-          <TarjetaPedido pedido={p} rubro={rubro} ahora={ahora} puedeGestionar={puedeGestionar} puedeCobrar={puedeCobrar} />
+          <TarjetaPedido
+            pedido={p}
+            rubro={rubro}
+            ahora={ahora}
+            puedeGestionar={puedeGestionar}
+            puedeCobrar={puedeCobrar}
+            slug={slug}
+            nombreLocal={nombreLocal}
+          />
         )}
       />
     </div>
@@ -170,14 +183,21 @@ function TarjetaPedido({
   ahora,
   puedeGestionar,
   puedeCobrar,
+  slug,
+  nombreLocal,
 }: {
   pedido: PedidoWebFila;
   rubro: RubroPedido;
   ahora: number | null;
   puedeGestionar: boolean;
   puedeCobrar: boolean;
+  slug: string;
+  nombreLocal: string;
 }) {
   const router = useRouter();
+  // La dirección del sitio, recién en el navegador (el servidor no la sabe): para armar el enlace de seguimiento del cliente.
+  const [origen, setOrigen] = useState("");
+  useEffect(() => setOrigen(window.location.origin), []);
   const etiquetas = etiquetasPersonal(rubro, p.tipoEntrega);
   const [error, setError] = useState<string | null>(null);
   const [ocupado, setOcupado] = useState(false);
@@ -251,7 +271,18 @@ function TarjetaPedido({
     }
   }
 
-  const telefonoWa = p.clienteTelefono.replace(/\D/g, "");
+  // El WhatsApp que el local le manda al cliente: dice cómo va su pedido y lleva el enlace para seguirlo (si retrocede o cierra la
+  // pantalla, lo tiene en el chat). El teléfono se lleva al formato internacional que pide wa.me.
+  const telefonoWa = normalizarTelefonoParaWhatsapp(p.clienteTelefono);
+  const enlaceSeguimiento = origen && slug && p.token ? `${origen}/${slug}/pedido/${p.token}` : null;
+  const mensajeAlCliente = mensajeParaElCliente({
+    nombre: p.clienteNombre,
+    local: nombreLocal,
+    numero: p.numero,
+    estado: p.estado,
+    tipoEntrega: p.tipoEntrega,
+    enlace: enlaceSeguimiento,
+  });
   const metodo = METODOS_PAGO_PEDIDO.find((m) => m.value === p.metodoPago)?.label ?? p.metodoPago;
   const textoEstado = esNuevo ? "Nuevo" : p.estado === "aceptado" ? etiquetas.preparando : p.estado === "listo" ? etiquetas.listo : p.estado;
 
@@ -262,7 +293,10 @@ function TarjetaPedido({
         <div className="flex flex-wrap items-center gap-2">
           <h3 className="text-[1.05rem] font-semibold text-tinta">Pedido {formatearNumero(p.numero)}</h3>
           <Pastilla color={COLOR_ESTADO[p.estado]}>{textoEstado}</Pastilla>
-          <Pastilla color="neutro">{p.tipoEntrega === "retiro" ? "Retiro" : "Delivery"}</Pastilla>
+          {/* El tipo de pedido, grande y en lila: a primera vista se distingue un retiro de un delivery. */}
+          <Pastilla color="violeta" grande>
+            {p.tipoEntrega === "retiro" ? "Retiro" : "Delivery"}
+          </Pastilla>
           {p.cuentaNumero != null && <Pastilla color="azul">Cuenta {formatearNumero(p.cuentaNumero)}</Pastilla>}
         </div>
         <span className="text-[0.78rem] text-tinta-suave">{haceCuanto(p.creadoEn, ahora)}</span>
@@ -278,7 +312,13 @@ function TarjetaPedido({
         </div>
         <div className="flex flex-wrap gap-2">
           {telefonoWa && (
-            <a href={`https://wa.me/${telefonoWa}`} target="_blank" rel="noopener noreferrer" className={clasesBoton("navegar", "sm")}>
+            <a
+              href={`https://wa.me/${telefonoWa}?text=${encodeURIComponent(mensajeAlCliente)}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={clasesBoton("navegar", "sm")}
+              title="Escribirle al cliente por WhatsApp con el enlace para seguir su pedido"
+            >
               WhatsApp
             </a>
           )}
@@ -427,7 +467,7 @@ function TarjetaPedido({
         <div className="mt-4 flex flex-wrap items-center gap-2">
           {esNuevo && !rechazando && (
             <>
-              <Boton tono="principal" tam="lg" disabled={ocupado} onClick={() => void aceptar()}>
+              <Boton tono="nuevo" tam="lg" disabled={ocupado} onClick={() => void aceptar()}>
                 {ocupado ? "Aceptando…" : "Aceptar"}
               </Boton>
               <Boton tono="navegar" tam="md" disabled={ocupado} onClick={() => setEditando((v) => !v)}>
@@ -566,4 +606,27 @@ function PanelCorregir({ pedido: p, onCerrar, onGuardado }: { pedido: PedidoWebF
       </div>
     </div>
   );
+}
+
+/**
+ * El WhatsApp que el local le escribe al cliente por su pedido: lo saluda, le dice en qué paso está y le deja el enlace para
+ * seguirlo. Va armado según el estado (recién llegado, en preparación, listo).
+ */
+export function mensajeParaElCliente(d: {
+  nombre: string;
+  local: string;
+  numero: number;
+  estado: EstadoPedidoWeb;
+  tipoEntrega: "delivery" | "retiro";
+  enlace: string | null;
+}): string {
+  const primerNombre = d.nombre.trim().split(/\s+/)[0] || "";
+  const saludo = `Hola${primerNombre ? ` ${primerNombre}` : ""}${d.local ? `, te escribimos de ${d.local}` : ""} por tu pedido ${formatearNumero(d.numero)}.`;
+  let situacion = "";
+  if (d.estado === "nuevo") situacion = "Lo recibimos y lo estamos revisando.";
+  else if (d.estado === "aceptado") situacion = "Ya lo estamos preparando.";
+  else if (d.estado === "listo") situacion = d.tipoEntrega === "retiro" ? "¡Ya está listo para que lo retires!" : "¡Ya está listo y sale en camino!";
+  const partes = [saludo, situacion];
+  if (d.enlace) partes.push(`Podés ver cómo va tu pedido acá: ${d.enlace}`);
+  return partes.filter(Boolean).join("\n");
 }

@@ -28,7 +28,7 @@ export default async function PedidosWebPage() {
 
   const local = await prisma.store.findUnique({
     where: { id: storeId },
-    select: { pedidosWebActivo: true, pedidosWebAutoAceptar: true, pedidosWebRubro: true },
+    select: { pedidosWebActivo: true, pedidosWebAutoAceptar: true, pedidosWebRubro: true, slug: true, nombre: true },
   });
 
   const desde = new Date();
@@ -86,6 +86,8 @@ export default async function PedidosWebPage() {
         puedeGestionar={puedeGestionar}
         puedeCobrar={puedeCobrar}
         aceptaSolo={local?.pedidosWebAutoAceptar ?? false}
+        slug={local?.slug ?? ""}
+        nombreLocal={local?.nombre ?? ""}
       />
     </div>
   );

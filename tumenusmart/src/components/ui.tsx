@@ -212,7 +212,7 @@ export function Vacio({
 //  Estado
 // ===========================================================================
 
-export type ColorEstado = "neutro" | "exito" | "aviso" | "peligro" | "marca" | "azul" | "amarillo";
+export type ColorEstado = "neutro" | "exito" | "aviso" | "peligro" | "marca" | "azul" | "amarillo" | "violeta";
 
 const ESTADOS: Record<ColorEstado, string> = {
   neutro: "bg-papel-hundido text-tinta-media",
@@ -223,6 +223,8 @@ const ESTADOS: Record<ColorEstado, string> = {
   azul: "bg-azul-luz text-azul-oscuro",
   // El amarillo natural de los campos de asignar: algo que falta elegir o que está apagado.
   amarillo: "bg-amarillo-campo text-amarillo-oscuro",
+  // Lila: lo que distingue un tipo de otro a primera vista (por ejemplo, retiro o delivery en un pedido).
+  violeta: "bg-violeta-tinte text-violeta-oscuro",
 };
 
 /** Etiqueta de estado: "Pendiente", "Entregado", "Vencido". */
@@ -230,14 +232,19 @@ export function Pastilla({
   children,
   color = "neutro",
   punto = false,
+  grande = false,
 }: {
   children: ReactNode;
   color?: ColorEstado;
   punto?: boolean;
+  /** Más grande, para lo que tiene que verse de lejos (el tipo de un pedido). */
+  grande?: boolean;
 }) {
   return (
     <span
-      className={`inline-flex flex-none items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-[0.74rem] font-semibold ${ESTADOS[color]}`}
+      className={`inline-flex flex-none items-center gap-1.5 whitespace-nowrap rounded-full font-semibold ${
+        grande ? "px-3.5 py-1.5 text-[0.95rem]" : "px-2.5 py-1 text-[0.74rem]"
+      } ${ESTADOS[color]}`}
     >
       {punto && <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-current" />}
       {children}
@@ -262,6 +269,7 @@ export function Aviso({
     marca: "border-brand/25 bg-brand-light",
     azul: "border-azul/25 bg-azul-luz",
     amarillo: "border-amarillo/60 bg-amarillo-luz",
+    violeta: "border-violeta/25 bg-violeta-luz",
   };
   const tintas: Record<string, string> = {
     exito: "text-exito",
@@ -270,6 +278,7 @@ export function Aviso({
     marca: "text-brand-texto",
     azul: "text-azul-oscuro",
     amarillo: "text-amarillo-oscuro",
+    violeta: "text-violeta-oscuro",
   };
   return (
     <div className={`rounded-xl border p-4 ${bordes[color]}`}>

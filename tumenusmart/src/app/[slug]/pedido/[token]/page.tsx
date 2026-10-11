@@ -3,6 +3,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { AutoRefresh } from "@/components/AutoRefresh";
+import { FirmaPlataforma } from "@/components/FirmaPlataforma";
+import { RecordarPedido } from "@/components/PedidosRecientes";
 import { localPorSlug } from "@/lib/local-por-slug";
 import { formatearGuarani, formatearNumero } from "@/lib/format";
 import { METODOS_PAGO_PEDIDO } from "@/lib/metodos-pago";
@@ -57,6 +59,8 @@ export default async function SeguimientoPedidoPage({ params }: { params: Promis
   return (
     <main className="mx-auto max-w-2xl px-4 pb-16 pt-4">
       {abierto && <AutoRefresh segundos={15} />}
+      {/* Anota el pedido en este navegador: si el cliente llegó por el enlace del WhatsApp, después lo encuentra desde el menú. */}
+      <RecordarPedido slug={slug} token={token} numero={p.numero} />
 
       <header className="flex items-center gap-3">
         <Link
@@ -153,6 +157,15 @@ export default async function SeguimientoPedidoPage({ params }: { params: Promis
           Escribirle al local por WhatsApp
         </a>
       )}
+
+      <Link
+        href={`/${slug}`}
+        className="mt-3 flex h-12 w-full items-center justify-center rounded-2xl bg-azul-luz text-[0.92rem] font-semibold text-azul-oscuro ring-1 ring-azul/25 transition-all hover:bg-azul hover:text-white active:scale-[0.98]"
+      >
+        Volver al menú
+      </Link>
+
+      <FirmaPlataforma />
     </main>
   );
 }
