@@ -28,6 +28,9 @@ export type ItemCarrito = {
   mitadYMitad?: MitadYMitad;
   cantidad: number;
   imagenUrl?: string | null;
+  /** Qué parte de la foto se ve cuando se recorta (ver ProductoCarta). Los ítems guardados antes no lo traen. */
+  imagenFocoX?: number | null;
+  imagenFocoY?: number | null;
 };
 
 export function precioUnitario(item: ItemCarrito): number {

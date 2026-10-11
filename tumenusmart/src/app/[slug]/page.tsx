@@ -179,6 +179,8 @@ export default async function CatalogoPage({
       descripcion: p.descripcion,
       ...precioPublico(p),
       imagenUrl: p.imagenUrl,
+      imagenFocoX: p.imagenFocoX,
+      imagenFocoY: p.imagenFocoY,
       ingredientes: p.ingredientes,
       opciones: combinarOpciones(p.opciones, p.gruposAgregados, posicion).map((o) => ({
         id: o.id,
@@ -287,6 +289,8 @@ export default async function CatalogoPage({
               nombre: p.nombre,
               ...precioPublico(p),
               imagenUrl: p.imagenUrl,
+              imagenFocoX: p.imagenFocoX,
+              imagenFocoY: p.imagenFocoY,
             }))}
           />
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { formatearGuarani } from "@/lib/format";
+import { estiloDeFoco } from "@/lib/foco-imagen";
 import { IconoFoto } from "./iconos";
 
 type Producto = {
@@ -11,6 +12,8 @@ type Producto = {
   enPromocion?: boolean;
   etiquetaPromo?: string;
   imagenUrl: string | null;
+  imagenFocoX?: number | null;
+  imagenFocoY?: number | null;
 };
 
 /**
@@ -43,6 +46,7 @@ export function CarruselDestacados({ productos }: { productos: Producto[] }) {
                 loading="lazy"
                 decoding="async"
                 className="h-28 w-full object-cover md:h-32"
+                style={estiloDeFoco(p.imagenFocoX, p.imagenFocoY)}
               />
             ) : (
               <span

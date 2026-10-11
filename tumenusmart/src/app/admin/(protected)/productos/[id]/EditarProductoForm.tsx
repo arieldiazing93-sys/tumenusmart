@@ -23,6 +23,8 @@ type Producto = {
   unidadMedida: string;
   esServicio: boolean;
   imagenUrl: string | null;
+  imagenFocoX: number | null;
+  imagenFocoY: number | null;
   disponible: boolean;
   destacado: boolean;
   ingredientes: string[];
@@ -178,26 +180,28 @@ export function EditarProductoForm({
         </div>
       </Tarjeta>
 
-      {/* La foto y la visibilidad lado a lado (en el celular, una debajo de otra). */}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <Tarjeta className="!p-3">
-          <ImagenProductoField initialUrl={producto.imagenUrl} />
-        </Tarjeta>
+      {/* La foto, con su vista previa para encuadrarla (miniatura a la izquierda y el marco a la derecha). */}
+      <Tarjeta className="!p-3">
+        <ImagenProductoField
+          initialUrl={producto.imagenUrl}
+          initialFocoX={producto.imagenFocoX}
+          initialFocoY={producto.imagenFocoY}
+        />
+      </Tarjeta>
 
-        <Tarjeta className="flex flex-col gap-2 !p-3">
-          <p className="rotulo text-[0.8rem] font-bold">Visibilidad</p>
-          <div className="flex flex-col gap-2">
-            <label className="flex items-center gap-2 text-sm">
-              <input type="checkbox" name="disponible" defaultChecked={producto.disponible} />
-              Disponible en el menú
-            </label>
-            <label className="flex items-start gap-2 text-sm">
-              <input type="checkbox" name="destacado" defaultChecked={producto.destacado} className="mt-1" />
-              <span>⭐ Destacado (aparece en el carrusel de la cabecera del menú)</span>
-            </label>
-          </div>
-        </Tarjeta>
-      </div>
+      <Tarjeta className="flex flex-col gap-2 !p-3">
+        <p className="rotulo text-[0.8rem] font-bold">Visibilidad</p>
+        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:gap-x-6">
+          <label className="flex items-center gap-2 text-sm">
+            <input type="checkbox" name="disponible" defaultChecked={producto.disponible} />
+            Disponible en el menú
+          </label>
+          <label className="flex items-center gap-2 text-sm">
+            <input type="checkbox" name="destacado" defaultChecked={producto.destacado} />
+            ⭐ Destacado (aparece en el carrusel de la cabecera del menú)
+          </label>
+        </div>
+      </Tarjeta>
 
       <Tarjeta className="!p-3">
         <IngredientesField initial={producto.ingredientes} />

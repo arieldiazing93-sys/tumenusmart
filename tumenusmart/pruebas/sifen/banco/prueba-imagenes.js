@@ -191,6 +191,20 @@
   try { await limp.limpiarImagenesHuerfanas(ahora, 10000); } catch { fallo = true; }
   ok(fallo, "si el almacenamiento falla, la limpieza lo informa (no se calla)");
 
+  // ------------------------------------------------------------------------------------- el encuadre de la foto de un producto
+  window.log("== Imágenes: el encuadre (qué parte de la foto se ve cuando la carta la recorta)");
+  const foco = await C.cargar("src/lib/foco-imagen");
+  igual([foco.leerFoco("32"), foco.leerFoco(50), foco.leerFoco(" 7.6 "), foco.leerFoco("0"), foco.leerFoco("100")], [32, 50, 8, 0, 100], "un valor de 0 a 100, redondeado");
+  igual([foco.leerFoco(-20), foco.leerFoco(250), foco.leerFoco("999999")], [0, 100, 100], "fuera de rango se acota a 0 o 100");
+  igual([foco.leerFoco(""), foco.leerFoco(null), foco.leerFoco(undefined), foco.leerFoco("abc"), foco.leerFoco(NaN)], [null, null, null, null, null], "vacío o que no es número: sin encuadre");
+  igual(foco.leerEncuadre("30", "70"), { x: 30, y: 70 }, "los dos valores del formulario");
+  igual(foco.leerEncuadre("30", ""), { x: null, y: null }, "con uno solo no se guarda nada (no se sabe qué quiso)");
+  igual(foco.leerEncuadre("", ""), { x: null, y: null }, "y sin tocar nada, tampoco");
+  igual(foco.estiloDeFoco(50, 32), { objectPosition: "50% 32%" }, "el estilo que se le pone a la foto");
+  igual(foco.estiloDeFoco(null, null), undefined, "sin encuadre no se le pone nada: la foto se ve como siempre");
+  igual(foco.estiloDeFoco(40, null), undefined, "con la mitad del dato tampoco");
+  igual(foco.estiloDeFoco(500, -5), { objectPosition: "100% 0%" }, "y nunca sale un valor fuera de la foto");
+
   window.log("\naciertos: " + window.__aciertos + " · fallas: " + window.__fallas);
   window.__listo = true;
 })().catch((e) => { document.getElementById("salida").textContent += "\nERROR: " + (e && e.stack || e); window.__listo = true; window.__fallas = (window.__fallas || 0) + 1; });

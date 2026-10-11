@@ -12,6 +12,7 @@ import { normalizarUnidadMedida, etiquetaUnidadMedida } from "@/lib/unidad-medid
 import { formatearGuarani } from "@/lib/format";
 import { registrarBitacora } from "@/lib/bitacora";
 import { descartarImagenes } from "@/lib/imagenes";
+import { leerEncuadre } from "@/lib/foco-imagen";
 import { describirTramo, validarTramos } from "@/lib/precio-promocion";
 
 export type ResultadoFoto = { ok: true; url: string } | { ok: false; error: string };
@@ -29,6 +30,15 @@ export async function subirFotoProducto(formData: FormData): Promise<ResultadoFo
   }
   const url = await subirImagenProducto(archivo);
   return { ok: true, url };
+}
+
+/**
+ * El encuadre de la foto que viene del formulario (qué parte se ve cuando la carta la recorta): dos enteros de 0 a 100, o ninguno.
+ * Nunca se guarda lo que llegue tal cual: se acota, y con uno solo de los dos no se guarda nada.
+ */
+function encuadreDeFoto(formData: FormData): { imagenFocoX: number | null; imagenFocoY: number | null } {
+  const e = leerEncuadre(formData.get("imagenFocoX"), formData.get("imagenFocoY"));
+  return { imagenFocoX: e.x, imagenFocoY: e.y };
 }
 
 function parsearIngredientes(formData: FormData): string[] {
@@ -130,6 +140,7 @@ export async function crearProducto(formData: FormData): Promise<ResultadoProduc
       precio,
       descripcion: String(formData.get("descripcion") ?? "") || null,
       imagenUrl: String(formData.get("imagenUrl") ?? "") || null,
+      ...encuadreDeFoto(formData),
       disponible: formData.get("disponible") === "on",
       destacado: formData.get("destacado") === "on",
       ingredientes: parsearIngredientes(formData),
@@ -212,6 +223,8 @@ export async function actualizarProducto(
       precio,
       descripcion: String(formData.get("descripcion") ?? "") || null,
       imagenUrl,
+      // Sin foto no hay encuadre (queda sin valor y la carta no recorta de ninguna manera especial).
+      ...(imagenUrl ? encuadreDeFoto(formData) : { imagenFocoX: null, imagenFocoY: null }),
       disponible: formData.get("disponible") === "on",
       destacado: formData.get("destacado") === "on",
       ingredientes: parsearIngredientes(formData),

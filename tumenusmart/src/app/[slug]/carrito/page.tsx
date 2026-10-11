@@ -12,6 +12,7 @@ import {
   type ItemCarrito,
 } from "@/lib/cart-types";
 import { formatearGuarani } from "@/lib/format";
+import { estiloDeFoco } from "@/lib/foco-imagen";
 
 /**
  * Una línea del carrito, como tarjeta.
@@ -62,7 +63,13 @@ function FilaCarrito({
         >
           {item.imagenUrl && (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={item.imagenUrl} alt="" loading="lazy" className="h-20 w-20 flex-none rounded-xl object-cover" />
+            <img
+              src={item.imagenUrl}
+              alt=""
+              loading="lazy"
+              className="h-20 w-20 flex-none rounded-xl object-cover"
+              style={estiloDeFoco(item.imagenFocoX, item.imagenFocoY)}
+            />
           )}
 
           <div className="min-w-0 flex-1">

@@ -119,6 +119,7 @@ export function FormularioServicio({
 
           <ImagenProductoField
             initialUrl={servicio?.imagenUrl ?? null}
+            conEncuadre={false}
             etiqueta="Foto del servicio (opcional)"
             ayuda="Un ejemplo del corte, la barba o el diseño terminado, para que el cliente sepa qué está reservando. Se muestra cuadrada."
           />

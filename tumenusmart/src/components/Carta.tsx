@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useCart } from "./CartProvider";
 import { construirKey } from "@/lib/cart-types";
 import { formatearGuarani } from "@/lib/format";
+import { estiloDeFoco } from "@/lib/foco-imagen";
 import { MitadYMitadPicker } from "./MitadYMitadPicker";
 import { FichaProducto } from "./FichaProducto";
 import { IconoFoto } from "./iconos";
@@ -271,6 +272,8 @@ function FilaProducto({
       opciones: [],
       cantidad: 1,
       imagenUrl: producto.imagenUrl,
+      imagenFocoX: producto.imagenFocoX,
+      imagenFocoY: producto.imagenFocoY,
     });
     if (typeof navigator !== "undefined" && navigator.vibrate) navigator.vibrate(8);
     setLate(true);
@@ -306,6 +309,7 @@ function FilaProducto({
       loading="lazy"
       decoding="async"
       className={tarjetas ? "h-52 w-full object-cover" : "h-24 w-24 rounded-xl object-cover"}
+      style={estiloDeFoco(producto.imagenFocoX, producto.imagenFocoY)}
     />
   ) : tarjetas ? (
     <span aria-hidden="true" className="flex h-40 w-full items-center justify-center bg-papel-hundido text-tinta-suave/35">

@@ -27,6 +27,9 @@ export type ProductoCarta = {
   /** La etiqueta de la Promoción que rige ahora para este producto ("−20 %", "2x1"), si alguna. */
   etiquetaPromo?: string;
   imagenUrl: string | null;
+  /** Qué parte de la foto se ve cuando se recorta (0 a 100; 50 = centro). Sin valor, centrada como siempre. */
+  imagenFocoX?: number | null;
+  imagenFocoY?: number | null;
   ingredientes: string[];
   opciones: OpcionCarta[];
 };

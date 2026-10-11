@@ -696,6 +696,10 @@ model Product {
   /// cambia nada.
   esServicio   Boolean        @default(false)
   imagenUrl   String?
+  /// Qué parte de la foto se ve cuando la carta la recorta (0 = borde izquierdo / superior, 50 = centro, 100 = borde derecho /
+  /// inferior). La elige el dueño arrastrando la foto al cargarla. Sin valor, la carta la muestra como siempre.
+  imagenFocoX Int?
+  imagenFocoY Int?
   disponible  Boolean         @default(true)
   orden       Int             @default(0)
   // Ingredientes "de base" del producto, mostrados como etiquetas que el

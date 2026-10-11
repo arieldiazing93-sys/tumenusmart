@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useCart } from "./CartProvider";
 import { construirKey } from "@/lib/cart-types";
 import { formatearGuarani } from "@/lib/format";
+import { estiloDeFoco } from "@/lib/foco-imagen";
 import type { OpcionCarta, ProductoCarta } from "@/lib/carta";
 
 // Se re-exportan para no romper a quien ya los importaba desde acá.
@@ -157,6 +158,8 @@ export function FichaProducto({
       ingredientesQuitados: quitados.length > 0 ? quitados : undefined,
       cantidad,
       imagenUrl: producto.imagenUrl,
+      imagenFocoX: producto.imagenFocoX,
+      imagenFocoY: producto.imagenFocoY,
     });
     if (typeof navigator !== "undefined" && navigator.vibrate) navigator.vibrate(8);
     onCerrar();
@@ -196,6 +199,7 @@ export function FichaProducto({
               src={producto.imagenUrl}
               alt={producto.nombre}
               className="h-56 w-full rounded-2xl object-cover"
+              style={estiloDeFoco(producto.imagenFocoX, producto.imagenFocoY)}
               decoding="async"
             />
           )}
