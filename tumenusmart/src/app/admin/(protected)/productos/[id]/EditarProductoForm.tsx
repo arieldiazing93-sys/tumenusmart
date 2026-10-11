@@ -51,12 +51,15 @@ export function EditarProductoForm({
   categorias,
   areasImpresion,
   almacenes,
+  estiloCarta = "lista",
 }: {
   producto: Producto;
   categorias: Categoria[];
   areasImpresion: AreaImpresion[];
   /** Los activos, más el que ya tiene este producto aunque se haya desactivado; el más antiguo primero. */
   almacenes: Almacen[];
+  /** Cómo muestra el local su carta: la vista previa de la foto se arma con esa forma. */
+  estiloCarta?: string;
 }) {
   const [pendiente, iniciar] = useTransition();
 
@@ -186,6 +189,7 @@ export function EditarProductoForm({
           initialUrl={producto.imagenUrl}
           initialFocoX={producto.imagenFocoX}
           initialFocoY={producto.imagenFocoY}
+          estiloCarta={estiloCarta}
         />
       </Tarjeta>
 

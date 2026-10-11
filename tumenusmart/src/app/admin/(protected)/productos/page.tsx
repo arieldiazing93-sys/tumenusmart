@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import { clasesBoton, Cabecera } from "@/components/ui";
 import { prismaDelLocal } from "@/lib/prisma-local";
+import { prisma as prismaGlobal } from "@/lib/prisma";
 import { idLocalActual } from "@/lib/local-actual";
 import { pantallaConPermiso } from "@/lib/auth";
 import { puede } from "@/lib/permisos";
@@ -26,7 +27,10 @@ export default async function AdminProductosPage({
   const puedeEditar = puede(sesion.rol, "productos.editar");
 
   // Todas las consultas de acá abajo quedan atadas a este local.
-  const prisma = prismaDelLocal(await idLocalActual());
+  const idLocal = await idLocalActual();
+  const prisma = prismaDelLocal(idLocal);
+  // Cómo muestra el local su carta: la vista previa de la foto se arma con la forma en que de verdad se va a ver.
+  const tienda = await prismaGlobal.store.findUnique({ where: { id: idLocal }, select: { estiloCarta: true } });
 
   const { categoria: categoriaParam, producto: productoParam } = await searchParams;
 
@@ -122,6 +126,7 @@ export default async function AdminProductosPage({
           areasImpresion={areasImpresion}
           almacenes={almacenes}
           puedeEditar={puedeEditar}
+          estiloCarta={tienda?.estiloCarta === "tarjetas" ? "tarjetas" : "lista"}
           categoriaInicial={categoriaInicial}
           abiertoId={abierto?.id ?? null}
           detalle={abierto ? <FichaProducto productoId={abierto.id} /> : null}

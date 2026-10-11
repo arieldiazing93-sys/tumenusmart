@@ -15,12 +15,15 @@ export function CrearProductoForm({
   categoriaActivaId,
   areasImpresion,
   almacenes,
+  estiloCarta = "lista",
 }: {
   categorias: Categoria[];
   categoriaActivaId?: string;
   areasImpresion: AreaImpresion[];
   /** Solo los activos, el más antiguo primero (queda elegido de entrada). */
   almacenes: Almacen[];
+  /** Cómo muestra el local su carta: la vista previa de la foto se arma con esa forma. */
+  estiloCarta?: string;
 }) {
   const [pendiente, iniciar] = useTransition();
 
@@ -103,7 +106,7 @@ export function CrearProductoForm({
           className="rounded-lg border border-linea px-3 py-2"
         />
       </div>
-      <ImagenProductoField initialUrl={null} />
+      <ImagenProductoField initialUrl={null} estiloCarta={estiloCarta} />
       <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:gap-x-6">
         <label className="flex items-center gap-2 text-sm">
           <input type="checkbox" name="disponible" defaultChecked />

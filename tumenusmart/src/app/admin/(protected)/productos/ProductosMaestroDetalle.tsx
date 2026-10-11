@@ -44,6 +44,7 @@ export function ProductosMaestroDetalle({
   areasImpresion,
   almacenes,
   puedeEditar,
+  estiloCarta = "lista",
   categoriaInicial,
   abiertoId,
   detalle,
@@ -55,6 +56,8 @@ export function ProductosMaestroDetalle({
   almacenes: Almacen[];
   /** Quien solo puede ver la carta (y marcar agotados) no abre la ficha ni crea ni reordena. */
   puedeEditar: boolean;
+  /** Cómo muestra el local su carta ("tarjetas" o "lista"): la vista previa de la foto de un producto nuevo se arma igual. */
+  estiloCarta?: string;
   /** La categoría que viene en la dirección ("" = todas). */
   categoriaInicial: string;
   /** El producto que viene en la dirección, ya comprobado en el servidor. */
@@ -313,6 +316,7 @@ export function ProductosMaestroDetalle({
                 categoriaActivaId={categoriaFiltro !== TODAS ? categoriaFiltro : undefined}
                 areasImpresion={areasImpresion}
                 almacenes={almacenes}
+                estiloCarta={estiloCarta}
               />
             </Tarjeta>
           ) : esperando && esperando !== abiertoId ? (

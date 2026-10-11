@@ -181,7 +181,7 @@ export function GruposAgregadosProducto({
       {gruposDisponibles.length > 0 && (
         <div>
           <p className="mb-2 text-[0.82rem] text-tinta-media">O usar un grupo que ya creaste:</p>
-          {/* Botones con fondo propio (blanco sobre el fondo azul de la tarjeta):
+          {/* Botones con fondo propio (blanco sobre el fondo amarillo suave de la tarjeta):
               antes eran píldoras transparentes y no se notaba que se podían tocar. */}
           <div className="flex flex-wrap gap-2">
             {gruposDisponibles.map((g) => (

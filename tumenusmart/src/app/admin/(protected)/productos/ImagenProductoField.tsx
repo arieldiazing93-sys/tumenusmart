@@ -11,6 +11,7 @@ export function ImagenProductoField({
   initialFocoX = null,
   initialFocoY = null,
   conEncuadre = true,
+  estiloCarta = "lista",
   etiqueta = "Foto del producto",
   ayuda,
 }: {
@@ -20,6 +21,12 @@ export function ImagenProductoField({
   initialFocoY?: number | null;
   /** Si se ofrece elegir qué parte de la foto se ve. Los servicios no lo usan: su foto se muestra cuadrada y por arriba. */
   conEncuadre?: boolean;
+  /**
+   * Cómo muestra el local su carta. En "tarjetas" la foto se ve ancha; en "lista", cuadrada. El marco para encuadrar tiene esa
+   * misma forma: lo que se mueve es lo que de verdad cambia (en un marco cuadrado se mueve de costado, en uno ancho, hacia arriba
+   * y abajo; con una forma distinta a la de la carta, parecería que no pasa nada).
+   */
+  estiloCarta?: string;
   etiqueta?: string;
   /** Una línea de ayuda debajo del campo, si hace falta explicar para qué sirve acá. */
   ayuda?: string;
@@ -122,8 +129,9 @@ export function ImagenProductoField({
 
       {/* Con foto: la vista previa para elegir qué parte se ve en la carta (se arrastra con el mouse o con el dedo). */}
       {url && conEncuadre && (
-        <div className="w-full max-w-[16rem]">
+        <div className={`w-full ${estiloCarta === "tarjetas" ? "max-w-[16rem]" : "max-w-[10rem]"}`}>
           <EncuadreImagen
+            cuadrada={estiloCarta !== "tarjetas"}
             url={url}
             x={foco?.x ?? 50}
             y={foco?.y ?? 50}

@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { prismaDelLocal } from "@/lib/prisma-local";
+import { prisma as prismaGlobal } from "@/lib/prisma";
 import { idLocalActual } from "@/lib/local-actual";
 import { EliminarProductoBoton, EliminarOpcionBoton } from "./[id]/EliminarBotones";
 import { EditarProductoForm } from "./[id]/EditarProductoForm";
@@ -28,6 +29,9 @@ export async function FichaProducto({ productoId }: { productoId: string }) {
   // Todas las consultas de acá abajo quedan atadas a este local.
   const idLocal = await idLocalActual();
   const prisma = prismaDelLocal(idLocal);
+
+  // Cómo muestra el local su carta: la vista previa de la foto se arma con la forma en que de verdad se va a ver.
+  const tienda = await prismaGlobal.store.findUnique({ where: { id: idLocal }, select: { estiloCarta: true } });
 
   const [producto, categorias, areasImpresion, todosLosAlmacenes, todosLosGrupos] = await Promise.all([
     prisma.product.findUnique({
@@ -178,6 +182,7 @@ export async function FichaProducto({ productoId }: { productoId: string }) {
         categorias={categorias}
         areasImpresion={areasImpresion}
         almacenes={almacenes}
+        estiloCarta={tienda?.estiloCarta === "tarjetas" ? "tarjetas" : "lista"}
       />
 
       {producto.opciones.length > 0 && (
@@ -206,9 +211,9 @@ export async function FichaProducto({ productoId }: { productoId: string }) {
         </Tarjeta>
       )}
 
-      <div className="flex flex-col gap-2 rounded-xl border border-azul/25 bg-azul-luz p-3">
+      <div className="flex flex-col gap-2 rounded-xl border border-amarillo/50 bg-amarillo-luz p-3">
         <div>
-          <p className="rotulo text-[0.8rem] font-bold text-azul-oscuro">Grupos de agregados</p>
+          <p className="rotulo text-[0.8rem] font-bold text-amarillo-oscuro">Grupos de agregados</p>
           <p className="text-[0.82rem] text-tinta-media">
             Grupos reutilizables (ej: Salsas, Quesos). Cada modificador es un producto real de tu catálogo: buscalo y
             agregalo acá mismo.

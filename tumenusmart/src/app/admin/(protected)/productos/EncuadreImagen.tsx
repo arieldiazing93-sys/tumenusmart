@@ -10,7 +10,7 @@ function acotar(n: number): number {
  * La vista previa de una foto con la que se elige qué parte se ve en la carta: se arrastra la foto con el mouse o con el dedo
  * (como al subir la foto de perfil en Instagram) y se ve al instante cómo queda.
  *
- * El marco tiene la proporción de la tarjeta de la carta (la más ancha); en la lista, el carrusel y la ficha la foto se recorta
+ * El marco tiene la proporción de la foto en la carta (la tarjeta, de unos 8:5, o el cuadrado de la lista); en la lista, el carrusel y la ficha la foto se recorta
  * distinto, pero con el mismo punto: lo que el dueño deja a la vista acá es lo que se prioriza en todos lados. No toca la imagen:
  * solo guarda el punto (x, y de 0 a 100; 50 = centro) que la carta usa como `object-position`.
  *
@@ -22,11 +22,14 @@ export function EncuadreImagen({
   x,
   y,
   onCambio,
+  cuadrada = false,
 }: {
   url: string;
   x: number;
   y: number;
   onCambio: (x: number, y: number) => void;
+  /** El marco es cuadrado (la carta en «lista») en vez de ancho (la carta en «tarjetas»). */
+  cuadrada?: boolean;
 }) {
   const marco = useRef<HTMLDivElement>(null);
   const [natural, setNatural] = useState<{ ancho: number; alto: number } | null>(null);
@@ -100,7 +103,7 @@ export function EncuadreImagen({
         onPointerUp={alSoltar}
         onPointerCancel={alSoltar}
         onKeyDown={alTeclear}
-        className={`relative aspect-[7/4] w-full touch-none select-none overflow-hidden rounded-xl border-2 border-azul/50 bg-papel-hundido focus:outline-none focus-visible:ring-2 focus-visible:ring-azul/40 ${
+        className={`relative ${cuadrada ? "aspect-square" : "aspect-[8/5]"} w-full touch-none select-none overflow-hidden rounded-xl border-2 border-azul/50 bg-papel-hundido focus:outline-none focus-visible:ring-2 focus-visible:ring-azul/40 ${
           sePuedeMover ? (arrastrando ? "cursor-grabbing" : "cursor-grab") : ""
         }`}
       >
@@ -124,7 +127,7 @@ export function EncuadreImagen({
       </div>
       <p className="mt-1 text-[0.76rem] leading-snug text-tinta-media">
         {sePuedeMover
-          ? "Así se ve en la carta. Movela con el mouse o con el dedo hasta que se vea lo importante."
+          ? `Así se ve en tu carta (${cuadrada ? "en lista, cuadrada" : "en tarjetas, ancha"}). Movela con el mouse o con el dedo hasta que se vea lo importante.`
           : "Esta foto entra justa en el marco: no hay nada para mover."}
       </p>
     </div>

@@ -308,7 +308,7 @@ function FilaProducto({
       alt={producto.nombre}
       loading="lazy"
       decoding="async"
-      className={tarjetas ? "h-52 w-full object-cover" : "h-24 w-24 rounded-xl object-cover"}
+      className={tarjetas ? "h-[220px] w-full object-cover" : "h-24 w-24 rounded-xl object-cover"}
       style={estiloDeFoco(producto.imagenFocoX, producto.imagenFocoY)}
     />
   ) : tarjetas ? (
@@ -343,18 +343,26 @@ function FilaProducto({
 
   // Con opciones: un botón de verdad (no un comentario gris al pie), para quien no ve bien.
   const elegir = conFicha ? (
-    <span className="inline-flex h-9 flex-none items-center whitespace-nowrap rounded-full bg-brand-light px-4 text-[0.82rem] font-semibold text-brand-texto transition-transform active:scale-95">
+    <span
+      className={`inline-flex flex-none items-center whitespace-nowrap rounded-full bg-brand-light font-semibold text-brand-texto transition-transform active:scale-95 ${
+        tarjetas ? "h-8 px-3.5 text-[0.8rem]" : "h-9 px-4 text-[0.82rem]"
+      }`}
+    >
       Elegir agregados
     </span>
   ) : null;
 
+  // En «tarjetas» el texto va más apretado (la foto ya es grande y el nombre, la descripción, el precio y los agregados tienen que
+  // caber sin que cada tarjeta se estire de más).
   const texto = (
     <>
-      <span className={`block font-semibold leading-tight tracking-titular text-tinta ${tarjetas ? "text-[1.08rem]" : "text-[1rem]"}`}>
+      <span className={`block font-semibold leading-tight tracking-titular text-tinta ${tarjetas ? "text-[1.02rem]" : "text-[1rem]"}`}>
         {producto.nombre}
       </span>
       {producto.descripcion && (
-        <span className={`mt-1 line-clamp-2 block leading-snug text-tinta-suave ${tarjetas ? "text-[0.88rem]" : "text-[0.82rem]"}`}>
+        <span
+          className={`line-clamp-2 block leading-snug text-tinta-suave ${tarjetas ? "mt-0.5 text-[0.84rem]" : "mt-1 text-[0.82rem]"}`}
+        >
           {producto.descripcion}
         </span>
       )}
@@ -373,9 +381,9 @@ function FilaProducto({
           {foto}
           {mas && <span className="absolute bottom-3 right-3 flex">{mas}</span>}
         </span>
-        <span className="block p-4">
+        <span className="block px-3.5 pb-3 pt-2.5">
           {texto}
-          <span className="mt-2.5 flex items-center justify-between gap-3">
+          <span className="mt-1.5 flex items-center justify-between gap-3">
             {precio}
             {elegir}
           </span>
