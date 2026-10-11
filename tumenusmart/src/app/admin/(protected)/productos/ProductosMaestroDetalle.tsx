@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, useTransition, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { Tarjeta, Selector, clasesBoton } from "@/components/ui";
+import { Tarjeta, Selector, clasesBoton, CLASES_CAMPO_UBICACION } from "@/components/ui";
 import { BotonesMover } from "@/components/BotonesMover";
 import { formatearGuarani } from "@/lib/format";
 import { moverProducto } from "./actions";
@@ -146,6 +146,7 @@ export function ProductosMaestroDetalle({
       <div className="flex flex-col gap-2 border-b border-linea p-3">
         <Selector
           aria-label="Categoría"
+          className={CLASES_CAMPO_UBICACION}
           value={categoriaFiltro}
           onChange={(e) => setCategoriaFiltro(e.target.value)}
         >

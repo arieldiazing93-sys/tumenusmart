@@ -1,7 +1,7 @@
 "use client";
 
 import { useTransition } from "react";
-import { clasesBoton } from "@/components/ui";
+import { clasesBoton, CLASES_CAMPO_UBICACION } from "@/components/ui";
 import { crearProducto } from "./actions";
 import { ImagenProductoField } from "./ImagenProductoField";
 import { IngredientesField } from "./IngredientesField";
@@ -46,7 +46,7 @@ export function CrearProductoForm({
           name="categoryId"
           required
           defaultValue={categoriaActivaId ?? ""}
-          className="rounded-lg border border-linea px-3 py-2"
+          className={`rounded-lg border border-linea px-3 py-2 ${CLASES_CAMPO_UBICACION}`}
         >
           <option value="" disabled>
             Elegí una categoría

@@ -299,6 +299,14 @@ const BASE_CAMPO_INVALIDO =
 
 export const clasesCampo = BASE_CAMPO;
 
+/**
+ * El amarillo de «acá te ubicás»: el desplegable que dice en qué categoría estás parado (en Productos, el de la lista y el de la
+ * ficha) va así, para saberlo de un vistazo. Es el mismo amarillo de los campos de asignar (el repartidor, el sector de una mesa).
+ * El `!` le gana al borde y al fondo comunes de los campos y a la regla de `campos-grises`, que pinta todo de gris.
+ */
+export const CLASES_CAMPO_UBICACION =
+  "!border-2 !border-amarillo !bg-amarillo-campo font-semibold !text-tinta focus:!border-amarillo focus:!ring-amarillo/40";
+
 /** Las clases de un campo, en rojo cuando no pasó la validación. */
 export function clasesDeCampo(invalido = false) {
   return invalido ? BASE_CAMPO_INVALIDO : BASE_CAMPO;

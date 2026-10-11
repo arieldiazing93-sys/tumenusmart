@@ -1,7 +1,7 @@
 "use client";
 
 import { useTransition } from "react";
-import { Tarjeta, Campo, Entrada, Area, Selector, clasesBoton } from "@/components/ui";
+import { Tarjeta, Campo, Entrada, Area, Selector, clasesBoton, CLASES_CAMPO_UBICACION } from "@/components/ui";
 import { actualizarProducto } from "../actions";
 import { ImagenProductoField } from "../ImagenProductoField";
 import { IngredientesField } from "../IngredientesField";
@@ -73,7 +73,7 @@ export function EditarProductoForm({
         */}
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Campo etiqueta="Categoría">
-            <Selector name="categoryId" required defaultValue={producto.categoryId}>
+            <Selector name="categoryId" required defaultValue={producto.categoryId} className={CLASES_CAMPO_UBICACION}>
               {categorias.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.nombre}
