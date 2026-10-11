@@ -131,7 +131,7 @@ export async function FichaProducto({ productoId }: { productoId: string }) {
     // arranquen de cero en vez de arrastrar lo que había escrito en el anterior.
     <div
       key={producto.id}
-      className="flex flex-col gap-4 rounded-xl border-2 border-azul/50 bg-white p-3 sm:p-4"
+      className="flex flex-col gap-3 rounded-xl border-2 border-azul/50 bg-white p-3"
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="min-w-0">
@@ -204,13 +204,12 @@ export async function FichaProducto({ productoId }: { productoId: string }) {
         </Tarjeta>
       )}
 
-      <div className="flex flex-col gap-3 rounded-xl border border-azul/25 bg-azul-luz p-4">
+      <div className="flex flex-col gap-2 rounded-xl border border-azul/25 bg-azul-luz p-3">
         <div>
           <p className="rotulo text-[0.8rem] font-bold text-azul-oscuro">Grupos de agregados</p>
-          <p className="text-sm text-tinta-media">
-            Grupos reutilizables (ej: Salsas, Quesos) que se suman a los agregados propios de
-            arriba. Cada modificador es un producto real de tu catálogo — buscalo y agregalo acá
-            mismo, sin salir de esta pantalla.
+          <p className="text-[0.82rem] text-tinta-media">
+            Grupos reutilizables (ej: Salsas, Quesos). Cada modificador es un producto real de tu catálogo: buscalo y
+            agregalo acá mismo.
           </p>
         </div>
         <GruposAgregadosProducto
@@ -231,15 +230,13 @@ export async function FichaProducto({ productoId }: { productoId: string }) {
         />
       </div>
 
-      <div className="flex flex-col gap-3 rounded-xl border border-linea bg-superficie p-4">
+      <div className="flex flex-col gap-2 rounded-xl border border-linea bg-superficie p-3">
         <div>
           <p className="rotulo text-[0.8rem] font-bold">Receta (Control de stock)</p>
-          <p className="text-sm text-tinta-media">
-            Qué insumos descuenta cada unidad vendida de este producto, y cuánto de cada uno.
-            Si usa una preparación (salsa, masa…), poné la preparación con la cantidad que lleva:
-            al vender, se descuentan solos los insumos con que se hace. Sin receta, este producto
-            no descuenta ningún insumo. Un "extra" de Grupos de agregados es también un producto —
-            armale la receta en su propia ficha para que también descuente.
+          <p className="text-[0.82rem] text-tinta-media">
+            Qué insumos descuenta cada unidad vendida, y cuánto de cada uno. Si usa una preparación (salsa, masa…),
+            poné la preparación con su cantidad: al vender se descuentan solos sus insumos. Sin receta, no descuenta
+            nada. Un «extra» de Grupos de agregados también es un producto: armale la receta en su propia ficha.
           </p>
         </div>
         <RecetaProducto

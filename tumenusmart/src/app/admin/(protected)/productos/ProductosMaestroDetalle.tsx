@@ -257,7 +257,7 @@ export function ProductosMaestroDetalle({
                   </td>
                   {puedeEditar && (
                     <td className="px-2 py-1 text-right">
-                      <button type="button" onClick={() => abrir(p.id)} className={clasesBoton("suave", "sm")}>
+                      <button type="button" onClick={() => abrir(p.id)} className={clasesBoton("navegar", "sm")}>
                         Ver
                       </button>
                     </td>
