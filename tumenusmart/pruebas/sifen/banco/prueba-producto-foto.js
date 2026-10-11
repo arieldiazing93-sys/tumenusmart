@@ -42,15 +42,15 @@
   sembrar();
   let p = await guardar({ imagenFocoX: "50", imagenFocoY: "32" });
   ok(p.imagenFocoX === 50 && p.imagenFocoY === 32 && p.imagenUrl === url, "el encuadre que manda el formulario se guarda (" + JSON.stringify([p.imagenFocoX, p.imagenFocoY]) + ")");
-  p = await guardar({ imagenFocoX: "480", imagenFocoY: "-9" });
-  ok(p.imagenFocoX === 100 && p.imagenFocoY === 0, "un valor fuera de rango se acota a 0–100");
+  p = await guardar({ imagenFocoX: "480", imagenFocoY: "-9", imagenZoom: "9000" });
+  ok(p.imagenFocoX === 100 && p.imagenFocoY === 0 && p.imagenZoom === 300, "un valor fuera de rango se acota (0–100 el encuadre, 100–300 el acercamiento)");
   p = await guardar({ imagenFocoX: "40", imagenFocoY: "" });
   ok(p.imagenFocoX === null && p.imagenFocoY === null, "con un solo valor no se guarda nada");
-  p = await guardar({ imagenFocoX: "", imagenFocoY: "" });
-  ok(p.imagenFocoX === null && p.imagenFocoY === null, "sin tocar nada queda sin encuadre (la carta la muestra como siempre)");
+  p = await guardar({ imagenFocoX: "", imagenFocoY: "", imagenZoom: "100" });
+  ok(p.imagenFocoX === null && p.imagenFocoY === null && p.imagenZoom === null, "sin tocar nada queda sin encuadre (la carta la muestra como siempre)");
   p = await guardar({ imagenFocoX: "20", imagenFocoY: "80" });
-  p = await guardar({ imagenUrl: "", imagenFocoX: "20", imagenFocoY: "80" });
-  ok(p.imagenUrl === null && p.imagenFocoX === null && p.imagenFocoY === null, "si se quita la foto, el encuadre se borra con ella");
+  p = await guardar({ imagenUrl: "", imagenFocoX: "20", imagenFocoY: "80", imagenZoom: "200" });
+  ok(p.imagenUrl === null && p.imagenFocoX === null && p.imagenFocoY === null && p.imagenZoom === null, "si se quita la foto, el encuadre se borra con ella");
 
   window.log("\naciertos: " + window.__aciertos + " · fallas: " + window.__fallas);
   window.__listo = true;

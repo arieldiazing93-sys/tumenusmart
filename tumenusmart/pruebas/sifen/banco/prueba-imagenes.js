@@ -204,6 +204,10 @@
   igual(foco.estiloDeFoco(null, null), undefined, "sin encuadre no se le pone nada: la foto se ve como siempre");
   igual(foco.estiloDeFoco(40, null), undefined, "con la mitad del dato tampoco");
   igual(foco.estiloDeFoco(500, -5), { objectPosition: "100% 0%" }, "y nunca sale un valor fuera de la foto");
+  igual([foco.leerZoom("150"), foco.leerZoom(250.4), foco.leerZoom(100), foco.leerZoom(80), foco.leerZoom(999), foco.leerZoom(""), foco.leerZoom("x"), foco.leerZoom(null)], [150, 250, null, null, 300, null, null, null], "el acercamiento: de 100 a 300; sin acercar (100 o menos) o sin dato no guarda nada");
+  igual(foco.estiloDeFoco(50, 20, 150), { objectPosition: "50% 20%", transform: "scale(1.5)", transformOrigin: "50% 20%" }, "con acercamiento, el mismo punto es el centro del zoom (lo elegido no se corre al acercar)");
+  igual(foco.estiloDeFoco(null, null, 200), { objectPosition: "50% 50%", transform: "scale(2)", transformOrigin: "50% 50%" }, "acercado sin haber movido nada: se acerca por el centro");
+  igual(foco.estiloDeFoco(30, 70, 100), { objectPosition: "30% 70%" }, "sin acercar no lleva transformación");
 
   window.log("\naciertos: " + window.__aciertos + " · fallas: " + window.__fallas);
   window.__listo = true;

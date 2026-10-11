@@ -3,13 +3,14 @@
 import { useRef, useState } from "react";
 import { subirFotoProducto } from "./actions";
 import { comprimirImagen, pesoLegible, PARA_PRODUCTO } from "@/lib/comprimir-imagen";
-import { estiloDeFoco, leerEncuadre } from "@/lib/foco-imagen";
+import { estiloDeFoco, leerEncuadre, leerZoom } from "@/lib/foco-imagen";
 import { EncuadreImagen } from "./EncuadreImagen";
 
 export function ImagenProductoField({
   initialUrl,
   initialFocoX = null,
   initialFocoY = null,
+  initialZoom = null,
   conEncuadre = true,
   estiloCarta = "lista",
   etiqueta = "Foto del producto",
@@ -19,6 +20,8 @@ export function ImagenProductoField({
   /** Qué parte de la foto se ve cuando la carta la recorta (0 a 100; 50 = centro). Sin valor, como siempre. */
   initialFocoX?: number | null;
   initialFocoY?: number | null;
+  /** Cuánto se acerca la foto (100 a 300). Sin valor, sin acercar. */
+  initialZoom?: number | null;
   /** Si se ofrece elegir qué parte de la foto se ve. Los servicios no lo usan: su foto se muestra cuadrada y por arriba. */
   conEncuadre?: boolean;
   /**
@@ -37,6 +40,7 @@ export function ImagenProductoField({
     const e = leerEncuadre(initialFocoX, initialFocoY);
     return e.x !== null && e.y !== null ? { x: e.x, y: e.y } : null;
   });
+  const [zoom, setZoom] = useState<number>(() => leerZoom(initialZoom) ?? 100);
   const [subiendo, setSubiendo] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [ahorro, setAhorro] = useState<string | null>(null);
@@ -64,6 +68,7 @@ export function ImagenProductoField({
       }
       setUrl(subida.url);
       setFoco(null);
+      setZoom(100);
 
       if (resultado.comprimida) {
         setAhorro(
@@ -93,7 +98,7 @@ export function ImagenProductoField({
               src={url}
               alt={etiqueta}
               className="h-full w-full object-cover"
-              style={estiloDeFoco(foco?.x, foco?.y)}
+              style={estiloDeFoco(foco?.x, foco?.y, zoom)}
             />
           ) : (
             <span className="text-xs text-tinta-suave">Sin foto</span>
@@ -118,6 +123,7 @@ export function ImagenProductoField({
               onClick={() => {
                 setUrl("");
                 setFoco(null);
+                setZoom(100);
               }}
               className="text-left text-xs text-peligro hover:underline"
             >
@@ -135,15 +141,24 @@ export function ImagenProductoField({
             url={url}
             x={foco?.x ?? 50}
             y={foco?.y ?? 50}
+            zoom={zoom}
             onCambio={(x, y) => setFoco({ x, y })}
+            onZoom={(z) => {
+              setZoom(z);
+              // Acercar sin haber movido nada: se acerca por el centro (el punto queda guardado junto con el acercamiento).
+              setFoco((f) => f ?? { x: 50, y: 50 });
+            }}
           />
-          {foco && (foco.x !== 50 || foco.y !== 50) && (
+          {((foco && (foco.x !== 50 || foco.y !== 50)) || zoom > 100) && (
             <button
               type="button"
-              onClick={() => setFoco({ x: 50, y: 50 })}
+              onClick={() => {
+                setFoco({ x: 50, y: 50 });
+                setZoom(100);
+              }}
               className="mt-1 rounded-lg border border-azul/35 bg-azul-luz px-2.5 py-1 text-xs font-semibold text-azul-oscuro hover:border-azul hover:bg-azul hover:text-white"
             >
-              Centrar de nuevo
+              Volver a empezar (centrar y sin acercar)
             </button>
           )}
         </div>
@@ -162,6 +177,7 @@ export function ImagenProductoField({
         <>
           <input type="hidden" name="imagenFocoX" value={url && foco ? foco.x : ""} />
           <input type="hidden" name="imagenFocoY" value={url && foco ? foco.y : ""} />
+          <input type="hidden" name="imagenZoom" value={url && zoom > 100 ? zoom : ""} />
         </>
       )}
     </div>

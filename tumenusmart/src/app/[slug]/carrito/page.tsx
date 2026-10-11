@@ -62,14 +62,16 @@ function FilaCarrito({
           }`}
         >
           {item.imagenUrl && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={item.imagenUrl}
-              alt=""
-              loading="lazy"
-              className="h-20 w-20 flex-none rounded-xl object-cover"
-              style={estiloDeFoco(item.imagenFocoX, item.imagenFocoY)}
-            />
+            <span className="block h-20 w-20 flex-none overflow-hidden rounded-xl">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={item.imagenUrl}
+                alt=""
+                loading="lazy"
+                className="h-20 w-20 rounded-xl object-cover"
+                style={estiloDeFoco(item.imagenFocoX, item.imagenFocoY, item.imagenZoom)}
+              />
+            </span>
           )}
 
           <div className="min-w-0 flex-1">

@@ -160,6 +160,7 @@ export function FichaProducto({
       imagenUrl: producto.imagenUrl,
       imagenFocoX: producto.imagenFocoX,
       imagenFocoY: producto.imagenFocoY,
+      imagenZoom: producto.imagenZoom,
     });
     if (typeof navigator !== "undefined" && navigator.vibrate) navigator.vibrate(8);
     onCerrar();
@@ -194,14 +195,16 @@ export function FichaProducto({
 
         <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-4 pt-2">
           {producto.imagenUrl && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={producto.imagenUrl}
-              alt={producto.nombre}
-              className="h-56 w-full rounded-2xl object-cover"
-              style={estiloDeFoco(producto.imagenFocoX, producto.imagenFocoY)}
-              decoding="async"
-            />
+            <span className="block overflow-hidden rounded-2xl">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={producto.imagenUrl}
+                alt={producto.nombre}
+                className="h-56 w-full rounded-2xl object-cover"
+                style={estiloDeFoco(producto.imagenFocoX, producto.imagenFocoY, producto.imagenZoom)}
+                decoding="async"
+              />
+            </span>
           )}
 
           <h2 className="mt-4 text-[1.5rem] font-semibold leading-tight tracking-titular text-tinta">{producto.nombre}</h2>

@@ -181,6 +181,7 @@ export default async function CatalogoPage({
       imagenUrl: p.imagenUrl,
       imagenFocoX: p.imagenFocoX,
       imagenFocoY: p.imagenFocoY,
+      imagenZoom: p.imagenZoom,
       ingredientes: p.ingredientes,
       opciones: combinarOpciones(p.opciones, p.gruposAgregados, posicion).map((o) => ({
         id: o.id,
@@ -291,6 +292,7 @@ export default async function CatalogoPage({
               imagenUrl: p.imagenUrl,
               imagenFocoX: p.imagenFocoX,
               imagenFocoY: p.imagenFocoY,
+              imagenZoom: p.imagenZoom,
             }))}
           />
 

@@ -25,6 +25,7 @@ type Producto = {
   imagenUrl: string | null;
   imagenFocoX: number | null;
   imagenFocoY: number | null;
+  imagenZoom: number | null;
   disponible: boolean;
   destacado: boolean;
   ingredientes: string[];
@@ -189,6 +190,7 @@ export function EditarProductoForm({
           initialUrl={producto.imagenUrl}
           initialFocoX={producto.imagenFocoX}
           initialFocoY={producto.imagenFocoY}
+          initialZoom={producto.imagenZoom}
           estiloCarta={estiloCarta}
         />
       </Tarjeta>

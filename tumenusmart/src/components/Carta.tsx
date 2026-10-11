@@ -274,6 +274,7 @@ function FilaProducto({
       imagenUrl: producto.imagenUrl,
       imagenFocoX: producto.imagenFocoX,
       imagenFocoY: producto.imagenFocoY,
+      imagenZoom: producto.imagenZoom,
     });
     if (typeof navigator !== "undefined" && navigator.vibrate) navigator.vibrate(8);
     setLate(true);
@@ -301,16 +302,20 @@ function FilaProducto({
     </span>
   );
 
+  // La foto va dentro de un contenedor que recorta lo que sobra: con el acercamiento que eligió el dueño, la foto se agranda y no
+  // puede tapar el texto de abajo ni salirse de sus esquinas redondeadas.
   const foto = producto.imagenUrl ? (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
-      src={producto.imagenUrl}
-      alt={producto.nombre}
-      loading="lazy"
-      decoding="async"
-      className={tarjetas ? "h-[220px] w-full object-cover" : "h-24 w-24 rounded-xl object-cover"}
-      style={estiloDeFoco(producto.imagenFocoX, producto.imagenFocoY)}
-    />
+    <span className={tarjetas ? "block overflow-hidden" : "block overflow-hidden rounded-xl"}>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={producto.imagenUrl}
+        alt={producto.nombre}
+        loading="lazy"
+        decoding="async"
+        className={tarjetas ? "h-[220px] w-full object-cover" : "h-24 w-24 rounded-xl object-cover"}
+        style={estiloDeFoco(producto.imagenFocoX, producto.imagenFocoY, producto.imagenZoom)}
+      />
+    </span>
   ) : tarjetas ? (
     <span aria-hidden="true" className="flex h-40 w-full items-center justify-center bg-papel-hundido text-tinta-suave/35">
       <IconoFoto />

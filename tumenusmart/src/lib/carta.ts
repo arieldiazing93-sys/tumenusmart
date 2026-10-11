@@ -30,6 +30,8 @@ export type ProductoCarta = {
   /** Qué parte de la foto se ve cuando se recorta (0 a 100; 50 = centro). Sin valor, centrada como siempre. */
   imagenFocoX?: number | null;
   imagenFocoY?: number | null;
+  /** Cuánto se acerca la foto (100 a 300). Sin valor, sin acercar. */
+  imagenZoom?: number | null;
   ingredientes: string[];
   opciones: OpcionCarta[];
 };

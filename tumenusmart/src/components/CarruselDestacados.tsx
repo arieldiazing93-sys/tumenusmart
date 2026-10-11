@@ -14,6 +14,7 @@ type Producto = {
   imagenUrl: string | null;
   imagenFocoX?: number | null;
   imagenFocoY?: number | null;
+  imagenZoom?: number | null;
 };
 
 /**
@@ -39,15 +40,17 @@ export function CarruselDestacados({ productos }: { productos: Producto[] }) {
             className="w-40 flex-none overflow-hidden rounded-2xl bg-superficie shadow-sm ring-1 ring-linea transition-all active:scale-[0.98] md:w-48"
           >
             {p.imagenUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={p.imagenUrl}
-                alt={p.nombre}
-                loading="lazy"
-                decoding="async"
-                className="h-28 w-full object-cover md:h-32"
-                style={estiloDeFoco(p.imagenFocoX, p.imagenFocoY)}
-              />
+              <span className="block overflow-hidden">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={p.imagenUrl}
+                  alt={p.nombre}
+                  loading="lazy"
+                  decoding="async"
+                  className="h-28 w-full object-cover md:h-32"
+                  style={estiloDeFoco(p.imagenFocoX, p.imagenFocoY, p.imagenZoom)}
+                />
+              </span>
             ) : (
               <span
                 aria-hidden="true"

@@ -173,6 +173,7 @@ export async function FichaProducto({ productoId }: { productoId: string }) {
           imagenUrl: producto.imagenUrl,
           imagenFocoX: producto.imagenFocoX,
           imagenFocoY: producto.imagenFocoY,
+          imagenZoom: producto.imagenZoom,
           disponible: producto.disponible,
           destacado: producto.destacado,
           ingredientes: producto.ingredientes,

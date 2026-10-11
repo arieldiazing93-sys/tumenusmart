@@ -700,6 +700,8 @@ model Product {
   /// inferior). La elige el dueño arrastrando la foto al cargarla. Sin valor, la carta la muestra como siempre.
   imagenFocoX Int?
   imagenFocoY Int?
+  /// Cuánto se acerca la foto (100 = entera, 300 = el triple): con la foto acercada hay lugar para subirla o bajarla. Sin valor, sin acercar.
+  imagenZoom  Int?
   disponible  Boolean         @default(true)
   orden       Int             @default(0)
   // Ingredientes "de base" del producto, mostrados como etiquetas que el
