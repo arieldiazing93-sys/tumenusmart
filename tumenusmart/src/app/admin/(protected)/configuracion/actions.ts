@@ -274,23 +274,30 @@ export async function guardarPedidosWeb(formData: FormData): Promise<void> {
   const activo = formData.get("pedidosWebActivo") === "on";
   const aceptarSolo = formData.get("pedidosWebAutoAceptar") === "on";
   const rubro = normalizarRubro(formData.get("pedidosWebRubro"));
+  const confirmaWhatsapp = formData.get("pedidosWebConfirmaWhatsapp") === "on";
 
   const antes = await prisma.store.findUnique({
     where: { id: storeId },
-    select: { pedidosWebActivo: true, pedidosWebAutoAceptar: true, pedidosWebRubro: true },
+    select: { pedidosWebActivo: true, pedidosWebAutoAceptar: true, pedidosWebRubro: true, pedidosWebConfirmaWhatsapp: true },
   });
   await prisma.store.update({
     where: { id: storeId },
-    data: { pedidosWebActivo: activo, pedidosWebAutoAceptar: aceptarSolo, pedidosWebRubro: rubro },
+    data: { pedidosWebActivo: activo, pedidosWebAutoAceptar: aceptarSolo, pedidosWebRubro: rubro, pedidosWebConfirmaWhatsapp: confirmaWhatsapp },
   });
-  if (!antes || antes.pedidosWebActivo !== activo || antes.pedidosWebAutoAceptar !== aceptarSolo || antes.pedidosWebRubro !== rubro) {
+  if (
+    !antes ||
+    antes.pedidosWebActivo !== activo ||
+    antes.pedidosWebAutoAceptar !== aceptarSolo ||
+    antes.pedidosWebRubro !== rubro ||
+    antes.pedidosWebConfirmaWhatsapp !== confirmaWhatsapp
+  ) {
     await registrarBitacora(storeId, sesion, {
       modulo: "configuracion",
       accion: "pedidos_web_configurados",
-      descripcion: `Pedidos del menú digital: ${activo ? "activados" : "desactivados"}${activo ? `, aceptar solo ${aceptarSolo ? "sí" : "no"}, tipo de negocio ${rubro}` : ""}.`,
+      descripcion: `Pedidos del menú digital: ${activo ? "activados" : "desactivados"}${activo ? `, aceptar solo ${aceptarSolo ? "sí" : "no"}, confirmar por WhatsApp ${confirmaWhatsapp ? "sí" : "no"}, tipo de negocio ${rubro}` : ""}.`,
       entidad: "Store",
       entidadId: storeId,
-      detalle: { activo, aceptarSolo, rubro },
+      detalle: { activo, aceptarSolo, rubro, confirmaWhatsapp },
     });
   }
 

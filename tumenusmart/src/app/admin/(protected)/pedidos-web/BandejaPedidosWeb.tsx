@@ -27,6 +27,8 @@ import {
 const MOTIVOS_RECHAZO = ["Sin stock", "Estamos cerrados", "Fuera de la zona de entrega", "No podemos atenderlo ahora"];
 
 const COLOR_ESTADO: Record<EstadoPedidoWeb, ColorEstado> = {
+  // El personal no lo ve (espera que el cliente lo mande por WhatsApp), pero el tipo es el mismo para todos los estados.
+  pendiente: "amarillo",
   nuevo: "amarillo",
   aceptado: "azul",
   listo: "exito",
@@ -52,6 +54,8 @@ type PedidoLista = PedidoWebFila & { activo: boolean };
 function textoDeEstado(p: PedidoWebFila, rubro: RubroPedido): string {
   const e = etiquetasPersonal(rubro, p.tipoEntrega);
   switch (p.estado) {
+    case "pendiente":
+      return "Esperando el WhatsApp";
     case "nuevo":
       return "Nuevo";
     case "aceptado":

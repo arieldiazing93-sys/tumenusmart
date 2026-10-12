@@ -36,7 +36,11 @@ export default async function PedidosWebPage() {
   const [abiertos, cerrados] = await Promise.all([
     db.pedidoWeb.findMany({ where: { estado: { in: ["nuevo", "aceptado", "listo"] } }, orderBy: { createdAt: "asc" }, take: 100 }),
     db.pedidoWeb.findMany({
-      where: { estado: { in: ["entregado", "rechazado", "cancelado"] }, updatedAt: { gte: desde } },
+      // Los «cancelados» que nunca entraron (el cliente no lo mandó por WhatsApp a tiempo) no son del personal: no se listan.
+      where: {
+        updatedAt: { gte: desde },
+        OR: [{ estado: { in: ["entregado", "rechazado"] } }, { estado: "cancelado", aceptadoEn: { not: null } }],
+      },
       orderBy: { updatedAt: "desc" },
       take: 30,
     }),

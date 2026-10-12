@@ -8,13 +8,16 @@ import { RecordarPedido } from "@/components/PedidosRecientes";
 import { localPorSlug } from "@/lib/local-por-slug";
 import { formatearGuarani, formatearNumero } from "@/lib/format";
 import { METODOS_PAGO_PEDIDO } from "@/lib/metodos-pago";
-import { construirLinkWhatsapp } from "@/lib/whatsapp";
-import { sincronizarPedidosConCuentas } from "@/lib/pedido-web-servidor";
+import { headers } from "next/headers";
+import { ConfirmarPorWhatsapp } from "@/components/ConfirmarPorWhatsapp";
+import { construirLinkWhatsapp, construirMensajePedido } from "@/lib/whatsapp";
+import { sincronizarPedidosConCuentas, vencerPedidosPendientes } from "@/lib/pedido-web-servidor";
 import {
   ESTADOS_PEDIDO_ABIERTOS,
   normalizarEstado,
   normalizarRubro,
   pasosDeSeguimiento,
+  segundosParaConfirmar,
   textoParaCliente,
   type LineaVisible,
   type TipoEntregaPedido,
@@ -36,6 +39,9 @@ export default async function SeguimientoPedidoPage({ params }: { params: Promis
   const local = await localPorSlug(slug);
   if (!FORMATO_TOKEN.test(token)) notFound();
 
+  // Un pedido que esperaba el WhatsApp y se pasó del tiempo se cancela acá mismo, antes de mostrarlo.
+  await vencerPedidosPendientes(local.id);
+
   let p = await prisma.pedidoWeb.findFirst({ where: { storeId: local.id, token } });
   if (!p) notFound();
   // Si ya es una cuenta del delivery y se cobró o se canceló desde allá, el seguimiento lo refleja.
@@ -56,9 +62,45 @@ export default async function SeguimientoPedidoPage({ params }: { params: Promis
     ? construirLinkWhatsapp(local.whatsappNumero, `Hola, te escribo por mi pedido N° ${formatearNumero(p.numero)}.`)
     : null;
 
+  // Pendiente: el cliente todavía tiene que mandarlo por WhatsApp. Se arma el mensaje del pedido (con el enlace de seguimiento) y
+  // cuánto tiempo le queda; el botón de la pantalla lo confirma.
+  const pendiente = estado === "pendiente";
+  let paraConfirmar: { enlace: string; segundos: number } | null = null;
+  if (pendiente && local.whatsappNumero.replace(/\D/g, "")) {
+    const cabeceras = await headers();
+    const host = cabeceras.get("x-forwarded-host") ?? cabeceras.get("host") ?? "";
+    const protocolo = cabeceras.get("x-forwarded-proto") ?? "https";
+    const mensaje = construirMensajePedido({
+      numero: p.numero,
+      saludo: local.mensajeSaludo,
+      clienteNombre: p.clienteNombre,
+      clienteTelefono: p.clienteTelefono,
+      tipoEntrega: p.tipoEntrega,
+      direccion: p.direccion,
+      zonaNombre: p.zonaNombre,
+      clienteLat: p.clienteLat,
+      clienteLng: p.clienteLng,
+      metodoPagoReferencia: p.metodoPago,
+      comprobanteTipo: p.comprobanteTipo,
+      facturaRazonSocial: p.facturaRazonSocial,
+      facturaRuc: p.facturaRuc,
+      facturaEmail: p.facturaEmail,
+      notas: p.notas,
+      items: lineas.map((l) => ({ nombreProducto: l.nombre, cantidad: l.cantidad, precioUnitario: l.precioUnitario, opcionesTexto: l.detalle })),
+      subtotal: Number(p.subtotal),
+      costoEnvio: Number(p.costoEnvio),
+      total: Number(p.total),
+      linkSeguimiento: host ? `${protocolo}://${host}/${slug}/pedido/${token}` : null,
+    });
+    paraConfirmar = {
+      enlace: construirLinkWhatsapp(local.whatsappNumero, mensaje),
+      segundos: segundosParaConfirmar(p.createdAt.getTime(), Date.now()),
+    };
+  }
+
   return (
     <main className="mx-auto max-w-2xl px-4 pb-16 pt-4">
-      {abierto && <AutoRefresh segundos={15} />}
+      {(abierto || pendiente) && <AutoRefresh segundos={15} />}
       {/* Anota el pedido en este navegador: si el cliente llegó por el enlace del WhatsApp, después lo encuentra desde el menú. */}
       <RecordarPedido slug={slug} token={token} numero={p.numero} />
 
@@ -99,6 +141,22 @@ export default async function SeguimientoPedidoPage({ params }: { params: Promis
               </li>
             ))}
           </ol>
+        )}
+
+        {paraConfirmar && (
+          <div className="mt-5">
+            <ConfirmarPorWhatsapp
+              slug={slug}
+              token={token}
+              enlace={paraConfirmar.enlace}
+              segundos={paraConfirmar.segundos}
+              nombreLocal={local.nombre}
+            />
+          </div>
+        )}
+
+        {estado === "cancelado" && p.motivoRechazo && (
+          <p className="mt-4 rounded-xl bg-peligro-luz px-3.5 py-2.5 text-[0.88rem] font-medium text-peligro">{p.motivoRechazo}</p>
         )}
 
         {estado === "rechazado" && p.motivoRechazo && (

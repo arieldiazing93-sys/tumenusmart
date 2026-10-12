@@ -436,6 +436,78 @@
   x = await servidor.quitarLineaPedidoWeb(storeId, "ajeno", 0, quien);
   ok(!x.ok, "ni quitarle productos");
 
+  // ---- confirmar por WhatsApp: el pedido queda pendiente y recién entra cuando el cliente lo manda (tiene 3 minutos)
+  window.log("== Pedido web: se confirma mandándolo por WhatsApp (3 minutos)");
+  const conWsp = (extra = {}) => local({ pedidosWebConfirmaWhatsapp: true, whatsappNumero: "595981234567", ...extra });
+  const min = (m, s = 0) => new Date(Date.now() + (m * 60 + s) * 1000);
+  sembrar();
+  c = await crear({}, { ipHash: "ip-w1" }, conWsp({ pedidosWebAutoAceptar: true }));
+  fila = T().pedidoWeb[0];
+  ok(c.ok && c.estado === "pendiente" && fila.estado === "pendiente" && c.segundosRestantes === 180, "con la confirmación por WhatsApp, el pedido queda «pendiente» y tiene 180 segundos");
+  ok(!(T().bitacora || []).some((b) => b.accion === "pedido_web_recibido") && (T().cuentaDelivery || []).length === 0 && rondas.length === 0, "todavía no entró: ni bitácora, ni cuenta, ni comanda (aunque el local acepte solos)");
+  const tokenW = c.token;
+  T().store[0].pedidosWebAutoAceptar = true; // el local también lo tiene guardado: la confirmación lee la base, no lo que viajó
+  let rep = await servidor.crearPedidoWeb(conWsp(), { ...datos(), envioId: fila.envioId }, { ipHash: "ip-w1" });
+  ok(rep.ok && rep.yaEnviado && rep.estado === "pendiente" && rep.segundosRestantes > 0 && T().pedidoWeb.length === 1, "tocar dos veces «Enviar» devuelve el mismo pendiente (con el tiempo que le queda), sin duplicar");
+
+  let cf = await servidor.confirmarPedidoWebPorWhatsapp(storeId, tokenW);
+  ok(cf.ok && !cf.yaConfirmado && cf.estado === "aceptado" && cf.aceptado && T().pedidoWeb[0].estado === "aceptado", "al mandarlo por WhatsApp entra: aceptar solo lo acepta y abre la cuenta");
+  ok(T().bitacora.some((b) => b.accion === "pedido_web_recibido") && T().cuentaDelivery.length === 1 && rondas.length === 1, "y recién ahí queda en la bitácora, con su cuenta y su comanda");
+  cf = await servidor.confirmarPedidoWebPorWhatsapp(storeId, tokenW);
+  ok(cf.ok && cf.yaConfirmado && T().cuentaDelivery.length === 1 && rondas.length === 1, "confirmarlo otra vez no hace nada de más");
+
+  // sin «aceptar solos»: entra como «nuevo» y espera a una persona
+  sembrar();
+  c = await crear({}, { ipHash: "ip-w2" }, conWsp());
+  cf = await servidor.confirmarPedidoWebPorWhatsapp(storeId, c.token);
+  ok(cf.ok && cf.estado === "nuevo" && !cf.aceptado && T().pedidoWeb[0].estado === "nuevo", "sin aceptar solos, entra como «nuevo» (aparece en la bandeja y suena el aviso)");
+
+  // el tiempo
+  sembrar();
+  c = await crear({}, { ipHash: "ip-w3" }, conWsp());
+  cf = await servidor.confirmarPedidoWebPorWhatsapp(storeId, c.token, min(3, 10));
+  ok(cf.ok && T().pedidoWeb[0].estado === "nuevo", "a los 3:10 todavía cuenta (hay 20 segundos de tolerancia por la conexión)");
+  sembrar();
+  c = await crear({}, { ipHash: "ip-w4" }, conWsp());
+  cf = await servidor.confirmarPedidoWebPorWhatsapp(storeId, c.token, min(3, 30));
+  ok(!cf.ok && cf.vencido === true && T().pedidoWeb[0].estado === "cancelado" && T().pedidoWeb[0].motivoRechazo.includes("a tiempo"), "pasado el tiempo ya no entra: se cancela y se le dice");
+  ok((T().cuentaDelivery || []).length === 0 && rondas.length === 0 && !(T().bitacora || []).some((b) => b.accion === "pedido_web_recibido"), "y no quedó nada hecho (todo vuelve atrás)");
+
+  // vencer a los pendientes
+  sembrar();
+  await crear({ telefono: "0981777001" }, { ipHash: "ip-w5" }, conWsp());
+  await crear({ telefono: "0981777002" }, { ipHash: "ip-w6" }, conWsp());
+  ok((await servidor.vencerPedidosPendientes(storeId, min(1))) === 0, "antes de tiempo no se vence ninguno");
+  ok((await servidor.vencerPedidosPendientes(storeId, min(5))) === 2 && T().pedidoWeb.every((p) => p.estado === "cancelado"), "pasados los minutos se cancelan todos los pendientes");
+
+  // el reintento con el mismo identificador después de vencido no «revive» el pedido
+  sembrar();
+  c = await crear({}, { ipHash: "ip-w7" }, conWsp());
+  const envioViejo = T().pedidoWeb[0].envioId;
+  T().pedidoWeb[0].createdAt = new Date(Date.now() - 10 * 60000);
+  rep = await servidor.crearPedidoWeb(conWsp(), { ...datos(), envioId: envioViejo }, { ipHash: "ip-w7" });
+  ok(!rep.ok && rep.error.includes("Se venció") && T().pedidoWeb[0].estado === "cancelado", "reenviar con el identificador de un pendiente vencido lo cancela y pide volver a enviarlo");
+  c = await crear({}, { ipHash: "ip-w8" }, conWsp());
+  ok(c.ok && c.estado === "pendiente" && T().pedidoWeb.length === 2, "con un identificador nuevo se arma un pedido nuevo");
+
+  // cancelar a mano, y solo lo pendiente
+  sembrar();
+  c = await crear({}, { ipHash: "ip-w9" }, conWsp());
+  ok((await servidor.cancelarPedidoWebPendiente(storeId, c.token)).ok && T().pedidoWeb[0].estado === "cancelado", "el cliente puede cancelar su pedido pendiente");
+  c = await crear({}, { ipHash: "ip-w10" }, local());
+  ok(c.ok && c.estado === "nuevo", "con la confirmación apagada el pedido entra apenas se envía, como antes");
+  ok(!(await servidor.cancelarPedidoWebPendiente(storeId, c.token)).ok && T().pedidoWeb[1].estado === "nuevo", "y cancelar no toca un pedido que ya entró");
+
+  // otro local y llaves inventadas
+  sembrar();
+  c = await crear({}, { ipHash: "ip-w11" }, conWsp());
+  cf = await servidor.confirmarPedidoWebPorWhatsapp("local-2", c.token);
+  ok(!cf.ok && T().pedidoWeb[0].estado === "pendiente", "la llave de un pedido no sirve desde otro local");
+  cf = await servidor.confirmarPedidoWebPorWhatsapp(storeId, "corta");
+  ok(!cf.ok, "ni una llave inventada");
+  c = await crear({}, { ipHash: "ip-w12" }, conWsp({ whatsappNumero: "" }));
+  ok(c.ok && c.estado === "nuevo", "si el local no tiene número de WhatsApp, no se puede pedir la confirmación: entra directo");
+
   // ---- el rastro del pedido: el enlace va en el WhatsApp y el navegador se acuerda de los pedidos recientes
   window.log("== Pedido web: el cliente no pierde el rastro de su pedido");
   const wsp = await C.cargar("src/lib/whatsapp");

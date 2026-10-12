@@ -10,6 +10,7 @@ import { Campo, Entrada, Aviso } from "@/components/ui";
 import { Segmentado } from "@/components/Segmentado";
 import { BotonEnviar } from "@/components/BotonEnviar";
 import { BotonWhatsappCTA } from "@/components/BotonWhatsappCTA";
+import { ConfirmarPorWhatsapp } from "@/components/ConfirmarPorWhatsapp";
 import { IconoWhatsapp } from "@/components/iconos";
 import { METODOS_PAGO_PEDIDO, type MetodoPagoPedido } from "@/lib/metodos-pago";
 import { ingredientesQuitadosTexto, opcionesTexto, precioUnitario } from "@/lib/cart-types";
@@ -66,6 +67,11 @@ type Props = {
    * arma el mensaje de WhatsApp. Lo decide el local en Configuración.
    */
   pedidosEnSistema: boolean;
+  /**
+   * true: el local pide confirmar el pedido mandándolo por WhatsApp. El pedido queda pendiente y el cliente tiene unos minutos para
+   * tocar «Enviar por WhatsApp»; si no, se cancela y el carrito sigue como estaba.
+   */
+  confirmaPorWhatsapp?: boolean;
 };
 
 export function CheckoutForm({
@@ -86,6 +92,7 @@ export function CheckoutForm({
   aceptaRetiro,
   zonas,
   pedidosEnSistema,
+  confirmaPorWhatsapp = false,
 }: Props) {
   const { items, subtotal, vaciarCarrito } = useCart();
 
@@ -138,11 +145,13 @@ export function CheckoutForm({
   const [notas, setNotas] = useState("");
   const [sitioWeb, setSitioWeb] = useState("");
   const [enviando, setEnviando] = useState(false);
-  const [envioId] = useState(() => (typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `e${Date.now()}${Math.random().toString(36).slice(2)}`));
+  const [envioId, setEnvioId] = useState(() => (typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `e${Date.now()}${Math.random().toString(36).slice(2)}`));
   const [recibido, setRecibido] = useState<{ token: string; numero: number; aceptado: boolean } | null>(null);
   // Con los pedidos por el sistema, además del registro se arma el aviso por WhatsApp al local (con el número de pedido). `abierto`:
   // el navegador ya abrió WhatsApp solo; si no, el botón de la pantalla final lo abre con un toque.
   const [avisoWsp, setAvisoWsp] = useState<{ enlace: string; abierto: boolean } | null>(null);
+  // El pedido ya está creado pero espera que el cliente lo mande por WhatsApp (no entró al sistema ni se vació el carrito).
+  const [pendiente, setPendiente] = useState<{ token: string; numero: number; segundos: number; enlace: string } | null>(null);
   /** El enlace de WhatsApp con el pedido ya escrito: cuando existe, se muestra la pantalla de "enviá tu pedido". */
   const [enlace, setEnlace] = useState<string | null>(null);
   /** El cliente ya tocó el botón de WhatsApp (el carrito se vació en ese momento). */
@@ -267,6 +276,22 @@ export function CheckoutForm({
           total: r.total,
         });
         const enlaceWsp = construirLinkWhatsapp(whatsappNumero, mensaje);
+
+        // El local pide confirmar por WhatsApp: el pedido existe pero todavía no entró. Se espera que el cliente lo mande (con su
+        // cuenta regresiva); el carrito NO se vacía, así si se cancela o se vence todo vuelve atrás y puede reintentar.
+        if (r.pendiente) {
+          ventanaWsp?.close();
+          setResumen({
+            lineas: items.map((i) => ({ texto: `${i.cantidad} × ${i.nombreProducto}`, monto: precioUnitario(i) * i.cantidad })),
+            entrega: tipoEntrega === "delivery" ? "Delivery" : "Retiro en el local",
+            pago: METODOS_PAGO_PEDIDO.find((m) => m.value === metodoPago)?.label ?? metodoPago,
+            total: formatearGuarani(r.total),
+          });
+          setPendiente({ token: r.token, numero: r.numero, segundos: r.segundosRestantes, enlace: enlaceWsp });
+          window.scrollTo({ top: 0 });
+          return;
+        }
+
         let abierto = false;
         if (ventanaWsp && !ventanaWsp.closed) {
           try {
@@ -341,7 +366,8 @@ export function CheckoutForm({
     if (pedidosEnSistema) {
       // Se abre ya, con el toque, una ventana en blanco para WhatsApp: después de esperar al servidor el navegador no deja abrir
       // ventanas nuevas. Si el pedido sale bien se la lleva al aviso; si falla, se cierra.
-      const ventanaWsp = whatsappNumero.replace(/\D/g, "") ? window.open("", "_blank") : null;
+      // Si el local pide confirmar por WhatsApp, no se abre nada ahora: el cliente lo manda con el botón de la pantalla siguiente.
+      const ventanaWsp = !confirmaPorWhatsapp && whatsappNumero.replace(/\D/g, "") ? window.open("", "_blank") : null;
       void enviarAlSistema(ventanaWsp);
       return;
     }
@@ -379,6 +405,75 @@ export function CheckoutForm({
     });
     setEnlace(construirLinkWhatsapp(whatsappNumero, mensaje));
     window.scrollTo({ top: 0 });
+  }
+
+  // El pedido está creado pero espera que el cliente lo mande por WhatsApp: cuenta regresiva y el botón. Si pasa el tiempo o lo
+  // cancela, todo vuelve atrás (el carrito no se tocó) y puede reintentar con un envío nuevo.
+  if (pendiente) {
+    const volverAtras = (mensaje: string) => {
+      setPendiente(null);
+      setResumen(null);
+      // Un identificador nuevo: el viejo quedó atado al pedido cancelado y el servidor lo devolvería tal cual.
+      setEnvioId(typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `e${Date.now()}${Math.random().toString(36).slice(2)}`);
+      fallar(mensaje);
+      window.scrollTo({ top: 0 });
+    };
+    return (
+      <div className="flex flex-col items-center px-1 pt-2">
+        <h2 className="text-[1.4rem] font-semibold tracking-titular text-tinta">Pedido {formatearNumero(pendiente.numero)}</h2>
+        <p className="mb-4 mt-1 max-w-sm text-center text-[0.9rem] leading-snug text-tinta-media">
+          Ya armamos tu pedido. Para que {nombreLocal} lo reciba, mandalo por WhatsApp.
+        </p>
+        <div className="w-full max-w-sm">
+          <ConfirmarPorWhatsapp
+            slug={slug}
+            token={pendiente.token}
+            enlace={pendiente.enlace}
+            segundos={pendiente.segundos}
+            nombreLocal={nombreLocal}
+            onConfirmado={(aceptado) => {
+              // Ahora sí entró: queda anotado para «Ver mi pedido», se vacía el carrito y se muestra la pantalla de seguimiento.
+              guardarPedidoReciente(slug, { token: pendiente.token, numero: pendiente.numero });
+              setAvisoWsp({ enlace: pendiente.enlace, abierto: true });
+              setRecibido({ token: pendiente.token, numero: pendiente.numero, aceptado });
+              setPendiente(null);
+              vaciarCarrito();
+              window.scrollTo({ top: 0 });
+            }}
+            onVencido={() => volverAtras("Se acabó el tiempo y no se envió por WhatsApp: el pedido se canceló. Tu carrito sigue igual, podés volver a enviarlo.")}
+            onCancelado={() => volverAtras("Cancelaste el pedido. Tu carrito sigue igual.")}
+          />
+        </div>
+
+        {resumen && (
+          <section aria-label="Resumen del pedido" className="mt-6 w-full max-w-sm rounded-2xl bg-superficie p-5 text-left shadow-sm ring-1 ring-linea">
+            <p className="text-[0.74rem] font-semibold uppercase tracking-rotulo text-tinta-suave">Tu pedido</p>
+            <ul className="mt-2.5 flex flex-col gap-1.5">
+              {resumen.lineas.map((l, i) => (
+                <li key={i} className="flex justify-between gap-3 text-[0.9rem]">
+                  <span className="min-w-0 text-tinta">{l.texto}</span>
+                  <span className="cifra flex-none font-medium text-tinta-media">{formatearGuarani(l.monto)}</span>
+                </li>
+              ))}
+            </ul>
+            <div className="mt-3 flex flex-col gap-1.5 border-t border-dashed border-linea pt-3 text-[0.86rem] text-tinta-media">
+              <div className="flex justify-between gap-3">
+                <span>Entrega</span>
+                <span className="text-right font-medium text-tinta">{resumen.entrega}</span>
+              </div>
+              <div className="flex justify-between gap-3">
+                <span>Pago</span>
+                <span className="text-right font-medium text-tinta">{resumen.pago}</span>
+              </div>
+              <div className="mt-1 flex items-baseline justify-between gap-3">
+                <span className="text-[0.95rem] font-semibold text-tinta">Total</span>
+                <span className="cifra text-[1.2rem] font-bold text-tinta">{resumen.total}</span>
+              </div>
+            </div>
+          </section>
+        )}
+      </div>
+    );
   }
 
   // El pedido ya llegó al local: pantalla final con el número y el enlace para seguirlo.

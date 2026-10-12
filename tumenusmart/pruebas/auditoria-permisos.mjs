@@ -65,6 +65,12 @@ const EXCEPCIONES = {
     enviarPedidoWeb:
       "el cliente no tiene cuenta; el local sale de la dirección del menú, el servidor recalcula precios y envío, " +
       "revisa todo de nuevo y frena el abuso por teléfono y por dispositivo",
+    confirmarEnvioPorWhatsapp:
+      "el cliente no tiene cuenta; el local sale de la dirección del menú y el pedido se busca por su llave larga y al azar (solo la tiene " +
+      "quien lo hizo), dentro de ese local; pasado el plazo se cancela",
+    cancelarPedidoPendiente:
+      "el cliente no tiene cuenta; mismo criterio: local por la dirección del menú, pedido por su llave, y solo cancela pedidos que " +
+      "todavía están pendientes (nunca uno que ya entró al sistema)",
   },
   // El celular fijo del Registro de asistencia (/asistencia/<llave>): el personal no tiene cuenta del panel. El local sale
   // de la llave de la dirección (larga y al azar, regenerable) y a la persona la identifica su PIN, con freno a la

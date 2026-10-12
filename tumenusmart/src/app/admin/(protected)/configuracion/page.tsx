@@ -401,6 +401,21 @@ export default async function AdminConfiguracionPage() {
             <input type="checkbox" name="pedidosWebAutoAceptar" defaultChecked={store?.pedidosWebAutoAceptar ?? false} />
             Aceptarlos solos apenas llegan (con el local abierto)
           </label>
+          <div>
+            <label className="flex items-center gap-2 text-sm font-medium text-tinta-media">
+              <input
+                type="checkbox"
+                name="pedidosWebConfirmaWhatsapp"
+                defaultChecked={store?.pedidosWebConfirmaWhatsapp ?? true}
+              />
+              Que el cliente lo confirme enviándolo por WhatsApp (tiene 3 minutos)
+            </label>
+            <p className="mt-1 max-w-2xl text-xs text-tinta-media">
+              El pedido recién entra al sistema (y suena el aviso) cuando el cliente toca «Enviar por WhatsApp»; si no lo manda en 3
+              minutos, se cancela solo y todo vuelve atrás. Así llega siempre también a tu WhatsApp. Para que funcione tiene que estar
+              cargado el número de WhatsApp del negocio.
+            </p>
+          </div>
           <div className="max-w-sm">
             <label className="mb-1 block text-sm font-medium text-tinta-media" htmlFor="pedidosWebRubro">
               Tipo de negocio (cambia cómo se llaman los pasos)

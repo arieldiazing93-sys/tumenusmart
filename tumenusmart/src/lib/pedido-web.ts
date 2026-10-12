@@ -14,7 +14,26 @@ import { calcularDvRuc, separarRuc } from "./sifen-codigos";
 //  Estados y nombres según el tipo de negocio
 // ---------------------------------------------------------------------------
 
-export type EstadoPedidoWeb = "nuevo" | "aceptado" | "listo" | "entregado" | "rechazado" | "cancelado";
+export type EstadoPedidoWeb = "pendiente" | "nuevo" | "aceptado" | "listo" | "entregado" | "rechazado" | "cancelado";
+
+/**
+ * Cuánto tiene el cliente para mandar el pedido por WhatsApp (cuando el local pide esa confirmación). Mientras tanto el pedido está
+ * «pendiente»: no aparece en la bandeja del personal, no suena nada y no se descuenta nada. Si no lo manda a tiempo, se cancela solo.
+ */
+export const MINUTOS_PARA_CONFIRMAR_PEDIDO = 3;
+/** Una pequeña tolerancia del servidor (cortes de internet, reloj del celular): el botón se toca a los 2:59 y el pedido tiene que contar. */
+export const SEGUNDOS_DE_GRACIA_CONFIRMACION = 20;
+
+/** Cuántos segundos le quedan a un pedido pendiente (0 si ya se venció). `creadoEn` y `ahora` en milisegundos. */
+export function segundosParaConfirmar(creadoEn: number, ahora: number): number {
+  const vence = creadoEn + MINUTOS_PARA_CONFIRMAR_PEDIDO * 60_000;
+  return Math.max(0, Math.ceil((vence - ahora) / 1000));
+}
+
+/** ¿Todavía se acepta la confirmación? Es el plazo más la tolerancia. */
+export function sigueVigenteLaConfirmacion(creadoEn: number, ahora: number): boolean {
+  return ahora <= creadoEn + MINUTOS_PARA_CONFIRMAR_PEDIDO * 60_000 + SEGUNDOS_DE_GRACIA_CONFIRMACION * 1000;
+}
 export type TipoEntregaPedido = "delivery" | "retiro";
 export type RubroPedido = "gastronomia" | "distribuidora" | "tienda";
 
@@ -29,7 +48,7 @@ export function normalizarRubro(valor: unknown): RubroPedido {
 }
 
 export function normalizarEstado(valor: unknown): EstadoPedidoWeb {
-  const validos: EstadoPedidoWeb[] = ["nuevo", "aceptado", "listo", "entregado", "rechazado", "cancelado"];
+  const validos: EstadoPedidoWeb[] = ["pendiente", "nuevo", "aceptado", "listo", "entregado", "rechazado", "cancelado"];
   return validos.includes(valor as EstadoPedidoWeb) ? (valor as EstadoPedidoWeb) : "nuevo";
 }
 
@@ -38,6 +57,8 @@ export const ESTADOS_PEDIDO_ABIERTOS: EstadoPedidoWeb[] = ["nuevo", "aceptado", 
 
 /** A qué estados se puede pasar desde cada uno. La pantalla solo ofrece estos botones y el servidor vuelve a comprobarlo. */
 export const TRANSICIONES: Record<EstadoPedidoWeb, EstadoPedidoWeb[]> = {
+  // Esperando que el cliente lo mande por WhatsApp: o lo confirma (pasa a «nuevo») o se cancela (él mismo o por el tiempo).
+  pendiente: ["nuevo", "cancelado"],
   nuevo: ["aceptado", "rechazado"],
   aceptado: ["listo", "cancelado"],
   listo: ["entregado", "cancelado"],
@@ -102,6 +123,11 @@ export function etiquetasPersonal(rubro: RubroPedido, tipo: TipoEntregaPedido): 
 export function textoParaCliente(rubro: RubroPedido, tipo: TipoEntregaPedido, estado: EstadoPedidoWeb): { titulo: string; detalle: string } {
   const retiro = tipo === "retiro";
   switch (estado) {
+    case "pendiente":
+      return {
+        titulo: "Falta un paso: enviarlo por WhatsApp",
+        detalle: `Tocá el botón y mandá el mensaje al local. Tenés ${MINUTOS_PARA_CONFIRMAR_PEDIDO} minutos: si no lo mandás, el pedido se cancela solo.`,
+      };
     case "nuevo":
       return { titulo: "Recibimos tu pedido", detalle: "El local lo está revisando. En unos minutos lo confirma." };
     case "aceptado":
@@ -126,7 +152,7 @@ export function textoParaCliente(rubro: RubroPedido, tipo: TipoEntregaPedido, es
 export function pasosDeSeguimiento(rubro: RubroPedido, tipo: TipoEntregaPedido, estado: EstadoPedidoWeb): { pasos: string[]; actual: number } {
   const e = etiquetasPersonal(rubro, tipo);
   const pasos = ["Recibido", e.preparando, e.listo, e.entregado];
-  const indice: Record<EstadoPedidoWeb, number> = { nuevo: 0, aceptado: 1, listo: 2, entregado: 3, rechazado: -1, cancelado: -1 };
+  const indice: Record<EstadoPedidoWeb, number> = { pendiente: -1, nuevo: 0, aceptado: 1, listo: 2, entregado: 3, rechazado: -1, cancelado: -1 };
   return { pasos, actual: indice[estado] };
 }
 

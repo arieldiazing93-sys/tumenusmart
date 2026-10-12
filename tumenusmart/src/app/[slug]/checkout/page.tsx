@@ -67,6 +67,7 @@ export default async function CheckoutPage({
           aceptaDelivery={store.aceptaDelivery}
           aceptaRetiro={store.aceptaRetiro}
           pedidosEnSistema={store.pedidosWebActivo}
+          confirmaPorWhatsapp={store.pedidosWebActivo && store.pedidosWebConfirmaWhatsapp && store.whatsappNumero.replace(/\D/g, "").length > 0}
           zonas={zonas.map((z) => ({
             id: z.id,
             nombre: z.nombre,

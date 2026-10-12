@@ -37,7 +37,11 @@ import { validarDatosFiscales } from "./datos-fiscales";
 import {
   avisosDeStock,
   lineasVisibles,
+  MINUTOS_PARA_CONFIRMAR_PEDIDO,
   normalizarRubro,
+  SEGUNDOS_DE_GRACIA_CONFIRMACION,
+  segundosParaConfirmar,
+  sigueVigenteLaConfirmacion,
   type EstadoPedidoWeb,
   type ItemPublicoPedido,
   type LineaVisible,
@@ -62,7 +66,7 @@ export function huellaDeDispositivo(ip: string | null | undefined, sal: string =
 // ---------------------------------------------------------------------------------------------------------------------
 
 export type ResultadoCrearPedidoWeb =
-  | { ok: true; token: string; numero: number; estado: EstadoPedidoWeb; total: number; yaEnviado: boolean }
+  | { ok: true; token: string; numero: number; estado: EstadoPedidoWeb; total: number; yaEnviado: boolean; segundosRestantes?: number }
   | { ok: false; error: string; campo?: string };
 
 export type ContextoCrearPedido = {
@@ -85,6 +89,8 @@ export async function localParaPedidoWeb(slug: string) {
       pedidosWebActivo: true,
       pedidosWebAutoAceptar: true,
       pedidosWebRubro: true,
+      pedidosWebConfirmaWhatsapp: true,
+      whatsappNumero: true,
       aceptaDelivery: true,
       aceptaRetiro: true,
       aceptaEfectivo: true,
@@ -115,11 +121,27 @@ export async function crearPedidoWeb(local: LocalPedido, datos: PedidoNormalizad
   // Un reintento del mismo envío: se devuelve lo que ya se hizo, sin duplicar nada ni volver a contarlo en el tope.
   const previo = await prisma.pedidoWeb.findFirst({
     where: { storeId, envioId: datos.envioId },
-    select: { token: true, numero: true, estado: true, total: true },
+    select: { token: true, numero: true, estado: true, total: true, createdAt: true },
   });
   if (previo) {
-    return { ok: true, token: previo.token, numero: previo.numero, estado: previo.estado as EstadoPedidoWeb, total: Number(previo.total), yaEnviado: true };
+    // Uno pendiente que ya se pasó del tiempo no se «revive»: se cancela y se le pide que lo vuelva a mandar.
+    if (previo.estado === "pendiente" && !sigueVigenteLaConfirmacion(previo.createdAt.getTime(), ahora.getTime())) {
+      await vencerPedidosPendientes(storeId, ahora);
+      return { ok: false, error: "Se venció el tiempo para enviar ese pedido por WhatsApp y se canceló. Volvé a enviarlo." };
+    }
+    return {
+      ok: true,
+      token: previo.token,
+      numero: previo.numero,
+      estado: previo.estado as EstadoPedidoWeb,
+      total: Number(previo.total),
+      yaEnviado: true,
+      ...(previo.estado === "pendiente" ? { segundosRestantes: segundosParaConfirmar(previo.createdAt.getTime(), ahora.getTime()) } : {}),
+    };
   }
+
+  // Los pendientes que se pasaron del tiempo se cancelan acá mismo: no hace falta una tarea programada, y así no ocupan el tope.
+  await vencerPedidosPendientes(storeId, ahora);
 
   const estadoTienda = await obtenerEstadoTienda(storeId);
   if (!estadoTienda.aceptaPedidos) {
@@ -199,6 +221,10 @@ export async function crearPedidoWeb(local: LocalPedido, datos: PedidoNormalizad
   // ------------------------------------------------------------------------------------------ avisos para quien atiende
   const avisos = await avisosDelPedido(storeId, armado.lineas);
 
+  // El local pidió que el cliente confirme mandándolo por WhatsApp (y tiene un número al que mandarlo): hasta que lo mande, el pedido
+  // queda «pendiente» y no existe para el personal.
+  const exigeWhatsapp = !!local.pedidosWebConfirmaWhatsapp && String(local.whatsappNumero ?? "").replace(/\D/g, "").length > 0;
+
   // ---------------------------------------------------------------------------------------------------------- guardar
   const token = randomBytes(24).toString("base64url");
   let creado: { id: string; numero: number; token: string };
@@ -215,7 +241,7 @@ export async function crearPedidoWeb(local: LocalPedido, datos: PedidoNormalizad
           numero: contadorPedidosWeb,
           token,
           envioId: datos.envioId,
-          estado: "nuevo",
+          estado: exigeWhatsapp ? "pendiente" : "nuevo",
           tipoEntrega: datos.tipoEntrega,
           clienteNombre: datos.nombre,
           clienteTelefono: datos.telefono,
@@ -256,23 +282,140 @@ export async function crearPedidoWeb(local: LocalPedido, datos: PedidoNormalizad
     return { ok: false, error: "No pudimos registrar tu pedido. Probá de nuevo en unos segundos." };
   }
 
+  // Pendiente: todavía no «entró» (ni bitácora, ni aceptar solo): eso pasa cuando el cliente lo manda por WhatsApp.
+  if (exigeWhatsapp) {
+    return {
+      ok: true,
+      token: creado.token,
+      numero: creado.numero,
+      estado: "pendiente",
+      total,
+      yaEnviado: false,
+      segundosRestantes: MINUTOS_PARA_CONFIRMAR_PEDIDO * 60,
+    };
+  }
+
+  const estado = await darEntradaAlPedido(storeId, local, { id: creado.id, numero: creado.numero, nombre: datos.nombre, total, tipoEntrega: datos.tipoEntrega, metodoPago: datos.metodoPago, comprobante: datos.comprobanteTipo, envioACoordinar });
+  return { ok: true, token: creado.token, numero: creado.numero, estado, total, yaEnviado: false };
+}
+
+/**
+ * Lo que pasa cuando un pedido «entra» de verdad al sistema: queda en la bitácora y, si el local aceptó solos, se acepta. Va al
+ * crearse (si no se pide confirmar por WhatsApp) o al confirmarse.
+ */
+async function darEntradaAlPedido(
+  storeId: string,
+  local: { pedidosWebAutoAceptar: boolean },
+  p: { id: string; numero: number; nombre: string; total: number; tipoEntrega: string; metodoPago: string; comprobante: string; envioACoordinar: boolean }
+): Promise<EstadoPedidoWeb> {
   await registrarBitacora(storeId, { email: "menu-digital", nombre: "Menú digital", rol: "cliente" }, {
     modulo: "pedidos",
     accion: "pedido_web_recibido",
-    descripcion: `Entró el pedido web ${formatearNumero(creado.numero)} de ${datos.nombre} (${formatearGuarani(total)}, ${datos.tipoEntrega === "delivery" ? "delivery" : "retiro"}).`,
+    descripcion: `Entró el pedido web ${formatearNumero(p.numero)} de ${p.nombre} (${formatearGuarani(p.total)}, ${p.tipoEntrega === "delivery" ? "delivery" : "retiro"}).`,
     entidad: "PedidoWeb",
-    entidadId: creado.id,
-    detalle: { numero: creado.numero, total, tipoEntrega: datos.tipoEntrega, metodoPago: datos.metodoPago, comprobante: datos.comprobanteTipo },
+    entidadId: p.id,
+    detalle: { numero: p.numero, total: p.total, tipoEntrega: p.tipoEntrega, metodoPago: p.metodoPago, comprobante: p.comprobante },
   });
 
-  let estado: EstadoPedidoWeb = "nuevo";
   // Aceptar solo: únicamente si el local lo pidió y el envío ya está definido (si es "a coordinar" lo tiene que fijar una persona).
-  if (local.pedidosWebAutoAceptar && !envioACoordinar) {
-    const r = await aceptarPedidoWeb(storeId, creado.id, { nombre: "Automático", email: "automatico", rol: "sistema" }, { automatico: true });
-    if (r.ok) estado = "aceptado";
+  if (local.pedidosWebAutoAceptar && !p.envioACoordinar) {
+    const r = await aceptarPedidoWeb(storeId, p.id, { nombre: "Automático", email: "automatico", rol: "sistema" }, { automatico: true });
+    if (r.ok) return "aceptado";
+  }
+  return "nuevo";
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+//  Confirmar por WhatsApp (el pedido «pendiente» pasa a ser un pedido)
+// ---------------------------------------------------------------------------------------------------------------------
+
+const MOTIVO_SIN_ENVIAR = "No se envió por WhatsApp a tiempo: el pedido se canceló solo.";
+
+/**
+ * Cancela los pedidos pendientes de un local que ya se pasaron del tiempo para mandarlos por WhatsApp. Devuelve cuántos. Es barato
+ * (una sola actualización) y se llama al crear un pedido, al confirmarlo y al mirar el seguimiento.
+ */
+export async function vencerPedidosPendientes(storeId: string, ahora: Date = new Date()): Promise<number> {
+  const limite = new Date(ahora.getTime() - (MINUTOS_PARA_CONFIRMAR_PEDIDO * 60 + SEGUNDOS_DE_GRACIA_CONFIRMACION) * 1000);
+  const r = await prisma.pedidoWeb.updateMany({
+    where: { storeId, estado: "pendiente", createdAt: { lt: limite } },
+    data: { estado: "cancelado", motivoRechazo: MOTIVO_SIN_ENVIAR, resueltoPor: "Sistema", resueltoEn: ahora },
+  });
+  return r.count;
+}
+
+export type ResultadoConfirmarPedidoWeb =
+  | { ok: true; estado: EstadoPedidoWeb; numero: number; aceptado: boolean; yaConfirmado: boolean }
+  | { ok: false; error: string; vencido?: boolean };
+
+/**
+ * El cliente tocó «Enviar por WhatsApp»: el pedido pendiente entra al sistema (aparece en la bandeja, suena el aviso y, si el local
+ * aceptó solos, se acepta). Si ya pasó el tiempo, se cancela y se le dice. Tocar dos veces no hace nada de más.
+ *
+ * Ojo con lo que NO puede saber: WhatsApp no avisa si el mensaje se mandó de verdad; esto cuenta el toque que lo abre (el mismo
+ * criterio de las reservas de mesa), y el plazo corto es lo que obliga a hacerlo.
+ */
+export async function confirmarPedidoWebPorWhatsapp(storeId: string, token: string, ahora: Date = new Date()): Promise<ResultadoConfirmarPedidoWeb> {
+  const llave = String(token ?? "");
+  if (!/^[A-Za-z0-9_-]{20,64}$/.test(llave)) return { ok: false, error: "No encontré ese pedido." };
+
+  const pedido = await prisma.pedidoWeb.findFirst({
+    where: { storeId, token: llave },
+    select: {
+      id: true, numero: true, estado: true, createdAt: true, envioACoordinar: true, clienteNombre: true, total: true,
+      tipoEntrega: true, metodoPago: true, comprobanteTipo: true,
+    },
+  });
+  if (!pedido) return { ok: false, error: "No encontré ese pedido." };
+
+  const estado = pedido.estado as EstadoPedidoWeb;
+  if (estado === "nuevo" || estado === "aceptado" || estado === "listo" || estado === "entregado") {
+    return { ok: true, estado, numero: pedido.numero, aceptado: estado !== "nuevo", yaConfirmado: true };
+  }
+  if (estado !== "pendiente") {
+    return { ok: false, vencido: estado === "cancelado", error: "Este pedido ya no está activo. Volvé a hacerlo." };
   }
 
-  return { ok: true, token: creado.token, numero: creado.numero, estado, total, yaEnviado: false };
+  if (!sigueVigenteLaConfirmacion(pedido.createdAt.getTime(), ahora.getTime())) {
+    await prisma.pedidoWeb.updateMany({
+      where: { id: pedido.id, storeId, estado: "pendiente" },
+      data: { estado: "cancelado", motivoRechazo: MOTIVO_SIN_ENVIAR, resueltoPor: "Sistema", resueltoEn: ahora },
+    });
+    return { ok: false, vencido: true, error: "Se venció el tiempo para enviar el pedido por WhatsApp y se canceló. Volvé a hacerlo." };
+  }
+
+  const r = await prisma.pedidoWeb.updateMany({ where: { id: pedido.id, storeId, estado: "pendiente" }, data: { estado: "nuevo" } });
+  if (r.count !== 1) {
+    // Otro toque (o el vencimiento) se adelantó: se devuelve lo que quedó.
+    const ahoraEs = await prisma.pedidoWeb.findFirst({ where: { id: pedido.id, storeId }, select: { estado: true } });
+    const e = (ahoraEs?.estado ?? "cancelado") as EstadoPedidoWeb;
+    if (e === "cancelado") return { ok: false, vencido: true, error: "El pedido se canceló. Volvé a hacerlo." };
+    return { ok: true, estado: e, numero: pedido.numero, aceptado: e !== "nuevo", yaConfirmado: true };
+  }
+
+  const local = await prisma.store.findUnique({ where: { id: storeId }, select: { pedidosWebAutoAceptar: true } });
+  const nuevoEstado = await darEntradaAlPedido(storeId, { pedidosWebAutoAceptar: local?.pedidosWebAutoAceptar ?? false }, {
+    id: pedido.id,
+    numero: pedido.numero,
+    nombre: pedido.clienteNombre,
+    total: Number(pedido.total),
+    tipoEntrega: pedido.tipoEntrega,
+    metodoPago: pedido.metodoPago,
+    comprobante: pedido.comprobanteTipo,
+    envioACoordinar: pedido.envioACoordinar,
+  });
+  return { ok: true, estado: nuevoEstado, numero: pedido.numero, aceptado: nuevoEstado !== "nuevo", yaConfirmado: false };
+}
+
+/** El cliente se arrepintió antes de mandarlo (o se le acabó el tiempo en su pantalla): el pendiente se cancela. */
+export async function cancelarPedidoWebPendiente(storeId: string, token: string): Promise<{ ok: boolean }> {
+  const llave = String(token ?? "");
+  if (!/^[A-Za-z0-9_-]{20,64}$/.test(llave)) return { ok: false };
+  const r = await prisma.pedidoWeb.updateMany({
+    where: { storeId, token: llave, estado: "pendiente" },
+    data: { estado: "cancelado", motivoRechazo: "Lo canceló el cliente antes de enviarlo por WhatsApp.", resueltoPor: "Cliente", resueltoEn: new Date() },
+  });
+  return { ok: r.count === 1 };
 }
 
 /** Compara lo que va a consumir el pedido con lo que hay de cada insumo cuyo stock se lleva. */

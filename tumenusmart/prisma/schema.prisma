@@ -109,6 +109,8 @@ model Store {
   pedidosWebActivo        Boolean @default(false)
   /// Aceptar solos los pedidos que llegan con el local abierto: la comanda sale sin que nadie toque nada. Apagado por defecto.
   pedidosWebAutoAceptar   Boolean @default(false)
+  /// El cliente tiene que mandar el pedido por WhatsApp (en 3 minutos) para que entre a la bandeja; si no, se cancela solo.
+  pedidosWebConfirmaWhatsapp Boolean @default(true)
   /// "gastronomia" | "distribuidora" | "tienda": cambia cómo se llaman los pasos del pedido (preparación, armado, retiro…).
   pedidosWebRubro         String  @default("gastronomia")
   /// Regla del Servicio comedor: si un mozo puede ver y cargar las cuentas que abrió OTRO mozo (true), o solo las suyas
