@@ -50,7 +50,7 @@ export default async function EmpleadosPage() {
   return (
     <div>
       <Cabecera
-        titulo="Empleados"
+        titulo="Usuarios del sistema"
         bajada="Cada persona entra con su propio correo, así sabés quién hizo cada cosa y podés quitarle el acceso el día que se va."
       />
       <GestionEmpleados empleados={filas} nombreLocal={store?.nombre ?? "el local"} />

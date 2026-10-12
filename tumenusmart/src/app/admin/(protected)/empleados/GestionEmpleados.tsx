@@ -107,7 +107,7 @@ export function GestionEmpleados({
 
       {/* ---------- alta ---------- */}
       <Tarjeta>
-        <p className="text-[0.95rem] font-semibold tracking-titular">Agregar un empleado</p>
+        <p className="text-[0.95rem] font-semibold tracking-titular">Agregar un usuario</p>
         <p className="mt-1 text-[0.83rem] leading-snug text-tinta-media">
           Va a poder ver los pedidos y cambiarles el estado, ver las reservas, ver los
           repartidores y marcar productos como agotados. No puede tocar precios, borrar nada,
@@ -138,7 +138,7 @@ export function GestionEmpleados({
           </Campo>
           <div className="flex items-end">
             <Boton tono="nuevo" type="submit" disabled={pendiente} className="w-full sm:w-auto">
-              {pendiente ? "Creando…" : "Crear empleado"}
+              {pendiente ? "Creando…" : "Crear usuario"}
             </Boton>
           </div>
         </form>
@@ -154,7 +154,7 @@ export function GestionEmpleados({
       {/* ---------- lista ---------- */}
       {empleados.length === 0 ? (
         <Vacio
-          titulo="Todavía no hay empleados"
+          titulo="Todavía no hay usuarios"
           detalle="Cuando agregues uno, va a poder entrar con su propio correo y contraseña. Vos seguís siendo el único que puede tocar precios y configuración."
         />
       ) : (

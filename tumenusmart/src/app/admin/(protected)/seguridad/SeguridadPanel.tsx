@@ -124,7 +124,7 @@ export function SeguridadPanel({
         <div className="flex flex-wrap items-center justify-between gap-2">
           <p className="rotulo text-[0.78rem] font-bold">Perfiles de seguridad</p>
           <Link href="/admin/empleados" className={clasesBoton("navegar", "sm")}>
-            Asignar perfiles en Empleados
+            Asignar perfiles en Usuarios del sistema
           </Link>
         </div>
         <div className="flex flex-col gap-2">
@@ -155,8 +155,8 @@ export function SeguridadPanel({
           </p>
         )}
         <p className="text-[0.78rem] leading-snug text-tinta-suave">
-          La contraseña que se pide es la de entrar al panel de quien autoriza. El dueño siempre es Administrador; a cada empleado se le asigna el perfil al
-          crearlo o después, en Empleados. Con 5 contraseñas incorrectas seguidas el cuadro se bloquea 3 minutos, y todo queda en la Bitácora (módulo Seguridad).
+          La contraseña que se pide es la de entrar al panel de quien autoriza. El dueño siempre es Administrador; a cada usuario se le asigna el perfil al
+          crearlo o después, en Usuarios del sistema. Con 5 contraseñas incorrectas seguidas el cuadro se bloquea 3 minutos, y todo queda en la Bitácora (módulo Seguridad).
         </p>
       </Tarjeta>
     </div>

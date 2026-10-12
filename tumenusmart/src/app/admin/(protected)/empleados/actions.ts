@@ -81,7 +81,7 @@ export async function crearEmpleado(formData: FormData): Promise<ResultadoCrearE
   await registrarBitacora(storeId, sesion, {
     modulo: "empleados",
     accion: "empleado_creado",
-    descripcion: `Dio de alta al empleado ${nombre} (${email}) con el perfil de seguridad ${etiquetaDePerfil(perfilSeguridad)}.`,
+    descripcion: `Dio de alta al usuario ${nombre} (${email}) con el perfil de seguridad ${etiquetaDePerfil(perfilSeguridad)}.`,
     entidad: "Usuario",
     detalle: { empleado: nombre, correo: email, perfilSeguridad },
   });
@@ -110,14 +110,14 @@ export async function alternarActivoEmpleado(
     data: { activo },
   });
   if (resultado.count === 0) {
-    return { ok: false, error: "Ese empleado no es de tu local" };
+    return { ok: false, error: "Ese usuario no es de tu local" };
   }
 
   const empleado = await prisma.usuario.findFirst({ where: { id, storeId }, select: { nombre: true, email: true } });
   await registrarBitacora(storeId, sesion, {
     modulo: "empleados",
     accion: activo ? "empleado_activado" : "empleado_desactivado",
-    descripcion: `${activo ? "Volvió a activar" : "Desactivó"} al empleado ${empleado?.nombre ?? empleado?.email ?? ""}.`,
+    descripcion: `${activo ? "Volvió a activar" : "Desactivó"} al usuario ${empleado?.nombre ?? empleado?.email ?? ""}.`,
     entidad: "Usuario",
     entidadId: id,
     detalle: { empleado: empleado?.nombre ?? null, correo: empleado?.email ?? null, activo },
@@ -142,13 +142,13 @@ export async function cambiarPerfilSeguridadEmpleado(id: string, perfil: string)
     where: { id, storeId, rol: "empleado" },
     data: { perfilSeguridad: perfil },
   });
-  if (resultado.count === 0) return { ok: false, error: "Ese empleado no es de tu local" };
+  if (resultado.count === 0) return { ok: false, error: "Ese usuario no es de tu local" };
 
   const empleado = await prisma.usuario.findFirst({ where: { id, storeId }, select: { nombre: true, email: true } });
   await registrarBitacora(storeId, sesion, {
     modulo: "seguridad",
     accion: "perfil_seguridad_cambiado",
-    descripcion: `Le dio el perfil de seguridad ${etiquetaDePerfil(perfil)} al empleado ${empleado?.nombre ?? empleado?.email ?? ""}.`,
+    descripcion: `Le dio el perfil de seguridad ${etiquetaDePerfil(perfil)} al usuario ${empleado?.nombre ?? empleado?.email ?? ""}.`,
     entidad: "Usuario",
     entidadId: id,
     detalle: { empleado: empleado?.nombre ?? null, correo: empleado?.email ?? null, perfilSeguridad: perfil },
@@ -168,7 +168,7 @@ export async function restablecerPasswordEmpleado(id: string): Promise<Resultado
     where: { id, storeId, rol: "empleado" },
     select: { id: true, nombre: true, email: true },
   });
-  if (!empleado) return { ok: false, error: "Ese empleado no es de tu local" };
+  if (!empleado) return { ok: false, error: "Ese usuario no es de tu local" };
 
   const password = generarPassword();
   await prisma.usuario.update({
@@ -179,7 +179,7 @@ export async function restablecerPasswordEmpleado(id: string): Promise<Resultado
   await registrarBitacora(storeId, sesion, {
     modulo: "empleados",
     accion: "contrasena_restablecida",
-    descripcion: `Le restableció la contraseña al empleado ${empleado.nombre ?? empleado.email}.`,
+    descripcion: `Le restableció la contraseña al usuario ${empleado.nombre ?? empleado.email}.`,
     entidad: "Usuario",
     entidadId: empleado.id,
     detalle: { empleado: empleado.nombre, correo: empleado.email },

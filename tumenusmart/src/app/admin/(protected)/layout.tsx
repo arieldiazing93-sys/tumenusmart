@@ -252,7 +252,7 @@ function armarGrupos(hayIdeaSinVer: boolean, rol: string, ventasACredito: boolea
             { href: "/admin/comedor/reglas", label: "Reglas del mozo", icono: "configuracion" as const,
               ver: conPermiso("comedor.configurar") },
           ] },
-        { href: "/admin/empleados", label: "Empleados", icono: "usuarios" as const,
+        { href: "/admin/empleados", label: "Usuarios del sistema", icono: "usuarios" as const,
           ver: conPermiso("empleados.gestionar") },
         // Quién hizo qué en el sistema: solo el dueño.
         { href: "/admin/bitacora", label: "Bitácora", icono: "cuenta" as const,
