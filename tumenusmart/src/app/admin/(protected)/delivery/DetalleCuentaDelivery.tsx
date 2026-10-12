@@ -4,6 +4,8 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { MensajeError, Pastilla, Tarjeta, clasesBoton } from "@/components/ui";
 import { useAutorizacion } from "@/components/Autorizacion";
+import { IconoWhatsapp } from "@/components/iconos";
+import { linkWhatsappCliente, normalizarTelefonoParaWhatsapp } from "@/lib/whatsapp";
 import { formatearCantidad, formatearGuarani, formatearNumero } from "@/lib/format";
 import { agruparPorClave, claveDeLinea, importeDeLinea, repartirEnFilas, textoEstadoCuenta } from "@/lib/comedor";
 import { textoPorcentaje } from "@/lib/descuento-venta";
@@ -187,6 +189,22 @@ export function DetalleCuentaDelivery({
               </a>{" "}
               · <Hace iso={cuenta.abiertaEn} />
             </p>
+            {/* Escribirle al cliente por WhatsApp (el mensaje ya viene con su nombre y el número de la cuenta). */}
+            {normalizarTelefonoParaWhatsapp(cuenta.clienteTelefono) && (
+              <a
+                href={linkWhatsappCliente(
+                  cuenta.clienteTelefono,
+                  `Hola ${cuenta.clienteNombre}, te escribimos por tu pedido de delivery N° ${formatearNumero(cuenta.numero)}.`
+                )}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={`${clasesBoton("whatsapp", "sm")} mt-1.5`}
+                title="Escribirle al cliente por WhatsApp"
+              >
+                <IconoWhatsapp tam={16} />
+                WhatsApp
+              </a>
+            )}
           </div>
           <div className="flex flex-none flex-col items-end gap-0.5">
             <Pastilla color={porCobrar ? "amarillo" : "marca"} punto>

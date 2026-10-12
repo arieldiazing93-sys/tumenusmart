@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { clasesBoton } from "./ui";
+import { clasesBoton, type Tono } from "./ui";
 
 /**
  * El botón de enviar un formulario público (checkout, reservas).
@@ -17,6 +17,7 @@ export function BotonEnviar({
   enviandoTexto = "Enviando...",
   className = "",
   tam = "lg",
+  tono = "principal",
 }: {
   enviando: boolean;
   disabled?: boolean;
@@ -24,12 +25,14 @@ export function BotonEnviar({
   children: ReactNode;
   className?: string;
   tam?: "sm" | "md" | "lg";
+  /** "whatsapp" cuando el envío termina en un WhatsApp (el verde de WhatsApp, con su ícono en el texto). */
+  tono?: Tono;
 }) {
   return (
     <button
       type="submit"
       disabled={enviando || disabled}
-      className={`${clasesBoton("principal", tam)} ${className}`}
+      className={`${clasesBoton(tono, tam)} ${className}`}
     >
       {enviando && (
         <span

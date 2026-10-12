@@ -1,7 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { Area, Boton, Campo, Entrada, MensajeError, Selector } from "@/components/ui";
+import { Area, Boton, Campo, Entrada, MensajeError, Selector, clasesBoton } from "@/components/ui";
+import { IconoWhatsapp } from "@/components/iconos";
+import { linkWhatsappCliente } from "@/lib/whatsapp";
 import { PanelLateral } from "@/components/PanelLateral";
 import { formatearGuarani, formatearNumero } from "@/lib/format";
 import { leerCostoEnvio } from "@/lib/delivery";
@@ -254,6 +256,18 @@ export function AbrirCuentaDeliveryPanel({
                 )}
                 {estadoCliente === "nuevo" && (
                   <span className="mt-1.5 block text-[0.8rem] font-semibold text-azul">Este cliente no existe: cargá sus datos.</span>
+                )}
+                {/* Abrir el chat de WhatsApp con ese número (el pedido suele llegar por ahí): verde de WhatsApp. */}
+                {telefono.replace(/\D/g, "").length >= 6 && (
+                  <a
+                    href={linkWhatsappCliente(telefono, nombre.trim() ? `Hola ${nombre.trim()}, te escribimos por tu pedido.` : "Hola, te escribimos por tu pedido.")}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={`${clasesBoton("whatsapp", "sm")} mt-2`}
+                  >
+                    <IconoWhatsapp tam={16} />
+                    Escribirle por WhatsApp
+                  </a>
                 )}
               </Campo>
               <Campo etiqueta="Nombre">

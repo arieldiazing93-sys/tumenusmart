@@ -18,7 +18,7 @@ import type { ReactNode } from "react";
 //  Botón
 // ===========================================================================
 
-type Tono = "principal" | "suave" | "navegar" | "violeta" | "exito" | "nuevo" | "peligro" | "fantasma";
+export type Tono = "principal" | "suave" | "navegar" | "violeta" | "exito" | "nuevo" | "peligro" | "fantasma" | "whatsapp";
 
 const TONOS: Record<Tono, string> = {
   // Naranja: avanzar y ejecutar (cobrar, continuar, enviar, filtrar). Guardar es azul (navegar) y crear es verde (nuevo).
@@ -43,6 +43,9 @@ const TONOS: Record<Tono, string> = {
   peligro:
     "border border-peligro/30 bg-peligro-luz text-peligro hover:bg-peligro hover:text-white",
   fantasma: "text-tinta-media hover:bg-papel-hundido hover:text-tinta",
+  // El verde de WhatsApp (verde limón): TODO botón que abre o manda un WhatsApp lo lleva, con el ícono de WhatsApp adelante, para
+  // que se reconozca de un vistazo qué hace. Mismo color que el botón que ve el cliente en el menú.
+  whatsapp: "bg-[#25D366] text-white hover:opacity-90 focus-visible:outline-[#128C7E]",
 };
 
 const TAMANOS = {

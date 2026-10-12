@@ -856,12 +856,24 @@ export function CheckoutForm({
               {error}
             </div>
           )}
-          <BotonEnviar enviando={enviando} disabled={!aceptaPedidos || enviando} className="w-full !h-14 !rounded-2xl shadow-alta">
+          {/* Si el pedido termina en un WhatsApp (casi siempre: el local tiene su número), el botón es verde WhatsApp y lleva su
+              ícono: el cliente reconoce de un vistazo que el envío pasa por ahí. Sin número de WhatsApp, queda el color de la marca. */}
+          <BotonEnviar
+            enviando={enviando}
+            disabled={!aceptaPedidos || enviando}
+            tono={aceptaPedidos && (!pedidosEnSistema || whatsappNumero.replace(/\D/g, "").length > 0) ? "whatsapp" : "principal"}
+            className="w-full !h-14 !rounded-2xl shadow-alta"
+          >
             {!aceptaPedidos ? (
               "No disponible en este momento"
             ) : pedidosEnSistema ? (
               enviando ? (
                 "Enviando tu pedido…"
+              ) : whatsappNumero.replace(/\D/g, "").length > 0 ? (
+                <>
+                  <IconoWhatsapp tam={26} />
+                  Enviar pedido
+                </>
               ) : (
                 "Enviar pedido"
               )

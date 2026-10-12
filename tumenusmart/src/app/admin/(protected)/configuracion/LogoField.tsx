@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { subirFotoLogo, quitarLogoStore } from "./actions";
 import { comprimirImagen, pesoLegible, PARA_LOGO } from "@/lib/comprimir-imagen";
+import { clasesBoton } from "@/components/ui";
 
 export function LogoField({ initialUrl }: { initialUrl: string | null }) {
   const [url, setUrl] = useState(initialUrl ?? "");
@@ -66,12 +67,12 @@ export function LogoField({ initialUrl }: { initialUrl: string | null }) {
         Logo del negocio
       </label>
       <p className="mb-2 text-[0.78rem] text-tinta-suave">
-        Se achica y se optimiza solo en tu celular antes de subirse. Podés mandar la foto
-        tal como salió de la cámara.
+        Es el cuadrito que se ve arriba de tu carta, sobre la portada, y en el encabezado de tus reportes.
       </p>
 
       <div className="flex items-center gap-3">
-        <div className="flex h-20 w-20 flex-none items-center justify-center overflow-hidden rounded-full border border-linea bg-papel-suave">
+        {/* Cuadrado con las esquinas redondeadas: así se ve en la carta. */}
+        <div className="flex h-20 w-20 flex-none items-center justify-center overflow-hidden rounded-2xl border border-linea bg-papel-suave">
           {url ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={url} alt="Logo del negocio" className="h-full w-full object-cover" />
@@ -80,8 +81,8 @@ export function LogoField({ initialUrl }: { initialUrl: string | null }) {
           )}
         </div>
 
-        <div className="flex flex-col gap-1">
-          <label className="cursor-pointer rounded-lg border border-linea px-3 py-1.5 text-sm font-medium text-tinta-media hover:bg-papel-suave">
+        <div className="flex flex-wrap items-center gap-2">
+          <label className={`${clasesBoton(url ? "navegar" : "nuevo", "md")} cursor-pointer ${subiendo ? "pointer-events-none opacity-45" : ""}`}>
             {subiendo ? "Subiendo..." : url ? "Cambiar logo" : "Subir logo"}
             <input
               ref={inputRef}
@@ -93,11 +94,7 @@ export function LogoField({ initialUrl }: { initialUrl: string | null }) {
             />
           </label>
           {url && (
-            <button
-              type="button"
-              onClick={quitar}
-              className="text-left text-xs text-peligro hover:underline"
-            >
+            <button type="button" onClick={quitar} className={clasesBoton("peligro", "md")}>
               Quitar logo
             </button>
           )}
@@ -111,6 +108,16 @@ export function LogoField({ initialUrl }: { initialUrl: string | null }) {
         </p>
       )}
       {error && <p className="mt-1 text-xs text-peligro">{error}</p>}
+
+      {/* El pie: el tamaño con el que mejor se ve (el mismo estilo que el de la portada). */}
+      <div className="mt-3 rounded-lg bg-azul-luz px-3 py-2.5 text-[0.78rem] leading-snug text-azul-oscuro">
+        <p className="font-semibold">Tamaño recomendado: 500 × 500 píxeles (cuadrado)</p>
+        <ul className="mt-1 list-disc space-y-0.5 pl-4">
+          <li>Formato cuadrado, en JPG, PNG o WEBP. Se ve chico (unos 96 píxeles), así que conviene un dibujo simple y con letras grandes.</li>
+          <li>Dejá un poco de aire en los bordes: las esquinas se redondean. Si el fondo es transparente, se rellena de blanco.</li>
+          <li>Se achica y se optimiza sola antes de subirse; podés mandar la foto tal como salió de la cámara.</li>
+        </ul>
+      </div>
     </div>
   );
 }
