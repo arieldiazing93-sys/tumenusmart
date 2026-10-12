@@ -17,6 +17,7 @@ import {
 import { armarDE, armarRDE } from "@/lib/sifen/armar-de";
 import { cargarFactura, problemaParaEmitirElectronico } from "@/lib/sifen/servidor";
 import { esElectronico } from "@/lib/modalidad-punto";
+import { errorDelTelefono, limpiarTelefonoDeCliente } from "@/lib/datos-fiscales";
 import { aXmlRDE } from "@/lib/sifen/xml";
 import { esDeMesAnterior, nombreDelMes } from "@/lib/mes-fiscal";
 import { registrarBitacora } from "@/lib/bitacora";
@@ -452,6 +453,8 @@ export async function remitirFactura(
     numeroIdentificacion: string;
     razonSocial: string;
     email: string;
+    /** Opcional: el teléfono que el cliente dejó en «Nuevo cliente»; se guarda en su ficha. */
+    telefono?: string;
   },
   motivo: string
 ): Promise<ResultadoRemitirFactura> {
@@ -469,6 +472,9 @@ export async function remitirFactura(
   if (!tipoIdentificacion || !numeroIdentificacion || !razonSocial) {
     return { ok: false, error: "Completá tipo, número y razón social del cliente." };
   }
+  const errorTelefono = errorDelTelefono(datosCliente.telefono);
+  if (errorTelefono) return { ok: false, error: errorTelefono };
+  const telefono = limpiarTelefonoDeCliente(datosCliente.telefono);
 
   // La remisión se emite desde el punto de expedición vigente de ESTA
   // computadora, no el que emitió el número viejo — ese turno/estación
@@ -547,7 +553,7 @@ export async function remitirFactura(
 
     try {
       await prisma.$transaction(async (tx) => {
-        await upsertClienteFiscal(tx, storeId, { tipoIdentificacion, numeroIdentificacion, razonSocial, email });
+        await upsertClienteFiscal(tx, storeId, { tipoIdentificacion, numeroIdentificacion, razonSocial, email, telefono });
 
         // Atómico: se incrementa PRIMERO y se usa el valor YA incrementado.
         const peActualizado = await tx.puntoExpedicion.update({
@@ -710,7 +716,7 @@ export async function remitirFactura(
 
   try {
     await prisma.$transaction(async (tx) => {
-      await upsertClienteFiscal(tx, storeId, { tipoIdentificacion, numeroIdentificacion, razonSocial, email });
+      await upsertClienteFiscal(tx, storeId, { tipoIdentificacion, numeroIdentificacion, razonSocial, email, telefono });
 
       const peActualizado = await tx.puntoExpedicion.update({
         where: { id: pe.id },

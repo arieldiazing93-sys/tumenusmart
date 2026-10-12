@@ -2,13 +2,14 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Boton, Campo, Entrada, Selector, MensajeError, Area } from "@/components/ui";
+import { Boton, Entrada, MensajeError, Area } from "@/components/ui";
 import { Segmentado } from "@/components/Segmentado";
 import { TIPOS_IDENTIFICACION_FISCAL, etiquetaTipoIdentificacion } from "@/lib/tipo-cliente";
 import { formatearGuarani, formatearNumero } from "@/lib/format";
 import { ZONA_NEGOCIO } from "@/lib/timezone";
 import { imprimirComprobante } from "@/lib/impresion-comprobantes";
 import { AvisoRucDnit, useVerificacionDeCliente } from "../../pos/AvisoRucDnit";
+import { ClienteFiscalModal, type DatosClienteFiscal } from "../../pos/ClienteFiscalModal";
 import {
   buscarClientesFiscales,
   buscarParaRemision,
@@ -49,9 +50,13 @@ export function NuevaFacturaForm({
   const [numeroIdentificacion, setNumeroIdentificacion] = useState("");
   const [razonSocial, setRazonSocial] = useState("");
   const [email, setEmail] = useState("");
+  // El teléfono que se dejó en el cuadro «Nuevo cliente» (opcional): se guarda en la ficha del cliente al generar la factura.
+  const [telefono, setTelefono] = useState("");
+  // El cuadro «Nuevo cliente»: el mismo del mostrador, el comedor, el delivery y la reserva de turnos.
+  const [modalCliente, setModalCliente] = useState(false);
   // El RUC contra la DNIT: se verifica solo al elegir o escribir un cliente con RUC completo. Es justo el caso de esta pantalla (el RUC
   // venía mal cargado), así que si la DNIT dice que no existe o está suspendido, no se deja generar otra factura que volvería rechazada.
-  const { verificacion, verificando, verificarAhora, usarNombreDeLaDnit } = useVerificacionDeCliente({
+  const { verificacion, verificando } = useVerificacionDeCliente({
     tipo: tipoIdentificacion,
     numero: numeroIdentificacion,
     razonSocial,
@@ -77,8 +82,22 @@ export function NuevaFacturaForm({
     setNumeroIdentificacion(c.numeroIdentificacion ?? "");
     setRazonSocial(c.nombre);
     setEmail(c.email ?? "");
+    setTelefono("");
     setResultadosCliente(null);
     setCargandoClienteNuevo(false);
+  }
+
+  /** Lo que se cargó en el cuadro «Nuevo cliente» queda como el cliente de la factura. */
+  function guardarClienteNuevo(datos: DatosClienteFiscal) {
+    setClienteAsignado(null);
+    setTipoIdentificacion(datos.tipoIdentificacion);
+    setNumeroIdentificacion(datos.numeroIdentificacion);
+    setRazonSocial(datos.razonSocial);
+    setEmail(datos.email);
+    setTelefono(datos.telefono);
+    setResultadosCliente(null);
+    setCargandoClienteNuevo(false);
+    setModalCliente(false);
   }
 
   function buscarOtroCliente() {
@@ -89,6 +108,7 @@ export function NuevaFacturaForm({
     setNumeroIdentificacion("");
     setRazonSocial("");
     setEmail("");
+    setTelefono("");
   }
 
   function buscarCliente() {
@@ -133,7 +153,7 @@ export function NuevaFacturaForm({
       const r = await remitirFactura(
         resumen.origen,
         resumen.id,
-        { tipoIdentificacion, numeroIdentificacion, razonSocial, email },
+        { tipoIdentificacion, numeroIdentificacion, razonSocial, email, telefono },
         motivo
       );
       if (!r.ok) {
@@ -213,7 +233,7 @@ export function NuevaFacturaForm({
                 ))}
                 <button
                   type="button"
-                  onClick={() => setCargandoClienteNuevo(true)}
+                  onClick={() => setModalCliente(true)}
                   className="rounded-lg border border-dashed border-brand/40 bg-brand-light/40 px-3 py-2 text-left text-[0.85rem] font-medium text-brand-texto transition-colors hover:border-brand hover:bg-brand-light"
                 >
                   + Ninguno de estos — crear cliente nuevo
@@ -222,57 +242,13 @@ export function NuevaFacturaForm({
             )}
 
             {cargandoClienteNuevo && (
-              <div className="mt-3 flex flex-col gap-3 rounded-lg border border-linea bg-papel-suave p-3">
+              <div className="mt-3 flex flex-col items-start gap-2 rounded-lg border border-linea bg-papel-suave p-3">
                 <p className="text-[0.82rem] font-medium text-aviso">
-                  No existe ningún cliente con ese dato — completá los datos para crear uno nuevo.
+                  No existe ningún cliente con ese dato — creá uno nuevo.
                 </p>
-                <Campo etiqueta="Tipo">
-                  <Selector value={tipoIdentificacion} onChange={(e) => setTipoIdentificacion(e.target.value)}>
-                    {TIPOS_IDENTIFICACION_FISCAL.map((t) => (
-                      <option key={t.valor} value={t.valor}>
-                        {t.etiqueta}
-                      </option>
-                    ))}
-                  </Selector>
-                </Campo>
-                <div>
-                  <Campo etiqueta="N° de RUC / Cédula / etc.">
-                    <Entrada value={numeroIdentificacion} onChange={(e) => setNumeroIdentificacion(e.target.value)} />
-                  </Campo>
-                  {tipoIdentificacion === "ruc" && (
-                    <>
-                      <AvisoRucDnit verificacion={verificacion} verificando={verificando} conRazonSocial={false} />
-                      {verificacion?.resultado === "encontrado" && verificacion.razonSocial && razonSocial.trim() !== verificacion.razonSocial && (
-                        <div className="mt-1.5">
-                          <Boton tono="navegar" tam="sm" onClick={usarNombreDeLaDnit}>
-                            Usar el nombre de la DNIT
-                          </Boton>
-                        </div>
-                      )}
-                      <div className="mt-2">
-                        <Boton tono="navegar" tam="sm" disabled={verificando || !numeroIdentificacion.trim()} onClick={() => void verificarAhora(numeroIdentificacion.trim(), true)}>
-                          {verificando ? "Verificando…" : "Verificar en la DNIT"}
-                        </Boton>
-                      </div>
-                    </>
-                  )}
-                </div>
-                <Campo etiqueta="Razón social">
-                  <Entrada value={razonSocial} onChange={(e) => setRazonSocial(e.target.value)} autoFocus />
-                </Campo>
-                <Campo etiqueta="Correo electrónico">
-                  <Entrada
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="cliente@correo.com"
-                  />
-                </Campo>
-                {clienteListo && (
-                  <Boton tono="suave" tam="sm" onClick={() => setCargandoClienteNuevo(false)} className="self-start">
-                    Listo, seguir
-                  </Boton>
-                )}
+                <Boton tono="nuevo" tam="sm" onClick={() => setModalCliente(true)}>
+                  Crear cliente
+                </Boton>
               </div>
             )}
           </>
@@ -357,6 +333,19 @@ export function NuevaFacturaForm({
             {enviando ? "Generando…" : "Generar factura nueva"}
           </Boton>
         </>
+      )}
+
+      {modalCliente && (
+        <ClienteFiscalModal
+          // Lo que se buscó sirve de punto de partida: un número queda como documento y un texto como nombre.
+          numeroInicial={numeroIdentificacion || (/^[\d-]+$/.test(busquedaCliente.trim()) ? busquedaCliente.trim() : "")}
+          tipoInicial={tipoIdentificacion}
+          razonSocialInicial={razonSocial || (/^[\d-]+$/.test(busquedaCliente.trim()) ? "" : busquedaCliente.trim())}
+          emailInicial={email}
+          telefonoInicial={telefono}
+          onCerrar={() => setModalCliente(false)}
+          onGuardar={guardarClienteNuevo}
+        />
       )}
     </div>
   );

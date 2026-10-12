@@ -17,6 +17,7 @@ import { crearComprobante, descripcionDeItem } from "@/lib/comprobante";
 import { esElectronico } from "@/lib/modalidad-punto";
 import { ErrorFacturaElectronica, problemaParaEmitirElectronico } from "@/lib/sifen/servidor";
 import { SIN_REGISTRO_FISCAL } from "@/lib/tipo-cliente";
+import { errorDelTelefono, limpiarTelefonoDeCliente } from "@/lib/datos-fiscales";
 import { calcularDescuento, textoPorcentaje } from "@/lib/descuento-venta";
 import { resolverDescuentoConTipos } from "@/lib/tipos-descuento";
 import { cargarTiposDescuento } from "@/lib/tipos-descuento-servidor";
@@ -857,6 +858,8 @@ export type DatosCobroCuenta = {
   facturaNumeroIdentificacion?: string;
   facturaRazonSocial?: string;
   facturaEmail?: string;
+  /** Opcional: el teléfono que el cliente dejó en «Nuevo cliente»; se guarda en su ficha fiscal y queda en la venta si no se cargó otro. */
+  facturaTelefono?: string;
   /** Solo si se paga "a_credito": a quién se le cobra después (nombre y teléfono; con factura con registro fiscal alcanza su RUC). */
   clienteNombre?: string;
   clienteTelefono?: string;
@@ -932,6 +935,10 @@ export async function pagarCuenta(cuentaId: string, datos: DatosCobroCuenta): Pr
     }
     if (!esSinRegistroFiscal && datos.facturaEmail?.trim() && !datos.facturaEmail.includes("@")) {
       return { ok: false, error: "El correo electrónico no es válido." };
+    }
+    if (!esSinRegistroFiscal) {
+      const errorTelefono = errorDelTelefono(datos.facturaTelefono);
+      if (errorTelefono) return { ok: false, error: errorTelefono };
     }
     if (!puntoExpedicion) {
       return {
@@ -1022,7 +1029,10 @@ export async function pagarCuenta(cuentaId: string, datos: DatosCobroCuenta): Pr
     datos.pagos.length === 1 &&
     String(datos.pagos[0]?.forma ?? "").trim().toLowerCase() === FORMA_PAGO_A_CREDITO;
   const clienteNombre = String(datos?.clienteNombre ?? "").trim().slice(0, 80) || null;
-  const clienteTelefono = String(datos?.clienteTelefono ?? "").trim().slice(0, 30) || null;
+  const telefonoDelMostrador = String(datos?.clienteTelefono ?? "").trim().slice(0, 30) || null;
+  // El que el cliente dejó en «Nuevo cliente» (solo con registro fiscal): va a SU ficha fiscal y, si no se cargó otro, a la venta.
+  const telefonoFiscal = esFactura && !esSinRegistroFiscal ? limpiarTelefonoDeCliente(datos?.facturaTelefono) : "";
+  const clienteTelefono = telefonoDelMostrador || telefonoFiscal || null;
   let fechaVencimientoCredito: Date | null = null;
   if (esCredito) {
     if (!store?.ventasACredito) return { ok: false, error: "Este local no vende a crédito. Se activa en Configuración." };
@@ -1054,11 +1064,11 @@ export async function pagarCuenta(cuentaId: string, datos: DatosCobroCuenta): Pr
   const notaVenta = `Mesa ${cuenta.mesa} · Cuenta ${formatearNumero(cuenta.numero)}`;
 
   // Con teléfono, el cliente queda en la lista de clientes (o se le actualiza el nombre): mismo alta que el mostrador.
-  if (clienteTelefono) {
+  if (telefonoDelMostrador) {
     await prisma.customer.upsert({
-      where: { storeId_telefono: { storeId, telefono: clienteTelefono } },
+      where: { storeId_telefono: { storeId, telefono: telefonoDelMostrador } },
       update: clienteNombre ? { nombre: clienteNombre } : {},
-      create: { storeId, nombre: clienteNombre || "Cliente de mostrador", telefono: clienteTelefono },
+      create: { storeId, nombre: clienteNombre || "Cliente de mostrador", telefono: telefonoDelMostrador },
     });
   }
 
@@ -1086,6 +1096,7 @@ export async function pagarCuenta(cuentaId: string, datos: DatosCobroCuenta): Pr
             numeroIdentificacion: datos.facturaNumeroIdentificacion!.trim(),
             razonSocial: datos.facturaRazonSocial!.trim(),
             email: datos.facturaEmail?.trim() ?? "",
+            telefono: telefonoFiscal,
           });
         }
         // Atómico: se incrementa PRIMERO y se usa el valor ya incrementado (dos cobros a la vez no toman el mismo número).

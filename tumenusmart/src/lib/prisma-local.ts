@@ -1,6 +1,7 @@
 import { Prisma, type PrismaClient } from "@prisma/client";
 import { prisma } from "./prisma";
 import { aplicarLocal, type ArgsConsulta } from "./alcance-local";
+import { limpiarTelefonoDeCliente } from "./datos-fiscales";
 
 /**
  * Acceso a la base ya atado a un local.
@@ -118,6 +119,13 @@ export async function siguienteNumeroCliente(
  * Necesita el `tx` de la transacción en curso: la carrera de dos cajas
  * facturando el mismo RUC nuevo al mismo tiempo se resuelve con un `catch`
  * de P2002 que cae a `update` en vez de fallar en medio del cobro.
+ *
+ * El teléfono es opcional (lo deja el cliente en el cuadro «Nuevo cliente»).
+ * Es único por local, así que NUNCA hace fallar la venta: si ya es de otra
+ * ficha (por ejemplo la del cliente del mostrador o del delivery, que se
+ * identifica por teléfono), simplemente no se guarda en esta. A propósito no
+ * se fusionan las dos fichas: la del teléfono lleva el nombre de la PERSONA y
+ * la fiscal la razón social, y pisar una con la otra perdería datos.
  */
 export async function upsertClienteFiscal(
   db: PrismaClient | Prisma.TransactionClient,
@@ -127,6 +135,7 @@ export async function upsertClienteFiscal(
     numeroIdentificacion: string;
     razonSocial: string;
     email: string;
+    telefono?: string | null;
   }
 ): Promise<void> {
   const claveFiscal = {
@@ -137,14 +146,29 @@ export async function upsertClienteFiscal(
     },
   };
   const emailFiscal = datos.email.trim();
+  const telefono = limpiarTelefonoDeCliente(datos.telefono);
   const existente = await db.customer.findUnique({ where: claveFiscal, select: { id: true } });
 
+  // Quién tiene ya ese teléfono en este local (si alguien lo tiene).
+  const duenoDelTelefono = telefono
+    ? await db.customer.findUnique({
+        where: { storeId_telefono: { storeId, telefono } },
+        select: { id: true },
+      })
+    : null;
+
   if (existente) {
+    const telefonoLibre = !!telefono && (!duenoDelTelefono || duenoDelTelefono.id === existente.id);
     await db.customer.update({
       where: claveFiscal,
       // Solo se toca el email si vino algo: no hay que borrar uno ya
-      // cargado porque esta vez no se volvió a tipear.
-      data: { nombre: datos.razonSocial, ...(emailFiscal ? { email: emailFiscal } : {}) },
+      // cargado porque esta vez no se volvió a tipear. Con el teléfono,
+      // igual: solo se guarda si vino y no es de otra ficha.
+      data: {
+        nombre: datos.razonSocial,
+        ...(emailFiscal ? { email: emailFiscal } : {}),
+        ...(telefonoLibre ? { telefono } : {}),
+      },
     });
     return;
   }
@@ -158,6 +182,8 @@ export async function upsertClienteFiscal(
         tipoIdentificacion: datos.tipoIdentificacion,
         numeroIdentificacion: datos.numeroIdentificacion,
         email: emailFiscal || null,
+        // Si el número ya es de otra ficha (con otro documento), esta queda sin teléfono: no se pisa ni se frena el cobro.
+        telefono: telefono && !duenoDelTelefono ? telefono : null,
         numero: numeroCliente,
       },
     });

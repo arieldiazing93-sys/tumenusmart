@@ -17,7 +17,7 @@ import { anularComprobantes, crearComprobante, descripcionDeItem } from "@/lib/c
 import { esElectronico } from "@/lib/modalidad-punto";
 import { ErrorFacturaElectronica, problemaParaEmitirElectronico } from "@/lib/sifen/servidor";
 import { SIN_REGISTRO_FISCAL } from "@/lib/tipo-cliente";
-import { limpiarTexto, validarDatosFiscales } from "@/lib/datos-fiscales";
+import { errorDelTelefono, limpiarTelefonoDeCliente, limpiarTexto, validarDatosFiscales } from "@/lib/datos-fiscales";
 import { extraerUbicacion } from "@/lib/ubicacion-mapa";
 import { calcularDescuento, textoPorcentaje } from "@/lib/descuento-venta";
 import { resolverDescuentoConTipos } from "@/lib/tipos-descuento";
@@ -1095,6 +1095,8 @@ export type DatosFacturaRapida = {
   facturaNumeroIdentificacion?: string;
   facturaRazonSocial?: string;
   facturaEmail?: string;
+  /** Opcional: el teléfono que el cliente dejó en «Nuevo cliente»; se guarda en su ficha fiscal. */
+  facturaTelefono?: string;
   /** El total que la persona tenía en pantalla: sirve para avisar si la cuenta cambió mientras se emitía la factura. */
   totalMostrado?: number;
 };
@@ -1155,9 +1157,12 @@ export async function emitirFacturaDelivery(cuentaId: string, datos: DatosFactur
       email: datos.facturaEmail,
     });
     if (!revisado.ok) return { ok: false, error: revisado.error };
+    const errorTelefono = errorDelTelefono(datos.facturaTelefono);
+    if (errorTelefono) return { ok: false, error: errorTelefono };
     comprador = revisado.datos;
   }
   const compradorFinal = comprador;
+  const telefonoFiscal = esSinRegistroFiscal ? "" : limpiarTelefonoDeCliente(datos.facturaTelefono);
   const tipoIdFactura = esSinRegistroFiscal ? SIN_REGISTRO_FISCAL.tipo : (compradorFinal?.tipoIdentificacion ?? "");
   const numeroIdFactura = esSinRegistroFiscal ? SIN_REGISTRO_FISCAL.numero : (compradorFinal?.numeroIdentificacion ?? "");
   const razonSocialFactura = esSinRegistroFiscal ? null : (compradorFinal?.razonSocial ?? null);
@@ -1234,6 +1239,7 @@ export async function emitirFacturaDelivery(cuentaId: string, datos: DatosFactur
           numeroIdentificacion: compradorFinal.numeroIdentificacion,
           razonSocial: compradorFinal.razonSocial,
           email: compradorFinal.email ?? "",
+          telefono: telefonoFiscal,
         });
         // La ficha de la cuenta queda con los datos con que se facturó.
         await tx.cuentaDelivery.update({
@@ -1437,6 +1443,8 @@ export type DatosCobroDelivery = {
   facturaNumeroIdentificacion?: string;
   facturaRazonSocial?: string;
   facturaEmail?: string;
+  /** Opcional: el teléfono que el cliente dejó en «Nuevo cliente»; se guarda en su ficha fiscal. */
+  facturaTelefono?: string;
   /** Solo si se paga "a_credito": en cuántos días vence lo que debe el cliente (0 a 365; por defecto 30). */
   creditoDias?: number;
   /**
@@ -1522,6 +1530,8 @@ export async function pagarCuentaDelivery(cuentaId: string, datos: DatosCobroDel
         email: datos.facturaEmail,
       });
       if (!revisado.ok) return { ok: false, error: revisado.error };
+      const errorTelefono = errorDelTelefono(datos.facturaTelefono);
+      if (errorTelefono) return { ok: false, error: errorTelefono };
       comprador = revisado.datos;
     }
     if (!puntoExpedicion) {
@@ -1640,6 +1650,8 @@ export async function pagarCuentaDelivery(cuentaId: string, datos: DatosCobroDel
   const notaVenta = `Delivery · Cuenta ${formatearNumero(cuenta.numero)}`;
   // Lo que va en la factura sobre el comprador: "Sin Nombre" (Consumidor Final) o los datos ya revisados.
   const compradorFinal = comprador;
+  // Con la factura ya emitida ("factura rápida") no se vuelve a guardar nada del cliente: ya se hizo al emitirla.
+  const telefonoFiscal = esSinRegistroFiscal || facturaPrevia ? "" : limpiarTelefonoDeCliente(datos.facturaTelefono);
   const tipoIdFactura = esSinRegistroFiscal ? SIN_REGISTRO_FISCAL.tipo : (compradorFinal?.tipoIdentificacion ?? "");
   const numeroIdFactura = esSinRegistroFiscal ? SIN_REGISTRO_FISCAL.numero : (compradorFinal?.numeroIdentificacion ?? "");
   const razonSocialFactura = esSinRegistroFiscal ? null : (compradorFinal?.razonSocial ?? null);
@@ -1688,6 +1700,7 @@ export async function pagarCuentaDelivery(cuentaId: string, datos: DatosCobroDel
             numeroIdentificacion: compradorFinal.numeroIdentificacion,
             razonSocial: compradorFinal.razonSocial,
             email: compradorFinal.email ?? "",
+            telefono: telefonoFiscal,
           });
         }
         // Atómico: se incrementa PRIMERO y se usa el valor ya incrementado (dos cobros a la vez no toman el mismo número).

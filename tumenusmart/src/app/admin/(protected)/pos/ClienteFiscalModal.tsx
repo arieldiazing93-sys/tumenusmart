@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { Boton, Campo, Entrada, Selector, MensajeError } from "@/components/ui";
 import { TIPOS_IDENTIFICACION_FISCAL } from "@/lib/tipo-cliente";
+import { errorDelTelefono, limpiarTelefonoDeCliente } from "@/lib/datos-fiscales";
 import { AvisoRucDnit, useVerificacionDeCliente } from "./AvisoRucDnit";
 
 export type DatosClienteFiscal = {
@@ -11,6 +12,8 @@ export type DatosClienteFiscal = {
   tipoIdentificacion: string;
   razonSocial: string;
   email: string;
+  /** Opcional: "" si el cliente no lo quiso dejar. Se guarda en su ficha junto con los datos fiscales. */
+  telefono: string;
 };
 
 /**
@@ -22,7 +25,10 @@ export type DatosClienteFiscal = {
  * antes de cobrar no deja un cliente huérfano.
  *
  * La Clave no se puede mostrar todavía: sale de un contador que recién se
- * incrementa cuando el cliente se crea de verdad.
+ * incrementa cuando el cliente se crea de verdad (por eso no es un campo: se avisa en el encabezado).
+ *
+ * Es el MISMO cuadro en todos los servicios que facturan (mostrador, comedor, delivery, reserva de turnos), con el orden que pidió
+ * el dueño: número de documento primero, después el tipo, el nombre o razón social, el correo y, al final, el teléfono (opcional).
  *
  * Hoja desde abajo en el celular, cuadro centrado en pantallas más anchas.
  *
@@ -33,18 +39,26 @@ export type DatosClienteFiscal = {
 export function ClienteFiscalModal({
   numeroInicial,
   tipoInicial,
+  razonSocialInicial = "",
+  emailInicial = "",
+  telefonoInicial = "",
   onCerrar,
   onGuardar,
 }: {
   numeroInicial: string;
   tipoInicial: string;
+  /** Lo que ya se había escrito (al tocar «Editar datos» o si la pantalla ya conocía el teléfono del cliente). */
+  razonSocialInicial?: string;
+  emailInicial?: string;
+  telefonoInicial?: string;
   onCerrar: () => void;
   onGuardar: (datos: DatosClienteFiscal) => void;
 }) {
   const [numero, setNumero] = useState(numeroInicial);
   const [tipo, setTipo] = useState(tipoInicial);
-  const [razonSocial, setRazonSocial] = useState("");
-  const [email, setEmail] = useState("");
+  const [razonSocial, setRazonSocial] = useState(razonSocialInicial);
+  const [email, setEmail] = useState(emailInicial);
+  const [telefono, setTelefono] = useState(telefonoInicial);
   const [error, setError] = useState<string | null>(null);
   const { verificacion, verificando, verificarAhora, usarNombreDeLaDnit } = useVerificacionDeCliente({
     tipo,
@@ -93,11 +107,17 @@ export function ClienteFiscalModal({
       setError("El correo electrónico no es válido.");
       return;
     }
+    const errorTelefono = errorDelTelefono(telefono);
+    if (errorTelefono) {
+      setError(errorTelefono);
+      return;
+    }
     onGuardar({
       numeroIdentificacion: numeroFinal,
       tipoIdentificacion: tipo,
       razonSocial: razon,
       email: email.trim(),
+      telefono: limpiarTelefonoDeCliente(telefono),
     });
   }
 
@@ -128,6 +148,7 @@ export function ClienteFiscalModal({
               Nuevo cliente
             </p>
             <p className="text-[0.85rem] text-tinta-media">Datos para la factura</p>
+            <p className="mt-0.5 text-[0.74rem] text-tinta-suave">La clave del cliente se asigna al guardar la venta.</p>
           </div>
           <button
             type="button"
@@ -140,20 +161,6 @@ export function ClienteFiscalModal({
         </div>
 
         <div className="mt-4 flex flex-col gap-3">
-          <Campo etiqueta="Clave" ayuda="Se asigna al guardar la venta">
-            <Entrada value="" disabled placeholder="Se asigna al guardar la venta" />
-          </Campo>
-
-          <Campo etiqueta="Tipo">
-            <Selector value={tipo} onChange={(e) => setTipo(e.target.value)}>
-              {TIPOS_IDENTIFICACION_FISCAL.map((t) => (
-                <option key={t.valor} value={t.valor}>
-                  {t.etiqueta}
-                </option>
-              ))}
-            </Selector>
-          </Campo>
-
           <div>
             <Campo etiqueta="N° de RUC / Cédula / etc.">
               <Entrada
@@ -163,6 +170,8 @@ export function ClienteFiscalModal({
                   setError(null);
                 }}
                 placeholder="80012345-0"
+                // Si ya vino con el número escrito (lo buscó con la lupa y no existía), el cursor va directo al nombre.
+                autoFocus={!numeroInicial.trim()}
               />
             </Campo>
             {tipo === "ruc" && (
@@ -189,21 +198,45 @@ export function ClienteFiscalModal({
             )}
           </div>
 
+          <Campo etiqueta="Tipo">
+            <Selector value={tipo} onChange={(e) => setTipo(e.target.value)}>
+              {TIPOS_IDENTIFICACION_FISCAL.map((t) => (
+                <option key={t.valor} value={t.valor}>
+                  {t.etiqueta}
+                </option>
+              ))}
+            </Selector>
+          </Campo>
+
           <Campo etiqueta="Nombre / Razón social">
             <Entrada
               value={razonSocial}
               onChange={(e) => setRazonSocial(e.target.value)}
               placeholder="Nombre de la empresa o del titular"
-              autoFocus
+              autoFocus={!!numeroInicial.trim()}
             />
           </Campo>
 
-          <Campo etiqueta="Correo electrónico" ayuda="Opcional — para cuando se implemente la factura electrónica">
+          <Campo etiqueta="Correo electrónico" ayuda="Opcional — para enviarle la factura electrónica">
             <Entrada
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="cliente@correo.com"
+            />
+          </Campo>
+
+          <Campo etiqueta="Teléfono" ayuda="Opcional — para dejarlo en la ficha del cliente y ubicarlo la próxima vez">
+            <Entrada
+              type="tel"
+              inputMode="tel"
+              value={telefono}
+              onChange={(e) => {
+                setTelefono(e.target.value);
+                setError(null);
+              }}
+              placeholder="0981 234 567"
+              autoComplete="off"
             />
           </Campo>
 

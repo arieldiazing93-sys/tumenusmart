@@ -128,6 +128,7 @@ export function FormularioCita({
     numeroIdentificacion: "",
     razonSocial: "",
     email: inicial?.clienteEmail ?? "",
+    telefono: "",
   });
   const [cobradoAhora, setCobradoAhora] = useState<{ ventaId: string } | null>(null);
   const [avisoImpresion, setAvisoImpresion] = useState<string | null>(null);
@@ -913,6 +914,8 @@ export function FormularioCita({
             total={total}
             cobrando={cobrando}
             porAdelantado={turnoPorLlegar}
+            // El teléfono de la cita: el cuadro «Nuevo cliente» lo sugiere para dejarlo también en la ficha fiscal.
+            telefonoCita={telefono}
             retraso={200}
           />
         )}

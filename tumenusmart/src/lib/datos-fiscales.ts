@@ -91,3 +91,36 @@ export function validarDatosFiscales(
 
   return { ok: true, datos: { tipoIdentificacion: tipo, numeroIdentificacion: numero, razonSocial, email: email || null } };
 }
+
+// ---------------------------------------------------------------------------------------------------------------------
+//  Teléfono del cliente (opcional) que se deja junto con los datos de la factura
+// ---------------------------------------------------------------------------------------------------------------------
+
+export const TELEFONO_LARGO = { minimoDigitos: 6, maximoDigitos: 15, maximo: 20 };
+
+/**
+ * Lo que dejó el cliente como teléfono, con los espacios en orden (se guarda tal cual lo escribió, igual que el teléfono del cliente
+ * del mostrador: así la búsqueda por teléfono lo encuentra). Devuelve "" si no escribió nada o si no parece un teléfono — la
+ * pantalla avisa antes con `errorDelTelefono`; el servidor, que nunca da por bueno lo que llega, simplemente no lo guarda.
+ */
+export function limpiarTelefonoDeCliente(valor: unknown): string {
+  const texto = limpiarTexto(valor);
+  if (!texto) return "";
+  return errorDelTelefono(texto) ? "" : texto;
+}
+
+/** Por qué no sirve el teléfono escrito, o null si está vacío (es opcional) o está bien. */
+export function errorDelTelefono(valor: unknown): string | null {
+  const texto = limpiarTexto(valor);
+  if (!texto) return null;
+  const digitos = texto.replace(/\D/g, "");
+  if (
+    texto.length > TELEFONO_LARGO.maximo ||
+    !/^\+?[0-9()\- ]+$/.test(texto) ||
+    digitos.length < TELEFONO_LARGO.minimoDigitos ||
+    digitos.length > TELEFONO_LARGO.maximoDigitos
+  ) {
+    return "El teléfono no parece válido. Dejalo vacío si el cliente no quiso darlo.";
+  }
+  return null;
+}

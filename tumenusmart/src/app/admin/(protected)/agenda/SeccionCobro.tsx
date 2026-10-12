@@ -3,15 +3,16 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Campo, Entrada, Selector, clasesBoton } from "@/components/ui";
+import { Boton, Campo, clasesBoton } from "@/components/ui";
 import type { DatosCobro, EstadoCaja } from "@/lib/agenda-cita";
 import { formatearGuarani } from "@/lib/format";
 import { rutaParaAbrirTurno } from "@/lib/turno-requerido";
-import { TIPOS_IDENTIFICACION_FISCAL } from "@/lib/tipo-cliente";
+import { etiquetaCortaTipoIdentificacion } from "@/lib/tipo-cliente";
 import { FORMAS_PAGO_POS, type FormaPagoPos } from "@/lib/turno-pos";
 import { pareceRucConDigito } from "@/lib/sifen/ruc";
 import { buscarClientePorIdentificacion } from "../pos/actions";
 import { AvisoRucDnit, useVerificacionRuc } from "../pos/AvisoRucDnit";
+import { ClienteFiscalModal, type DatosClienteFiscal } from "../pos/ClienteFiscalModal";
 import { EntradaConLupa } from "../pos/EntradaConLupa";
 import { BloqueCita, Conmutador } from "./BloqueCita";
 import { IconoBillete } from "./IconosAgenda";
@@ -38,6 +39,7 @@ export function SeccionCobro({
   total,
   cobrando,
   porAdelantado,
+  telefonoCita = "",
   retraso = 0,
 }: {
   valor: DatosCobro;
@@ -48,13 +50,19 @@ export function SeccionCobro({
   cobrando: boolean;
   /** Si el turno todavía no llegó: se cobra por adelantado, el pago entra hoy y la cita queda confirmada. */
   porAdelantado: boolean;
+  /** El teléfono del cliente de la cita: el cuadro «Nuevo cliente» lo sugiere para dejarlo también en la ficha fiscal. */
+  telefonoCita?: string;
   /** Milisegundos que espera para entrar (las tarjetas del detalle entran una tras otra). */
   retraso?: number;
 }) {
   const router = useRouter();
   const [pagaCon, setPagaCon] = useState("");
   const [buscando, setBuscando] = useState(false);
-  const [avisoBusqueda, setAvisoBusqueda] = useState<string | null>(null);
+  // Resultado de la búsqueda por RUC/cédula: ya es cliente, o no existe y se lo crea con el cuadro «Nuevo cliente» (el mismo del
+  // mostrador, del comedor y del delivery).
+  const [encontrado, setEncontrado] = useState(false);
+  const [esNuevo, setEsNuevo] = useState(false);
+  const [modalCliente, setModalCliente] = useState(false);
   // El RUC del cliente contra la DNIT (existe / razón social / estado): una ayuda que solo frena si la DNIT lo va a rechazar.
   const { verificacion: verifRuc, verificando: verificandoRuc, verificar: verificarRuc, limpiar: limpiarVerifRuc } = useVerificacionRuc();
 
@@ -65,7 +73,8 @@ export function SeccionCobro({
     const numero = valor.numeroIdentificacion.trim();
     if (!numero) return;
     setBuscando(true);
-    setAvisoBusqueda(null);
+    setEncontrado(false);
+    setEsNuevo(false);
     try {
       const r = await buscarClientePorIdentificacion(numero);
       // Aunque ya sea cliente, se vuelve a mirar en la DNIT: su RUC pudo suspenderse desde la última vez. No espera ni frena la búsqueda.
@@ -75,15 +84,39 @@ export function SeccionCobro({
         limpiarVerifRuc();
       }
       if (r.ok) {
-        onCambio({ razonSocial: r.nombre, tipoIdentificacion: r.tipoIdentificacion });
-        setAvisoBusqueda("Cliente encontrado.");
+        onCambio({ razonSocial: r.nombre, tipoIdentificacion: r.tipoIdentificacion, telefono: "" });
+        setEncontrado(true);
       } else {
-        setAvisoBusqueda("No hay un cliente con ese número: completá los datos y se guarda al cobrar.");
+        onCambio({ razonSocial: "", telefono: "" });
+        setEsNuevo(true);
       }
     } catch {
-      setAvisoBusqueda("No se pudo buscar. Completá los datos a mano.");
+      // No se pudo buscar: se puede crear igual con el cuadro y completar los datos a mano.
+      setEsNuevo(true);
     }
     setBuscando(false);
+  }
+
+  /** Lo que se cargó en el cuadro «Nuevo cliente» pasa a los datos del cobro. */
+  function guardarClienteNuevo(datos: DatosClienteFiscal) {
+    onCambio({
+      numeroIdentificacion: datos.numeroIdentificacion,
+      tipoIdentificacion: datos.tipoIdentificacion,
+      razonSocial: datos.razonSocial,
+      email: datos.email,
+      telefono: datos.telefono,
+      rucBloqueado: null,
+    });
+    // El cuadro ya lo verificó (la respuesta quedó guardada unos minutos): acá se vuelve a mostrar el resultado bajo el campo.
+    limpiarVerifRuc();
+    if (datos.tipoIdentificacion === "ruc" && pareceRucConDigito(datos.numeroIdentificacion)) {
+      void verificarRuc(datos.numeroIdentificacion).then((v) =>
+        onCambio({ rucBloqueado: v?.bloquea ? (v.mensaje ?? "La DNIT no acepta facturas a ese RUC.") : null })
+      );
+    }
+    setEsNuevo(true);
+    setEncontrado(false);
+    setModalCliente(false);
   }
 
   return (
@@ -231,12 +264,14 @@ export function SeccionCobro({
               <p className="text-[0.8rem] text-tinta-media">Se factura a Consumidor Final (Sin Nombre).</p>
             ) : (
               <>
-                <Campo etiqueta="N° de RUC / Cédula">
+                <Campo etiqueta="N° de RUC / Cédula / etc.">
                   <EntradaConLupa
                     value={valor.numeroIdentificacion}
                     onChange={(e) => {
-                      onCambio({ numeroIdentificacion: e.target.value, rucBloqueado: null });
-                      setAvisoBusqueda(null);
+                      // Un número nuevo es otro cliente: lo que se había cargado del anterior no se arrastra.
+                      onCambio({ numeroIdentificacion: e.target.value, rucBloqueado: null, razonSocial: "", telefono: "" });
+                      setEncontrado(false);
+                      setEsNuevo(false);
                       limpiarVerifRuc();
                     }}
                     onBuscar={buscarCliente}
@@ -245,42 +280,86 @@ export function SeccionCobro({
                     placeholder="80012345-0"
                   />
                 </Campo>
-                {avisoBusqueda && <p className="-mt-1 text-[0.76rem] text-tinta-media">{avisoBusqueda}</p>}
                 <AvisoRucDnit verificacion={verifRuc} verificando={verificandoRuc} />
-                <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
-                  <Campo etiqueta="Tipo">
-                    <Selector
-                      value={valor.tipoIdentificacion}
-                      onChange={(e) => onCambio({ tipoIdentificacion: e.target.value })}
-                    >
-                      {TIPOS_IDENTIFICACION_FISCAL.map((t) => (
-                        <option key={t.valor} value={t.valor}>
-                          {t.etiqueta}
-                        </option>
-                      ))}
-                    </Selector>
-                  </Campo>
-                  <Campo etiqueta="Correo (opcional)">
-                    <Entrada
-                      type="email"
-                      value={valor.email}
-                      onChange={(e) => onCambio({ email: e.target.value })}
-                      placeholder="cliente@correo.com"
+                {encontrado ? (
+                  <div className="flex flex-col items-start gap-1 rounded-lg bg-white px-3 py-2">
+                    <DatoDelCliente etiqueta="Razón social" valor={valor.razonSocial} />
+                    <DatoDelCliente
+                      etiqueta={etiquetaCortaTipoIdentificacion(valor.tipoIdentificacion)}
+                      valor={valor.numeroIdentificacion.trim()}
                     />
-                  </Campo>
-                </div>
-                <Campo etiqueta="Nombre / Razón social">
-                  <Entrada
-                    value={valor.razonSocial}
-                    onChange={(e) => onCambio({ razonSocial: e.target.value })}
-                    placeholder="Nombre de la empresa o del titular"
-                  />
-                </Campo>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEncontrado(false);
+                        setEsNuevo(true);
+                      }}
+                      className="text-[0.76rem] font-medium text-brand-texto underline"
+                    >
+                      ¿No es este cliente?
+                    </button>
+                  </div>
+                ) : buscando ? (
+                  <p className="text-[0.74rem] text-tinta-suave">Buscando…</p>
+                ) : esNuevo ? (
+                  valor.razonSocial.trim() ? (
+                    <div className="flex flex-col items-start gap-1 rounded-lg bg-white px-3 py-2">
+                      <DatoDelCliente etiqueta="Razón social" valor={valor.razonSocial} />
+                      <DatoDelCliente
+                        etiqueta={etiquetaCortaTipoIdentificacion(valor.tipoIdentificacion)}
+                        valor={valor.numeroIdentificacion.trim()}
+                      />
+                      {valor.email && <DatoDelCliente etiqueta="Correo" valor={valor.email} />}
+                      {valor.telefono && <DatoDelCliente etiqueta="Teléfono" valor={valor.telefono} />}
+                      <button
+                        type="button"
+                        onClick={() => setModalCliente(true)}
+                        className="text-[0.76rem] font-medium text-brand-texto underline"
+                      >
+                        Editar datos
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <p className="text-[0.74rem] font-medium text-aviso">No existe ningún cliente con ese número.</p>
+                      <Boton tono="nuevo" tam="sm" onClick={() => setModalCliente(true)}>
+                        Crear cliente
+                      </Boton>
+                    </>
+                  )
+                ) : (
+                  <p className="text-[0.74rem] text-tinta-suave">
+                    Tocá la lupa (o Enter) para completar los datos si ya es cliente.
+                  </p>
+                )}
               </>
             )}
           </div>
         )}
       </div>
+
+      {/* El mismo cuadro «Nuevo cliente» del mostrador, el comedor y el delivery (se dibuja aparte, sobre toda la pantalla). */}
+      {modalCliente && (
+        <ClienteFiscalModal
+          numeroInicial={valor.numeroIdentificacion}
+          tipoInicial={valor.tipoIdentificacion}
+          razonSocialInicial={valor.razonSocial}
+          emailInicial={valor.email}
+          // Si el cliente ya dejó su teléfono en la cita, se sugiere el mismo, así no hay que volver a tipearlo.
+          telefonoInicial={valor.telefono || telefonoCita}
+          onCerrar={() => setModalCliente(false)}
+          onGuardar={guardarClienteNuevo}
+        />
+      )}
     </BloqueCita>
+  );
+}
+
+/** Una línea "Etiqueta: dato" del cliente, con la etiqueta apagada y el dato resaltado. */
+function DatoDelCliente({ etiqueta, valor }: { etiqueta: string; valor: string }) {
+  return (
+    <p className="text-[0.85rem] text-tinta">
+      <span className="text-tinta-suave">{etiqueta}:</span> <span className="font-medium">{valor}</span>
+    </p>
   );
 }

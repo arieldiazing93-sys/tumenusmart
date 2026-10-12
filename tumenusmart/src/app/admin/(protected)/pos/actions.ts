@@ -27,6 +27,7 @@ import { resolverDescuentoConTipos } from "@/lib/tipos-descuento";
 import { cargarTiposDescuento } from "@/lib/tipos-descuento-servidor";
 import { exigirAutorizacion } from "@/lib/seguridad-servidor";
 import { SIN_REGISTRO_FISCAL } from "@/lib/tipo-cliente";
+import { errorDelTelefono, limpiarTelefonoDeCliente } from "@/lib/datos-fiscales";
 import { SELECCION_PROMOCIONES, precioEnPosicion, segundoDeSemanaAsuncion, tramosDeFilas } from "@/lib/precio-promocion";
 import { aplicarPromociones } from "@/lib/promociones";
 import { cargarPromociones } from "@/lib/promociones-servidor";
@@ -141,6 +142,9 @@ export type DatosVenta = {
   /** Opcional — pensado para el día que se implemente la factura
    *  electrónica. No aplica si facturaTipoIdentificacion es "sin_nombre". */
   facturaEmail?: string;
+  /** Opcional — el teléfono que el cliente dejó en el cuadro «Nuevo cliente». Se guarda en su ficha junto con los datos fiscales
+   *  (y queda en la venta si no se cargó otro). No aplica si facturaTipoIdentificacion es "sin_nombre". */
+  facturaTelefono?: string;
   /** Descuento general de la cuenta (porcentaje o monto). Sin esto, o con valor 0, no hay descuento.
    *  El monto real lo calcula el servidor sobre el subtotal — ver calcularDescuento. */
   descuento?: DescuentoPedido;
@@ -290,6 +294,10 @@ export async function registrarVenta(turnoId: string, datos: DatosVenta): Promis
     }
     if (!esSinRegistroFiscal && datos.facturaEmail?.trim() && !datos.facturaEmail.includes("@")) {
       return { ok: false, error: "El correo electrónico no es válido." };
+    }
+    if (!esSinRegistroFiscal) {
+      const errorTelefono = errorDelTelefono(datos.facturaTelefono);
+      if (errorTelefono) return { ok: false, error: errorTelefono };
     }
     if (!puntoExpedicion) {
       return {
@@ -586,14 +594,18 @@ export async function registrarVenta(turnoId: string, datos: DatosVenta): Promis
   const registradoPor = sesion.nombre?.trim() || sesion.email;
   const tipoEntrega = datos.tipoEntrega === "llevar" ? "llevar" : "local";
   const clienteNombre = datos.clienteNombre.trim() || null;
-  const clienteTelefono = datos.clienteTelefono.trim() || null;
+  const telefonoDelMostrador = datos.clienteTelefono.trim() || null;
+  // El que el cliente dejó en «Nuevo cliente» (solo con registro fiscal): se guarda en SU ficha fiscal (upsertClienteFiscal) y
+  // además queda en la venta cuando no se cargó otro teléfono.
+  const telefonoFiscal = esFactura && !esSinRegistroFiscal ? limpiarTelefonoDeCliente(datos.facturaTelefono) : "";
+  const clienteTelefono = telefonoDelMostrador || telefonoFiscal || null;
   const nota = datos.nota.trim() || null;
 
-  if (clienteTelefono) {
+  if (telefonoDelMostrador) {
     await prisma.customer.upsert({
-      where: { storeId_telefono: { storeId, telefono: clienteTelefono } },
+      where: { storeId_telefono: { storeId, telefono: telefonoDelMostrador } },
       update: clienteNombre ? { nombre: clienteNombre } : {},
-      create: { storeId, nombre: clienteNombre || "Cliente de mostrador", telefono: clienteTelefono },
+      create: { storeId, nombre: clienteNombre || "Cliente de mostrador", telefono: telefonoDelMostrador },
     });
   }
 
@@ -614,6 +626,7 @@ export async function registrarVenta(turnoId: string, datos: DatosVenta): Promis
           numeroIdentificacion: datos.facturaNumeroIdentificacion!.trim(),
           razonSocial: datos.facturaRazonSocial!.trim(),
           email: datos.facturaEmail?.trim() ?? "",
+          telefono: telefonoFiscal,
         });
       }
 

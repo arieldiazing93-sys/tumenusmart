@@ -67,6 +67,8 @@ export function PagarCuentaPanel({
   const [razonSocial, setRazonSocial] = useState("");
   const [tipoId, setTipoId] = useState<string>(TIPOS_IDENTIFICACION_FISCAL[0].valor);
   const [email, setEmail] = useState("");
+  // El teléfono que dejó el cliente en «Nuevo cliente» (opcional): se guarda en su ficha al cobrar.
+  const [telefonoFiscal, setTelefonoFiscal] = useState("");
   const [encontrado, setEncontrado] = useState(false);
   const [esNuevo, setEsNuevo] = useState(false);
   const [buscando, setBuscando] = useState(false);
@@ -134,6 +136,7 @@ export function PagarCuentaPanel({
         setRazonSocial(r.nombre);
         setTipoId(r.tipoIdentificacion);
         setEmail("");
+        setTelefonoFiscal("");
         setEncontrado(true);
       } else {
         setRazonSocial("");
@@ -192,6 +195,7 @@ export function PagarCuentaPanel({
         facturaNumeroIdentificacion: conRegistro ? numero.trim() : undefined,
         facturaRazonSocial: conRegistro ? razonSocial : undefined,
         facturaEmail: conRegistro ? email.trim() || undefined : undefined,
+        facturaTelefono: conRegistro ? telefonoFiscal.trim() || undefined : undefined,
         // El cliente (si se cargó): a crédito es a quien se le cobra después; en cualquier venta con teléfono, la venta
         // cuenta para su ficha y su fidelización, igual que en el mostrador.
         clienteNombre,
@@ -536,6 +540,7 @@ export function PagarCuentaPanel({
                               setEsNuevo(false);
                               setEncontrado(false);
                               setEmail("");
+                              setTelefonoFiscal("");
                               limpiarVerifRuc();
                             }}
                             onBuscar={() => void buscarCliente()}
@@ -568,6 +573,7 @@ export function PagarCuentaPanel({
                               <DatoDelCliente etiqueta="Razón social" valor={razonSocial} />
                               <DatoDelCliente etiqueta={etiquetaCortaTipoIdentificacion(tipoId)} valor={numero.trim()} />
                               {email && <DatoDelCliente etiqueta="Correo" valor={email} />}
+                              {telefonoFiscal && <DatoDelCliente etiqueta="Teléfono" valor={telefonoFiscal} />}
                               <button
                                 type="button"
                                 onClick={() => setModalCliente(true)}
@@ -627,12 +633,17 @@ export function PagarCuentaPanel({
         <ClienteFiscalModal
           numeroInicial={numero}
           tipoInicial={tipoId}
+          razonSocialInicial={razonSocial}
+          emailInicial={email}
+          // Si ya se cargó el teléfono del cliente en el cobro, se sugiere el mismo, así no hay que volver a tipearlo.
+          telefonoInicial={telefonoFiscal || clienteTelefono}
           onCerrar={() => setModalCliente(false)}
           onGuardar={(datos: DatosClienteFiscal) => {
             setNumero(datos.numeroIdentificacion);
             setTipoId(datos.tipoIdentificacion);
             setRazonSocial(datos.razonSocial);
             setEmail(datos.email);
+            setTelefonoFiscal(datos.telefono);
             // El cuadro ya lo verificó (la respuesta quedó guardada unos minutos): acá se vuelve a mostrar el resultado bajo el campo.
             limpiarVerifRuc();
             if (datos.tipoIdentificacion === "ruc" && pareceRucConDigito(datos.numeroIdentificacion)) void verificarRuc(datos.numeroIdentificacion);

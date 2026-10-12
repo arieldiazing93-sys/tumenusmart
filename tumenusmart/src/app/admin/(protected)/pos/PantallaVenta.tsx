@@ -163,6 +163,8 @@ export function PantallaVenta({
     TIPOS_IDENTIFICACION_FISCAL[0].valor
   );
   const [facturaEmail, setFacturaEmail] = useState("");
+  // El teléfono que dejó el cliente en el cuadro «Nuevo cliente» (opcional): se guarda en su ficha al cobrar.
+  const [facturaTelefono, setFacturaTelefono] = useState("");
   const [clienteFiscalEsNuevo, setClienteFiscalEsNuevo] = useState(false);
   const [clienteFiscalEncontrado, setClienteFiscalEncontrado] = useState(false);
   const [buscandoClienteFiscal, setBuscandoClienteFiscal] = useState(false);
@@ -382,6 +384,7 @@ export function PantallaVenta({
       setFacturaRazonSocial(r.nombre);
       setFacturaTipoIdentificacionElegido(r.tipoIdentificacion);
       setFacturaEmail("");
+      setFacturaTelefono("");
       setClienteFiscalEncontrado(true);
     } else {
       setFacturaRazonSocial("");
@@ -406,6 +409,7 @@ export function PantallaVenta({
       setFacturaRazonSocial("");
       setFacturaNumeroIdentificacion("");
       setFacturaEmail("");
+      setFacturaTelefono("");
       setClienteFiscalEncontrado(false);
       setClienteFiscalEsNuevo(false);
       limpiarVerifRuc();
@@ -465,6 +469,7 @@ export function PantallaVenta({
       facturaNumeroIdentificacion: esFactura && !esSinRegistroFiscal ? facturaNumeroIdentificacion.trim() : undefined,
       facturaRazonSocial: esFactura && !esSinRegistroFiscal ? facturaRazonSocial : undefined,
       facturaEmail: esFactura && !esSinRegistroFiscal ? facturaEmail.trim() || undefined : undefined,
+      facturaTelefono: esFactura && !esSinRegistroFiscal ? facturaTelefono.trim() || undefined : undefined,
       descuento: descuentoPedido,
       creditoDias: esCredito ? creditoDias : undefined,
       personalId: personalAAsignar.length > 0 ? personalId : undefined,
@@ -606,6 +611,7 @@ export function PantallaVenta({
                 setClienteFiscalEsNuevo(false);
                 setClienteFiscalEncontrado(false);
                 setFacturaEmail("");
+                setFacturaTelefono("");
                 limpiarVerifRuc();
               }}
               onKeyDown={(e) => {
@@ -1097,6 +1103,7 @@ export function PantallaVenta({
                             setClienteFiscalEsNuevo(false);
                             setClienteFiscalEncontrado(false);
                             setFacturaEmail("");
+                            setFacturaTelefono("");
                             limpiarVerifRuc();
                           }}
                           onBuscar={buscarClienteFiscal}
@@ -1135,6 +1142,7 @@ export function PantallaVenta({
                               valor={facturaNumeroIdentificacion.trim()}
                             />
                             {facturaEmail && <DatoDelCliente etiqueta="Correo" valor={facturaEmail} />}
+                            {facturaTelefono && <DatoDelCliente etiqueta="Teléfono" valor={facturaTelefono} />}
                             <button
                               type="button"
                               onClick={() => setMostrarModalClienteFiscal(true)}
@@ -1299,12 +1307,17 @@ export function PantallaVenta({
         <ClienteFiscalModal
           numeroInicial={facturaNumeroIdentificacion}
           tipoInicial={facturaTipoIdentificacionElegido}
+          razonSocialInicial={facturaRazonSocial}
+          emailInicial={facturaEmail}
+          // Si ya se cargó el teléfono del cliente del mostrador, se sugiere el mismo, así no hay que volver a tipearlo.
+          telefonoInicial={facturaTelefono || clienteTelefono}
           onCerrar={() => setMostrarModalClienteFiscal(false)}
           onGuardar={(datos: DatosClienteFiscal) => {
             setFacturaNumeroIdentificacion(datos.numeroIdentificacion);
             setFacturaTipoIdentificacionElegido(datos.tipoIdentificacion);
             setFacturaRazonSocial(datos.razonSocial);
             setFacturaEmail(datos.email);
+            setFacturaTelefono(datos.telefono);
             // El cuadro ya lo verificó (la respuesta quedó guardada unos minutos): acá se vuelve a mostrar el resultado bajo el campo.
             limpiarVerifRuc();
             if (datos.tipoIdentificacion === "ruc" && pareceRucConDigito(datos.numeroIdentificacion)) void verificarRuc(datos.numeroIdentificacion);

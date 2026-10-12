@@ -51,9 +51,25 @@
     }
   }
 
+  // Una clave única compuesta de Prisma ({ storeId_telefono: { storeId, telefono } }) se aplana a sus campos. Solo si el valor es un
+  // objeto SIN operadores de filtro: los demás filtros ({ in }, { not }, { contains }…) se dejan como están.
+  const OPERADORES = ["in", "lte", "gt", "gte", "lt", "not", "contains", "equals", "startsWith", "endsWith", "mode", "some", "every", "none"];
+  function aplanar(donde) {
+    if (!donde) return donde;
+    const salida = {};
+    for (const [k, v] of Object.entries(donde)) {
+      const esCompuesta =
+        k !== "OR" && k !== "AND" && k.includes("_") && v !== null && typeof v === "object" && !(v instanceof Date) && !Array.isArray(v) &&
+        Object.keys(v).length > 0 && !Object.keys(v).some((o) => OPERADORES.includes(o));
+      if (esCompuesta) Object.assign(salida, v);
+      else salida[k] = v;
+    }
+    return salida;
+  }
+
   function delegado(nombre) {
     const filtrar = (args) => {
-      let filas = tabla(nombre).filter((f) => coincide(f, args && args.where));
+      let filas = tabla(nombre).filter((f) => coincide(f, aplanar(args && args.where)));
       const orden = args && args.orderBy;
       if (orden) {
         const [campo, sentido] = Object.entries(Array.isArray(orden) ? orden[0] : orden)[0];

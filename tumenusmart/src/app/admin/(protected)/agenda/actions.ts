@@ -556,6 +556,7 @@ export async function cobrarCita(citaId: string, datos: DatosCita, cobro: DatosC
     facturaNumeroIdentificacion: conRegistro ? String(cobro.numeroIdentificacion ?? "").trim() : undefined,
     facturaRazonSocial: conRegistro ? String(cobro.razonSocial ?? "").trim() : undefined,
     facturaEmail: conRegistro ? String(cobro.email ?? "").trim() || undefined : undefined,
+    facturaTelefono: conRegistro ? String(cobro.telefono ?? "").trim() || undefined : undefined,
     descuento:
       p.descuentoMonto > 0
         ? datos.descuento?.tipo === "porcentaje" && p.descuentoPorcentaje != null

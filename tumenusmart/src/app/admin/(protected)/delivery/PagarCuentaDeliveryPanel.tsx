@@ -71,6 +71,8 @@ export function PagarCuentaDeliveryPanel({
   const [razonSocial, setRazonSocial] = useState(ficha?.razon ?? "");
   const [tipoId, setTipoId] = useState<string>(ficha?.tipo ?? TIPOS_IDENTIFICACION_FISCAL[0].valor);
   const [email, setEmail] = useState(ficha?.email ?? "");
+  // El teléfono que dejó el cliente en «Nuevo cliente» (opcional): se guarda en su ficha al facturar.
+  const [telefonoFiscal, setTelefonoFiscal] = useState("");
   const [encontrado, setEncontrado] = useState(!!ficha);
   const [esNuevo, setEsNuevo] = useState(false);
   const [buscando, setBuscando] = useState(false);
@@ -119,6 +121,7 @@ export function PagarCuentaDeliveryPanel({
         setRazonSocial(r.nombre);
         setTipoId(r.tipoIdentificacion);
         setEmail("");
+        setTelefonoFiscal("");
         setEncontrado(true);
       } else {
         setRazonSocial("");
@@ -162,6 +165,7 @@ export function PagarCuentaDeliveryPanel({
         facturaNumeroIdentificacion: conRegistro ? numero.trim() : undefined,
         facturaRazonSocial: conRegistro ? razonSocial : undefined,
         facturaEmail: conRegistro ? email.trim() || undefined : undefined,
+        facturaTelefono: conRegistro ? telefonoFiscal.trim() || undefined : undefined,
         creditoDias: esCredito ? creditoDias : undefined,
         // Para que el servidor avise si la cuenta cambió mientras se cobraba.
         totalMostrado: total,
@@ -362,6 +366,7 @@ export function PagarCuentaDeliveryPanel({
                               setEsNuevo(false);
                               setEncontrado(false);
                               setEmail("");
+                              setTelefonoFiscal("");
                               limpiarVerifRuc();
                             }}
                             onBuscar={() => void buscarCliente()}
@@ -376,6 +381,7 @@ export function PagarCuentaDeliveryPanel({
                             <DatoDelCliente etiqueta="Razón social" valor={razonSocial} />
                             <DatoDelCliente etiqueta={etiquetaCortaTipoIdentificacion(tipoId)} valor={numero.trim()} />
                             {email && <DatoDelCliente etiqueta="Correo" valor={email} />}
+                            {telefonoFiscal && <DatoDelCliente etiqueta="Teléfono" valor={telefonoFiscal} />}
                             <button
                               type="button"
                               onClick={() => {
@@ -395,6 +401,7 @@ export function PagarCuentaDeliveryPanel({
                               <DatoDelCliente etiqueta="Razón social" valor={razonSocial} />
                               <DatoDelCliente etiqueta={etiquetaCortaTipoIdentificacion(tipoId)} valor={numero.trim()} />
                               {email && <DatoDelCliente etiqueta="Correo" valor={email} />}
+                              {telefonoFiscal && <DatoDelCliente etiqueta="Teléfono" valor={telefonoFiscal} />}
                               <button
                                 type="button"
                                 onClick={() => setModalCliente(true)}
@@ -452,12 +459,17 @@ export function PagarCuentaDeliveryPanel({
         <ClienteFiscalModal
           numeroInicial={numero}
           tipoInicial={tipoId}
+          razonSocialInicial={razonSocial}
+          emailInicial={email}
+          // El delivery ya conoce el teléfono del cliente: se sugiere ese, así no hay que volver a tipearlo.
+          telefonoInicial={telefonoFiscal || cuenta.clienteTelefono}
           onCerrar={() => setModalCliente(false)}
           onGuardar={(datos: DatosClienteFiscal) => {
             setNumero(datos.numeroIdentificacion);
             setTipoId(datos.tipoIdentificacion);
             setRazonSocial(datos.razonSocial);
             setEmail(datos.email);
+            setTelefonoFiscal(datos.telefono);
             // El cuadro ya lo verificó (la respuesta quedó guardada unos minutos): acá se vuelve a mostrar el resultado bajo el campo.
             limpiarVerifRuc();
             if (datos.tipoIdentificacion === "ruc" && pareceRucConDigito(datos.numeroIdentificacion)) void verificarRuc(datos.numeroIdentificacion);
