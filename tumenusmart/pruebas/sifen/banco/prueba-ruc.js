@@ -223,6 +223,10 @@
   nueva();
   t = await verificar("80069563-1", {}, "local-sin-certificado");
   ok(t.resultado === "no_disponible" && t.mensaje === null && !t.bloquea && t.rucCompleto === "80069563-1" && llamadas.length === 0, "un local sin certificado (no factura electrónico): no consulta y no muestra nada");
+  // Pero si la persona apretó «Verificar en la DNIT», se le dice por qué no hay datos (callarse parecía que no pasó nada).
+  nueva();
+  t = await verificar("80069563-1", { forzar: true }, "local-sin-certificado");
+  ok(t.resultado === "no_disponible" && !t.bloquea && /certificado digital/.test(t.mensaje) && /Facturación electrónica/.test(t.mensaje) && t.rucCompleto === "80069563-1" && llamadas.length === 0, "con el botón «Verificar»: dice que falta cargar el certificado y dónde, sin consultar ni frenar");
 
   // 8. certificado vencido y clave maestra ausente
   nueva();

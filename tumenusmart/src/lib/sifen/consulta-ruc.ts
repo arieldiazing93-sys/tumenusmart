@@ -82,8 +82,16 @@ export async function verificarRucEnLaDnit(storeId: string, entrada: string, opc
 
   try {
     const db = prismaDelLocal(storeId);
-    // Un local que no factura electrónico no tiene certificado: no hay con qué consultar y tampoco hay nada que avisar.
-    if ((await db.certificadoFirma.count({ where: { storeId, activo: true } })) === 0) return sinConsulta(null);
+    // Un local que no factura electrónico no tiene certificado: no hay con qué consultar. Al ir escribiendo el RUC no se muestra nada (no
+    // es una falla y un local así no quiere un cartel en cada venta); pero si la persona apretó «Verificar en la DNIT», callarse parece
+    // que el sistema no hizo nada: se le dice por qué no hay datos y qué falta.
+    if ((await db.certificadoFirma.count({ where: { storeId, activo: true } })) === 0) {
+      return sinConsulta(
+        opciones.forzar
+          ? "Todavía no se puede consultar la DNIT: este local no tiene cargado el certificado digital (se carga en Facturación electrónica). Se controló solo el dígito verificador: escribí la razón social a mano."
+          : null
+      );
+    }
 
     const config = await db.configFacturacionElectronica.findFirst({});
     const ambiente: AmbienteWs = config?.ambiente === "produccion" ? "produccion" : "pruebas";
