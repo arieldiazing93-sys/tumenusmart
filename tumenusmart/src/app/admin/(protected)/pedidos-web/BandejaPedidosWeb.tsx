@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Boton, Campo, Entrada, MensajeError, Pastilla, clasesBoton, type ColorEstado } from "@/components/ui";
+import { IconoWhatsapp } from "@/components/iconos";
 import { MaestroDetalle } from "@/components/MaestroDetalle";
 import { Segmentado } from "@/components/Segmentado";
 import { formatearGuarani, formatearNumero } from "@/lib/format";
@@ -320,9 +321,11 @@ function TarjetaPedido({
               href={`https://wa.me/${telefonoWa}?text=${encodeURIComponent(mensajeAlCliente)}`}
               target="_blank"
               rel="noopener noreferrer"
-              className={clasesBoton("navegar", "sm")}
+              // El verde de WhatsApp (el mismo del botón que ve el cliente): se reconoce de un vistazo qué abre.
+              className="inline-flex h-8 flex-none items-center justify-center gap-1.5 whitespace-nowrap rounded-lg bg-[#25D366] px-3 text-[0.82rem] font-semibold text-white transition-[opacity,transform] duration-150 hover:opacity-90 active:scale-[0.97]"
               title="Escribirle al cliente por WhatsApp con el enlace para seguir su pedido"
             >
+              <IconoWhatsapp tam={16} />
               WhatsApp
             </a>
           )}
