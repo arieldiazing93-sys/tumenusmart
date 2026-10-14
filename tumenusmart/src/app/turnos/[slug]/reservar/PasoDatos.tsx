@@ -46,18 +46,6 @@ export function PasoDatos({
   datos: DatosCliente;
   onCambiar: (parche: Partial<DatosCliente>) => void;
 }) {
-  const activo = (clave: string) => campos.find((c) => c.clave === clave && c.activo);
-  const pide = (clave: string) => {
-    const c = activo(clave);
-    return c ? { etiqueta: c.etiqueta, opcional: !c.obligatorio } : null;
-  };
-
-  const nombre = pide("nombre");
-  const apellido = pide("apellido");
-  const telefono = pide("telefono");
-  const email = pide("email");
-  const direccion = pide("direccion");
-
   return (
     <div>
       {/* ---------- resumen: con quién, cuándo, qué y cuánto, en una tarjeta con el color del negocio ---------- */}
@@ -112,6 +100,38 @@ export function PasoDatos({
         </div>
       </section>
 
+      <FormularioDatosCliente campos={campos} datos={datos} onCambiar={onCambiar} />
+    </div>
+  );
+}
+
+/**
+ * Los datos del cliente: solo los campos que el negocio pidió, y los que no son obligatorios marcados como opcionales.
+ * Lo comparten la reserva de turnos y la de canchas, así los dos formularios son siempre iguales.
+ */
+export function FormularioDatosCliente({
+  campos,
+  datos,
+  onCambiar,
+}: {
+  campos: CampoFormulario[];
+  datos: DatosCliente;
+  onCambiar: (parche: Partial<DatosCliente>) => void;
+}) {
+  const activo = (clave: string) => campos.find((c) => c.clave === clave && c.activo);
+  const pide = (clave: string) => {
+    const c = activo(clave);
+    return c ? { etiqueta: c.etiqueta, opcional: !c.obligatorio } : null;
+  };
+
+  const nombre = pide("nombre");
+  const apellido = pide("apellido");
+  const telefono = pide("telefono");
+  const email = pide("email");
+  const direccion = pide("direccion");
+
+  return (
+    <>
       {/* ---------- datos del cliente ---------- */}
       <h3 className="mb-3 mt-7 text-[1.1rem] font-semibold tracking-titular text-tinta">Tus datos</h3>
       <div className="flex flex-col gap-4">
@@ -221,6 +241,6 @@ export function PasoDatos({
             </label>
           ))}
       </div>
-    </div>
+    </>
   );
 }

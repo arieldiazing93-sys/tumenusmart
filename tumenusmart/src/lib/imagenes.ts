@@ -38,6 +38,7 @@ export async function imagenEnUso(ruta: string): Promise<boolean> {
     prisma.colaborador.findFirst({ where: { fotoUrl: { contains: ruta } }, select: { id: true } }),
     prisma.marcacionAsistencia.findFirst({ where: { fotoUrl: { contains: ruta } }, select: { id: true } }),
     prisma.paginaReservas.findFirst({ where: { OR: [{ fotoUrl: { contains: ruta } }, { bannerUrl: { contains: ruta } }] }, select: { storeId: true } }),
+    prisma.cancha.findFirst({ where: { fotoUrl: { contains: ruta } }, select: { id: true } }),
   ]);
   if (hallazgos.some((h) => h !== null)) return true;
 

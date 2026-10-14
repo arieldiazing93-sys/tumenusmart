@@ -287,6 +287,11 @@ model Store {
   paginaReservas   PaginaReservas?
   citaServicios    CitaServicio[]
 
+  // --- Reserva de canchas (complejos deportivos) ---
+  canchas          Cancha[]
+  reservasCancha   ReservaCancha[]
+  horariosCanchas  HorarioCanchas[]
+
   // --- Registro de asistencia ---
   colaboradores         Colaborador[]
   marcacionesAsistencia MarcacionAsistencia[]
@@ -2664,6 +2669,97 @@ model ServicioPersonal {
   @@unique([servicioId, personalId])
   @@index([storeId])
   @@index([personalId])
+}
+
+/// Una cancha de un complejo deportivo (fútbol 5, pádel, tenis…): lo que el cliente reserva por horas.
+/// Se desactiva en vez de borrarse (sus reservas viejas siguen mostrándose); solo se borra si nunca tuvo reservas.
+model Cancha {
+  id          String  @id @default(cuid())
+  storeId     String
+  store       Store   @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  /// Cómo la llama el negocio: "Cancha 1", "Pádel A".
+  nombre      String
+  /// El tipo: una clave de DEPORTES_CANCHA (src/lib/canchas.ts): futbol5, futbol7, padel, tenis…
+  deporte     String  @default("futbol5")
+  /// "Césped sintético", "Cemento", "Arena"… (texto libre, opcional).
+  superficie  String?
+  /// Cubierta (se juega aunque llueva).
+  techada     Boolean @default(false)
+  descripcion String?
+  fotoUrl     String?
+  /// Lo que cuesta una hora, en guaraníes.
+  precioHora  Decimal @db.Decimal(10, 2)
+  /// Tarifa de la hora de noche (la luz): rige desde `nocheDesde`. NULL = no hay tarifa de noche.
+  precioNocturnoHora Decimal? @db.Decimal(10, 2)
+  /// "HH:MM": desde qué hora rige la tarifa de noche.
+  nocheDesde  String  @default("18:00")
+  /// Las duraciones que se ofrecen al cliente, en minutos (60, 90, 120…).
+  duraciones  Int[]   @default([60, 90, 120])
+  /// Cada cuántos minutos arranca un horario: 30 (09:00, 09:30…) o 60 (09:00, 10:00…).
+  pasoMin     Int     @default(30)
+  activa      Boolean @default(true)
+  orden       Int     @default(0)
+  createdAt   DateTime @default(now())
+
+  reservas ReservaCancha[]
+
+  @@index([storeId])
+}
+
+/// Una reserva de cancha: un cliente con una cancha, de `inicio` a `fin`. Es lo que se ve en el calendario de canchas.
+model ReservaCancha {
+  id            String   @id @default(cuid())
+  storeId       String
+  store         Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  canchaId      String
+  cancha        Cancha   @relation(fields: [canchaId], references: [id])
+  /// El nombre de la cancha tal como era al reservar (así la reserva no cambia si después se la renombra).
+  canchaNombre  String
+  clienteNombre String
+  /// Internacional, solo dígitos (ej: 595984123456).
+  clienteTelefono String?
+  clienteEmail  String?
+  nota          String?
+  /// Respuestas a los campos extra del formulario: [{ clave, etiqueta, valor }].
+  extras        Json?
+  /// Instantes reales (UTC): en pantalla se muestran en hora de Asunción.
+  inicio        DateTime
+  fin           DateTime
+  duracionMin   Int
+  /// pendiente | proxima | finalizada | cancelada | no_asistio (los mismos de la agenda de turnos).
+  estado        String   @default("pendiente")
+  /// Lo que cuesta la reserva, en guaraníes (ya con la tarifa de noche si corresponde).
+  precio        Decimal  @db.Decimal(10, 2)
+  /// panel = la cargó el negocio; web = la pidió el cliente desde la página de reservas.
+  origen        String   @default("panel")
+  /// false = todavía no se ve en el calendario (esperando que el cliente mande el aviso por WhatsApp).
+  /// Sigue reservando el horario unos minutos (ver MINUTOS_BLOQUEO_SIN_CONFIRMAR).
+  visible       Boolean  @default(true)
+  createdAt     DateTime @default(now())
+
+  @@index([storeId, inicio])
+  @@index([canchaId, inicio])
+}
+
+/// El horario general del complejo para la Reserva de canchas: una fila por día de la semana, con si se abre ese día,
+/// de qué hora a qué hora y el descanso del medio. Mismas columnas que HorarioTrabajo (pero aparte: un complejo y un
+/// salón no comparten horario). Se guardan siempre los siete días juntos.
+model HorarioCanchas {
+  id             String  @id @default(cuid())
+  storeId        String
+  store          Store   @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  /// 0 = domingo, 1 = lunes ... 6 = sábado.
+  diaSemana      Int
+  trabaja        Boolean @default(true)
+  /// "HH:MM". Para cerrar a la medianoche se pone 23:59.
+  inicio         String  @default("08:00")
+  fin            String  @default("23:59")
+  descansa       Boolean @default(false)
+  descansoInicio String  @default("13:00")
+  descansoFin    String  @default("14:00")
+
+  @@unique([storeId, diaSemana])
+  @@index([storeId])
 }
 
 /// La página pública de reservas de un negocio de turnos (salón, barbería…).

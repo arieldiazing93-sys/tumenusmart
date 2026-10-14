@@ -104,6 +104,7 @@
     ["reservas/1-f.jpg", "paginaReservas", { storeId: "s1", fotoUrl: url("reservas/1-f.jpg"), bannerUrl: null, galeria: [] }],
     ["reservas/1-b.jpg", "paginaReservas", { storeId: "s1", fotoUrl: null, bannerUrl: url("reservas/1-b.jpg"), galeria: [] }],
     ["reservas/1-g.jpg", "paginaReservas", { storeId: "s1", fotoUrl: null, bannerUrl: null, galeria: [{ url: url("reservas/1-g.jpg"), descripcion: "" }] }],
+    ["reservas/1-cancha.jpg", "cancha", { id: "c1", fotoUrl: url("reservas/1-cancha.jpg") }],
   ];
   for (const [ruta, tabla, fila] of enUso) {
     reponer();

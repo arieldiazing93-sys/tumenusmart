@@ -84,10 +84,16 @@ function Palanca({
 export function EditorHorario({
   inicial,
   personalId = null,
+  guardar: guardarPropio,
+  nota,
 }: {
   inicial: HorarioDia[];
   /** null: el horario general del negocio; un id: el horario propio de esa persona. */
   personalId?: string | null;
+  /** Otra forma de guardar (la Reserva de canchas guarda en su propia tabla). Sin esto guarda el horario de trabajo de la agenda. */
+  guardar?: (dias: HorarioDia[]) => Promise<{ ok: true } | { ok: false; error: string }>;
+  /** El texto de ayuda de abajo, si no es el de siempre. */
+  nota?: string;
 }) {
   const router = useRouter();
   const [guardado, setGuardado] = useState(inicial);
@@ -144,7 +150,7 @@ export function EditorHorario({
     if (hayErrores) return;
     setError(null);
     iniciar(async () => {
-      const resultado = await guardarHorarioTrabajo(dias, personalId);
+      const resultado = guardarPropio ? await guardarPropio(dias) : await guardarHorarioTrabajo(dias, personalId);
       if (!resultado.ok) {
         setError(resultado.error);
         return;
@@ -246,8 +252,8 @@ export function EditorHorario({
       </div>
 
       <p className="text-[0.8rem] leading-snug text-tinta-suave">
-        Los días apagados quedan cerrados y las horas fuera del horario y el descanso se ven sombreados en el
-        calendario.
+        {nota ??
+          "Los días apagados quedan cerrados y las horas fuera del horario y el descanso se ven sombreados en el calendario."}
       </p>
 
       {recienGuardado && !hayCambios && (

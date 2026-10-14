@@ -23,7 +23,11 @@ const BOTON_QR =
  * pedir reseñas) y todo lo del WhatsApp: el número donde llegan las reservas,
  * si se avisa por WhatsApp y cuándo entra la reserva al calendario.
  */
-export function PerfilPagina({ datos, cambiar }: PropsSeccion) {
+export function PerfilPagina({
+  datos,
+  cambiar,
+  rutaPublica = "turnos",
+}: PropsSeccion & { rutaPublica?: "turnos" | "canchas" }) {
   // El dominio se lee recién en el navegador: en el servidor no se conoce.
   const [origen, setOrigen] = useState("");
   const [editandoDireccion, setEditandoDireccion] = useState(false);
@@ -40,7 +44,7 @@ export function PerfilPagina({ datos, cambiar }: PropsSeccion) {
     return () => clearTimeout(t);
   }, [copiado]);
 
-  const enlace = `${origen}/turnos/${datos.slug}`;
+  const enlace = `${origen}/${rutaPublica}/${datos.slug}`;
 
   async function copiar() {
     try {
@@ -160,7 +164,7 @@ export function PerfilPagina({ datos, cambiar }: PropsSeccion) {
                 ayuda="Solo letras, números y guiones. Si la cambiás, el link anterior deja de funcionar."
               >
                 <div className="flex items-center gap-1.5">
-                  <span className="flex-none text-[0.82rem] text-tinta-suave">/turnos/</span>
+                  <span className="flex-none text-[0.82rem] text-tinta-suave">/{rutaPublica}/</span>
                   <Entrada
                     value={datos.slug}
                     onChange={(e) =>

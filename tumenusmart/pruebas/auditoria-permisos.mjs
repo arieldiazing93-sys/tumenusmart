@@ -58,6 +58,16 @@ const EXCEPCIONES = {
     marcarCitaEnviada:
       "solo muestra una cita web ya creada, filtrando por id + local; el id no se puede adivinar",
   },
+  // La reserva pública de canchas: igual que la de turnos. El cliente no tiene cuenta; el local sale de la dirección de la
+  // página (nunca del navegador), la página tiene que estar habilitada y todo lo que llega se vuelve a verificar contra la base.
+  "src/app/canchas/[slug]/actions.ts": {
+    tableroDeCanchas: "solo lee: las horas libres de las canchas de ESE local, en una ventana de días",
+    crearReservaCanchaPublica:
+      "el cliente no tiene cuenta; crea la reserva en el local de la dirección, " +
+      "revisando de nuevo cancha, duración, hora libre y datos, y calculando el precio en el servidor",
+    marcarReservaCanchaEnviada:
+      "solo muestra una reserva web ya creada, filtrando por id + local; el id no se puede adivinar",
+  },
   // El envío del pedido desde el menú digital: el cliente no tiene cuenta. El local sale de la dirección del menú (nunca del
   // navegador) y tiene que tener encendidos los pedidos por el sistema; del navegador solo llega QUÉ eligió y el servidor recalcula
   // precios, zona y envío. Todo se revisa de nuevo, un reintento no duplica el pedido y hay un tope por teléfono y por dispositivo.

@@ -99,6 +99,43 @@ export function validarHorario(dias: HorarioDia[]): string | null {
   return null;
 }
 
+
+/**
+ * Lo que llega del navegador no se guarda tal cual: se revisa que sean los siete días, sin repetir, con horas bien
+ * escritas, y se arman objetos nuevos con solo los campos que corresponden. Lo usan el horario de la agenda y el del
+ * complejo de canchas (cada uno lo guarda en su propia tabla).
+ */
+export function sanearHorarioSemana(entrada: unknown): { ok: true; dias: HorarioDia[] } | { ok: false; error: string } {
+  const invalido = { ok: false as const, error: "El horario que llegó no es válido. Recargá la página e intentá de nuevo." };
+  if (!Array.isArray(entrada) || entrada.length !== 7) return invalido;
+
+  const dias: HorarioDia[] = [];
+  const vistos = new Set<number>();
+  for (const fila of entrada) {
+    if (!fila || typeof fila !== "object") return invalido;
+    const f = fila as Record<string, unknown>;
+    const diaSemana = f.diaSemana;
+    if (typeof diaSemana !== "number" || !Number.isInteger(diaSemana) || diaSemana < 0 || diaSemana > 6) return invalido;
+    if (vistos.has(diaSemana)) return invalido;
+    vistos.add(diaSemana);
+    if (typeof f.trabaja !== "boolean" || typeof f.descansa !== "boolean") return invalido;
+    if (![f.inicio, f.fin, f.descansoInicio, f.descansoFin].every(esHoraValida)) {
+      return { ok: false, error: `${nombreDeDia(diaSemana)}: hay una hora sin completar.` };
+    }
+    dias.push({
+      diaSemana,
+      trabaja: f.trabaja,
+      inicio: f.inicio as string,
+      fin: f.fin as string,
+      descansa: f.descansa,
+      descansoInicio: f.descansoInicio as string,
+      descansoFin: f.descansoFin as string,
+    });
+  }
+
+  const error = validarHorario(dias);
+  return error ? { ok: false, error } : { ok: true, dias };
+}
 // ---------------------------------------------------------------------------
 //  Para el calendario
 // ---------------------------------------------------------------------------

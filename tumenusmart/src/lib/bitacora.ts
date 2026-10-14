@@ -30,6 +30,7 @@ export const MODULOS_BITACORA = [
   { valor: "clientes", etiqueta: "Clientes" },
   { valor: "empleados", etiqueta: "Usuarios del sistema" },
   { valor: "agenda", etiqueta: "Agenda y turnos" },
+  { valor: "canchas", etiqueta: "Reserva de canchas" },
   { valor: "asistencia", etiqueta: "Asistencia" },
   { valor: "comedor", etiqueta: "Servicio comedor" },
   { valor: "delivery", etiqueta: "Servicio delivery" },

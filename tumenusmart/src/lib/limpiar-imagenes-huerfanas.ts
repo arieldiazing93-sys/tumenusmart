@@ -28,7 +28,7 @@ export type ResultadoLimpiezaImagenes = {
 
 /** Todas las rutas del almacenamiento que alguna fila usa, en el momento de la consulta. */
 async function rutasEnUso(): Promise<{ claves: Set<string>; cantidad: number }> {
-  const [tiendas, productos, clientes, personal, colaboradores, marcaciones, paginas] = await Promise.all([
+  const [tiendas, productos, clientes, personal, colaboradores, marcaciones, paginas, canchas] = await Promise.all([
     prisma.store.findMany({ where: { OR: [{ logoUrl: { not: null } }, { portadaUrl: { not: null } }] }, select: { logoUrl: true, portadaUrl: true } }),
     prisma.product.findMany({ where: { imagenUrl: { not: null } }, select: { imagenUrl: true } }),
     prisma.customer.findMany({ where: { fotoUrl: { not: null } }, select: { fotoUrl: true } }),
@@ -36,6 +36,7 @@ async function rutasEnUso(): Promise<{ claves: Set<string>; cantidad: number }> 
     prisma.colaborador.findMany({ where: { fotoUrl: { not: null } }, select: { fotoUrl: true } }),
     prisma.marcacionAsistencia.findMany({ where: { fotoUrl: { not: null } }, select: { fotoUrl: true } }),
     prisma.paginaReservas.findMany({ select: { fotoUrl: true, bannerUrl: true, galeria: true } }),
+    prisma.cancha.findMany({ where: { fotoUrl: { not: null } }, select: { fotoUrl: true } }),
   ]);
 
   const urls: Array<string | null> = [];
@@ -46,6 +47,7 @@ async function rutasEnUso(): Promise<{ claves: Set<string>; cantidad: number }> 
   for (const c of colaboradores) urls.push(c.fotoUrl);
   for (const m of marcaciones) urls.push(m.fotoUrl);
   for (const p of paginas) urls.push(p.fotoUrl, p.bannerUrl, ...urlsDeGaleria(p.galeria));
+  for (const c of canchas) urls.push(c.fotoUrl);
 
   // Se guarda la ruta completa Y el nombre suelto (que es único: lleva 96 bits al azar). Ser generoso acá es lo seguro: si una
   // dirección quedó con otra forma (otro servidor, otra carpeta), la imagen se conserva en vez de borrarse por error.

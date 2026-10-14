@@ -53,6 +53,11 @@ export type Permiso =
   // Armar la agenda: cargar y editar el personal (y más adelante horarios,
   // servicios y la página de reservas). Del dueño, como el resto de la configuración.
   | "agenda.configurar"
+  // --- reserva de canchas: la agenda de los complejos deportivos ---
+  // Ver el calendario de canchas, anotar reservas a mano y cambiarles el estado (el mostrador, igual que los turnos).
+  | "canchas.ver"
+  // Armar el complejo: las canchas y sus precios, el horario y la página pública de reservas. Del dueño.
+  | "canchas.configurar"
   // --- registro de asistencia: quién entró y salió, con foto. Del dueño: son datos del personal. ---
   | "asistencia.gestionar"
   // --- servicio comedor: el mozo carga las mesas desde su celular y la caja las opera ---
@@ -105,6 +110,7 @@ const PERMISOS_EMPLEADO: Permiso[] = [
   // Quien atiende el mostrador es quien anota y mueve los turnos, igual que
   // con las reservas de mesa.
   "agenda.ver",
+  "canchas.ver",
   "repartidores.ver",
   "pos.vender",
   // El cajero ve las mesas y opera la cuenta: es quien habla con el mozo. Lo que cargó el mozo y lo que hace la caja
@@ -148,6 +154,7 @@ const PERMISOS_LOCAL: Permiso[] = [
   "stock.ver",
   "stock.editar",
   "agenda.configurar",
+  "canchas.configurar",
   "asistencia.gestionar",
   // Quién puede ser mozo y la llave de su enlace: del dueño, como el resto de la configuración del personal.
   "comedor.configurar",

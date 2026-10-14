@@ -18,6 +18,10 @@ type Reserva = {
   cliente: string;
   servicios: string | null;
   personal: string;
+  /** Para las reservas de canchas: dónde es ("Cancha 1"), en vez del "con <persona>" de los turnos. */
+  lugar?: string;
+  /** A dónde lleva el botón Ver, si no es el calendario de turnos. */
+  enlace?: string;
   /** "YYYY-MM-DD" y "HH:MM" del turno. */
   dia: string;
   hora: string;
@@ -174,7 +178,7 @@ export function AvisoReservasNuevas() {
         setAvisos((previos) => [...nuevas, ...previos].slice(0, 10));
         if (sonidoRef.current) void sonar();
         // Con el calendario (o Citas) abierto, la reserva aparece sola.
-        if (rutaRef.current.startsWith("/admin/agenda")) router.refresh();
+        if (rutaRef.current.startsWith("/admin/agenda") || rutaRef.current.startsWith("/admin/canchas")) router.refresh();
       } catch {
         // Sin conexión un momento: se reintenta en el próximo ciclo.
       }
@@ -279,12 +283,12 @@ export function AvisoReservasNuevas() {
                   <p className="mt-0.5 truncate text-[0.95rem] font-semibold text-tinta">{a.cliente}</p>
                   {a.servicios && <p className="truncate text-[0.82rem] text-tinta-media">{a.servicios}</p>}
                   <p className="text-[0.8rem] text-tinta-suave">
-                    {a.cuando} · con {a.personal}
+                    {a.cuando} · {a.lugar ?? `con ${a.personal}`}
                   </p>
                 </div>
                 <div className="flex flex-none flex-col items-end gap-1.5">
                   <Link
-                    href={urlCita({ vista: "dia", fecha: a.dia, personal: null, ocultar: [] }, a.id)}
+                    href={a.enlace ?? urlCita({ vista: "dia", fecha: a.dia, personal: null, ocultar: [] }, a.id)}
                     scroll={false}
                     onClick={() => descartar(a.id)}
                     className={clasesBoton("navegar", "sm")}

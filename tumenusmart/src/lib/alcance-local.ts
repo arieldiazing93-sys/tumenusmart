@@ -71,6 +71,9 @@ export const MODELOS_POR_LOCAL = new Set([
   "ServicioPersonal",
   "PaginaReservas",
   "CitaServicio",
+  "Cancha",
+  "ReservaCancha",
+  "HorarioCanchas",
   "Colaborador",
   "MarcacionAsistencia",
   "Mozo",
@@ -199,6 +202,8 @@ export const SLUGS_RESERVADOS = new Set([
   "reservas",
   // /turnos/<dirección> es la página pública de reservas de los salones.
   "turnos",
+  // /canchas/<dirección> es la página pública de reservas de los complejos deportivos.
+  "canchas",
   // /personal/<id> es la vista de trabajo de cada persona del personal de un salón.
   "personal",
   // /asistencia/<llave> es el celular fijo del local donde el personal marca entrada y salida.

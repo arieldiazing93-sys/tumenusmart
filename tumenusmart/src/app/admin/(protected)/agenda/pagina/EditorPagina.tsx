@@ -35,7 +35,16 @@ const SECCIONES: { valor: Seccion; etiqueta: string }[] = [
  * En el celular el menú de secciones es una tira de botones que se desliza y el
  * perfil queda arriba de todo.
  */
-export function EditorPagina({ inicial, yaGuardada }: { inicial: DatosPagina; yaGuardada: boolean }) {
+export function EditorPagina({
+  inicial,
+  yaGuardada,
+  rutaPublica = "turnos",
+}: {
+  inicial: DatosPagina;
+  yaGuardada: boolean;
+  /** En qué dirección se ve la página: /turnos/<dirección> (Reserva de turnos) o /canchas/<dirección> (Reserva de canchas). */
+  rutaPublica?: "turnos" | "canchas";
+}) {
   const router = useRouter();
   const [guardado, setGuardado] = useState(inicial);
   const [datos, setDatos] = useState(inicial);
@@ -78,7 +87,7 @@ export function EditorPagina({ inicial, yaGuardada }: { inicial: DatosPagina; ya
     if (errorLocal) return;
     setError(null);
     iniciar(async () => {
-      const resultado = await guardarPaginaReservas(datos);
+      const resultado = await guardarPaginaReservas(datos, rutaPublica);
       if (!resultado.ok) {
         setError(resultado.error);
         return;
@@ -106,7 +115,7 @@ export function EditorPagina({ inicial, yaGuardada }: { inicial: DatosPagina; ya
       <div className="grid gap-4 lg:grid-cols-[22rem_minmax(0,1fr)] lg:items-start">
         {/* ---------- izquierda: perfil y menú de secciones ---------- */}
         <div className="flex flex-col gap-3">
-          <PerfilPagina datos={datos} cambiar={cambiar} />
+          <PerfilPagina datos={datos} cambiar={cambiar} rutaPublica={rutaPublica} />
 
           {/* Pantalla ancha: lista vertical. */}
           <nav aria-label="Secciones de la página" className="hidden rounded-xl border-2 border-azul/50 bg-superficie p-2 lg:block">

@@ -122,6 +122,24 @@ function armarGrupos(hayIdeaSinVer: boolean, rol: string, ventasACredito: boolea
       ],
     },
     {
+      // Para los complejos deportivos (fútbol, pádel, tenis…): el cliente reserva una cancha por horas desde la página
+      // pública. Es el espejo de "Reserva de turnos", pero lo que se agenda es una cancha y no una persona.
+      titulo: "Reserva de canchas",
+      secciones: [
+        { href: "/admin/canchas", label: "Calendario", icono: "reservas" as const,
+          ver: conPermiso("canchas.ver") },
+        // Las canchas del complejo: su tipo, su precio por hora y las duraciones que se ofrecen.
+        { href: "/admin/canchas/lista", label: "Canchas", icono: "productos" as const,
+          ver: conPermiso("canchas.configurar") },
+        // Qué días se abre y de qué hora a qué hora: es el horario de todas las canchas.
+        { href: "/admin/canchas/horario", label: "Horario del complejo", icono: "configuracion" as const,
+          ver: conPermiso("canchas.configurar") },
+        // La página pública donde el cliente reserva (/canchas/<dirección>): foto, redes, colores y el WhatsApp.
+        { href: "/admin/canchas/pagina", label: "Página de reservas", icono: "categorias" as const,
+          ver: conPermiso("canchas.configurar") },
+      ],
+    },
+    {
       // Control de asistencia del personal: marcan entrada, almuerzo y salida en un celular fijo del
       // local, con PIN y una prueba de persona real con la cámara. Acá el dueño ve lo marcado, da de
       // alta a las personas y saca el enlace del celular.
@@ -354,7 +372,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   // El aviso sonoro de reservas nuevas solo tiene sentido si el negocio tiene abierta su página pública de reservas
   // (si no, nunca entra una) y quien mira puede ver el calendario. Un local sin turnos no consulta nada.
   let avisarReservas = false;
-  if (localActualId && puede(sesion.rol, "agenda.ver")) {
+  if (localActualId && (puede(sesion.rol, "agenda.ver") || puede(sesion.rol, "canchas.ver"))) {
     avisarReservas = await prisma.paginaReservas
       .findUnique({ where: { storeId: localActualId }, select: { habilitada: true } })
       .then((pagina) => pagina?.habilitada === true)
