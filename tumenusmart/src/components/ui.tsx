@@ -448,9 +448,9 @@ export function Td({
 }
 
 /** Fila con realce al pasar por encima, para listas largas. */
-export function Tr({ children }: { children: ReactNode }) {
+export function Tr({ children, className = "" }: { children: ReactNode; className?: string }) {
   return (
-    <tr className="transition-colors duration-100 last:[&>td]:border-0 hover:bg-papel-suave">
+    <tr className={`transition-colors duration-100 last:[&>td]:border-0 hover:bg-papel-suave ${className}`}>
       {children}
     </tr>
   );

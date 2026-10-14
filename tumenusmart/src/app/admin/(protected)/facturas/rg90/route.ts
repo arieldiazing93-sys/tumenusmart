@@ -31,8 +31,10 @@ export async function GET(request: NextRequest) {
   if (!puede(sesion.rol, "pos.verHistorico")) return NextResponse.json({ error: "No autorizado" }, { status: 403 });
 
   const { searchParams } = new URL(request.url);
+  // A dónde se vuelve con el aviso si no se puede armar el archivo: a Contabilidad (de donde se pidió) o a Facturas.
+  const base = searchParams.get("volver") === "contabilidad" ? "/admin/contabilidad/rg90" : "/admin/facturas";
   const volver = (aviso: string, extra: Record<string, string> = {}) =>
-    NextResponse.redirect(new URL(`/admin/facturas?${new URLSearchParams({ rg90: aviso, ...extra })}`, request.url));
+    NextResponse.redirect(new URL(`${base}?${new URLSearchParams({ rg90: aviso, ...extra })}`, request.url));
 
   const mes = MES.exec(searchParams.get("mes") ?? "");
   if (!mes) return volver("mes_invalido");

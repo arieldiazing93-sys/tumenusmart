@@ -2,6 +2,8 @@ import { prismaDelLocal } from "./prisma-local";
 import { fechaAsuncionDesdeTexto, ZONA_NEGOCIO } from "./timezone";
 import { SIN_REGISTRO_FISCAL, TIPOS_IDENTIFICACION_FISCAL } from "./tipo-cliente";
 import { crearZip } from "./zip-simple";
+import { repartirEnEnteros } from "./enteros";
+import { montosDeCompra } from "./libro-iva";
 
 /**
  * Archivo de importación de comprobantes de VENTAS y de COMPRAS para el Sistema
@@ -28,7 +30,7 @@ import { crearZip } from "./zip-simple";
  *    exactamente la suma de gravado 10%, gravado 5% y exento.
  *  - Los RUC van sin dígito verificador.
  *  - No se incluyen comprobantes de e-Kuatia (SIFEN) ni de Comprobantes
- *    Virtuales: acá solo hay facturas autoimpresor, que es lo que se registra.
+ *    Virtuales: acá solo entran las facturas autoimpresor (las electrónicas se excluyen por su modalidad, ver armarRegistroRg90).
  *
  * Ventas: solo entran las facturas VIGENTES: el formato exige un total mayor a
  * cero y no tiene ningún campo para marcar un comprobante anulado, así que una
@@ -97,21 +99,8 @@ type FacturaBase = {
   aCredito: boolean;
 };
 
-/** Partes de un monto repartidas en enteros que suman justo el total redondeado. */
-export function repartirEnEnteros(partes: number[]): number[] {
-  const total = Math.round(partes.reduce((s, p) => s + p, 0));
-  const pisos = partes.map((p) => Math.floor(p));
-  let resto = total - pisos.reduce((s, p) => s + p, 0);
-  // Los enteros que faltan se reparten a las partes con más decimales.
-  const porDecimales = partes.map((p, i) => ({ i, dec: p - Math.floor(p) })).sort((a, b) => b.dec - a.dec);
-  const resultado = [...pisos];
-  for (const { i } of porDecimales) {
-    if (resto <= 0) break;
-    resultado[i] += 1;
-    resto -= 1;
-  }
-  return resultado;
-}
+// La cuenta de los enteros que suman justo el total vive en enteros.ts (la comparten el archivo RG 90 y los libros de IVA).
+export { repartirEnEnteros };
 
 /** El RUC sin su dígito verificador ("80012345-0" → "80012345"). */
 export function rucSinDv(ruc: string | null | undefined): string {
@@ -237,21 +226,10 @@ function armarFilaCompra(c: CompraBase, o: OpcionesRg90): { fila: string[] } | {
   const ruc = rucSinDv(c.rucProveedor).slice(0, 20);
   if (!ruc) faltan.push("el RUC del proveedor");
 
-  // Lo que se guardó de cada línea es neto, con el descuento de línea; el descuento
-  // general baja el neto de todas. Acá se lleva a lo que dice la factura: con IVA
-  // incluido, separado por tasa.
-  const factorGeneral = 1 - Math.min(Math.max(c.descuentoGeneralPorcentaje, 0), 100) / 100;
-  let neto10 = 0;
-  let neto5 = 0;
-  let netoExento = 0;
-  for (const item of c.items) {
-    const neto = item.subtotal * factorGeneral;
-    if (item.iva === "gravado10") neto10 += neto;
-    else if (item.iva === "gravado5") neto5 += neto;
-    else netoExento += neto;
-  }
-  // Enteros que suman justo el total (el formato exige total = suma de las tres partes).
-  const [g10, g5, exento] = repartirEnEnteros([neto10 * 1.1, neto5 * 1.05, netoExento]);
+  // Lo que se guardó de cada línea es neto, con el descuento de línea; el descuento general baja el neto de todas. Acá se lleva a lo
+  // que dice la factura: con IVA incluido, separado por tasa y en enteros que suman justo el total (el formato lo exige). Es la misma
+  // cuenta del Libro IVA Compras (ver libro-iva.ts), así que el archivo y el libro dan lo mismo.
+  const [g10, g5, exento] = montosDeCompra(c.items, c.descuentoGeneralPorcentaje);
   const total = g10 + g5 + exento;
   if (total <= 0) faltan.push("un total mayor a cero");
 
@@ -312,6 +290,8 @@ export async function armarRegistroRg90(storeId: string, o: OpcionesRg90): Promi
         facturaAnulada: false,
         estado: { not: "cancelado" },
         createdAt: { gte, lt },
+        // La factura ELECTRÓNICA (SIFEN) no va en este archivo: la DNIT ya la tiene por e-Kuatia y la trae sola a Marangatú.
+        comprobantes: { none: { modalidad: "electronico" } },
       },
       select: { createdAt: true, ...campos },
     }),
@@ -322,8 +302,9 @@ export async function armarRegistroRg90(storeId: string, o: OpcionesRg90): Promi
         facturaAnulada: false,
         cancelada: false,
         creadoEn: { gte, lt },
-        // La factura de un delivery emitida con la "factura rápida" se informa aparte, por su comprobante (ver más abajo).
-        comprobantes: { none: { cuentaDeliveryId: { not: null } } },
+        // La factura de un delivery emitida con la "factura rápida" se informa aparte, por su comprobante (ver más abajo). Y la
+        // factura ELECTRÓNICA (SIFEN) no va en este archivo: la DNIT ya la tiene por e-Kuatia (la especificación técnica lo prohíbe).
+        comprobantes: { none: { OR: [{ cuentaDeliveryId: { not: null } }, { modalidad: "electronico" }] } },
       },
       select: { creadoEn: true, formaPago: true, ...campos },
     }),
@@ -334,6 +315,8 @@ export async function armarRegistroRg90(storeId: string, o: OpcionesRg90): Promi
       where: {
         tipo: "factura",
         estado: "vigente",
+        // Solo las autoimpresor: las electrónicas (SIFEN) las trae la DNIT por e-Kuatia y no se importan.
+        modalidad: "autoimpresor",
         cuentaDeliveryId: { not: null },
         fechaEmision: { gte, lt },
       },

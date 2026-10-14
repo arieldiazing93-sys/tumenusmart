@@ -212,6 +212,21 @@ function armarGrupos(hayIdeaSinVer: boolean, rol: string, ventasACredito: boolea
       ],
     },
     {
+      // Lo que mira el contador: el libro de IVA de ventas y de compras, el resumen del IVA del mes y el registro RG 90 para Marangatú.
+      // Las ventas son del histórico del dueño; las compras (y por lo tanto el resumen) también piden Control de stock.
+      titulo: "Contabilidad",
+      secciones: [
+        { href: "/admin/contabilidad/libro-ventas", label: "Libro IVA ventas", icono: "estadisticas" as const,
+          ver: conPermiso("pos.verHistorico") },
+        { href: "/admin/contabilidad/libro-compras", label: "Libro IVA compras", icono: "estadisticas" as const,
+          ver: conPermiso("pos.verHistorico") && conPermiso("stock.ver") },
+        { href: "/admin/contabilidad/resumen-iva", label: "Resumen del IVA del mes", icono: "cierre" as const,
+          ver: conPermiso("pos.verHistorico") && conPermiso("stock.ver") },
+        { href: "/admin/contabilidad/rg90", label: "Registro RG 90", icono: "cierre" as const,
+          ver: conPermiso("pos.verHistorico") },
+      ],
+    },
+    {
       // Todo lo que hace falta configurar UNA VEZ para poder facturar (hoy
       // Estaciones, más adelante puntos de expedición y timbrados de la
       // Factura Autoimpresor) vive junto y separado de "Ajustes" —
