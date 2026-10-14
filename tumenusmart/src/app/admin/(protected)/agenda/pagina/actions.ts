@@ -37,14 +37,8 @@ export async function subirImagenPagina(formData: FormData): Promise<ResultadoIm
  * La dirección (/turnos/<slug>) es única entre todos los negocios, así que se
  * revisa que no la use otro.
  */
-export async function guardarPaginaReservas(
-  entrada: DatosPagina,
-  /** Desde qué módulo se edita: decide la dirección que se muestra en los mensajes (/turnos/… o /canchas/…). */
-  rutaPublica: "turnos" | "canchas" = "turnos"
-): Promise<ResultadoPagina> {
-  // Es la misma página pública de reservas del negocio: la edita quien configura la agenda o quien configura las canchas.
-  const sesion = await exigirPermiso(rutaPublica === "canchas" ? "canchas.configurar" : "agenda.configurar");
-  const ruta = rutaPublica === "canchas" ? "canchas" : "turnos";
+export async function guardarPaginaReservas(entrada: DatosPagina): Promise<ResultadoPagina> {
+  const sesion = await exigirPermiso("agenda.configurar");
   const storeId = await idLocalActual();
 
   const saneado = sanearDatosPagina(entrada);
@@ -55,7 +49,7 @@ export async function guardarPaginaReservas(
   // negocios, así que la búsqueda no puede limitarse al propio.
   const ocupada = await prisma.paginaReservas.findUnique({ where: { slug: d.slug }, select: { storeId: true } });
   if (ocupada && ocupada.storeId !== storeId) {
-    return { ok: false, error: `La dirección /${ruta}/${d.slug} ya la usa otro negocio. Elegí otra.` };
+    return { ok: false, error: `La dirección /turnos/${d.slug} ya la usa otro negocio. Elegí otra.` };
   }
 
   const anterior = await prisma.paginaReservas.findUnique({
@@ -95,7 +89,7 @@ export async function guardarPaginaReservas(
   } catch (err) {
     // Otro negocio tomó la misma dirección justo entre la revisión y el guardado.
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
-      return { ok: false, error: `La dirección /${ruta}/${d.slug} ya la usa otro negocio. Elegí otra.` };
+      return { ok: false, error: `La dirección /turnos/${d.slug} ya la usa otro negocio. Elegí otra.` };
     }
     throw err;
   }
@@ -114,10 +108,10 @@ export async function guardarPaginaReservas(
   if (!anterior) cambios.push("la creó");
   else {
     if (anterior.habilitada !== d.habilitada) cambios.push(d.habilitada ? "la habilitó" : "la deshabilitó");
-    if (anterior.slug !== d.slug) cambios.push(`cambió la dirección a /${ruta}/${d.slug}`);
+    if (anterior.slug !== d.slug) cambios.push(`cambió la dirección a /turnos/${d.slug}`);
   }
   await registrarBitacora(storeId, sesion, {
-    modulo: ruta === "canchas" ? "canchas" : "agenda",
+    modulo: "agenda",
     accion: "pagina_reservas_guardada",
     descripcion:
       cambios.length > 0
@@ -127,13 +121,8 @@ export async function guardarPaginaReservas(
     detalle: { slug: d.slug, habilitada: d.habilitada },
   });
 
-  revalidatePath(ruta === "canchas" ? "/admin/canchas/pagina" : "/admin/agenda/pagina");
-  // La misma página se ve en las dos direcciones: se refrescan las dos.
+  revalidatePath("/admin/agenda/pagina");
   revalidatePath(`/turnos/${d.slug}`);
-  revalidatePath(`/canchas/${d.slug}`);
-  if (anterior && anterior.slug !== d.slug) {
-    revalidatePath(`/turnos/${anterior.slug}`);
-    revalidatePath(`/canchas/${anterior.slug}`);
-  }
+  if (anterior && anterior.slug !== d.slug) revalidatePath(`/turnos/${anterior.slug}`);
   return { ok: true, slug: d.slug };
 }

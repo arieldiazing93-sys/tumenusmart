@@ -15,7 +15,9 @@ import {
 } from "@/lib/canchas";
 import {
   cargarCanchasPublicas,
+  cargarPaginaCanchasPublica,
   disponibilidadDeCanchas,
+  tableroDeCanchasDb,
   limpiarReservasCanchaSinEnviar,
 } from "@/lib/canchas-publicas";
 import { DIAS_ADELANTE, MINUTOS_BLOQUEO_SIN_CONFIRMAR } from "@/lib/disponibilidad";
@@ -23,7 +25,6 @@ import { aMinutos, esHoraValida } from "@/lib/horario-trabajo";
 import { completarCampos } from "@/lib/pagina-reservas";
 import { prisma } from "@/lib/prisma";
 import { DATOS_CLIENTE_VACIOS, validarDatosCliente, type DatosCliente } from "@/lib/reserva-cliente";
-import { cargarPaginaPublica } from "@/lib/reservas-publicas";
 import { claveDiaAsuncion, instanteAsuncionDesdeTexto } from "@/lib/timezone";
 import { construirLinkWhatsapp } from "@/lib/whatsapp";
 
@@ -65,17 +66,20 @@ export type ResultadoTablero =
       desde: string;
       /** Cuántos días trae (puede ser menos de la ventana si se llega al límite de días reservables). */
       dias: DisponibilidadPorDia;
+      /** Lo OCUPADO: los horarios que habría si no hubiera reservas y hoy una reserva pisa. Se muestran tachados, no desaparecen. */
+      ocupadas: DisponibilidadPorDia;
       /** El último día que cubre esta respuesta ("YYYY-MM-DD"). */
       hasta: string;
     }
   | { ok: false; error: string };
 
 /**
- * El tablero de la página: las horas libres de TODAS las canchas, para cada duración, en una ventana de días desde `desde`.
+ * El tablero de la página: las horas libres (y las ocupadas, para verlas tachadas) de TODAS las canchas, para cada duración,
+ * en una ventana de días desde `desde`.
  * Es lo que permite elegir "viernes, 21:00, hora y media" y ver de una qué canchas están libres. Solo lee.
  */
 export async function tableroDeCanchas(slug: string, desde: string): Promise<ResultadoTablero> {
-  const pagina = await cargarPaginaPublica(slug);
+  const pagina = await cargarPaginaCanchasPublica(slug);
   if (!pagina) return { ok: false, error: NO_DISPONIBLE };
 
   const ahora = new Date();
@@ -87,12 +91,13 @@ export async function tableroDeCanchas(slug: string, desde: string): Promise<Res
   if (inicio > ultimo) return { ok: false, error: "Esa fecha no está disponible." };
 
   const canchas = await cargarCanchasPublicas(prisma, pagina.storeId);
-  const disponibilidad = await disponibilidadDeCanchas(prisma, pagina.storeId, canchas, ahora);
+  const { libres, ocupadas } = await tableroDeCanchasDb(prisma, pagina.storeId, canchas, ahora);
   const cantidad = Math.min(DIAS_POR_VENTANA, DIAS_ADELANTE - diasEntre(hoy, inicio));
   return {
     ok: true,
     desde: inicio,
-    dias: ventanaDeDisponibilidad(disponibilidad, inicio, cantidad),
+    dias: ventanaDeDisponibilidad(libres, inicio, cantidad),
+    ocupadas: ventanaDeDisponibilidad(ocupadas, inicio, cantidad),
     hasta: claveSumarDias(inicio, cantidad - 1),
   };
 }
@@ -110,7 +115,7 @@ function diasEntre(a: string, b: string): number {
  * el aviso por WhatsApp (mientras tanto reserva el horario un rato, pero no se ve).
  */
 export async function crearReservaCanchaPublica(slug: string, datos: DatosReservaPublica): Promise<ResultadoReserva> {
-  const pagina = await cargarPaginaPublica(slug);
+  const pagina = await cargarPaginaCanchasPublica(slug);
   if (!pagina) return { ok: false, error: NO_DISPONIBLE };
   const storeId = pagina.storeId;
 
@@ -269,7 +274,7 @@ export async function marcarReservaCanchaEnviada(
   slug: string,
   reservaId: string
 ): Promise<{ ok: boolean; vencida?: boolean }> {
-  const pagina = await cargarPaginaPublica(slug);
+  const pagina = await cargarPaginaCanchasPublica(slug);
   if (!pagina || typeof reservaId !== "string" || !reservaId) return { ok: false };
   const storeId = pagina.storeId;
 

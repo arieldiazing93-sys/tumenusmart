@@ -1,10 +1,9 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { aMinutos, esHoraValida } from "@/lib/horario-trabajo";
-import { cargarCanchasPublicas } from "@/lib/canchas-publicas";
+import { cargarCanchasPublicas, cargarPaginaCanchasPublica } from "@/lib/canchas-publicas";
 import { completarCampos, normalizarTema } from "@/lib/pagina-reservas";
 import { prisma } from "@/lib/prisma";
-import { cargarPaginaPublica } from "@/lib/reservas-publicas";
 import { claveDiaAsuncion } from "@/lib/timezone";
 import { variablesDePagina } from "@/app/turnos/[slug]/marco";
 import { TableroReserva } from "./TableroReserva";
@@ -13,7 +12,7 @@ export const dynamic = "force-dynamic";
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const { slug } = await params;
-  const pagina = await cargarPaginaPublica(slug);
+  const pagina = await cargarPaginaCanchasPublica(slug);
   return { title: pagina ? `Reservar cancha — ${pagina.nombre}` : "Reservas" };
 }
 
@@ -34,7 +33,7 @@ export default async function ReservarCanchaPage({
 }) {
   const { slug } = await params;
   const sp = await searchParams;
-  const pagina = await cargarPaginaPublica(slug);
+  const pagina = await cargarPaginaCanchasPublica(slug);
   if (!pagina) notFound();
 
   const canchas = await cargarCanchasPublicas(prisma, pagina.storeId);

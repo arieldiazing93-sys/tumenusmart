@@ -237,6 +237,26 @@
   igual(c.ventanaDeDisponibilidad(new Map(), "2026-10-14", 14), {}, "sin canchas, vacío");
   igual(c.DIAS_POR_VENTANA, 14, "se piden de a catorce días");
 
+  // =============================================================== lo ocupado se ve tachado, no desaparece
+  window.log("== Canchas: lo ocupado (se muestra tachado)");
+  const tomada = [{ desde: h("20:00"), hasta: h("21:30") }];
+  const oc60 = c.horasOcupadasCancha({ horario: dia(1), ocupados: tomada, duracion: 60, paso: 30, minutoMinimo: 0 });
+  igual(oc60, [h("19:30"), h("20:00"), h("20:30"), h("21:00")], "con 1 hora: 19:30 (pisaría las 20:00), 20:00, 20:30 y 21:00");
+  const oc120 = c.horasOcupadasCancha({ horario: dia(1), ocupados: tomada, duracion: 120, paso: 30, minutoMinimo: 0 });
+  igual(oc120, [h("18:30"), h("19:00"), h("19:30"), h("20:00"), h("20:30"), h("21:00")], "con 2 horas empieza antes: 18:30 ya pisa");
+  igual(c.horasOcupadasCancha({ horario: dia(1), ocupados: [], duracion: 60, paso: 30, minutoMinimo: 0 }), [], "sin reservas no hay nada ocupado");
+  const libresOc = c.horasLibresCancha({ horario: dia(1), ocupados: tomada, duracion: 60, paso: 30, minutoMinimo: 0 });
+  ok(oc60.every((m) => !libresOc.includes(m)), "una hora nunca es libre y ocupada a la vez");
+  const todas = c.horasLibresCancha({ horario: dia(1), ocupados: [], duracion: 60, paso: 30, minutoMinimo: 0 });
+  igual([...libresOc, ...oc60].sort((a, b) => a - b), todas, "libres + ocupadas = todas las que habría sin reservas (ninguna desaparece)");
+  const antesDeAhora = c.horasOcupadasCancha({ horario: dia(1), ocupados: tomada, duracion: 60, paso: 30, minutoMinimo: h("20:15") });
+  igual(antesDeAhora, [h("20:30"), h("21:00")], "lo que ya pasó hoy no se muestra ni como ocupado");
+  igual(c.horasOcupadasCancha({ horario: dia(1, { trabaja: false }), ocupados: tomada, duracion: 60, paso: 30, minutoMinimo: 0 }), [], "un día cerrado no muestra nada");
+  const ocPeriodo = c.horasOcupadasDelPeriodoCancha({ horarios: semana(), ocupadosPorDia: new Map([["2026-10-15", tomada]]), duracion: 60, paso: 30, hoy: "2026-10-14", minutosAhora: 600 });
+  igual(Object.keys(ocPeriodo), ["2026-10-15"], "solo aparecen los días que tienen algo ocupado");
+  const ocDur = c.horasOcupadasPorDuracion({ horarios: semana(), ocupadosPorDia: new Map([["2026-10-15", tomada]]), duraciones: [60, 90, 120], paso: 30, hoy: "2026-10-14", minutosAhora: 600 });
+  ok(ocDur[120]["2026-10-15"].length > ocDur[60]["2026-10-15"].length, "una reserva más larga necesita más lugar: más horarios caen como ocupados");
+
   window.log("\naciertos: " + window.__aciertos + " · fallas: " + window.__fallas);
   window.__listo = true;
 })().catch((e) => { document.getElementById("salida").textContent += "\nERROR: " + (e && e.stack || e); window.__listo = true; window.__fallas = (window.__fallas || 0) + 1; });

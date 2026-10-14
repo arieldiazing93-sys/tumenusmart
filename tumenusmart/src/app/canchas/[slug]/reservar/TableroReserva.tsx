@@ -62,6 +62,8 @@ export function TableroReserva({
   const ultimoReservable = claveSumarDias(hoy, DIAS_ADELANTE - 1);
 
   const [dias, setDias] = useState<DisponibilidadPorDia>({});
+  // Lo OCUPADO (que una reserva ya tomó): se muestra tachado y en rojo, no desaparece.
+  const [ocupadas, setOcupadas] = useState<DisponibilidadPorDia>({});
   const [cubierto, setCubierto] = useState<string | null>(null);
   const [cargando, setCargando] = useState(true);
   const [errorCarga, setErrorCarga] = useState<string | null>(null);
@@ -80,6 +82,7 @@ export function TableroReserva({
 
   // Lo último cargado, para que las cargas que se encadenan no lean valores viejos.
   const diasRef = useRef<DisponibilidadPorDia>({});
+  const ocupadasRef = useRef<DisponibilidadPorDia>({});
   const cubiertoRef = useRef<string | null>(null);
   const yaPreseleccionado = useRef(false);
 
@@ -90,6 +93,7 @@ export function TableroReserva({
       setCargando(true);
       setErrorCarga(null);
       const acumulado: DisponibilidadPorDia = desdeCero ? {} : { ...diasRef.current };
+      const acumuladoOcupadas: DisponibilidadPorDia = desdeCero ? {} : { ...ocupadasRef.current };
       let ultimo: string | null = desdeCero ? null : cubiertoRef.current;
       let siguiente = ultimo ? claveSumarDias(ultimo, 1) : hoy;
       try {
@@ -100,6 +104,7 @@ export function TableroReserva({
             break;
           }
           Object.assign(acumulado, r.dias);
+          Object.assign(acumuladoOcupadas, r.ocupadas);
           ultimo = r.hasta;
           siguiente = claveSumarDias(r.hasta, 1);
         }
@@ -107,8 +112,10 @@ export function TableroReserva({
         setErrorCarga("No se pudieron cargar los horarios. Revisá tu conexión e intentá de nuevo.");
       }
       diasRef.current = acumulado;
+      ocupadasRef.current = acumuladoOcupadas;
       cubiertoRef.current = ultimo;
       setDias(acumulado);
+      setOcupadas(acumuladoOcupadas);
       setCubierto(ultimo);
       setCargando(false);
     },
@@ -142,6 +149,18 @@ export function TableroReserva({
   const horasDe = useCallback(
     (d: string, canchaId: string, minutos: number): number[] => dias[d]?.[canchaId]?.[minutos] ?? [],
     [dias]
+  );
+
+  /** Los horarios que una reserva ya tomó (con esa duración): son los que se ven tachados. */
+  const ocupadasDe = useCallback(
+    (d: string, canchaId: string, minutos: number): number[] => ocupadas[d]?.[canchaId]?.[minutos] ?? [],
+    [ocupadas]
+  );
+
+  /** ¿Ese día tiene algún horario (libre u ocupado) con la duración que se mira? Un día lleno igual se puede abrir a mirar. */
+  const diaConAlgo = useCallback(
+    (d: string) => delTipo.some((c) => horasDe(d, c.id, duracion).length > 0 || ocupadasDe(d, c.id, duracion).length > 0),
+    [delTipo, horasDe, ocupadasDe, duracion]
   );
 
   /** ¿Ese día tiene algún horario libre (con la duración que se mira, si `conDuracion`)? */
@@ -332,6 +351,9 @@ export function TableroReserva({
         <div className="mt-3 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none]" role="tablist" aria-label="Día">
           {listaDeDias.map((d) => {
             const hay = diaConHoras(d, false);
+            // Un día sin horarios libres pero con franjas tomadas está COMPLETO: se puede abrir a mirar (se ve todo tachado).
+            const completo =
+              !hay && delTipo.some((c) => c.duraciones.some((m) => ocupadasDe(d, c.id, m).length > 0));
             const elegido = d === dia;
             return (
               <button
@@ -340,14 +362,16 @@ export function TableroReserva({
                 type="button"
                 role="tab"
                 aria-selected={elegido}
-                disabled={!hay && !elegido}
+                disabled={!hay && !completo && !elegido}
                 onClick={() => setDia(d)}
                 className={`flex w-14 flex-none flex-col items-center gap-0.5 rounded-2xl px-1 py-2 transition-all ${
                   elegido
                     ? "bg-brand text-white shadow-media"
                     : hay
                       ? "bg-superficie text-tinta ring-1 ring-linea hover:ring-brand/60 active:scale-95"
-                      : "bg-papel-hundido/60 text-tinta-suave/60"
+                      : completo
+                        ? "bg-peligro-luz text-peligro ring-1 ring-peligro/30 active:scale-95"
+                        : "bg-papel-hundido/60 text-tinta-suave/60"
                 }`}
               >
                 <span className={`text-[0.64rem] font-semibold uppercase ${elegido ? "text-white/80" : "text-tinta-suave"}`}>
@@ -416,7 +440,13 @@ export function TableroReserva({
           </section>
         )}
 
-        <p className="mb-3 mt-4 text-[0.82rem] capitalize text-tinta-media">{diaLargo(dia)}</p>
+        <p className="mb-3 mt-4 flex flex-wrap items-center justify-between gap-x-3 text-[0.82rem] text-tinta-media">
+          <span className="capitalize">{diaLargo(dia)}</span>
+          <span className="inline-flex items-center gap-1.5 text-[0.74rem]">
+            <span aria-hidden="true" className="inline-block h-3 w-5 rounded bg-peligro-luz ring-1 ring-peligro/30" />
+            <span className="line-through decoration-peligro">Tachado</span> = ocupado
+          </span>
+        </p>
 
         {errorCarga && <p className="mb-3 rounded-xl bg-peligro-luz p-3.5 text-[0.88rem] text-peligro">{errorCarga}</p>}
 
@@ -431,7 +461,7 @@ export function TableroReserva({
               <li key={c.id} className="h-40 animate-pulse rounded-2xl bg-papel-hundido" />
             ))}
           </ul>
-        ) : !diaConHoras(dia, true) ? (
+        ) : !diaConAlgo(dia) ? (
           <div className="rounded-2xl border border-dashed border-linea bg-papel-suave px-5 py-9 text-center">
             <p className="text-[0.95rem] font-semibold text-tinta">No quedan horarios de {textoDuracionCancha(duracion)} este día</p>
             {diaConHoras(dia, false) ? (
@@ -454,6 +484,11 @@ export function TableroReserva({
               .filter((c) => c.duraciones.includes(duracion))
               .map((c) => {
                 const horas = horasDe(dia, c.id, duracion);
+                // Libres y ocupadas juntas, en orden de hora: lo ocupado no desaparece, se ve tachado.
+                const franjas = [
+                  ...horas.map((hora) => ({ hora, libre: true })),
+                  ...ocupadasDe(dia, c.id, duracion).map((hora) => ({ hora, libre: false })),
+                ].sort((a, b) => a.hora - b.hora);
                 const otrasDuraciones = c.duraciones.filter((m) => m !== duracion && horasDe(dia, c.id, m).length > 0);
                 return (
                   <li key={c.id} className="rounded-2xl bg-superficie p-3.5 shadow-sm ring-1 ring-linea">
@@ -481,33 +516,69 @@ export function TableroReserva({
                       </p>
                     </div>
 
-                    {horas.length > 0 ? (
-                      <div className="mt-3 grid grid-cols-4 gap-2 sm:grid-cols-5">
-                        {horas.map((h) => {
-                          const marcada = sel?.dia === dia && sel.canchaId === c.id && sel.hora === h;
-                          return (
-                            <button
-                              key={h}
-                              type="button"
-                              aria-pressed={marcada}
-                              onClick={() => {
-                                setSel({ dia, canchaId: c.id, hora: h });
-                                setError(null);
-                              }}
-                              className={`flex flex-col items-center rounded-xl px-1 py-2 transition-all active:scale-95 ${
-                                marcada
-                                  ? "bg-brand text-white shadow-media"
-                                  : "bg-papel-suave text-tinta ring-1 ring-linea hover:ring-brand/60"
-                              }`}
-                            >
-                              <span className="cifra text-[0.95rem] font-bold leading-tight">{horaDeMinutos(h)}</span>
-                              <span className={`cifra text-[0.64rem] ${marcada ? "text-white/80" : "text-tinta-suave"}`}>
-                                a {horaDeMinutos(h + duracion)}
-                              </span>
-                            </button>
-                          );
-                        })}
-                      </div>
+                    {franjas.length > 0 ? (
+                      <>
+                        <div className="mt-3 grid grid-cols-4 gap-2 sm:grid-cols-5">
+                          {franjas.map(({ hora: h, libre }) => {
+                            if (!libre) {
+                              // Una franja que ya tomó otra reserva: se ve, pero tachada y en rojo (no se puede elegir).
+                              return (
+                                <span
+                                  key={h}
+                                  role="img"
+                                  aria-label={`${horaDeMinutos(h)}, ocupado`}
+                                  title="Ocupado"
+                                  className="flex cursor-not-allowed flex-col items-center rounded-xl bg-peligro-luz px-1 py-2 text-peligro ring-1 ring-peligro/30"
+                                >
+                                  <span className="cifra text-[0.95rem] font-bold leading-tight line-through decoration-2">
+                                    {horaDeMinutos(h)}
+                                  </span>
+                                  <span className="text-[0.62rem] font-semibold uppercase tracking-wide">Ocupado</span>
+                                </span>
+                              );
+                            }
+                            const marcada = sel?.dia === dia && sel.canchaId === c.id && sel.hora === h;
+                            return (
+                              <button
+                                key={h}
+                                type="button"
+                                aria-pressed={marcada}
+                                onClick={() => {
+                                  setSel({ dia, canchaId: c.id, hora: h });
+                                  setError(null);
+                                }}
+                                className={`flex flex-col items-center rounded-xl px-1 py-2 transition-all active:scale-95 ${
+                                  marcada
+                                    ? "bg-brand text-white shadow-media"
+                                    : "bg-papel-suave text-tinta ring-1 ring-linea hover:ring-brand/60"
+                                }`}
+                              >
+                                <span className="cifra text-[0.95rem] font-bold leading-tight">{horaDeMinutos(h)}</span>
+                                <span className={`cifra text-[0.64rem] ${marcada ? "text-white/80" : "text-tinta-suave"}`}>
+                                  a {horaDeMinutos(h + duracion)}
+                                </span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                        {horas.length === 0 && (
+                          <p className="mt-2.5 text-[0.8rem] font-medium text-peligro">
+                            Completa este día para {textoDuracionCancha(duracion)}.
+                            {otrasDuraciones.length > 0 && (
+                              <>
+                                {" "}
+                                <button
+                                  type="button"
+                                  onClick={() => setDuracionElegida(otrasDuraciones[0])}
+                                  className="font-semibold text-brand-texto underline"
+                                >
+                                  Ver {textoDuracionCancha(otrasDuraciones[0])}
+                                </button>
+                              </>
+                            )}
+                          </p>
+                        )}
+                      </>
                     ) : (
                       <p className="mt-3 rounded-xl bg-papel-hundido/60 px-3 py-2.5 text-[0.82rem] text-tinta-media">
                         Sin horarios de {textoDuracionCancha(duracion)} este día.

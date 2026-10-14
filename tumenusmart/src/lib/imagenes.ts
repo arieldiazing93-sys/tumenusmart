@@ -39,11 +39,15 @@ export async function imagenEnUso(ruta: string): Promise<boolean> {
     prisma.marcacionAsistencia.findFirst({ where: { fotoUrl: { contains: ruta } }, select: { id: true } }),
     prisma.paginaReservas.findFirst({ where: { OR: [{ fotoUrl: { contains: ruta } }, { bannerUrl: { contains: ruta } }] }, select: { storeId: true } }),
     prisma.cancha.findFirst({ where: { fotoUrl: { contains: ruta } }, select: { id: true } }),
+    prisma.paginaCanchas.findFirst({ where: { OR: [{ fotoUrl: { contains: ruta } }, { bannerUrl: { contains: ruta } }] }, select: { storeId: true } }),
   ]);
   if (hallazgos.some((h) => h !== null)) return true;
 
   // La galería es una lista dentro de una columna: no se puede buscar con un filtro, se mira en memoria (una fila por local).
-  const paginas = await prisma.paginaReservas.findMany({ select: { galeria: true } });
+  const paginas = [
+    ...(await prisma.paginaReservas.findMany({ select: { galeria: true } })),
+    ...(await prisma.paginaCanchas.findMany({ select: { galeria: true } })),
+  ];
   return paginas.some((p) => urlsDeGaleria(p.galeria).some((u) => (rutaEnUsoDeUrl(u) ?? "") === ruta));
 }
 

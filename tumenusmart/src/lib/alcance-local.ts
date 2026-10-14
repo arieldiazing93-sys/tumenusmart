@@ -70,6 +70,7 @@ export const MODELOS_POR_LOCAL = new Set([
   "ServicioAgenda",
   "ServicioPersonal",
   "PaginaReservas",
+  "PaginaCanchas",
   "CitaServicio",
   "Cancha",
   "ReservaCancha",

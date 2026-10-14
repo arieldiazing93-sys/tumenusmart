@@ -188,7 +188,8 @@ export function ReservaConfirmada({
                   // Sin conexión con el servidor: el cliente igual llega a WhatsApp, y el complejo tiene el mensaje.
                 });
             }}
-            className="flex h-14 w-full items-center justify-center gap-2.5 rounded-2xl bg-brand text-[1rem] font-semibold text-white shadow-alta transition-all hover:bg-brand-dark active:scale-[0.98]"
+            // El verde de WhatsApp (el mismo en todo el sistema), no el color del negocio: es lo que el cliente reconoce de una.
+            className="flex h-14 w-full items-center justify-center gap-2.5 rounded-2xl bg-[#25D366] text-[1rem] font-semibold text-white shadow-alta transition-all hover:opacity-90 active:scale-[0.98]"
           >
             <IconoWhatsapp tam={20} />
             {enviado ? "Volver a abrir WhatsApp" : "Enviar por WhatsApp"}

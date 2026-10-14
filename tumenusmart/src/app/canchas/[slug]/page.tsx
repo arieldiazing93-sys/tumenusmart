@@ -30,7 +30,7 @@ export const dynamic = "force-dynamic";
 
 /** Se busca una sola vez por visita, aunque la use la página y sus metadatos. */
 const cargarPagina = cache(async (slug: string) => {
-  return prisma.paginaReservas.findUnique({
+  return prisma.paginaCanchas.findUnique({
     where: { slug: slug.toLowerCase() },
     include: { store: { select: { estado: true, vencimiento: true } } },
   });
@@ -50,7 +50,7 @@ const SUMMARY =
   "flex cursor-pointer list-none items-center gap-2 px-4 py-4 text-[0.95rem] font-semibold text-tinta [&::-webkit-details-marker]:hidden";
 
 /** Un botón de contacto: una píldora con su icono y su nombre al lado. */
-type Contacto = { nombre: string; href: string; icono: ReactNode; externo: boolean };
+type Contacto = { nombre: string; href: string; icono: ReactNode; externo: boolean; color: string };
 
 /** "08:00 – 24:00", o "Cerrado". */
 function textoDelDia(h: HorarioDia | undefined): string {
@@ -119,22 +119,22 @@ export default async function PaginaPublicaCanchas({ params }: { params: Promise
     : null;
   const contactos: Contacto[] = [];
   if (enlaceWhatsapp) {
-    contactos.push({ nombre: "WhatsApp", href: enlaceWhatsapp, icono: <IconoWhatsappLinea tam={18} />, externo: true });
+    contactos.push({ nombre: "WhatsApp", href: enlaceWhatsapp, icono: <IconoWhatsappLinea tam={18} />, externo: true, color: "text-[#25D366]" });
   }
   if (pagina.telefono) {
-    contactos.push({ nombre: "Llamar", href: `tel:+${pagina.telefono}`, icono: <IconoTelefono tam={18} />, externo: false });
+    contactos.push({ nombre: "Llamar", href: `tel:+${pagina.telefono}`, icono: <IconoTelefono tam={18} />, externo: false, color: "text-brand-texto" });
   }
   if (pagina.email) {
-    contactos.push({ nombre: "Correo", href: `mailto:${pagina.email}`, icono: <IconoCorreo tam={18} />, externo: false });
+    contactos.push({ nombre: "Correo", href: `mailto:${pagina.email}`, icono: <IconoCorreo tam={18} />, externo: false, color: "text-brand-texto" });
   }
   if (pagina.instagram) {
-    contactos.push({ nombre: "Instagram", href: pagina.instagram, icono: <IconoInstagram tam={18} />, externo: true });
+    contactos.push({ nombre: "Instagram", href: pagina.instagram, icono: <IconoInstagram tam={18} />, externo: true, color: "text-[#E1306C]" });
   }
   if (pagina.tiktok) {
-    contactos.push({ nombre: "TikTok", href: pagina.tiktok, icono: <IconoTiktok tam={18} />, externo: true });
+    contactos.push({ nombre: "TikTok", href: pagina.tiktok, icono: <IconoTiktok tam={18} />, externo: true, color: "text-tinta" });
   }
   if (pagina.facebook) {
-    contactos.push({ nombre: "Facebook", href: pagina.facebook, icono: <IconoFacebook tam={18} />, externo: true });
+    contactos.push({ nombre: "Facebook", href: pagina.facebook, icono: <IconoFacebook tam={18} />, externo: true, color: "text-[#1877F2]" });
   }
 
   return (
@@ -279,7 +279,7 @@ export default async function PaginaPublicaCanchas({ params }: { params: Promise
                     {...(a.externo ? { target: "_blank", rel: "noopener noreferrer" } : {})}
                     className="inline-flex items-center gap-2 rounded-full bg-superficie px-3.5 py-2 text-[0.84rem] font-semibold text-tinta shadow-sm ring-1 ring-linea transition-all hover:ring-brand active:scale-95"
                   >
-                    <span className="text-brand-texto">{a.icono}</span>
+                    <span className={a.color}>{a.icono}</span>
                     {a.nombre}
                   </a>
                 </li>

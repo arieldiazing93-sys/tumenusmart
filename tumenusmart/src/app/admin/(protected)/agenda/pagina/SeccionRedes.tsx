@@ -24,7 +24,22 @@ const REDES: {
  * enlace completo o solo escribir el usuario. El de WhatsApp no se carga acá:
  * usa el número donde se reciben las reservas.
  */
-export function SeccionRedes({ datos, cambiar }: PropsSeccion) {
+/** El color de cada plataforma, para los iconos (cuando el editor lo pide). */
+const COLOR_DE_MARCA: Record<RedSocial | "whatsapp", string> = {
+  instagram: "text-[#E1306C]",
+  tiktok: "text-black",
+  facebook: "text-[#1877F2]",
+  whatsapp: "text-[#25D366]",
+};
+
+export function SeccionRedes({
+  datos,
+  cambiar,
+  coloresDeMarca = false,
+}: PropsSeccion & {
+  /** Cada icono con el color de su plataforma (Instagram rosado, TikTok negro, Facebook azul, WhatsApp verde). */
+  coloresDeMarca?: boolean;
+}) {
   const numero = normalizarTelefonoPersonal(datos.whatsappPais, datos.whatsapp);
 
   function cambiarRed(red: RedSocial, valor: string) {
@@ -46,7 +61,12 @@ export function SeccionRedes({ datos, cambiar }: PropsSeccion) {
         <label key={clave} className="block">
           <span className="mb-1.5 block text-[0.82rem] font-semibold text-tinta">Enlace de {etiqueta}</span>
           <div className="relative">
-            <Icono tam={18} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-tinta-suave" />
+            <Icono
+              tam={18}
+              className={`pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 ${
+                coloresDeMarca ? COLOR_DE_MARCA[clave] : "text-tinta-suave"
+              }`}
+            />
             <Entrada
               value={datos[clave]}
               onChange={(e) => cambiarRed(clave, e.target.value)}
@@ -63,7 +83,7 @@ export function SeccionRedes({ datos, cambiar }: PropsSeccion) {
       ))}
 
       <div className="flex items-start gap-3 rounded-lg border border-linea bg-papel-suave p-3">
-        <IconoWhatsapp tam={20} className="mt-0.5 text-exito" />
+        <IconoWhatsapp tam={20} className={`mt-0.5 ${coloresDeMarca ? COLOR_DE_MARCA.whatsapp : "text-exito"}`} />
         <div className="min-w-0">
           <p className="text-[0.86rem] font-semibold text-tinta">WhatsApp</p>
           <p className="text-[0.8rem] leading-snug text-tinta-media">

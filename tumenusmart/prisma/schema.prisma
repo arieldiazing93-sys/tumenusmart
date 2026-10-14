@@ -285,6 +285,7 @@ model Store {
   serviciosAgenda  ServicioAgenda[]
   serviciosPersonal ServicioPersonal[]
   paginaReservas   PaginaReservas?
+  paginaCanchas    PaginaCanchas?
   citaServicios    CitaServicio[]
 
   // --- Reserva de canchas (complejos deportivos) ---
@@ -2760,6 +2761,51 @@ model HorarioCanchas {
 
   @@unique([storeId, diaSemana])
   @@index([storeId])
+}
+
+/// La página pública de un complejo deportivo (Reserva de canchas): /canchas/<dirección>.
+/// Es INDEPENDIENTE de la página de la Reserva de turnos (PaginaReservas): tiene su propia portada, nombre, contacto,
+/// redes, galería, colores y campos del formulario. Guardar una nunca toca la otra. Una por local.
+model PaginaCanchas {
+  id      String  @id @default(cuid())
+  storeId String  @unique
+  store   Store   @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  /// La dirección pública: /canchas/<slug>. Única entre todos los complejos.
+  slug    String  @unique
+  /// Interruptor "Habilitar la reserva en línea": apagada, la página no se ve.
+  habilitada Boolean @default(false)
+  nombre  String
+  /// El rubro que se muestra debajo del nombre ("Barbershop", "Salón de belleza").
+  industria   String?
+  descripcion String?
+  email       String?
+  /// Internacional, solo dígitos (ej: 595984123456).
+  telefono    String?
+  fotoUrl     String?
+  bannerUrl   String?
+  /// Enlaces completos (https://…).
+  instagram String?
+  tiktok    String?
+  facebook  String?
+  /// El número donde llegan las reservas, internacional y solo dígitos.
+  whatsapp      String?
+  /// Si el cliente, al reservar, manda el aviso por WhatsApp a ese número.
+  avisoWhatsapp Boolean @default(true)
+  /// Cuándo entra la reserva al calendario: al_reservar | al_enviar_whatsapp.
+  entradaCalendario String @default("al_reservar")
+  /// Hasta 5 fotos: [{ "url": "https://…", "descripcion": "…" }].
+  galeria Json @default("[]")
+  /// Enlace a la ficha de Google Maps del negocio, para el QR de "dejanos tu reseña".
+  googleMapsUrl String?
+  /// El color de la página, "#RRGGBB".
+  colorPrimario String @default("#3B82F6")
+  /// claro | oscuro | sistema.
+  tema    String @default("claro")
+  /// Los campos del formulario de reserva y cuáles son obligatorios
+  /// (ver src/lib/pagina-reservas.ts).
+  campos  Json   @default("[]")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 /// La página pública de reservas de un negocio de turnos (salón, barbería…).

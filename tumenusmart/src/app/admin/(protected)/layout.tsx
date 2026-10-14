@@ -372,11 +372,23 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   // El aviso sonoro de reservas nuevas solo tiene sentido si el negocio tiene abierta su página pública de reservas
   // (si no, nunca entra una) y quien mira puede ver el calendario. Un local sin turnos no consulta nada.
   let avisarReservas = false;
-  if (localActualId && (puede(sesion.rol, "agenda.ver") || puede(sesion.rol, "canchas.ver"))) {
-    avisarReservas = await prisma.paginaReservas
-      .findUnique({ where: { storeId: localActualId }, select: { habilitada: true } })
-      .then((pagina) => pagina?.habilitada === true)
-      .catch(() => false);
+  if (localActualId) {
+    // Cada calendario tiene SU página pública: se avisa si alguna de las que quien mira puede ver está abierta.
+    const [turnos, canchas] = await Promise.all([
+      puede(sesion.rol, "agenda.ver")
+        ? prisma.paginaReservas
+            .findUnique({ where: { storeId: localActualId }, select: { habilitada: true } })
+            .then((pagina) => pagina?.habilitada === true)
+            .catch(() => false)
+        : false,
+      puede(sesion.rol, "canchas.ver")
+        ? prisma.paginaCanchas
+            .findUnique({ where: { storeId: localActualId }, select: { habilitada: true } })
+            .then((pagina) => pagina?.habilitada === true)
+            .catch(() => false)
+        : false,
+    ]);
+    avisarReservas = turnos || canchas;
   }
 
   // La impresión automática de comandas (Servicio comedor) corre en el navegador de la caja, en cualquier sección del panel.

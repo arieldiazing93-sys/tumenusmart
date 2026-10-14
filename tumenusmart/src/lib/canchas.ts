@@ -650,3 +650,64 @@ export function ventanaDeDisponibilidad(
   }
   return salida;
 }
+
+// ---------------------------------------------------------------------------
+//  Lo ocupado: se ve tachado en el tablero, no desaparece
+// ---------------------------------------------------------------------------
+
+/**
+ * Los horarios que la cancha ofrecería ese día para esa duración si NO tuviera ninguna reserva (dentro del horario, fuera del
+ * descanso y desde ahora) pero que hoy no se pueden tomar porque una reserva los pisa. Son los que el tablero muestra
+ * tachados y en rojo: que se vea de un vistazo qué franja ya está ocupada en lugar de que el horario simplemente falte.
+ */
+export function horasOcupadasCancha(datos: {
+  horario: HorarioDia | undefined;
+  ocupados: Ocupado[];
+  duracion: number;
+  paso: number;
+  minutoMinimo: number;
+}): number[] {
+  if (datos.ocupados.length === 0) return [];
+  const libres = new Set(horasLibresCancha(datos));
+  return horasLibresCancha({ ...datos, ocupados: [] }).filter((m) => !libres.has(m));
+}
+
+/** Lo ocupado de cada día de los próximos `DIAS_ADELANTE` días para una cancha y una duración (los días sin nada no aparecen). */
+export function horasOcupadasDelPeriodoCancha(datos: {
+  horarios: HorarioDia[];
+  ocupadosPorDia: Map<string, Ocupado[]>;
+  duracion: number;
+  paso: number;
+  hoy: string;
+  minutosAhora: number;
+}): Record<string, number[]> {
+  const salida: Record<string, number[]> = {};
+  for (let i = 0; i < DIAS_ADELANTE; i++) {
+    const dia = claveSumarDias(datos.hoy, i);
+    const ocupadas = horasOcupadasCancha({
+      horario: datos.horarios.find((h) => h.diaSemana === diaDeLaSemana(dia)),
+      ocupados: datos.ocupadosPorDia.get(dia) ?? [],
+      duracion: datos.duracion,
+      paso: datos.paso,
+      minutoMinimo: i === 0 ? minutoMinimoDeHoyCancha(datos.minutosAhora) : 0,
+    });
+    if (ocupadas.length > 0) salida[dia] = ocupadas;
+  }
+  return salida;
+}
+
+/** Lo ocupado de una cancha para CADA una de sus duraciones: `{ 60: {día: [...]}, 90: {...} }`. */
+export function horasOcupadasPorDuracion(datos: {
+  horarios: HorarioDia[];
+  ocupadosPorDia: Map<string, Ocupado[]>;
+  duraciones: number[];
+  paso: number;
+  hoy: string;
+  minutosAhora: number;
+}): Record<number, Record<string, number[]>> {
+  const salida: Record<number, Record<string, number[]>> = {};
+  for (const duracion of datos.duraciones) {
+    salida[duracion] = horasOcupadasDelPeriodoCancha({ ...datos, duracion });
+  }
+  return salida;
+}

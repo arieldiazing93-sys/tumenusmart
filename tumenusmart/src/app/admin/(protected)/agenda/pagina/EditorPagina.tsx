@@ -4,7 +4,7 @@ import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { clasesBoton } from "@/components/ui";
 import { sanearDatosPagina, type DatosPagina } from "@/lib/pagina-reservas";
-import { guardarPaginaReservas } from "./actions";
+import { guardarPaginaReservas, type ResultadoPagina } from "./actions";
 import { PerfilPagina } from "./PerfilPagina";
 import { SeccionApariencia } from "./SeccionApariencia";
 import { SeccionCampos } from "./SeccionCampos";
@@ -39,11 +39,20 @@ export function EditorPagina({
   inicial,
   yaGuardada,
   rutaPublica = "turnos",
+  guardar: guardarPropio,
+  coloresDeMarca = false,
 }: {
   inicial: DatosPagina;
   yaGuardada: boolean;
   /** En qué dirección se ve la página: /turnos/<dirección> (Reserva de turnos) o /canchas/<dirección> (Reserva de canchas). */
   rutaPublica?: "turnos" | "canchas";
+  /**
+   * Cómo se guarda. Sin esto se guarda la página de la Reserva de turnos. La Reserva de canchas tiene SU PROPIA página
+   * (otra tabla, otra dirección, otra portada): guardar una nunca toca la otra.
+   */
+  guardar?: (datos: DatosPagina) => Promise<ResultadoPagina>;
+  /** Los iconos de los enlaces sociales con el color de cada plataforma. */
+  coloresDeMarca?: boolean;
 }) {
   const router = useRouter();
   const [guardado, setGuardado] = useState(inicial);
@@ -87,7 +96,7 @@ export function EditorPagina({
     if (errorLocal) return;
     setError(null);
     iniciar(async () => {
-      const resultado = await guardarPaginaReservas(datos, rutaPublica);
+      const resultado = await (guardarPropio ?? guardarPaginaReservas)(datos);
       if (!resultado.ok) {
         setError(resultado.error);
         return;
@@ -104,7 +113,7 @@ export function EditorPagina({
 
   const contenido = {
     empresa: <SeccionEmpresa datos={datos} cambiar={cambiar} />,
-    redes: <SeccionRedes datos={datos} cambiar={cambiar} />,
+    redes: <SeccionRedes datos={datos} cambiar={cambiar} coloresDeMarca={coloresDeMarca} />,
     galeria: <SeccionGaleria datos={datos} cambiar={cambiar} />,
     apariencia: <SeccionApariencia datos={datos} cambiar={cambiar} />,
     campos: <SeccionCampos datos={datos} cambiar={cambiar} />,

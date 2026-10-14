@@ -12,6 +12,7 @@ import { partesLocales } from "./agenda";
 import { claveSumarDias } from "./calendario";
 import {
   completarHorarioCanchas,
+  horasOcupadasPorDuracion,
   horasPorDuracion,
   limpiarDuraciones,
   normalizarDeporte,
@@ -20,6 +21,8 @@ import {
 } from "./canchas";
 import { DIAS_ADELANTE, MINUTOS_BLOQUEO_SIN_CONFIRMAR, type Ocupado } from "./disponibilidad";
 import type { HorarioDia } from "./horario-trabajo";
+import { estaSuspendido } from "./local-por-slug";
+import { prisma } from "./prisma";
 import { claveDiaAsuncion, fechaAsuncionDesdeTexto } from "./timezone";
 
 type Db = PrismaClient | Prisma.TransactionClient;
@@ -156,4 +159,61 @@ export async function disponibilidadDeCanchas(
     );
   }
   return salida;
+}
+
+/**
+ * Igual que `disponibilidadDeCanchas`, pero devuelve además lo OCUPADO: los horarios que la cancha ofrecería si no tuviera
+ * reservas y hoy pisa una. El tablero los muestra tachados y en rojo (que se vea qué franja ya está tomada). Se consulta una
+ * sola vez la base para las dos cosas.
+ */
+export async function tableroDeCanchasDb(
+  db: Db,
+  storeId: string,
+  canchas: CanchaPublica[],
+  ahora: Date
+): Promise<{
+  libres: Map<string, Record<number, Record<string, number[]>>>;
+  ocupadas: Map<string, Record<number, Record<string, number[]>>>;
+}> {
+  const hoy = claveDiaAsuncion(ahora);
+  const minutosAhora = partesLocales(ahora).minutos;
+  const [horarios, ocupados] = await Promise.all([
+    cargarHorarioCanchas(db, storeId),
+    ocupadosPorCancha(
+      db,
+      storeId,
+      canchas.map((c) => c.id),
+      hoy,
+      ahora
+    ),
+  ]);
+
+  const libres = new Map<string, Record<number, Record<string, number[]>>>();
+  const ocupadas = new Map<string, Record<number, Record<string, number[]>>>();
+  for (const cancha of canchas) {
+    const base = {
+      horarios,
+      ocupadosPorDia: ocupados.get(cancha.id) ?? new Map<string, Ocupado[]>(),
+      duraciones: cancha.duraciones,
+      paso: cancha.pasoMin,
+      hoy,
+      minutosAhora,
+    };
+    libres.set(cancha.id, horasPorDuracion(base));
+    ocupadas.set(cancha.id, horasOcupadasPorDuracion(base));
+  }
+  return { libres, ocupadas };
+}
+
+/**
+ * La página pública del complejo (Reserva de canchas), solo si está habilitada y el negocio en regla. Es SU página, aparte
+ * de la de la Reserva de turnos: otra tabla, otra dirección, otra portada.
+ */
+export async function cargarPaginaCanchasPublica(slug: string) {
+  const pagina = await prisma.paginaCanchas.findUnique({
+    where: { slug: slug.toLowerCase() },
+    include: { store: { select: { estado: true, vencimiento: true } } },
+  });
+  if (!pagina || !pagina.habilitada || estaSuspendido(pagina.store)) return null;
+  return pagina;
 }
