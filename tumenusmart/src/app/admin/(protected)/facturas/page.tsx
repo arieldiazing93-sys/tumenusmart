@@ -1,10 +1,10 @@
 import Link from "next/link";
 import { pantallaConPermiso } from "@/lib/auth";
 import { idLocalActual } from "@/lib/local-actual";
-import { Cabecera, Campo, Entrada, Selector, Tabla, Th, Td, Tr, Vacio, Pastilla, clasesBoton } from "@/components/ui";
+import { Cabecera, Campo, Entrada, Tabla, Th, Td, Tr, Vacio, Pastilla, clasesBoton } from "@/components/ui";
 import { calcularRangoFecha, claveDia, type FiltroFecha } from "@/lib/rango-fecha";
 import { formatearGuarani } from "@/lib/format";
-import { ZONA_NEGOCIO, claveDiaAsuncion, inicioDeMesEnAsuncion } from "@/lib/timezone";
+import { ZONA_NEGOCIO } from "@/lib/timezone";
 import { esVigente, listarFacturas } from "@/lib/reporte-facturas";
 import { VerFacturaBoton } from "./VerFacturaBoton";
 
@@ -22,15 +22,11 @@ export default async function FacturasPage({
     fecha?: string;
     desde?: string;
     hasta?: string;
-    /** Resultado de la exportación RG 90 cuando no se pudo bajar el archivo (ver rg90/route.ts). */
-    rg90?: string;
-    mes?: string;
-    detalle?: string;
   }>;
 }) {
   await pantallaConPermiso("pos.verHistorico");
 
-  const { fecha, desde, hasta, rg90, mes: mesAviso, detalle } = await searchParams;
+  const { fecha, desde, hasta } = await searchParams;
   const fechaActiva: FiltroFecha = (fecha as FiltroFecha) ?? "30dias";
   let rango =
     calcularRangoFecha(fechaActiva, desde, hasta) ?? calcularRangoFecha("30dias", undefined, undefined)!;
@@ -54,25 +50,6 @@ export default async function FacturasPage({
   // Solo las vigentes suman al total facturado del período.
   const vigentes = filas.filter(esVigente);
   const totalFacturado = vigentes.reduce((s, f) => s + f.total, 0);
-
-  // Exportación RG 90: el mes que se propone es el anterior (el que se presenta
-  // en Marangatú), salvo que se esté volviendo de un aviso sobre otro mes.
-  const ultimoDiaMesAnterior = new Date(inicioDeMesEnAsuncion(new Date()).getTime() - 24 * 60 * 60 * 1000);
-  const mesPorDefecto = /^\d{4}-\d{2}$/.test(mesAviso ?? "")
-    ? (mesAviso as string)
-    : claveDiaAsuncion(ultimoDiaMesAnterior).slice(0, 7);
-  const avisoRg90: string | null =
-    rg90 === "sin_facturas"
-      ? `No hay facturas vigentes ni compras con factura de proveedor en ${mesAviso ?? "ese mes"} para exportar.`
-      : rg90 === "incompletas"
-        ? `No se generó el archivo: estos comprobantes tienen datos incompletos y no se pueden informar: ${detalle ?? ""}. Corregilos (las compras se editan desde su detalle en Compras) y volvé a exportar.`
-        : rg90 === "sin_ruc"
-          ? "No se pudo saber el RUC del contribuyente para el nombre del archivo. Cargalo en Puntos de expedición y volvé a exportar."
-          : rg90 === "sin_imputacion"
-            ? "Elegí al menos una obligación a la que imputar las facturas (IVA, IRE o IRP-RSP)."
-            : rg90 === "mes_invalido"
-              ? "Elegí un mes válido para exportar."
-              : null;
 
   return (
     <div>
@@ -121,85 +98,6 @@ export default async function FacturasPage({
           Filtrar
         </button>
       </form>
-
-      {avisoRg90 && (
-        <p className="mb-4 rounded-lg bg-aviso-luz px-4 py-3 text-[0.85rem] font-medium text-aviso">{avisoRg90}</p>
-      )}
-
-      {/* Registro de comprobantes de ventas en el formato de importación de la
-          DNIT (RG 90/2021, Marangatú). El formulario baja un .zip listo para subir.
-          La cabecera va con fondo naranja claro para distinguirla del resto. */}
-      <details open={!!rg90} className="group mb-6 overflow-hidden rounded-xl border border-brand/30 bg-white">
-        <summary className="flex cursor-pointer list-none items-center justify-between gap-2 bg-brand-light px-4 py-3 text-[0.9rem] font-semibold text-brand-texto">
-          <span>Exportar para Marangatú (RG 90)</span>
-          <span aria-hidden="true" className="text-xs transition-transform group-open:rotate-180">
-            ▼
-          </span>
-        </summary>
-        <form
-          method="get"
-          action="/admin/facturas/rg90"
-          className="grid grid-cols-1 gap-3 border-t border-brand/30 p-4 sm:grid-cols-2 lg:grid-cols-3"
-        >
-          <Campo etiqueta="Mes" ayuda="El mes fiscal del registro. Entran las facturas y compras con fecha de ese mes.">
-            <Entrada type="month" name="mes" defaultValue={mesPorDefecto} required />
-          </Campo>
-          <Campo etiqueta="Formato del archivo" ayuda="Los dos los acepta Marangatú.">
-            <Selector name="formato" defaultValue="csv">
-              <option value="csv">CSV (delimitado por comas)</option>
-              <option value="txt">TXT (delimitado por tabulaciones)</option>
-            </Selector>
-          </Campo>
-          <Campo etiqueta="Número de archivo" ayuda="V0001 (ventas), C0001 (compras)… Cada archivo que subas al mismo mes lleva uno distinto.">
-            {/* De texto con teclado numérico, no type="number": ese agrega un manejador
-                de la rueda del mouse que no puede ir en una pantalla de servidor. */}
-            <Entrada type="text" inputMode="numeric" pattern="[0-9]{1,4}" name="archivo" defaultValue="1" required />
-          </Campo>
-          <Campo etiqueta="Imputa al IVA">
-            <Selector name="iva" defaultValue="S">
-              <option value="S">Sí</option>
-              <option value="N">No</option>
-            </Selector>
-          </Campo>
-          <Campo etiqueta="Imputa al IRE">
-            <Selector name="ire" defaultValue="N">
-              <option value="S">Sí</option>
-              <option value="N">No</option>
-            </Selector>
-          </Campo>
-          <Campo etiqueta="Imputa al IRP-RSP">
-            <Selector name="irp" defaultValue="N">
-              <option value="S">Sí</option>
-              <option value="N">No</option>
-            </Selector>
-          </Campo>
-          <div className="flex flex-col gap-2 sm:col-span-2 lg:col-span-3">
-            <label className="flex items-start gap-2 text-[0.86rem] text-tinta">
-              <input type="checkbox" name="compras" value="1" defaultChecked className="mt-1" />
-              <span>
-                Incluir también las <strong>compras</strong> del mes (facturas de tus proveedores).
-                <span className="block text-xs text-tinta-suave">
-                  Salen en su propio archivo (C0001). Entran las compras que tienen folio y/o timbrado de la factura del
-                  proveedor, y el proveedor con su RUC; las compras sin factura no se informan.
-                </span>
-              </span>
-            </label>
-            <div>
-              <button type="submit" className={clasesBoton("principal", "sm")}>
-                Descargar archivo RG 90 (.zip)
-              </button>
-            </div>
-            <p className="text-xs text-tinta-suave">
-              De las ventas solo entran las facturas vigentes: el formato pide un total mayor a cero y no tiene dónde marcar
-              una factura anulada, así que las anuladas no se informan. El archivo sale comprimido y con el nombre que pide la DNIT
-              (RUC sin dígito verificador, mes y número de archivo): subilo tal cual en Marangatú → Declaraciones
-              informativas → Gestión de comprobantes informativos → Importar. A qué obligaciones se imputan las
-              facturas depende del contribuyente: si tenés dudas, confirmalo con tu contador (por defecto, solo IVA).
-              Con más de 5.000 facturas en el mes se arman varios archivos dentro del mismo .zip.
-            </p>
-          </div>
-        </form>
-      </details>
 
       {filas.length > 0 && (
         <div className="mb-4 flex flex-wrap gap-6 rounded-xl border border-linea bg-white px-4 py-3 text-[0.85rem]">

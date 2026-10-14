@@ -31,8 +31,9 @@ export async function GET(request: NextRequest) {
   if (!puede(sesion.rol, "pos.verHistorico")) return NextResponse.json({ error: "No autorizado" }, { status: 403 });
 
   const { searchParams } = new URL(request.url);
-  // A dónde se vuelve con el aviso si no se puede armar el archivo: a Contabilidad (de donde se pidió) o a Facturas.
-  const base = searchParams.get("volver") === "contabilidad" ? "/admin/contabilidad/rg90" : "/admin/facturas";
+  // A dónde se vuelve con el aviso si no se puede armar el archivo: la exportación vive en Contabilidad (Facturas ya solo lista las
+  // facturas). La ruta se queda acá, con su permiso, y la pantalla que la usa es Contabilidad → Registro RG 90.
+  const base = "/admin/contabilidad/rg90";
   const volver = (aviso: string, extra: Record<string, string> = {}) =>
     NextResponse.redirect(new URL(`${base}?${new URLSearchParams({ rg90: aviso, ...extra })}`, request.url));
 
