@@ -231,6 +231,12 @@
   igual(c.urlCanchas(pc, { tipo: "padel", canceladas: true }), "/admin/canchas?fecha=2026-10-16&tipo=padel&canceladas=1", "con tipo y canceladas");
   igual(c.urlReservaCancha(pc, "nueva", { cancha: "c1", hora: "18:30" }), "/admin/canchas?fecha=2026-10-16&reserva=nueva&cancha=c1&hora=18%3A30", "una reserva nueva con cancha y hora");
   igual(c.urlReservaCancha(pc, "abc"), "/admin/canchas?fecha=2026-10-16&reserva=abc", "el detalle de una reserva");
+  // La vista (Día/Semana/Mes) y una sola cancha: el día no cambia la dirección de siempre.
+  igual(c.urlCanchas({ ...pc, vista: "dia" }), "/admin/canchas?fecha=2026-10-16", "vista día: la dirección de siempre");
+  igual(c.urlCanchas({ ...pc, vista: "semana" }), "/admin/canchas?fecha=2026-10-16&vista=semana", "vista semana");
+  igual(c.urlCanchas({ ...pc, vista: "mes", solo: "c2", tipo: "padel", canceladas: true }), "/admin/canchas?fecha=2026-10-16&vista=mes&tipo=padel&solo=c2&canceladas=1", "mes con tipo, una cancha y canceladas");
+  igual(c.urlCanchas({ ...pc, vista: "semana", solo: "c2" }, { vista: "dia", fecha: "2026-10-17" }), "/admin/canchas?fecha=2026-10-17&solo=c2", "pasar de la semana al día de una casilla conserva la cancha");
+  igual(c.urlReservaCancha({ ...pc, vista: "semana", solo: "c1" }, "nueva", { cancha: "c1", hora: "19:30" }), "/admin/canchas?fecha=2026-10-16&vista=semana&solo=c1&reserva=nueva&cancha=c1&hora=19%3A30", "una reserva nueva conserva la vista y la cancha elegida");
 
   // =============================================================== el tablero de la página pública
   window.log("== Canchas: el tablero (todas las canchas por día)");

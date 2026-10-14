@@ -5,8 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { prismaDelLocal } from "@/lib/prisma-local";
 import { limitesEnAsuncion } from "@/lib/rango-dias";
 import { claveDiaAsuncion } from "@/lib/timezone";
-import { diaDeLaSemana, diaLargo, horaDeMinutos, parsearFecha, partesLocales } from "@/lib/agenda";
-import { claveSumarDias } from "@/lib/calendario";
+import { diaDeLaSemana, diasDeVista, horaDeMinutos, parsearFecha, parsearVista, partesLocales } from "@/lib/agenda";
 import {
   DEPORTES_CANCHA,
   estadoLiberaHorario,
@@ -21,7 +20,11 @@ import {
 import { cargarHorarioCanchas } from "@/lib/canchas-publicas";
 import { formatearGuarani } from "@/lib/format";
 import { Cabecera, clasesBoton } from "@/components/ui";
+import { BarraCanchas } from "./BarraCanchas";
 import { GrillaCanchas, type ColumnaCancha, type ReservaGrilla } from "./GrillaCanchas";
+import { MesCanchas } from "./MesCanchas";
+import { SelectorCancha } from "./SelectorCancha";
+import { SemanaCanchas } from "./SemanaCanchas";
 import { formatearNumero } from "@/lib/format";
 import { detallePagos } from "@/lib/pago-venta";
 import { cargarEstadoCaja } from "../agenda/cargar-cita";
@@ -31,6 +34,8 @@ export const dynamic = "force-dynamic";
 
 /** Tope de reservas que se dibujan de una vez en un día. */
 const MAXIMO_RESERVAS = 500;
+/** Tope de la semana o el mes: más que eso no se lee igual (el mes se mira por día, tocando una casilla). */
+const MAXIMO_RESERVAS_PERIODO = 2000;
 
 const PASTILLA = "inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[0.8rem] font-medium transition-colors";
 const PASTILLA_ACTIVA = `${PASTILLA} border-azul bg-azul-luz text-azul-oscuro`;
@@ -49,17 +54,29 @@ function leerExtras(valor: unknown): { etiqueta: string; valor: string }[] {
 }
 
 /**
- * El calendario de la Reserva de canchas: un día, con una columna por cancha y las reservas como bloques. Se mira por
- * tipo de cancha y se puede mostrar o esconder lo cancelado.
+ * El calendario de la Reserva de canchas, en vista de Día, Semana o Mes (como la Agenda de turnos):
+ *  - Día: una columna por cancha y las reservas como bloques (la vista de siempre);
+ *  - Semana: un día por columna, lunes a domingo, con las reservas de todas las canchas (o de la que se elija);
+ *  - Mes: una casilla por día, con la cantidad y las primeras reservas.
+ * Se mira por tipo de cancha o por una sola cancha, y se puede mostrar o esconder lo cancelado.
  *
- * Todo lo que se elige (día, tipo, canceladas) vive en la dirección de la página: `?fecha=2026-10-16&tipo=padel`.
- * Tocar una reserva agrega `&reserva=<id>` y abre su detalle a la derecha; tocar un hueco vacío agrega
- * `&reserva=nueva&cancha=<id>&hora=18:30` y abre una reserva nueva ya con esa cancha y esa hora.
+ * Todo lo que se elige (vista, fecha, tipo, cancha, canceladas) vive en la dirección de la página:
+ * `?vista=semana&fecha=2026-10-16&solo=<cancha>`. Tocar una reserva agrega `&reserva=<id>` y abre su detalle a la derecha;
+ * tocar un hueco vacío agrega `&reserva=nueva&cancha=<id>&hora=18:30` y abre una reserva nueva ya con esa cancha y esa hora.
  */
 export default async function CanchasCalendarioPage({
   searchParams,
 }: {
-  searchParams: Promise<{ fecha?: string; tipo?: string; canceladas?: string; reserva?: string; cancha?: string; hora?: string }>;
+  searchParams: Promise<{
+    vista?: string;
+    fecha?: string;
+    tipo?: string;
+    solo?: string;
+    canceladas?: string;
+    reserva?: string;
+    cancha?: string;
+    hora?: string;
+  }>;
 }) {
   await pantallaConPermiso("canchas.ver");
   const storeId = await idLocalActual();
@@ -69,23 +86,38 @@ export default async function CanchasCalendarioPage({
   const ahora = new Date();
   const hoy = claveDiaAsuncion(ahora);
   const fecha = parsearFecha(sp.fecha, hoy);
+  // Sin vista en la dirección se abre el Día, que es lo que se miraba siempre.
+  const vista = parsearVista(sp.vista) ?? "dia";
   const tipoPedido = DEPORTES_CANCHA.find((d) => d.valor === sp.tipo)?.valor ?? null;
-  const parametros: ParametrosCanchas = { fecha, tipo: tipoPedido, canceladas: sp.canceladas === "1" };
 
   const [canchasDb, horarios] = await Promise.all([
     db.cancha.findMany({ orderBy: [{ orden: "asc" }, { createdAt: "asc" }, { id: "asc" }] }),
     cargarHorarioCanchas(prisma, storeId),
   ]);
 
+  // Una cancha que no es de este local (o que ya no está) se ignora: se ven todas.
+  const soloElegida = canchasDb.find((c) => c.id === sp.solo) ?? null;
+  const parametros: ParametrosCanchas = {
+    fecha,
+    tipo: soloElegida ? null : tipoPedido,
+    canceladas: sp.canceladas === "1",
+    vista,
+    solo: soloElegida?.id ?? null,
+  };
+
+  // Los días que abarca la vista (para el mes, también los de las semanas vecinas que completan la grilla).
+  const dias = diasDeVista(vista, fecha);
+
   const reservasDb = await db.reservaCancha.findMany({
     where: {
-      inicio: limitesEnAsuncion({ desde: fecha, hasta: fecha }),
+      inicio: limitesEnAsuncion({ desde: dias[0], hasta: dias[dias.length - 1] }),
       // Una reserva pedida por la web que espera el aviso por WhatsApp todavía no se ve.
       visible: true,
       ...(parametros.canceladas ? {} : { estado: { not: "cancelada" } }),
+      ...(soloElegida ? { canchaId: soloElegida.id } : {}),
     },
     orderBy: [{ inicio: "asc" }, { id: "asc" }],
-    take: MAXIMO_RESERVAS,
+    take: vista === "dia" ? MAXIMO_RESERVAS : MAXIMO_RESERVAS_PERIODO,
     select: {
       id: true,
       canchaId: true,
@@ -113,12 +145,16 @@ export default async function CanchasCalendarioPage({
     cobrada: r.ventaPosId !== null,
   }));
 
-  // Los tipos que hay (para filtrar) y las columnas: las canchas activas del tipo elegido, más las inactivas que ese día
-  // tienen reservas (para no esconder una reserva que existe).
+  // Los tipos que hay (para filtrar) y las columnas: las canchas activas del tipo elegido (o la cancha elegida), más las
+  // inactivas que en este período tienen reservas (para no esconder una reserva que existe).
   const tiposPresentes = DEPORTES_CANCHA.filter((d) => canchasDb.some((c) => c.activa && normalizarDeporte(c.deporte) === d.valor));
   const conReservas = new Set(reservas.map((r) => r.canchaId));
   const columnas: ColumnaCancha[] = canchasDb
-    .filter((c) => (c.activa || conReservas.has(c.id)) && (!tipoPedido || normalizarDeporte(c.deporte) === tipoPedido))
+    .filter((c) =>
+      soloElegida
+        ? c.id === soloElegida.id
+        : (c.activa || conReservas.has(c.id)) && (!tipoPedido || normalizarDeporte(c.deporte) === tipoPedido)
+    )
     .map((c) => ({
       id: c.id,
       nombre: c.nombre,
@@ -127,13 +163,34 @@ export default async function CanchasCalendarioPage({
     }));
   const idsVisibles = new Set(columnas.map((c) => c.id));
   const reservasVisibles = reservas.filter((r) => idsVisibles.has(r.canchaId));
+  const nombres: Record<string, string> = Object.fromEntries(canchasDb.map((c) => [c.id, c.nombre]));
 
-  // El resumen del día: lo que de verdad ocupa cancha (sin canceladas ni inasistencias).
-  const vigentes = reservasVisibles.filter((r) => !estadoLiberaHorario(r.estado));
-  const totalDelDia = vigentes.reduce((suma, r) => suma + r.precio, 0);
+  // El resumen del período: lo que de verdad ocupa cancha (sin canceladas ni inasistencias). En el mes cuentan solo los días
+  // del mes (la grilla también muestra algunos de los meses vecinos).
+  const delPeriodo =
+    vista === "mes"
+      ? reservasVisibles.filter((r) => partesLocales(r.inicio).dia.startsWith(fecha.slice(0, 7)))
+      : reservasVisibles;
+  const vigentes = delPeriodo.filter((r) => !estadoLiberaHorario(r.estado));
+  const totalDelPeriodo = vigentes.reduce((suma, r) => suma + r.precio, 0);
   const porConfirmar = vigentes.filter((r) => r.estado === "pendiente").length;
+  const periodoEnPalabras = vista === "dia" ? "" : vista === "semana" ? " de la semana" : " del mes";
 
   const horarioDelDia = horarios.find((h) => h.diaSemana === diaDeLaSemana(fecha)) ?? null;
+
+  // Elegir una sola cancha: solo si hay más de una activa (con una sola no hay nada que elegir).
+  const canchasParaElegir = canchasDb.filter(
+    (c) => (c.activa && (!tipoPedido || normalizarDeporte(c.deporte) === tipoPedido)) || c.id === soloElegida?.id
+  );
+  const opcionesCancha = [
+    { valor: "", etiqueta: "Todas las canchas", href: urlCanchas(parametros, { solo: null }) },
+    ...canchasParaElegir.map((c) => ({
+      valor: c.id,
+      etiqueta: c.activa ? c.nombre : `${c.nombre} (inactiva)`,
+      href: urlCanchas(parametros, { solo: c.id, tipo: null }),
+    })),
+  ];
+  const puedeElegirCancha = canchasDb.filter((c) => c.activa).length > 1;
 
   // El panel de la derecha: el detalle de la reserva tocada, o una reserva nueva.
   let panel: React.ReactNode = null;
@@ -254,7 +311,7 @@ export default async function CanchasCalendarioPage({
     <div className="flex flex-col gap-2">
       <Cabecera
         titulo="Calendario de canchas"
-        bajada="Las reservas de cada cancha, hora por hora. Tocá una reserva para ver su detalle, o un hueco vacío para anotar una nueva."
+        bajada="Las reservas de cada cancha, hora por hora. Mirá el día, la semana o el mes. Tocá una reserva para ver su detalle, o un hueco vacío para anotar una nueva."
         compacta
         acciones={
           <Link href={urlReservaCancha(parametros, "nueva")} scroll={false} className={clasesBoton("nuevo", "sm")}>
@@ -263,69 +320,25 @@ export default async function CanchasCalendarioPage({
         }
       />
 
-      {/* ---------- el día, y de un día al otro ---------- */}
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="flex items-center gap-1">
-          <Link
-            href={urlCanchas(parametros, { fecha: claveSumarDias(fecha, -1) })}
-            scroll={false}
-            aria-label="Día anterior"
-            className={clasesBoton("suave", "sm")}
-          >
-            ‹
-          </Link>
-          <Link
-            href={urlCanchas(parametros, { fecha: hoy })}
-            scroll={false}
-            aria-current={fecha === hoy ? "date" : undefined}
-            className={clasesBoton(fecha === hoy ? "navegar" : "suave", "sm")}
-          >
-            Hoy
-          </Link>
-          <Link
-            href={urlCanchas(parametros, { fecha: claveSumarDias(fecha, 1) })}
-            scroll={false}
-            aria-label="Día siguiente"
-            className={clasesBoton("suave", "sm")}
-          >
-            ›
-          </Link>
-        </div>
-        <p className="text-[0.95rem] font-semibold capitalize text-tinta">{diaLargo(fecha)}</p>
+      {/* ---------- el período (Día / Semana / Mes), y de uno al otro ---------- */}
+      <BarraCanchas parametros={parametros} hoy={hoy} />
 
-        {/* Ir a otro día: un formulario común (sin JavaScript), igual que los filtros de los reportes. */}
-        <form method="get" action="/admin/canchas" className="ml-auto flex items-center gap-1.5">
-          {parametros.tipo && <input type="hidden" name="tipo" value={parametros.tipo} />}
-          {parametros.canceladas && <input type="hidden" name="canceladas" value="1" />}
-          <input
-            type="date"
-            name="fecha"
-            defaultValue={fecha}
-            aria-label="Ir a un día"
-            className="cifra h-9 rounded-lg border border-linea bg-superficie px-2 text-[0.84rem] text-tinta"
-          />
-          <button type="submit" className={clasesBoton("navegar", "sm")}>
-            Ir
-          </button>
-        </form>
-      </div>
-
-      {/* ---------- el tipo de cancha y lo cancelado ---------- */}
+      {/* ---------- el tipo de cancha, una sola cancha y lo cancelado ---------- */}
       <div className="flex flex-wrap items-center gap-1.5">
         {tiposPresentes.length > 1 && (
           <nav aria-label="Tipo de cancha" className="flex flex-wrap gap-1.5">
             <Link
-              href={urlCanchas(parametros, { tipo: null })}
+              href={urlCanchas(parametros, { tipo: null, solo: null })}
               scroll={false}
-              aria-current={parametros.tipo ? undefined : "page"}
-              className={parametros.tipo ? PASTILLA_INACTIVA : PASTILLA_ACTIVA}
+              aria-current={parametros.tipo || parametros.solo ? undefined : "page"}
+              className={parametros.tipo || parametros.solo ? PASTILLA_INACTIVA : PASTILLA_ACTIVA}
             >
               Todas
             </Link>
             {tiposPresentes.map((t) => (
               <Link
                 key={t.valor}
-                href={urlCanchas(parametros, { tipo: t.valor })}
+                href={urlCanchas(parametros, { tipo: t.valor, solo: null })}
                 scroll={false}
                 aria-current={parametros.tipo === t.valor ? "page" : undefined}
                 className={parametros.tipo === t.valor ? PASTILLA_ACTIVA : PASTILLA_INACTIVA}
@@ -335,6 +348,7 @@ export default async function CanchasCalendarioPage({
             ))}
           </nav>
         )}
+        {puedeElegirCancha && <SelectorCancha opciones={opcionesCancha} elegida={soloElegida?.id ?? ""} />}
         <Link
           href={urlCanchas(parametros, { canceladas: !parametros.canceladas })}
           scroll={false}
@@ -345,17 +359,24 @@ export default async function CanchasCalendarioPage({
         </Link>
       </div>
 
-      {/* ---------- el resumen del día ---------- */}
+      {/* ---------- el resumen del período ---------- */}
       <p className="text-[0.82rem] text-tinta-media">
         <span className="font-semibold text-tinta">
           {vigentes.length === 1 ? "1 reserva" : `${vigentes.length} reservas`}
+          {periodoEnPalabras}
         </span>
         {" · "}
-        <span className="cifra font-semibold text-tinta">{formatearGuarani(totalDelDia)}</span>
+        <span className="cifra font-semibold text-tinta">{formatearGuarani(totalDelPeriodo)}</span>
         {porConfirmar > 0 && (
           <>
             {" · "}
             <span className="font-semibold text-aviso">{porConfirmar === 1 ? "1 por confirmar" : `${porConfirmar} por confirmar`}</span>
+          </>
+        )}
+        {soloElegida && (
+          <>
+            {" · "}
+            <span className="font-semibold text-azul-oscuro">{soloElegida.nombre}</span>
           </>
         )}
       </p>
@@ -375,16 +396,37 @@ export default async function CanchasCalendarioPage({
         </div>
       ) : (
         <div className="overflow-hidden rounded-xl border-2 border-azul/50 bg-superficie">
-          <GrillaCanchas
-            canchas={columnas}
-            reservas={reservasVisibles}
-            dia={fecha}
-            hoy={hoy}
-            ahora={ahora}
-            horario={horarioDelDia}
-            parametros={parametros}
-          />
+          {vista === "mes" ? (
+            <MesCanchas fecha={fecha} reservas={reservasVisibles} nombres={nombres} hoy={hoy} parametros={parametros} />
+          ) : vista === "semana" ? (
+            <SemanaCanchas
+              dias={dias}
+              reservas={reservasVisibles}
+              nombres={nombres}
+              hoy={hoy}
+              ahora={ahora}
+              horarios={horarios}
+              parametros={parametros}
+              canchaUnica={soloElegida ? { id: soloElegida.id, nombre: soloElegida.nombre, activa: soloElegida.activa } : null}
+            />
+          ) : (
+            <GrillaCanchas
+              canchas={columnas}
+              reservas={reservasVisibles}
+              dia={fecha}
+              hoy={hoy}
+              ahora={ahora}
+              horario={horarioDelDia}
+              parametros={parametros}
+            />
+          )}
         </div>
+      )}
+
+      {vista !== "dia" && columnas.length > 0 && vigentes.length === 0 && (
+        <p className="text-center text-[0.85rem] text-tinta-media">
+          {parametros.canceladas ? "No hay reservas en este período." : "No hay reservas en este período (las canceladas no se muestran)."}
+        </p>
       )}
 
       {panel}

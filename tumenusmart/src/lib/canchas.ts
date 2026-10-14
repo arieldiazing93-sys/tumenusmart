@@ -13,7 +13,7 @@
  * Todo en minutos desde la medianoche, en hora de Asunción.
  */
 
-import { diaDeLaSemana, esEstadoCita, type EstadoCita } from "./agenda";
+import { diaDeLaSemana, esEstadoCita, type EstadoCita, type VistaAgenda } from "./agenda";
 import { normalizarTelefonoCliente } from "./agenda-personal";
 import { claveSumarDias } from "./calendario";
 import { ANTICIPACION_MIN, DIAS_ADELANTE, tramosDeTrabajo, type Ocupado } from "./disponibilidad";
@@ -605,6 +605,10 @@ export type ParametrosCanchas = {
   tipo: string | null;
   /** Mostrar también las reservas canceladas. */
   canceladas: boolean;
+  /** La vista del calendario: el día (la de siempre, si no se dice nada), la semana o el mes. */
+  vista?: VistaAgenda;
+  /** Mirar una sola cancha (su id) en vez de todas. */
+  solo?: string | null;
 };
 
 /** La dirección del calendario con estos parámetros, cambiando solo lo que se pida. */
@@ -612,7 +616,9 @@ export function urlCanchas(base: ParametrosCanchas, cambios: Partial<ParametrosC
   const p = { ...base, ...cambios };
   const consulta = new URLSearchParams();
   consulta.set("fecha", p.fecha);
+  if (p.vista && p.vista !== "dia") consulta.set("vista", p.vista);
   if (p.tipo) consulta.set("tipo", p.tipo);
+  if (p.solo) consulta.set("solo", p.solo);
   if (p.canceladas) consulta.set("canceladas", "1");
   return `/admin/canchas?${consulta.toString()}`;
 }
