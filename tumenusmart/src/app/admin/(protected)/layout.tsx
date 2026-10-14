@@ -409,6 +409,11 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           </Link>
 
           <div className="ml-auto flex min-w-0 items-center gap-2.5">
+            {/* Hasta cuándo tiene pagado el local: cortito, sobre fondo lila, al lado de los botones (desde pantalla mediana). */}
+            {avisoSuscripcion && (
+              <AvisoVencimiento estado={avisoSuscripcion} vencimiento={vencimientoLocal} enBarra />
+            )}
+
             {/* La campana del aviso de reservas nuevas (y sus carteles, que se dibujan fuera de la barra). */}
             {pedidosWebActivo && puede(sesion.rol, "delivery.ver") && <AvisoPedidosWeb />}
             {avisarReservas && <AvisoReservasNuevas />}
@@ -466,8 +471,9 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         </div>
       )}
 
+      {/* En el celular la etiqueta de vencimiento no entra en la barra: va en una franja fina debajo. */}
       {avisoSuscripcion && (
-        <BannerSuscripcion estado={avisoSuscripcion} vencimiento={vencimientoLocal} />
+        <AvisoVencimiento estado={avisoSuscripcion} vencimiento={vencimientoLocal} enBarra={false} />
       )}
 
       {imprimirComandas && <MotorImpresion />}
@@ -494,58 +500,79 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   );
 }
 
-function fechaLarga(fecha: Date | null): string {
+/** "26/10/2026": día/mes/año de dos y cuatro cifras, en la hora del negocio. */
+function fechaCorta(fecha: Date | null): string {
   if (!fecha) return "";
-  return new Intl.DateTimeFormat("es-PY", {
-    day: "numeric",
-    month: "long",
+  const partes = new Intl.DateTimeFormat("es-PY", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
     timeZone: ZONA_NEGOCIO,
-  }).format(fecha);
+  }).formatToParts(fecha);
+  const de = (tipo: string) => partes.find((p) => p.type === tipo)?.value ?? "";
+  return `${de("day")}/${de("month")}/${de("year")}`;
 }
 
-const ESTILOS_SUSCRIPCION: Record<string, string> = {
-  al_dia: "border-linea bg-white text-tinta-media",
-  por_vencer: "border-aviso/25 bg-aviso-luz text-aviso",
-  vencido: "border-peligro/25 bg-peligro-luz text-peligro",
-  suspendido: "border-peligro/25 bg-peligro-luz text-peligro",
-};
-
 /**
- * Le muestra a quien esté administrando ese local hasta cuándo tiene pagado
- * — desde el primer día, no solo cuando ya está por vencer. Que la fecha esté
- * siempre a la vista evita la sorpresa de un menú que se apaga solo sin que
- * nadie lo viera venir. Al superadmin también se lo muestra: es la vista de
- * ESE local puntual (elegido con el selector), no un reemplazo de /admin/super.
+ * Hasta cuándo tiene pagado el local, cortito y a la vista en la barra de arriba (en el celular, una franja fina debajo de la barra, porque
+ * ahí no entra): «Vencimiento: 26/10/2026» sobre fondo lila. Cuando ya venció o está suspendido pasa a rojo, porque el menú público está
+ * apagado y eso no se puede pasar por alto. La frase completa queda en el texto de ayuda (al apoyar el mouse).
+ *
+ * Se muestra desde el primer día, no solo cuando está por vencer: que la fecha esté siempre a la vista evita la sorpresa de un menú que se
+ * apaga solo sin que nadie lo viera venir. Al superadmin también: es la vista de ESE local puntual (elegido con el selector), no un
+ * reemplazo de /admin/super.
  */
-function BannerSuscripcion({
+function AvisoVencimiento({
   estado,
   vencimiento,
+  enBarra,
 }: {
   estado: EstadoSuscripcion;
   vencimiento: Date | null;
+  /** true: la etiqueta de la barra de arriba (desde pantalla mediana); false: la franja del celular. */
+  enBarra: boolean;
 }) {
   if (estado.clase === "sin_vencimiento") return null;
 
-  let mensaje: string;
+  const fecha = fechaCorta(vencimiento);
+  let texto: string;
+  let completo: string;
   switch (estado.clase) {
     case "vencido":
-      mensaje = `Tu plan venció el ${fechaLarga(vencimiento)}. El menú público está apagado hasta que se renueve.`;
+      texto = `Venció: ${fecha} · menú apagado`;
+      completo = `Tu plan venció el ${fecha}. El menú público está apagado hasta que se renueve.`;
       break;
     case "suspendido":
-      mensaje = "Tu cuenta está suspendida. El menú público no está tomando pedidos.";
+      texto = "Cuenta suspendida";
+      completo = "Tu cuenta está suspendida. El menú público no está tomando pedidos.";
       break;
     case "por_vencer":
-      mensaje = `Tu plan vence el ${fechaLarga(vencimiento)} — ${estado.dias === 1 ? "mañana" : `en ${estado.dias} días`}.`;
+      texto = `Vencimiento: ${fecha} · ${estado.dias === 1 ? "mañana" : `en ${estado.dias} días`}`;
+      completo = `Tu plan vence el ${fecha} (${estado.dias === 1 ? "mañana" : `en ${estado.dias} días`}).`;
       break;
     default:
-      mensaje = `Tu plan vence el ${fechaLarga(vencimiento)} (en ${estado.dias} días).`;
+      texto = `Vencimiento: ${fecha}`;
+      completo = `Tu plan vence el ${fecha} (en ${estado.dias} días).`;
   }
 
+  const rojo = estado.clase === "vencido" || estado.clase === "suspendido";
+  const colores = rojo
+    ? "border-peligro/30 bg-peligro-luz text-peligro"
+    : "border-violeta/30 bg-violeta-tinte text-violeta-oscuro";
+
+  if (enBarra) {
+    return (
+      <span
+        title={completo}
+        className={`hidden flex-none whitespace-nowrap rounded-lg border px-2.5 py-1 text-[0.78rem] font-semibold sm:inline-block ${colores}`}
+      >
+        {texto}
+      </span>
+    );
+  }
   return (
-    <div className={`border-b print:hidden ${ESTILOS_SUSCRIPCION[estado.clase]}`}>
-      <div className="mx-auto max-w-[92rem] px-4 py-2 text-[0.82rem] font-medium">
-        {mensaje}
-      </div>
+    <div className={`border-b sm:hidden print:hidden ${colores}`}>
+      <p className="mx-auto max-w-[92rem] px-4 py-1.5 text-center text-[0.8rem] font-semibold">{texto}</p>
     </div>
   );
 }
