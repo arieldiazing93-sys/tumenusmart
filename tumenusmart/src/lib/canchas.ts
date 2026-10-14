@@ -711,3 +711,18 @@ export function horasOcupadasPorDuracion(datos: {
   }
   return salida;
 }
+
+// ---------------------------------------------------------------------------
+//  Cobrar una reserva
+// ---------------------------------------------------------------------------
+
+/** El nombre del producto oculto con que se vende el alquiler de una cancha. */
+export function nombreDelProductoDeAlquiler(nombreCancha: string): string {
+  return `Alquiler ${nombreCancha}`.slice(0, 80);
+}
+
+/** Lo que va entre paréntesis junto al nombre en el comprobante: «14/10 · 20:00 a 21:30 · 1 h 30». */
+export function detalleDeAlquiler(dia: string, horaInicio: string, horaFin: string, duracionMin: number): string {
+  const [, mes, d] = dia.split("-");
+  return `${d}/${mes} · ${horaInicio} a ${horaFin} · ${textoDuracionCancha(duracionMin)}`;
+}

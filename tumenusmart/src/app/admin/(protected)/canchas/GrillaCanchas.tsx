@@ -34,6 +34,8 @@ export type ReservaGrilla = {
   duracionMin: number;
   /** web = la pidió el cliente desde la página; panel = la anotó el negocio. */
   origen: string;
+  /** true si ya se cobró en la caja (se marca con una tilde). */
+  cobrada: boolean;
 };
 
 /**
@@ -217,6 +219,7 @@ export function GrillaCanchas({
                       estado.etiqueta,
                       formatearGuarani(r.precio),
                       r.origen === "web" ? "Pedida desde la página" : null,
+                      r.cobrada ? "Cobrada en caja" : null,
                     ]
                       .filter(Boolean)
                       .join(" · ")}
@@ -230,6 +233,11 @@ export function GrillaCanchas({
                       animationDelay: `${Math.min(indice, 8) * 30}ms`,
                     }}
                   >
+                    {r.cobrada && (
+                      <span aria-label="Cobrada" title="Cobrada en caja" className="absolute right-1 top-0.5 text-[0.78rem] font-bold leading-none">
+                        ✓
+                      </span>
+                    )}
                     {/* Primero quién es (lo que se busca con la vista), después la hora y el resto, según cuánto lugar haya. */}
                     <p className="truncate text-[0.78rem] font-semibold">
                       {nivel === 1 ? `${horaDeMinutos(r.desde)} · ${r.clienteNombre}` : r.clienteNombre}

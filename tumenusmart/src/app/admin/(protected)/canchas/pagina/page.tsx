@@ -34,6 +34,7 @@ export default async function PaginaCanchasPage() {
         rutaPublica="canchas"
         guardar={guardarPaginaCanchas}
         coloresDeMarca
+        conMapa
       />
     </div>
   );

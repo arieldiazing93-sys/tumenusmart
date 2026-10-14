@@ -41,6 +41,7 @@ export function EditorPagina({
   rutaPublica = "turnos",
   guardar: guardarPropio,
   coloresDeMarca = false,
+  conMapa = false,
 }: {
   inicial: DatosPagina;
   yaGuardada: boolean;
@@ -53,6 +54,8 @@ export function EditorPagina({
   guardar?: (datos: DatosPagina) => Promise<ResultadoPagina>;
   /** Los iconos de los enlaces sociales con el color de cada plataforma. */
   coloresDeMarca?: boolean;
+  /** El campo del enlace de Google Maps: la página pública muestra el mapa de la ubicación (hoy, la de la Reserva de canchas). */
+  conMapa?: boolean;
 }) {
   const router = useRouter();
   const [guardado, setGuardado] = useState(inicial);
@@ -113,7 +116,7 @@ export function EditorPagina({
 
   const contenido = {
     empresa: <SeccionEmpresa datos={datos} cambiar={cambiar} />,
-    redes: <SeccionRedes datos={datos} cambiar={cambiar} coloresDeMarca={coloresDeMarca} />,
+    redes: <SeccionRedes datos={datos} cambiar={cambiar} coloresDeMarca={coloresDeMarca} conMapa={conMapa} />,
     galeria: <SeccionGaleria datos={datos} cambiar={cambiar} />,
     apariencia: <SeccionApariencia datos={datos} cambiar={cambiar} />,
     campos: <SeccionCampos datos={datos} cambiar={cambiar} />,

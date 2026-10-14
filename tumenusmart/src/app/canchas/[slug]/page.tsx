@@ -25,6 +25,7 @@ import { CarruselGaleria } from "@/app/turnos/[slug]/CarruselGaleria";
 import { CompartirBoton } from "@/app/turnos/[slug]/CompartirBoton";
 import { IconoCalendario, IconoChevron, IconoReloj } from "@/app/turnos/[slug]/Iconos";
 import { variablesDePagina } from "@/app/turnos/[slug]/marco";
+import { MapaUbicacion } from "@/components/MapaUbicacion";
 
 export const dynamic = "force-dynamic";
 
@@ -140,36 +141,42 @@ export default async function PaginaPublicaCanchas({ params }: { params: Promise
   return (
     <div data-tema={tema} style={estilo} className="min-h-screen bg-papel-suave text-tinta">
       <main className="relative mx-auto min-h-screen w-full max-w-xl bg-papel pb-44 sm:shadow-alta">
-        {/* ---------- portada: el color del negocio, con la foto de portada si hay ---------- */}
-        <div className="relative h-52 overflow-hidden bg-gradient-to-br from-brand to-brand-dark sm:h-60">
-          {pagina.bannerUrl && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={pagina.bannerUrl} alt="" className="absolute inset-0 h-full w-full object-cover" />
-          )}
-          <span aria-hidden="true" className="absolute -right-8 -top-10 h-44 w-44 rounded-full border-[14px] border-white/10" />
-          <span aria-hidden="true" className="absolute -bottom-16 left-1/2 h-40 w-40 -translate-x-1/2 rounded-full border-[14px] border-white/10" />
-          <span aria-hidden="true" className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/45 to-transparent" />
+        {/* ---------- cabecera: la foto de perfil, redonda y centrada; debajo, el nombre y los enlaces sociales en una sola línea ---------- */}
+        <header className="relative bg-gradient-to-b from-brand-light to-papel px-5 pb-6 pt-12 text-center">
           <div className="absolute right-3 top-3">
             <CompartirBoton nombre={pagina.nombre} />
           </div>
-          <div className="absolute inset-x-0 bottom-0 flex items-end gap-3.5 px-5 pb-4">
-            <div className="flex h-20 w-20 flex-none items-center justify-center overflow-hidden rounded-2xl border-4 border-white/90 bg-brand-light text-[1.7rem] font-semibold text-brand-texto shadow-media">
-              {pagina.fotoUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={pagina.fotoUrl} alt={pagina.nombre} className="h-full w-full object-cover" />
-              ) : (
-                iniciales(pagina.nombre)
-              )}
-            </div>
-            <div className="min-w-0 pb-0.5 text-white">
-              <h1 className="text-[1.5rem] font-semibold leading-tight tracking-titular drop-shadow">{pagina.nombre}</h1>
-              {pagina.industria && <p className="text-[0.9rem] text-white/85">{pagina.industria}</p>}
-            </div>
+          <div className="mx-auto flex h-32 w-32 items-center justify-center overflow-hidden rounded-full border-4 border-papel bg-brand-light text-[2.6rem] font-semibold text-brand-texto shadow-media">
+            {pagina.fotoUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={pagina.fotoUrl} alt={pagina.nombre} className="h-full w-full object-cover" />
+            ) : (
+              iniciales(pagina.nombre)
+            )}
           </div>
-        </div>
+          <h1 className="mt-3.5 text-[1.65rem] font-semibold leading-tight tracking-titular text-tinta">{pagina.nombre}</h1>
+          {pagina.industria && <p className="mt-0.5 text-[0.98rem] text-tinta-media">{pagina.industria}</p>}
 
-        <div className="px-5">
-          <div className="mt-4 flex flex-wrap items-center gap-2">
+          {/* Los enlaces sociales (y llamar, correo, WhatsApp), cada uno con el color de su plataforma, en una sola línea. */}
+          {contactos.length > 0 && (
+            <ul className="mt-4 flex flex-nowrap items-center justify-center gap-2.5 overflow-x-auto px-1 py-1">
+              {contactos.map((a) => (
+                <li key={a.nombre} className="flex-none">
+                  <a
+                    href={a.href}
+                    {...(a.externo ? { target: "_blank", rel: "noopener noreferrer" } : {})}
+                    aria-label={a.nombre}
+                    title={a.nombre}
+                    className="flex h-11 w-11 items-center justify-center rounded-full bg-superficie shadow-sm ring-1 ring-linea transition-all hover:ring-brand active:scale-90"
+                  >
+                    <span className={a.color}>{a.icono}</span>
+                  </a>
+                </li>
+              ))}
+            </ul>
+          )}
+
+          <div className="mt-3.5 flex flex-wrap items-center justify-center gap-2">
             <span className="inline-flex items-center gap-1.5 rounded-full bg-brand-light px-3 py-1.5 text-[0.82rem] font-semibold text-brand-texto">
               <IconoReloj tam={15} />
               {hoy?.trabaja ? `Hoy abre ${textoDelDia(hoy)}` : "Hoy está cerrado"}
@@ -178,6 +185,9 @@ export default async function PaginaPublicaCanchas({ params }: { params: Promise
               <span className="cifra text-[0.85rem] text-tinta-suave">{formatearTelefonoPersonal(pagina.telefono)}</span>
             )}
           </div>
+        </header>
+
+        <div className="px-5">
 
           {pagina.descripcion && (
             <p className="mt-4 whitespace-pre-line text-[0.95rem] leading-relaxed text-tinta-media">{pagina.descripcion}</p>
@@ -269,22 +279,16 @@ export default async function PaginaPublicaCanchas({ params }: { params: Promise
             )}
           </section>
 
-          {/* ---------- contacto y redes ---------- */}
-          {contactos.length > 0 && (
-            <ul className="mt-6 flex flex-wrap gap-2">
-              {contactos.map((a) => (
-                <li key={a.nombre}>
-                  <a
-                    href={a.href}
-                    {...(a.externo ? { target: "_blank", rel: "noopener noreferrer" } : {})}
-                    className="inline-flex items-center gap-2 rounded-full bg-superficie px-3.5 py-2 text-[0.84rem] font-semibold text-tinta shadow-sm ring-1 ring-linea transition-all hover:ring-brand active:scale-95"
-                  >
-                    <span className={a.color}>{a.icono}</span>
-                    {a.nombre}
-                  </a>
-                </li>
-              ))}
-            </ul>
+          {/* ---------- la ubicación: el mapa, con botones para abrirla y compartirla ---------- */}
+          {pagina.googleMapsUrl && (
+            <section className="mt-6" aria-label="Ubicación">
+              <MapaUbicacion
+                nombre={pagina.nombre}
+                enlace={pagina.googleMapsUrl}
+                lat={pagina.ubicacionLat}
+                lng={pagina.ubicacionLng}
+              />
+            </section>
           )}
 
           {/* ---------- horario ---------- */}

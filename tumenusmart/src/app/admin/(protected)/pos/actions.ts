@@ -22,6 +22,8 @@ import { anularComprobantes, crearComprobante, descripcionDeItem } from "@/lib/c
 import { esElectronico } from "@/lib/modalidad-punto";
 import { ErrorFacturaElectronica, problemaParaEmitirElectronico } from "@/lib/sifen/servidor";
 import { DURACION_MINIMA_CITA } from "@/lib/agenda-cita";
+import { horaDeMinutos, partesLocales } from "@/lib/agenda";
+import { detalleDeAlquiler } from "@/lib/canchas";
 import { calcularDescuento, type DescuentoPedido } from "@/lib/descuento-venta";
 import { resolverDescuentoConTipos } from "@/lib/tipos-descuento";
 import { cargarTiposDescuento } from "@/lib/tipos-descuento-servidor";
@@ -164,6 +166,12 @@ export type DatosVenta = {
    */
   citaId?: string;
   /**
+   * Si esta venta cobra una reserva de cancha (ver cobrarReservaCancha en canchas/actions.ts): su id. La reserva queda enlazada a la venta
+   * (Finalizada, o Próxima si todavía no se jugó) en la misma transacción que la crea. La línea tiene que ser el alquiler de ESA
+   * cancha (su producto oculto) y el precio es el de la reserva: el servidor lo verifica, nunca confía en el navegador.
+   */
+  reservaCanchaId?: string;
+  /**
    * A quién del personal se le asigna el trabajo (negocios con "preguntar el personal al cobrar",
    * ver Store.pedirPersonalEnVenta). Solo se usa si el local lo tiene activado y la venta no cobra
    * una cita (esa ya tiene su persona): el servidor lo exige y lo verifica, nunca confía en el navegador.
@@ -179,6 +187,8 @@ export type DatosVenta = {
 
 /** Lo que se lanza dentro de la transacción si la cita ya no se puede cobrar (la cobraron en ese instante). */
 const CITA_NO_COBRABLE = "CITA_NO_COBRABLE";
+/** Igual, para una reserva de cancha. */
+const RESERVA_NO_COBRABLE = "RESERVA_NO_COBRABLE";
 
 /**
  * Cobra el carrito y cierra la cuenta.
@@ -235,6 +245,53 @@ export async function registrarVenta(turnoId: string, datos: DatosVenta): Promis
     if (cita.inicio.getTime() > Date.now()) estadoDeLaCitaCobrada = "proxima";
   }
 
+  // Cobrar una reserva de cancha: de este local, sin cobrar y no cancelada. La línea es el alquiler (producto oculto) de ESA cancha y el
+  // precio es el de la reserva, que se lee acá de la base: lo que mande el navegador no cuenta. Se vuelve a comprobar adentro de la
+  // transacción. Queda Finalizada, o Próxima si todavía no se jugó (pagada por adelantado).
+  let estadoDeLaReservaCobrada: "proxima" | "finalizada" = "finalizada";
+  let productoDeAlquilerId: string | null = null;
+  let precioDeLaReserva = 0;
+  let detalleDeLaReserva = "";
+  if (datos.reservaCanchaId) {
+    if (datos.citaId) return { ok: false, error: "Una venta cobra una cita o una reserva de cancha, no las dos." };
+    const reserva = await db.reservaCancha.findFirst({
+      where: { id: datos.reservaCanchaId },
+      select: {
+        ventaPosId: true,
+        estado: true,
+        inicio: true,
+        fin: true,
+        duracionMin: true,
+        precio: true,
+        cancha: { select: { productId: true } },
+      },
+    });
+    if (!reserva) return { ok: false, error: "Esa reserva no existe." };
+    if (reserva.ventaPosId) return { ok: false, error: "Esa reserva ya está cobrada." };
+    if (reserva.estado === "cancelada" || reserva.estado === "no_asistio") {
+      return { ok: false, error: "Esa reserva está cancelada o sin asistencia. Reactivala para poder cobrarla." };
+    }
+    productoDeAlquilerId = reserva.cancha.productId;
+    const unica = datos.items[0];
+    if (
+      !productoDeAlquilerId ||
+      datos.items.length !== 1 ||
+      !unica ||
+      "mitadYMitad" in unica ||
+      unica.productId !== productoDeAlquilerId ||
+      unica.cantidad !== 1
+    ) {
+      return { ok: false, error: "El cobro de una reserva solo puede llevar el alquiler de su cancha." };
+    }
+    precioDeLaReserva = Math.round(Number(reserva.precio));
+    if (!Number.isFinite(precioDeLaReserva) || precioDeLaReserva <= 0) {
+      return { ok: false, error: "La reserva no tiene un precio mayor a cero. Cargalo y volvé a cobrar." };
+    }
+    if (reserva.inicio.getTime() > Date.now()) estadoDeLaReservaCobrada = "proxima";
+    const desde = partesLocales(reserva.inicio);
+    detalleDeLaReserva = detalleDeAlquiler(desde.dia, horaDeMinutos(desde.minutos), horaDeMinutos(desde.minutos + reserva.duracionMin), reserva.duracionMin);
+  }
+
   // Negocios que atienden sin reserva (barberías, salones): al cobrar en el mostrador el trabajo se le asigna a
   // una persona del personal. Si la cuenta lleva algún SERVICIO, esa venta queda como una cita ya cobrada suya
   // (para su vista de trabajo y su comisión de servicio). Si lleva algún PRODUCTO, se le asigna la comisión de
@@ -242,7 +299,7 @@ export async function registrarVenta(turnoId: string, datos: DatosVenta): Promis
   // dos cosas para que se pregunte; con una cita de por medio no hace falta. Solo si el local lo activó y hay
   // personal cargado. Qué líneas hay se sabe más abajo, así que la decisión final queda ahí.
   const pideAsignarPersonal =
-    !datos.citaId && !!store?.pedirPersonalEnVenta && (await db.miembroPersonal.count({ where: { activo: true } })) > 0;
+    !datos.citaId && !datos.reservaCanchaId && !!store?.pedirPersonalEnVenta && (await db.miembroPersonal.count({ where: { activo: true } })) > 0;
   let personalElegido: {
     id: string;
     comisionPorcentaje: number | null;
@@ -359,7 +416,9 @@ export async function registrarVenta(turnoId: string, datos: DatosVenta): Promis
     // Mismo filtro que el checkout público: si una categoría se desactivó
     // justo mientras el cajero tenía la pantalla abierta, sus productos no
     // se pueden seguir vendiendo.
-    where: { category: { activa: true } },
+    where: productoDeAlquilerId
+      ? { OR: [{ category: { activa: true } }, { id: productoDeAlquilerId }] }
+      : { category: { activa: true } },
     select: {
       id: true,
       nombre: true,
@@ -445,7 +504,8 @@ export async function registrarVenta(turnoId: string, datos: DatosVenta): Promis
       id: p.id,
       nombre: p.nombre,
       precio: precioEnPosicion(Number(p.precio), tramosDeFilas(p.promociones), posicionPromos).precio,
-      disponible: p.disponible,
+      // El alquiler oculto de una reserva no está «disponible» en la carta, pero sí se puede cobrar con su reserva.
+      disponible: p.disponible || p.id === productoDeAlquilerId,
       ingredientes: p.ingredientes,
       mitadYMitadGrupo: p.mitadYMitadGrupo,
       mitadYMitadModo: p.mitadYMitadModo,
@@ -503,7 +563,12 @@ export async function registrarVenta(turnoId: string, datos: DatosVenta): Promis
   // Las líneas finales: las del pedido y, si una promoción se les aplicó, con su marca (qué promoción, si es la regalada y a qué precio estaba).
   let filas: (LineaArmada & { promocionId?: string; cortesia?: boolean; precioAntesPromo?: number })[] = armado.lineas;
   let subtotal = armado.subtotal;
-  if (datos.citaId) {
+  if (datos.reservaCanchaId) {
+    // El alquiler de una reserva: el precio es el de la reserva (leído arriba de la base) y el comprobante dice qué día y a qué
+    // hora fue. Sin promociones: el precio de la reserva ya es lo acordado con el cliente.
+    filas = armado.lineas.map((f) => ({ ...f, precioUnitario: precioDeLaReserva, opcionesTexto: detalleDeLaReserva }));
+    subtotal = filas.reduce((suma, f) => suma + f.precioUnitario * f.cantidad, 0);
+  } else if (datos.citaId) {
     for (const it of datos.items) {
       if (!("mitadYMitad" in it) && it.precioServicio !== undefined) {
         if (!Number.isFinite(it.precioServicio) || it.precioServicio < 0) {
@@ -759,6 +824,21 @@ export async function registrarVenta(turnoId: string, datos: DatosVenta): Promis
       if (marcada.count !== 1) throw new Error(CITA_NO_COBRABLE);
     }
 
+    // Cobrar una reserva de cancha: igual que la cita, queda enlazada a esta venta en la misma transacción (Finalizada, o Próxima si
+    // todavía no se jugó) y con lo que se cobró de verdad. La condición evita que dos cajas cobren la misma reserva.
+    if (datos.reservaCanchaId) {
+      const marcada = await tx.reservaCancha.updateMany({
+        where: {
+          id: datos.reservaCanchaId,
+          storeId,
+          ventaPosId: null,
+          estado: { notIn: ["cancelada", "no_asistio"] },
+        },
+        data: { ventaPosId: venta.id, estado: estadoDeLaReservaCobrada, precio: total },
+      });
+      if (marcada.count !== 1) throw new Error(RESERVA_NO_COBRABLE);
+    }
+
     // Alguien que llegó sin reserva y se le asignó el trabajo a una persona: si la cuenta lleva algún SERVICIO,
     // la venta queda como una cita ya cobrada de esa persona (nace Finalizada, con la hora en que terminó el
     // trabajo), así aparece en Citas, en su vista de trabajo y en su comisión igual que una cita reservada. La
@@ -859,14 +939,17 @@ export async function registrarVenta(turnoId: string, datos: DatosVenta): Promis
   })
     .catch((e: unknown) => {
       // La cita se cobró (o se canceló) en el mismo instante desde otra pantalla.
-      if (e instanceof Error && e.message === CITA_NO_COBRABLE) return null;
+      if (e instanceof Error && e.message === CITA_NO_COBRABLE) {
+        return { errorFactura: "Esa cita ya se cobró o se canceló mientras tanto. Actualizá la pantalla." };
+      }
+      // La reserva de cancha, igual: se cobró (o se canceló) en el mismo instante desde otra pantalla.
+      if (e instanceof Error && e.message === RESERVA_NO_COBRABLE) {
+        return { errorFactura: "Esa reserva ya se cobró o se canceló mientras tanto. Actualizá la pantalla." };
+      }
       // La factura electrónica no se pudo emitir: la venta se deshizo (con su número) y se le dice por qué a quien cobra.
       if (e instanceof ErrorFacturaElectronica) return { errorFactura: e.message };
       throw e;
     });
-  if (ventaCreada === null) {
-    return { ok: false, error: "Esa cita ya se cobró o se canceló mientras tanto. Actualizá la pantalla." };
-  }
   if (typeof ventaCreada === "object") return { ok: false, error: ventaCreada.errorFactura };
   const ventaId = ventaCreada;
 
@@ -901,6 +984,7 @@ export async function registrarVenta(turnoId: string, datos: DatosVenta): Promis
 
   revalidatePath("/admin/pos");
   revalidatePath("/admin/pos/cuentas");
+  if (datos.reservaCanchaId) revalidatePath("/admin/canchas");
   if (datos.citaId || personalAsignado) {
     revalidatePath("/admin/agenda");
     revalidatePath("/admin/agenda/citas");
@@ -1249,6 +1333,12 @@ export async function cancelarVenta(ventaId: string, motivo: string, autorizacio
       where: { storeId, ventaPosId: ventaId },
       data: { ventaPosId: null, estado: "proxima", comisionPorcentaje: null },
     });
+
+    // Si había cobrado una reserva de cancha, la reserva vuelve a estar sin cobrar (queda como Próxima: confirmada).
+    await tx.reservaCancha.updateMany({
+      where: { storeId, ventaPosId: ventaId },
+      data: { ventaPosId: null, estado: "proxima" },
+    });
   });
 
   await registrarBitacora(storeId, sesion, {
@@ -1268,5 +1358,6 @@ export async function cancelarVenta(ventaId: string, motivo: string, autorizacio
   revalidatePath("/admin/stock/insumos");
   revalidatePath("/admin/agenda");
   revalidatePath("/admin/agenda/citas");
+  revalidatePath("/admin/canchas");
   return { ok: true };
 }

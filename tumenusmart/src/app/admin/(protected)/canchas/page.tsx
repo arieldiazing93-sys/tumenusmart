@@ -22,6 +22,9 @@ import { cargarHorarioCanchas } from "@/lib/canchas-publicas";
 import { formatearGuarani } from "@/lib/format";
 import { Cabecera, clasesBoton } from "@/components/ui";
 import { GrillaCanchas, type ColumnaCancha, type ReservaGrilla } from "./GrillaCanchas";
+import { formatearNumero } from "@/lib/format";
+import { detallePagos } from "@/lib/pago-venta";
+import { cargarEstadoCaja } from "../agenda/cargar-cita";
 import { PanelReservaCancha, type CanchaDelPanel, type DetalleReservaCancha } from "./PanelReservaCancha";
 
 export const dynamic = "force-dynamic";
@@ -93,6 +96,7 @@ export default async function CanchasCalendarioPage({
       precio: true,
       duracionMin: true,
       origen: true,
+      ventaPosId: true,
     },
   });
 
@@ -106,6 +110,7 @@ export default async function CanchasCalendarioPage({
     precio: Number(r.precio),
     duracionMin: r.duracionMin,
     origen: r.origen,
+    cobrada: r.ventaPosId !== null,
   }));
 
   // Los tipos que hay (para filtrar) y las columnas: las canchas activas del tipo elegido, más las inactivas que ese día
@@ -166,10 +171,42 @@ export default async function CanchasCalendarioPage({
         );
       }
     } else {
-      const fila = await db.reservaCancha.findFirst({ where: { id: sp.reserva } });
+      const fila = await db.reservaCancha.findFirst({
+        where: { id: sp.reserva },
+        select: {
+          id: true,
+          canchaId: true,
+          canchaNombre: true,
+          clienteNombre: true,
+          clienteTelefono: true,
+          clienteEmail: true,
+          nota: true,
+          extras: true,
+          inicio: true,
+          duracionMin: true,
+          estado: true,
+          precio: true,
+          origen: true,
+          ventaPos: {
+            select: {
+              id: true,
+              numero: true,
+              total: true,
+              cancelada: true,
+              comprobanteTipo: true,
+              facturaNumero: true,
+              facturaAnulada: true,
+              pagos: { orderBy: { orden: "asc" }, select: { forma: true, monto: true } },
+            },
+          },
+        },
+      });
       // Una dirección con una reserva que ya no existe simplemente no abre nada.
       if (fila) {
         const i = partesLocales(fila.inicio);
+        // Una venta cancelada ya no cuenta: la reserva vuelve a estar sin cobrar.
+        const cobrada = fila.ventaPos && !fila.ventaPos.cancelada ? fila.ventaPos : null;
+        const caja = cobrada ? ({ listo: false, motivo: "sin_turno" } as const) : await cargarEstadoCaja(db, storeId);
         const detalle: DetalleReservaCancha = {
           id: fila.id,
           codigo: fila.id.slice(-6).toUpperCase(),
@@ -186,6 +223,17 @@ export default async function CanchasCalendarioPage({
           estado: fila.estado,
           precio: Number(fila.precio),
           origen: fila.origen,
+          cobro: cobrada
+            ? {
+                ventaId: cobrada.id,
+                numero: formatearNumero(cobrada.numero),
+                pagoTexto: detallePagos(cobrada.pagos.map((p: { forma: string; monto: unknown }) => ({ forma: p.forma, monto: Number(p.monto) }))),
+                total: Number(cobrada.total),
+                comprobanteTipo: cobrada.comprobanteTipo,
+                facturaNumero: cobrada.facturaNumero,
+                facturaAnulada: cobrada.facturaAnulada,
+              }
+            : null,
         };
         panel = (
           <PanelReservaCancha
@@ -193,6 +241,7 @@ export default async function CanchasCalendarioPage({
             reserva={detalle}
             canchas={canchasPanel}
             precarga={{ canchaId: null, hora: null, fecha }}
+            caja={caja}
             parametros={parametros}
             negocio={local.nombre}
           />

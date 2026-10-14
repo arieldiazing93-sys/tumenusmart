@@ -36,9 +36,12 @@ export function SeccionRedes({
   datos,
   cambiar,
   coloresDeMarca = false,
+  conMapa = false,
 }: PropsSeccion & {
   /** Cada icono con el color de su plataforma (Instagram rosado, TikTok negro, Facebook azul, WhatsApp verde). */
   coloresDeMarca?: boolean;
+  /** El campo del enlace de Google Maps: la página pública muestra el mapa de la ubicación (hoy, la de la Reserva de canchas). */
+  conMapa?: boolean;
 }) {
   const numero = normalizarTelefonoPersonal(datos.whatsappPais, datos.whatsapp);
 
@@ -81,6 +84,44 @@ export function SeccionRedes({
           <span className="mt-1 block text-[0.76rem] text-tinta-suave">Ejemplo: {ejemplo}</span>
         </label>
       ))}
+
+      {/* La ubicación: el enlace de Google Maps. En la página pública se ve el mapa, con botones para abrirlo y compartirlo. */}
+      {conMapa && (
+        <label className="block">
+          <span className="mb-1.5 block text-[0.82rem] font-semibold text-tinta">Ubicación en Google Maps</span>
+          <div className="relative">
+            <svg
+              viewBox="0 0 24 24"
+              width={18}
+              height={18}
+              fill="none"
+              stroke="#EA4335"
+              strokeWidth={2}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2"
+            >
+              <path d="M12 21s7-6.2 7-11a7 7 0 1 0-14 0c0 4.8 7 11 7 11Z" />
+              <circle cx="12" cy="10" r="2.5" />
+            </svg>
+            <Entrada
+              value={datos.googleMapsUrl}
+              onChange={(e) => cambiar({ googleMapsUrl: e.target.value })}
+              maxLength={300}
+              inputMode="url"
+              autoComplete="off"
+              placeholder="https://maps.app.goo.gl/..."
+              // Inline y no una clase: el campo ya trae px-3 y no hay garantía de cuál gana.
+              style={{ paddingLeft: "2.5rem" }}
+            />
+          </div>
+          <span className="mt-1 block text-[0.76rem] leading-snug text-tinta-suave">
+            En Google Maps buscá tu complejo, tocá «Compartir» y pegá acá el enlace. Tus clientes ven el mapa en tu página, lo
+            abren con un toque y pueden compartirlo (WhatsApp, redes). Al guardar se carga el mapa.
+          </span>
+        </label>
+      )}
 
       <div className="flex items-start gap-3 rounded-lg border border-linea bg-papel-suave p-3">
         <IconoWhatsapp tam={20} className={`mt-0.5 ${coloresDeMarca ? COLOR_DE_MARCA.whatsapp : "text-exito"}`} />

@@ -1570,6 +1570,8 @@ model VentaPos {
 
   /// La cita de la agenda que se cobró con esta venta, si es el caso (ver Cita.ventaPosId).
   cita Cita?
+  /// La reserva de cancha que se cobró con esta venta, si es el caso (ver ReservaCancha.ventaPosId).
+  reservaCancha ReservaCancha?
 
   @@index([storeId])
   @@index([turnoPosId])
@@ -2700,6 +2702,9 @@ model Cancha {
   pasoMin     Int     @default(30)
   activa      Boolean @default(true)
   orden       Int     @default(0)
+  /// El producto oculto «Alquiler <cancha>» con que se vende (y factura) cada alquiler: se crea solo la primera vez que se cobra. No
+  /// aparece en la carta ni en el punto de venta (categoría y producto desactivados); sirve para el IVA, el comprobante y los reportes.
+  productId   String?
   createdAt   DateTime @default(now())
 
   reservas ReservaCancha[]
@@ -2736,6 +2741,11 @@ model ReservaCancha {
   /// false = todavía no se ve en el calendario (esperando que el cliente mande el aviso por WhatsApp).
   /// Sigue reservando el horario unos minutos (ver MINUTOS_BLOQUEO_SIN_CONFIRMAR).
   visible       Boolean  @default(true)
+  /// La venta del punto de venta con la que se cobró la reserva. Con esto la reserva «entró en caja»: pasa a Finalizada (o Próxima,
+  /// si se pagó por adelantado) y la venta aparece en Día a día → Historial de cuentas. Si esa venta se cancela, se suelta y la
+  /// reserva vuelve a estar sin cobrar.
+  ventaPosId    String?  @unique
+  ventaPos      VentaPos? @relation(fields: [ventaPosId], references: [id], onDelete: SetNull)
   createdAt     DateTime @default(now())
 
   @@index([storeId, inicio])
@@ -2797,6 +2807,10 @@ model PaginaCanchas {
   galeria Json @default("[]")
   /// Enlace a la ficha de Google Maps del negocio, para el QR de "dejanos tu reseña".
   googleMapsUrl String?
+  /// Las coordenadas del enlace de Google Maps (se sacan al guardar la página, siguiendo el enlace corto de «Compartir»): con ellas la
+  /// página pública dibuja el mapa. NULL = el enlace no trajo coordenadas (se muestra solo el botón de abrirlo).
+  ubicacionLat  Float?
+  ubicacionLng  Float?
   /// El color de la página, "#RRGGBB".
   colorPrimario String @default("#3B82F6")
   /// claro | oscuro | sistema.

@@ -86,16 +86,18 @@ export async function calcularReporteGeneralPos(
   // que cobró una cita de la agenda es una reserva de turnos, y el resto es del mostrador. (Una cita "de mostrador" es la que crea el
   // propio Punto de Venta al asignarle una venta a alguien del personal: esa venta sigue siendo del mostrador.)
   const idsDeVentas = [...new Set([...ventas.map((v) => v.id), ...cobros.map((c) => c.ventaPos.id)])];
-  const [cuentasMesa, cuentasDelivery, citas] = idsDeVentas.length
+  const [cuentasMesa, cuentasDelivery, citas, reservasCancha] = idsDeVentas.length
     ? await Promise.all([
         db.cuentaMesa.findMany({ where: { ventaPosId: { in: idsDeVentas } }, select: { ventaPosId: true } }),
         db.cuentaDelivery.findMany({ where: { ventaPosId: { in: idsDeVentas } }, select: { ventaPosId: true } }),
         db.cita.findMany({ where: { ventaPosId: { in: idsDeVentas }, origen: { not: "mostrador" } }, select: { ventaPosId: true } }),
+        // Una reserva de cancha cobrada también es del canal de reservas.
+        db.reservaCancha.findMany({ where: { ventaPosId: { in: idsDeVentas } }, select: { ventaPosId: true } }),
       ])
-    : [[], [], []];
+    : [[], [], [], []];
   const delComedor = new Set(cuentasMesa.map((c) => c.ventaPosId));
   const delDelivery = new Set(cuentasDelivery.map((c) => c.ventaPosId));
-  const deReserva = new Set(citas.map((c) => c.ventaPosId));
+  const deReserva = new Set([...citas, ...reservasCancha].map((c) => c.ventaPosId));
   const canalDe = (ventaId: string): CanalDeVenta =>
     delDelivery.has(ventaId) ? "delivery" : delComedor.has(ventaId) ? "comedor" : deReserva.has(ventaId) ? "reserva" : "mostrador";
 

@@ -40,6 +40,7 @@ export function SeccionCobro({
   cobrando,
   porAdelantado,
   telefonoCita = "",
+  objeto = "cita",
   retraso = 0,
 }: {
   valor: DatosCobro;
@@ -52,6 +53,8 @@ export function SeccionCobro({
   porAdelantado: boolean;
   /** El teléfono del cliente de la cita: el cuadro «Nuevo cliente» lo sugiere para dejarlo también en la ficha fiscal. */
   telefonoCita?: string;
+  /** Qué se cobra: una cita de la agenda o una reserva de cancha (cambia solo el texto de ayuda). */
+  objeto?: "cita" | "reserva";
   /** Milisegundos que espera para entrar (las tarjetas del detalle entran una tras otra). */
   retraso?: number;
 }) {
@@ -122,11 +125,15 @@ export function SeccionCobro({
   return (
     <BloqueCita titulo="Cobro en caja" icono={<IconoBillete />} retraso={retraso}>
       <p className="-mt-1 text-[0.78rem] leading-snug text-tinta-suave">
-        {cobrando
+        {objeto === "reserva"
           ? porAdelantado
-            ? "Al tocar Cobrar, el pago entra hoy en el turno de caja y la cita queda confirmada para su día."
-            : "Al tocar Cobrar, el pago entra en el turno de caja y la cita queda finalizada."
-          : "Elegí cómo paga para cobrar. Si el turno es de otro día, el pago entra hoy en caja y la cita queda confirmada."}
+            ? "Al tocar Cobrar, el pago entra hoy en el turno de caja y la reserva queda confirmada y paga para su día."
+            : "Al tocar Cobrar, el pago entra en el turno de caja y la reserva queda cobrada (Finalizada)."
+          : cobrando
+            ? porAdelantado
+              ? "Al tocar Cobrar, el pago entra hoy en el turno de caja y la cita queda confirmada para su día."
+              : "Al tocar Cobrar, el pago entra en el turno de caja y la cita queda finalizada."
+            : "Elegí cómo paga para cobrar. Si el turno es de otro día, el pago entra hoy en caja y la cita queda confirmada."}
       </p>
 
       {/* ---------- la caja ---------- */}

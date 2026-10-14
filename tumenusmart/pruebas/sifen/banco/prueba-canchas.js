@@ -257,6 +257,38 @@
   const ocDur = c.horasOcupadasPorDuracion({ horarios: semana(), ocupadosPorDia: new Map([["2026-10-15", tomada]]), duraciones: [60, 90, 120], paso: 30, hoy: "2026-10-14", minutosAhora: 600 });
   ok(ocDur[120]["2026-10-15"].length > ocDur[60]["2026-10-15"].length, "una reserva más larga necesita más lugar: más horarios caen como ocupados");
 
+  // =============================================================== cobrar la reserva: lo que va al comprobante
+  window.log("== Canchas: el alquiler en el comprobante");
+  igual(c.nombreDelProductoDeAlquiler("Cancha 1"), "Alquiler Cancha 1", "el producto se llama «Alquiler <cancha>»");
+  ok(c.nombreDelProductoDeAlquiler("x".repeat(200)).length === 80, "y no pasa de 80 letras");
+  igual(c.detalleDeAlquiler("2026-10-14", "20:00", "21:30", 90), "14/10 · 20:00 a 21:30 · 1 h 30", "el detalle: día, hora y duración");
+  igual(c.detalleDeAlquiler("2026-01-05", "08:00", "24:00", 960), "05/01 · 08:00 a 24:00 · 16 horas", "con cierre a medianoche");
+
+  // =============================================================== la ubicación (enlace de Google Maps)
+  window.log("== Ubicación: coordenadas de un enlace de Google Maps");
+  const um = await C.cargar("src/lib/ubicacion-maps");
+  igual(um.leerCoordenadasDeMaps("https://www.google.com/maps/place/Complejo+Sol/@-25.2866,-57.647,17z/data=!3m1!4b1!4m6!3m5!1s0x0:0x0!8m2!3d-25.2870!4d-57.6480"), { lat: -25.287, lng: -57.648 }, "prefiere el pin del lugar (!3d!4d) al centro de la vista");
+  igual(um.leerCoordenadasDeMaps("https://www.google.com/maps/@-25.2866,-57.647,15z"), { lat: -25.2866, lng: -57.647 }, "el centro de la vista (@lat,lng)");
+  igual(um.leerCoordenadasDeMaps("https://www.google.com/maps?q=-25.28,-57.64"), { lat: -25.28, lng: -57.64 }, "?q=lat,lng");
+  igual(um.leerCoordenadasDeMaps("https://maps.google.com/?q=loc:-25.28,-57.64"), { lat: -25.28, lng: -57.64 }, "?q=loc:lat,lng");
+  igual(um.leerCoordenadasDeMaps("https://www.google.com/maps?ll=-25.28%2C-57.64&z=16"), { lat: -25.28, lng: -57.64 }, "?ll= con la coma codificada");
+  igual(um.leerCoordenadasDeMaps("https://maps.app.goo.gl/AbCdEf12345"), null, "un enlace corto no trae coordenadas (hay que seguir su redirección)");
+  igual(um.leerCoordenadasDeMaps("https://www.google.com/maps/@95.0,-57.6,15z"), null, "una latitud imposible no vale");
+  igual(um.leerCoordenadasDeMaps(""), null, "vacío: nada");
+  window.log("== Ubicación: qué enlaces se aceptan");
+  ok(um.esEnlaceDeGoogleMaps("https://maps.app.goo.gl/AbCdEf12345"), "el enlace corto de «Compartir»");
+  ok(um.esEnlaceDeGoogleMaps("https://goo.gl/maps/AbCdEf"), "el enlace corto viejo");
+  ok(um.esEnlaceDeGoogleMaps("https://www.google.com/maps/place/Complejo+Sol"), "un enlace largo de Maps");
+  ok(um.esEnlaceDeGoogleMaps("https://maps.google.com/?q=-25.28,-57.64"), "maps.google.com");
+  ok(!um.esEnlaceDeGoogleMaps("http://maps.app.goo.gl/AbCdEf"), "sin https: no");
+  ok(!um.esEnlaceDeGoogleMaps("https://www.google.com/search?q=hola"), "una página de Google que no es de mapas: no");
+  ok(!um.esEnlaceDeGoogleMaps("https://maps.google.com.evil.com/maps"), "un dominio que solo parece de Google: no");
+  ok(!um.esEnlaceDeGoogleMaps("https://evil.com/?u=https://maps.app.goo.gl/x"), "otro sitio con un enlace adentro: no");
+  ok(!um.esEnlaceDeGoogleMaps("javascript:alert(1)") && !um.esEnlaceDeGoogleMaps("no es un enlace"), "ni javascript: ni texto suelto");
+  window.log("== Ubicación: compartir");
+  igual(um.enlaceComoLlegar({ lat: -25.28, lng: -57.64 }), "https://www.google.com/maps/dir/?api=1&destination=-25.28,-57.64", "el enlace para trazar la ruta");
+  ok(um.enlaceParaCompartirPorWhatsapp("Complejo Sol", "https://maps.app.goo.gl/x").startsWith("https://wa.me/?text=Complejo%20Sol%0Ahttps%3A%2F%2Fmaps.app.goo.gl%2Fx"), "el mensaje de WhatsApp: nombre y enlace");
+
   window.log("\naciertos: " + window.__aciertos + " · fallas: " + window.__fallas);
   window.__listo = true;
 })().catch((e) => { document.getElementById("salida").textContent += "\nERROR: " + (e && e.stack || e); window.__listo = true; window.__fallas = (window.__fallas || 0) + 1; });

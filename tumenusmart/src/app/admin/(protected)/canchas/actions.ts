@@ -6,7 +6,9 @@ import { exigirPermiso } from "@/lib/auth";
 import { registrarBitacora } from "@/lib/bitacora";
 import { diaDeLaSemana, diaLargo, estadoDeCita, horaDeMinutos, partesLocales } from "@/lib/agenda";
 import {
+  codigoDeReserva,
   estadoLiberaHorario,
+  nombreDelProductoDeAlquiler,
   sanearReservaPanel,
   tramosDeCancha,
   type DatosReservaPanel,
@@ -14,6 +16,13 @@ import {
 import { cargarHorarioCanchas } from "@/lib/canchas-publicas";
 import { MINUTOS_BLOQUEO_SIN_CONFIRMAR } from "@/lib/disponibilidad";
 import { aMinutos, nombreDeDia } from "@/lib/horario-trabajo";
+import type { DatosCobro } from "@/lib/agenda-cita";
+import { estacionActual } from "@/lib/estacion-actual";
+import { formatearGuarani } from "@/lib/format";
+import { SIN_REGISTRO_FISCAL } from "@/lib/tipo-cliente";
+import { FORMAS_PAGO_POS, etiquetaFormaPagoPos, type FormaPagoPos } from "@/lib/turno-pos";
+import { cancelarVenta, registrarVenta } from "../pos/actions";
+import { turnoAbierto } from "../pos/turno-actual";
 import { idLocalActual } from "@/lib/local-actual";
 import { prisma } from "@/lib/prisma";
 import { prismaDelLocal } from "@/lib/prisma-local";
@@ -83,10 +92,14 @@ export async function guardarReservaCancha(id: string | null, entrada: DatosRese
   const anterior = id
     ? await db.reservaCancha.findFirst({
         where: { id },
-        select: { id: true, canchaId: true, estado: true, clienteNombre: true },
+        select: { id: true, canchaId: true, estado: true, clienteNombre: true, ventaPosId: true },
       })
     : null;
   if (id && !anterior) return { ok: false, error: "Esa reserva ya no existe." };
+  // Una reserva cobrada queda bloqueada (es una venta de la caja): para tocarla hay que anular el cobro primero.
+  if (anterior?.ventaPosId) {
+    return { ok: false, error: "Esta reserva ya está cobrada. Anulá el cobro para poder cambiarla." };
+  }
   // Una cancha desactivada no recibe reservas nuevas (una reserva vieja suya sí se puede seguir editando).
   if (!cancha.activa && (!anterior || anterior.canchaId !== cancha.id)) {
     return { ok: false, error: "Esa cancha está desactivada. Elegí otra." };
@@ -189,9 +202,21 @@ export async function cambiarEstadoReservaCancha(id: string, estado: string): Pr
   }
   const reserva = await db.reservaCancha.findFirst({
     where: { id },
-    select: { id: true, canchaId: true, canchaNombre: true, clienteNombre: true, estado: true, inicio: true, fin: true },
+    select: {
+      id: true,
+      canchaId: true,
+      canchaNombre: true,
+      clienteNombre: true,
+      estado: true,
+      inicio: true,
+      fin: true,
+      ventaPosId: true,
+    },
   });
   if (!reserva) return { ok: false, error: "Esa reserva ya no existe." };
+  if (reserva.ventaPosId) {
+    return { ok: false, error: "Esta reserva ya está cobrada. Anulá el cobro para poder cambiarla." };
+  }
   if (reserva.estado === estado) return { ok: true, id };
 
   const textoDelChoque = await prisma.$transaction(
@@ -219,4 +244,210 @@ export async function cambiarEstadoReservaCancha(id: string, estado: string): Pr
 
   refrescar();
   return { ok: true, id: reserva.id };
+}
+
+// ---------------------------------------------------------------------------
+//  Cobrar la reserva
+// ---------------------------------------------------------------------------
+
+/** La categoría (desactivada) donde viven los productos ocultos de alquiler. */
+const CATEGORIA_DE_ALQUILER = "Alquiler de canchas";
+
+/**
+ * El producto oculto «Alquiler <cancha>» con que se vende y factura cada alquiler. Se crea solo la primera vez que se cobra una
+ * reserva de esa cancha: queda en una categoría y con una disponibilidad apagadas, así no aparece en la carta pública ni en el punto de
+ * venta (solo se puede vender desde una reserva). Sirve para que el comprobante lleve su IVA, su unidad y que es una prestación de
+ * servicios, y para que los reportes de productos vendidos muestren cuánto dejó cada cancha. Con un candado por cancha: dos cobros a
+ * la vez no crean dos productos.
+ */
+async function asegurarProductoDeAlquiler(
+  storeId: string,
+  canchaId: string
+): Promise<{ ok: true; productId: string } | { ok: false; error: string }> {
+  return prisma.$transaction(async (tx) => {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${"alquiler:" + canchaId}))`;
+    const cancha = await tx.cancha.findFirst({
+      where: { id: canchaId, storeId },
+      select: { id: true, nombre: true, precioHora: true, productId: true },
+    });
+    if (!cancha) return { ok: false as const, error: "Esa cancha ya no existe." };
+    const nombre = nombreDelProductoDeAlquiler(cancha.nombre);
+
+    if (cancha.productId) {
+      const existente = await tx.product.findFirst({
+        where: { id: cancha.productId, storeId },
+        select: { id: true, nombre: true },
+      });
+      if (existente) {
+        // Si a la cancha se le cambió el nombre, el comprobante lo dice igual.
+        if (existente.nombre !== nombre) {
+          await tx.product.updateMany({ where: { id: existente.id, storeId }, data: { nombre } });
+        }
+        return { ok: true as const, productId: existente.id };
+      }
+    }
+
+    const categoria =
+      (await tx.category.findFirst({ where: { storeId, nombre: CATEGORIA_DE_ALQUILER }, select: { id: true } })) ??
+      (await tx.category.create({
+        data: { storeId, nombre: CATEGORIA_DE_ALQUILER, activa: false, orden: 9999 },
+        select: { id: true },
+      }));
+    const producto = await tx.product.create({
+      data: {
+        storeId,
+        categoryId: categoria.id,
+        nombre,
+        precio: Number(cancha.precioHora),
+        iva: "gravado10",
+        unidadMedida: "unidad",
+        esServicio: true,
+        disponible: false,
+      },
+      select: { id: true },
+    });
+    await tx.cancha.updateMany({ where: { id: canchaId, storeId }, data: { productId: producto.id } });
+    return { ok: true as const, productId: producto.id };
+  });
+}
+
+export type ResultadoCobroReservaCancha =
+  | { ok: true; ventaId: string; total: number }
+  /** `sinTurno`: no hay turno de caja abierto; la pantalla manda directo a abrirlo (ver src/lib/turno-requerido.ts). */
+  | { ok: false; error: string; sinTurno?: true };
+
+/**
+ * Cobra la reserva: el detalle funciona como punto de venta.
+ *
+ * Registra la venta en el turno de caja abierto de ESTA computadora con el MISMO motor que el punto de venta (`registrarVenta`): ticket
+ * o factura con todas sus validaciones (timbrado vigente, factura obligatoria, RUC verificado en la DNIT, factura electrónica), forma de
+ * pago, IVA, cierre de caja y bitácora. La reserva queda enlazada a esa venta en la misma transacción (Finalizada, o Próxima si todavía
+ * no se jugó) y la venta aparece en Día a día → Historial de cuentas.
+ *
+ * El precio sale de la reserva guardada, nunca del navegador; la línea es el alquiler de SU cancha.
+ */
+export async function cobrarReservaCancha(reservaId: string, cobro: DatosCobro): Promise<ResultadoCobroReservaCancha> {
+  const sesion = await exigirPermiso("pos.vender");
+  const storeId = await idLocalActual();
+  const db = prismaDelLocal(storeId);
+
+  const reserva = await db.reservaCancha.findFirst({
+    where: { id: reservaId },
+    select: {
+      id: true,
+      canchaId: true,
+      canchaNombre: true,
+      clienteNombre: true,
+      clienteTelefono: true,
+      estado: true,
+      ventaPosId: true,
+      precio: true,
+    },
+  });
+  if (!reserva) return { ok: false, error: "Esa reserva ya no existe." };
+  if (reserva.ventaPosId) return { ok: false, error: "Esta reserva ya está cobrada." };
+  if (reserva.estado === "cancelada" || reserva.estado === "no_asistio") {
+    return { ok: false, error: "Esta reserva está cancelada o sin asistencia. Reactivala para poder cobrarla." };
+  }
+
+  const forma: FormaPagoPos | null = FORMAS_PAGO_POS.find((f) => f.valor === cobro?.forma)?.valor ?? null;
+  if (!forma) return { ok: false, error: "Elegí cómo paga el cliente." };
+
+  const precio = Math.round(Number(reserva.precio));
+  if (!Number.isFinite(precio) || precio <= 0) {
+    return { ok: false, error: "El precio de la reserva tiene que ser mayor a cero para cobrar." };
+  }
+
+  // La caja: esta computadora tiene que estar vinculada a una estación con el turno abierto.
+  const estacion = await estacionActual(db);
+  if (!estacion) {
+    return {
+      ok: false,
+      error: "Esta computadora no está vinculada a una caja. Vinculala en Estaciones (punto de venta) para poder cobrar.",
+    };
+  }
+  const turno = await turnoAbierto(db, estacion.id);
+  if (!turno) {
+    return { ok: false, error: "No hay un turno de caja abierto en esta computadora. Abrilo y volvé a cobrar.", sinTurno: true };
+  }
+
+  const producto = await asegurarProductoDeAlquiler(storeId, reserva.canchaId);
+  if (!producto.ok) return producto;
+
+  const esFactura = cobro.comprobanteTipo === "factura";
+  const sinRegistro = esFactura && cobro.registroFiscal === "sin";
+  const conRegistro = esFactura && !sinRegistro;
+
+  const venta = await registrarVenta(turno.id, {
+    pagos: [{ forma, monto: precio }],
+    tipoEntrega: "local",
+    clienteNombre: reserva.clienteNombre,
+    clienteTelefono: reserva.clienteTelefono ?? "",
+    nota: `Reserva ${codigoDeReserva(reserva.id)} · ${reserva.canchaNombre}`,
+    comprobanteTipo: esFactura ? "factura" : "ticket",
+    facturaTipoIdentificacion: esFactura
+      ? sinRegistro
+        ? SIN_REGISTRO_FISCAL.tipo
+        : String(cobro.tipoIdentificacion ?? "")
+      : undefined,
+    facturaNumeroIdentificacion: conRegistro ? String(cobro.numeroIdentificacion ?? "").trim() : undefined,
+    facturaRazonSocial: conRegistro ? String(cobro.razonSocial ?? "").trim() : undefined,
+    facturaEmail: conRegistro ? String(cobro.email ?? "").trim() || undefined : undefined,
+    facturaTelefono: conRegistro ? String(cobro.telefono ?? "").trim() || undefined : undefined,
+    items: [{ productId: producto.productId, cantidad: 1 }],
+    reservaCanchaId: reserva.id,
+  });
+  if (!venta.ok) return venta;
+
+  await registrarBitacora(storeId, sesion, {
+    modulo: "canchas",
+    accion: "reserva_cobrada",
+    descripcion: `Cobró la reserva de ${reserva.clienteNombre} en ${reserva.canchaNombre} (${formatearGuarani(venta.total)}, ${etiquetaFormaPagoPos(forma)}).`,
+    entidad: "ReservaCancha",
+    entidadId: reserva.id,
+    detalle: { venta: venta.ventaId, total: venta.total, forma, comprobante: esFactura ? "factura" : "ticket" },
+  });
+
+  refrescar();
+  return { ok: true, ventaId: venta.ventaId, total: venta.total };
+}
+
+/**
+ * Anula el cobro de una reserva (se cargó mal, el cliente se arrepintió): cancela la venta del punto de venta —con sus reglas: solo
+ * mientras el turno de caja sigue abierto, con motivo y, si el local lo protegió en Seguridad, con la contraseña de un usuario
+ * autorizado— y la reserva vuelve a quedar sin cobrar.
+ */
+export async function anularCobroReservaCancha(
+  reservaId: string,
+  motivo: string,
+  autorizacion?: string
+): Promise<{ ok: true } | { ok: false; error: string; requiereClave?: true }> {
+  const sesion = await exigirPermiso("pos.vender");
+  const storeId = await idLocalActual();
+  const db = prismaDelLocal(storeId);
+
+  const reserva = await db.reservaCancha.findFirst({
+    where: { id: reservaId },
+    select: { id: true, ventaPosId: true, clienteNombre: true, canchaNombre: true },
+  });
+  if (!reserva?.ventaPosId) return { ok: false, error: "Esta reserva no tiene un cobro para anular." };
+
+  const limpio = String(motivo ?? "").trim();
+  if (limpio.length < 3) return { ok: false, error: "Escribí por qué se anula el cobro." };
+
+  // cancelarVenta suelta la reserva (vuelve a "sin cobrar") en la misma transacción.
+  const anulada = await cancelarVenta(reserva.ventaPosId, limpio, autorizacion);
+  if (!anulada.ok) return anulada;
+
+  await registrarBitacora(storeId, sesion, {
+    modulo: "canchas",
+    accion: "reserva_cobro_anulado",
+    descripcion: `Anuló el cobro de la reserva de ${reserva.clienteNombre} en ${reserva.canchaNombre}. Motivo: ${limpio}.`,
+    entidad: "ReservaCancha",
+    entidadId: reserva.id,
+    detalle: { venta: reserva.ventaPosId, motivo: limpio },
+  });
+
+  refrescar();
+  return { ok: true };
 }
