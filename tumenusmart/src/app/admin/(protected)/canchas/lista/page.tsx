@@ -2,7 +2,8 @@ import { pantallaConPermiso } from "@/lib/auth";
 import { idLocalActual } from "@/lib/local-actual";
 import { prismaDelLocal } from "@/lib/prisma-local";
 import { Cabecera } from "@/components/ui";
-import { limpiarDuraciones, normalizarDeporte, normalizarPaso, type CanchaFila } from "@/lib/canchas";
+import { etiquetaDeDeporte, limpiarDuraciones, normalizarDeporte, normalizarPaso, type CanchaFila } from "@/lib/canchas";
+import { normalizarIva } from "@/lib/iva";
 import { ListaCanchas } from "./ListaCanchas";
 
 export const dynamic = "force-dynamic";
@@ -15,15 +16,18 @@ export default async function CanchasPage() {
   await pantallaConPermiso("canchas.configurar");
   const db = prismaDelLocal(await idLocalActual());
 
-  const [filas, conReservas] = await Promise.all([
+  const [filas, conReservas, grupos] = await Promise.all([
     db.cancha.findMany({
       // Las activas primero; entre ellas, en el orden en que se cargaron.
       orderBy: [{ activa: "desc" }, { orden: "asc" }, { createdAt: "asc" }, { id: "asc" }],
     }),
     // Qué canchas ya tuvieron alguna reserva (una sola fila por cancha): esas no se pueden borrar, solo desactivar.
     db.reservaCancha.findMany({ distinct: ["canchaId"], select: { canchaId: true } }),
+    // Los grupos de canchas del punto de venta (Fútbol 5, Pádel…): para sugerirlos al cargar otra cancha.
+    db.category.findMany({ where: { paraCanchas: true }, orderBy: { orden: "asc" }, select: { id: true, nombre: true } }),
   ]);
   const idsConReservas = new Set(conReservas.map((r) => r.canchaId));
+  const nombreDelGrupo = new Map(grupos.map((g) => [g.id, g.nombre] as const));
 
   const canchas: CanchaFila[] = filas.map((f) => ({
     id: f.id,
@@ -40,6 +44,9 @@ export default async function CanchasPage() {
     pasoMin: normalizarPaso(f.pasoMin),
     activa: f.activa,
     tieneReservas: idsConReservas.has(f.id),
+    // Las canchas cargadas antes de los grupos quedan en el del tipo de cancha hasta que se guarden de nuevo.
+    categoria: (f.categoriaId ? nombreDelGrupo.get(f.categoriaId) : undefined) ?? etiquetaDeDeporte(f.deporte),
+    iva: normalizarIva(f.iva),
   }));
 
   return (
@@ -48,7 +55,7 @@ export default async function CanchasPage() {
         titulo="Canchas"
         bajada="Las canchas de tu complejo, con su precio por hora y las duraciones que ofrecés. Tus clientes las reservan desde tu página."
       />
-      <ListaCanchas canchas={canchas} />
+      <ListaCanchas canchas={canchas} grupos={grupos.map((g) => g.nombre)} />
     </div>
   );
 }

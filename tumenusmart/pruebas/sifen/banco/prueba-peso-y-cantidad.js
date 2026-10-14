@@ -256,6 +256,30 @@
   const ivaKilo = fp.desglosarIva(kilo.lineas, 0);
   ok(ivaKilo.totalGeneral === 17100 && ivaKilo.gravado10 === 17100 && ivaKilo.iva10 === Math.round(17100 / 11), "el IVA de esos 17.100 es 1.555 (÷ 11) y el total cierra");
 
+  // =============================================================== el alquiler de una cancha: se vende por HORA
+  window.log("== Unidad «Hora»: el alquiler de una cancha en el punto de venta");
+  ok(um.seVendePorPeso("hora"), "la hora admite decimales (1,5)");
+  ok(um.seVendePorPeso("kilogramo") && um.seVendePorPeso("litro") && !um.seVendePorPeso("unidad"), "y lo de antes sigue igual");
+  igual(um.UNIDADES_MEDIDA.find((u) => u.valor === "hora").codigoSifen, 100, "el código oficial de SIFEN para «Hora» es 100");
+  igual(um.normalizarUnidadMedida("hora"), "hora", "la unidad hora se conserva");
+  igual([um.textoDePeso(1, "hora"), um.textoDePeso(1.5, "hora"), um.textoDePeso(2, "hora"), um.textoDePeso(0.5, "hora"), um.textoDePeso(2.25, "hora")], ["1 h", "1 h 30", "2 h", "30 min", "2 h 15"], "el tiempo se lee como un partido: 1 h 30");
+  igual([um.textoDePeso(0.285, "kilogramo"), um.textoDePeso(1.5, "litro")], ["285 g", "1,5 L"], "y el kilo y el litro no cambian");
+  igual([um.medidaDelPrecio("hora"), um.medidaDelPrecio("litro"), um.medidaDelPrecio("kilogramo")], ["hora", "litro", "kilo"], "el precio dice «/ hora»");
+  igual(um.montoPorPeso(80000, 1.5), 120000, "1 h 30 a 80.000 la hora = 120.000");
+  igual(um.montoPorPeso(80000, 0.5), 40000, "media hora = 40.000");
+  igual(um.montoPorPeso(75000, 1.25), 93750, "1 h 15 a 75.000 = 93.750");
+  const cancha1 = { id: "c1", nombre: "Alquiler Cancha 1", precio: 80000, unidadMedida: "hora", iva: "gravado10", disponible: true };
+  const alquiler = pp.armarPedido([producto(cancha1)], [{ productId: "c1", cantidad: 1, peso: 1.5 }]);
+  ok(alquiler.ok && alquiler.subtotal === 120000 && alquiler.lineas[0].nombreProducto === "Alquiler Cancha 1 (1 h 30)", "el servidor cobra 120.000 y la línea dice «Alquiler Cancha 1 (1 h 30)»");
+  const dosHoras = pp.armarPedido([producto(cancha1)], [{ productId: "c1", cantidad: 2 }]);
+  ok(dosHoras.ok && dosHoras.subtotal === 160000, "dos horas enteras sin decimales: 160.000");
+  const sobreHora = ce.cargaDeProducto({ tipo: "decimal", valor: 60 }, { nombre: "Alquiler Cancha 1", porPeso: true, unidad: "hora" });
+  ok(!sobreHora.ok && sobreHora.error.includes("horas"), "60 horas de una vez se avisa en horas (no en kilos)");
+  const bien = ce.cargaDeProducto(ce.leerCantidadEscrita("1,5"), { nombre: "Alquiler Cancha 1", porPeso: true, unidad: "hora" });
+  ok(bien.ok && bien.peso === 1.5 && bien.cantidad === 1, "«1,5» en la cantidad carga hora y media");
+  const ivaAlquiler = fp.desglosarIva(alquiler.lineas, 0);
+  ok(ivaAlquiler.totalGeneral === 120000 && ivaAlquiler.iva10 === Math.round(120000 / 11), "el IVA 10 % de 120.000 es 10.909");
+
   window.log("\naciertos: " + window.__aciertos + " · fallas: " + window.__fallas);
   window.__listo = true;
 })().catch((e) => { document.getElementById("salida").textContent += "\nERROR: " + (e && e.stack || e); window.__listo = true; window.__fallas = (window.__fallas || 0) + 1; });

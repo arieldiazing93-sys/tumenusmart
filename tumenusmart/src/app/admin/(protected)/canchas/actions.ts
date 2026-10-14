@@ -8,12 +8,12 @@ import { diaDeLaSemana, diaLargo, estadoDeCita, horaDeMinutos, partesLocales } f
 import {
   codigoDeReserva,
   estadoLiberaHorario,
-  nombreDelProductoDeAlquiler,
   sanearReservaPanel,
   tramosDeCancha,
   type DatosReservaPanel,
 } from "@/lib/canchas";
 import { cargarHorarioCanchas } from "@/lib/canchas-publicas";
+import { sincronizarProductoDeCancha } from "@/lib/canchas-producto";
 import { MINUTOS_BLOQUEO_SIN_CONFIRMAR } from "@/lib/disponibilidad";
 import { aMinutos, nombreDeDia } from "@/lib/horario-trabajo";
 import type { DatosCobro } from "@/lib/agenda-cita";
@@ -250,65 +250,16 @@ export async function cambiarEstadoReservaCancha(id: string, estado: string): Pr
 //  Cobrar la reserva
 // ---------------------------------------------------------------------------
 
-/** La categoría (desactivada) donde viven los productos ocultos de alquiler. */
-const CATEGORIA_DE_ALQUILER = "Alquiler de canchas";
-
 /**
- * El producto oculto «Alquiler <cancha>» con que se vende y factura cada alquiler. Se crea solo la primera vez que se cobra una
- * reserva de esa cancha: queda en una categoría y con una disponibilidad apagadas, así no aparece en la carta pública ni en el punto de
- * venta (solo se puede vender desde una reserva). Sirve para que el comprobante lleve su IVA, su unidad y que es una prestación de
- * servicios, y para que los reportes de productos vendidos muestren cuánto dejó cada cancha. Con un candado por cancha: dos cobros a
- * la vez no crean dos productos.
+ * El producto del punto de venta con que se cobra el alquiler de esa cancha («Alquiler Cancha 1», por hora, servicio, con el IVA de su
+ * ficha). Lo mantiene al día la ficha de la cancha; acá solo se asegura de que exista (las canchas cargadas antes de que tuvieran
+ * producto lo reciben en su primer cobro).
  */
-async function asegurarProductoDeAlquiler(
+async function productoDeAlquiler(
   storeId: string,
   canchaId: string
 ): Promise<{ ok: true; productId: string } | { ok: false; error: string }> {
-  return prisma.$transaction(async (tx) => {
-    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${"alquiler:" + canchaId}))`;
-    const cancha = await tx.cancha.findFirst({
-      where: { id: canchaId, storeId },
-      select: { id: true, nombre: true, precioHora: true, productId: true },
-    });
-    if (!cancha) return { ok: false as const, error: "Esa cancha ya no existe." };
-    const nombre = nombreDelProductoDeAlquiler(cancha.nombre);
-
-    if (cancha.productId) {
-      const existente = await tx.product.findFirst({
-        where: { id: cancha.productId, storeId },
-        select: { id: true, nombre: true },
-      });
-      if (existente) {
-        // Si a la cancha se le cambió el nombre, el comprobante lo dice igual.
-        if (existente.nombre !== nombre) {
-          await tx.product.updateMany({ where: { id: existente.id, storeId }, data: { nombre } });
-        }
-        return { ok: true as const, productId: existente.id };
-      }
-    }
-
-    const categoria =
-      (await tx.category.findFirst({ where: { storeId, nombre: CATEGORIA_DE_ALQUILER }, select: { id: true } })) ??
-      (await tx.category.create({
-        data: { storeId, nombre: CATEGORIA_DE_ALQUILER, activa: false, orden: 9999 },
-        select: { id: true },
-      }));
-    const producto = await tx.product.create({
-      data: {
-        storeId,
-        categoryId: categoria.id,
-        nombre,
-        precio: Number(cancha.precioHora),
-        iva: "gravado10",
-        unidadMedida: "unidad",
-        esServicio: true,
-        disponible: false,
-      },
-      select: { id: true },
-    });
-    await tx.cancha.updateMany({ where: { id: canchaId, storeId }, data: { productId: producto.id } });
-    return { ok: true as const, productId: producto.id };
-  });
+  return sincronizarProductoDeCancha(storeId, canchaId);
 }
 
 export type ResultadoCobroReservaCancha =
@@ -371,7 +322,7 @@ export async function cobrarReservaCancha(reservaId: string, cobro: DatosCobro):
     return { ok: false, error: "No hay un turno de caja abierto en esta computadora. Abrilo y volvé a cobrar.", sinTurno: true };
   }
 
-  const producto = await asegurarProductoDeAlquiler(storeId, reserva.canchaId);
+  const producto = await productoDeAlquiler(storeId, reserva.canchaId);
   if (!producto.ok) return producto;
 
   const esFactura = cobro.comprobanteTipo === "factura";

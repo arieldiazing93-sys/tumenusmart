@@ -20,7 +20,7 @@ import { lineasParaPromos, repreciarCarrito } from "@/lib/precio-carrito-pos";
 import { aplicarPromociones, detallePorLinea, type PromoDef } from "@/lib/promociones";
 import { segundoDeSemanaAsuncion } from "@/lib/precio-promocion";
 import { CANTIDAD_MAXIMA_EN_CAJA, cargaDeProducto, leerCantidadEscrita, sumarCargaALista } from "@/lib/cantidad-escrita";
-import { seVendePorPeso, textoDePeso } from "@/lib/unidad-medida";
+import { medidaDelPrecio, seVendePorPeso, textoDePeso } from "@/lib/unidad-medida";
 
 /** Un producto (con o sin agregados) o un combo mitad y mitad ya armado, con su nota para la cocina. */
 type ItemCarrito = { key: string; nombre: string; precio: number; cantidad: number; detalle?: string; nota: string } & (
@@ -173,7 +173,7 @@ export function CargarProductosPanel({
   /** Lo escrito en «Cantidad» aplicado al producto que se tocó; null si no se puede (ya se avisó cuál es el problema). */
   function cargaPara(p: ProductoVenta): { cantidad: number; peso?: number } | null {
     if (!conCantidad) return { cantidad: 1 };
-    const carga = cargaDeProducto(leerCantidadEscrita(cantidadPrevia), { nombre: p.nombre, porPeso: seVendePorPeso(p.unidadMedida) });
+    const carga = cargaDeProducto(leerCantidadEscrita(cantidadPrevia), { nombre: p.nombre, porPeso: seVendePorPeso(p.unidadMedida), unidad: p.unidadMedida });
     if (!carga.ok) {
       setErrorCantidad(carga.error);
       return null;
@@ -446,7 +446,7 @@ export function CargarProductosPanel({
                     {formatearGuarani(p.precio)}
                     {/* Un producto por kilo o por litro: el precio es de esa medida (se escribe el peso en «Cantidad»). */}
                     {conCantidad && seVendePorPeso(p.unidadMedida) && (
-                      <span className="ml-1 text-[0.7rem] font-medium text-tinta-suave">/ {p.unidadMedida === "litro" ? "litro" : "kilo"}</span>
+                      <span className="ml-1 text-[0.7rem] font-medium text-tinta-suave">/ {medidaDelPrecio(p.unidadMedida)}</span>
                     )}
                   </p>
                   {/* Promoción por descuento o por volumen que rige ahora para este producto (2x1, −20 %…). */}

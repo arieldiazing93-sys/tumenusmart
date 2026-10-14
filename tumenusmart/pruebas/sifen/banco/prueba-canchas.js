@@ -120,6 +120,16 @@
   igual(s.cancha.precioNocturnoHora, null, "sin precio de noche = null");
   igual(s.cancha.descripcion, null, "descripción vacía = null");
   ok(s.cancha.techada === true, "techada se respeta");
+  igual(s.cancha.categoria, "Fútbol 5", "sin grupo escrito usa el nombre del tipo de cancha");
+  igual(s.cancha.iva, "gravado10", "el IVA por defecto es 10 %");
+  s = c.sanearCancha({ ...base, categoria: "  Cancha techada  ", iva: "exento" });
+  ok(s.ok && s.cancha.categoria === "Cancha techada" && s.cancha.iva === "exento", "con grupo e IVA elegidos (el grupo sin espacios de más)");
+  s = c.sanearCancha({ ...base, iva: "veinte" });
+  ok(s.ok && s.cancha.iva === "gravado10", "un IVA que no existe vuelve a 10 %");
+  s = c.sanearCancha({ ...base, categoria: "x".repeat(100) });
+  ok(s.ok && s.cancha.categoria.length === 40, "el grupo se recorta a 40 letras");
+  s = c.sanearCancha({ ...base, deporte: "padel" });
+  ok(s.ok && s.cancha.categoria === "Pádel", "el grupo por defecto sigue al tipo (Pádel)");
   s = c.sanearCancha({ ...base, nombre: "   " });
   ok(!s.ok, "sin nombre se rechaza");
   s = c.sanearCancha({ ...base, deporte: "rugby" });

@@ -27,7 +27,7 @@ import { MitadYMitadPickerPos } from "./MitadYMitadPickerPos";
 import { AgregadosPickerPos } from "./AgregadosPickerPos";
 import { CantidadPrevia } from "./CantidadPrevia";
 import { CANTIDAD_MAXIMA_EN_CAJA, cargaDeProducto, leerCantidadEscrita, sumarPesos } from "@/lib/cantidad-escrita";
-import { pesoValido, seVendePorPeso, textoDePeso } from "@/lib/unidad-medida";
+import { medidaDelPrecio, pesoValido, seVendePorPeso, textoDePeso } from "@/lib/unidad-medida";
 import { imprimirComprobante, type ResultadoImpresion } from "@/lib/impresion-comprobantes";
 import type {
   AgregadoVenta,
@@ -278,6 +278,7 @@ export function PantallaVenta({
     const carga = cargaDeProducto(leerCantidadEscrita(cantidadPrevia), {
       nombre: p.nombre,
       porPeso: seVendePorPeso(p.unidadMedida),
+      unidad: p.unidadMedida,
     });
     if (!carga.ok) {
       setErrorCantidad(carga.error);
@@ -864,7 +865,7 @@ export function PantallaVenta({
                     {formatearGuarani(p.precio)}
                     {/* Un producto por kilo o por litro: el precio es de esa medida (se escribe el peso en «Cantidad»). */}
                     {seVendePorPeso(p.unidadMedida) && (
-                      <span className="ml-1 text-[0.72rem] font-medium text-tinta-suave">/ {p.unidadMedida === "litro" ? "litro" : "kilo"}</span>
+                      <span className="ml-1 text-[0.72rem] font-medium text-tinta-suave">/ {medidaDelPrecio(p.unidadMedida)}</span>
                     )}
                   </p>
                   {/* Promoción por descuento o por volumen que rige ahora para este producto (2x1, −20 %…). */}

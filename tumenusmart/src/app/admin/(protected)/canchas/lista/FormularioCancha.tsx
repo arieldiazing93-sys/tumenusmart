@@ -8,11 +8,13 @@ import {
   DEPORTES_CANCHA,
   DURACIONES_DISPONIBLES,
   PASOS_DE_CANCHA,
+  etiquetaDeDeporte,
   textoDuracionCancha,
   type CanchaFila,
   type DatosCancha,
 } from "@/lib/canchas";
 import { comprimirImagen, PARA_LOGO } from "@/lib/comprimir-imagen";
+import { TASAS_IVA } from "@/lib/iva";
 import { actualizarCancha, crearCancha, eliminarCancha, subirFotoDeCancha } from "./actions";
 
 /** Cómo se escribe un precio en la pantalla: "80000" → "80.000". */
@@ -27,7 +29,16 @@ function textoDePrecio(n: number | null): string {
  * No usa `action={...}` del formulario a propósito: React vacía los campos al terminar una acción, y con un error de
  * validación la persona tendría que volver a escribir todo.
  */
-export function FormularioCancha({ cancha, onCerrar }: { cancha: CanchaFila | null; onCerrar: () => void }) {
+export function FormularioCancha({
+  cancha,
+  grupos = [],
+  onCerrar,
+}: {
+  cancha: CanchaFila | null;
+  /** Los grupos de canchas que ya existen en el punto de venta (para sugerirlos). */
+  grupos?: string[];
+  onCerrar: () => void;
+}) {
   const router = useRouter();
   const [pendiente, iniciar] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -49,6 +60,8 @@ export function FormularioCancha({ cancha, onCerrar }: { cancha: CanchaFila | nu
     duraciones: cancha?.duraciones ?? [60, 90, 120],
     pasoMin: cancha?.pasoMin ?? 30,
     activa: cancha?.activa ?? true,
+    categoria: cancha?.categoria ?? "",
+    iva: cancha?.iva ?? "gravado10",
   });
   const [confirmandoBorrar, setConfirmandoBorrar] = useState(false);
 
@@ -206,6 +219,55 @@ export function FormularioCancha({ cancha, onCerrar }: { cancha: CanchaFila | nu
             placeholder="Ej: 5 contra 5, con vestuarios e iluminación LED"
           />
         </Campo>
+
+        {/* ---------- cómo se vende y se factura: el grupo del punto de venta y el IVA ---------- */}
+        <div className="rounded-xl border-2 border-azul/50 p-3.5">
+          <h3 className="mb-1 text-[0.92rem] font-semibold tracking-titular text-tinta">En el punto de venta y en la factura</h3>
+          <p className="mb-3 text-[0.78rem] leading-snug text-tinta-suave">
+            Cada cancha se ve en el punto de venta como un producto (alquiler por hora), dentro de su grupo. Así podés cobrar en el
+            mostrador a quien no reservó, con ticket o factura.
+          </p>
+          <div className="flex flex-col gap-3.5">
+            <Campo
+              etiqueta="Grupo en el punto de venta"
+              ayuda="Como las categorías de la carta: «Fútbol 5», «Pádel»… Si lo dejás vacío se usa el tipo de cancha."
+            >
+              <Entrada
+                list="grupos-de-canchas"
+                maxLength={40}
+                value={datos.categoria}
+                onChange={(e) => cambiar({ categoria: e.target.value })}
+                placeholder={etiquetaDeDeporte(datos.deporte)}
+              />
+              <datalist id="grupos-de-canchas">
+                {grupos.map((g) => (
+                  <option key={g} value={g} />
+                ))}
+              </datalist>
+            </Campo>
+
+            <Campo etiqueta="IVA del alquiler">
+              <Selector value={datos.iva} onChange={(e) => cambiar({ iva: e.target.value })}>
+                {TASAS_IVA.map((t) => (
+                  <option key={t.valor} value={t.valor}>
+                    {t.etiqueta}
+                  </option>
+                ))}
+              </Selector>
+            </Campo>
+
+            <dl className="grid grid-cols-2 gap-x-3 gap-y-1 rounded-lg bg-papel-suave px-3 py-2.5 text-[0.8rem]">
+              <dt className="text-tinta-suave">Unidad de medida</dt>
+              <dd className="font-semibold text-tinta">Hora</dd>
+              <dt className="text-tinta-suave">Tipo</dt>
+              <dd className="font-semibold text-tinta">Prestación de servicios</dd>
+            </dl>
+            <p className="-mt-1 text-[0.76rem] leading-snug text-tinta-suave">
+              En el punto de venta, para 1 hora tocás la cancha; para 1 h 30 escribís <strong>1,5</strong> en «Cantidad» y después tocás
+              la cancha. La factura electrónica sale con el IVA de acá y la unidad Hora.
+            </p>
+          </div>
+        </div>
 
         {/* ---------- precio ---------- */}
         <div className="rounded-xl border-2 border-azul/50 p-3.5">

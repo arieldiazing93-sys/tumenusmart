@@ -37,7 +37,8 @@ export async function cargarCatalogoParaPedido(
   if (idsPedidos.size === 0) return [];
 
   const productos = await db.product.findMany({
-    where: { id: { in: [...idsPedidos] }, category: { activa: true } },
+    // Lo que se pide desde la carta (o desde el mozo): los grupos de canchas son solo del mostrador.
+    where: { id: { in: [...idsPedidos] }, category: { activa: true, paraCanchas: false } },
     orderBy: { orden: "asc" },
     include: {
       promociones: SELECCION_PROMOCIONES,

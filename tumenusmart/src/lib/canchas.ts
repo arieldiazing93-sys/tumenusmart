@@ -19,6 +19,7 @@ import { claveSumarDias } from "./calendario";
 import { ANTICIPACION_MIN, DIAS_ADELANTE, tramosDeTrabajo, type Ocupado } from "./disponibilidad";
 import { formatearGuarani } from "./format";
 import { aMinutos, esHoraValida, type HorarioDia } from "./horario-trabajo";
+import { normalizarIva, type TasaIva } from "./iva";
 import type { ClienteLimpio } from "./reserva-cliente";
 
 // ---------------------------------------------------------------------------
@@ -373,6 +374,10 @@ export type DatosCancha = {
   duraciones: number[];
   pasoMin: number;
   activa: boolean;
+  /** El grupo del punto de venta («Fútbol 5»). Vacío = el del tipo de cancha. */
+  categoria: string;
+  /** gravado10 | gravado5 | exento. */
+  iva: string;
 };
 
 export type CanchaLimpia = {
@@ -388,6 +393,9 @@ export type CanchaLimpia = {
   duraciones: number[];
   pasoMin: number;
   activa: boolean;
+  /** El nombre del grupo del punto de venta (nunca vacío). */
+  categoria: string;
+  iva: TasaIva;
 };
 
 function texto(valor: unknown, max: number): string {
@@ -455,6 +463,9 @@ export function sanearCancha(entrada: unknown): { ok: true; cancha: CanchaLimpia
       duraciones: limpiarDuraciones(e.duraciones),
       pasoMin: normalizarPaso(e.pasoMin),
       activa: e.activa !== false,
+      // El grupo del punto de venta: lo que escribió el dueño o, si lo dejó vacío, el nombre del tipo de cancha.
+      categoria: texto(e.categoria, 40) || etiquetaDeDeporte(e.deporte),
+      iva: normalizarIva(e.iva),
     },
   };
 }
@@ -463,6 +474,10 @@ export function sanearCancha(entrada: unknown): { ok: true; cancha: CanchaLimpia
 export type CanchaFila = CanchaPublica & {
   activa: boolean;
   tieneReservas: boolean;
+  /** El grupo del punto de venta («Fútbol 5»). */
+  categoria: string;
+  /** gravado10 | gravado5 | exento. */
+  iva: string;
 };
 
 // ---------------------------------------------------------------------------

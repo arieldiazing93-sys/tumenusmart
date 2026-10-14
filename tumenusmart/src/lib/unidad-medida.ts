@@ -12,12 +12,14 @@
  * https://ekuatia.set.gov.py/sifen/xsd/Unidades_Medida_v141.xsd
  */
 
-export type UnidadMedida = "unidad" | "kilogramo" | "litro";
+export type UnidadMedida = "unidad" | "kilogramo" | "litro" | "hora";
 
 export const UNIDADES_MEDIDA: { valor: UnidadMedida; etiqueta: string; codigoSifen: number }[] = [
   { valor: "unidad", etiqueta: "Unidad", codigoSifen: 77 },
   { valor: "kilogramo", etiqueta: "Kilogramo", codigoSifen: 83 },
   { valor: "litro", etiqueta: "Litro", codigoSifen: 89 },
+  // El alquiler de una cancha se vende por hora (1 h, 1 h 30…). Código 100 = «Hora - Hs» en el mismo XSD oficial.
+  { valor: "hora", etiqueta: "Hora", codigoSifen: 100 },
 ];
 
 /** Cualquier valor raro (o vacío) cae en "unidad" — el más común en gastronomía. */
@@ -34,9 +36,12 @@ export function etiquetaUnidadMedida(valor: string): string {
 //  Venta por peso o volumen (kilogramo / litro): se pesa y el monto sale de precio × peso
 // ---------------------------------------------------------------------------------------------------------------------
 
-/** ¿Se vende por peso o volumen? El precio del producto es por kilogramo (o por litro) y lo que se vende se pesa o se mide. */
+/**
+ * ¿Se vende por una medida que admite decimales? El precio del producto es por kilogramo, por litro o por hora y lo que se vende se
+ * pesa, se mide o se cuenta en horas (0,285 kg, 1,5 h). Con la hora el «peso» es el tiempo: 1,5 = una hora y media.
+ */
 export function seVendePorPeso(unidad: string | null | undefined): boolean {
-  return unidad === "kilogramo" || unidad === "litro";
+  return unidad === "kilogramo" || unidad === "litro" || unidad === "hora";
 }
 
 /** Lo más chico y lo más grande que se puede pesar en una línea: de 1 g (1 ml) a 999,999 kg (L). Siempre con hasta 3 decimales. */
@@ -50,13 +55,28 @@ export function pesoValido(peso: unknown): peso is number {
   return Math.abs(peso * 1000 - Math.round(peso * 1000)) < 1e-6;
 }
 
-/** Lo que se pesó, como se lee en un ticket: "350 g", "1,25 kg", "250 ml", "1,5 L". */
+/**
+ * Lo que se pesó, como se lee en un ticket: "350 g", "1,25 kg", "250 ml", "1,5 L". Con la hora, el tiempo: "30 min", "1 h",
+ * "1 h 30", "2 h 15".
+ */
 export function textoDePeso(peso: number, unidad: string): string {
+  if (unidad === "hora") {
+    const minutos = Math.round(peso * 60);
+    if (minutos < 60) return `${minutos} min`;
+    const horas = Math.floor(minutos / 60);
+    const resto = minutos % 60;
+    return resto === 0 ? `${horas} h` : `${horas} h ${String(resto).padStart(2, "0")}`;
+  }
   const litro = unidad === "litro";
   if (peso < 1) return `${Math.round(peso * 1000)} ${litro ? "ml" : "g"}`;
   const redondeado = Math.round(peso * 1000) / 1000;
   const texto = Number.isInteger(redondeado) ? String(redondeado) : String(redondeado).replace(".", ",");
   return `${texto} ${litro ? "L" : "kg"}`;
+}
+
+/** De qué medida es el precio de un producto que se vende por peso: «kilo», «litro» u «hora» (para escribir «/ hora»). */
+export function medidaDelPrecio(unidad: string | null | undefined): string {
+  return unidad === "litro" ? "litro" : unidad === "hora" ? "hora" : "kilo";
 }
 
 /**

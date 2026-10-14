@@ -72,7 +72,7 @@ export type CargaDeProducto =
  */
 export function cargaDeProducto(
   escrita: CantidadEscrita,
-  producto: { nombre: string; porPeso: boolean }
+  producto: { nombre: string; porPeso: boolean; /** "kilogramo" | "litro" | "hora" | "unidad": para que el aviso diga la medida correcta. */ unidad?: string }
 ): CargaDeProducto {
   if (escrita.tipo === "vacia") return { ok: true, cantidad: 1 };
   if (escrita.tipo === "invalida") return { ok: false, error: escrita.error };
@@ -81,7 +81,10 @@ export function cargaDeProducto(
     if (escrita.valor > PESO_MAXIMO_POR_CARGA) {
       return {
         ok: false,
-        error: `Son más de ${PESO_MAXIMO_POR_CARGA} kilos. Si querías gramos, escribí 0,250 para 250 g. Para más cantidad, cargalo de a varias veces.`,
+        error:
+          producto.unidad === "hora"
+            ? `Son más de ${PESO_MAXIMO_POR_CARGA} horas. Para un partido se escribe 1, 1,5 o 2. Para más cantidad, cargalo de a varias veces.`
+            : `Son más de ${PESO_MAXIMO_POR_CARGA} kilos. Si querías gramos, escribí 0,250 para 250 g. Para más cantidad, cargalo de a varias veces.`,
       };
     }
     return { ok: true, cantidad: 1, peso: escrita.valor };

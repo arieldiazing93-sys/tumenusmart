@@ -528,6 +528,9 @@ model Category {
   /// Barba, Color…). Sus servicios son Products con esServicio = true, así que
   /// se venden en el punto de venta y se facturan como cualquier producto.
   paraServicios Boolean @default(false)
+  /// true = es un grupo de canchas de la Reserva de canchas («Fútbol 5», «Pádel»…). Sus productos son las canchas (alquiler por hora): se
+  /// ven y se venden en el punto de venta como cualquier producto, pero NO aparecen en la carta pública ni en el menú del cliente.
+  paraCanchas Boolean @default(false)
   productos Product[]
   createdAt DateTime  @default(now())
   // Días y horarios en que esta categoría se OCULTA de la carta pública —
@@ -2702,9 +2705,12 @@ model Cancha {
   pasoMin     Int     @default(30)
   activa      Boolean @default(true)
   orden       Int     @default(0)
-  /// El producto oculto «Alquiler <cancha>» con que se vende (y factura) cada alquiler: se crea solo la primera vez que se cobra. No
-  /// aparece en la carta ni en el punto de venta (categoría y producto desactivados); sirve para el IVA, el comprobante y los reportes.
+/// El producto del punto de venta con que se vende (y factura) el alquiler de esta cancha: «Alquiler <cancha>», por hora, servicio. Se  /// crea y se mantiene solo al guardar la cancha (nombre, precio, IVA, grupo y disponibilidad salen de la ficha).
   productId   String?
+  /// El grupo (categoría) del punto de venta donde se ve esta cancha: «Fútbol 5», «Pádel»… Es una Category con paraCanchas = true.
+  categoriaId String?
+  /// El IVA con que se vende y factura el alquiler: gravado10 | gravado5 | exento (el mismo catálogo de los productos).
+  iva         String  @default("gravado10")
   createdAt   DateTime @default(now())
 
   reservas ReservaCancha[]

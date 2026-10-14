@@ -566,7 +566,13 @@ export async function registrarVenta(turnoId: string, datos: DatosVenta): Promis
   if (datos.reservaCanchaId) {
     // El alquiler de una reserva: el precio es el de la reserva (leído arriba de la base) y el comprobante dice qué día y a qué
     // hora fue. Sin promociones: el precio de la reserva ya es lo acordado con el cliente.
-    filas = armado.lineas.map((f) => ({ ...f, precioUnitario: precioDeLaReserva, opcionesTexto: detalleDeLaReserva }));
+    // `porPeso`: el comprobante dice «1 unidad» con el detalle (14/10 · 20:00 a 21:30 · 1 h 30), no «1 hora» por un partido de 90 minutos.
+    filas = armado.lineas.map((f) => ({
+      ...f,
+      precioUnitario: precioDeLaReserva,
+      opcionesTexto: detalleDeLaReserva,
+      porPeso: true,
+    }));
     subtotal = filas.reduce((suma, f) => suma + f.precioUnitario * f.cantidad, 0);
   } else if (datos.citaId) {
     for (const it of datos.items) {

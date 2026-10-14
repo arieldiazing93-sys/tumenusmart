@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { exigirPermiso } from "@/lib/auth";
 import { registrarBitacora } from "@/lib/bitacora";
 import { etiquetaDeDeporte, sanearCancha } from "@/lib/canchas";
+import { asegurarGrupoDeCanchas, retirarProductoDeCancha, sincronizarProductoDeCancha } from "@/lib/canchas-producto";
 import { descartarImagenes } from "@/lib/imagenes";
 import { idLocalActual } from "@/lib/local-actual";
 import { prismaDelLocal } from "@/lib/prisma-local";
@@ -43,12 +44,28 @@ export async function crearCancha(entrada: unknown): Promise<ResultadoCancha> {
   const c = saneada.cancha;
 
   // Va al final de la lista: después de la última que tiene el local.
+  // El grupo del punto de venta (Fútbol 5…): se resuelve primero, así un nombre repetido de la carta no deja la cancha a medio hacer.
+  const grupo = await asegurarGrupoDeCanchas(storeId, c.categoria);
+  if (!grupo.ok) return grupo;
+  // `categoria` es del grupo del punto de venta (no es una columna de la cancha): se saca de lo que se guarda.
+  const columnas: Omit<typeof c, "categoria"> & { categoria?: string } = { ...c };
+  delete columnas.categoria;
+
   const ultima = await db.cancha.findFirst({ orderBy: { orden: "desc" }, select: { orden: true } });
 
   const creada = await db.cancha.create({
-    data: { storeId, ...c, orden: (ultima?.orden ?? -1) + 1 },
+    data: { storeId, ...columnas, categoriaId: grupo.categoriaId, orden: (ultima?.orden ?? -1) + 1 },
     select: { id: true },
   });
+
+  // Su producto en el punto de venta (alquiler por hora, con su IVA, dentro de su grupo).
+  const producto = await sincronizarProductoDeCancha(storeId, creada.id);
+  if (!producto.ok) {
+    return {
+      ok: false,
+      error: `La cancha se creó, pero no se pudo prepararla para el punto de venta: ${producto.error} Abrila y guardala de nuevo.`,
+    };
+  }
 
   await registrarBitacora(storeId, sesion, {
     modulo: "canchas",
@@ -79,7 +96,16 @@ export async function actualizarCancha(id: string, entrada: unknown): Promise<Re
   });
   if (!anterior) return { ok: false, error: "No se encontró esa cancha." };
 
-  await db.cancha.updateMany({ where: { id }, data: c });
+  // El grupo del punto de venta, antes de tocar nada (un nombre repetido de la carta se avisa y no cambia nada).
+  const grupo = await asegurarGrupoDeCanchas(storeId, c.categoria);
+  if (!grupo.ok) return grupo;
+  const columnas: Omit<typeof c, "categoria"> & { categoria?: string } = { ...c };
+  delete columnas.categoria;
+
+  await db.cancha.updateMany({ where: { id }, data: { ...columnas, categoriaId: grupo.categoriaId } });
+  // Su producto en el punto de venta sigue a la ficha: nombre, precio, IVA, grupo y si está disponible.
+  const producto = await sincronizarProductoDeCancha(storeId, id);
+  if (!producto.ok) return producto;
   // Si se cambió o se quitó la foto, la anterior se borra del almacenamiento (si ninguna otra fila la usa).
   if (anterior.fotoUrl && anterior.fotoUrl !== c.fotoUrl) await descartarImagenes([anterior.fotoUrl]);
 
@@ -108,7 +134,7 @@ export async function eliminarCancha(id: string): Promise<ResultadoCancha> {
   const storeId = await idLocalActual();
   const db = prismaDelLocal(storeId);
 
-  const cancha = await db.cancha.findFirst({ where: { id }, select: { nombre: true, fotoUrl: true } });
+  const cancha = await db.cancha.findFirst({ where: { id }, select: { nombre: true, fotoUrl: true, productId: true } });
   if (!cancha) return { ok: false, error: "No se encontró esa cancha." };
 
   const reservas = await db.reservaCancha.count({ where: { canchaId: id } });
@@ -120,6 +146,8 @@ export async function eliminarCancha(id: string): Promise<ResultadoCancha> {
   }
 
   await db.cancha.deleteMany({ where: { id } });
+  // Su producto del punto de venta: se borra, o queda desactivado si ya tuvo ventas.
+  await retirarProductoDeCancha(storeId, cancha.productId);
   if (cancha.fotoUrl) await descartarImagenes([cancha.fotoUrl]);
 
   await registrarBitacora(storeId, sesion, {

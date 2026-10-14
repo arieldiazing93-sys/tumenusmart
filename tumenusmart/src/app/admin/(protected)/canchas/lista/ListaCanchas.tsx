@@ -5,6 +5,7 @@ import { Pastilla, Tabla, Td, Th, Tr, Vacio, clasesBoton } from "@/components/ui
 import { PanelLateral } from "@/components/PanelLateral";
 import { etiquetaDeDeporte, textoDuracionCancha, type CanchaFila } from "@/lib/canchas";
 import { formatearGuarani } from "@/lib/format";
+import { etiquetaIva } from "@/lib/iva";
 import { FormularioCancha } from "./FormularioCancha";
 
 /** Qué muestra el panel lateral: nada, el alta o el formulario para editar una cancha. */
@@ -34,7 +35,7 @@ function resumenDeDuraciones(c: CanchaFila): string {
  * La lista de canchas: el botón para añadir y una fila por cancha. Tocar "Editar" abre el panel lateral con la ficha.
  * En pantalla ancha la lista es una tabla; en el celular son tarjetas.
  */
-export function ListaCanchas({ canchas }: { canchas: CanchaFila[] }) {
+export function ListaCanchas({ canchas, grupos }: { canchas: CanchaFila[]; grupos: string[] }) {
   const [panel, setPanel] = useState<PanelCancha>(null);
 
   const cancha = panel && panel.modo === "editar" ? (canchas.find((c) => c.id === panel.id) ?? null) : null;
@@ -65,7 +66,7 @@ export function ListaCanchas({ canchas }: { canchas: CanchaFila[] }) {
               <thead>
                 <tr>
                   <Th>Cancha</Th>
-                  <Th>Tipo</Th>
+                  <Th>Grupo en el punto de venta</Th>
                   <Th className="text-right">Precio por hora</Th>
                   <Th className="text-right">Hora de noche</Th>
                   <Th>Duraciones</Th>
@@ -86,7 +87,12 @@ export function ListaCanchas({ canchas }: { canchas: CanchaFila[] }) {
                         {!c.activa && <Pastilla>Inactiva</Pastilla>}
                       </div>
                     </Td>
-                    <Td>{etiquetaDeDeporte(c.deporte)}</Td>
+                    <Td>
+                      {c.categoria}
+                      <span className="block text-[0.72rem] text-tinta-suave">
+                        {etiquetaDeDeporte(c.deporte)} · {etiquetaIva(c.iva)}
+                      </span>
+                    </Td>
                     <Td className="cifra text-right">{formatearGuarani(c.precioHora)}</Td>
                     <Td className="cifra text-right">
                       {c.precioNocturnoHora == null ? (
@@ -125,7 +131,7 @@ export function ListaCanchas({ canchas }: { canchas: CanchaFila[] }) {
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-[0.92rem] font-semibold text-tinta">{c.nombre}</p>
                   <p className="truncate text-[0.8rem] text-tinta-media">
-                    {etiquetaDeDeporte(c.deporte)} · {formatearGuarani(c.precioHora)} por hora
+                    {c.categoria} · {formatearGuarani(c.precioHora)} por hora
                   </p>
                   <div className="mt-1 flex flex-wrap gap-1.5">
                     {c.techada && <Pastilla color="azul">Techada</Pastilla>}
@@ -150,6 +156,7 @@ export function ListaCanchas({ canchas }: { canchas: CanchaFila[] }) {
           <FormularioCancha
             key={panel.modo === "nuevo" ? "nueva" : `editar-${panel.id}`}
             cancha={cancha}
+            grupos={grupos}
             onCerrar={() => setPanel(null)}
           />
         </PanelLateral>

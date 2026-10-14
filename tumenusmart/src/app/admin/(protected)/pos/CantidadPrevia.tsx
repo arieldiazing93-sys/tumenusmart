@@ -2,7 +2,6 @@
 
 import { Entrada } from "@/components/ui";
 import { leerCantidadEscrita } from "@/lib/cantidad-escrita";
-import { textoDePeso } from "@/lib/unidad-medida";
 
 /**
  * La cantidad que se escribe ANTES de tocar el producto («35», o «0,250» para 250 g de un producto por kilo). Va arriba de los productos,
@@ -46,10 +45,10 @@ export function CantidadPrevia({
           </span>
         ) : escrita.tipo === "decimal" ? (
           <span className="font-medium text-tinta">
-            {textoDePeso(escrita.valor, "kilogramo")}: para productos por kilo o litro.
+            Con decimales ({String(escrita.valor).replace(".", ",")}): para productos por kilo, litro u hora (1,5 = una hora y media).
           </span>
         ) : (
-          "Opcional: escribí la cantidad (35) o el peso (0,250 = 250 g) y después tocá el producto."
+          "Opcional: escribí la cantidad (35), el peso (0,250 = 250 g) o las horas de una cancha (1,5) y después tocá el producto."
         )}
       </span>
       {(error || escrita.tipo === "invalida") && (

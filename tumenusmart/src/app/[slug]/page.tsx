@@ -65,7 +65,8 @@ export default async function CatalogoPage({
 
   const [categoriasCrudas, destacados, estadoTienda, promociones] = await Promise.all([
     prisma.category.findMany({
-      where: { storeId, activa: true },
+      // Los grupos de canchas (Reserva de canchas) se venden en el mostrador, no se piden desde la carta.
+      where: { storeId, activa: true, paraCanchas: false },
       orderBy: { orden: "asc" },
       include: {
         productos: {
@@ -92,7 +93,7 @@ export default async function CatalogoPage({
       },
     }),
     prisma.product.findMany({
-      where: { storeId, destacado: true, disponible: true },
+      where: { storeId, destacado: true, disponible: true, category: { paraCanchas: false } },
       orderBy: { orden: "asc" },
       include: { promociones: SELECCION_PROMOCIONES },
     }),
