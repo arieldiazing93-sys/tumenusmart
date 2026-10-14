@@ -54,6 +54,10 @@ function armarGrupos(hayIdeaSinVer: boolean, rol: string, ventasACredito: boolea
             // Las propinas que los clientes dejan con tarjeta o transferencia: se acumulan por mozo y se les pagan desde la caja.
             { href: "/admin/comedor/propinas", label: "Propinas", icono: "usuarios" as const,
               ver: conPermiso("comedor.gestionar") },
+            // Lo que cada mozo ganó de comisión por las cuentas que cobró y lo que se le debe: se le paga desde la caja (retiro de
+            // caja) hoy o en otra fecha, todo o una parte.
+            { href: "/admin/comedor/comisiones", label: "Comisiones", icono: "usuarios" as const,
+              ver: conPermiso("comedor.gestionar") },
           ] },
         // Las cuentas de los pedidos a domicilio: la caja abre una con los datos del cliente y su dirección, le carga los productos,
         // la manda con un repartidor y la cobra. Tercera opción del día a día, después del Punto de venta y el Servicio comedor.

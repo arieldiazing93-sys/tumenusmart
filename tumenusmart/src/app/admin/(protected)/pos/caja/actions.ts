@@ -157,6 +157,15 @@ export async function eliminarMovimientoCaja(movimientoId: string): Promise<Resu
     };
   }
 
+  // Lo mismo con el pago de una comisión: quedaría registrado como pagado sin el retiro de la caja. Se deshace desde Comisiones.
+  const esPagoDeComision = await db.pagoComisionMozo.count({ where: { movimientoCajaId: movimientoId } });
+  if (esPagoDeComision > 0) {
+    return {
+      ok: false,
+      error: "Este retiro es un pago de comisión a un mozo: deshacelo desde Servicio comedor → Comisiones.",
+    };
+  }
+
   await db.movimientoCaja.delete({ where: { id: movimientoId } });
 
   await registrarBitacora(storeId, sesion, {

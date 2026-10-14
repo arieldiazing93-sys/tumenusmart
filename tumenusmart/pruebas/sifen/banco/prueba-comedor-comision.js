@@ -76,6 +76,115 @@
   ce.sumarCargaALista(original, linea("k", 1, 0.25));
   ok(original[0].peso === 0.25, "la lista original no se toca");
 
+  // =============================================================== lo que se le debe y el pago de la comisión
+  window.log("== Pago de comisiones: lo que se le debe");
+  igual(cm.comisionPendiente(100000, 30000), 70000, "ganó 100.000, se le pagaron 30.000: se le deben 70.000");
+  igual(cm.comisionPendiente(100000, 100000), 0, "pagado todo: 0");
+  igual(cm.comisionPendiente(50000, 80000), 0, "si se le pagó de más (se canceló una venta), debe 0 y no queda negativo");
+  igual(cm.comisionPendiente(0, 0), 0, "sin nada: 0");
+  igual(cm.comisionPendiente(1000.4, 0.2), 1000, "redondea al guaraní");
+
+  window.log("== Pago de comisiones: validar el pago");
+  const v = (d, p) => cm.validarPagoDeComision(d, p);
+  let pv = v({ monto: 70000 }, 70000);
+  ok(pv.ok && pv.pago.monto === 70000 && pv.pago.desde === null && pv.pago.hasta === null && pv.pago.nota === null, "pagar todo lo que se le debe, sin período ni nota");
+  pv = v({ monto: 20000 }, 70000);
+  ok(pv.ok && pv.pago.monto === 20000, "pagar solo una parte");
+  pv = v({ monto: "45000" }, 70000);
+  ok(pv.ok && pv.pago.monto === 45000, "el monto llega como texto");
+  pv = v({ monto: 70000.4 }, 70000);
+  ok(pv.ok && pv.pago.monto === 70000, "redondea al guaraní");
+  ok(v({ monto: 70001 }, 70000).ok === false, "no se puede pagar más de lo que se le debe");
+  ok(v({ monto: 0 }, 70000).ok === false, "monto cero se rechaza");
+  ok(v({ monto: -500 }, 70000).ok === false, "monto negativo se rechaza");
+  ok(v({ monto: "abc" }, 70000).ok === false, "monto que no es número se rechaza");
+  ok(v({}, 70000).ok === false, "sin monto se rechaza");
+  ok(v(null, 70000).ok === false, "sin datos se rechaza");
+  ok(v({ monto: 1000 }, 0).ok === false, "si no se le debe nada, no se paga");
+  pv = v({ monto: 1000, desde: "2026-10-01", hasta: "2026-10-07" }, 5000);
+  ok(pv.ok && pv.pago.desde === "2026-10-01" && pv.pago.hasta === "2026-10-07", "con período");
+  pv = v({ monto: 1000, desde: "2026-10-07", hasta: "2026-10-07" }, 5000);
+  ok(pv.ok, "un solo día");
+  ok(v({ monto: 1000, desde: "2026-10-08", hasta: "2026-10-07" }, 5000).ok === false, "período al revés se rechaza");
+  ok(v({ monto: 1000, desde: "2026-02-31" }, 5000).ok === false, "una fecha que no existe se rechaza");
+  ok(v({ monto: 1000, hasta: "mañana" }, 5000).ok === false, "una fecha escrita mal se rechaza");
+  pv = v({ monto: 1000, desde: "2026-10-01" }, 5000);
+  ok(pv.ok && pv.pago.desde === "2026-10-01" && pv.pago.hasta === null, "solo «desde»");
+  pv = v({ monto: 1000, desde: "  ", hasta: "" }, 5000);
+  ok(pv.ok && pv.pago.desde === null && pv.pago.hasta === null, "fechas en blanco = sin período");
+  pv = v({ monto: 1000, nota: "  quincena\n del 1 al 15  " }, 5000);
+  ok(pv.ok && pv.pago.nota === "quincena del 1 al 15", "la nota se limpia (espacios y saltos)");
+  pv = v({ monto: 1000, nota: "x".repeat(500) }, 5000);
+  ok(pv.ok && pv.pago.nota.length === 200, "la nota se corta en 200");
+  pv = v({ monto: 1000, nota: "   " }, 5000);
+  ok(pv.ok && pv.pago.nota === null, "nota en blanco = sin nota");
+
+  window.log("== Pago de comisiones: el período en palabras");
+  igual(cm.textoDelPeriodo("2026-10-01", "2026-10-07"), "del 01/10/2026 al 07/10/2026", "con los dos extremos");
+  igual(cm.textoDelPeriodo("2026-10-07", "2026-10-07"), "del 07/10/2026", "un solo día");
+  igual(cm.textoDelPeriodo("2026-10-01", null), "desde el 01/10/2026", "solo desde");
+  igual(cm.textoDelPeriodo(null, "2026-10-07"), "hasta el 07/10/2026", "solo hasta");
+  igual(cm.textoDelPeriodo(null, null), "", "sin período");
+
+  window.log("== Pago de comisiones: el evento de Seguridad");
+  const seg = await C.cargar("src/lib/seguridad");
+  ok(seg.esEventoDeSeguridad("pago_comisiones"), "pago_comisiones es un evento conocido");
+  ok(seg.EVENTOS_DE_SEGURIDAD.some((e) => e.id === "pago_comisiones" && e.etiqueta === "Pago de comisiones"), "figura en la lista de Ajustes → Seguridad");
+  const lim = seg.limpiarEventos(["descuentos", "pago_comisiones"]);
+  ok(lim.ok && lim.eventos.join() === "descuentos,pago_comisiones", "se puede guardar tildado");
+  ok(seg.pideClave(["pago_comisiones"], "pago_comisiones") && !seg.pideClave(["descuentos"], "pago_comisiones"), "pide clave solo si está tildado");
+  ok(seg.puedeAutorizar("administrador", [], "pago_comisiones"), "el administrador siempre puede autorizarlo");
+  ok(!seg.puedeAutorizar("caja", [], "pago_comisiones") && seg.puedeAutorizar("caja", ["pago_comisiones"], "pago_comisiones"), "caja, solo si se le tildó");
+
+  // =============================================================== los saldos con una base de mentira
+  window.log("== Pago de comisiones: ganado, pagado y pendiente por mozo");
+  const sv = await C.cargar("src/lib/comision-mozo-servidor");
+  const d = (s) => new Date(s + "T12:00:00Z");
+  const cuentasBase = [
+    // mozo A: tres cuentas cobradas (una con venta cancelada después)
+    { mozoId: "A", ventaPosId: "v1", comisionMozoPorcentaje: 5, comisionMozoBase: 100000 }, // 5.000
+    { mozoId: "A", ventaPosId: "v2", comisionMozoPorcentaje: 5, comisionMozoBase: 200000 }, // 10.000
+    { mozoId: "A", ventaPosId: "v3", comisionMozoPorcentaje: 5, comisionMozoBase: 400000 }, // venta cancelada: no cuenta
+    // mozo B: una cuenta cobrada
+    { mozoId: "B", ventaPosId: "v4", comisionMozoPorcentaje: 10, comisionMozoBase: 33333 }, // 3.333
+  ];
+  const ventasBase = [
+    { id: "v1", cancelada: false, creadoEn: d("2026-10-02") },
+    { id: "v2", cancelada: false, creadoEn: d("2026-10-10") },
+    { id: "v3", cancelada: true, creadoEn: d("2026-10-03") },
+    { id: "v4", cancelada: false, creadoEn: d("2026-10-05") },
+  ];
+  const pagosBase = [
+    { mozoId: "A", monto: 4000, createdAt: d("2026-10-06") },
+    { mozoId: "A", monto: 1000, createdAt: d("2026-10-11") },
+    { mozoId: "B", monto: 5000, createdAt: d("2026-10-06") }, // se le pagó de más: debe 0
+  ];
+  const consultas = [];
+  const filtra = (filas, where) =>
+    filas.filter((f) => (where.mozoId === undefined || f.mozoId === where.mozoId) && (!where.id || where.id.in.includes(f.id)));
+  const dbFalsa = {
+    cuentaMesa: { findMany: async ({ where }) => { consultas.push(where); return filtra(cuentasBase, where); } },
+    ventaPos: { findMany: async ({ where }) => { consultas.push(where); return filtra(ventasBase, where); } },
+    pagoComisionMozo: { findMany: async ({ where }) => { consultas.push(where); return filtra(pagosBase, where); } },
+  };
+  const todos = await sv.saldosDeComision(dbFalsa, "local-1");
+  igual(todos.get("A").ganada, 15000, "A ganó 5.000 + 10.000 (la venta cancelada no suma)");
+  igual(todos.get("A").pagada, 5000, "a A se le pagaron 4.000 + 1.000");
+  igual(todos.get("A").pendiente, 10000, "a A se le deben 10.000");
+  igual(todos.get("B").ganada, 3333, "B ganó 3.333");
+  igual(todos.get("B").pendiente, 0, "a B se le pagó de más: debe 0, no negativo");
+  ok(consultas.every((w) => w.storeId === "local-1"), "toda consulta lleva el local");
+
+  const corto = await sv.saldosDeComision(dbFalsa, "local-1", { periodo: { gte: d("2026-10-01"), lt: d("2026-10-08") } });
+  igual(corto.get("A").ganadaEnPeriodo, 5000, "del 1 al 7: A ganó 5.000 (la venta del 10 queda afuera)");
+  igual(corto.get("A").pagadaEnPeriodo, 4000, "del 1 al 7: se le pagaron 4.000 (el pago del 11 queda afuera)");
+  igual(corto.get("A").pendiente, 10000, "lo que se le debe no depende del período");
+
+  const soloA = await sv.saldosDeComision(dbFalsa, "local-1", { mozoId: "A" });
+  ok(soloA.has("A") && !soloA.has("B"), "con un mozo pedido, solo vuelve ese mozo");
+  const sinNadie = await sv.saldosDeComision(dbFalsa, "local-1", { mozoId: "Z" });
+  ok(sinNadie.size === 0, "un mozo sin movimiento no aparece (se le debe 0)");
+
   window.log("\naciertos: " + window.__aciertos + " · fallas: " + window.__fallas);
   window.__listo = true;
 })().catch((e) => { document.getElementById("salida").textContent += "\nERROR: " + (e && e.stack || e); window.__listo = true; window.__fallas = (window.__fallas || 0) + 1; });

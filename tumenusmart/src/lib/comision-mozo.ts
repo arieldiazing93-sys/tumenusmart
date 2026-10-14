@@ -48,3 +48,72 @@ export function baseDeComision(
 export function montoDeComision(base: number, porcentaje: number): number {
   return Math.round((base * porcentaje) / 100);
 }
+
+// ---------------------------------------------------------------------------
+//  Pagar la comisión: lo que se le debe al mozo y el pago
+// ---------------------------------------------------------------------------
+
+/** Lo que se le debe a un mozo: lo ganado menos lo ya pagado. Nunca negativo (si se pagó de más —una venta se canceló después—, debe 0). */
+export function comisionPendiente(ganada: number, pagada: number): number {
+  return Math.max(0, Math.round(ganada) - Math.round(pagada));
+}
+
+export type PagoDeComisionValido = {
+  monto: number;
+  /** "YYYY-MM-DD" o null. */
+  desde: string | null;
+  hasta: string | null;
+  nota: string | null;
+};
+
+function diaValido(valor: unknown): string | null {
+  if (typeof valor !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(valor)) return null;
+  const t = Date.parse(valor);
+  return Number.isFinite(t) && new Date(t).toISOString().slice(0, 10) === valor ? valor : null;
+}
+
+/**
+ * Comprueba lo que llega del navegador al pagar una comisión: un monto entero de guaraníes mayor a cero que no pase de lo que se le debe
+ * al mozo, el período que paga (opcional, "desde" no después de "hasta") y una nota corta. Devuelve el error en palabras, o el pago
+ * limpio. Quien lo guarda vuelve a calcular lo que se le debe en el servidor.
+ */
+export function validarPagoDeComision(
+  datos: unknown,
+  pendiente: number
+): { ok: true; pago: PagoDeComisionValido } | { ok: false; error: string } {
+  const d = (datos && typeof datos === "object" ? datos : {}) as Record<string, unknown>;
+  const monto = Math.round(Number(d.monto));
+  if (!Number.isFinite(monto) || monto <= 0) return { ok: false, error: "El monto a pagar tiene que ser mayor a cero." };
+  if (pendiente <= 0) return { ok: false, error: "Ese mozo no tiene comisión pendiente de pago." };
+  if (monto > Math.round(pendiente)) {
+    return { ok: false, error: "Ese monto es mayor a lo que se le debe al mozo. Revisalo." };
+  }
+
+  const desdeEscrito = typeof d.desde === "string" && d.desde.trim() !== "";
+  const hastaEscrito = typeof d.hasta === "string" && d.hasta.trim() !== "";
+  const desde = desdeEscrito ? diaValido(d.desde) : null;
+  const hasta = hastaEscrito ? diaValido(d.hasta) : null;
+  if ((desdeEscrito && !desde) || (hastaEscrito && !hasta)) return { ok: false, error: "Una de las fechas del período no es válida." };
+  if (desde && hasta && desde > hasta) return { ok: false, error: "El período está al revés: «desde» tiene que ser antes que «hasta»." };
+
+  const nota = String(d.nota ?? "")
+    .replace(/[\x00-\x1F\x7F]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 200);
+  return { ok: true, pago: { monto, desde, hasta, nota: nota || null } };
+}
+
+/** "2026-10-07" → "07/10/2026". */
+function diaCorto(dia: string): string {
+  const [a, m, d] = dia.split("-");
+  return `${d}/${m}/${a}`;
+}
+
+/** El período de un pago dicho en palabras ("del 01/10/2026 al 07/10/2026", "desde el 01/10/2026", "hasta el 07/10/2026"), o "" si no tiene. */
+export function textoDelPeriodo(desde: string | null | undefined, hasta: string | null | undefined): string {
+  if (desde && hasta) return desde === hasta ? `del ${diaCorto(desde)}` : `del ${diaCorto(desde)} al ${diaCorto(hasta)}`;
+  if (desde) return `desde el ${diaCorto(desde)}`;
+  if (hasta) return `hasta el ${diaCorto(hasta)}`;
+  return "";
+}

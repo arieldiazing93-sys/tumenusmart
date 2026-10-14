@@ -5,6 +5,7 @@ import { formatearGuarani } from "@/lib/format";
 import { calcularRangoFecha, type FiltroFecha } from "@/lib/rango-fecha";
 import { calcularReporteMozos } from "@/lib/reporte-mozos";
 import { FiltroFechaReporte } from "@/components/FiltroFechaReporte";
+import { SelectorMozo } from "./SelectorMozo";
 
 export const dynamic = "force-dynamic";
 
@@ -23,16 +24,21 @@ const FILTROS_FECHA: { value: FiltroFecha; label: string }[] = [
 export default async function ReporteMozosPage({
   searchParams,
 }: {
-  searchParams: Promise<{ fecha?: string; desde?: string; hasta?: string }>;
+  searchParams: Promise<{ fecha?: string; desde?: string; hasta?: string; mozo?: string }>;
 }) {
   await pantallaConPermiso("estadisticas.ver");
 
-  const { fecha, desde, hasta } = await searchParams;
+  const { fecha, desde, hasta, mozo } = await searchParams;
   const fechaActiva: FiltroFecha = (fecha as FiltroFecha) ?? "mes";
   const rango = calcularRangoFecha(fechaActiva, desde, hasta) ?? calcularRangoFecha("mes", undefined, undefined)!;
 
-  const reporte = await calcularReporteMozos(await idLocalActual(), rango);
+  const storeId = await idLocalActual();
+  let reporte = await calcularReporteMozos(storeId, rango, mozo || null);
+  // El mozo elegido en el filtro. Si el enlace trae uno que ya no existe, se muestra el reporte de todos.
+  const mozoElegido = reporte.mozosDisponibles.find((m) => m.id === mozo) ?? null;
+  if (mozo && !mozoElegido) reporte = await calcularReporteMozos(storeId, rango, null);
   const t = reporte.totales;
+  const conComisiones = t.comision > 0 || t.comisionPagada > 0 || t.comisionPendiente > 0;
   const hayDatos = reporte.filas.length > 0 && (t.cuentasAbiertas > 0 || t.cuentasCobradas > 0 || t.productosEnviados > 0);
 
   function querystringActual() {
@@ -40,6 +46,7 @@ export default async function ReporteMozosPage({
     params.set("fecha", fechaActiva);
     if (fechaActiva === "rango" && desde) params.set("desde", desde);
     if (fechaActiva === "rango" && hasta) params.set("hasta", hasta);
+    if (mozoElegido) params.set("mozo", mozoElegido.id);
     return params.toString();
   }
 
@@ -47,7 +54,9 @@ export default async function ReporteMozosPage({
     <div className="flex flex-col gap-4">
       <Cabecera
         titulo="Mozos"
-        bajada="Lo que vendió cada mozo, su ticket promedio, los descuentos que se le dieron a sus cuentas y lo que se canceló."
+        bajada={`${
+          mozoElegido ? `Solo ${mozoElegido.nombre}: ` : "Elegí un mozo para ver solo el suyo. "
+        }Lo que vendió, su ticket promedio, los descuentos que se le dieron a sus cuentas, lo que se canceló y su comisión: ganada, pagada y lo que se le debe.`}
         acciones={
           <a href={`/admin/reporte-mozos/exportar?${querystringActual()}`} className={clasesBoton("principal", "sm")}>
             Descargar Excel
@@ -55,18 +64,44 @@ export default async function ReporteMozosPage({
         }
       />
 
+      {/* Un mozo o todos: el reporte se recalcula con el mismo período que ya estaba elegido. */}
+      <SelectorMozo
+        accion="/admin/reporte-mozos"
+        mozos={reporte.mozosDisponibles}
+        elegido={mozoElegido?.id ?? ""}
+        conservar={{
+          fecha: fechaActiva,
+          ...(fechaActiva === "rango" && desde ? { desde } : {}),
+          ...(fechaActiva === "rango" && hasta ? { hasta } : {}),
+        }}
+      />
+
       {/* El filtro de fechas: se adapta al celular (atajos que se deslizan, rango en dos campos lado a lado). */}
-      <FiltroFechaReporte accion="/admin/reporte-mozos" opciones={FILTROS_FECHA} activa={fechaActiva} desde={desde} hasta={hasta} />
+      <FiltroFechaReporte
+        accion="/admin/reporte-mozos"
+        opciones={FILTROS_FECHA}
+        activa={fechaActiva}
+        desde={desde}
+        hasta={hasta}
+        conservar={{ mozo: mozoElegido?.id }}
+      />
 
       {!hayDatos ? (
         <Vacio
-          titulo="Todavía no hay movimiento de mozos en este período"
+          titulo={mozoElegido ? `${mozoElegido.nombre} no tuvo movimiento en este período` : "Todavía no hay movimiento de mozos en este período"}
           detalle="Cuando los mozos abran mesas y se cobren sus cuentas desde Servicio comedor, acá se ve cuánto vendió cada uno."
         />
       ) : (
         <>
-          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-            <Cifra valor={formatearGuarani(Math.round(t.ventas))} rotulo="Vendido" detalle={`${t.cuentasCobradas} cuentas cobradas${t.comision > 0 ? ` · comisiones ${formatearGuarani(Math.round(t.comision))}` : ""}`} />
+          <div className={`grid grid-cols-2 gap-3 ${conComisiones ? "lg:grid-cols-5" : "lg:grid-cols-4"}`}>
+            <Cifra valor={formatearGuarani(Math.round(t.ventas))} rotulo="Vendido" detalle={`${t.cuentasCobradas} ${t.cuentasCobradas === 1 ? "cuenta cobrada" : "cuentas cobradas"}`} />
+            {conComisiones && (
+              <Cifra
+                valor={formatearGuarani(Math.round(t.comisionPendiente))}
+                rotulo="Comisión que se les debe"
+                detalle={`ganada ${formatearGuarani(Math.round(t.comision))} · pagada ${formatearGuarani(Math.round(t.comisionPagada))} en el período`}
+              />
+            )}
             <Cifra valor={formatearGuarani(Math.round(t.ticketPromedio))} rotulo="Ticket promedio" detalle="por cuenta cobrada" />
             <Cifra
               valor={formatearGuarani(Math.round(t.descuentos))}
@@ -89,7 +124,9 @@ export default async function ReporteMozosPage({
                 <Th className="text-right">Cuentas abiertas</Th>
                 <Th className="text-right">Cobradas</Th>
                 <Th className="text-right">Vendido</Th>
-                <Th className="text-right">Comisión</Th>
+                <Th className="text-right">Comisión ganada</Th>
+                <Th className="text-right">Comisión pagada</Th>
+                <Th className="text-right">Comisión pendiente</Th>
                 <Th className="text-right">Ticket promedio</Th>
                 <Th className="text-right">Por persona</Th>
                 <Th className="text-right">Descuentos</Th>
@@ -110,6 +147,10 @@ export default async function ReporteMozosPage({
                   <Td className="cifra text-right">{f.cuentasCobradas}</Td>
                   <Td className="cifra text-right font-semibold text-tinta">{formatearGuarani(Math.round(f.ventas))}</Td>
                   <Td className="cifra text-right">{f.comision > 0 ? formatearGuarani(Math.round(f.comision)) : "—"}</Td>
+                  <Td className="cifra text-right">{f.comisionPagada > 0 ? formatearGuarani(Math.round(f.comisionPagada)) : "—"}</Td>
+                  <Td className={`cifra text-right ${f.comisionPendiente > 0 ? "font-semibold text-tinta" : ""}`}>
+                    {f.comisionPendiente > 0 ? formatearGuarani(Math.round(f.comisionPendiente)) : "—"}
+                  </Td>
                   <Td className="cifra text-right">{formatearGuarani(Math.round(f.ticketPromedio))}</Td>
                   <Td className="cifra text-right">
                     {f.ventaPorPersona != null ? formatearGuarani(Math.round(f.ventaPorPersona)) : "—"}
@@ -139,6 +180,8 @@ export default async function ReporteMozosPage({
                 <Td className="cifra text-right font-semibold text-tinta">{t.cuentasCobradas}</Td>
                 <Td className="cifra text-right font-semibold text-tinta">{formatearGuarani(Math.round(t.ventas))}</Td>
                 <Td className="cifra text-right font-semibold text-tinta">{t.comision > 0 ? formatearGuarani(Math.round(t.comision)) : "—"}</Td>
+                <Td className="cifra text-right font-semibold text-tinta">{t.comisionPagada > 0 ? formatearGuarani(Math.round(t.comisionPagada)) : "—"}</Td>
+                <Td className="cifra text-right font-semibold text-tinta">{t.comisionPendiente > 0 ? formatearGuarani(Math.round(t.comisionPendiente)) : "—"}</Td>
                 <Td className="cifra text-right font-semibold text-tinta">{formatearGuarani(Math.round(t.ticketPromedio))}</Td>
                 <Td className="cifra text-right font-semibold text-tinta">
                   {t.ventaPorPersona != null ? formatearGuarani(Math.round(t.ventaPorPersona)) : "—"}
@@ -156,7 +199,9 @@ export default async function ReporteMozosPage({
             Lo vendido es lo cobrado (ya con el descuento) de las cuentas del mozo, por el día en que se cobraron. Los productos
             enviados y cancelados son los que el mozo cargó desde su celular; lo que carga la caja desde el panel no se le
             cuenta a ningún mozo. “Cuentas canceladas” son las que se anularon antes de cobrarse; “Cobros cancelados”, ventas
-            ya cobradas que después se anularon.
+            ya cobradas que después se anularon. La comisión ganada es la de las cuentas cobradas en el período; la pagada, lo que se
+            le entregó desde la caja en esas fechas (Servicio comedor → Comisiones); la pendiente es lo que se le debe hoy, sin
+            importar el período.
           </p>
         </>
       )}

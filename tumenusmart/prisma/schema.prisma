@@ -308,6 +308,7 @@ model Store {
   mesasComedor     MesaComedor[]
   sectoresComedor  SectorComedor[]
   propinasMozo     PropinaMozo[]
+  pagosComisionMozo PagoComisionMozo[]
 }
 
 /// Las direcciones que este local tuvo antes.
@@ -2938,9 +2939,35 @@ model Mozo {
   cuentas  CuentaMesa[]
   items    ItemCuentaMesa[]
   propinas PropinaMozo[]
+  pagosComision PagoComisionMozo[]
 
   @@unique([storeId, pinClave])
   @@index([storeId])
+}
+
+/// Un pago de comisión a un mozo: el negocio le paga en efectivo, desde la caja, lo que ganó por sus ventas (Mozo.comisionPorcentaje). Cada
+/// pago es un RETIRO DE CAJA en el turno abierto de la estación que lo hizo (`movimientoCajaId`, sin clave foránea a propósito: igual que
+/// las propinas). Lo que se le debe es lo ganado (sus cuentas cobradas y no canceladas) menos lo ya pagado.
+model PagoComisionMozo {
+  id            String   @id @default(cuid())
+  storeId       String
+  store         Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  mozoId        String
+  mozo          Mozo     @relation(fields: [mozoId], references: [id])
+  monto         Decimal  @db.Decimal(12, 2)
+  /// Qué período de ventas paga, como lo anotó quien pagó ("YYYY-MM-DD"). Opcional: sirve para saber a qué corresponde.
+  desde         String?
+  hasta         String?
+  nota          String?
+  /// El retiro de caja y el turno en que salió la plata.
+  movimientoCajaId String
+  turnoPosId    String
+  registradoPor String
+  createdAt     DateTime @default(now())
+
+  @@index([storeId, createdAt])
+  @@index([mozoId])
+  @@index([movimientoCajaId])
 }
 
 /// Una propina que el cliente dejó al pagar la cuenta de una mesa con tarjeta o transferencia (las propinas en efectivo no se

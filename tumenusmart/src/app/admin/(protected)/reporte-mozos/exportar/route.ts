@@ -18,11 +18,12 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const fecha = searchParams.get("fecha") ?? "mes";
   const desde = searchParams.get("desde") ?? undefined;
+  const mozo = searchParams.get("mozo") || null;
   const hasta = searchParams.get("hasta") ?? undefined;
   const rango = calcularRangoFecha(fecha, desde, hasta) ?? calcularRangoFecha("mes", undefined, undefined)!;
 
   const storeId = await idLocalActual();
-  const [local, reporte] = await Promise.all([localActual(), calcularReporteMozos(storeId, rango)]);
+  const [local, reporte] = await Promise.all([localActual(), calcularReporteMozos(storeId, rango, mozo)]);
 
   const finRangoInclusive = new Date(rango.lt.getTime() - 24 * 60 * 60 * 1000);
   const opcionesFecha: Intl.DateTimeFormatOptions = { day: "2-digit", month: "2-digit", year: "numeric", timeZone: ZONA_NEGOCIO };
@@ -32,7 +33,9 @@ export async function GET(request: NextRequest) {
   hoja.columns = [
     { width: 26 },
     { width: 16 },
-    { width: 12 },
+    { width: 18 },
+    { width: 18 },
+    { width: 18 },
     { width: 18 },
     { width: 18 },
     { width: 16 },
@@ -48,6 +51,8 @@ export async function GET(request: NextRequest) {
   filaTitulo(hoja, ["Negocio", local.nombre], 2);
   filaTitulo(hoja, ["Reporte", "Mozos (Servicio comedor)"], 2);
   filaTitulo(hoja, ["Período", periodo], 2);
+  const mozoElegido = mozo ? reporte.mozosDisponibles.find((m) => m.id === mozo) : undefined;
+  filaTitulo(hoja, ["Mozo", mozoElegido ? mozoElegido.nombre : "Todos los mozos"], 2);
   hoja.addRow([]);
 
   filaTitulo(
@@ -57,7 +62,9 @@ export async function GET(request: NextRequest) {
       "Cuentas abiertas",
       "Cobradas",
       "Vendido (Gs.)",
-      "Comisión (Gs.)",
+      "Comisión ganada (Gs.)",
+      "Comisión pagada (Gs.)",
+      "Comisión pendiente (Gs.)",
       "Ticket promedio (Gs.)",
       "Por persona (Gs.)",
       "Descuentos (Gs.)",
@@ -67,7 +74,7 @@ export async function GET(request: NextRequest) {
       "Monto cancelado (Gs.)",
       "Cuentas canceladas",
     ],
-    13
+    15
   );
   for (const f of reporte.filas) {
     hoja.addRow([
@@ -76,6 +83,8 @@ export async function GET(request: NextRequest) {
       f.cuentasCobradas,
       Math.round(f.ventas),
       Math.round(f.comision),
+      Math.round(f.comisionPagada),
+      Math.round(f.comisionPendiente),
       Math.round(f.ticketPromedio),
       f.ventaPorPersona != null ? Math.round(f.ventaPorPersona) : "",
       Math.round(f.descuentos),
@@ -97,6 +106,8 @@ export async function GET(request: NextRequest) {
       t.cuentasCobradas,
       Math.round(t.ventas),
       Math.round(t.comision),
+      Math.round(t.comisionPagada),
+      Math.round(t.comisionPendiente),
       Math.round(t.ticketPromedio),
       t.ventaPorPersona != null ? Math.round(t.ventaPorPersona) : "",
       Math.round(t.descuentos),
@@ -106,7 +117,7 @@ export async function GET(request: NextRequest) {
       Math.round(t.montoCancelado),
       t.cuentasCanceladas,
     ],
-    13
+    15
   );
   hoja.addRow([]);
   hoja.addRow(["Cobros cancelados (ventas ya cobradas que después se anularon)", t.cobrosCancelados]);

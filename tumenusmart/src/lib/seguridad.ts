@@ -15,7 +15,7 @@
  * exige la contraseña en el servidor (el navegador nunca decide si hace falta).
  */
 
-export type EventoSeguridad = "descuentos" | "cancelar_productos" | "cancelaciones" | "reabrir_cuentas";
+export type EventoSeguridad = "descuentos" | "cancelar_productos" | "cancelaciones" | "reabrir_cuentas" | "pago_comisiones";
 
 export type DefinicionDeEvento = {
   id: EventoSeguridad;
@@ -46,6 +46,12 @@ export const EVENTOS_DE_SEGURIDAD: DefinicionDeEvento[] = [
     id: "reabrir_cuentas",
     etiqueta: "Reapertura de cuentas",
     detalle: "Reabrir una cuenta que ya se imprimió (quedó por cobrar) en el comedor o el delivery.",
+  },
+  {
+    id: "pago_comisiones",
+    etiqueta: "Pago de comisiones",
+    detalle:
+      "Pagarle al mozo su comisión desde la caja (sale efectivo del turno abierto, como retiro). Deshacer el pago también lo pide. El pago de propinas todavía no lo pide.",
   },
 ];
 
