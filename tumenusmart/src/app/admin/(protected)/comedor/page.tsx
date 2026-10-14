@@ -22,6 +22,7 @@ import { BotonEnlace, Cabecera, Pastilla } from "@/components/ui";
 import { RefrescarCada } from "@/components/RefrescarCada";
 import { turnoAbierto } from "../pos/turno-actual";
 import { CompartirCarta } from "../CompartirCarta";
+import { AccesosDeServicio } from "../AccesosDeServicio";
 import { ComedorCaja, type ContextoCaja, type CuentaCajaFila } from "./ComedorCaja";
 
 export const dynamic = "force-dynamic";
@@ -245,8 +246,15 @@ export default async function ComedorPage() {
           <>
             {/* Ver mi carta: abre el enlace público y el QR para imprimir y poner en las mesas. */}
             {urlCarta && (
-              <CompartirCarta nombreNegocio={local?.nombre ?? "Nuestra carta"} url={urlCarta} etiquetaBoton="Ver mi carta" tonoBoton="navegar" />
+              <CompartirCarta nombreNegocio={local?.nombre ?? "Nuestra carta"} url={urlCarta} etiquetaBoton="📱 Ver mi carta" tonoBoton="navegar" />
             )}
+            {/* Accesos directos para no salir al menú: el punto de venta y el delivery. */}
+            <AccesosDeServicio
+              actual="comedor"
+              pos={puede(sesion.rol, "pos.vender")}
+              comedor={false}
+              delivery={puede(sesion.rol, "delivery.ver")}
+            />
             {puedeGestionar && (
               <BotonEnlace href="/admin/impresion" tono="navegar" tam="md">
                 Impresión automática

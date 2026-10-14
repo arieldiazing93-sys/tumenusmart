@@ -14,7 +14,10 @@ import { SEGUNDOS_LATIDO_IMPRESION, descuentoDeCuenta, impuestosDeCuenta, lineas
 import { ESTADOS_DELIVERY_ABIERTA, lineaDeEnvio, totalesDeDelivery } from "@/lib/delivery";
 import { BotonEnlace, Cabecera, Pastilla } from "@/components/ui";
 import { RefrescarCada } from "@/components/RefrescarCada";
+import { urlPublicaCarta } from "@/lib/url-publica-carta";
 import { turnoAbierto } from "../pos/turno-actual";
+import { AccesosDeServicio } from "../AccesosDeServicio";
+import { CompartirCarta } from "../CompartirCarta";
 import { DeliveryCaja } from "./DeliveryCaja";
 import type { ContextoDelivery, CuentaDeliveryFila } from "./tipos-delivery";
 
@@ -32,6 +35,10 @@ export default async function DeliveryPage() {
   const db = prismaDelLocal(storeId);
   const puedeGestionar = puede(sesion.rol, "delivery.gestionar");
   const puedeCobrar = puedeGestionar && puede(sesion.rol, "pos.vender");
+
+  // El enlace y el QR de la carta pública, para el acceso directo «Ver mi carta» de la cabecera.
+  const local = await prisma.store.findUnique({ where: { id: storeId }, select: { nombre: true, slug: true } });
+  const urlCarta = local ? await urlPublicaCarta(local.slug) : "";
 
   const desdeLatido = new Date(Date.now() - SEGUNDOS_LATIDO_IMPRESION * 1000);
   const [cuentas, enEspera, imprimiendo] = await Promise.all([
@@ -265,6 +272,16 @@ export default async function DeliveryPage() {
         bajada="Las cuentas de los pedidos a domicilio: abrí una con los datos del cliente y su dirección, cargale los productos, mandala con el repartidor y cobrala. Se actualiza solo."
         acciones={
           <>
+            {/* Accesos directos para no salir al menú: la carta (enlace y QR), el punto de venta y el comedor. */}
+            {urlCarta && (
+              <CompartirCarta nombreNegocio={local?.nombre ?? "Nuestra carta"} url={urlCarta} etiquetaBoton="📱 Ver mi carta" tonoBoton="navegar" />
+            )}
+            <AccesosDeServicio
+              actual="delivery"
+              pos={puede(sesion.rol, "pos.vender")}
+              comedor={puede(sesion.rol, "comedor.ver")}
+              delivery={false}
+            />
             {puedeGestionar && (
               <BotonEnlace href="/admin/impresion" tono="navegar" tam="md">
                 Impresión automática

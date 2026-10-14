@@ -11,7 +11,7 @@ import { validarPagosDeVenta } from "@/lib/pago-venta";
 import { claveDiaAsuncion } from "@/lib/timezone";
 import { formatearGuarani, formatearNumero } from "@/lib/format";
 import { registrarBitacora } from "@/lib/bitacora";
-import { armarPedido, type LineaArmada, type LineaPedida, type ProductoBase } from "@/lib/precio-pedido";
+import { LIMITES_DE_CAJA, armarPedido, type LineaArmada, type LineaPedida, type ProductoBase } from "@/lib/precio-pedido";
 import { devolverConsumo, registrarConsumoVenta, revertirMovimientosVenta } from "@/lib/movimientos-stock";
 import { leerConsumoGuardado } from "@/lib/comedor";
 import { costoDelProducto } from "@/lib/costo-receta";
@@ -103,6 +103,11 @@ export type ItemVentaInput =
       productId: string;
       opcionIds?: string[];
       cantidad: number;
+      /**
+       * Solo para un producto que se vende por kilogramo o por litro: cuánto se pesó, en esa unidad (0,35 = 350 g). El servidor calcula
+       * el precio (precio de lista × peso) y rechaza el peso en un producto que no se vende así. Ver `LineaPedida.peso`.
+       */
+      peso?: number;
       /**
        * Solo al cobrar una cita (ver `DatosVenta.citaId`): el precio final de un
        * servicio, si se cambió en el turno (un "desde", un ajuste). Se ignora en
@@ -444,6 +449,8 @@ export async function registrarVenta(turnoId: string, datos: DatosVenta): Promis
       ingredientes: p.ingredientes,
       mitadYMitadGrupo: p.mitadYMitadGrupo,
       mitadYMitadModo: p.mitadYMitadModo,
+      // Solo un producto por kilogramo o por litro se puede pesar (ver LineaPedida.peso).
+      unidadMedida: p.unidadMedida,
       iva: p.iva,
       receta,
       // Lo que cuesta preparar una unidad, según su receta: se guarda en la línea vendida.
@@ -477,10 +484,16 @@ export async function registrarVenta(turnoId: string, datos: DatosVenta): Promis
   const pedidas: LineaPedida[] = datos.items.map((it) =>
     "mitadYMitad" in it
       ? { mitadYMitad: it.mitadYMitad, opcionIds: it.opcionIds ?? [], cantidad: it.cantidad }
-      : { productId: it.productId, opcionIds: it.opcionIds ?? [], cantidad: it.cantidad }
+      : {
+          productId: it.productId,
+          opcionIds: it.opcionIds ?? [],
+          cantidad: it.cantidad,
+          ...(it.peso !== undefined && it.peso !== null ? { peso: it.peso } : {}),
+        }
   );
 
-  const armado = armarPedido(catalogo, pedidas);
+  // Los topes de la caja (un evento puede ser de cientos de unidades), no los de la carta pública.
+  const armado = armarPedido(catalogo, pedidas, LIMITES_DE_CAJA);
   if (!armado.ok) return { ok: false, error: armado.motivo };
 
   // Al cobrar una cita, el precio de un servicio puede haberse cambiado en el turno.
@@ -829,7 +842,8 @@ export async function registrarVenta(turnoId: string, datos: DatosVenta): Promis
         items: filas.map((f) => ({
           productId: f.productId ?? null,
           descripcion: descripcionDeItem(f.nombreProducto, f.opcionesTexto),
-          unidadMedida: f.productId ? (unidadDelProducto.get(f.productId) ?? null) : null,
+          // Una línea pesada ("Queso (350 g)") es una porción: la cantidad cuenta porciones, no kilos.
+          unidadMedida: f.porPeso ? "unidad" : f.productId ? (unidadDelProducto.get(f.productId) ?? null) : null,
           // Un combo mitad y mitad (sin producto único) es comida: mercadería.
           esServicio: f.productId ? (esServicioElProducto.get(f.productId) ?? false) : false,
           cantidad: f.cantidad,

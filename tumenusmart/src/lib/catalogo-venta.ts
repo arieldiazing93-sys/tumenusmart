@@ -42,6 +42,11 @@ export type ProductoVenta = {
   /** El precio normal; con `conPromosVigentes` pasa a ser el vigente. */
   precio: number;
   esServicio: boolean;
+  /**
+   * "unidad" | "kilogramo" | "litro". Con kilogramo o litro el precio es por esa unidad y en el mostrador se puede cargar lo que se
+   * pesó (gramos o kilos) para que la pantalla calcule el monto. Ausente = "unidad".
+   */
+  unidadMedida?: string;
   agregados: AgregadoVenta[];
   promos?: TramoPromocion[];
   precioNormal?: number;
@@ -83,6 +88,7 @@ export async function cargarCatalogoDeVenta(
           nombre: true,
           precio: true,
           esServicio: true,
+          unidadMedida: true,
           mitadYMitadGrupo: true,
           mitadYMitadModo: true,
           ...PROMOS,
@@ -135,6 +141,7 @@ export async function cargarCatalogoDeVenta(
         nombre: p.nombre,
         precio: Number(p.precio),
         esServicio: p.esServicio,
+        unidadMedida: p.unidadMedida,
         agregados: agregadosDe(p),
         promos: tramosDeFilas(p.promociones),
       })),

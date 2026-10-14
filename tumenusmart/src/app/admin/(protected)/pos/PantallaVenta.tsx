@@ -19,11 +19,14 @@ import { MovimientosCajaBoton } from "./caja/MovimientosCajaBoton";
 import { CompartirCarta } from "../CompartirCarta";
 import { EntradaConLupa } from "./EntradaConLupa";
 import { ClienteFiscalModal, type DatosClienteFiscal } from "./ClienteFiscalModal";
+import { AccesosDeServicio } from "../AccesosDeServicio";
 import { AvisoRucDnit, useVerificacionRuc } from "./AvisoRucDnit";
 import { pareceRucConDigito } from "@/lib/sifen/ruc";
 import { ClienteRapidoModal } from "./ClienteRapidoModal";
 import { MitadYMitadPickerPos } from "./MitadYMitadPickerPos";
 import { AgregadosPickerPos } from "./AgregadosPickerPos";
+import { CantidadSeleccion, CANTIDAD_MAXIMA_EN_CAJA } from "./CantidadSeleccion";
+import { seVendePorPeso, textoDePeso } from "@/lib/unidad-medida";
 import { imprimirComprobante, type ResultadoImpresion } from "@/lib/impresion-comprobantes";
 import type {
   AgregadoVenta,
@@ -54,7 +57,8 @@ type TipoEntregaPos = "local" | "llevar";
  * elegidas).
  */
 type ItemCarrito = { key: string; nombre: string; precio: number; cantidad: number; detalle?: string } & (
-  | { tipo: "producto"; productId: string; agregadoIds: string[] }
+  // `peso`: lo que se pesó de un producto por kilogramo o por litro (0,35 = 350 g). `precio` ya es el de ESA porción (lista × peso).
+  | { tipo: "producto"; productId: string; agregadoIds: string[]; peso?: number }
   | { tipo: "combo"; productIdA: string; productIdB: string; agregadoIds: string[] }
 );
 
@@ -150,6 +154,8 @@ export function PantallaVenta({
     () => repreciarCarrito(carritoGuardado, categorias, gruposMitad),
     [carritoGuardado, categorias, gruposMitad]
   );
+  // La línea elegida para el control «Cantidad de la selección» (sin elegir, la última que se tocó o agregó).
+  const [seleccionKey, setSeleccionKey] = useState<string | null>(null);
   const [clienteNombre, setClienteNombre] = useState("");
   const [clienteTelefono, setClienteTelefono] = useState("");
   const [tipoEntrega, setTipoEntrega] = useState<TipoEntregaPos>("local");
@@ -253,6 +259,27 @@ export function PantallaVenta({
   const total = subtotal - descuentoMonto;
   const cantidadTotal = useMemo(() => carrito.reduce((s, i) => s + i.cantidad, 0), [carrito]);
 
+  // La carta por producto (para saber en qué unidad se vende cada uno) y la línea que está elegida para «Cantidad de la selección».
+  const productoPorId = useMemo(() => {
+    const mapa = new Map<string, Producto>();
+    for (const c of categorias) for (const p of c.productos) mapa.set(p.id, p);
+    return mapa;
+  }, [categorias]);
+  const seleccionada = carrito.find((i) => i.key === seleccionKey) ?? carrito[carrito.length - 1] ?? null;
+  const productoDeSeleccion = seleccionada && seleccionada.tipo === "producto" ? (productoPorId.get(seleccionada.productId) ?? null) : null;
+  const seleccionPorPeso =
+    seleccionada && seleccionada.tipo === "producto" && productoDeSeleccion && seVendePorPeso(productoDeSeleccion.unidadMedida)
+      ? {
+          unidad: productoDeSeleccion.unidadMedida as string,
+          precioLista: productoDeSeleccion.precio,
+          peso: seleccionada.peso,
+          // Lo que suman los agregados elegidos (no se multiplica por el peso): la parte del precio de la línea que no es del producto.
+          precioAgregados: seleccionada.agregadoIds.length
+            ? productoDeSeleccion.agregados.filter((a) => seleccionada.agregadoIds.includes(a.id)).reduce((s, a) => s + a.precioExtra, 0)
+            : 0,
+        }
+      : null;
+
   function agregarProducto(p: Producto) {
     setError(null);
     // Con agregados para elegir, siempre abre el selector — igual que "Elegir
@@ -261,6 +288,7 @@ export function PantallaVenta({
       setProductoEligiendo(p);
       return;
     }
+    setSeleccionKey(p.id);
     setCarrito((actual) => {
       const existente = actual.find((i) => i.key === p.id);
       if (existente) {
@@ -283,6 +311,7 @@ export function PantallaVenta({
     const detalle = elegidos.length > 0 ? elegidos.map((a) => a.nombre).join(", ") : undefined;
 
     setError(null);
+    setSeleccionKey(key);
     setCarrito((actual) => {
       const existente = actual.find((i) => i.key === key);
       if (existente) {
@@ -309,6 +338,7 @@ export function PantallaVenta({
     const key = `combo:${parIds.join("+")}${idsAgregados.length > 0 ? `::${idsAgregados.join(",")}` : ""}`;
     const nombre = `Mitad ${a.nombre} / Mitad ${b.nombre}`;
     const detalle = agregadosElegidos.length > 0 ? agregadosElegidos.map((x) => x.nombre).join(", ") : undefined;
+    setSeleccionKey(key);
     setCarrito((actual) => {
       const existente = actual.find((i) => i.key === key);
       if (existente) {
@@ -332,13 +362,36 @@ export function PantallaVenta({
   }
 
   function cambiarCantidad(key: string, delta: number) {
+    setSeleccionKey(key);
     setCarrito((actual) =>
-      actual.map((i) => (i.key === key ? { ...i, cantidad: i.cantidad + delta } : i)).filter((i) => i.cantidad > 0)
+      actual
+        .map((i) => (i.key === key ? { ...i, cantidad: Math.min(i.cantidad + delta, CANTIDAD_MAXIMA_EN_CAJA) } : i))
+        .filter((i) => i.cantidad > 0)
+    );
+  }
+
+  /** La cantidad escrita a mano en «Cantidad de la selección» (50 empanadas): de un solo paso, sin tocar «+» cincuenta veces. */
+  function fijarCantidad(key: string, cantidad: number) {
+    if (!Number.isInteger(cantidad) || cantidad < 1) return;
+    setCarrito((actual) =>
+      actual.map((i) => (i.key === key ? { ...i, cantidad: Math.min(cantidad, CANTIDAD_MAXIMA_EN_CAJA) } : i))
+    );
+  }
+
+  /** Lo que se pesó de un producto por kilogramo o por litro (undefined = sin pesar). El monto lo recalcula la pantalla (lista × peso). */
+  function fijarPeso(key: string, peso: number | undefined) {
+    setCarrito((actual) =>
+      actual.map((i) => {
+        if (i.key !== key || i.tipo !== "producto") return i;
+        const { peso: _anterior, ...sinPeso } = i;
+        return peso === undefined ? sinPeso : { ...sinPeso, peso };
+      })
     );
   }
 
   function quitarProducto(key: string) {
     setCarrito((actual) => actual.filter((i) => i.key !== key));
+    setSeleccionKey((actual) => (actual === key ? null : actual));
   }
 
   function limpiarCarrito() {
@@ -482,7 +535,13 @@ export function PantallaVenta({
               opcionIds: i.agregadoIds,
               cantidad: i.cantidad,
             }
-          : { productId: i.productId, opcionIds: i.agregadoIds, cantidad: i.cantidad }
+          : {
+              productId: i.productId,
+              opcionIds: i.agregadoIds,
+              cantidad: i.cantidad,
+              // Lo que se pesó (producto por kilo o por litro): el servidor calcula el monto con el precio de lista.
+              ...(i.peso !== undefined ? { peso: i.peso } : {}),
+            }
       ),
       }));
     } catch {
@@ -710,16 +769,8 @@ export function PantallaVenta({
             {carta && (
               <CompartirCarta nombreNegocio={carta.nombre} url={carta.url} etiquetaBoton="📱 Ver mi carta" tonoBoton="navegar" tamBoton="md" />
             )}
-            {accesos.comedor && (
-              <Link href="/admin/comedor" className={clasesBoton("navegar", "md")}>
-                🍽 Servicio comedor
-              </Link>
-            )}
-            {accesos.delivery && (
-              <Link href="/admin/delivery" className={clasesBoton("navegar", "md")}>
-                🛵 Servicio delivery
-              </Link>
-            )}
+            {/* Los mismos botones están en la cabecera del Servicio comedor y del Servicio delivery (un solo componente). */}
+            <AccesosDeServicio actual="pos" pos={false} comedor={accesos.comedor} delivery={accesos.delivery} />
             <Link href="/admin/pos/cuentas" className={clasesBoton("navegar", "md")}>
               🧾 Historial de cuentas
             </Link>
@@ -733,7 +784,8 @@ export function PantallaVenta({
 
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1fr_23rem] lg:items-start">
         <div className="min-w-0">
-          <div className="-mx-0.5 mb-4 flex gap-2 overflow-x-auto px-0.5 pb-1">
+          {/* Los grupos se acomodan en varias filas (sin barra para deslizar a la derecha): todos a la vista, de un toque. */}
+          <div className="mb-4 flex flex-wrap gap-2">
             <button
               type="button"
               onClick={() => setCategoriaId(TODOS)}
@@ -863,10 +915,18 @@ export function PantallaVenta({
               {carrito.map((i, indice) => (
                 <div
                   key={i.key}
-                  className="flex items-center justify-between gap-2 border-b border-linea-fina pb-2.5 last:border-0 last:pb-0"
+                  className={`flex items-center justify-between gap-2 border-b border-linea-fina pb-2.5 last:border-0 last:pb-0 ${
+                    carrito.length > 1 && seleccionada?.key === i.key ? "-mx-1.5 rounded-lg bg-azul-luz/50 px-1.5 pt-1.5 ring-1 ring-azul/30" : ""
+                  }`}
                 >
-                  <div className="min-w-0">
+                  {/* Tocar el nombre elige la línea para «Cantidad de la selección» (abajo de la lista). */}
+                  <button type="button" onClick={() => setSeleccionKey(i.key)} className="min-w-0 flex-1 text-left" aria-label={`Elegir ${i.nombre}`}>
                     <p className="truncate text-[0.85rem] font-medium text-tinta">{i.nombre}</p>
+                    {i.tipo === "producto" && i.peso !== undefined && (
+                      <p className="truncate text-[0.76rem] font-semibold text-azul-oscuro">
+                        ⚖ {textoDePeso(i.peso, productoPorId.get(i.productId)?.unidadMedida ?? "kilogramo")}
+                      </p>
+                    )}
                     {i.detalle && <p className="truncate text-[0.76rem] text-tinta-suave">+ {i.detalle}</p>}
                     <p className="cifra text-[0.78rem] font-medium text-tinta">
                       {formatearGuarani(i.precio)} c/u · {formatearGuarani(i.precio * i.cantidad)}
@@ -877,7 +937,7 @@ export function PantallaVenta({
                         🎁 {detallePromos[indice].texto} · −{formatearGuarani(detallePromos[indice].ahorro)}
                       </p>
                     )}
-                  </div>
+                  </button>
                   <div className="flex flex-none items-center gap-1">
                     <button
                       type="button"
@@ -887,7 +947,7 @@ export function PantallaVenta({
                     >
                       −
                     </button>
-                    <span className="cifra w-5 text-center text-[0.85rem] font-semibold text-tinta">
+                    <span className="cifra min-w-[1.25rem] text-center text-[0.85rem] font-semibold text-tinta">
                       {i.cantidad}
                     </span>
                     <button
@@ -910,6 +970,19 @@ export function PantallaVenta({
                 </div>
               ))}
             </div>
+          )}
+
+          {/* «Cantidad de la selección»: un control mínimo debajo de la lista para la línea elegida. Escribir la cantidad directo (50
+              empanadas para un evento) o, si se vende por kilo o por litro, lo que se pesó en gramos o kilos y ver ya el monto. */}
+          {seleccionada && (
+            <CantidadSeleccion
+              key={seleccionada.key}
+              nombre={seleccionada.nombre}
+              cantidad={seleccionada.cantidad}
+              porPeso={seleccionPorPeso}
+              onCantidad={(n) => fijarCantidad(seleccionada.key, n)}
+              onPeso={(p) => fijarPeso(seleccionada.key, p)}
+            />
           )}
 
           {/* Descuento general: sobre toda la cuenta, no por producto. Solo tiene

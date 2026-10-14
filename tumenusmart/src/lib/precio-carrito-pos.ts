@@ -13,9 +13,12 @@
 import { calcularPrecioMitadYMitad } from "./mitad-mitad";
 import type { AgregadoVenta, CategoriaVenta, GrupoMitadVenta, ProductoMitadVenta, ProductoVenta } from "./catalogo-venta";
 import type { LineaDePromo } from "./promociones";
+import { montoPorPeso } from "./unidad-medida";
 
 export type LineaDeCarrito =
-  | { tipo: "producto"; productId: string; agregadoIds: string[]; precio: number }
+  // `peso`: lo que se pesó de un producto por kilogramo o por litro (0,35 = 350 g). El precio de la línea es el de lista × peso, al guaraní
+  // (la misma cuenta que hace `armarPedido`); los agregados se suman aparte, sin multiplicar.
+  | { tipo: "producto"; productId: string; agregadoIds: string[]; precio: number; peso?: number }
   | { tipo: "combo"; productIdA: string; productIdB: string; agregadoIds: string[]; precio: number };
 
 /** Los agregados que se pueden elegir en un combo: los de la primera mitad y después los de la segunda, sin repetir nombre (igual que `agregadosDeCombo`). */
@@ -60,7 +63,10 @@ export function repreciarCarrito<T extends LineaDeCarrito>(
     let precio: number | null = null;
     if (linea.tipo === "producto") {
       const p = productos.get(linea.productId);
-      if (p) precio = p.precio + sumaAgregados(p.agregados, linea.agregadoIds);
+      if (p) {
+        const base = linea.peso !== undefined ? montoPorPeso(p.precio, linea.peso) : p.precio;
+        precio = base + sumaAgregados(p.agregados, linea.agregadoIds);
+      }
     } else {
       const a = mitades.get(linea.productIdA);
       const b = mitades.get(linea.productIdB);

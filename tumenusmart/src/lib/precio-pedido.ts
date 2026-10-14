@@ -17,6 +17,7 @@
  */
 
 import { calcularPrecioMitadYMitad, type ModoPrecioMitad } from "./mitad-mitad";
+import { montoPorPeso, pesoValido, seVendePorPeso, textoDePeso } from "./unidad-medida";
 
 /**
  * Un monto como puede llegar desde donde sea — mismo criterio que en
@@ -55,6 +56,11 @@ export type ProductoBase = {
   ingredientes: string[];
   mitadYMitadGrupo: string | null;
   mitadYMitadModo: string;
+  /**
+   * "unidad" | "kilogramo" | "litro" — ver src/lib/unidad-medida.ts. Solo un producto por kilogramo o por litro se puede vender por
+   * peso (`LineaPedida.peso`). Ausente = "unidad".
+   */
+  unidadMedida?: string;
   /** "gravado10" | "gravado5" | "exento" — ver src/lib/iva.ts. */
   iva: string;
   /** Ya ordenadas como las ve el cliente. */
@@ -93,6 +99,12 @@ export type LineaPedida = {
   opcionIds?: string[];
   ingredientesQuitados?: string[];
   cantidad: number;
+  /**
+   * Solo en el mostrador, para un producto que se vende por kilogramo o por litro: cuánto se pesó, en esa unidad (0,35 = 350 g). El
+   * precio de UNA unidad de la línea pasa a ser precio × peso, redondeado al guaraní; `cantidad` sigue siendo cuántas porciones así.
+   * Sin esto, el producto se vende como siempre (la cantidad por el precio de lista). No aplica a un combo mitad y mitad.
+   */
+  peso?: number;
 };
 
 /** Una línea ya verificada, con los valores que van a la base. */
@@ -125,6 +137,11 @@ export type LineaArmada = {
    * diferencia del costo, el precio de un agregado siempre está cargado. */
   precioAgregados: number;
   /**
+   * true si la línea se pesó (ver `LineaPedida.peso`): el nombre lleva lo pesado ("Queso (350 g)") y la unidad de la factura es "unidad",
+   * porque `cantidad` cuenta porciones y no kilos.
+   */
+  porPeso?: boolean;
+  /**
    * Insumos que descuenta ESTA línea, POR UNIDAD — igual que precioUnitario,
    * no viene multiplicado por `cantidad` (quien llama multiplica). [] si
    * nada de lo elegido tiene receta armada — no descuenta nada, no bloquea
@@ -142,6 +159,34 @@ export type ResultadoArmado =
 export const MAX_LINEAS = 40;
 export const MAX_CANTIDAD_POR_LINEA = 50;
 export const MAX_UNIDADES = 200;
+
+/** Los topes de un pedido: según quién lo arma (el cliente desde la carta pública, o la caja en el mostrador). */
+export type LimitesPedido = {
+  maxLineas: number;
+  maxCantidadPorLinea: number;
+  maxUnidades: number;
+  /** true: lo arma un cliente por internet (los avisos lo mandan a escribir por WhatsApp). false: lo arma la caja. */
+  publico: boolean;
+};
+
+/** Los de siempre: el cliente armando su pedido desde la carta, el comedor, el delivery y el mozo. */
+export const LIMITES_PUBLICOS: LimitesPedido = {
+  maxLineas: MAX_LINEAS,
+  maxCantidadPorLinea: MAX_CANTIDAD_POR_LINEA,
+  maxUnidades: MAX_UNIDADES,
+  publico: true,
+};
+
+/**
+ * La caja del mostrador: un pedido para un evento (50 empanadas, 300 sándwiches) tiene que poder cargarse. Siguen siendo topes contra el
+ * error de tipeo (un cero de más), no contra el abuso: quien arma esto es una persona del local, con su sesión.
+ */
+export const LIMITES_DE_CAJA: LimitesPedido = {
+  maxLineas: MAX_LINEAS,
+  maxCantidadPorLinea: 1000,
+  maxUnidades: 5000,
+  publico: false,
+};
 
 /**
  * Cuánto puede diferir el total que vio el cliente del recalculado sin que
@@ -278,13 +323,14 @@ function elegirOpciones(
  */
 export function armarPedido(
   catalogo: ProductoBase[],
-  pedidas: LineaPedida[]
+  pedidas: LineaPedida[],
+  limites: LimitesPedido = LIMITES_PUBLICOS
 ): ResultadoArmado {
   if (!Array.isArray(pedidas) || pedidas.length === 0) {
     return { ok: false, motivo: "El carrito está vacío" };
   }
-  if (pedidas.length > MAX_LINEAS) {
-    return { ok: false, motivo: `Un pedido no puede tener más de ${MAX_LINEAS} líneas.` };
+  if (pedidas.length > limites.maxLineas) {
+    return { ok: false, motivo: `Un pedido no puede tener más de ${limites.maxLineas} líneas.` };
   }
 
   const porId = new Map<string, ProductoBase>();
@@ -298,18 +344,25 @@ export function armarPedido(
     if (!esEnteroPositivo(pedida?.cantidad)) {
       return { ok: false, motivo: "La cantidad de un producto tiene que ser un número entero mayor a cero." };
     }
-    if (pedida.cantidad > MAX_CANTIDAD_POR_LINEA) {
+    if (pedida.cantidad > limites.maxCantidadPorLinea) {
       return {
         ok: false,
-        motivo: `No se pueden pedir más de ${MAX_CANTIDAD_POR_LINEA} unidades del mismo producto. Escribinos por WhatsApp para un pedido grande.`,
+        motivo: limites.publico
+          ? `No se pueden pedir más de ${limites.maxCantidadPorLinea} unidades del mismo producto. Escribinos por WhatsApp para un pedido grande.`
+          : `No se pueden cargar más de ${limites.maxCantidadPorLinea} unidades del mismo producto en una línea.`,
       };
     }
     unidades += pedida.cantidad;
-    if (unidades > MAX_UNIDADES) {
+    if (unidades > limites.maxUnidades) {
       return {
         ok: false,
-        motivo: `El pedido supera las ${MAX_UNIDADES} unidades. Escribinos por WhatsApp para coordinarlo.`,
+        motivo: limites.publico
+          ? `El pedido supera las ${limites.maxUnidades} unidades. Escribinos por WhatsApp para coordinarlo.`
+          : `La cuenta supera las ${limites.maxUnidades} unidades. Dividila en dos.`,
       };
+    }
+    if (pedida.peso !== undefined && pedida.mitadYMitad) {
+      return { ok: false, motivo: "Un combo mitad y mitad no se vende por peso." };
     }
 
     const opcionIds = pedida.opcionIds ?? [];
@@ -369,10 +422,24 @@ function armarProducto(
   }
   const quitadosOrdenados = producto.ingredientes.filter((i) => quitados.includes(i));
 
+  // Un producto por kilogramo o por litro se puede vender por peso: el precio de la línea es el de lista × lo que se pesó, al guaraní.
+  // El stock y el costo salen de la receta (que es por unidad de medida) × el mismo peso.
+  const peso = pedida.peso;
+  if (peso !== undefined) {
+    if (!pesoValido(peso)) {
+      return { ok: false, motivo: "El peso no es válido: tiene que estar entre 1 g y 999,999 kg." };
+    }
+    if (!seVendePorPeso(producto.unidadMedida)) {
+      return { ok: false, motivo: `"${producto.nombre}" no se vende por peso (su unidad de medida no es kilogramo ni litro).` };
+    }
+  }
+  const factor = peso ?? 1;
+
   const precioAgregados = sumaPrecioOpciones(elegidas.opciones);
-  const precioUnitario = aNumero(producto.precio) + precioAgregados;
+  const precioBase = peso !== undefined ? montoPorPeso(aNumero(producto.precio), peso) : aNumero(producto.precio);
+  const precioUnitario = precioBase + precioAgregados;
   const consumo = combinarConsumo(
-    escalarConsumo(producto.receta, 1, producto.almacenId),
+    escalarConsumo(producto.receta, factor, producto.almacenId),
     sumaConsumoOpciones(elegidas.opciones)
   );
 
@@ -380,7 +447,9 @@ function armarProducto(
     ok: true,
     linea: {
       productId: producto.id,
-      nombreProducto: producto.nombre,
+      nombreProducto:
+        peso !== undefined ? `${producto.nombre} (${textoDePeso(peso, producto.unidadMedida ?? "kilogramo")})` : producto.nombre,
+      ...(peso !== undefined ? { porPeso: true } : {}),
       cantidad: pedida.cantidad,
       precioUnitario,
       iva: producto.iva,
@@ -388,7 +457,7 @@ function armarProducto(
       ingredientesQuitadosTexto:
         quitadosOrdenados.length > 0 ? `Sin: ${quitadosOrdenados.join(", ")}` : undefined,
       costoAgregados: sumaCostoOpciones(elegidas.opciones),
-      costoProducto: producto.costo != null ? aNumero(producto.costo) : null,
+      costoProducto: producto.costo != null ? aNumero(producto.costo) * factor : null,
       precioAgregados,
       consumo,
     },
