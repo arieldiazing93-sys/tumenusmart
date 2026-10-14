@@ -1,0 +1,62 @@
+"use client";
+
+import { Entrada } from "@/components/ui";
+import { leerCantidadEscrita } from "@/lib/cantidad-escrita";
+import { textoDePeso } from "@/lib/unidad-medida";
+
+/**
+ * La cantidad que se escribe ANTES de tocar el producto («35», o «0,250» para 250 g de un producto por kilo). Va arriba de los productos,
+ * a la izquierda, en blanco: sin escribir nada, cada toque suma de a uno como siempre. Es opcional y es para las cantidades grandes.
+ *
+ * No hace nada por su cuenta: la pantalla lee el texto al tocar el producto (ver `cargaDeProducto`) y lo borra después de usarlo.
+ * Solo deja escribir números, coma y punto: nunca borra el punto o la coma en silencio, porque «0.250» no es 250 unidades.
+ */
+export function CantidadPrevia({
+  valor,
+  onCambio,
+  error,
+}: {
+  valor: string;
+  onCambio: (texto: string) => void;
+  /** Por qué no se pudo cargar con esa cantidad (se muestra en rojo al lado). */
+  error: string | null;
+}) {
+  const escrita = leerCantidadEscrita(valor);
+  return (
+    <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-1.5">
+      <label htmlFor="pos-cantidad-previa" className="text-[0.72rem] font-semibold uppercase tracking-rotulo text-tinta-suave">
+        Cantidad
+      </label>
+      <Entrada
+        id="pos-cantidad-previa"
+        value={valor}
+        onChange={(e) => onCambio(e.target.value.replace(/[^\d.,]/g, "").slice(0, 8))}
+        inputMode="decimal"
+        autoComplete="off"
+        // Blanco y vacío a propósito: nada preescrito, nada seleccionado, sin atajos.
+        style={{ backgroundColor: "#ffffff" }}
+        invalido={escrita.tipo === "invalida" || !!error}
+        aria-describedby="pos-cantidad-ayuda"
+        className="!h-10 !w-28 text-center text-[1rem] font-semibold"
+      />
+      <span id="pos-cantidad-ayuda" className="min-w-0 text-[0.78rem] leading-snug text-tinta-suave">
+        {escrita.tipo === "entera" ? (
+          <span className="font-medium text-tinta">
+            Ahora cada producto que toques suma <strong>{escrita.valor}</strong>.
+          </span>
+        ) : escrita.tipo === "decimal" ? (
+          <span className="font-medium text-tinta">
+            {textoDePeso(escrita.valor, "kilogramo")}: para productos por kilo o litro.
+          </span>
+        ) : (
+          "Opcional: escribí la cantidad (35) o el peso (0,250 = 250 g) y después tocá el producto."
+        )}
+      </span>
+      {(error || escrita.tipo === "invalida") && (
+        <p role="alert" className="basis-full text-[0.8rem] font-medium text-peligro">
+          {error ?? (escrita.tipo === "invalida" ? escrita.error : "")}
+        </p>
+      )}
+    </div>
+  );
+}

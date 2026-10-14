@@ -211,6 +211,51 @@
   }
   ok(falladas === 0, `${cuentas} cuentas al azar con pesos y descuento: el IVA y el total cierran al guaraní en todas (${falladas} con problemas)`);
 
+  // =============================================================== la cantidad que se escribe antes de tocar el producto
+  window.log("== Cantidad escrita: «0.250» NO es 250 unidades");
+  const ce = await C.cargar("src/lib/cantidad-escrita");
+  const leer = ce.leerCantidadEscrita;
+  igual(leer("").tipo, "vacia", "vacío = sin cantidad (suma de a uno)");
+  igual(leer("   ").tipo, "vacia", "solo espacios = sin cantidad");
+  igual(leer("35"), { tipo: "entera", valor: 35 }, "35 son 35 unidades");
+  igual(leer("0.250"), { tipo: "decimal", valor: 0.25 }, "0.250 es el decimal 0,25 (NUNCA 250 unidades)");
+  igual(leer("0,250"), { tipo: "decimal", valor: 0.25 }, "0,250 con coma es lo mismo");
+  igual(leer(".25"), { tipo: "decimal", valor: 0.25 }, ".25 es 0,25");
+  igual(leer("0,285"), { tipo: "decimal", valor: 0.285 }, "0,285 (lo que marca una balanza)");
+  igual(leer("1,5"), { tipo: "decimal", valor: 1.5 }, "1,5");
+  igual(leer("2,000"), { tipo: "entera", valor: 2 }, "2,000 es el entero 2");
+  igual(leer("1000"), { tipo: "entera", valor: 1000 }, "1000");
+  for (const malo of ["abc", "0", "0,0", "0,000", "-1", "1e3", "35 unidades", "1,2,3", "1.2.3", "0,0004", "0,2501", ",", ".", "99999999", "$5"]) {
+    ok(leer(malo).tipo === "invalida" && typeof leer(malo).error === "string", `«${malo}» se rechaza con un aviso`);
+  }
+  const porUnidad = { nombre: "Pizza Grande", porPeso: false };
+  const porKilo = { nombre: "Comida por kilo", porPeso: true };
+  const carga = (texto, producto) => ce.cargaDeProducto(leer(texto), producto);
+  igual(carga("", porUnidad), { ok: true, cantidad: 1 }, "sin escribir nada: 1 unidad");
+  igual(carga("", porKilo), { ok: true, cantidad: 1 }, "sin escribir nada en uno por kilo: 1 kilo, como siempre");
+  igual(carga("35", porUnidad), { ok: true, cantidad: 35 }, "35 en un producto por unidad: 35 unidades");
+  const decimalEnUnidad = carga("0.250", porUnidad);
+  ok(!decimalEnUnidad.ok && decimalEnUnidad.error.includes("unidad") && decimalEnUnidad.error.includes("Kilogramo"), "0.250 en un producto por unidad NO carga 250: avisa que se vende por unidad y cómo cambiarlo");
+  igual(carga("0,285", porKilo), { ok: true, cantidad: 1, peso: 0.285 }, "0,285 en uno por kilo: una porción de 285 g");
+  igual(carga("0.250", porKilo), { ok: true, cantidad: 1, peso: 0.25 }, "0.250 en uno por kilo: 250 g");
+  igual(carga("2", porKilo), { ok: true, cantidad: 1, peso: 2 }, "2 en uno por kilo: 2 kilos");
+  const demasiado = carga("250", porKilo);
+  ok(!demasiado.ok && demasiado.error.includes("0,250"), "250 en uno por kilo se frena (¿eran 250 g?) y dice cómo escribir gramos");
+  igual(carga("50", porKilo), { ok: true, cantidad: 1, peso: 50 }, "50 kilos todavía se cargan");
+  ok(!carga("50,5", porKilo).ok, "50,5 kilos de una vez no");
+  ok(!carga("1001", porUnidad).ok, "1001 unidades de una vez no");
+  igual(carga("1000", porUnidad), { ok: true, cantidad: 1000 }, "1000 unidades sí");
+  ok(!carga("abc", porKilo).ok, "letras no");
+  igual(ce.sumarPesos(0.1, 0.2), 0.3, "0,1 + 0,2 = 0,3 justo (sin 0,30000000000000004)");
+  igual(ce.sumarPesos(0.285, 0.715), 1, "0,285 + 0,715 = 1");
+  igual(ce.sumarPesos(0.25, 0.25), 0.5, "dos veces 0,250 son 0,500");
+  // el caso del dueño: la balanza dice 0,285 y el producto vale 60.000 el kilo → 17.100
+  igual(um.montoPorPeso(60000, 0.285), 17100, "0,285 kg a 60.000 el kilo = 17.100");
+  const kilo = pp.armarPedido([producto({ id: "p-buffet", nombre: "Buffet", precio: 60000 })], [{ productId: "p-buffet", cantidad: 1, peso: 0.285 }], pp.LIMITES_DE_CAJA);
+  ok(kilo.ok && kilo.subtotal === 17100 && kilo.lineas[0].nombreProducto === "Buffet (285 g)", "el servidor cobra 17.100 y la línea dice «Buffet (285 g)»");
+  const ivaKilo = fp.desglosarIva(kilo.lineas, 0);
+  ok(ivaKilo.totalGeneral === 17100 && ivaKilo.gravado10 === 17100 && ivaKilo.iva10 === Math.round(17100 / 11), "el IVA de esos 17.100 es 1.555 (÷ 11) y el total cierra");
+
   window.log("\naciertos: " + window.__aciertos + " · fallas: " + window.__fallas);
   window.__listo = true;
 })().catch((e) => { document.getElementById("salida").textContent += "\nERROR: " + (e && e.stack || e); window.__listo = true; window.__fallas = (window.__fallas || 0) + 1; });

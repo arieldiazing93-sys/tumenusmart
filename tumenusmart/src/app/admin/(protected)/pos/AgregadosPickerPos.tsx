@@ -19,17 +19,20 @@ export function AgregadosPickerPos({
   nombre,
   precioBase,
   agregados,
+  cantidadInicial = 1,
   onCerrar,
   onAgregar,
 }: {
   nombre: string;
   precioBase: number;
   agregados: Agregado[];
+  /** Con cuántas unidades arranca el cuadro (la cantidad que se escribió antes de tocar el producto). */
+  cantidadInicial?: number;
   onCerrar: () => void;
   onAgregar: (agregadoIds: string[], cantidad: number) => void;
 }) {
   const [seleccionados, setSeleccionados] = useState<string[]>([]);
-  const [cantidad, setCantidad] = useState(1);
+  const [cantidad, setCantidad] = useState(cantidadInicial);
 
   const elegidos = agregados.filter((a) => seleccionados.includes(a.id));
   const unitario = precioBase + elegidos.reduce((s, a) => s + a.precioExtra, 0);
