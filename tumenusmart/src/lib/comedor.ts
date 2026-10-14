@@ -250,6 +250,8 @@ export type LineaDeCobro = {
   promocionId?: string | null;
   cortesia?: boolean;
   precioAntesPromo?: number | null;
+  /** La línea se pesó (producto por kilo o litro): al facturar su unidad es «unidad», porque la cantidad cuenta porciones. */
+  porPeso?: boolean;
 };
 
 /**

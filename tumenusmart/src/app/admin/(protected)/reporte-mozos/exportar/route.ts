@@ -42,6 +42,7 @@ export async function GET(request: NextRequest) {
     { width: 20 },
     { width: 18 },
     { width: 18 },
+    { width: 18 },
   ];
 
   filaTitulo(hoja, ["Negocio", local.nombre], 2);
@@ -56,6 +57,7 @@ export async function GET(request: NextRequest) {
       "Cuentas abiertas",
       "Cobradas",
       "Vendido (Gs.)",
+      "Comisión (Gs.)",
       "Ticket promedio (Gs.)",
       "Por persona (Gs.)",
       "Descuentos (Gs.)",
@@ -65,7 +67,7 @@ export async function GET(request: NextRequest) {
       "Monto cancelado (Gs.)",
       "Cuentas canceladas",
     ],
-    12
+    13
   );
   for (const f of reporte.filas) {
     hoja.addRow([
@@ -73,6 +75,7 @@ export async function GET(request: NextRequest) {
       f.cuentasAbiertas,
       f.cuentasCobradas,
       Math.round(f.ventas),
+      Math.round(f.comision),
       Math.round(f.ticketPromedio),
       f.ventaPorPersona != null ? Math.round(f.ventaPorPersona) : "",
       Math.round(f.descuentos),
@@ -93,6 +96,7 @@ export async function GET(request: NextRequest) {
       t.cuentasAbiertas,
       t.cuentasCobradas,
       Math.round(t.ventas),
+      Math.round(t.comision),
       Math.round(t.ticketPromedio),
       t.ventaPorPersona != null ? Math.round(t.ventaPorPersona) : "",
       Math.round(t.descuentos),
@@ -102,7 +106,7 @@ export async function GET(request: NextRequest) {
       Math.round(t.montoCancelado),
       t.cuentasCanceladas,
     ],
-    12
+    13
   );
   hoja.addRow([]);
   hoja.addRow(["Cobros cancelados (ventas ya cobradas que después se anularon)", t.cobrosCancelados]);

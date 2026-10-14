@@ -2768,6 +2768,9 @@ model Mozo {
   /// NULL = todavía no tiene PIN (no puede entrar).
   pinClave  String?
   activo    Boolean  @default(true)
+  /// Comisión por venta (0 a 100): el porcentaje de lo que se cobra en las cuentas de mesa que tiene a cargo, sobre los PRODUCTOS (no los
+  /// servicios) y ya con el descuento restado. NULL = no cobra comisión. Cada cuenta guarda el porcentaje que tenía al cobrarse.
+  comisionPorcentaje Decimal? @db.Decimal(5, 2)
   createdAt DateTime @default(now())
 
   cuentas  CuentaMesa[]
@@ -2854,6 +2857,12 @@ model CuentaMesa {
   cuentaOrigenId  String?
   mesaBase        String?
 
+  /// La comisión del mozo por esta cuenta, congelada al cobrarla: el % que tenía (Mozo.comisionPorcentaje) y la base sobre la que se
+  /// calcula (los productos de la cuenta, sin los servicios, con su parte del descuento general restada). El monto es base × % ÷ 100.
+  /// NULL = el mozo no tenía comisión (o la cuenta no se cobró).
+  comisionMozoPorcentaje Decimal? @db.Decimal(5, 2)
+  comisionMozoBase       Decimal? @db.Decimal(10, 2)
+
   items            ItemCuentaMesa[]
   trabajos         TrabajoImpresion[]
   movimientosStock MovimientoStock[]
@@ -2911,6 +2920,9 @@ model ItemCuentaMesa {
   cortesia       Boolean @default(false)
   /// El precio de UNA unidad antes de la promoción (con agregados): pasa a la venta al cobrar, para el reporte de Promociones.
   precioAntesPromo Decimal? @db.Decimal(10, 2)
+  /// true si se pesó (producto por kilogramo o litro: «Queso (285 g)», cantidad 1 y el monto ya calculado): al facturar, su unidad es
+  /// «unidad» porque la cantidad cuenta porciones y no kilos.
+  porPeso        Boolean @default(false)
 
   /// "activo" | "anulado"
   estado          String    @default("activo")

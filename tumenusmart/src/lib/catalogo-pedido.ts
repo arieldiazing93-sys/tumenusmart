@@ -96,6 +96,8 @@ export async function cargarCatalogoParaPedido(
       ingredientes: p.ingredientes,
       mitadYMitadGrupo: p.mitadYMitadGrupo,
       mitadYMitadModo: p.mitadYMitadModo,
+      // Solo un producto por kilogramo o por litro se puede pesar (ver LineaPedida.peso).
+      unidadMedida: p.unidadMedida,
       iva: p.iva,
       receta,
       costo: costoDelProducto(p.costo, receta),

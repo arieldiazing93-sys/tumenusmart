@@ -18,6 +18,8 @@ import { esElectronico } from "@/lib/modalidad-punto";
 import { ErrorFacturaElectronica, problemaParaEmitirElectronico } from "@/lib/sifen/servidor";
 import { SIN_REGISTRO_FISCAL } from "@/lib/tipo-cliente";
 import { errorDelTelefono, limpiarTelefonoDeCliente } from "@/lib/datos-fiscales";
+import { LIMITES_DE_CAJA } from "@/lib/precio-pedido";
+import { baseDeComision } from "@/lib/comision-mozo";
 import { calcularDescuento, textoPorcentaje } from "@/lib/descuento-venta";
 import { resolverDescuentoConTipos } from "@/lib/tipos-descuento";
 import { cargarTiposDescuento } from "@/lib/tipos-descuento-servidor";
@@ -738,6 +740,8 @@ export async function cargarProductosCaja(
     cargadoPor: quien,
     detalleTecnico: true,
     cuentaId: cuenta.id,
+    // La caja arma pedidos de evento: sus propios topes (1000 por línea), no los de la carta pública.
+    limites: LIMITES_DE_CAJA,
   });
   if (!r.ok) return r;
 
@@ -819,6 +823,8 @@ export async function abrirCuentaEnCaja(datos: {
     mesasPermitidas:
       !manual && mesasCargadas.length > 0 ? mesasCargadas.filter((m) => m.activa).map((m) => m.clave) : undefined,
     soloAbrirNueva: true,
+    // La caja arma pedidos de evento: sus propios topes (1000 por línea), no los de la carta pública.
+    limites: LIMITES_DE_CAJA,
   });
   if (!r.ok) return r;
 
@@ -987,6 +993,8 @@ export async function pagarCuenta(cuentaId: string, datos: DatosCobroCuenta): Pr
       promocionId: i.promocionId,
       cortesia: i.cortesia,
       precioAntesPromo: i.precioAntesPromo == null ? null : Number(i.precioAntesPromo),
+      // Se pesó (producto por kilo o litro): al facturar su unidad es «unidad».
+      porPeso: i.porPeso,
     }))
   );
   const totales = totalesDeCuenta(filas, descuentoDeCuenta(cuenta));
@@ -1059,6 +1067,26 @@ export async function pagarCuenta(cuentaId: string, datos: DatosCobroCuenta): Pr
     : [];
   const unidadDelProducto = new Map(datosProductos.map((p) => [p.id, p.unidadMedida]));
   const esServicioElProducto = new Map(datosProductos.map((p) => [p.id, p.esServicio]));
+
+  // La comisión del mozo (si tiene): su porcentaje de hoy y la base de esta cuenta (los productos sin los servicios, con su parte del
+  // descuento). Se congela en la cuenta al cobrarla: cambiarle el porcentaje después no mueve lo que ya ganó.
+  let comisionMozo: { porcentaje: number; base: number } | null = null;
+  const mozoDeLaCuenta = await db.mozo.findFirst({ where: { id: cuenta.mozoId }, select: { comisionPorcentaje: true } });
+  const porcentajeDelMozo = mozoDeLaCuenta?.comisionPorcentaje != null ? Number(mozoDeLaCuenta.comisionPorcentaje) : 0;
+  if (porcentajeDelMozo > 0) {
+    const servicios = idsDeProductos.length
+      ? await db.product.findMany({ where: { id: { in: idsDeProductos }, esServicio: true }, select: { id: true } })
+      : [];
+    const idsDeServicios = new Set(servicios.map((s) => s.id));
+    comisionMozo = {
+      porcentaje: porcentajeDelMozo,
+      base: baseDeComision(
+        filas.map((f) => ({ productId: f.productId, precioUnitario: f.precioUnitario, cantidad: f.cantidad })),
+        (id) => idsDeServicios.has(id),
+        totales.descuento
+      ),
+    };
+  }
 
   const numero = await siguienteNumeroVentaPos(storeId);
   const notaVenta = `Mesa ${cuenta.mesa} · Cuenta ${formatearNumero(cuenta.numero)}`;
@@ -1188,7 +1216,8 @@ export async function pagarCuenta(cuentaId: string, datos: DatosCobroCuenta): Pr
           items: filas.map((f) => ({
             productId: f.productId ?? null,
             descripcion: descripcionDeItem(f.nombreProducto, f.opcionesTexto ?? undefined),
-            unidadMedida: f.productId ? (unidadDelProducto.get(f.productId) ?? null) : null,
+            // Una línea pesada («Queso (285 g)») es una porción: la cantidad cuenta porciones, no kilos.
+            unidadMedida: f.porPeso ? "unidad" : f.productId ? (unidadDelProducto.get(f.productId) ?? null) : null,
             // Un combo mitad y mitad (sin producto único) es comida: mercadería.
             esServicio: f.productId ? (esServicioElProducto.get(f.productId) ?? false) : false,
             cantidad: f.cantidad,
@@ -1200,7 +1229,13 @@ export async function pagarCuenta(cuentaId: string, datos: DatosCobroCuenta): Pr
         });
       }
 
-      await tx.cuentaMesa.update({ where: { id: cuenta.id }, data: { ventaPosId: venta.id } });
+      await tx.cuentaMesa.update({
+        where: { id: cuenta.id },
+        data: {
+          ventaPosId: venta.id,
+          ...(comisionMozo ? { comisionMozoPorcentaje: comisionMozo.porcentaje, comisionMozoBase: comisionMozo.base } : {}),
+        },
+      });
 
       // La propina queda anotada en el mismo instante que el cobro (o no queda ninguna de las dos): pendiente de pagarle al mozo.
       if (propina) {

@@ -103,3 +103,30 @@ export function cargaDeProducto(
 export function sumarPesos(a: number, b: number): number {
   return Math.round((Math.round(a * 1000) + Math.round(b * 1000))) / 1000;
 }
+
+/** Lo mínimo que tiene que tener una línea para juntarse con otra igual (la misma clave): su cantidad y, si se pesó, el peso. */
+export type LineaConPeso = { key: string; cantidad: number; peso?: number };
+
+/**
+ * Suma lo que se acaba de cargar (`nuevo`: con su cantidad y, si es un producto por kilo o litro, su peso) a la lista de lo que ya se
+ * cargó. Si ya hay una línea con la misma clave:
+ *  - sin peso, se suma la cantidad (hasta el tope de la caja);
+ *  - con peso, lo pesado se JUNTA en una sola línea (lo que ya había + lo nuevo, siempre una porción): dos veces 0,250 son 0,500.
+ * Devuelve un aviso si una línea pasaría del peso máximo. No toca la lista que recibe.
+ */
+export function sumarCargaALista<T extends LineaConPeso>(
+  lista: T[],
+  nuevo: T
+): { ok: true; lista: T[] } | { ok: false; error: string } {
+  const i = lista.findIndex((x) => x.key === nuevo.key);
+  if (i < 0) return { ok: true, lista: [...lista, nuevo] };
+  const existente = lista[i];
+  if (nuevo.peso !== undefined) {
+    const yaPesado = existente.peso !== undefined ? (Math.round(existente.peso * 1000) * existente.cantidad) / 1000 : existente.cantidad;
+    const suma = sumarPesos(yaPesado, nuevo.peso);
+    if (!pesoValido(suma)) return { ok: false, error: "Esa línea pasaría del peso máximo (999 kilos). Cargalo aparte." };
+    return { ok: true, lista: lista.map((x, k) => (k === i ? { ...x, cantidad: 1, peso: suma } : x)) };
+  }
+  const cantidad = Math.min(existente.cantidad + nuevo.cantidad, CANTIDAD_MAXIMA_EN_CAJA);
+  return { ok: true, lista: lista.map((x, k) => (k === i ? { ...x, cantidad } : x)) };
+}

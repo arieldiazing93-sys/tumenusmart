@@ -12,6 +12,8 @@ export type MozoFila = {
   apellido: string | null;
   activo: boolean;
   sinPin: boolean;
+  /** El % de comisión por venta (0 a 100); null = sin comisión. */
+  comisionPorcentaje: number | null;
 };
 
 /**
@@ -90,6 +92,20 @@ export function FormularioMozo({ mozo, onCerrar }: { mozo: MozoFila | null; onCe
               Generar
             </button>
           </div>
+        </Campo>
+
+        <Campo
+          etiqueta="Comisión por venta, en % (opcional)"
+          ayuda="Lo que gana sobre lo que se cobra en las cuentas de mesa que tiene a cargo: se calcula sobre los productos, sin los servicios y con el descuento restado. Dejalo vacío si no cobra comisión. Cada cuenta guarda el porcentaje que tenía al cobrarse."
+        >
+          <Entrada
+            name="comision"
+            defaultValue={mozo?.comisionPorcentaje != null ? String(mozo.comisionPorcentaje).replace(".", ",") : ""}
+            inputMode="decimal"
+            autoComplete="off"
+            placeholder="Ej: 5 o 7,5"
+            maxLength={6}
+          />
         </Campo>
 
         {editando && (

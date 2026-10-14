@@ -1,7 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { prismaDelLocal } from "@/lib/prisma-local";
-import { armarPedido, type LineaPedida } from "@/lib/precio-pedido";
+import { armarPedido, type LimitesPedido, type LineaPedida } from "@/lib/precio-pedido";
 import { cargarCatalogoParaPedido } from "@/lib/catalogo-pedido";
 import { consumosGuardablesPorLinea, registrarConsumoVenta } from "@/lib/movimientos-stock";
 import { aplicarPromociones, previasDeCuenta } from "@/lib/promociones";
@@ -57,6 +57,11 @@ export type DatosRonda = {
    * ocupada por otro mozo se rechaza. Sin esto, cualquiera con acceso puede sumar a cualquier cuenta abierta.
    */
   soloCuentasDelMozoId?: string;
+  /**
+   * Los topes del pedido. Sin esto rigen los de la carta pública (50 por línea, 200 en total); la caja pasa los suyos
+   * (`LIMITES_DE_CAJA`) para poder cargar un evento de cientos de unidades.
+   */
+  limites?: LimitesPedido;
   /**
    * Si está, las mesas que el dueño cargó en Ajustes (sus claves, ver claveDeMesa): solo se puede ABRIR una mesa de esa
    * lista (seguir cargando en una cuenta que ya existe siempre se puede). Sin esto, la mesa se escribe libremente.
@@ -181,9 +186,11 @@ export async function guardarRonda(datos: DatosRonda): Promise<ResultadoRonda> {
     opcionIds: i.opcionIds,
     ingredientesQuitados: i.ingredientesQuitados,
     cantidad: i.cantidad,
+    // Lo pesado de un producto por kilo o litro (el precio de la línea sale de precio × peso; ver armarPedido).
+    ...(i.peso !== undefined && i.peso !== null ? { peso: i.peso } : {}),
   }));
   const catalogo = await cargarCatalogoParaPedido(db, storeId, pedidas);
-  const armado = armarPedido(catalogo, pedidas);
+  const armado = armarPedido(catalogo, pedidas, datos.limites);
   if (!armado.ok) return { ok: false, error: armado.motivo };
   // Las promociones activas (por descuento y por volumen): se aplican dentro de la transacción, con lo que la cuenta ya tiene.
   const promos = await cargarPromociones(db);
@@ -307,6 +314,8 @@ export async function guardarRonda(datos: DatosRonda): Promise<ResultadoRonda> {
             promocionId: l.promocionId ?? null,
             cortesia: l.cortesia === true,
             precioAntesPromo: l.precioAntesPromo ?? null,
+            // Se pesó (producto por kilo o litro): al facturar, su unidad es «unidad».
+            porPeso: l.porPeso === true,
           })),
         });
 

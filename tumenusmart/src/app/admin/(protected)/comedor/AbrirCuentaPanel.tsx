@@ -116,6 +116,8 @@ export function AbrirCuentaPanel({
         categorias={contexto.categorias}
         gruposMitad={contexto.gruposMitad}
         promociones={contexto.promociones}
+        // Con el campo «Cantidad» (35 de algo; 0,285 de un producto por kilo): el Servicio comedor lo acepta en el servidor.
+        conCantidad
         // Volver sin enviar no abre nada: se regresa a los datos de la cuenta.
         onCerrar={() => setPaso("datos")}
         onEnviado={(areas) => onAbierta(mesa, areas)}

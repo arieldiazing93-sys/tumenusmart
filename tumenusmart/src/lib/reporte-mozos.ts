@@ -1,5 +1,6 @@
 import { prismaDelLocal } from "./prisma-local";
 import type { RangoFecha } from "./estadisticas";
+import { montoDeComision } from "./comision-mozo";
 
 /**
  * Reporte de mozos (Servicio comedor): cuánto vendió cada mozo, con qué ticket, cuánto descuento se le dio a sus cuentas y
@@ -23,6 +24,8 @@ export type FilaMozo = {
   cuentasCobradas: number;
   /** Lo cobrado (ya con el descuento), de las cuentas cobradas. */
   ventas: number;
+  /** Lo que ganó de comisión por esas cuentas (el % que tenía al cobrar sobre los productos, con el descuento restado). */
+  comision: number;
   /** ventas ÷ cuentas cobradas. */
   ticketPromedio: number;
   /** Cuánto se descontó en total a sus cuentas cobradas. */
@@ -90,7 +93,7 @@ export async function calcularReporteMozos(storeId: string, rango: RangoFecha): 
   const cuentasDeVentas = idsVentas.length
     ? await db.cuentaMesa.findMany({
         where: { ventaPosId: { in: idsVentas } },
-        select: { ventaPosId: true, mozoId: true, comensales: true },
+        select: { ventaPosId: true, mozoId: true, comensales: true, comisionMozoPorcentaje: true, comisionMozoBase: true },
       })
     : [];
   const ventaPorId = new Map(ventas.map((v) => [v.id, v]));
@@ -105,6 +108,7 @@ export async function calcularReporteMozos(storeId: string, rango: RangoFecha): 
         cuentasAbiertas: 0,
         cuentasCobradas: 0,
         ventas: 0,
+        comision: 0,
         ticketPromedio: 0,
         descuentos: 0,
         cuentasConDescuento: 0,
@@ -129,6 +133,7 @@ export async function calcularReporteMozos(storeId: string, rango: RangoFecha): 
         cuentasAbiertas: 0,
         cuentasCobradas: 0,
         ventas: 0,
+        comision: 0,
         ticketPromedio: 0,
         descuentos: 0,
         cuentasConDescuento: 0,
@@ -156,6 +161,10 @@ export async function calcularReporteMozos(storeId: string, rango: RangoFecha): 
     }
     f.cuentasCobradas += 1;
     f.ventas += Number(v.total);
+    // Su comisión por esta cuenta: el % y la base que quedaron congelados al cobrarla (sin comisión, no suma).
+    if (c.comisionMozoPorcentaje != null && c.comisionMozoBase != null) {
+      f.comision += montoDeComision(Number(c.comisionMozoBase), Number(c.comisionMozoPorcentaje));
+    }
     const descuento = Number(v.descuento);
     if (descuento > 0) {
       f.descuentos += descuento;
@@ -199,6 +208,7 @@ export async function calcularReporteMozos(storeId: string, rango: RangoFecha): 
       cuentasAbiertas: suma((f) => f.cuentasAbiertas),
       cuentasCobradas,
       ventas: ventasTotales,
+      comision: suma((f) => f.comision),
       ticketPromedio: cuentasCobradas > 0 ? ventasTotales / cuentasCobradas : 0,
       descuentos: suma((f) => f.descuentos),
       cuentasConDescuento: suma((f) => f.cuentasConDescuento),

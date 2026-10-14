@@ -56,6 +56,9 @@ export function ListaMozos({ mozos }: { mozos: MozoFila[] }) {
                     </Pastilla>
                   )}
                   {m.sinPin && <Pastilla color="peligro">Sin PIN: no puede entrar</Pastilla>}
+                  {m.comisionPorcentaje != null && (
+                    <Pastilla color="violeta">Comisión {String(m.comisionPorcentaje).replace(".", ",")} %</Pastilla>
+                  )}
                 </div>
               </div>
               <button

@@ -24,7 +24,7 @@ export default async function MozosPage() {
     prisma.store.findUnique({ where: { id: idLocal }, select: { tokenMozos: true } }),
     db.mozo.findMany({
       orderBy: [{ activo: "desc" }, { nombre: "asc" }],
-      select: { id: true, nombre: true, apellido: true, activo: true, pinClave: true },
+      select: { id: true, nombre: true, apellido: true, activo: true, pinClave: true, comisionPorcentaje: true },
     }),
   ]);
 
@@ -69,6 +69,7 @@ export default async function MozosPage() {
           apellido: m.apellido,
           activo: m.activo,
           sinPin: m.pinClave === null,
+          comisionPorcentaje: m.comisionPorcentaje != null ? Number(m.comisionPorcentaje) : null,
         }))}
       />
 

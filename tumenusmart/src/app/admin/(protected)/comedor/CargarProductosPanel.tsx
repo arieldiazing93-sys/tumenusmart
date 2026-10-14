@@ -12,22 +12,26 @@ import type {
   ProductoVenta,
 } from "@/lib/catalogo-venta";
 import { AgregadosPickerPos } from "../pos/AgregadosPickerPos";
+import { CantidadPrevia } from "../pos/CantidadPrevia";
 import { MitadYMitadPickerPos } from "../pos/MitadYMitadPickerPos";
 import { abrirCuentaEnCaja, cargarProductosCaja } from "./actions";
 import { usePromosVigentes } from "@/lib/use-promos-vigentes";
 import { lineasParaPromos, repreciarCarrito } from "@/lib/precio-carrito-pos";
 import { aplicarPromociones, detallePorLinea, type PromoDef } from "@/lib/promociones";
 import { segundoDeSemanaAsuncion } from "@/lib/precio-promocion";
+import { CANTIDAD_MAXIMA_EN_CAJA, cargaDeProducto, leerCantidadEscrita, sumarCargaALista } from "@/lib/cantidad-escrita";
+import { seVendePorPeso, textoDePeso } from "@/lib/unidad-medida";
 
 /** Un producto (con o sin agregados) o un combo mitad y mitad ya armado, con su nota para la cocina. */
 type ItemCarrito = { key: string; nombre: string; precio: number; cantidad: number; detalle?: string; nota: string } & (
-  | { tipo: "producto"; productId: string; agregadoIds: string[] }
+  // `peso`: lo que se pesó de un producto por kilo o litro (0,285 = 285 g); `precio` ya es el de ESA porción (lista × peso).
+  | { tipo: "producto"; productId: string; agregadoIds: string[]; peso?: number }
   | { tipo: "combo"; productIdA: string; productIdB: string; agregadoIds: string[] }
 );
 
 /** Lo que se manda al enviar: qué y cuántos (el servidor pone nombres y precios). */
 export type ItemParaEnviar =
-  | { productId: string; opcionIds: string[]; cantidad: number; nota: string }
+  | { productId: string; opcionIds: string[]; cantidad: number; nota: string; peso?: number }
   | { mitadYMitad: { productIdA: string; productIdB: string }; opcionIds: string[]; cantidad: number; nota: string };
 
 const TODOS = "__todos__";
@@ -65,6 +69,7 @@ export function CargarProductosPanel({
   titulo,
   textoEnviar,
   sinNotas,
+  conCantidad = false,
 }: {
   /** La cuenta a la que se le carga. Sin esto, tiene que venir `nuevaCuenta` (o `enviarItems`). */
   cuentaId?: string;
@@ -89,6 +94,11 @@ export function CargarProductosPanel({
   textoEnviar?: string;
   /** Sin la nota para la cocina en cada producto (un pedido no guarda notas por producto). */
   sinNotas?: boolean;
+  /**
+   * Con el campo «Cantidad»: se escribe la cantidad (35) o, para un producto por kilo o litro, el peso (0,285) ANTES de tocar el
+   * producto. Solo lo usa el Servicio comedor (su servidor acepta pesos y los topes de la caja); el delivery sigue como siempre.
+   */
+  conCantidad?: boolean;
 }) {
   // Los precios de ESTE momento: un producto con precio de promoción (de lunes a viernes de 18 a 20, por ejemplo) viene con el precio que
   // vale ahora y cambia solo cuando empieza o termina la franja. El servidor cobra con el mismo cálculo.
@@ -114,6 +124,13 @@ export function CargarProductosPanel({
     }
     return mapa;
   }, [carrito]);
+
+  // La carta por producto: para saber en qué unidad se vende cada uno y mostrar lo pesado.
+  const productoPorId = useMemo(() => {
+    const mapa = new Map<string, ProductoVenta>();
+    for (const c of categorias) for (const p of c.productos) mapa.set(p.id, p);
+    return mapa;
+  }, [categorias]);
 
   const textoBusqueda = sinTildes(busqueda.trim());
   const productosVisibles: ProductoVenta[] = textoBusqueda
@@ -146,21 +163,58 @@ export function CargarProductosPanel({
   const total = carrito.reduce((s, i) => s + i.precio * i.cantidad, 0) - ahorroPromos;
   const cantidadTotal = carrito.reduce((s, i) => s + i.cantidad, 0);
 
+  // La cantidad que se escribe ANTES de tocar el producto («35», o «0,285» para un producto por kilo): opcional; se usa en el próximo
+  // producto que se toque y se borra. Sin nada escrito, cada toque suma de a uno. Solo con `conCantidad` (Servicio comedor).
+  const [cantidadPrevia, setCantidadPrevia] = useState("");
+  const [errorCantidad, setErrorCantidad] = useState<string | null>(null);
+  // Si el producto tocado tiene agregados para elegir, lo escrito espera a que se confirme el cuadro de agregados.
+  const [cargaPendiente, setCargaPendiente] = useState<{ cantidad: number; peso?: number } | null>(null);
+
+  /** Lo escrito en «Cantidad» aplicado al producto que se tocó; null si no se puede (ya se avisó cuál es el problema). */
+  function cargaPara(p: ProductoVenta): { cantidad: number; peso?: number } | null {
+    if (!conCantidad) return { cantidad: 1 };
+    const carga = cargaDeProducto(leerCantidadEscrita(cantidadPrevia), { nombre: p.nombre, porPeso: seVendePorPeso(p.unidadMedida) });
+    if (!carga.ok) {
+      setErrorCantidad(carga.error);
+      return null;
+    }
+    setErrorCantidad(null);
+    return carga;
+  }
+
+  /** Suma lo cargado a la lista (junta lo pesado del mismo producto en una línea). Devuelve false, avisando, si no se pudo. */
+  function sumarAlCarrito(item: ItemCarrito): boolean {
+    const r = sumarCargaALista(carritoGuardado, item);
+    if (!r.ok) {
+      setErrorCantidad(r.error);
+      return false;
+    }
+    setCarrito(r.lista);
+    return true;
+  }
+
   function agregarProducto(p: ProductoVenta) {
     setError(null);
-    // Con agregados para elegir, siempre abre el selector, en vez de sumar 1 a ciegas sin preguntar.
+    const carga = cargaPara(p);
+    if (!carga) return;
+    // Con agregados para elegir, siempre abre el selector, en vez de sumar a ciegas sin preguntar. Lo escrito en «Cantidad» espera ahí.
     if (p.agregados.length > 0) {
+      setCargaPendiente(carga);
       setProductoEligiendo(p);
       return;
     }
-    setCarrito((actual) => {
-      const existente = actual.find((i) => i.key === p.id);
-      if (existente) return actual.map((i) => (i.key === p.id ? { ...i, cantidad: i.cantidad + 1 } : i));
-      return [
-        ...actual,
-        { key: p.id, tipo: "producto", productId: p.id, agregadoIds: [], nombre: p.nombre, precio: p.precio, cantidad: 1, nota: "" },
-      ];
+    const agregado = sumarAlCarrito({
+      key: p.id,
+      tipo: "producto",
+      productId: p.id,
+      agregadoIds: [],
+      nombre: p.nombre,
+      precio: p.precio,
+      cantidad: carga.cantidad,
+      nota: "",
+      ...(carga.peso !== undefined ? { peso: carga.peso } : {}),
     });
+    if (agregado) setCantidadPrevia("");
   }
 
   function confirmarAgregadosProducto(agregadoIds: string[], cantidad: number) {
@@ -173,25 +227,25 @@ export function CargarProductosPanel({
     const detalleTexto = elegidos.length > 0 ? elegidos.map((a) => a.nombre).join(", ") : undefined;
 
     setError(null);
-    setCarrito((actual) => {
-      const existente = actual.find((i) => i.key === key);
-      if (existente) return actual.map((i) => (i.key === key ? { ...i, cantidad: i.cantidad + cantidad } : i));
-      return [
-        ...actual,
-        {
-          key,
-          tipo: "producto",
-          productId: p.id,
-          agregadoIds: idsOrdenados,
-          nombre: p.nombre,
-          precio,
-          cantidad,
-          detalle: detalleTexto,
-          nota: "",
-        },
-      ];
+    // Un producto por peso lleva lo escrito como peso (y las porciones que se hayan puesto en el cuadro); uno por unidad, la cantidad del cuadro.
+    const peso = cargaPendiente?.peso;
+    const agregado = sumarAlCarrito({
+      key,
+      tipo: "producto",
+      productId: p.id,
+      agregadoIds: idsOrdenados,
+      nombre: p.nombre,
+      precio,
+      cantidad,
+      detalle: detalleTexto,
+      nota: "",
+      ...(peso !== undefined ? { peso } : {}),
     });
-    setProductoEligiendo(null);
+    if (agregado) {
+      setCantidadPrevia("");
+      setProductoEligiendo(null);
+      setCargaPendiente(null);
+    }
   }
 
   function agregarCombo(
@@ -230,7 +284,9 @@ export function CargarProductosPanel({
 
   function cambiarCantidad(key: string, delta: number) {
     setCarrito((actual) =>
-      actual.map((i) => (i.key === key ? { ...i, cantidad: i.cantidad + delta } : i)).filter((i) => i.cantidad > 0)
+      actual
+        .map((i) => (i.key === key ? { ...i, cantidad: Math.min(i.cantidad + delta, CANTIDAD_MAXIMA_EN_CAJA) } : i))
+        .filter((i) => i.cantidad > 0)
     );
   }
 
@@ -251,7 +307,14 @@ export function CargarProductosPanel({
               cantidad: i.cantidad,
               nota: i.nota,
             }
-          : { productId: i.productId, opcionIds: i.agregadoIds, cantidad: i.cantidad, nota: i.nota }
+          : {
+              productId: i.productId,
+              opcionIds: i.agregadoIds,
+              cantidad: i.cantidad,
+              nota: i.nota,
+              // Lo que se pesó (producto por kilo o litro): el servidor calcula el monto con el precio de lista.
+              ...(i.peso !== undefined ? { peso: i.peso } : {}),
+            }
       );
       let r: { ok: true; areas: string[]; aviso?: string } | { ok: false; error: string };
       if (enviarItems) {
@@ -342,6 +405,19 @@ export function CargarProductosPanel({
             </div>
           )}
 
+          {/* La cantidad se escribe ANTES de tocar el producto (35 de algo; 0,285 de un producto por kilo, el peso de la balanza). En
+              blanco y opcional: vacía, cada toque suma de a uno. Solo en el Servicio comedor. */}
+          {conCantidad && (
+            <CantidadPrevia
+              valor={cantidadPrevia}
+              onCambio={(t) => {
+                setCantidadPrevia(t);
+                setErrorCantidad(null);
+              }}
+              error={errorCantidad}
+            />
+          )}
+
           {gruposVisibles.map((g) => (
             <MitadYMitadPickerPos key={g.nombreVisible} grupoNombre={g.nombreVisible} productos={g.productos} onAgregar={agregarCombo} />
           ))}
@@ -366,7 +442,13 @@ export function CargarProductosPanel({
                     </span>
                   )}
                   <p className="text-[0.85rem] font-medium leading-snug text-tinta">{p.nombre}</p>
-                  <p className="cifra mt-1.5 text-[0.88rem] font-semibold text-tinta">{formatearGuarani(p.precio)}</p>
+                  <p className="cifra mt-1.5 text-[0.88rem] font-semibold text-tinta">
+                    {formatearGuarani(p.precio)}
+                    {/* Un producto por kilo o por litro: el precio es de esa medida (se escribe el peso en «Cantidad»). */}
+                    {conCantidad && seVendePorPeso(p.unidadMedida) && (
+                      <span className="ml-1 text-[0.7rem] font-medium text-tinta-suave">/ {p.unidadMedida === "litro" ? "litro" : "kilo"}</span>
+                    )}
+                  </p>
                   {/* Promoción por descuento o por volumen que rige ahora para este producto (2x1, −20 %…). */}
                   {p.promo && (
                     <p className="mt-1">
@@ -412,6 +494,13 @@ export function CargarProductosPanel({
                   <div className="flex items-center justify-between gap-2">
                     <div className="min-w-0">
                       <p className="truncate text-[0.85rem] font-medium text-tinta">{i.nombre}</p>
+                      {/* Lo que se pesó (producto por kilo o litro): el precio ya es el de esa porción. */}
+                      {i.tipo === "producto" && i.peso !== undefined && (
+                        <p className="truncate text-[0.74rem] font-semibold text-azul-oscuro">
+                          ⚖ {textoDePeso(i.peso, productoPorId.get(i.productId)?.unidadMedida ?? "kilogramo")} ·{" "}
+                          <span className="cifra">{formatearGuarani(i.precio * i.cantidad)}</span>
+                        </p>
+                      )}
                       {i.detalle && <p className="truncate text-[0.74rem] text-tinta-suave">+ {i.detalle}</p>}
                       {detallePromos[indice]?.texto && (
                         <p className="text-[0.74rem] font-semibold text-exito">
@@ -480,7 +569,12 @@ export function CargarProductosPanel({
           nombre={productoEligiendo.nombre}
           precioBase={(productoVivo ?? productoEligiendo).precio}
           agregados={(productoVivo ?? productoEligiendo).agregados}
-          onCerrar={() => setProductoEligiendo(null)}
+          // Si ya había una cantidad escrita (35), el cuadro arranca con ella; con un peso (0,285) las porciones arrancan en 1.
+          cantidadInicial={cargaPendiente && cargaPendiente.peso === undefined ? cargaPendiente.cantidad : 1}
+          onCerrar={() => {
+            setProductoEligiendo(null);
+            setCargaPendiente(null);
+          }}
           onAgregar={confirmarAgregadosProducto}
         />
       )}

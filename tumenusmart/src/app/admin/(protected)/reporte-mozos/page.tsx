@@ -66,7 +66,7 @@ export default async function ReporteMozosPage({
       ) : (
         <>
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-            <Cifra valor={formatearGuarani(Math.round(t.ventas))} rotulo="Vendido" detalle={`${t.cuentasCobradas} cuentas cobradas`} />
+            <Cifra valor={formatearGuarani(Math.round(t.ventas))} rotulo="Vendido" detalle={`${t.cuentasCobradas} cuentas cobradas${t.comision > 0 ? ` · comisiones ${formatearGuarani(Math.round(t.comision))}` : ""}`} />
             <Cifra valor={formatearGuarani(Math.round(t.ticketPromedio))} rotulo="Ticket promedio" detalle="por cuenta cobrada" />
             <Cifra
               valor={formatearGuarani(Math.round(t.descuentos))}
@@ -89,6 +89,7 @@ export default async function ReporteMozosPage({
                 <Th className="text-right">Cuentas abiertas</Th>
                 <Th className="text-right">Cobradas</Th>
                 <Th className="text-right">Vendido</Th>
+                <Th className="text-right">Comisión</Th>
                 <Th className="text-right">Ticket promedio</Th>
                 <Th className="text-right">Por persona</Th>
                 <Th className="text-right">Descuentos</Th>
@@ -108,6 +109,7 @@ export default async function ReporteMozosPage({
                   <Td className="cifra text-right">{f.cuentasAbiertas}</Td>
                   <Td className="cifra text-right">{f.cuentasCobradas}</Td>
                   <Td className="cifra text-right font-semibold text-tinta">{formatearGuarani(Math.round(f.ventas))}</Td>
+                  <Td className="cifra text-right">{f.comision > 0 ? formatearGuarani(Math.round(f.comision)) : "—"}</Td>
                   <Td className="cifra text-right">{formatearGuarani(Math.round(f.ticketPromedio))}</Td>
                   <Td className="cifra text-right">
                     {f.ventaPorPersona != null ? formatearGuarani(Math.round(f.ventaPorPersona)) : "—"}
@@ -136,6 +138,7 @@ export default async function ReporteMozosPage({
                 <Td className="cifra text-right font-semibold text-tinta">{t.cuentasAbiertas}</Td>
                 <Td className="cifra text-right font-semibold text-tinta">{t.cuentasCobradas}</Td>
                 <Td className="cifra text-right font-semibold text-tinta">{formatearGuarani(Math.round(t.ventas))}</Td>
+                <Td className="cifra text-right font-semibold text-tinta">{t.comision > 0 ? formatearGuarani(Math.round(t.comision)) : "—"}</Td>
                 <Td className="cifra text-right font-semibold text-tinta">{formatearGuarani(Math.round(t.ticketPromedio))}</Td>
                 <Td className="cifra text-right font-semibold text-tinta">
                   {t.ventaPorPersona != null ? formatearGuarani(Math.round(t.ventaPorPersona)) : "—"}

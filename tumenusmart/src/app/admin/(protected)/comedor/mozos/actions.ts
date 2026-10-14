@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { exigirPermiso } from "@/lib/auth";
 import { AVISO_PIN_FACIL, pinDemasiadoFacil } from "@/lib/asistencia";
 import { pinDeMozoValido } from "@/lib/comedor";
+import { leerPorcentajeDeComision } from "@/lib/comision-mozo";
 import { registrarBitacora } from "@/lib/bitacora";
 import { idLocalActual } from "@/lib/local-actual";
 import { prisma } from "@/lib/prisma";
@@ -81,7 +82,7 @@ export async function apagarEnlaceMozos(): Promise<ResultadoMozo> {
   return { ok: true };
 }
 
-type DatosMozo = { nombre: string; apellido: string | null; pin: string | null };
+type DatosMozo = { nombre: string; apellido: string | null; pin: string | null; comisionPorcentaje: number | null };
 
 /** Lee y valida lo que mandó el formulario. Nunca se guarda lo que llega tal cual. */
 function leerDatos(formData: FormData): { ok: true; datos: DatosMozo } | { ok: false; error: string } {
@@ -94,7 +95,10 @@ function leerDatos(formData: FormData): { ok: true; datos: DatosMozo } | { ok: f
   const pin = texto(formData.get("pin"));
   if (pin && !pinDeMozoValido(pin)) return { ok: false, error: "El PIN tiene que ser de 3 a 5 números (solo números)." };
   if (pin && pinDemasiadoFacil(pin)) return { ok: false, error: AVISO_PIN_FACIL };
-  return { ok: true, datos: { nombre, apellido: apellido || null, pin: pin || null } };
+  // La comisión por venta: vacía o 0 = sin comisión; si no, un porcentaje de 0,01 a 100.
+  const comision = leerPorcentajeDeComision(formData.get("comision"));
+  if (!comision.ok) return { ok: false, error: comision.error };
+  return { ok: true, datos: { nombre, apellido: apellido || null, pin: pin || null, comisionPorcentaje: comision.valor } };
 }
 
 export async function crearMozo(formData: FormData): Promise<ResultadoMozo> {

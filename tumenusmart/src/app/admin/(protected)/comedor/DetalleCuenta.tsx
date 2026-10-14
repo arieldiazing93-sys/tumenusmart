@@ -458,6 +458,8 @@ export function DetalleCuenta({
           categorias={contexto.categorias}
           gruposMitad={contexto.gruposMitad}
           promociones={contexto.promociones}
+          // Con el campo «Cantidad» (35 de algo; 0,285 de un producto por kilo): el Servicio comedor lo acepta en el servidor.
+          conCantidad
           onCerrar={() => setCargando(false)}
           onEnviado={(areas) => {
             setCargando(false);
