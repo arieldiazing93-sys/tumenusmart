@@ -15,6 +15,7 @@ import {
   DIAS_ADELANTE,
   MINUTOS_BLOQUEO_SIN_CONFIRMAR,
   horasDelPeriodo,
+  horasOcupadasDelPeriodo,
   type Ocupado,
 } from "./disponibilidad";
 import { horarioEfectivo, type HorarioDia } from "./horario-trabajo";
@@ -220,16 +221,17 @@ export async function ocupadosPorPersonal(
 }
 
 /**
- * Las horas libres de cada profesional para esa selección, en los próximos días:
- * `personalId → { "2026-09-25": [540, 555, …] }`.
+ * Las horas libres Y las ya ocupadas de cada profesional para esa selección, en los próximos días:
+ * `personalId → { "2026-09-25": [540, 555, …] }`, una vez para lo libre y otra para lo ocupado. Lo ocupado son las horas que entran en el
+ * horario de atención pero que otro turno ya tomó: la página pública las muestra tachadas en vez de esconderlas.
  */
-export async function disponibilidadDePersonal(
+export async function disponibilidadYOcupadasDePersonal(
   db: Db,
   storeId: string,
   seleccion: SeleccionResuelta,
   personalIds: string[],
   ahora: Date
-): Promise<Map<string, Record<string, number[]>>> {
+): Promise<{ libres: Map<string, Record<string, number[]>>; ocupadas: Map<string, Record<string, number[]>> }> {
   const columnasDeHorario = {
     diaSemana: true,
     trabaja: true,
@@ -257,21 +259,35 @@ export async function disponibilidadDePersonal(
   const minutosAhora = partesLocales(ahora).minutos;
   const ocupados = await ocupadosPorPersonal(db, storeId, personalIds, hoy, ahora);
 
-  const salida = new Map<string, Record<string, number[]>>();
+  const libres = new Map<string, Record<string, number[]>>();
+  const ocupadas = new Map<string, Record<string, number[]>>();
   for (const id of personalIds) {
-    salida.set(
-      id,
-      horasDelPeriodo({
-        // Su horario propio si lo tiene; si no, el general (y si tampoco se guardó ninguno, el de ejemplo:
-        // lunes a sábado de 9 a 18, descanso de 13 a 14).
-        horarios: horarioEfectivo(propioDe.get(id) ?? [], filasGenerales),
-        ocupadosPorDia: ocupados.get(id) ?? new Map<string, Ocupado[]>(),
-        duracion: seleccion.duracion,
-        buffer: seleccion.buffer,
-        hoy,
-        minutosAhora,
-      })
-    );
+    const datos = {
+      // Su horario propio si lo tiene; si no, el general (y si tampoco se guardó ninguno, el de ejemplo:
+      // lunes a sábado de 9 a 18, descanso de 13 a 14).
+      horarios: horarioEfectivo(propioDe.get(id) ?? [], filasGenerales),
+      ocupadosPorDia: ocupados.get(id) ?? new Map<string, Ocupado[]>(),
+      duracion: seleccion.duracion,
+      buffer: seleccion.buffer,
+      hoy,
+      minutosAhora,
+    };
+    libres.set(id, horasDelPeriodo(datos));
+    ocupadas.set(id, horasOcupadasDelPeriodo(datos));
   }
-  return salida;
+  return { libres, ocupadas };
+}
+
+/**
+ * Las horas libres de cada profesional para esa selección, en los próximos días:
+ * `personalId → { "2026-09-25": [540, 555, …] }`. Es lo que se reserva (y lo que se vuelve a comprobar al crear la cita).
+ */
+export async function disponibilidadDePersonal(
+  db: Db,
+  storeId: string,
+  seleccion: SeleccionResuelta,
+  personalIds: string[],
+  ahora: Date
+): Promise<Map<string, Record<string, number[]>>> {
+  return (await disponibilidadYOcupadasDePersonal(db, storeId, seleccion, personalIds, ahora)).libres;
 }

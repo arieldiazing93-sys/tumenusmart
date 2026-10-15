@@ -20,6 +20,7 @@ import {
   cargarPaginaPublica,
   cargarPersonalPublico,
   disponibilidadDePersonal,
+  disponibilidadYOcupadasDePersonal,
   limpiarReservasSinEnviar,
   resolverSeleccion,
 } from "@/lib/reservas-publicas";
@@ -45,7 +46,13 @@ export type ResultadoProximas =
   | { ok: false; error: string };
 
 export type ResultadoHoras =
-  | { ok: true; /** día → horas libres ("09:00", "09:15"…). Los días sin horas no aparecen. */ dias: Record<string, string[]> }
+  | {
+      ok: true;
+      /** día → horas libres ("09:00", "09:15"…). Los días sin horas libres no aparecen. */
+      dias: Record<string, string[]>;
+      /** día → horas que YA están ocupadas (entran en el horario pero otro turno las tomó): se muestran tachadas. */
+      ocupadas: Record<string, string[]>;
+    }
   | { ok: false; error: string };
 
 export type DatosCitaPublica = {
@@ -107,11 +114,14 @@ export async function horasDisponibles(
     return { ok: false, error: "Ese profesional no realiza los servicios elegidos." };
   }
 
-  const disponibilidad = await disponibilidadDePersonal(prisma, pagina.storeId, seleccion, [personalId], new Date());
-  const enMinutos = disponibilidad.get(personalId) ?? {};
+  const disponibilidad = await disponibilidadYOcupadasDePersonal(prisma, pagina.storeId, seleccion, [personalId], new Date());
+  const enMinutos = disponibilidad.libres.get(personalId) ?? {};
   const dias: Record<string, string[]> = {};
   for (const [dia, minutos] of Object.entries(enMinutos)) dias[dia] = minutos.map(horaDeMinutos);
-  return { ok: true, dias };
+  const ocupadasEnMinutos = disponibilidad.ocupadas.get(personalId) ?? {};
+  const ocupadas: Record<string, string[]> = {};
+  for (const [dia, minutos] of Object.entries(ocupadasEnMinutos)) ocupadas[dia] = minutos.map(horaDeMinutos);
+  return { ok: true, dias, ocupadas };
 }
 
 /**

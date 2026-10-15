@@ -117,6 +117,37 @@ export function horasDelPeriodo(datos: {
   return salida;
 }
 
+/**
+ * Las horas de inicio de un día que YA están tomadas: las que serían libres si nadie hubiera reservado (entran en el horario de
+ * atención, no son del pasado) pero que hoy no se pueden elegir porque un turno ya tomado las pisa (o su búfer). La página pública
+ * las muestra tachadas y en rojo, para que el cliente vea que existen y que ya están ocupadas, en vez de que desaparezcan.
+ */
+export function horasOcupadas(datos: Parameters<typeof horasLibres>[0]): number[] {
+  const libres = new Set(horasLibres(datos));
+  return horasLibres({ ...datos, ocupados: [] }).filter((m) => !libres.has(m));
+}
+
+/**
+ * Lo mismo de `horasDelPeriodo`, pero con las horas ocupadas de cada día de los próximos `DIAS_ADELANTE` días:
+ * `{ "2026-09-25": [600, 615] }`. Los días sin ninguna hora ocupada no aparecen.
+ */
+export function horasOcupadasDelPeriodo(datos: Parameters<typeof horasDelPeriodo>[0]): Record<string, number[]> {
+  const salida: Record<string, number[]> = {};
+  for (let i = 0; i < DIAS_ADELANTE; i++) {
+    const dia = claveSumarDias(datos.hoy, i);
+    const horario = datos.horarios.find((h) => h.diaSemana === diaDeLaSemana(dia));
+    const ocupadas = horasOcupadas({
+      horario,
+      ocupados: datos.ocupadosPorDia.get(dia) ?? [],
+      duracion: datos.duracion,
+      buffer: datos.buffer,
+      minutoMinimo: i === 0 ? minutoMinimoDeHoy(datos.minutosAhora) : 0,
+    });
+    if (ocupadas.length > 0) salida[dia] = ocupadas;
+  }
+  return salida;
+}
+
 /** El primer minuto reservable de hoy: ahora más la anticipación, redondeado hacia arriba al paso. */
 export function minutoMinimoDeHoy(minutosAhora: number): number {
   return Math.ceil((minutosAhora + ANTICIPACION_MIN) / PASO_MIN) * PASO_MIN;
