@@ -151,7 +151,7 @@ export function GruposAgregadosProducto({
           <button
             type="submit"
             disabled={pendiente}
-            className="rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-dark disabled:opacity-50"
+            className={clasesBoton("nuevo", "md")}
           >
             {pendiente ? "Creando…" : "Crear grupo"}
           </button>
@@ -162,7 +162,7 @@ export function GruposAgregadosProducto({
               setNombreNuevo("");
               setError(null);
             }}
-            className="text-sm text-tinta-media hover:underline"
+            className={clasesBoton("peligro", "md")}
           >
             Cancelar
           </button>
@@ -172,7 +172,7 @@ export function GruposAgregadosProducto({
         <button
           type="button"
           onClick={() => setCreando(true)}
-          className="self-start rounded-lg border border-dashed border-linea px-3 py-2 text-sm text-tinta-media hover:border-brand hover:text-brand"
+          className={`${clasesBoton("nuevo", "md")} self-start`}
         >
           + Crear grupo nuevo
         </button>
@@ -181,8 +181,7 @@ export function GruposAgregadosProducto({
       {gruposDisponibles.length > 0 && (
         <div>
           <p className="mb-2 text-[0.82rem] text-tinta-media">O usar un grupo que ya creaste:</p>
-          {/* Botones con fondo propio (blanco sobre el fondo amarillo suave de la tarjeta):
-              antes eran píldoras transparentes y no se notaba que se podían tocar. */}
+          {/* Botones violeta con fondo propio: se nota que se pueden tocar sobre el fondo amarillo suave de la tarjeta. */}
           <div className="flex flex-wrap gap-2">
             {gruposDisponibles.map((g) => (
               <button
@@ -190,7 +189,7 @@ export function GruposAgregadosProducto({
                 type="button"
                 disabled={pendiente}
                 onClick={() => usarGrupoExistente(g.id)}
-                className={`${clasesBoton("suave", "md")} shadow-sm`}
+                className={`${clasesBoton("violeta", "md")} shadow-sm`}
               >
                 + {g.nombre} ({g.cantidadModificadores})
               </button>

@@ -212,9 +212,9 @@ export async function FichaProducto({ productoId }: { productoId: string }) {
         </Tarjeta>
       )}
 
-      <div className="flex flex-col gap-2 rounded-xl border border-amarillo/50 bg-amarillo-luz p-3">
+      <div className="flex flex-col gap-2 rounded-xl border border-amarillo/30 bg-amarillo-luz/50 p-3">
         <div>
-          <p className="rotulo text-[0.8rem] font-bold text-amarillo-oscuro">Grupos de agregados</p>
+          <p className="rotulo text-[0.8rem] font-bold !text-tinta">Grupos de agregados</p>
           <p className="text-[0.82rem] text-tinta-media">
             Grupos reutilizables (ej: Salsas, Quesos). Cada modificador es un producto real de tu catálogo: buscalo y
             agregalo acá mismo.
