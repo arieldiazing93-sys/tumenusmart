@@ -920,7 +920,7 @@ export function PantallaVenta({
               <button
                 type="button"
                 onClick={limpiarCarrito}
-                className="flex-none rounded-full border border-linea bg-white px-3 py-1.5 text-[0.8rem] font-medium text-tinta-media shadow-sm transition-colors hover:border-peligro hover:bg-peligro-luz hover:text-peligro"
+                className="flex-none rounded-full border border-violeta/30 bg-violeta-tinte px-3 py-1.5 text-[0.8rem] font-semibold text-violeta-oscuro shadow-sm transition-colors hover:border-violeta hover:bg-violeta hover:text-white"
               >
                 Vaciar
               </button>

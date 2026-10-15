@@ -23,7 +23,7 @@ export function CantidadPrevia({
   const escrita = leerCantidadEscrita(valor);
   return (
     <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-1.5">
-      <label htmlFor="pos-cantidad-previa" className="text-[0.72rem] font-semibold uppercase tracking-rotulo text-tinta-suave">
+      <label htmlFor="pos-cantidad-previa" className="text-[0.78rem] font-bold uppercase tracking-rotulo text-tinta">
         Cantidad
       </label>
       <Entrada
@@ -36,7 +36,10 @@ export function CantidadPrevia({
         style={{ backgroundColor: "#ffffff" }}
         invalido={escrita.tipo === "invalida" || !!error}
         aria-describedby="pos-cantidad-ayuda"
-        className="!h-10 !w-28 text-center text-[1rem] font-semibold"
+        // Con borde bien marcado (el campo blanco sobre el fondo blanco no se veía); en rojo si la cantidad no sirve.
+        className={`!h-10 !w-28 !border-2 text-center text-[1rem] font-semibold focus:!border-brand ${
+          escrita.tipo === "invalida" || error ? "!border-peligro" : "!border-tinta/70"
+        }`}
       />
       <span id="pos-cantidad-ayuda" className="min-w-0 text-[0.78rem] leading-snug text-tinta-suave">
         {escrita.tipo === "entera" ? (
