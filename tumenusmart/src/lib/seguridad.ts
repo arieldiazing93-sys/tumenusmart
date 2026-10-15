@@ -51,7 +51,7 @@ export const EVENTOS_DE_SEGURIDAD: DefinicionDeEvento[] = [
     id: "pago_comisiones",
     etiqueta: "Pago de comisiones",
     detalle:
-      "Pagarle al mozo su comisión desde la caja (sale efectivo del turno abierto, como retiro). Deshacer el pago también lo pide. El pago de propinas todavía no lo pide.",
+      "Pagarle su comisión a un mozo o a una persona del personal de turnos desde la caja (sale efectivo del turno abierto, como retiro). Deshacer el pago también lo pide. El pago de propinas todavía no lo pide.",
   },
 ];
 

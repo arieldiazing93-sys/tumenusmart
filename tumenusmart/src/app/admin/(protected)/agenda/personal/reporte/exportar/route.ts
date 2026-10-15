@@ -2,7 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { exigirPermiso } from "@/lib/auth";
 import { idLocalActual, localActual } from "@/lib/local-actual";
 import { prismaDelLocal } from "@/lib/prisma-local";
-import { diaEnTexto } from "@/lib/rango-dias";
+import { diaEnTexto, limitesEnAsuncion } from "@/lib/rango-dias";
+import { prisma } from "@/lib/prisma";
+import { saldosDeComisionPersonal } from "@/lib/comision-personal-servidor";
 import { MAXIMO_DIAS_REPORTE, cargarReportePersonal } from "@/lib/reporte-personal";
 import { filaTitulo, nuevoLibro, respuestaXlsx } from "@/lib/excel-reporte";
 
@@ -63,6 +65,13 @@ export async function GET(request: NextRequest) {
   }
 
   const local = await localActual();
+  // Lo pagado de comisión en el período y lo que se les debe hoy (los pagos salen de la caja).
+  const saldos = await saldosDeComisionPersonal(prisma, storeId, {
+    periodo: limitesEnAsuncion(periodo),
+    personalId: personalElegido?.id,
+  });
+  const pagadoTotal = [...saldos.values()].reduce((s, x) => s + x.pagadaEnPeriodo, 0);
+  const pendienteTotal = [...saldos.values()].reduce((s, x) => s + x.pendiente, 0);
   const textoPeriodo =
     periodo.desde === periodo.hasta ? diaEnTexto(periodo.desde) : `${diaEnTexto(periodo.desde)} - ${diaEnTexto(periodo.hasta)}`;
   const quien = personalElegido ? personalElegido.nombre : "Todo el personal";
@@ -76,6 +85,8 @@ export async function GET(request: NextRequest) {
     { width: 18 },
     { width: 18 },
     { width: 16 },
+    { width: 18 },
+    { width: 20 },
     { width: 18 },
   ];
 
@@ -95,8 +106,10 @@ export async function GET(request: NextRequest) {
       "Comisión servicio (Gs.)",
       "Comisión producto (%)",
       "Comisión producto (Gs.)",
+      "Comisión pagada en el período (Gs.)",
+      "Se le debe hoy (Gs.)",
     ],
-    7
+    9
   );
   // Se ve a quien está activo y a quien, aunque esté inactivo, tuvo trabajo en el período.
   const aMostrar = personalElegido ? [personalElegido] : personas.filter((p) => p.activo || porPersona.has(p.id));
@@ -110,10 +123,14 @@ export async function GET(request: NextRequest) {
       Math.round(suma.comision),
       p.comisionProducto != null ? textoPorcentaje(p.comisionProducto) : "Sin comisión",
       Math.round(suma.comisionProducto),
+      Math.round(saldos.get(p.id)?.pagadaEnPeriodo ?? 0),
+      Math.round(saldos.get(p.id)?.pendiente ?? 0),
     ]);
     fila.getCell(4).numFmt = FORMATO_GUARANIES;
     fila.getCell(5).numFmt = FORMATO_GUARANIES;
     fila.getCell(7).numFmt = FORMATO_GUARANIES;
+    fila.getCell(8).numFmt = FORMATO_GUARANIES;
+    fila.getCell(9).numFmt = FORMATO_GUARANIES;
   }
   resumen.addRow([]);
   const filaTotal = filaTitulo(
@@ -126,12 +143,16 @@ export async function GET(request: NextRequest) {
       Math.round(general.comision),
       "",
       Math.round(general.comisionProducto),
+      Math.round(pagadoTotal),
+      Math.round(pendienteTotal),
     ],
-    7
+    9
   );
   filaTotal.getCell(4).numFmt = FORMATO_GUARANIES;
   filaTotal.getCell(5).numFmt = FORMATO_GUARANIES;
   filaTotal.getCell(7).numFmt = FORMATO_GUARANIES;
+  filaTotal.getCell(8).numFmt = FORMATO_GUARANIES;
+  filaTotal.getCell(9).numFmt = FORMATO_GUARANIES;
 
   resumen.addRow([]);
   resumen.addRow([

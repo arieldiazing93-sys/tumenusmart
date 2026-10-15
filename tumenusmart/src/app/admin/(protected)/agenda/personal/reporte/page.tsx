@@ -5,7 +5,9 @@ import { Aviso, BotonEnlace, Cabecera, Tabla, Td, Th, Tr, Vacio, clasesBoton } f
 import { diaLargo } from "@/lib/agenda";
 import { claveSumarDias } from "@/lib/calendario";
 import { formatearGuarani } from "@/lib/format";
-import { diaEnTexto } from "@/lib/rango-dias";
+import { diaEnTexto, limitesEnAsuncion } from "@/lib/rango-dias";
+import { prisma } from "@/lib/prisma";
+import { saldosDeComisionPersonal } from "@/lib/comision-personal-servidor";
 import { MAXIMO_DIAS_REPORTE, cargarReportePersonal } from "@/lib/reporte-personal";
 import { claveDiaAsuncion } from "@/lib/timezone";
 import { AvatarPersonal } from "../../AvatarPersonal";
@@ -35,7 +37,8 @@ export default async function ReportePersonalPage({
   searchParams: Promise<{ personal?: string; desde?: string; hasta?: string }>;
 }) {
   await pantallaConPermiso("agenda.configurar");
-  const db = prismaDelLocal(await idLocalActual());
+  const storeId = await idLocalActual();
+  const db = prismaDelLocal(storeId);
   const sp = await searchParams;
 
   const hoy = claveDiaAsuncion(new Date());
@@ -60,6 +63,13 @@ export default async function ReportePersonalPage({
     filas,
     hayMas,
   } = await cargarReportePersonal(db, sp, MAXIMO_FILAS);
+  // Lo pagado de comisión en el período y lo que se les debe hoy (los pagos salen de la caja: ver Reserva de turnos → Comisiones).
+  const saldos =
+    periodo && !demasiadoLargo
+      ? await saldosDeComisionPersonal(prisma, storeId, { periodo: limitesEnAsuncion(periodo), personalId: personalElegido?.id })
+      : new Map<string, { pagadaEnPeriodo: number; pendiente: number }>();
+  const pagadoTotal = [...saldos.values()].reduce((s, x) => s + x.pagadaEnPeriodo, 0);
+  const pendienteTotal = [...saldos.values()].reduce((s, x) => s + x.pendiente, 0);
   const promedio = general.cantidad > 0 ? general.cobrado / general.cantidad : 0;
   const columnas = personalElegido ? 8 : 9;
   // Sin trabajos NI ventas con comisión de producto: ahí sí no hay nada que mostrar. Antes solo miraba los
@@ -72,6 +82,8 @@ export default async function ReportePersonalPage({
     { rotulo: "Promedio por trabajo", valor: formatearGuarani(promedio), tono: "neutro" },
     { rotulo: "Comisión de servicios", valor: formatearGuarani(general.comision), tono: "exito" },
     { rotulo: "Comisión de productos", valor: formatearGuarani(general.comisionProducto), tono: "exito" },
+    { rotulo: "Comisión pagada", valor: formatearGuarani(pagadoTotal), tono: "neutro" },
+    { rotulo: "Se les debe hoy", valor: formatearGuarani(pendienteTotal), tono: pendienteTotal > 0 ? "aviso" : "neutro" },
   ];
 
   const urlDe = (personalId: string) =>
@@ -146,13 +158,13 @@ export default async function ReportePersonalPage({
             )}
           </div>
 
-          <dl className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-5">
+          <dl className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7">
             {resumen.map((r) => (
               <div
                 key={r.rotulo}
-                className={`rounded-lg px-3 py-2.5 ${r.tono === "exito" ? "bg-exito-luz" : "bg-papel-suave"}`}
+                className={`rounded-lg px-3 py-2.5 ${r.tono === "exito" ? "bg-exito-luz" : r.tono === "aviso" ? "bg-amarillo-luz" : "bg-papel-suave"}`}
               >
-                <dt className={`text-[0.7rem] font-medium ${r.tono === "exito" ? "text-exito" : "text-tinta-suave"}`}>
+                <dt className={`text-[0.7rem] font-medium ${r.tono === "exito" ? "text-exito" : r.tono === "aviso" ? "text-amarillo-oscuro" : "text-tinta-suave"}`}>
                   {r.rotulo}
                 </dt>
                 <dd
@@ -206,6 +218,8 @@ export default async function ReportePersonalPage({
                           <Th className="text-right">Cobrado</Th>
                           <Th className="text-right">Comisión servicios</Th>
                           <Th className="text-right">Comisión productos</Th>
+                          <Th className="text-right">Comisión pagada</Th>
+                          <Th className="text-right">Se le debe hoy</Th>
                           <Th className="text-right">
                             <span className="sr-only">Acción</span>
                           </Th>
@@ -239,6 +253,10 @@ export default async function ReportePersonalPage({
                                 <Td className="cifra text-right font-medium text-exito">
                                   {formatearGuarani(suma.comisionProducto)}
                                 </Td>
+                                <Td className="cifra text-right">{formatearGuarani(saldos.get(p.id)?.pagadaEnPeriodo ?? 0)}</Td>
+                                <Td className={`cifra text-right ${(saldos.get(p.id)?.pendiente ?? 0) > 0 ? "font-semibold text-tinta" : ""}`}>
+                                  {formatearGuarani(saldos.get(p.id)?.pendiente ?? 0)}
+                                </Td>
                                 <Td className="text-right">
                                   {suma.cantidad > 0 && (
                                     <BotonEnlace href={urlDe(p.id)} tono="navegar" tam="sm">
@@ -259,6 +277,8 @@ export default async function ReportePersonalPage({
                           <Td className="cifra text-right font-semibold text-exito">
                             {formatearGuarani(general.comisionProducto)}
                           </Td>
+                          <Td className="cifra text-right font-semibold text-tinta">{formatearGuarani(pagadoTotal)}</Td>
+                          <Td className="cifra text-right font-semibold text-tinta">{formatearGuarani(pendienteTotal)}</Td>
                           <Td>{null}</Td>
                         </tr>
                       </tfoot>
@@ -313,6 +333,18 @@ export default async function ReportePersonalPage({
                                   {formatearGuarani(suma.comisionProducto)}
                                 </p>
                                 <p className="text-[0.66rem] text-tinta-suave">Com. productos</p>
+                              </div>
+                              <div>
+                                <p className="cifra text-[0.86rem] font-semibold text-tinta">
+                                  {formatearGuarani(saldos.get(p.id)?.pagadaEnPeriodo ?? 0)}
+                                </p>
+                                <p className="text-[0.66rem] text-tinta-suave">Com. pagada</p>
+                              </div>
+                              <div>
+                                <p className="cifra text-[0.86rem] font-semibold text-tinta">
+                                  {formatearGuarani(saldos.get(p.id)?.pendiente ?? 0)}
+                                </p>
+                                <p className="text-[0.66rem] text-tinta-suave">Se le debe</p>
                               </div>
                             </div>
                             {suma.cantidad > 0 && (

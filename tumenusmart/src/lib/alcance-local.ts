@@ -88,6 +88,7 @@ export const MODELOS_POR_LOCAL = new Set([
   "SectorComedor",
   "PropinaMozo",
   "PagoComisionMozo",
+  "PagoComisionPersonal",
   "CertificadoFirma",
   "ConfigFacturacionElectronica",
   "DocumentoElectronico",

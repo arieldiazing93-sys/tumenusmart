@@ -114,6 +114,10 @@ function armarGrupos(hayIdeaSinVer: boolean, rol: string, ventasACredito: boolea
         // Quienes atienden. Lo arma el dueño, igual que el resto de la configuración.
         { href: "/admin/agenda/personal", label: "Personal", icono: "cuenta" as const,
           ver: conPermiso("agenda.configurar") },
+        // Lo que cada persona ganó de comisión por sus trabajos y productos y lo que se le debe: se le paga desde la caja (retiro de caja)
+        // hoy o en otra fecha, todo o una parte.
+        { href: "/admin/agenda/personal/comisiones", label: "Comisiones", icono: "usuarios" as const,
+          ver: conPermiso("agenda.configurar") },
         // Qué días se atiende, de qué hora a qué hora y el descanso.
         { href: "/admin/agenda/horario", label: "Horario de trabajo", icono: "configuracion" as const,
           ver: conPermiso("agenda.configurar") },

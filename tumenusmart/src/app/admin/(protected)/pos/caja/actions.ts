@@ -166,6 +166,15 @@ export async function eliminarMovimientoCaja(movimientoId: string): Promise<Resu
     };
   }
 
+  // Y el de una persona del personal de turnos: se deshace desde Reserva de turnos → Comisiones.
+  const esPagoAPersonal = await db.pagoComisionPersonal.count({ where: { movimientoCajaId: movimientoId } });
+  if (esPagoAPersonal > 0) {
+    return {
+      ok: false,
+      error: "Este retiro es un pago de comisión al personal: deshacelo desde Reserva de turnos → Comisiones.",
+    };
+  }
+
   await db.movimientoCaja.delete({ where: { id: movimientoId } });
 
   await registrarBitacora(storeId, sesion, {

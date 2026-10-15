@@ -309,6 +309,7 @@ model Store {
   sectoresComedor  SectorComedor[]
   propinasMozo     PropinaMozo[]
   pagosComisionMozo PagoComisionMozo[]
+  pagosComisionPersonal PagoComisionPersonal[]
 }
 
 /// Las direcciones que este local tuvo antes.
@@ -2512,6 +2513,8 @@ model MiembroPersonal {
   horario   HorarioPersonal[]
   /// Ventas del mostrador donde se le asignó la comisión de producto (ver VentaPos.personalId).
   ventasProducto VentaPos[]
+  /// Los pagos de comisión que se le hicieron desde la caja.
+  pagosComision PagoComisionPersonal[]
 
   @@index([storeId])
 }
@@ -2967,6 +2970,31 @@ model PagoComisionMozo {
 
   @@index([storeId, createdAt])
   @@index([mozoId])
+  @@index([movimientoCajaId])
+}
+
+/// Un pago de comisión a una persona del personal de la Reserva de turnos (sus trabajos y sus ventas de productos), hecho desde la caja:
+/// puede ser todo lo que se le debe o una parte, hoy o en otra fecha. Cada pago es un retiro de efectivo del turno abierto (MovimientoCaja).
+/// Lo que se le debe = lo que ganó de comisión (de siempre) menos la suma de sus pagos. Ver src/lib/comision-personal-servidor.ts.
+model PagoComisionPersonal {
+  id               String          @id @default(cuid())
+  storeId          String
+  store            Store           @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  personalId       String
+  personal         MiembroPersonal @relation(fields: [personalId], references: [id])
+  monto            Decimal         @db.Decimal(12, 2)
+  /// Qué período de trabajo paga, como lo anotó quien pagó ("YYYY-MM-DD"). Opcional: sirve para saber a qué corresponde.
+  desde            String?
+  hasta            String?
+  nota             String?
+  /// El retiro de caja y el turno en que salió la plata.
+  movimientoCajaId String
+  turnoPosId       String
+  registradoPor    String
+  createdAt        DateTime        @default(now())
+
+  @@index([storeId, createdAt])
+  @@index([personalId])
   @@index([movimientoCajaId])
 }
 

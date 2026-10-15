@@ -10,7 +10,7 @@ import { textoDelPeriodo } from "@/lib/comision-mozo";
 import { saldosDeComision } from "@/lib/comision-mozo-servidor";
 import { Cabecera } from "@/components/ui";
 import { turnoAbierto } from "../../pos/turno-actual";
-import { PanelComisiones, type MozoConComision, type PagoDeComisionFila } from "./PanelComisiones";
+import { PanelComisiones, type PagoDeComisionFila, type PersonaConComision } from "./PanelComisiones";
 
 export const dynamic = "force-dynamic";
 
@@ -64,20 +64,23 @@ export default async function ComisionesPage() {
   const nombre = (m: { nombre: string; apellido: string | null }) => [m.nombre, m.apellido].filter(Boolean).join(" ");
 
   // Se muestran los mozos activos con comisión, y cualquiera (aunque ya no esté activo) al que todavía se le debe algo o se le pagó.
-  const filas: MozoConComision[] = mozos
+  const filas: PersonaConComision[] = mozos
     .map((m) => {
       const s = saldos.get(m.id);
+      const porcentaje = m.comisionPorcentaje == null ? 0 : Number(m.comisionPorcentaje);
       return {
-        mozoId: m.id,
+        id: m.id,
         nombre: nombre(m),
         activo: m.activo,
-        porcentaje: m.comisionPorcentaje == null ? null : Number(m.comisionPorcentaje),
+        etiquetaPorcentaje: porcentaje > 0 ? `${String(porcentaje).replace(".", ",")} % de comisión` : "Sin comisión configurada",
         ganada: s?.ganada ?? 0,
         pagada: s?.pagada ?? 0,
         pendiente: s?.pendiente ?? 0,
+        porcentaje,
       };
     })
-    .filter((m) => m.ganada > 0 || m.pagada > 0 || (m.activo && (m.porcentaje ?? 0) > 0))
+    .filter((m) => m.ganada > 0 || m.pagada > 0 || (m.activo && m.porcentaje > 0))
+    .map(({ porcentaje: _porcentaje, ...fila }) => fila)
     .sort((a, b) => b.pendiente - a.pendiente || a.nombre.localeCompare(b.nombre, "es"));
   const totalPendiente = filas.reduce((s, m) => s + m.pendiente, 0);
 
@@ -91,7 +94,7 @@ export default async function ComisionesPage() {
   const pagos: PagoDeComisionFila[] = historial.map((p) => ({
     id: p.id,
     movimientoId: p.movimientoCajaId,
-    mozo: nombre(p.mozo),
+    persona: nombre(p.mozo),
     monto: Number(p.monto),
     periodo: textoDelPeriodo(p.desde, p.hasta),
     nota: p.nota,
@@ -129,7 +132,7 @@ export default async function ComisionesPage() {
         bajada={`Lo que cada mozo ganó por las cuentas que cobró, lo que ya se le pagó y lo que se le debe. Se le paga en efectivo desde la caja, hoy o en otra fecha, todo o una parte: sale como retiro de caja del turno abierto. Pendiente en total: ${formatearGuarani(totalPendiente)}.`}
       />
       <PanelComisiones
-        mozos={filas}
+        personas={filas}
         pagos={pagos}
         puedePagar={motivoNoPuede === null}
         motivoNoPuede={motivoNoPuede}

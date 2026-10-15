@@ -8,23 +8,31 @@ import { useAutorizacion } from "@/components/Autorizacion";
 import { formatearGuarani } from "@/lib/format";
 import { imprimirComprobante, type ResultadoImpresion } from "@/lib/impresion-comprobantes";
 import { deshacerPagoDeComision, pagarComisionDeMozo, type ResultadoComision } from "./actions";
+import { deshacerPagoDeComisionPersonal, pagarComisionDePersonal } from "../../agenda/personal/comisiones/actions";
 
-export type MozoConComision = {
-  mozoId: string;
+/** De quién son las comisiones: de los mozos (Servicio comedor) o del personal de la Reserva de turnos. Cambia las palabras y a qué acción llama. */
+export type RolDeComision = "mozo" | "personal";
+
+export type PersonaConComision = {
+  /** El id del mozo o de la persona del personal. */
+  id: string;
   nombre: string;
   activo: boolean;
-  /** El % de comisión que tiene hoy (null = sin comisión configurada). */
-  porcentaje: number | null;
+  /** Cuánto cobra de comisión, ya dicho ("5 % de comisión", "Servicio 10 % · Producto 5 %", "Sin comisión configurada"). */
+  etiquetaPorcentaje: string;
   ganada: number;
   pagada: number;
   pendiente: number;
 };
+/** Nombre de antes: lo siguen usando las pantallas del Servicio comedor. */
+export type MozoConComision = PersonaConComision;
 
 export type PagoDeComisionFila = {
   id: string;
   /** El retiro de caja con el que se pagó: con él se imprime el comprobante. */
   movimientoId: string;
-  mozo: string;
+  /** A quién se le pagó. */
+  persona: string;
   monto: number;
   /** "del 01/10/2026 al 07/10/2026" o "". */
   periodo: string;
@@ -37,9 +45,31 @@ export type PagoDeComisionFila = {
 
 const ROTULO = "text-[0.72rem] font-semibold uppercase tracking-rotulo text-tinta-suave";
 
+/** Las palabras de cada pantalla. */
+const PALABRAS = {
+  mozo: {
+    titulo: "Comisión de cada mozo",
+    firma: "el mozo",
+    periodo: "Ventas",
+    vacioTitulo: "Todavía no hay comisiones",
+    vacioDetalle:
+      "Cargá el % de comisión de un mozo en Ajustes → Mozos. Desde ese momento, cada cuenta que cobre le suma comisión y se acumula acá.",
+    cuando: "ventas",
+  },
+  personal: {
+    titulo: "Comisión de cada persona",
+    firma: "la persona",
+    periodo: "Trabajos",
+    vacioTitulo: "Todavía no hay comisiones",
+    vacioDetalle:
+      "Cargá el % de comisión de servicio o de producto de cada persona en Personal → Editar. Desde ese momento, cada trabajo cobrado o producto vendido le suma comisión y se acumula acá.",
+    cuando: "trabajos",
+  },
+} as const;
+
 /** Lo que se le dice a la persona sobre el comprobante del pago (que sale solo en la impresora del ticket de esta estación). */
-function textoDelComprobante(r: ResultadoImpresion): string {
-  if (r.ok) return "El comprobante salió en la impresora para que el mozo firme.";
+function textoDelComprobante(r: ResultadoImpresion, quien: string): string {
+  if (r.ok) return `El comprobante salió en la impresora para que ${quien} firme.`;
   if (r.motivo === "sin_impresora") {
     return "Esta estación no tiene impresora asignada al ticket, así que no se imprimió el comprobante (se puede reimprimir desde “Pagos hechos”).";
   }
@@ -49,20 +79,26 @@ function textoDelComprobante(r: ResultadoImpresion): string {
   return "No se pudo imprimir el comprobante (se puede reimprimir desde “Pagos hechos”).";
 }
 
-const urlDelComprobante = (movimientoId: string) => `/admin/comedor/comisiones/pago/${movimientoId}/crudo`;
+const urlDelComprobante = (rol: RolDeComision, movimientoId: string) =>
+  rol === "personal"
+    ? `/admin/agenda/personal/comisiones/pago/${movimientoId}/crudo`
+    : `/admin/comedor/comisiones/pago/${movimientoId}/crudo`;
 
 /**
- * Las comisiones de los mozos: lo ganado, lo pagado y lo que se les debe, el formulario para pagarles (monto, período opcional y nota;
- * sale como retiro de caja del turno abierto), los pagos ya hechos (con su comprobante y, mientras el turno siga abierto, deshacer).
+ * Las comisiones (de los mozos o del personal de turnos): lo ganado, lo pagado y lo que se les debe, el formulario para pagarles (monto,
+ * período opcional y nota; sale como retiro de caja del turno abierto), los pagos ya hechos (con su comprobante y, mientras el turno siga
+ * abierto, deshacer).
  */
 export function PanelComisiones({
-  mozos,
+  rol = "mozo",
+  personas,
   pagos,
   puedePagar,
   motivoNoPuede,
   nombreImpresoraTicket,
 }: {
-  mozos: MozoConComision[];
+  rol?: RolDeComision;
+  personas: PersonaConComision[];
   pagos: PagoDeComisionFila[];
   /** Si desde esta computadora se puede pagar (estación con turno abierto y permiso de vender). */
   puedePagar: boolean;
@@ -75,16 +111,17 @@ export function PanelComisiones({
   const [enCurso, iniciar] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
+  const palabras = PALABRAS[rol];
 
-  // El mozo al que se le está cargando un pago y lo que se escribió.
+  // La persona a la que se le está cargando un pago y lo que se escribió.
   const [pagandoId, setPagandoId] = useState<string | null>(null);
   const [monto, setMonto] = useState("");
   const [desde, setDesde] = useState("");
   const [hasta, setHasta] = useState("");
   const [nota, setNota] = useState("");
 
-  function abrirPago(m: MozoConComision) {
-    setPagandoId(m.mozoId);
+  function abrirPago(m: PersonaConComision) {
+    setPagandoId(m.id);
     setMonto(String(Math.round(m.pendiente)));
     setDesde("");
     setHasta("");
@@ -94,14 +131,17 @@ export function PanelComisiones({
   }
 
   /** Registra el pago y, si salió bien, imprime el comprobante para que firme (si esta estación tiene impresora del ticket). */
-  function pagar(m: MozoConComision) {
+  function pagar(m: PersonaConComision) {
     const importe = Number(monto);
     setError(null);
     setAviso(null);
     iniciar(async () => {
       try {
-        const r = await autorizar((clave) =>
-          pagarComisionDeMozo({ mozoId: m.mozoId, monto: importe, desde: desde || null, hasta: hasta || null, nota: nota || null }, clave)
+        const periodo = { monto: importe, desde: desde || null, hasta: hasta || null, nota: nota || null };
+        const r: ResultadoComision = await autorizar((clave) =>
+          rol === "personal"
+            ? pagarComisionDePersonal({ personalId: m.id, ...periodo }, clave)
+            : pagarComisionDeMozo({ mozoId: m.id, ...periodo }, clave)
         );
         if (!r.ok) {
           setError(r.error);
@@ -109,8 +149,8 @@ export function PanelComisiones({
         }
         let texto = r.mensaje ?? "";
         if (r.movimientoId) {
-          const impresion = await imprimirComprobante(urlDelComprobante(r.movimientoId), nombreImpresoraTicket);
-          texto = `${texto} ${textoDelComprobante(impresion)}`.trim();
+          const impresion = await imprimirComprobante(urlDelComprobante(rol, r.movimientoId), nombreImpresoraTicket);
+          texto = `${texto} ${textoDelComprobante(impresion, palabras.firma)}`.trim();
         }
         setAviso(texto);
         setPagandoId(null);
@@ -126,7 +166,9 @@ export function PanelComisiones({
     setAviso(null);
     iniciar(async () => {
       try {
-        const r: ResultadoComision = await autorizar((clave) => deshacerPagoDeComision(pagoId, clave));
+        const r: ResultadoComision = await autorizar((clave) =>
+          rol === "personal" ? deshacerPagoDeComisionPersonal(pagoId, clave) : deshacerPagoDeComision(pagoId, clave)
+        );
         if (!r.ok) {
           setError(r.error);
           return;
@@ -144,9 +186,9 @@ export function PanelComisiones({
     setError(null);
     setAviso(null);
     iniciar(async () => {
-      const impresion = await imprimirComprobante(urlDelComprobante(movimientoId), nombreImpresoraTicket);
+      const impresion = await imprimirComprobante(urlDelComprobante(rol, movimientoId), nombreImpresoraTicket);
       if (impresion.ok) setAviso("El comprobante salió en la impresora.");
-      else setError(textoDelComprobante(impresion));
+      else setError(textoDelComprobante(impresion, palabras.firma));
     });
   }
 
@@ -155,36 +197,31 @@ export function PanelComisiones({
       {aviso && <p className="rounded-lg bg-exito-luz px-3 py-2 text-[0.84rem] font-medium text-exito">{aviso}</p>}
       {error && <MensajeError>{error}</MensajeError>}
 
-      {/* ------------------------------------------------------------------- lo que se le debe a cada mozo */}
+      {/* ------------------------------------------------------------------- lo que se le debe a cada uno */}
       <section className="flex flex-col gap-2">
-        <p className={ROTULO}>Comisión de cada mozo</p>
+        <p className={ROTULO}>{palabras.titulo}</p>
         {!puedePagar && motivoNoPuede && (
           <p className="rounded-lg border border-amarillo/60 bg-amarillo-luz px-3 py-2 text-[0.8rem] text-amarillo-oscuro">
             {motivoNoPuede}
           </p>
         )}
-        {mozos.length === 0 ? (
-          <Vacio
-            titulo="Todavía no hay comisiones"
-            detalle="Cargá el % de comisión de un mozo en Ajustes → Mozos. Desde ese momento, cada cuenta que cobre le suma comisión y se acumula acá."
-          />
+        {personas.length === 0 ? (
+          <Vacio titulo={palabras.vacioTitulo} detalle={palabras.vacioDetalle} />
         ) : (
           <ul className="grid gap-2 sm:grid-cols-2">
-            {mozos.map((m) => {
-              const abierto = pagandoId === m.mozoId;
+            {personas.map((m) => {
+              const abierto = pagandoId === m.id;
               const importe = Number(monto);
               const montoInvalido = !Number.isFinite(importe) || importe <= 0 || importe > m.pendiente;
               const periodoAlReves = desde !== "" && hasta !== "" && desde > hasta;
               return (
-                <li key={m.mozoId} className="flex flex-col gap-2.5 rounded-xl border-2 border-azul/50 bg-superficie p-3.5">
+                <li key={m.id} className="flex flex-col gap-2.5 rounded-xl border-2 border-azul/50 bg-superficie p-3.5">
                   <div className="flex items-baseline justify-between gap-2">
                     <p className="truncate text-[1rem] font-semibold text-tinta">
                       {m.nombre}
                       {!m.activo && <span className="ml-1.5 text-[0.72rem] font-medium text-tinta-suave">(inactivo)</span>}
                     </p>
-                    <p className="flex-none text-[0.74rem] text-tinta-suave">
-                      {m.porcentaje != null && m.porcentaje > 0 ? `${String(m.porcentaje).replace(".", ",")} % de comisión` : "Sin comisión configurada"}
-                    </p>
+                    <p className="flex-none text-right text-[0.74rem] text-tinta-suave">{m.etiquetaPorcentaje}</p>
                   </div>
                   <dl className="grid grid-cols-3 gap-2 text-center">
                     <div className="rounded-lg bg-papel-suave px-1.5 py-1.5">
@@ -223,10 +260,10 @@ export function PanelComisiones({
                         />
                       </Campo>
                       <div className="grid grid-cols-2 gap-2">
-                        <Campo etiqueta="Ventas desde" ayuda="Opcional">
+                        <Campo etiqueta={`${palabras.periodo} desde`} ayuda="Opcional">
                           <Entrada type="date" value={desde} onChange={(e) => setDesde(e.target.value)} invalido={periodoAlReves} />
                         </Campo>
-                        <Campo etiqueta="Ventas hasta" ayuda="Opcional">
+                        <Campo etiqueta={`${palabras.periodo} hasta`} ayuda="Opcional">
                           <Entrada type="date" value={hasta} onChange={(e) => setHasta(e.target.value)} invalido={periodoAlReves} />
                         </Campo>
                       </div>
@@ -235,7 +272,7 @@ export function PanelComisiones({
                         <Entrada value={nota} onChange={(e) => setNota(e.target.value)} maxLength={200} />
                       </Campo>
                       <p className="text-[0.76rem] text-tinta-suave">
-                        Sale en efectivo de la caja del turno abierto y queda como un retiro de caja con el nombre del mozo.
+                        Sale en efectivo de la caja del turno abierto y queda como un retiro de caja con el nombre {rol === "mozo" ? "del mozo" : "de la persona"}.
                       </p>
                       <div className="flex flex-wrap justify-end gap-2">
                         <button type="button" disabled={enCurso} onClick={() => setPagandoId(null)} className={clasesBoton("peligro", "md")}>
@@ -277,9 +314,14 @@ export function PanelComisiones({
               {pagos.map((p) => (
                 <li key={p.id} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2.5">
                   <p className="min-w-0 text-[0.86rem] text-tinta">
-                    <strong className="font-semibold">{p.mozo}</strong> ·{" "}
+                    <strong className="font-semibold">{p.persona}</strong> ·{" "}
                     <span className="cifra font-semibold">{formatearGuarani(p.monto)}</span>
-                    {p.periodo && <span className="text-tinta-media"> · ventas {p.periodo}</span>}
+                    {p.periodo && (
+                      <span className="text-tinta-media">
+                        {" "}
+                        · {palabras.cuando} {p.periodo}
+                      </span>
+                    )}
                     <span className="block text-[0.74rem] text-tinta-suave">
                       {p.fecha} · pagó {p.pagadoPor} · retiro de caja{p.nota ? ` · ${p.nota}` : ""}
                     </span>
@@ -295,7 +337,7 @@ export function PanelComisiones({
                         onClick={() => {
                           if (
                             !confirm(
-                              "¿Deshacer este pago? Se borra el retiro de la caja y lo que se le debe al mozo vuelve a subir (solo se puede mientras el turno sigue abierto)."
+                              "¿Deshacer este pago? Se borra el retiro de la caja y lo que se le debe vuelve a subir (solo se puede mientras el turno sigue abierto)."
                             )
                           ) {
                             return;
