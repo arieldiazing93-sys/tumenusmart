@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { ICONOS, IconoPlegar, type NombreIcono } from "./iconos";
 import { Logo } from "./Logo";
@@ -27,7 +27,12 @@ export type Seccion = {
   subsecciones?: Seccion[];
 };
 
-export type GrupoSecciones = { titulo: string; secciones: Seccion[] };
+export type GrupoSecciones = {
+  titulo: string;
+  /** El icono del grupo: va en la pastilla de su título cuando el menú está desplegado. */
+  icono?: NombreIcono;
+  secciones: Seccion[];
+};
 
 /** Las pantallas a las que de verdad se navega: las secciones sueltas y las de adentro de cada submenú. */
 function pantallasDe(secciones: Seccion[]): Seccion[] {
@@ -46,7 +51,7 @@ export const COOKIE_MENU = "menu_plegado";
  * se agrupa por lo que hace cada cosa, y la sección activa se ve.
  *
  * Se puede plegar a una tira angosta de solo iconos, porque Pedidos y Reservas
- * son tablas anchas y esos 240 píxeles hacen la diferencia en una pantalla
+ * son tablas anchas y esos 200 píxeles hacen la diferencia en una pantalla
  * chica. Plegado sigue navegándose con un clic: por eso la tira conserva los
  * iconos en vez de desaparecer del todo.
  *
@@ -116,7 +121,14 @@ export function NavPanel({
     });
   }
 
+  // Al entrar al panel TODO arranca cerrado, también los submenús. Después, si se llega a una pantalla que está adentro de uno (desde
+  // un botón, por ejemplo), el submenú se despliega solo para ver dónde se está parado: eso no corre en la primera pintada.
+  const primeraPintada = useRef(true);
   useEffect(() => {
+    if (primeraPintada.current) {
+      primeraPintada.current = false;
+      return;
+    }
     const dueno = grupos
       .flatMap((g) => g.secciones)
       .find((s) => s.subsecciones?.some((h) => h.href === activa));
@@ -176,7 +188,13 @@ export function NavPanel({
     });
   }
 
-  /** Una fila que lleva a una pantalla. `anidada`: es una de las de adentro de un submenú (más chica y sin icono). */
+  /**
+   * Una fila que lleva a una pantalla.
+   *
+   * Desplegado, las pantallas de un grupo van SIN icono: el icono lo lleva el título del grupo y la sangría con su línea guía
+   * muestra a quién pertenecen (más limpio y más angosto). Plegado a la tira de iconos, en cambio, el icono es lo único que queda.
+   * `anidada`: es una de las de adentro de un submenú (una sangría más y letra un punto más chica).
+   */
   function enlace(s: Seccion, compacta: boolean, anidada: boolean) {
     const esActiva = activa === s.href;
     const Icono = ICONOS[s.icono];
@@ -190,28 +208,29 @@ export function NavPanel({
           // pantalla.
           title={compacta ? s.label : undefined}
           aria-label={compacta ? s.label : undefined}
-          className={`group relative flex items-center gap-2.5 rounded-lg font-medium transition-colors duration-100 ${
+          className={`group relative flex items-center gap-2 rounded-lg font-medium transition-colors duration-100 ${
             compacta
               ? "justify-center px-2 py-2.5 text-[0.86rem]"
               : anidada
-                ? "px-3 py-1.5 text-[0.82rem]"
-                : "px-3 py-2 text-[0.86rem]"
+                ? "px-2.5 py-1.5 text-[0.8rem]"
+                : "px-2.5 py-1.5 text-[0.83rem]"
           } ${
             esActiva
-              ? "bg-brand-light text-brand-texto"
+              ? "bg-brand-light font-semibold text-brand-texto"
               : "text-tinta-media hover:bg-papel-hundido hover:text-tinta"
           }`}
         >
-          {/* La barrita del costado marca dónde estás sin depender
-              solo del color de fondo. */}
-          <span
-            aria-hidden="true"
-            className={`absolute left-0 top-1/2 h-4 w-[3px] -translate-y-1/2 rounded-r bg-brand transition-opacity duration-150 ${
-              esActiva ? "opacity-100" : "opacity-0"
-            }`}
-          />
-          {!anidada && <Icono />}
-          {!compacta && <span className="flex-1">{s.label}</span>}
+          {/* Plegado, la barrita del costado marca dónde estás sin depender solo del color de fondo. */}
+          {compacta && (
+            <span
+              aria-hidden="true"
+              className={`absolute left-0 top-1/2 h-4 w-[3px] -translate-y-1/2 rounded-r bg-brand transition-opacity duration-150 ${
+                esActiva ? "opacity-100" : "opacity-0"
+              }`}
+            />
+          )}
+          {compacta && <Icono />}
+          {!compacta && <span className="flex-1 leading-snug">{s.label}</span>}
           {s.aviso && (
             <span
               className={`h-1.5 w-1.5 flex-none rounded-full bg-brand ${
@@ -234,27 +253,25 @@ export function NavPanel({
     const hijos = s.subsecciones ?? [];
     const abierto = submenus.has(s.label);
     const hayActivaAdentro = hijos.some((h) => h.href === activa);
-    const Icono = ICONOS[s.icono];
     return (
       <li key={s.label}>
         <button
           type="button"
           onClick={() => alternarSubmenu(s.label)}
           aria-expanded={abierto}
-          className={`group relative flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-[0.86rem] font-medium transition-colors duration-100 ${
+          className={`group relative flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-[0.83rem] font-medium transition-colors duration-100 ${
             hayActivaAdentro && !abierto
               ? "bg-brand-light text-brand-texto"
               : "text-tinta-media hover:bg-papel-hundido hover:text-tinta"
           }`}
         >
-          <Icono />
-          <span className="flex-1">{s.label}</span>
+          <span className="flex-1 leading-snug">{s.label}</span>
           <IconoPlegar
-            className={`flex-none transition-transform duration-150 ${abierto ? "-rotate-90" : "rotate-180"}`}
+            className={`flex-none text-tinta-suave transition-transform duration-150 ${abierto ? "-rotate-90" : "rotate-180"}`}
           />
         </button>
         {abierto && (
-          <ul className="ml-[1.45rem] mt-0.5 flex flex-col gap-0.5 border-l border-linea pl-2">
+          <ul className="ml-2.5 mt-0.5 flex animate-[entrarPanel_0.15s_ease-out] flex-col gap-0.5 border-l border-linea pl-1.5">
             {hijos.map((h) => enlace(h, false, true))}
           </ul>
         )}
@@ -264,79 +281,79 @@ export function NavPanel({
 
   function lista(compacta: boolean) {
     return (
-      <nav className={`flex flex-col ${compacta ? "gap-3 p-2" : "gap-4 p-3"}`}>
+      <nav className={`flex flex-col ${compacta ? "gap-3 p-2" : "gap-0.5 p-2"}`}>
         {grupos.map((grupo) => {
           // Plegado no hay título que tocar, así que tampoco hay nada para
           // colapsar — ahí siempre se ven todos los iconos.
           const colapsado = !compacta && colapsados.has(grupo.titulo);
+          const esDeLaPantalla = grupo.titulo === grupoActivo;
+          const IconoGrupo = ICONOS[grupo.icono ?? "pedidos"];
           return (
-          <div
-            key={grupo.titulo}
-            // La línea de arriba separa las secciones sin gastar color, y sirve
-            // igual desplegado que plegado. El primer grupo no la lleva: ahí
-            // arriba no hay nada de qué separarlo.
-            className={`border-t border-linea-fina first:border-t-0 first:pt-0 ${
-              compacta ? "pt-2.5" : "pt-3"
-            }`}
-          >
-            {/*
-              Plegado no entra el título: queda solo la línea de arriba, que es
-              lo que evita que once iconos se lean como una lista sin orden.
+            <div
+              key={grupo.titulo}
+              // Plegado a la tira de iconos, una línea separa los grupos (sin títulos, once iconos seguidos se leerían como una
+              // lista sin orden). Desplegado, los separa el propio título de cada grupo.
+              className={compacta ? "border-t border-linea-fina pt-2.5 first:border-t-0 first:pt-0" : ""}
+            >
+              {!compacta && (
+                /*
+                  El título de cada grupo es un botón con su icono en una pastillita: cerrado, es una fila limpia con una flecha;
+                  abierto, se tiñe de azul (navegación) y muestra sus pantallas debajo con una línea guía. Cerrado pero con la
+                  pantalla actual adentro, el icono se ilumina y lleva un puntito para saber dónde se está sin abrirlo.
 
-              Antes acá había un <span> separador con `first:hidden`, y como era
-              el primer hijo de su grupo la condición se cumplía SIEMPRE: la
-              raya no se dibujaba nunca. Ahora la separación la hace el borde
-              del grupo, que funciona en los dos modos.
-            */}
-            {!compacta && (
-              /*
-                El título va siempre en azul (es navegación, mismo significado
-                que el resto del panel) — el grupo de la sección activa se
-                distingue con un puntito cuando está cerrado, y con su enlace
-                resaltado adentro cuando se abre.
-
-                La separación entre letras baja de 0.19em a 0.15em porque a
-                este tamaño la anterior desarma las palabras.
-
-                Botón y no <p> suelto: con la lista ya larga (once secciones
-                repartidas en cinco grupos) hacía falta poder achicarla
-                mientras se navega. Un vistazo (la línea de arriba) alcanza
-                para saber que hay algo ahí aunque esté colapsado.
-              */
-              <button
-                type="button"
-                onClick={() => alternarGrupo(grupo.titulo)}
-                aria-expanded={!colapsado}
-                className="flex w-full items-center justify-between gap-2 rounded-lg px-3 pb-2 text-[0.75rem] font-bold uppercase tracking-[0.15em] text-azul-oscuro hover:text-brand"
-              >
-                <span className="flex flex-1 items-center gap-2 text-left">
-                  {grupo.titulo}
-                  {colapsado && grupo.titulo === grupoActivo && (
+                  Botón y no <p> suelto: con la lista tan larga hace falta poder achicarla mientras se navega.
+                */
+                <button
+                  type="button"
+                  onClick={() => alternarGrupo(grupo.titulo)}
+                  aria-expanded={!colapsado}
+                  className={`group flex w-full items-center gap-2.5 rounded-xl px-1.5 py-1.5 text-left text-[0.86rem] font-semibold leading-snug transition-colors duration-100 ${
+                    colapsado ? "text-tinta hover:bg-papel-hundido" : "bg-azul-luz/60 text-azul-oscuro"
+                  }`}
+                >
+                  <span
+                    className={`flex h-7 w-7 flex-none items-center justify-center rounded-lg transition-colors duration-100 ${
+                      !colapsado
+                        ? "bg-white text-azul shadow-sm"
+                        : esDeLaPantalla
+                          ? "bg-brand-light text-brand-texto"
+                          : "bg-papel-hundido text-tinta-media group-hover:bg-white group-hover:text-azul"
+                    }`}
+                  >
+                    <IconoGrupo />
+                  </span>
+                  <span className="flex-1">{grupo.titulo}</span>
+                  {colapsado && esDeLaPantalla && (
                     // Cerrado pero con la pantalla actual adentro: el puntito avisa dónde estás.
                     <span aria-label="Acá estás" title="Acá estás" className="h-1.5 w-1.5 flex-none rounded-full bg-brand" />
                   )}
-                </span>
-                <IconoPlegar
-                  className={`flex-none transition-transform duration-150 ${
-                    colapsado ? "rotate-180" : "-rotate-90"
-                  }`}
-                />
-              </button>
-            )}
-
-            {!colapsado && (
-            <ul className="flex flex-col gap-0.5">
-              {grupo.secciones.map((s) =>
-                s.subsecciones && s.subsecciones.length > 0
-                  ? compacta
-                    ? // Plegado no hay lugar para un desplegable: las pantallas de adentro se ven como iconos sueltos.
-                      s.subsecciones.map((h) => enlace(h, true, false))
-                    : submenu(s)
-                  : enlace(s, compacta, false)
+                  <IconoPlegar
+                    className={`flex-none text-tinta-suave transition-transform duration-150 ${
+                      colapsado ? "rotate-180" : "-rotate-90"
+                    }`}
+                  />
+                </button>
               )}
-            </ul>
-            )}
-          </div>
+
+              {!colapsado && (
+                <ul
+                  className={`flex flex-col gap-0.5 ${
+                    compacta
+                      ? ""
+                      : "mb-1.5 ml-[1.35rem] mt-1 animate-[entrarPanel_0.15s_ease-out] border-l border-linea pl-1.5"
+                  }`}
+                >
+                  {grupo.secciones.map((s) =>
+                    s.subsecciones && s.subsecciones.length > 0
+                      ? compacta
+                        ? // Plegado no hay lugar para un desplegable: las pantallas de adentro se ven como iconos sueltos.
+                          s.subsecciones.map((h) => enlace(h, true, false))
+                        : submenu(s)
+                      : enlace(s, compacta, false)
+                  )}
+                </ul>
+              )}
+            </div>
           );
         })}
       </nav>
@@ -351,18 +368,18 @@ export function NavPanel({
         // contenido por esa línea (el lienzo del panel ahora también es
         // blanco, así que ya no alcanza con el color de fondo).
         className={`hidden h-full flex-none border-r border-linea bg-white transition-[width] duration-200 lg:block ${
-          plegada ? "w-[3.5rem]" : "w-[15rem]"
+          plegada ? "w-[3.5rem]" : "w-[13rem]"
         }`}
       >
-        <div className="sticky top-14 max-h-[calc(100vh-3.5rem)] overflow-y-auto overflow-x-hidden py-3">
-          <div className={`flex ${plegada ? "justify-center" : "justify-end px-3"}`}>
+        <div className="sticky top-14 max-h-[calc(100vh-3.5rem)] overflow-y-auto overflow-x-hidden py-3 [scrollbar-width:thin]">
+          <div className={`flex ${plegada ? "justify-center" : "justify-end px-2.5"}`}>
             <button
               type="button"
               onClick={alternarPlegada}
               aria-expanded={!plegada}
               aria-label={plegada ? "Expandir el menú" : "Plegar el menú"}
               title={plegada ? "Expandir el menú" : "Plegar el menú"}
-              className="flex h-7 w-7 items-center justify-center rounded-lg border border-linea bg-white text-tinta-suave transition-colors duration-150 hover:border-brand hover:text-brand"
+              className="flex h-7 w-7 items-center justify-center rounded-lg text-tinta-suave transition-colors duration-150 hover:bg-papel-hundido hover:text-brand"
             >
               <IconoPlegar
                 className={`transition-transform duration-200 ${plegada ? "rotate-180" : ""}`}

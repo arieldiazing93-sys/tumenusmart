@@ -35,6 +35,7 @@ function armarGrupos(hayIdeaSinVer: boolean, rol: string, ventasACredito: boolea
   const grupos: GrupoSecciones[] = [
     {
       titulo: "Día a día",
+      icono: "pos",
       secciones: [
         // Punto de venta va primero: es lo que más se toca en el momento,
         // varias veces por hora.
@@ -95,12 +96,72 @@ function armarGrupos(hayIdeaSinVer: boolean, rol: string, ventasACredito: boolea
       ],
     },
     {
+      titulo: "Mi carta",
+      icono: "productos",
+      secciones: [
+        { href: "/admin/productos", label: "Productos", icono: "productos" as const,
+          ver: conPermiso("productos.ver") },
+        { href: "/admin/categorias", label: "Categorías", icono: "categorias" as const,
+          ver: conPermiso("categorias.ver") },
+        { href: "/admin/grupos-agregados", label: "Grupos de agregados", icono: "productos" as const,
+          ver: conPermiso("productos.ver") },
+        // Descuentos ("PROMO 20 %") y promociones por volumen ("2 por 1") que rigen en ciertos días y horas, en todos los canales de venta.
+        { href: "/admin/promociones", label: "Promociones", icono: "productos" as const,
+          ver: conPermiso("productos.ver") },
+      ],
+    },
+    {
+      titulo: "Control de stock",
+      icono: "categorias",
+      secciones: [
+        { href: "/admin/stock/insumos", label: "Insumos", icono: "productos" as const,
+          ver: conPermiso("stock.ver") },
+        { href: "/admin/stock/proveedores", label: "Proveedores", icono: "usuarios" as const,
+          ver: conPermiso("stock.ver") },
+        { href: "/admin/stock/almacenes", label: "Almacenes", icono: "configuracion" as const,
+          ver: conPermiso("stock.ver") },
+        // Entradas y salidas que no son compras ni ventas: mermas, roturas, consumo del personal.
+        { href: "/admin/stock/movimientos", label: "Movimientos de almacén", icono: "estadisticas" as const,
+          ver: conPermiso("stock.ver") },
+        // Qué insumos descontó cada venta y por qué producto — para comprobar cómo sale cada ingrediente.
+        { href: "/admin/stock/salidas-por-venta", label: "Salidas por venta", icono: "estadisticas" as const,
+          ver: conPermiso("stock.ver") },
+        { href: "/admin/stock/compras", label: "Compras", icono: "cierre" as const,
+          ver: conPermiso("stock.ver") },
+        { href: "/admin/stock/cuentas-por-pagar", label: "Cuentas por pagar", icono: "cierre" as const,
+          ver: conPermiso("stock.ver") },
+        { href: "/admin/stock/inventario", label: "Registro de inventario", icono: "estadisticas" as const,
+          ver: conPermiso("stock.ver") },
+        { href: "/admin/stock/gastos", label: "Gastos", icono: "cierre" as const,
+          ver: conPermiso("stock.ver") },
+      ],
+    },
+    {
+      // Para los complejos deportivos (fútbol, pádel, tenis…): el cliente reserva una cancha por horas desde la página
+      // pública. Es el espejo de "Reserva de turnos", pero lo que se agenda es una cancha y no una persona.
+      titulo: "Reserva de canchas",
+      icono: "reservas",
+      secciones: [
+        { href: "/admin/canchas", label: "Calendario", icono: "reservas" as const,
+          ver: conPermiso("canchas.ver") },
+        // Las canchas del complejo: su tipo, su precio por hora y las duraciones que se ofrecen.
+        { href: "/admin/canchas/lista", label: "Canchas", icono: "productos" as const,
+          ver: conPermiso("canchas.configurar") },
+        // Qué días se abre y de qué hora a qué hora: es el horario de todas las canchas.
+        { href: "/admin/canchas/horario", label: "Horario del complejo", icono: "configuracion" as const,
+          ver: conPermiso("canchas.configurar") },
+        // La página pública donde el cliente reserva (/canchas/<dirección>): foto, redes, colores y el WhatsApp.
+        { href: "/admin/canchas/pagina", label: "Página de reservas", icono: "categorias" as const,
+          ver: conPermiso("canchas.configurar") },
+      ],
+    },
+    {
       // Para los negocios que atienden con cita (peluquería, barbería, salón
       // de belleza). No es lo mismo que "Reservas" de Día a día: eso es
       // reservar mesa en un restaurante, esto es agendar a alguien con un
-      // profesional a una hora. Va entre "Día a día" y "Mi carta" porque el
-      // calendario también se usa durante el día.
+      // profesional a una hora. Va después de las canchas y antes de Asistencia.
       titulo: "Reserva de turnos",
+      icono: "cuenta",
       secciones: [
         { href: "/admin/agenda", label: "Calendario", icono: "reservas" as const,
           ver: conPermiso("agenda.ver") },
@@ -130,28 +191,11 @@ function armarGrupos(hayIdeaSinVer: boolean, rol: string, ventasACredito: boolea
       ],
     },
     {
-      // Para los complejos deportivos (fútbol, pádel, tenis…): el cliente reserva una cancha por horas desde la página
-      // pública. Es el espejo de "Reserva de turnos", pero lo que se agenda es una cancha y no una persona.
-      titulo: "Reserva de canchas",
-      secciones: [
-        { href: "/admin/canchas", label: "Calendario", icono: "reservas" as const,
-          ver: conPermiso("canchas.ver") },
-        // Las canchas del complejo: su tipo, su precio por hora y las duraciones que se ofrecen.
-        { href: "/admin/canchas/lista", label: "Canchas", icono: "productos" as const,
-          ver: conPermiso("canchas.configurar") },
-        // Qué días se abre y de qué hora a qué hora: es el horario de todas las canchas.
-        { href: "/admin/canchas/horario", label: "Horario del complejo", icono: "configuracion" as const,
-          ver: conPermiso("canchas.configurar") },
-        // La página pública donde el cliente reserva (/canchas/<dirección>): foto, redes, colores y el WhatsApp.
-        { href: "/admin/canchas/pagina", label: "Página de reservas", icono: "categorias" as const,
-          ver: conPermiso("canchas.configurar") },
-      ],
-    },
-    {
       // Control de asistencia del personal: marcan entrada, almuerzo y salida en un celular fijo del
       // local, con PIN y una prueba de persona real con la cámara. Acá el dueño ve lo marcado, da de
       // alta a las personas y saca el enlace del celular.
       titulo: "Asistencia",
+      icono: "usuarios",
       secciones: [
         { href: "/admin/asistencia", label: "Marcaciones", icono: "reservas" as const,
           ver: conPermiso("asistencia.gestionar") },
@@ -167,46 +211,8 @@ function armarGrupos(hayIdeaSinVer: boolean, rol: string, ventasACredito: boolea
       ],
     },
     {
-      titulo: "Mi carta",
-      secciones: [
-        { href: "/admin/productos", label: "Productos", icono: "productos" as const,
-          ver: conPermiso("productos.ver") },
-        { href: "/admin/categorias", label: "Categorías", icono: "categorias" as const,
-          ver: conPermiso("categorias.ver") },
-        { href: "/admin/grupos-agregados", label: "Grupos de agregados", icono: "productos" as const,
-          ver: conPermiso("productos.ver") },
-        // Descuentos ("PROMO 20 %") y promociones por volumen ("2 por 1") que rigen en ciertos días y horas, en todos los canales de venta.
-        { href: "/admin/promociones", label: "Promociones", icono: "productos" as const,
-          ver: conPermiso("productos.ver") },
-      ],
-    },
-    {
-      titulo: "Control de stock",
-      secciones: [
-        { href: "/admin/stock/insumos", label: "Insumos", icono: "productos" as const,
-          ver: conPermiso("stock.ver") },
-        { href: "/admin/stock/proveedores", label: "Proveedores", icono: "usuarios" as const,
-          ver: conPermiso("stock.ver") },
-        { href: "/admin/stock/almacenes", label: "Almacenes", icono: "configuracion" as const,
-          ver: conPermiso("stock.ver") },
-        // Entradas y salidas que no son compras ni ventas: mermas, roturas, consumo del personal.
-        { href: "/admin/stock/movimientos", label: "Movimientos de almacén", icono: "estadisticas" as const,
-          ver: conPermiso("stock.ver") },
-        // Qué insumos descontó cada venta y por qué producto — para comprobar cómo sale cada ingrediente.
-        { href: "/admin/stock/salidas-por-venta", label: "Salidas por venta", icono: "estadisticas" as const,
-          ver: conPermiso("stock.ver") },
-        { href: "/admin/stock/compras", label: "Compras", icono: "cierre" as const,
-          ver: conPermiso("stock.ver") },
-        { href: "/admin/stock/cuentas-por-pagar", label: "Cuentas por pagar", icono: "cierre" as const,
-          ver: conPermiso("stock.ver") },
-        { href: "/admin/stock/inventario", label: "Registro de inventario", icono: "estadisticas" as const,
-          ver: conPermiso("stock.ver") },
-        { href: "/admin/stock/gastos", label: "Gastos", icono: "cierre" as const,
-          ver: conPermiso("stock.ver") },
-      ],
-    },
-    {
       titulo: "Cómo va el negocio",
+      icono: "estadisticas",
       secciones: [
         { href: "/admin/estadisticas", label: "Estadísticas", icono: "estadisticas" as const,
           ver: conPermiso("estadisticas.ver") },
@@ -246,6 +252,7 @@ function armarGrupos(hayIdeaSinVer: boolean, rol: string, ventasACredito: boolea
       // Lo que mira el contador: el libro de IVA de ventas y de compras, el resumen del IVA del mes y el registro RG 90 para Marangatú.
       // Las ventas son del histórico del dueño; las compras (y por lo tanto el resumen) también piden Control de stock.
       titulo: "Contabilidad",
+      icono: "cartera",
       secciones: [
         { href: "/admin/contabilidad/libro-ventas", label: "Libro IVA ventas", icono: "estadisticas" as const,
           ver: conPermiso("pos.verHistorico") },
@@ -264,6 +271,7 @@ function armarGrupos(hayIdeaSinVer: boolean, rol: string, ventasACredito: boolea
       // "Ajustes" es del negocio en general, esto es específico de
       // facturación.
       titulo: "Configuración de facturas",
+      icono: "pedidos",
       secciones: [
         { href: "/admin/pos/estaciones", label: "Estaciones", icono: "configuracion" as const,
           ver: conPermiso("pos.gestionarEstaciones") },
@@ -278,6 +286,7 @@ function armarGrupos(hayIdeaSinVer: boolean, rol: string, ventasACredito: boolea
     },
     {
       titulo: "Ajustes",
+      icono: "configuracion",
       secciones: [
         { href: "/admin/configuracion", label: "Configuración", icono: "configuracion" as const,
           ver: conPermiso("configuracion.editar") },
@@ -309,6 +318,7 @@ function armarGrupos(hayIdeaSinVer: boolean, rol: string, ventasACredito: boolea
     },
     {
       titulo: "Administración",
+      icono: "asesores",
       secciones: [
         { href: "/admin/super", label: "Cartera", icono: "cartera" as const,
           ver: conPermiso("cartera.gestionar") },
