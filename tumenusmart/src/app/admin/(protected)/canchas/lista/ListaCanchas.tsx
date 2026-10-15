@@ -68,7 +68,6 @@ export function ListaCanchas({ canchas, grupos }: { canchas: CanchaFila[]; grupo
                   <Th>Cancha</Th>
                   <Th>Grupo en el punto de venta</Th>
                   <Th className="text-right">Precio por hora</Th>
-                  <Th className="text-right">Hora de noche</Th>
                   <Th>Duraciones</Th>
                   <Th className="text-right">Opciones</Th>
                 </tr>
@@ -97,18 +96,14 @@ export function ListaCanchas({ canchas, grupos }: { canchas: CanchaFila[]; grupo
                       {formatearGuarani(c.precioHora)}
                       {c.promos.length > 0 && (
                         <span className="block text-[0.72rem] text-azul-oscuro">
-                          {c.promos.length === 1 ? "+ 1 precio por día" : `+ ${c.promos.length} precios por día`}
+                          {c.promos.length === 1 ? "+ 1 promoción" : `+ ${c.promos.length} promociones`}
                         </span>
                       )}
-                    </Td>
-                    <Td className="cifra text-right">
-                      {c.precioNocturnoHora == null ? (
-                        <span className="text-tinta-suave">—</span>
-                      ) : (
-                        <>
-                          {formatearGuarani(c.precioNocturnoHora)}
-                          <span className="block text-[0.72rem] text-tinta-suave">desde las {c.nocheDesde}</span>
-                        </>
+                      {/* Una tarifa de noche de la versión anterior: se sigue cobrando hasta que se pase a promociones. */}
+                      {c.precioNocturnoHora != null && (
+                        <span className="block text-[0.72rem] text-amarillo-oscuro">
+                          Noche {formatearGuarani(c.precioNocturnoHora)} desde las {c.nocheDesde}
+                        </span>
                       )}
                     </Td>
                     <Td>{resumenDeDuraciones(c)}</Td>
@@ -142,7 +137,7 @@ export function ListaCanchas({ canchas, grupos }: { canchas: CanchaFila[]; grupo
                   </p>
                   <div className="mt-1 flex flex-wrap gap-1.5">
                     {c.techada && <Pastilla color="azul">Techada</Pastilla>}
-                    {c.promos.length > 0 && <Pastilla color="azul">Precios por día</Pastilla>}
+                    {c.promos.length > 0 && <Pastilla color="azul">Promociones</Pastilla>}
                     {!c.activa && <Pastilla>Inactiva</Pastilla>}
                   </div>
                 </div>

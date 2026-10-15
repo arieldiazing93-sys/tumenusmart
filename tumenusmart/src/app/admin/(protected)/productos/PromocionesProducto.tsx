@@ -20,18 +20,18 @@ import { guardarPromocionesProducto } from "./actions";
 /** Quién guarda las franjas: la de los productos (por defecto) o la de las canchas (`guardarPreciosDeCancha`). */
 type Guardar = (id: string, entradas: unknown) => Promise<{ ok: true } | { ok: false; error: string }>;
 
-/** Los textos según de qué es el cuadro: un producto («precios de promoción») o una cancha («precios por día y horario»). */
+/** Los textos según de qué es el cuadro: un producto o una cancha (la hora). Es el mismo cuadro: «Precios de promoción». */
 function textosDe(modo: "producto" | "cancha") {
   return modo === "cancha"
     ? {
-        boton: "🏷 Precios por día y horario",
-        titulo: "Precios por día y horario",
+        boton: "🏷 Precios de promoción",
+        titulo: "Precios de promoción",
         precioCampo: "Precio por hora",
         precioHoja: "Precio por hora",
-        guardar: "Guardar precios",
+        guardar: "Guardar promociones",
         normal: "precio normal",
-        etiquetaEspecial: "Precio especial",
-        quitar: "¿Quitar todos los precios por día y horario? La cancha vuelve a costar siempre su precio normal (y el de noche, si lo tiene).",
+        etiquetaEspecial: "Promoción",
+        quitar: "¿Quitar todas las promociones de esta cancha? Vuelve a costar siempre su precio por hora.",
       }
     : {
         boton: "🏷 Precios de promoción",
@@ -159,8 +159,8 @@ function CuadroPromociones({
   const [filas, setFilas] = useState<Fila[]>(() => filasDesde(promociones));
   const [errorServidor, setErrorServidor] = useState<string | null>(null);
 
-  // Carga rápida (en una cancha, lo común es un día entero: sábado y domingo; en un producto, una franja: de 18 a 20)
-  const [diasRapidos, setDiasRapidos] = useState<number[]>(esCancha ? [6, 0] : []);
+  // Carga rápida (en una cancha lo común es un día entero o una jornada; en un producto, una franja: de 18 a 20)
+  const [diasRapidos, setDiasRapidos] = useState<number[]>([]);
   const [desde, setDesde] = useState(esCancha ? "00:00:00" : "18:00:00");
   const [hasta, setHasta] = useState(esCancha ? "23:59:59" : "20:00:00");
   const [precioRapido, setPrecioRapido] = useState("");
@@ -291,8 +291,8 @@ function CuadroPromociones({
           {esCancha ? (
             <p className="text-[0.84rem] leading-snug text-tinta-media">
               En los días y horas que cargues, la hora de la cancha cuesta ese precio — en las reservas (según el día y la hora del partido) y
-              en el mostrador del punto de venta. Fuera de esas franjas rige el precio normal (y el de noche, si la cancha lo tiene). Por ejemplo:
-              lunes a viernes a {formatearGuarani(precioNormal)} (el precio normal) y sábado y domingo a un precio más alto. Las horas son las de
+              en el mostrador del punto de venta. Fuera de esas franjas rige el precio por hora de la ficha. Por ejemplo:
+              lunes a viernes de 08:00 a 18:00 a un precio menor, o de noche a uno mayor. Las horas son las de
               Asunción. A la hora de fin ya rige el precio normal: <strong>“hasta las 20:00”</strong> y <strong>19:59:59</strong> son lo mismo.
             </p>
           ) : (
@@ -308,7 +308,7 @@ function CuadroPromociones({
             <p className="rotulo text-[0.78rem] font-bold text-azul-oscuro">Carga rápida</p>
             <p className="text-[0.8rem] text-tinta-media">
               {esCancha
-                ? `Elegí los días, el horario y el precio por hora, y se completan esos días en la hoja de abajo. Por ejemplo: sábado y domingo, todo el día (00:00 a 23:59), a ${formatearGuarani(Math.round(precioNormal * 1.25))}.`
+                ? `Elegí los días, el horario y el precio por hora, y se completan esos días en la hoja de abajo. Por ejemplo: lunes a viernes, de 08:00 a 18:00, a ${formatearGuarani(Math.round(precioNormal * 0.8))}; o sábado y domingo, todo el día, a ${formatearGuarani(Math.round(precioNormal * 1.25))}.`
                 : `Elegí los días, el horario y el precio, y se completan esos días en la hoja de abajo. Por ejemplo: lunes a viernes, de 18:00 a 20:00, a ${formatearGuarani(Math.round(precioNormal * 0.9))}.`}
             </p>
             <div className="flex flex-wrap items-center gap-1.5">
@@ -460,14 +460,14 @@ function CuadroPromociones({
               </ul>
               <p className="mt-1 text-[0.78rem] text-tinta-media">
                 {esCancha
-                  ? `Fuera de esas franjas la hora cuesta ${formatearGuarani(precioNormal)} (o la tarifa de noche, si la cancha la tiene).`
+                  ? `Fuera de esas franjas la hora cuesta ${formatearGuarani(precioNormal)}.`
                   : `Fuera de esas franjas se vende a ${formatearGuarani(precioNormal)}.`}
               </p>
             </div>
           ) : (
             <p className="rounded-lg border border-dashed border-linea px-3 py-3 text-center text-[0.84rem] text-tinta-suave">
               {esCancha
-                ? `Sin precios por día y horario: la cancha cuesta siempre ${formatearGuarani(precioNormal)} por hora (o la tarifa de noche, si la tiene).`
+                ? `Sin promociones: la cancha cuesta siempre ${formatearGuarani(precioNormal)} por hora.`
                 : `Sin promociones: este producto se vende siempre a ${formatearGuarani(precioNormal)}.`}
             </p>
           )}
@@ -493,7 +493,7 @@ function CuadroPromociones({
                   {resultadoProbador ? (
                     <p className="text-[0.88rem] text-tinta">
                       Se vende a <span className="cifra font-semibold">{formatearGuarani(resultadoProbador.precio)}</span>{" "}
-                      {resultadoProbador.enPromocion ? <Pastilla color="exito">{txt.etiquetaEspecial}</Pastilla> : <Pastilla color="neutro">{esCancha ? "Tarifa normal" : "Precio normal"}</Pastilla>}
+                      {resultadoProbador.enPromocion ? <Pastilla color="exito">{txt.etiquetaEspecial}</Pastilla> : <Pastilla color="neutro">Precio normal</Pastilla>}
                     </p>
                   ) : (
                     <p className="text-[0.82rem] text-tinta-suave">Escribí una hora válida.</p>

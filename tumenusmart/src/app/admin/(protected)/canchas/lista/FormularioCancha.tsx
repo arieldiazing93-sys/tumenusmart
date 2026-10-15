@@ -275,7 +275,10 @@ export function FormularioCancha({
         <div className="rounded-xl border-2 border-azul/50 p-3.5">
           <h3 className="mb-3 text-[0.92rem] font-semibold tracking-titular text-tinta">Precio</h3>
           <div className="flex flex-col gap-3.5">
-            <Campo etiqueta="Precio por hora (Gs.)" ayuda="Lo que cuesta una hora de día. Una hora y media cuesta una vez y media.">
+            <Campo
+              etiqueta="Precio por hora (Gs.)"
+              ayuda="Lo que cuesta una hora. Una hora y media cuesta una vez y media. Si en algunos días u horarios cuesta otro precio (más barata de lunes a viernes, más cara de noche o el fin de semana), cargalo abajo en «Precios de promoción»."
+            >
               <Entrada
                 required
                 inputMode="numeric"
@@ -286,38 +289,33 @@ export function FormularioCancha({
               />
             </Campo>
 
-            <Campo
-              etiqueta="Precio por hora de noche (opcional)"
-              ayuda="Si de noche cobrás más (por la luz), escribilo acá. Vacío = cuesta lo mismo todo el día."
-            >
-              <Entrada
-                inputMode="numeric"
-                value={datos.precioNocturnoHora}
-                onChange={(e) => cambiar({ precioNocturnoHora: e.target.value })}
-                placeholder="Ej: 100.000"
-                className="cifra"
-              />
-            </Campo>
-
+            {/* Una tarifa de noche cargada con la versión anterior: ya no se edita acá (todo lo que cambia con el día o la hora va en
+                «Precios de promoción»), pero mientras exista se sigue cobrando. Se la quita con un toque y se carga como promoción. */}
             {datos.precioNocturnoHora.trim() !== "" && (
-              <Campo etiqueta="La tarifa de noche rige desde las">
-                <Entrada
-                  type="time"
-                  value={datos.nocheDesde}
-                  onChange={(e) => cambiar({ nocheDesde: e.target.value })}
-                  className="cifra max-w-[10rem]"
-                />
-              </Campo>
+              <div className="rounded-lg border border-amarillo/60 bg-amarillo-luz px-3 py-2.5 text-[0.8rem] leading-snug text-amarillo-oscuro">
+                <p>
+                  Esta cancha tiene una <strong>tarifa de noche</strong> de Gs. {datos.precioNocturnoHora} desde las {datos.nocheDesde}. Ya no se
+                  carga en este campo: ahora va en «Precios de promoción» (todos los días, desde las {datos.nocheDesde} hasta las 23:59). Quitala y
+                  cargala ahí.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => cambiar({ precioNocturnoHora: "" })}
+                  className={`mt-2 ${clasesBoton("peligro", "sm")}`}
+                >
+                  Quitar la tarifa de noche
+                </button>
+              </div>
             )}
           </div>
         </div>
-
-        {/* ---------- precios por día y horario (sábado y domingo, una franja…) ---------- */}
+        {/* ---------- precios de promoción: otro precio según el día y la hora (fin de semana, noche, una franja…) ---------- */}
         <div className="rounded-xl border-2 border-azul/50 p-3.5">
-          <h3 className="mb-1 text-[0.92rem] font-semibold tracking-titular text-tinta">Precios por día y horario</h3>
+          <h3 className="mb-1 text-[0.92rem] font-semibold tracking-titular text-tinta">Precios de promoción</h3>
           <p className="mb-3 text-[0.78rem] leading-snug text-tinta-suave">
-            Si la hora cuesta distinto según el día (por ejemplo, de lunes a viernes 80.000 y sábado y domingo 100.000), cargalo acá: el precio
-            de arriba es el de siempre y estos mandan en sus días y horas. Valen en las reservas y en el mostrador del punto de venta.
+            Igual que en los productos: elegís los días, de qué hora a qué hora y el precio por hora. En esos días y horas rige ese precio; fuera
+            de ellos, el «Precio por hora» de arriba. Por ejemplo, de lunes a viernes de 08:00 a 18:00 a 80.000, o sábado y domingo a 100.000.
+            Valen en las reservas y en el mostrador del punto de venta.
           </p>
           {editando && cancha ? (
             <div className="flex flex-col items-start gap-2.5">
