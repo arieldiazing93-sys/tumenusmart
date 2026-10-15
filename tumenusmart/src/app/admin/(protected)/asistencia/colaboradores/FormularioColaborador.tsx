@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Campo, Entrada, MensajeError, clasesBoton } from "@/components/ui";
 import { VerificadorPersona, type ResultadoVerificacion } from "@/components/VerificadorPersona";
 import { comprimirImagen, PARA_LOGO } from "@/lib/comprimir-imagen";
-import { pinDemasiadoFacil, type ColaboradorFila } from "@/lib/asistencia";
+import { LARGO_PIN, pinDemasiadoFacil, type ColaboradorFila, type MetodoAsistencia } from "@/lib/asistencia";
 import { rostroDeFoto, rostroDeFotoGuardada } from "@/lib/reconocimiento-cliente";
 import { actualizarColaborador, crearColaborador, subirFotoDelColaborador } from "./actions";
 
@@ -40,25 +40,28 @@ function Icono({ children, tam = 16 }: { children: React.ReactNode; tam?: number
 }
 
 /**
- * Un PIN de 6 números al azar, para no tener que inventarlo (con muchas personas, más largo se repite menos y es más difícil
- * de adivinar). Si sale uno demasiado fácil (111111, 123456) se tira de nuevo, porque el panel no lo aceptaría.
+ * Un PIN de 3 números al azar, para no tener que inventarlo. Si sale uno demasiado fácil (111, 123) se tira de nuevo, porque el
+ * panel no lo aceptaría.
  */
 function pinAlAzar(): string {
-  for (let intento = 0; intento < 20; intento++) {
+  for (let intento = 0; intento < 50; intento++) {
     const valores = new Uint32Array(1);
     crypto.getRandomValues(valores);
-    const pin = String(100000 + (valores[0] % 900000));
+    const pin = String(100 + (valores[0] % 900));
     if (!pinDemasiadoFacil(pin)) return pin;
   }
-  return "739204";
+  return "739";
 }
 
 export function FormularioColaborador({
   colaborador,
+  metodo = "pin_y_camara",
   onCerrar,
 }: {
   /** null para dar de alta a uno nuevo. */
   colaborador: ColaboradorFila | null;
+  /** Cómo se marca en este local: con solo PIN la selfie y el rostro son opcionales. */
+  metodo?: MetodoAsistencia;
   onCerrar: () => void;
 }) {
   const router = useRouter();
@@ -153,7 +156,7 @@ export function FormularioColaborador({
     e.preventDefault();
     const datos = new FormData(e.currentTarget);
     setError(null);
-    if (!editando && !rostro) {
+    if (!editando && !rostro && metodo !== "pin") {
       setError("Sacale la selfie para registrar su rostro: con él el celular comprueba que sea esa persona al marcar.");
       return;
     }
@@ -217,9 +220,9 @@ export function FormularioColaborador({
                 </label>
               </div>
               <p className="max-w-xs text-center text-[0.78rem] leading-snug text-tinta-suave">
-                Sacala con la persona delante, de frente y con buena luz. Es la foto de referencia para revisar sus
-                marcaciones, y de ella se registra su rostro: el celular fijo lo usa para comprobar que sea esa persona al
-                marcar.
+                {metodo === "pin"
+                  ? "Opcional: en este local se marca solo con PIN, así que la selfie no hace falta. Si la sacás, queda como foto de referencia y su rostro se registra por si algún día pasás a marcar con cámara."
+                  : "Sacala con la persona delante, de frente y con buena luz. Es la foto de referencia para revisar sus marcaciones, y de ella se registra su rostro: el celular fijo lo usa para comprobar que sea esa persona al marcar."}
               </p>
 
               {/* Si ya hay un rostro registrado (o uno nuevo listo para guardar), o falta registrarlo. */}
@@ -231,6 +234,8 @@ export function FormularioColaborador({
                 </p>
               ) : rostroYaGuardado ? (
                 <p className="text-center text-[0.8rem] font-semibold text-exito">✓ Rostro registrado.</p>
+              ) : metodo === "pin" ? (
+                <p className="text-center text-[0.8rem] text-tinta-suave">Sin rostro registrado: no hace falta para marcar solo con PIN.</p>
               ) : (
                 <div className="flex flex-col items-center gap-2">
                   <p className="text-center text-[0.8rem] font-semibold text-aviso">
@@ -276,7 +281,7 @@ export function FormularioColaborador({
           ayuda={
             editando && !colaborador?.sinPin
               ? "Dejalo vacío para no cambiarlo."
-              : "De 4 a 6 números. Es lo que identifica a la persona en el celular fijo, así que no puede repetirse. Con muchas personas conviene de 5 o 6 números."
+              : "De 3 números, fáciles de recordar. Es lo que identifica a la persona en el celular fijo, así que no puede repetirse."
           }
         >
           <div className="flex items-center gap-2">
@@ -284,12 +289,12 @@ export function FormularioColaborador({
               <Entrada
                 name="pin"
                 value={pin}
-                onChange={(e) => setPin(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                onChange={(e) => setPin(e.target.value.replace(/\D/g, "").slice(0, LARGO_PIN))}
                 inputMode="numeric"
                 autoComplete="off"
-                maxLength={6}
+                maxLength={LARGO_PIN}
                 required={!editando || colaborador?.sinPin}
-                placeholder="Ej: 48271"
+                placeholder="Ej: 482"
               />
             </div>
             <button type="button" onClick={() => setPin(pinAlAzar())} className={clasesBoton("suave", "md")}>

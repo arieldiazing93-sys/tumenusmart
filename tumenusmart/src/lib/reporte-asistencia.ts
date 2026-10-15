@@ -93,6 +93,7 @@ function celdaDe(m: {
   verificada: boolean;
   distanciaRostro: number | null;
   tardanzaMin: number | null;
+  metodo: string;
 }): CeldaMarca {
   return {
     id: m.id,
@@ -101,6 +102,7 @@ function celdaDe(m: {
     verificada: m.verificada,
     distanciaRostro: m.distanciaRostro,
     tardanzaMin: m.tardanzaMin,
+    metodo: m.metodo,
   };
 }
 
@@ -143,6 +145,7 @@ export async function cargarReporteAsistencia(
       fotoUrl: true,
       verificada: true,
       distanciaRostro: true,
+      metodo: true,
       tardanzaMin: true,
     },
   });

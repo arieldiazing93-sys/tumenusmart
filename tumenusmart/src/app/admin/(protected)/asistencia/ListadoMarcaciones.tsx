@@ -29,19 +29,21 @@ function diaCorto(f: FilaAsistencia): string {
 /** Un horario que se puede tocar para ver la foto de esa marcación. Sin marcación: un guion. */
 function BotonHora({ celda, alAbrir }: { celda: CeldaMarca | null; alAbrir: () => void }) {
   if (!celda) return <span className="text-tinta-suave">—</span>;
+  // Una marcación hecha solo con PIN no pasa por la cámara a propósito: no hay foto ni nada que revisar.
+  const porPin = celda.metodo === "pin";
   return (
     <button
       type="button"
       onClick={alAbrir}
-      title="Ver la foto de esta marcación"
+      title={porPin ? "Marcó solo con PIN (sin foto)" : "Ver la foto de esta marcación"}
       className={`cifra inline-flex items-center gap-1 rounded border px-1.5 py-px text-[0.78rem] font-semibold leading-snug transition-colors ${
-        celda.verificada
+        celda.verificada || porPin
           ? "border-azul/35 bg-azul-luz text-azul-oscuro hover:border-azul hover:bg-azul hover:text-white"
           : "border-aviso/40 bg-aviso-luz text-aviso hover:border-aviso hover:bg-aviso hover:text-white"
       }`}
     >
       {celda.hora}
-      {!celda.verificada && <span aria-label="La cámara no vio su cara">!</span>}
+      {!celda.verificada && !porPin && <span aria-label="La cámara no vio su cara">!</span>}
     </button>
   );
 }
@@ -209,7 +211,9 @@ function ModalFoto({ abierta, onCerrar }: { abierta: NonNullable<Abierta>; onCer
                 <img src={celda.fotoUrl} alt="Foto de la marcación" className="h-full w-full object-cover" />
               ) : (
                 <div className="flex h-full items-center justify-center p-3 text-center text-[0.8rem] text-tinta-suave">
-                  Sin foto: se guardan {DIAS_CONSERVAR_FOTOS_MARCACION} días y después se borran. La hora queda.
+                  {celda.metodo === "pin"
+                    ? "Se marcó solo con el PIN: no hay foto."
+                    : `Sin foto: se guardan ${DIAS_CONSERVAR_FOTOS_MARCACION} días y después se borran. La hora queda.`}
                 </div>
               )}
             </div>
@@ -231,7 +235,11 @@ function ModalFoto({ abierta, onCerrar }: { abierta: NonNullable<Abierta>; onCer
         </div>
 
         <div className="mt-3 flex flex-wrap items-center gap-2">
-          {celda.distanciaRostro !== null ? (
+          {celda.metodo === "pin" ? (
+            <Pastilla color="azul" punto>
+              Marcó solo con PIN (sin cámara)
+            </Pastilla>
+          ) : celda.distanciaRostro !== null ? (
             <Pastilla color="exito" punto>
               Su cara coincide con la del alta
             </Pastilla>

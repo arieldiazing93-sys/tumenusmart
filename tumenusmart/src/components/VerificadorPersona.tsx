@@ -13,7 +13,7 @@ export type ResultadoVerificacion = {
 };
 
 /** La cara tiene que estar bien puesta este tiempo seguido antes de sacar la foto. */
-const MS_CARA_QUIETA = 1000;
+const MS_CARA_QUIETA = 700;
 /** Si en este tiempo no logra poner la cara bien, se avisa y se vuelve a intentar. */
 const MS_POR_INTENTO = 8000;
 /** Cuántos intentos fallidos hacen falta para ofrecer "marcar igual" (la foto queda para revisar). */

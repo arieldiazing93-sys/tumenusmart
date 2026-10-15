@@ -81,6 +81,9 @@ model Store {
   /// Lo máximo que puede pasar entre la salida a almorzar y la vuelta. Pasado ese tiempo, la próxima marcación ya no
   /// es la vuelta del almuerzo sino la salida (se fue sin volver, o se olvidó de marcar la vuelta).
   almuerzoMaxMin         Int       @default(180)
+  /// Cómo se marca en el celular fijo: "pin" = solo con el PIN de 3 números (sin cámara); "pin_y_camara" = PIN y selfie con
+  /// reconocimiento de la cara (la forma de siempre). Lo elige el dueño en Celular fijo → Reglas de marcación.
+  metodoAsistencia       String    @default("pin_y_camara")
 
   /// La llave del enlace público del Servicio comedor (/mozo/<token>), donde cada mozo entra con su PIN a cargar las
   /// mesas. Es larga y al azar, y se puede regenerar o apagar (NULL = el Servicio comedor no está habilitado).
@@ -3389,6 +3392,8 @@ model MarcacionAsistencia {
   /// Qué tan lejos quedó el rostro de la selfie de esta marcación del rostro guardado de la persona (0 = idéntico; pasa si es
   /// 0,5 o menos). NULL = no se comparó (todavía no tenía rostro registrado). Sirve para ajustar el umbral con datos reales.
   distanciaRostro Float?
+  /// Con qué método se marcó: "pin" (solo el PIN, sin foto) o "pin_y_camara" (PIN y selfie). Las de antes quedan como pin_y_camara.
+  metodo        String      @default("pin_y_camara")
   nota          String?
   createdAt     DateTime    @default(now())
 

@@ -3,7 +3,7 @@
 import { randomBytes } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { exigirPermiso } from "@/lib/auth";
-import { ALMUERZO_MAXIMO_MIN, MINUTOS_ENTRE_MARCAS_MAXIMO, horaValida } from "@/lib/asistencia";
+import { ALMUERZO_MAXIMO_MIN, METODOS_ASISTENCIA, MINUTOS_ENTRE_MARCAS_MAXIMO, horaValida, type MetodoAsistencia } from "@/lib/asistencia";
 import { registrarBitacora } from "@/lib/bitacora";
 import { idLocalActual } from "@/lib/local-actual";
 import { prisma } from "@/lib/prisma";
@@ -46,6 +46,8 @@ export type ReglasMarcacionForm = {
   almuerzoHasta: string;
   /** Lo máximo que puede pasar entre la salida a almorzar y la vuelta, en minutos. */
   almuerzoMaxMin: number;
+  /** Cómo se marca: solo con PIN, o con PIN y cámara. */
+  metodo: MetodoAsistencia;
 };
 
 /**
@@ -64,6 +66,9 @@ export async function guardarReglasMarcacion(reglas: ReglasMarcacionForm): Promi
   ) {
     return { ok: false, error: `El tiempo entre marcaciones son minutos enteros, de 0 a ${MINUTOS_ENTRE_MARCAS_MAXIMO}.` };
   }
+  if (!METODOS_ASISTENCIA.some((m) => m.valor === reglas.metodo)) {
+    return { ok: false, error: "Elegí cómo se marca: solo con PIN, o con PIN y cámara." };
+  }
   if (!horaValida(reglas.almuerzoDesde) || !horaValida(reglas.almuerzoHasta)) {
     return { ok: false, error: "El horario de almuerzo no es válido: poné la hora de inicio y la de fin." };
   }
@@ -81,13 +86,14 @@ export async function guardarReglasMarcacion(reglas: ReglasMarcacionForm): Promi
       almuerzoDesde: reglas.almuerzoDesde,
       almuerzoHasta: reglas.almuerzoHasta,
       almuerzoMaxMin: reglas.almuerzoMaxMin,
+      metodoAsistencia: reglas.metodo,
     },
   });
 
   await registrarBitacora(idLocal, sesion, {
     modulo: "asistencia",
     accion: "reglas_de_marcacion_cambiadas",
-    descripcion: `Cambió las reglas del celular fijo: ${reglas.minutosEntreMarcas} min entre marcaciones, almuerzo de ${reglas.almuerzoDesde} a ${reglas.almuerzoHasta} (hasta ${reglas.almuerzoMaxMin} min).`,
+    descripcion: `Cambió las reglas del celular fijo: se marca ${reglas.metodo === "pin" ? "solo con PIN" : "con PIN y cámara"}, ${reglas.minutosEntreMarcas} min entre marcaciones, almuerzo de ${reglas.almuerzoDesde} a ${reglas.almuerzoHasta} (hasta ${reglas.almuerzoMaxMin} min).`,
     entidad: "Store",
     entidadId: idLocal,
     detalle: { ...reglas },

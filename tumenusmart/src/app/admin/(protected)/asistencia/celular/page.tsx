@@ -6,6 +6,7 @@ import {
   ALMUERZO_PREDETERMINADO,
   DIAS_CONSERVAR_FOTOS_MARCACION,
   MINUTOS_ENTRE_MARCAS_PREDETERMINADO,
+  normalizarMetodoAsistencia,
 } from "@/lib/asistencia";
 import { EnlaceCelularFijo } from "./EnlaceCelularFijo";
 import { ReglasMarcacion } from "./ReglasMarcacion";
@@ -31,9 +32,11 @@ export default async function CelularFijoPage() {
       almuerzoDesde: true,
       almuerzoHasta: true,
       almuerzoMaxMin: true,
+      metodoAsistencia: true,
     },
   });
 
+  const soloPin = normalizarMetodoAsistencia(store?.metodoAsistencia) === "pin";
   return (
     <div className="flex flex-col gap-4">
       <Cabecera
@@ -53,22 +56,40 @@ export default async function CelularFijoPage() {
         almuerzoDesde={store?.almuerzoDesde ?? ALMUERZO_PREDETERMINADO.desde}
         almuerzoHasta={store?.almuerzoHasta ?? ALMUERZO_PREDETERMINADO.hasta}
         almuerzoMaxMin={store?.almuerzoMaxMin ?? ALMUERZO_PREDETERMINADO.maxMin}
+        metodo={normalizarMetodoAsistencia(store?.metodoAsistencia)}
       />
 
       <Tarjeta className="flex flex-col gap-3 !border-2 !border-azul/50">
         <h2 className="text-[1rem] font-semibold tracking-titular text-tinta">Cómo dejarlo andando</h2>
         <ol className="list-decimal space-y-1.5 pl-5 text-[0.86rem] leading-snug text-tinta-media">
           <li>
-            Cargá a cada persona en <strong className="text-tinta">Colaboradores</strong>, con ella delante: sacale la
-            selfie y elegile un PIN. El PIN es lo que la identifica, así que no puede repetirse.
+            {soloPin ? (
+              <>
+                Cargá a cada persona en <strong className="text-tinta">Colaboradores</strong> y elegile un PIN de 3 números (la
+                selfie es opcional). El PIN es lo que la identifica, así que no puede repetirse.
+              </>
+            ) : (
+              <>
+                Cargá a cada persona en <strong className="text-tinta">Colaboradores</strong>, con ella delante: sacale la
+                selfie y elegile un PIN de 3 números. El PIN es lo que la identifica, así que no puede repetirse.
+              </>
+            )}
           </li>
-          <li>Abrí la dirección de arriba en el celular que va a quedar fijo y aceptá el permiso de la cámara.</li>
           <li>
-            Dejalo enchufado, con la pantalla prendida y la cámara de frente, a la altura de la cara de quien marca.
+            Abrí la dirección de arriba en el celular que va a quedar fijo{soloPin ? "." : " y aceptá el permiso de la cámara."}
           </li>
           <li>
+            Dejalo enchufado, con la pantalla prendida{soloPin ? "." : " y la cámara de frente, a la altura de la cara de quien marca."}
+          </li>
+          <li>
+            {soloPin ? (
+              <>Dejalo en un lugar <strong className="text-tinta">a la vista</strong>: desalienta a quien quiera hacer trampa.</>
+            ) : (
+              <>
             Elegí un lugar <strong className="text-tinta">bien iluminado</strong> y a la vista: la cámara ve mejor la cara
             con buena luz, y un lugar visible desalienta a quien quiera hacer trampa.
+              </>
+            )}
           </li>
         </ol>
       </Tarjeta>
@@ -78,7 +99,11 @@ export default async function CelularFijoPage() {
         <ol className="list-decimal space-y-1 pl-5 text-[0.86rem] leading-snug text-tinta-media">
           <li>Toca <strong className="text-tinta">Registrar asistencia</strong>.</li>
           <li>Pone su PIN. El celular le dice su nombre y qué va a marcar.</li>
-          <li>Mira a la cámara: la selfie sale sola y la marcación queda guardada.</li>
+          {soloPin ? (
+            <li>Confirma que es su nombre y toca <strong className="text-tinta">Marcar</strong>: la marcación queda guardada, sin foto.</li>
+          ) : (
+            <li>Mira a la cámara: la selfie sale sola y la marcación queda guardada.</li>
+          )}
         </ol>
         <p className="text-[0.84rem] leading-snug text-tinta-media">
           Nadie elige qué marca: lo decide el sistema con lo último que marcó la persona, la hora y el horario de almuerzo
@@ -108,12 +133,24 @@ export default async function CelularFijoPage() {
       </Tarjeta>
 
       <Aviso titulo="Cómo se evita que marquen por otro" color="azul">
-        Cada marcación pide el PIN de la persona y la cámara tiene que ver una cara de frente. Después de 5 PIN incorrectos
-        seguidos el celular se bloquea 3 minutos. Queda guardada la foto de cada marcación: en <strong>Marcaciones</strong>{" "}
-        podés compararla con la selfie del alta. Las fotos se guardan {DIAS_CONSERVAR_FOTOS_MARCACION} días y después se
-        borran solas; la marcación queda para siempre, con su hora, y la selfie del alta no se borra. La cámara detecta que hay una cara, pero no reconoce de quién es: si
-        alguien usa el PIN de otro, lo vas a ver en la foto. Si la cámara no llega a ver la cara, la persona puede marcar
-        igual y esa marcación queda señalada para que la revises.
+        {soloPin ? (
+          <>
+            Cada marcación pide solo el PIN de la persona (de 3 números, único en el local) y que confirme su nombre. Después de
+            5 PIN incorrectos seguidos el celular se bloquea 3 minutos.{" "}
+            <strong>Ojo:</strong> sin cámara no hay foto ni comparación de cara, así que quien sepa el PIN de otra persona puede
+            marcar por ella. Pedile a cada una que no lo comparta y, si sospechás de uno, cambialo desde Colaboradores. Podés
+            volver a «PIN y cámara» cuando quieras: lo marcado antes queda como estaba.
+          </>
+        ) : (
+          <>
+            Cada marcación pide el PIN de la persona y una selfie: el sistema compara la cara con la del alta y, si es otra, no
+            deja marcar. Después de 5 intentos incorrectos seguidos (PIN o cara) el celular se bloquea 3 minutos. Queda guardada
+            la foto de cada marcación: en <strong>Marcaciones</strong> podés verla junto a la selfie del alta. Las fotos se
+            guardan {DIAS_CONSERVAR_FOTOS_MARCACION} días y después se borran solas; la marcación queda para siempre, con su
+            hora, y la selfie del alta no se borra. Si la cámara no llega a ver la cara, la persona puede marcar igual y esa
+            marcación queda señalada para que la revises.
+          </>
+        )}
       </Aviso>
     </div>
   );

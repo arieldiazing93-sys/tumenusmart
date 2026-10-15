@@ -490,7 +490,7 @@ export function leerConsumoGuardado(valor: unknown): ConsumoGuardado[] {
 // ---------------------------------------------------------------------------------------------------------------------
 
 /**
- * El PIN con el que el mozo entra a su celular o tablet: SOLO NÚMEROS, de 3 a 5. Es más corto que el de asistencia (4 a 6) a
+ * El PIN con el que el mozo entra a su celular o tablet: SOLO NÚMEROS, de 3 a 5. Es corto a
  * propósito: el mozo entra muchas veces por turno y le sirve algo fácil de recordar, como los últimos 3 de su cédula o de su
  * teléfono. Lo que puede hacer un mozo con su PIN es cargar pedidos: no cancela, no da descuentos ni cobra. Por eso el freno a los
  * intentos incorrectos (src/lib/limite-pin.ts) y el enlace secreto del local son lo que lo protege.

@@ -22,7 +22,7 @@ const FORMATO_TOKEN = /^[A-Za-z0-9_-]{16,64}$/;
 /**
  * La huella de un PIN: lo que se guarda en vez del PIN, y con lo que se lo busca. Es un HMAC con una clave del servidor
  * y el local de por medio, así dos locales con el mismo PIN no comparten huella y quien lea la base no puede sacar los
- * PIN (de 4 a 6 números) probando todas las combinaciones.
+ * PIN (de 3 a 6 números) probando todas las combinaciones.
  *
  * Es siempre la misma para el mismo PIN y local, a propósito: por eso se puede buscar a la persona directamente por
  * su PIN (y exigir que no se repita) sin comparar contra cada una. Usa ASISTENCIA_PIN_SECRET si está definida y, si no,
@@ -52,6 +52,7 @@ export async function localPorToken(token: string) {
       almuerzoDesde: true,
       almuerzoHasta: true,
       almuerzoMaxMin: true,
+      metodoAsistencia: true,
     },
   });
 }

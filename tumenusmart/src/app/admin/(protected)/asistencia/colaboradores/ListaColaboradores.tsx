@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { Entrada, Pastilla, Vacio, clasesBoton } from "@/components/ui";
 import { PanelLateral } from "@/components/PanelLateral";
-import { nombreDeColaborador, type ColaboradorFila } from "@/lib/asistencia";
+import { nombreDeColaborador, type ColaboradorFila, type MetodoAsistencia } from "@/lib/asistencia";
 import { AvatarPersonal } from "../../agenda/AvatarPersonal";
 import { FormularioColaborador } from "./FormularioColaborador";
 
@@ -22,7 +22,14 @@ type PanelColaborador = null | { modo: "nuevo" } | { modo: "editar"; id: string 
  * La lista de colaboradores: el buscador, el botón para dar de alta y una tarjeta por persona con su selfie,
  * su cargo y su hora de entrada. "Añadir" y "Editar" abren el panel lateral con el formulario.
  */
-export function ListaColaboradores({ colaboradores }: { colaboradores: ColaboradorFila[] }) {
+export function ListaColaboradores({
+  colaboradores,
+  metodo = "pin_y_camara",
+}: {
+  colaboradores: ColaboradorFila[];
+  /** Cómo se marca en este local: con solo PIN el rostro no hace falta y no se avisa que falta. */
+  metodo?: MetodoAsistencia;
+}) {
   const [busqueda, setBusqueda] = useState("");
   const [panel, setPanel] = useState<PanelColaborador>(null);
 
@@ -91,7 +98,7 @@ export function ListaColaboradores({ colaboradores }: { colaboradores: Colaborad
                   )}
                   {!c.activo && <Pastilla>Inactivo</Pastilla>}
                   {c.sinPin && <Pastilla color="peligro">Sin PIN: no puede marcar</Pastilla>}
-                  {c.sinRostro ? (
+                  {metodo === "pin" ? null : c.sinRostro ? (
                     <Pastilla color="amarillo">Sin rostro registrado</Pastilla>
                   ) : (
                     <Pastilla color="exito">Rostro registrado</Pastilla>
@@ -119,6 +126,7 @@ export function ListaColaboradores({ colaboradores }: { colaboradores: Colaborad
           <FormularioColaborador
             key={panel.modo === "nuevo" ? "nuevo" : `editar-${panel.id}`}
             colaborador={persona}
+            metodo={metodo}
             onCerrar={() => setPanel(null)}
           />
         </PanelLateral>

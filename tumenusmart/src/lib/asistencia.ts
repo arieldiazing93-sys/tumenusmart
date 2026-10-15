@@ -134,9 +134,42 @@ export function mensajeDeEspera(
 /** Una marcación ya hecha, tal como se le muestra a la persona en el celular fijo: qué fue y a qué hora ("08:03"). */
 export type MarcaReciente = { tipo: TipoMarcacion; hora: string };
 
-/** El PIN: de 4 a 6 números. */
+/** Cuántos números tiene un PIN NUEVO: tres, para que cada persona se lo acuerde fácil. */
+export const LARGO_PIN = 3;
+/** Los PIN que ya existían (de 4 a 6 números) siguen andando hasta que se les cambie; el celular fijo acepta de 3 a 6. */
+export const LARGO_MAXIMO_PIN_ANTERIOR = 6;
+
+/** Un PIN que se puede ESCRIBIR al marcar: de 3 números (los nuevos) a 6 (los que ya existían). */
 export function pinValido(pin: string): boolean {
-  return /^\d{4,6}$/.test(pin);
+  return /^\d{3,6}$/.test(pin);
+}
+
+/** Un PIN que se puede CREAR o CAMBIAR: de 3 números justos. */
+export function pinNuevoValido(pin: string): boolean {
+  return /^\d{3}$/.test(pin);
+}
+
+/** Cómo se marca en el celular fijo. */
+export const METODOS_ASISTENCIA = [
+  {
+    valor: "pin",
+    etiqueta: "Solo con PIN",
+    detalle:
+      "La persona pone su PIN de 3 números, confirma su nombre y listo. No usa la cámara ni se saca foto. Es lo más rápido, pero quien sepa el PIN de otro puede marcar por él.",
+  },
+  {
+    valor: "pin_y_camara",
+    etiqueta: "PIN y cámara (reconoce la cara)",
+    detalle:
+      "Además del PIN, la cámara le saca la selfie y el sistema comprueba que la cara sea la de esa persona. Es más seguro, pero tarda más y necesita buena luz.",
+  },
+] as const;
+
+export type MetodoAsistencia = (typeof METODOS_ASISTENCIA)[number]["valor"];
+
+/** El método guardado, o el de siempre (PIN y cámara) si trae algo raro. */
+export function normalizarMetodoAsistencia(valor: unknown): MetodoAsistencia {
+  return valor === "pin" ? "pin" : "pin_y_camara";
 }
 
 /**
@@ -144,7 +177,7 @@ export function pinValido(pin: string): boolean {
  * CREAR o CAMBIAR un PIN (no al entrar: a quien ya tiene uno así no se le corta el acceso de golpe).
  */
 export function pinDemasiadoFacil(pin: string): boolean {
-  // De 3 a 6 números: el PIN del mozo puede ser de 3 (el de asistencia ya se exige de 4 a 6 antes de llegar acá).
+  // De 3 a 6 números: el PIN nuevo de asistencia y el del mozo son de 3; los de asistencia que ya existían llegan a 6.
   if (!/^\d{3,6}$/.test(pin)) return false;
   if (/^(\d)\1+$/.test(pin)) return true;
   const digitos = [...pin].map(Number);
@@ -224,6 +257,8 @@ export type MarcaDeTurno = {
   fecha: Date;
   tardanzaMin: number | null;
   verificada: boolean;
+  /** Con qué método se marcó ("pin" o "pin_y_camara"): una marcación solo con PIN no tiene foto que revisar. */
+  metodo?: string;
 };
 
 export type EstadoTurno = "completo" | "en_curso" | "incompleto";
@@ -319,7 +354,8 @@ export function armarTurnos<M extends MarcaDeTurno>(marcas: M[], dia: string, ho
     }
     if (t.tardanzaMin !== null && t.tardanzaMin > 0) t.avisos.push(`Llegó ${t.tardanzaMin} min tarde`);
     const todas = [t.entrada, t.salidaAlmuerzo, t.vueltaAlmuerzo, t.salida];
-    if (todas.some((m) => m && !m.verificada)) t.avisos.push("La cámara no vio su cara al marcar: revisá la foto");
+    // Una marcación hecha solo con PIN no pasa por la cámara: no hay foto que revisar.
+    if (todas.some((m) => m && !m.verificada && m.metodo !== "pin")) t.avisos.push("La cámara no vio su cara al marcar: revisá la foto");
   }
 
   return turnos;
@@ -336,6 +372,8 @@ export type CeldaMarca = {
   /** Qué tan lejos quedó su cara de la del alta (0 = idéntica; pasa hasta 0,5). NULL = no se comparó (no tenía rostro registrado). */
   distanciaRostro: number | null;
   tardanzaMin: number | null;
+  /** Con qué método se marcó: "pin" (sin foto) o "pin_y_camara" (PIN y selfie). */
+  metodo: string;
 };
 
 /** Una fila del reporte: un turno de una persona en un día. */

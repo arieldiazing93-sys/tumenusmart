@@ -3,9 +3,10 @@
 import { useCallback, useEffect, useState } from "react";
 import { VerificadorPersona, type ResultadoVerificacion } from "@/components/VerificadorPersona";
 import { clasesBoton } from "@/components/ui";
-import { ETIQUETA_TIPO, type TipoMarcacion } from "@/lib/asistencia";
+import { ETIQUETA_TIPO, LARGO_MAXIMO_PIN_ANTERIOR, LARGO_PIN, type MetodoAsistencia, type TipoMarcacion } from "@/lib/asistencia";
 import { INTENTOS_DE_ROSTRO } from "@/lib/reconocimiento-facial";
 import { cargarReconocedor, rostroDeFoto } from "@/lib/reconocimiento-cliente";
+import { cargarDetectorRostro } from "@/lib/vision-facial";
 import { identificarPin, registrarMarcacion, type ResultadoMarcacion } from "./actions";
 
 type Exito = Extract<ResultadoMarcacion, { ok: true }>;
@@ -25,6 +26,8 @@ type Paso =
       /** Por qué se rechazó la selfie anterior, si fue así. */
       aviso: string | null;
     }
+  // Solo con PIN: la persona ve su nombre y qué va a marcar, y confirma (sirve para cazar un PIN mal tipeado que cayó en otra persona).
+  | { paso: "confirmar"; pin: string; nombre: string; tipo: TipoMarcacion }
   | { paso: "guardando"; nombre: string; tipo: TipoMarcacion; comprobando: boolean }
   | { paso: "listo"; resultado: Exito }
   | { paso: "error"; mensaje: string };
@@ -32,13 +35,15 @@ type Paso =
 /** Cuánto se espera sin que nadie toque nada antes de volver al inicio (para no dejar un PIN a medio escribir a la vista). */
 const INACTIVIDAD_MS: Partial<Record<Paso["paso"], number>> = {
   pin: 45_000,
+  confirmar: 30_000,
   camara: 90_000,
   error: 15_000,
   listo: 6_000,
 };
 
 const TECLAS = ["1", "2", "3", "4", "5", "6", "7", "8", "9"];
-const LARGO_MAXIMO_PIN = 6;
+// Los PIN nuevos son de 3 números; los que ya existían llegan a 6, así que el teclado acepta hasta 6 y «Entrar» se habilita desde 3.
+const LARGO_MAXIMO_PIN = LARGO_MAXIMO_PIN_ANTERIOR;
 
 /**
  * El celular fijo del Registro de asistencia, en la pared del local. El camino es siempre el mismo y corto:
@@ -48,7 +53,16 @@ const LARGO_MAXIMO_PIN = 6;
  * marcó, la hora y el horario de almuerzo del negocio, así quien se saltea un paso (pasó el día afuera, se olvidó de
  * marcar) no tiene que explicar nada. Sin usuario ni contraseña: la llave está en la dirección.
  */
-export function Kiosco({ token, nombreNegocio }: { token: string; nombreNegocio: string }) {
+export function Kiosco({
+  token,
+  nombreNegocio,
+  metodoInicial = "pin_y_camara",
+}: {
+  token: string;
+  nombreNegocio: string;
+  /** Cómo se marca en este local al abrir la pantalla (después lo confirma el servidor en cada marcación). */
+  metodoInicial?: MetodoAsistencia;
+}) {
   const [estado, setEstado] = useState<Paso>({ paso: "inicio" });
   const [pin, setPin] = useState("");
   const [errorPin, setErrorPin] = useState<string | null>(null);
@@ -113,9 +127,13 @@ export function Kiosco({ token, nombreNegocio }: { token: string; nombreNegocio:
 
   // El reconocimiento de la cara se descarga de antemano (la primera vez son unos 8 MB que el celular guarda): así, cuando alguien
   // se saca la selfie, ya está listo y no hace esperar. Si no se puede (sin internet), se reintenta cuando haga falta.
+  // El detector de la cámara también: es lo más lento de cada selfie, así que se deja preparado de antemano. Solo si este local
+  // marca con cámara: con solo PIN no se descarga nada (y la cámara ni se pide).
   useEffect(() => {
+    if (metodoInicial === "pin") return;
     void cargarReconocedor().catch(() => undefined);
-  }, []);
+    void cargarDetectorRostro().catch(() => undefined);
+  }, [metodoInicial]);
 
   // Si nadie toca nada, vuelve al inicio.
   useEffect(() => {
@@ -138,7 +156,7 @@ export function Kiosco({ token, nombreNegocio }: { token: string; nombreNegocio:
   }
 
   async function enviarPin() {
-    if (estado.paso !== "pin" || pin.length < 4 || verificando) return;
+    if (estado.paso !== "pin" || pin.length < LARGO_PIN || verificando) return;
     setVerificando(true);
     setErrorPin(null);
     try {
@@ -146,6 +164,11 @@ export function Kiosco({ token, nombreNegocio }: { token: string; nombreNegocio:
       if (!r.ok) {
         setErrorPin(r.error);
         setPin("");
+        return;
+      }
+      // Cómo se marca lo dice el servidor en cada marcación (el dueño pudo cambiarlo con esta pantalla abierta).
+      if (r.metodo === "pin") {
+        setEstado({ paso: "confirmar", pin, nombre: r.nombre, tipo: r.tipo });
         return;
       }
       setEstado({ paso: "camara", pin, nombre: r.nombre, tipo: r.tipo, tieneRostro: r.tieneRostro, intento: 0, aviso: null });
@@ -171,6 +194,28 @@ export function Kiosco({ token, nombreNegocio }: { token: string; nombreNegocio:
       return;
     }
     setEstado({ ...actual, intento: siguiente, aviso: motivo });
+  }
+
+  /** Solo con PIN: la persona confirmó su nombre; se guarda la marcación sin foto ni comparación de cara. */
+  async function marcarConPin() {
+    if (estado.paso !== "confirmar") return;
+    const { pin: pinPuesto, nombre, tipo } = estado;
+    setEstado({ paso: "guardando", nombre, tipo, comprobando: false });
+
+    const datos = new FormData();
+    datos.set("token", token);
+    datos.set("pin", pinPuesto);
+    try {
+      const resultado = await registrarMarcacion(datos);
+      if (!resultado.ok) {
+        setEstado({ paso: "error", mensaje: resultado.error });
+        return;
+      }
+      setPin("");
+      setEstado({ paso: "listo", resultado });
+    } catch {
+      setEstado({ paso: "error", mensaje: "No se pudo guardar la marcación. Revisá el internet y probá de nuevo." });
+    }
   }
 
   async function alVerificar(r: ResultadoVerificacion) {
@@ -231,7 +276,9 @@ export function Kiosco({ token, nombreNegocio }: { token: string; nombreNegocio:
           <div className="flex flex-1 flex-col items-center justify-center gap-6 py-10 text-center">
             <div>
               <p className="text-[1.5rem] font-semibold tracking-titular text-tinta">Bienvenido</p>
-              <p className="mt-1 text-[0.95rem] text-tinta-media">Tocá el botón, poné tu PIN y sacate la selfie.</p>
+              <p className="mt-1 text-[0.95rem] text-tinta-media">
+                {metodoInicial === "pin" ? "Tocá el botón y poné tu PIN." : "Tocá el botón, poné tu PIN y sacate la selfie."}
+              </p>
             </div>
             <button
               type="button"
@@ -252,7 +299,8 @@ export function Kiosco({ token, nombreNegocio }: { token: string; nombreNegocio:
             </div>
 
             <div className="flex justify-center gap-2.5" aria-label={`${pin.length} números puestos`}>
-              {Array.from({ length: LARGO_MAXIMO_PIN }, (_, n) => (
+              {/* Tres puntos (el PIN nuevo es de tres números); si alguien tiene un PIN viejo más largo, aparecen más al escribirlo. */}
+              {Array.from({ length: Math.min(LARGO_MAXIMO_PIN, Math.max(LARGO_PIN, pin.length)) }, (_, n) => (
                 <span
                   key={n}
                   className={`h-4 w-4 rounded-full border-2 ${
@@ -292,7 +340,7 @@ export function Kiosco({ token, nombreNegocio }: { token: string; nombreNegocio:
               <button
                 type="button"
                 onClick={() => void enviarPin()}
-                disabled={pin.length < 4 || verificando}
+                disabled={pin.length < LARGO_PIN || verificando}
                 className="h-16 rounded-2xl bg-azul text-[1.05rem] font-semibold text-white disabled:opacity-40"
               >
                 {verificando ? "…" : "Entrar"}
@@ -303,6 +351,30 @@ export function Kiosco({ token, nombreNegocio }: { token: string; nombreNegocio:
               Cancelar
             </button>
           </>
+        )}
+
+        {/* ---------- 2 bis. Solo con PIN: confirmar quién es y qué marca ---------- */}
+        {estado.paso === "confirmar" && (
+          <div className="flex flex-1 flex-col items-center justify-center gap-5 py-8 text-center">
+            <div>
+              <p className="text-[0.9rem] font-medium text-tinta-media">Hola</p>
+              <p className="text-[1.75rem] font-semibold leading-tight tracking-titular text-tinta">{estado.nombre}</p>
+              <p className="mt-2 text-[1rem] text-tinta-media">
+                Vas a marcar: <strong className="text-tinta">{ETIQUETA_TIPO[estado.tipo].toLowerCase()}</strong>
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => void marcarConPin()}
+              className={`${clasesBoton("principal", "lg")} w-full max-w-xs justify-center`}
+              style={{ minHeight: "5rem", fontSize: "1.3rem" }}
+            >
+              Marcar {ETIQUETA_TIPO[estado.tipo].toLowerCase()}
+            </button>
+            <button type="button" onClick={reiniciar} className={clasesBoton("peligro", "md")}>
+              No soy yo
+            </button>
+          </div>
         )}
 
         {/* ---------- 3. La selfie ---------- */}

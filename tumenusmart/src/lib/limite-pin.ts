@@ -1,7 +1,7 @@
 /**
  * Freno a la adivinanza de PIN en los enlaces públicos (el celular fijo de asistencia y el de los mozos).
  *
- * Un PIN tiene de 4 a 6 números: sin freno se prueban todos en horas. El freno es POR LOCAL (el PIN es lo que identifica a
+ * Un PIN tiene de 3 a 6 números (los nuevos de asistencia, 3): sin freno se prueban todos en minutos. El freno es POR LOCAL (el PIN es lo que identifica a
  * la persona, así que no se puede bloquear "a esa persona") y está hecho para resistir lo que un atacante haría:
  *
  *  - Ráfagas: el intento se CUENTA ANTES de mirar el PIN, con un incremento atómico en la base. Si llegan mil pedidos a la

@@ -5,7 +5,9 @@ import {
   MINUTOS_BLOQUEO_PIN,
   calcularTardanza,
   mensajeDeEspera,
+  normalizarMetodoAsistencia,
   pinValido,
+  type MetodoAsistencia,
   type TipoMarcacion,
 } from "@/lib/asistencia";
 import {
@@ -15,7 +17,7 @@ import {
   type LocalAsistencia,
 } from "@/lib/asistencia-servidor";
 import { pedirIntentoDePin, resolverIntentoDePin } from "@/lib/limite-pin";
-import { compararRostros, rostroValido, tieneRostro } from "@/lib/reconocimiento-facial";
+import { compararRostros, esOtraPersona, rostroValido, tieneRostro } from "@/lib/reconocimiento-facial";
 import { registrarBitacora } from "@/lib/bitacora";
 import { descartarImagenes } from "@/lib/imagenes";
 import { subirFotoAsistencia } from "@/lib/supabase-storage";
@@ -70,7 +72,7 @@ async function identificarPorPin(
   local: LocalAsistencia,
   pin: string
 ): Promise<{ ok: true; colaborador: ColaboradorIdentificado } | { ok: false; error: string }> {
-  if (!pinValido(pin)) return { ok: false, error: "El PIN tiene entre 4 y 6 números." };
+  if (!pinValido(pin)) return { ok: false, error: "El PIN tiene 3 números." };
 
   // El intento se cuenta ANTES de mirar el PIN (ver src/lib/limite-pin.ts): una ráfaga de pedidos simultáneos no puede
   // probar más PIN que el tope, y acertar con el PIN propio no borra los errores seguidos de los demás.
@@ -105,6 +107,8 @@ export type ResultadoIdentificacion =
       nombre: string;
       /** La marcación que le toca, la que se registra sola (la decide el sistema, no la persona). */
       tipo: TipoMarcacion;
+      /** Cómo se marca en este local ahora mismo: solo con PIN, o con PIN y cámara. Lo decide el servidor, no el celular. */
+      metodo: MetodoAsistencia;
       /** Si ya tiene rostro registrado: la selfie se comprueba contra él (el celular saca los 128 números y los manda). */
       tieneRostro: boolean;
     }
@@ -128,7 +132,13 @@ export async function identificarPin(token: string, pin: string): Promise<Result
   const espera = mensajeDeEspera(estado.ultima, local.minutosEntreMarcas, ahora);
   if (espera) return { ok: false, error: espera };
 
-  return { ok: true, nombre: colaborador.nombre, tipo: estado.proxima, tieneRostro: tieneRostro(colaborador.rostro) };
+  return {
+    ok: true,
+    nombre: colaborador.nombre,
+    tipo: estado.proxima,
+    metodo: normalizarMetodoAsistencia(local.metodoAsistencia),
+    tieneRostro: tieneRostro(colaborador.rostro),
+  };
 }
 
 export type ResultadoMarcacion =
@@ -169,6 +179,35 @@ export async function registrarMarcacion(formData: FormData): Promise<ResultadoM
   const espera = mensajeDeEspera(estado.ultima, local.minutosEntreMarcas, ahora);
   if (espera) return { ok: false, error: espera };
 
+  // Cómo se marca lo decide el local (no el celular): con solo PIN no hay foto ni comparación de cara.
+  const metodo = normalizarMetodoAsistencia(local.metodoAsistencia);
+  const hora = horaAsuncion(ahora);
+  // La salida, el almuerzo y la vuelta son del turno que ya está abierto (su jornada es la de la entrada);
+  // una entrada abre la jornada de hoy.
+  const dia = tipo === "entrada" || !estado.ultima ? claveDiaAsuncion(ahora) : estado.ultima.dia;
+  const tardanzaMin =
+    tipo === "entrada" ? calcularTardanza(colaborador.horaEntrada, colaborador.toleranciaMin, hora) : null;
+
+  if (metodo === "pin") {
+    // Solo con PIN: la marcación se guarda tal cual, sin foto. Queda anotado que fue así (no es una marcación "sin verificar":
+    // no pasó por la cámara a propósito).
+    await prisma.marcacionAsistencia.create({
+      data: {
+        storeId: local.id,
+        colaboradorId: colaborador.id,
+        tipo,
+        fecha: ahora,
+        dia,
+        fotoUrl: null,
+        verificada: false,
+        distanciaRostro: null,
+        metodo: "pin",
+        tardanzaMin,
+      },
+    });
+    return { ok: true, tipo, hora, nombre: colaborador.nombre, tardanzaMin, verificada: true };
+  }
+
   const archivo = formData.get("archivo");
   if (!(archivo instanceof File)) return { ok: false, error: "Falta la foto. Probá de nuevo." };
 
@@ -200,6 +239,14 @@ export async function registrarMarcacion(formData: FormData): Promise<ResultadoM
           detalle: { distancia: comparacion.distancia, tipoQueLeTocaba: tipo },
         }
       );
+      // Claramente otra persona: se rechaza ya, sin hacerle esperar tres selfies más. En la zona dudosa (mala luz, cara torcida)
+      // sí se deja repetir la selfie.
+      if (esOtraPersona(comparacion.distancia)) {
+        return {
+          ok: false,
+          error: `La cara no coincide con la de ${colaborador.nombre}. Si el PIN no es tuyo, avisale al encargado.`,
+        };
+      }
       return {
         ok: false,
         error: `La cara no coincide con la de ${colaborador.nombre}. Si sos vos, probá de nuevo, de frente y con buena luz.`,
@@ -220,13 +267,6 @@ export async function registrarMarcacion(formData: FormData): Promise<ResultadoM
   // cámara llegó a ver una cara de frente; si no, la marcación queda para revisar.
   const verificada = distanciaRostro !== null || texto(formData.get("verificada")) === "1";
 
-  const hora = horaAsuncion(ahora);
-  // La salida, el almuerzo y la vuelta son del turno que ya está abierto (su jornada es la de la entrada);
-  // una entrada abre la jornada de hoy.
-  const dia = tipo === "entrada" || !estado.ultima ? claveDiaAsuncion(ahora) : estado.ultima.dia;
-  const tardanzaMin =
-    tipo === "entrada" ? calcularTardanza(colaborador.horaEntrada, colaborador.toleranciaMin, hora) : null;
-
   try {
     await prisma.marcacionAsistencia.create({
       data: {
@@ -238,6 +278,7 @@ export async function registrarMarcacion(formData: FormData): Promise<ResultadoM
         fotoUrl,
         verificada,
         distanciaRostro,
+        metodo: "pin_y_camara",
         tardanzaMin,
       },
     });

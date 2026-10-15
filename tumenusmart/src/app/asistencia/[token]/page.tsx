@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { normalizarMetodoAsistencia } from "@/lib/asistencia";
 import { localPorToken } from "@/lib/asistencia-servidor";
 import { Kiosco } from "./Kiosco";
 
@@ -26,7 +27,7 @@ export default async function AsistenciaKioscoPage({ params }: { params: Promise
 
   return (
     <div className="min-h-screen bg-papel-suave">
-      <Kiosco token={token} nombreNegocio={local.nombre} />
+      <Kiosco token={token} nombreNegocio={local.nombre} metodoInicial={normalizarMetodoAsistencia(local.metodoAsistencia)} />
     </div>
   );
 }

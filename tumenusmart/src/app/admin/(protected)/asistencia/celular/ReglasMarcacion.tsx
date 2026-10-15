@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Campo, Entrada, MensajeError, Tarjeta, clasesBoton } from "@/components/ui";
-import { ALMUERZO_MAXIMO_MIN, MINUTOS_ENTRE_MARCAS_MAXIMO } from "@/lib/asistencia";
+import { ALMUERZO_MAXIMO_MIN, METODOS_ASISTENCIA, MINUTOS_ENTRE_MARCAS_MAXIMO, type MetodoAsistencia } from "@/lib/asistencia";
 import { guardarReglasMarcacion } from "./actions";
 
 /**
@@ -20,11 +20,14 @@ export function ReglasMarcacion({
   almuerzoDesde,
   almuerzoHasta,
   almuerzoMaxMin,
+  metodo: metodoGuardado,
 }: {
   minutosEntreMarcas: number;
   almuerzoDesde: string;
   almuerzoHasta: string;
   almuerzoMaxMin: number;
+  /** Cómo se marca hoy en el celular fijo. */
+  metodo: MetodoAsistencia;
 }) {
   const router = useRouter();
   const [pendiente, iniciar] = useTransition();
@@ -32,6 +35,7 @@ export function ReglasMarcacion({
   const [desde, setDesde] = useState(almuerzoDesde);
   const [hasta, setHasta] = useState(almuerzoHasta);
   const [maximo, setMaximo] = useState(String(almuerzoMaxMin));
+  const [metodo, setMetodo] = useState<MetodoAsistencia>(metodoGuardado);
   const [error, setError] = useState<string | null>(null);
   const [guardado, setGuardado] = useState(false);
 
@@ -52,6 +56,7 @@ export function ReglasMarcacion({
         almuerzoDesde: desde,
         almuerzoHasta: hasta,
         almuerzoMaxMin: Number(maximo),
+        metodo,
       });
       if (!resultado.ok) {
         setError(resultado.error);
@@ -73,6 +78,44 @@ export function ReglasMarcacion({
       </div>
 
       <form onSubmit={guardar} className="flex flex-col gap-4">
+        <div className="rounded-xl border border-linea p-3">
+          <p className="text-[0.86rem] font-semibold text-tinta">Cómo se marca</p>
+          <p className="mt-0.5 text-[0.8rem] leading-snug text-tinta-media">
+            Elegí si tu personal marca solo con su PIN de 3 números, o si además la cámara le saca la selfie y comprueba que sea
+            su cara. Vale para el celular fijo: el cambio se nota en la próxima marcación.
+          </p>
+          <div role="radiogroup" aria-label="Cómo se marca" className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+            {METODOS_ASISTENCIA.map((m) => {
+              const elegido = metodo === m.valor;
+              return (
+                <button
+                  key={m.valor}
+                  type="button"
+                  role="radio"
+                  aria-checked={elegido}
+                  onClick={() => cambio(setMetodo)(m.valor)}
+                  className={`flex flex-col gap-1 rounded-xl border-2 p-3 text-left transition-colors ${
+                    elegido ? "border-azul bg-azul-luz" : "border-linea bg-superficie hover:border-azul/50"
+                  }`}
+                >
+                  <span className="flex items-center gap-2 text-[0.9rem] font-semibold text-tinta">
+                    <span
+                      aria-hidden="true"
+                      className={`flex h-4 w-4 flex-none items-center justify-center rounded-full border-2 ${
+                        elegido ? "border-azul" : "border-linea"
+                      }`}
+                    >
+                      {elegido && <span className="h-2 w-2 rounded-full bg-azul" />}
+                    </span>
+                    {m.etiqueta}
+                  </span>
+                  <span className="text-[0.78rem] leading-snug text-tinta-media">{m.detalle}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
         <div className="rounded-xl border border-linea p-3">
           <p className="text-[0.86rem] font-semibold text-tinta">Horario de almuerzo</p>
           <p className="mt-0.5 text-[0.8rem] leading-snug text-tinta-media">

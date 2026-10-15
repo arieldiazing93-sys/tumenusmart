@@ -36,7 +36,7 @@ const MODELO =
   "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task";
 
 /** Descarga y prepara el detector. Prueba con la placa de video y, si no puede, con el procesador. */
-export async function cargarDetectorRostro(): Promise<DetectorRostro> {
+async function crearDetectorRostro(): Promise<DetectorRostro> {
   const urlModulo = `${BASE}/vision_bundle.mjs`;
   // El import va por una variable y con estas marcas para que el empaquetador NO intente resolverlo
   // (es una dirección de internet, se carga recién en el navegador).
@@ -54,6 +54,29 @@ export async function cargarDetectorRostro(): Promise<DetectorRostro> {
   } catch {
     return await modulo.FaceLandmarker.createFromOptions(vision, opciones("CPU"));
   }
+}
+
+let detectorCompartido: Promise<DetectorRostro> | null = null;
+
+/**
+ * El detector, listo para usar. Se prepara UNA sola vez por página y se comparte entre intentos: armarlo (compilar el módulo y cargar
+ * el modelo) es lo más lento de la marcación, y antes se repetía en cada selfie, así que una cara rechazada tres veces seguidas
+ * tardaba tres veces más. Se puede pedir de antemano (al abrir la pantalla) para que cuando llegue la persona ya esté listo.
+ * `close()` no hace nada a propósito: el detector vive mientras la página esté abierta. Si no se pudo preparar, el próximo pedido reintenta.
+ */
+export function cargarDetectorRostro(): Promise<DetectorRostro> {
+  if (!detectorCompartido) {
+    detectorCompartido = crearDetectorRostro()
+      .then((detector): DetectorRostro => ({
+        detectForVideo: (video, marca) => detector.detectForVideo(video, marca),
+        close: () => undefined,
+      }))
+      .catch((e) => {
+        detectorCompartido = null;
+        throw e;
+      });
+  }
+  return detectorCompartido;
 }
 
 // ---------------------------------------------------------------------------

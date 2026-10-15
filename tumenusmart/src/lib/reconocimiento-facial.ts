@@ -24,6 +24,18 @@ export const LARGO_ROSTRO = 128;
  */
 export const UMBRAL_ROSTRO = 0.5;
 
+/**
+ * Desde esta distancia no hay duda: es otra persona (la misma cara da 0,15 a 0,40 aun con mala luz; otra persona, 0,52 a 0,90). Ahí
+ * no se le ofrece volver a intentar: se rechaza al toque, en vez de hacerle esperar tres selfies seguidas a quien no es. Entre
+ * `UMBRAL_ROSTRO` y este valor queda la zona dudosa (mala luz, la cara torcida): ahí sí se deja repetir la selfie.
+ */
+export const UMBRAL_OTRA_PERSONA = 0.65;
+
+/** ¿Esta distancia es claramente la de otra persona? (Rechazo definitivo, sin reintentos.) */
+export function esOtraPersona(distancia: number): boolean {
+  return distancia >= UMBRAL_OTRA_PERSONA;
+}
+
 /** Cuántas veces seguidas se le deja intentar a una persona en el celular antes de mandarla al inicio. */
 export const INTENTOS_DE_ROSTRO = 3;
 
