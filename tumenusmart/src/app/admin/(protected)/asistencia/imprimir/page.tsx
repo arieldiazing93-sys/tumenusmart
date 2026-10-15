@@ -47,7 +47,15 @@ export default async function ImprimirAsistenciaPage({
     tardanzas,
     paraRevisar,
     hayMas,
+    faltas,
+    justificados,
+    faltasNoCalculadas,
   } = reporte;
+  // En papel las ausencias también van de lo más viejo a lo más nuevo.
+  const ausencias = [...reporte.ausencias].sort((a, b) => {
+    if (a.dia !== b.dia) return a.dia < b.dia ? -1 : 1;
+    return a.nombre.localeCompare(b.nombre, "es");
+  });
   // En papel va en orden cronológico (de lo más viejo a lo más nuevo), que es como se lee un reporte.
   const filas = [...reporte.filas].sort((a, b) => {
     if (a.dia !== b.dia) return a.dia < b.dia ? -1 : 1;
@@ -83,11 +91,11 @@ export default async function ImprimirAsistenciaPage({
         </div>
       </div>
 
-      {filas.length === 0 ? (
+      {filas.length === 0 && ausencias.length === 0 ? (
         <p className="text-sm text-tinta-suave">No hay marcaciones en este período.</p>
       ) : (
         <>
-          <dl className="mb-6 grid grid-cols-4 gap-3 text-sm">
+          <dl className="mb-6 grid grid-cols-5 gap-3 text-sm">
             <div>
               <dt className="text-xs uppercase tracking-wide text-tinta-media">Personas que marcaron</dt>
               <dd className="mt-0.5 text-lg font-semibold text-tinta">{personasQueMarcaron}</dd>
@@ -99,6 +107,10 @@ export default async function ImprimirAsistenciaPage({
             <div>
               <dt className="text-xs uppercase tracking-wide text-tinta-media">Llegadas tarde</dt>
               <dd className="mt-0.5 text-lg font-semibold text-tinta">{tardanzas}</dd>
+            </div>
+            <div>
+              <dt className="text-xs uppercase tracking-wide text-tinta-media">Faltas sin aviso</dt>
+              <dd className="mt-0.5 text-lg font-semibold text-tinta">{faltasNoCalculadas ? "—" : faltas}</dd>
             </div>
             <div>
               <dt className="text-xs uppercase tracking-wide text-tinta-media">Para revisar</dt>
@@ -116,6 +128,8 @@ export default async function ImprimirAsistenciaPage({
                     <th className="py-1.5 text-right">Días</th>
                     <th className="py-1.5 text-right">Trabajado</th>
                     <th className="py-1.5 text-right">Llegadas tarde</th>
+                    <th className="py-1.5 text-right">Faltas sin aviso</th>
+                    <th className="py-1.5 text-right">Justificados</th>
                     <th className="py-1.5 text-right">Para revisar</th>
                   </tr>
                 </thead>
@@ -129,6 +143,8 @@ export default async function ImprimirAsistenciaPage({
                       <td className="py-1.5 text-right text-tinta">{r.dias}</td>
                       <td className="py-1.5 text-right font-semibold text-tinta">{formatearDuracion(r.minutos)}</td>
                       <td className="py-1.5 text-right text-tinta">{r.tardanzas}</td>
+                      <td className="py-1.5 text-right text-tinta">{faltasNoCalculadas ? "—" : r.faltas}</td>
+                      <td className="py-1.5 text-right text-tinta">{r.justificados}</td>
                       <td className="py-1.5 text-right text-tinta">{r.pendientes}</td>
                     </tr>
                   ))}
@@ -137,8 +153,40 @@ export default async function ImprimirAsistenciaPage({
                     <td className="py-2" />
                     <td className="py-2 text-right text-tinta">{formatearDuracion(minutosTotales)}</td>
                     <td className="py-2 text-right text-tinta">{tardanzas}</td>
+                    <td className="py-2 text-right text-tinta">{faltasNoCalculadas ? "—" : faltas}</td>
+                    <td className="py-2 text-right text-tinta">{justificados}</td>
                     <td className="py-2 text-right text-tinta">{paraRevisar}</td>
                   </tr>
+                </tbody>
+              </table>
+            </>
+          )}
+
+          {ausencias.length > 0 && (
+            <>
+              <h2 className="mb-2 font-semibold text-tinta">Faltas y ausencias</h2>
+              <table className="mb-8 w-full border-collapse text-sm">
+                <thead>
+                  <tr className="border-b border-linea text-left text-xs uppercase tracking-wide text-tinta-media">
+                    <th className="py-1.5">Día</th>
+                    {!personaElegida && <th className="py-1.5">Colaborador</th>}
+                    <th className="py-1.5">Qué pasó</th>
+                    <th className="py-1.5">Se paga</th>
+                    <th className="py-1.5">Comentario</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {ausencias.map((a) => (
+                    <tr key={a.clave} className="border-b border-linea-fina align-top [break-inside:avoid]">
+                      <td className="whitespace-nowrap py-1.5 text-tinta-media">
+                        {a.hasta === a.dia ? diaEnTexto(a.dia) : `${diaEnTexto(a.dia)} – ${diaEnTexto(a.hasta)}`}
+                      </td>
+                      {!personaElegida && <td className="py-1.5 text-tinta">{a.nombre}</td>}
+                      <td className="py-1.5 text-tinta">{a.etiqueta}</td>
+                      <td className="py-1.5 text-tinta-media">{a.estado === "justificado" ? (a.pagado ? "Sí" : "No") : "—"}</td>
+                      <td className="py-1.5 text-tinta-media">{a.nota ?? ""}</td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </>

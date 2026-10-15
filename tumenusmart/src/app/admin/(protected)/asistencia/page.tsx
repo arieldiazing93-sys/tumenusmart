@@ -11,6 +11,7 @@ import {
   MARCACIONES_MAXIMAS_PANTALLA,
   cargarReporteAsistencia,
 } from "@/lib/reporte-asistencia";
+import { AusenciasDelPeriodo } from "./AusenciasDelPeriodo";
 import { ListadoMarcaciones } from "./ListadoMarcaciones";
 
 export const dynamic = "force-dynamic";
@@ -59,9 +60,14 @@ export default async function MarcacionesPage({
     minutosTotales,
     tardanzas,
     paraRevisar,
-    sinMarcar,
+    ausencias,
+    faltas,
+    faltasNoCalculadas,
     hayMas,
   } = reporte;
+
+  // Para el formulario de «Justificar»: todas las personas del local (las inactivas solo si ya eran la de ese registro).
+  const personasParaAusencia = colaboradores.map((c) => ({ id: c.id, nombre: nombreDeColaborador(c), activo: c.activo }));
 
   const semana = diasDeLaSemana(hoy);
   const atajos: { texto: string; desde: string; hasta: string }[] = [
@@ -88,7 +94,7 @@ export default async function MarcacionesPage({
           <>
             {/* Verde: sacar el reporte a un archivo (Excel). Azul: lleva a otra pantalla — el PDF se imprime/guarda
                 desde ahí con el botón del navegador, mismo criterio que el reporte de personal. */}
-            {filas.length > 0 && (
+            {(filas.length > 0 || ausencias.length > 0) && (
               <>
                 <a href={urlExcel} className={clasesBoton("exito", "sm")}>
                   Descargar Excel
@@ -98,6 +104,12 @@ export default async function MarcacionesPage({
                 </a>
               </>
             )}
+            <BotonEnlace href="/admin/asistencia/ausencias" tono="navegar" tam="sm">
+              Ausencias
+            </BotonEnlace>
+            <BotonEnlace href="/admin/asistencia/liquidacion" tono="navegar" tam="sm">
+              Liquidación
+            </BotonEnlace>
             <BotonEnlace href="/admin/asistencia/colaboradores" tono="navegar" tam="sm">
               Colaboradores
             </BotonEnlace>
@@ -188,10 +200,11 @@ export default async function MarcacionesPage({
       ) : (
         <>
           {/* ---------- cifras: una sola franja ---------- */}
-          <div className="grid grid-cols-2 divide-x divide-linea overflow-hidden rounded-xl border border-linea bg-superficie sm:grid-cols-4">
+          <div className="grid grid-cols-2 divide-x divide-linea overflow-hidden rounded-xl border border-linea bg-superficie sm:grid-cols-5">
             <Dato rotulo={personaElegida ? "Persona" : "Personas"} valor={personaElegida ? nombreDeColaborador(personaElegida) : personasQueMarcaron} />
             <Dato rotulo="Horas trabajadas" valor={formatearDuracion(minutosTotales)} />
             <Dato rotulo="Llegadas tarde" valor={tardanzas} color={tardanzas > 0 ? "text-aviso" : "text-tinta"} />
+            <Dato rotulo="Faltas sin aviso" valor={faltasNoCalculadas ? "—" : faltas} color={faltas > 0 ? "text-peligro" : "text-tinta"} />
             <Dato rotulo="Para revisar" valor={paraRevisar} color={paraRevisar > 0 ? "text-peligro" : "text-tinta"} />
           </div>
 
@@ -202,12 +215,15 @@ export default async function MarcacionesPage({
             {buscar && !personaElegida && ` · ${coincidencias} personas coinciden con “${buscar}”`}
           </p>
 
-          {sinMarcar.length > 0 && (
+          {faltasNoCalculadas && (
             <p className="rounded-lg border border-aviso/25 bg-aviso-luz px-3 py-1.5 text-[0.78rem] leading-snug text-aviso">
-              <strong>{desde === hoy ? "Todavía no marcaron hoy" : "No marcaron ese día"}:</strong>{" "}
-              {sinMarcar.map((c) => nombreDeColaborador(c)).join(" · ")}
+              Son tantas marcaciones que no se puede asegurar quién faltó: no se calculan las faltas. Acotá el período (un mes o menos)
+              para verlas.
             </p>
           )}
+
+          {/* Quién tenía que ir y no marcó (y por qué, si se anotó): se justifica desde acá mismo. */}
+          <AusenciasDelPeriodo filas={ausencias} personas={personasParaAusencia} />
 
           {/* ---------- resumen por persona (varios días, varias personas): tabla chica con scroll ---------- */}
           {!unSoloDia && resumenPorPersona.length > 1 && (
@@ -224,6 +240,8 @@ export default async function MarcacionesPage({
                       <th className="px-3 py-1.5 text-right font-semibold">Días</th>
                       <th className="px-3 py-1.5 text-right font-semibold">Trabajado</th>
                       <th className="px-3 py-1.5 text-right font-semibold">Tarde</th>
+                      <th className="px-3 py-1.5 text-right font-semibold">Faltas</th>
+                      <th className="px-3 py-1.5 text-right font-semibold">Justif.</th>
                       <th className="px-3 py-1.5 text-right font-semibold">Revisar</th>
                     </tr>
                   </thead>
@@ -236,6 +254,10 @@ export default async function MarcacionesPage({
                         <td className={`cifra px-3 py-1 text-right ${r.tardanzas > 0 ? "font-semibold text-aviso" : "text-tinta-media"}`}>
                           {r.tardanzas}
                         </td>
+                        <td className={`cifra px-3 py-1 text-right ${r.faltas > 0 ? "font-semibold text-peligro" : "text-tinta-media"}`}>
+                          {faltasNoCalculadas ? "—" : r.faltas}
+                        </td>
+                        <td className="cifra px-3 py-1 text-right text-tinta-media">{r.justificados}</td>
                         <td className={`cifra px-3 py-1 text-right ${r.pendientes > 0 ? "font-semibold text-peligro" : "text-tinta-media"}`}>
                           {r.pendientes}
                         </td>

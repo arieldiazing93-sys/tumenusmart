@@ -2,10 +2,13 @@
 
 import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Campo, Entrada, MensajeError, clasesBoton } from "@/components/ui";
+import { Campo, Entrada, MensajeError, Selector, clasesBoton, clasesCampo } from "@/components/ui";
+import { EntradaMonto } from "@/components/EntradaMonto";
 import { VerificadorPersona, type ResultadoVerificacion } from "@/components/VerificadorPersona";
 import { comprimirImagen, PARA_LOGO } from "@/lib/comprimir-imagen";
 import { LARGO_PIN, pinDemasiadoFacil, type ColaboradorFila, type MetodoAsistencia } from "@/lib/asistencia";
+import { DIAS_SEMANA, FORMAS_DE_PAGO, normalizarDiasTrabajo, valorDelDia } from "@/lib/ausencias";
+import { formatearGuarani } from "@/lib/format";
 import { rostroDeFoto, rostroDeFotoGuardada } from "@/lib/reconocimiento-cliente";
 import { actualizarColaborador, crearColaborador, subirFotoDelColaborador } from "./actions";
 
@@ -77,6 +80,10 @@ export function FormularioColaborador({
   const [rostro, setRostro] = useState<number[] | null>(null);
   const [leyendoRostro, setLeyendoRostro] = useState(false);
   const archivo = useRef<HTMLInputElement>(null);
+  // Los días que tiene que ir y cómo se le paga (con eso se sabe cuándo faltó y cuánto le toca).
+  const [dias, setDias] = useState<number[]>(() => normalizarDiasTrabajo(colaborador?.diasTrabajo));
+  const [tipoPago, setTipoPago] = useState<string>(colaborador?.tipoPago ?? "");
+  const [montoPago, setMontoPago] = useState<string>(colaborador && colaborador.montoPago > 0 ? String(colaborador.montoPago) : "");
 
   const editando = colaborador !== null;
   const rostroYaGuardado = colaborador !== null && !colaborador.sinRostro;
@@ -156,6 +163,14 @@ export function FormularioColaborador({
     e.preventDefault();
     const datos = new FormData(e.currentTarget);
     setError(null);
+    if (dias.length === 0) {
+      setError("Marcá al menos un día de trabajo.");
+      return;
+    }
+    if (tipoPago && !(Number(montoPago) > 0)) {
+      setError(tipoPago === "mensual" ? "Poné cuánto es su salario del mes." : "Poné cuánto se le paga por día.");
+      return;
+    }
     if (!editando && !rostro && metodo !== "pin") {
       setError("Sacale la selfie para registrar su rostro: con él el celular comprueba que sea esa persona al marcar.");
       return;
@@ -321,6 +336,89 @@ export function FormularioColaborador({
             </span>
           </span>
         </label>
+
+        {/* ---------- días de trabajo ---------- */}
+        <div className="rounded-xl border-2 border-azul/50 p-3">
+          <p className="text-[0.82rem] font-semibold text-tinta">Días de trabajo</p>
+          <p className="mt-0.5 text-[0.78rem] leading-snug text-tinta-suave">
+            Los días que tiene que ir. Un día de estos sin marcación es una falta; los demás son su descanso y no cuentan.
+          </p>
+          <div role="group" aria-label="Días de trabajo" className="mt-2 flex flex-wrap gap-1.5">
+            {DIAS_SEMANA.map((d) => {
+              const elegido = dias.includes(d.valor);
+              return (
+                <button
+                  key={d.valor}
+                  type="button"
+                  aria-pressed={elegido}
+                  onClick={() =>
+                    setDias((actuales) =>
+                      actuales.includes(d.valor) ? actuales.filter((x) => x !== d.valor) : [...actuales, d.valor]
+                    )
+                  }
+                  className={`h-10 min-w-[3.1rem] rounded-lg border-2 px-2 text-[0.82rem] font-semibold transition-colors ${
+                    elegido
+                      ? "border-azul bg-azul-luz text-azul-oscuro"
+                      : "border-linea bg-superficie text-tinta-media hover:border-azul/50"
+                  }`}
+                >
+                  {d.corto}
+                </button>
+              );
+            })}
+          </div>
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            <button type="button" onClick={() => setDias([1, 2, 3, 4, 5])} className={clasesBoton("suave", "sm")}>
+              Lun a Vie
+            </button>
+            <button type="button" onClick={() => setDias([1, 2, 3, 4, 5, 6])} className={clasesBoton("suave", "sm")}>
+              Lun a Sáb
+            </button>
+            <button type="button" onClick={() => setDias([1, 2, 3, 4, 5, 6, 0])} className={clasesBoton("suave", "sm")}>
+              Todos
+            </button>
+          </div>
+          {dias.length === 0 && <p className="mt-2 text-[0.78rem] font-semibold text-peligro">Marcá al menos un día.</p>}
+          <input type="hidden" name="diasTrabajo" value={DIAS_SEMANA.filter((d) => dias.includes(d.valor)).map((d) => d.valor).join(",")} />
+        </div>
+
+        {/* ---------- cómo se le paga ---------- */}
+        <div className="rounded-xl border-2 border-azul/50 p-3">
+          <p className="text-[0.82rem] font-semibold text-tinta">Cómo se le paga</p>
+          <p className="mt-0.5 text-[0.78rem] leading-snug text-tinta-suave">
+            Con esto la liquidación calcula lo que le toca según los días que fue y los que faltó. Es opcional: sin definir, esta
+            persona aparece en la liquidación sin monto.
+          </p>
+          <div className="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <Campo etiqueta="Forma de pago">
+              <Selector name="tipoPago" value={tipoPago} onChange={(e) => setTipoPago(e.target.value)}>
+                <option value="">Sin definir</option>
+                {FORMAS_DE_PAGO.map((f) => (
+                  <option key={f.valor} value={f.valor}>
+                    {f.etiqueta}
+                  </option>
+                ))}
+              </Selector>
+            </Campo>
+            {tipoPago && (
+              <Campo etiqueta={tipoPago === "mensual" ? "Salario del mes (Gs.)" : "Pago por día (Gs.)"}>
+                <EntradaMonto value={montoPago} onChange={setMontoPago} className={clasesCampo} placeholder="Ej: 2.800.000" />
+              </Campo>
+            )}
+          </div>
+          {tipoPago && (
+            <p className="mt-2 text-[0.78rem] leading-snug text-tinta-media">
+              {FORMAS_DE_PAGO.find((f) => f.valor === tipoPago)?.detalle}
+              {tipoPago === "mensual" && Number(montoPago) > 0 && (
+                <>
+                  {" "}
+                  Un día vale <strong className="text-tinta">{formatearGuarani(valorDelDia(Number(montoPago)))}</strong>.
+                </>
+              )}
+            </p>
+          )}
+          <input type="hidden" name="montoPago" value={tipoPago ? montoPago : ""} />
+        </div>
 
         {/* ---------- horario ---------- */}
         <div className="rounded-xl border-2 border-azul/50 p-3">

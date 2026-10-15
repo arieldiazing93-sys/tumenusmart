@@ -14,6 +14,13 @@ import {
   type FilaAsistencia,
   type TipoMarcacion,
 } from "./asistencia";
+import {
+  clasificarDias,
+  etiquetaDeAusencia,
+  normalizarDiasTrabajo,
+  type AusenciaRango,
+  type DiaClasificado,
+} from "./ausencias";
 import { claveSumarDias } from "./calendario";
 import type { PrismaLocal } from "./prisma-local";
 import { claveDiaAsuncion, horaAsuncion } from "./timezone";
@@ -42,6 +49,40 @@ export type ResumenPersona = {
   tardanzas: number;
   /** Turnos con algo para revisar (sin salida, sin vuelta, sin cara). */
   pendientes: number;
+  /** Días que tenía que ir y no vino ni avisó. */
+  faltas: number;
+  /** Días que no vino pero tienen su motivo anotado (reposo, aviso, vacaciones, feriado...). */
+  justificados: number;
+};
+
+/**
+ * Un día (o varios seguidos) en que alguien tenía que ir y no marcó, con lo que se sabe de por qué:
+ *  - `falta`: no marcó ni se anotó nada (se puede justificar).
+ *  - `justificado`: no marcó pero se anotó el motivo (un reposo de varios días es UNA fila).
+ *  - `pendiente`: es hoy y todavía no marcó.
+ */
+export type FilaAusenciaReporte = {
+  clave: string;
+  /** El primer día de la fila ("YYYY-MM-DD") y el último (el mismo si es uno solo). */
+  dia: string;
+  hasta: string;
+  /** Cuántos días de trabajo cubre dentro del período mirado. */
+  dias: number;
+  diaTexto: string;
+  colaboradorId: string;
+  nombre: string;
+  cargo: string | null;
+  estado: "falta" | "justificado" | "pendiente";
+  /** El registro anotado (null en una falta sin anotar o en uno pendiente). */
+  ausenciaId: string | null;
+  tipo: string | null;
+  /** Lo que se lee en pantalla: "Falta sin aviso", "Reposo médico", "Todavía no marcó". */
+  etiqueta: string;
+  pagado: boolean;
+  nota: string | null;
+  /** El rango completo del registro (puede ser más largo que lo que se está mirando). */
+  ausenciaDesde: string | null;
+  ausenciaHasta: string | null;
 };
 
 export type ReporteAsistencia = {
@@ -66,8 +107,14 @@ export type ReporteAsistencia = {
   minutosTotales: number;
   tardanzas: number;
   paraRevisar: number;
-  /** Solo si se mira un día y todas las personas: quiénes (activos) no marcaron nada ese día. */
-  sinMarcar: PersonaAsistencia[];
+  /** Los días que alguien tenía que ir y no marcó (faltas, justificados y, hoy, los que todavía no marcaron): lo más reciente primero. */
+  ausencias: FilaAusenciaReporte[];
+  /** Cuántos días de falta sin aviso hay en el período (sumados todos). */
+  faltas: number;
+  /** Cuántos días no vino con el motivo anotado. */
+  justificados: number;
+  /** true = hay tantas marcaciones que se cortó la lista: no se puede asegurar quién faltó, así que las faltas no se calculan. */
+  faltasNoCalculadas: boolean;
   /** true = se llegó al tope de marcaciones y puede faltar alguna. */
   hayMas: boolean;
 };
@@ -118,10 +165,29 @@ export async function cargarReporteAsistencia(
   const recortado = diasEntre(desde, hasta) + 1 > DIAS_MAXIMOS_REPORTE;
   if (recortado) desde = claveSumarDias(hasta, -(DIAS_MAXIMOS_REPORTE - 1));
 
-  const colaboradores: PersonaAsistencia[] = await db.colaborador.findMany({
+  const filasColaborador = await db.colaborador.findMany({
     orderBy: [{ activo: "desc" }, { nombre: "asc" }, { createdAt: "asc" }],
-    select: { id: true, nombre: true, apellido: true, cargo: true, fotoUrl: true, activo: true },
+    select: {
+      id: true,
+      nombre: true,
+      apellido: true,
+      cargo: true,
+      fotoUrl: true,
+      activo: true,
+      diasTrabajo: true,
+      createdAt: true,
+    },
   });
+  const colaboradores: PersonaAsistencia[] = filasColaborador.map(
+    ({ id, nombre, apellido, cargo, fotoUrl, activo }) => ({ id, nombre, apellido, cargo, fotoUrl, activo })
+  );
+  // Lo que hace falta para saber qué días tenía que ir cada una y desde cuándo se la controla (el día en que se la dio de alta).
+  const controlDe = new Map(
+    filasColaborador.map((c) => [
+      c.id,
+      { diasTrabajo: normalizarDiasTrabajo(c.diasTrabajo), controlDesde: claveDiaAsuncion(c.createdAt) },
+    ])
+  );
 
   // El buscador: por nombre, apellido o cargo, sin importar tildes ni mayúsculas. Si coincide con una sola persona,
   // el reporte es de esa persona; si coincide con varias, de todas ellas; si con ninguna, no hay nada que mostrar.
@@ -224,18 +290,153 @@ export async function cargarReporteAsistencia(
 
   const unSoloDia = desde === hasta;
   const conMarcas = new Set(filas.map((f) => f.colaboradorId));
-  const sinMarcar = unSoloDia && !q ? colaboradores.filter((c) => c.activo && !conMarcas.has(c.id)) : [];
 
+  // ---------- los días que tenía que ir y no marcó ----------
+  const registros = await db.ausenciaColaborador.findMany({
+    where: {
+      desde: { lte: hasta },
+      hasta: { gte: desde },
+      ...(q ? { colaboradorId: { in: coinciden.map((c) => c.id) } } : {}),
+    },
+    orderBy: [{ desde: "asc" }, { createdAt: "asc" }],
+    select: { id: true, colaboradorId: true, desde: true, hasta: true, tipo: true, pagado: true, nota: true },
+  });
+  const registrosDe = new Map<string, AusenciaRango[]>();
+  for (const r of registros) {
+    const lista = registrosDe.get(r.colaboradorId);
+    if (lista) lista.push(r);
+    else registrosDe.set(r.colaboradorId, [r]);
+  }
+  const diasConMarca = new Map<string, Set<string>>();
+  for (const m of marcas) {
+    const set = diasConMarca.get(m.colaboradorId);
+    if (set) set.add(m.dia);
+    else diasConMarca.set(m.colaboradorId, new Set([m.dia]));
+  }
+
+  const ausencias: FilaAusenciaReporte[] = [];
+  const faltasDe = new Map<string, { faltas: number; justificados: number }>();
+  // Con la lista de marcaciones cortada no se puede asegurar quién faltó: solo se muestran los motivos que ya estaban anotados.
+  const faltasNoCalculadas = hayMas;
+
+  for (const persona of coinciden) {
+    const control = controlDe.get(persona.id);
+    if (!control) continue;
+    const marcadosEstaPersona = diasConMarca.get(persona.id) ?? new Set<string>();
+    // Una persona dada de baja se controla hasta su última marcación del período (lo que viene después no es falta).
+    const ultimaMarca = [...marcadosEstaPersona].sort().pop() ?? null;
+    const dias: DiaClasificado[] = clasificarDias({
+      desde,
+      hasta,
+      hoy,
+      diasTrabajo: control.diasTrabajo,
+      controlDesde: control.controlDesde,
+      controlHasta: persona.activo ? null : (ultimaMarca ?? "0000-00-00"),
+      diasConMarcacion: marcadosEstaPersona,
+      ausencias: registrosDe.get(persona.id) ?? [],
+    });
+
+    const cuenta = { faltas: 0, justificados: 0 };
+    // Un reposo de varios días es UNA fila: se junta por registro.
+    const porRegistro = new Map<string, { primero: string; ultimo: string; dias: number; registro: AusenciaRango }>();
+
+    for (const d of dias) {
+      if (d.estado === "justificado" && d.ausencia) {
+        cuenta.justificados += 1;
+        const previo = porRegistro.get(d.ausencia.id);
+        if (previo) {
+          previo.ultimo = d.dia;
+          previo.dias += 1;
+        } else {
+          porRegistro.set(d.ausencia.id, { primero: d.dia, ultimo: d.dia, dias: 1, registro: d.ausencia });
+        }
+      } else if (d.estado === "falta" && !faltasNoCalculadas) {
+        cuenta.faltas += 1;
+        ausencias.push({
+          clave: `${persona.id}|${d.dia}|falta`,
+          dia: d.dia,
+          hasta: d.dia,
+          dias: 1,
+          diaTexto: diaLargo(d.dia),
+          colaboradorId: persona.id,
+          nombre: nombreDeColaborador(persona),
+          cargo: persona.cargo,
+          estado: "falta",
+          ausenciaId: null,
+          tipo: null,
+          etiqueta: "Falta sin aviso",
+          pagado: false,
+          nota: null,
+          ausenciaDesde: null,
+          ausenciaHasta: null,
+        });
+      } else if (d.estado === "pendiente" && !faltasNoCalculadas) {
+        ausencias.push({
+          clave: `${persona.id}|${d.dia}|pendiente`,
+          dia: d.dia,
+          hasta: d.dia,
+          dias: 1,
+          diaTexto: diaLargo(d.dia),
+          colaboradorId: persona.id,
+          nombre: nombreDeColaborador(persona),
+          cargo: persona.cargo,
+          estado: "pendiente",
+          ausenciaId: null,
+          tipo: null,
+          etiqueta: "Todavía no marcó",
+          pagado: false,
+          nota: null,
+          ausenciaDesde: null,
+          ausenciaHasta: null,
+        });
+      }
+    }
+
+    for (const g of porRegistro.values()) {
+      ausencias.push({
+        clave: `${persona.id}|${g.registro.id}`,
+        dia: g.primero,
+        hasta: g.ultimo,
+        dias: g.dias,
+        diaTexto: g.primero === g.ultimo ? diaLargo(g.primero) : `${diaLargo(g.primero)} – ${diaLargo(g.ultimo)}`,
+        colaboradorId: persona.id,
+        nombre: nombreDeColaborador(persona),
+        cargo: persona.cargo,
+        estado: "justificado",
+        ausenciaId: g.registro.id,
+        tipo: g.registro.tipo,
+        etiqueta: etiquetaDeAusencia(g.registro.tipo),
+        pagado: g.registro.pagado,
+        nota: g.registro.nota,
+        ausenciaDesde: g.registro.desde,
+        ausenciaHasta: g.registro.hasta,
+      });
+    }
+    if (cuenta.faltas > 0 || cuenta.justificados > 0) faltasDe.set(persona.id, cuenta);
+  }
+  ausencias.sort((a, b) => {
+    if (a.dia !== b.dia) return a.dia < b.dia ? 1 : -1;
+    return a.nombre.localeCompare(b.nombre, "es");
+  });
+  const faltas = [...faltasDe.values()].reduce((s, c) => s + c.faltas, 0);
+  const justificados = [...faltasDe.values()].reduce((s, c) => s + c.justificados, 0);
+
+  // El resumen por persona: las que marcaron y también las que solo tienen faltas o días justificados.
   const resumenPorPersona: ResumenPersona[] = [];
-  for (const [id, r] of acumulados) {
+  const ids = new Set<string>([...acumulados.keys(), ...faltasDe.keys()]);
+  for (const id of ids) {
     const persona = personaDe.get(id);
     if (!persona) continue;
+    const r = acumulados.get(id);
+    const c = faltasDe.get(id);
     resumenPorPersona.push({
       persona,
-      dias: r.dias.size,
-      minutos: r.minutos,
-      tardanzas: r.tardanzas,
-      pendientes: r.pendientes,
+      dias: r ? r.dias.size : 0,
+      minutos: r ? r.minutos : 0,
+      tardanzas: r ? r.tardanzas : 0,
+      pendientes: r ? r.pendientes : 0,
+      faltas: c ? c.faltas : 0,
+      justificados: c ? c.justificados : 0,
     });
   }
   resumenPorPersona.sort((a, b) =>
@@ -258,7 +459,10 @@ export async function cargarReporteAsistencia(
     minutosTotales,
     tardanzas,
     paraRevisar,
-    sinMarcar,
+    ausencias,
+    faltas,
+    justificados,
+    faltasNoCalculadas,
     hayMas,
   };
 }

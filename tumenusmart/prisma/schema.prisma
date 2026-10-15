@@ -299,6 +299,7 @@ model Store {
   // --- Registro de asistencia ---
   colaboradores         Colaborador[]
   marcacionesAsistencia MarcacionAsistencia[]
+  ausenciasColaborador  AusenciaColaborador[]
 
   // --- Servicio comedor ---
   mozos            Mozo[]
@@ -2897,7 +2898,7 @@ model Colaborador {
   /// La selfie del alta, sacada por el dueño con la persona delante. Es la referencia para
   /// comparar a ojo con la foto de cada marcación.
   fotoUrl  String?
-  /// El PIN de 4 a 6 números NO se guarda: se guarda su huella (HMAC con una clave del servidor, ver
+  /// El PIN (3 números los nuevos; 4 a 6 los anteriores) NO se guarda: se guarda su huella (HMAC con una clave del servidor, ver
   /// src/lib/asistencia-servidor.ts). El PIN es lo que identifica a la persona en el celular fijo (toca
   /// "Registrar asistencia", pone su PIN y listo), así que no puede repetirse dentro del mismo local.
   /// NULL = todavía no tiene PIN (no puede marcar).
@@ -2915,14 +2916,48 @@ model Colaborador {
   horaEntrada   String?
   /// Cuántos minutos de gracia después de la hora de entrada antes de contar la tardanza.
   toleranciaMin Int     @default(10)
+  /// Los días de la semana que esta persona tiene que ir: 0 = domingo, 1 = lunes ... 6 = sábado (mismo criterio que HorarioAtencion).
+  /// Con eso el reporte sabe si un día sin marcación es una falta o su día libre. Por defecto, de lunes a sábado.
+  diasTrabajo Int[] @default([1, 2, 3, 4, 5, 6])
+  /// Cómo se le paga: "mensual" (un salario por mes) o "jornal" (un monto por cada día que fue). NULL = todavía sin definir.
+  tipoPago  String?
+  /// Guaraníes: el salario del mes (mensual) o lo que se le paga por día (jornal). 0 = sin definir.
+  montoPago Int     @default(0)
   /// Se desactiva en vez de borrarse: sus marcaciones viejas siguen en los reportes.
   activo   Boolean @default(true)
   createdAt DateTime @default(now())
 
   marcaciones MarcacionAsistencia[]
+  ausencias   AusenciaColaborador[]
 
   @@unique([storeId, pinClave])
   @@index([storeId])
+}
+
+/// Un día (o varios seguidos) en que un colaborador NO fue y por qué: reposo médico, avisó que no venía, vacaciones, un feriado...
+/// Sin esto, un día sin marcación es una falta sin aviso. `pagado` dice si ese día se le paga igual (cuenta en la liquidación).
+/// Los días de descanso de la persona (lo que no está en Colaborador.diasTrabajo) no cuentan aunque caigan dentro del rango.
+model AusenciaColaborador {
+  id            String      @id @default(cuid())
+  storeId       String
+  store         Store       @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  colaboradorId String
+  colaborador   Colaborador @relation(fields: [colaboradorId], references: [id], onDelete: Cascade)
+  /// El primer y el último día, "YYYY-MM-DD" (el mismo día si fue uno solo).
+  desde         String
+  hasta         String
+  /// reposo | aviso | permiso | vacaciones | feriado | falta (ver src/lib/ausencias.ts)
+  tipo          String
+  /// true = ese día se le paga igual.
+  pagado        Boolean     @default(false)
+  /// El comentario: "Presentó certificado del Dr. Pérez", "Avisó por WhatsApp a las 6:40"...
+  nota          String?
+  /// Quién lo anotó (el nombre o el correo de quien tenía la sesión).
+  creadoPor     String?
+  createdAt     DateTime    @default(now())
+
+  @@index([storeId, desde])
+  @@index([colaboradorId, desde])
 }
 
 // ===========================================================================

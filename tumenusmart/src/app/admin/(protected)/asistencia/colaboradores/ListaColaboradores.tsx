@@ -4,6 +4,8 @@ import { useMemo, useState } from "react";
 import { Entrada, Pastilla, Vacio, clasesBoton } from "@/components/ui";
 import { PanelLateral } from "@/components/PanelLateral";
 import { nombreDeColaborador, type ColaboradorFila, type MetodoAsistencia } from "@/lib/asistencia";
+import { esFormaDePago, etiquetaDeFormaDePago, normalizarDiasTrabajo, resumenDeDiasTrabajo } from "@/lib/ausencias";
+import { formatearGuarani } from "@/lib/format";
 import { AvatarPersonal } from "../../agenda/AvatarPersonal";
 import { FormularioColaborador } from "./FormularioColaborador";
 
@@ -104,6 +106,14 @@ export function ListaColaboradores({
                     <Pastilla color="exito">Rostro registrado</Pastilla>
                   )}
                   {!c.haceAlmuerzo && <Pastilla>No almuerza</Pastilla>}
+                  <Pastilla color="neutro">{resumenDeDiasTrabajo(normalizarDiasTrabajo(c.diasTrabajo))}</Pastilla>
+                  {esFormaDePago(c.tipoPago) && c.montoPago > 0 ? (
+                    <Pastilla color="exito">
+                      {etiquetaDeFormaDePago(c.tipoPago)} · {formatearGuarani(c.montoPago)}
+                    </Pastilla>
+                  ) : (
+                    <Pastilla color="amarillo">Sin forma de pago</Pastilla>
+                  )}
                 </div>
               </div>
               <button

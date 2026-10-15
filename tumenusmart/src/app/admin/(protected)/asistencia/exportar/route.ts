@@ -61,7 +61,25 @@ export async function GET(request: NextRequest) {
     },
     MARCACIONES_MAXIMAS_EXCEL
   );
-  const { desde, hasta, buscar, personaElegida, resumenPorPersona, minutosTotales, tardanzas, paraRevisar, hayMas } = reporte;
+  const {
+    desde,
+    hasta,
+    buscar,
+    personaElegida,
+    resumenPorPersona,
+    minutosTotales,
+    tardanzas,
+    paraRevisar,
+    hayMas,
+    faltas,
+    justificados,
+    faltasNoCalculadas,
+  } = reporte;
+  // Las ausencias van en orden cronológico, igual que el detalle.
+  const ausencias = [...reporte.ausencias].sort((a, b) => {
+    if (a.dia !== b.dia) return a.dia < b.dia ? -1 : 1;
+    return a.nombre.localeCompare(b.nombre, "es");
+  });
   // En el Excel va en orden cronológico (de lo más viejo a lo más nuevo), que es como se lee una planilla.
   const filas: FilaAsistencia[] = [...reporte.filas].sort((a, b) => {
     if (a.dia !== b.dia) return a.dia < b.dia ? -1 : 1;
@@ -79,7 +97,17 @@ export async function GET(request: NextRequest) {
 
   // ---------- hoja 1: el resumen por persona ----------
   const { libro, hoja: resumen } = nuevoLibro("Resumen");
-  resumen.columns = [{ width: 32 }, { width: 22 }, { width: 18 }, { width: 18 }, { width: 18 }, { width: 16 }, { width: 18 }];
+  resumen.columns = [
+    { width: 32 },
+    { width: 22 },
+    { width: 18 },
+    { width: 18 },
+    { width: 18 },
+    { width: 16 },
+    { width: 18 },
+    { width: 18 },
+    { width: 18 },
+  ];
 
   filaTitulo(resumen, ["Negocio", local.nombre], 2);
   filaTitulo(resumen, ["Reporte", "Registro de asistencia"], 2);
@@ -89,8 +117,18 @@ export async function GET(request: NextRequest) {
 
   filaTitulo(
     resumen,
-    ["Colaborador", "Cargo", "Días con marcación", "Trabajado", "Horas (decimal)", "Llegadas tarde", "Turnos para revisar"],
-    7
+    [
+      "Colaborador",
+      "Cargo",
+      "Días con marcación",
+      "Trabajado",
+      "Horas (decimal)",
+      "Llegadas tarde",
+      "Faltas sin aviso",
+      "Días justificados",
+      "Turnos para revisar",
+    ],
+    9
   );
   for (const r of resumenPorPersona) {
     const fila = resumen.addRow([
@@ -100,6 +138,8 @@ export async function GET(request: NextRequest) {
       formatearDuracion(r.minutos),
       horasDecimales(r.minutos),
       r.tardanzas,
+      faltasNoCalculadas ? "" : r.faltas,
+      r.justificados,
       r.pendientes,
     ]);
     fila.getCell(5).numFmt = "0.00";
@@ -114,9 +154,11 @@ export async function GET(request: NextRequest) {
       formatearDuracion(minutosTotales),
       horasDecimales(minutosTotales),
       tardanzas,
+      faltasNoCalculadas ? "" : faltas,
+      justificados,
       paraRevisar,
     ],
-    7
+    9
   );
   total.getCell(5).numFmt = "0.00";
 
@@ -127,6 +169,13 @@ export async function GET(request: NextRequest) {
   resumen.addRow([
     "Llegadas tarde: las que pasaron la tolerancia de cada persona. Turnos para revisar: sin entrada, sin salida, sin vuelta del almuerzo o marcados sin que la cámara viera la cara.",
   ]);
+  resumen.addRow([
+    "Faltas sin aviso: días que la persona tenía que ir (según sus días de trabajo) y no marcó, sin motivo anotado. Días justificados: los que no vino pero tienen su motivo anotado (reposo, aviso, vacaciones, feriado); ver la hoja Ausencias.",
+  ]);
+  if (faltasNoCalculadas) {
+    resumen.addRow([]);
+    resumen.addRow(["Hay tantas marcaciones que no se puede asegurar quién faltó: las faltas no se calcularon. Acotá el período."]);
+  }
   if (reporte.recortado) {
     resumen.addRow([]);
     resumen.addRow(["Se pidieron más días de los permitidos: se acotó el período a los últimos 62 días."]);
@@ -204,6 +253,27 @@ export async function GET(request: NextRequest) {
     detalle.addRow([
       `Se listan las primeras ${MARCACIONES_MAXIMAS_EXCEL} marcaciones del período; puede faltar alguna. Acotá el período para ver todo.`,
     ]);
+  }
+
+  // ---------- hoja 3: las ausencias (faltas, justificados y los que todavía no marcaron hoy) ----------
+  const hojaAusencias = libro.addWorksheet("Ausencias");
+  hojaAusencias.columns = [{ width: 14 }, { width: 14 }, { width: 28 }, { width: 20 }, { width: 24 }, { width: 8 }, { width: 14 }, { width: 60 }];
+  filaTitulo(hojaAusencias, ["Desde", "Hasta", "Colaborador", "Cargo", "Qué pasó", "Días", "Se paga", "Comentario"], 8);
+  for (const a of ausencias) {
+    hojaAusencias.addRow([
+      diaEnTexto(a.dia),
+      a.hasta === a.dia ? "" : diaEnTexto(a.hasta),
+      a.nombre,
+      a.cargo ?? "",
+      a.etiqueta,
+      a.dias,
+      a.estado === "justificado" ? (a.pagado ? "Sí" : "No") : "",
+      a.nota ?? "",
+    ]);
+  }
+  if (ausencias.length === 0) {
+    hojaAusencias.addRow([]);
+    hojaAusencias.addRow(["No hay faltas ni ausencias anotadas en este período."]);
   }
 
   const nombreArchivo = `asistencia_${paraArchivo(quien) || "personal"}_${desde}_${hasta}.xlsx`;

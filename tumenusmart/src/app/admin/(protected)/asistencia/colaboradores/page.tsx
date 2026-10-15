@@ -4,6 +4,7 @@ import { prismaDelLocal } from "@/lib/prisma-local";
 import { BotonEnlace, Cabecera } from "@/components/ui";
 import type { ColaboradorFila } from "@/lib/asistencia";
 import { normalizarMetodoAsistencia } from "@/lib/asistencia";
+import { normalizarDiasTrabajo } from "@/lib/ausencias";
 import { prisma } from "@/lib/prisma";
 import { tieneRostro } from "@/lib/reconocimiento-facial";
 import { ListaColaboradores } from "./ListaColaboradores";
@@ -34,6 +35,9 @@ export default async function ColaboradoresPage() {
       horaEntrada: true,
       toleranciaMin: true,
       haceAlmuerzo: true,
+      diasTrabajo: true,
+      tipoPago: true,
+      montoPago: true,
       activo: true,
       pinClave: true,
       rostro: true,
@@ -41,8 +45,9 @@ export default async function ColaboradoresPage() {
   });
 
   // Del PIN y del rostro solo se sabe si lo tienen o no: ni la huella del PIN ni los números del rostro salen del servidor.
-  const colaboradores: ColaboradorFila[] = filas.map(({ pinClave, rostro, ...f }) => ({
+  const colaboradores: ColaboradorFila[] = filas.map(({ pinClave, rostro, diasTrabajo, ...f }) => ({
     ...f,
+    diasTrabajo: normalizarDiasTrabajo(diasTrabajo),
     sinPin: pinClave === null,
     sinRostro: !tieneRostro(rostro),
   }));

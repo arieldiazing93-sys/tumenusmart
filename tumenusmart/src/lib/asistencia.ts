@@ -239,6 +239,12 @@ export type ColaboradorFila = {
   horaEntrada: string | null;
   toleranciaMin: number;
   haceAlmuerzo: boolean;
+  /** Los días de la semana que tiene que ir: 0 = domingo … 6 = sábado (ver src/lib/ausencias.ts). */
+  diasTrabajo: number[];
+  /** "mensual" o "jornal"; NULL = todavía sin definir. */
+  tipoPago: string | null;
+  /** Guaraníes: el salario del mes (mensual) o lo que se le paga por día (jornal). */
+  montoPago: number;
   activo: boolean;
   /** true = todavía no tiene PIN (no puede marcar hasta que el dueño le ponga uno). */
   sinPin: boolean;

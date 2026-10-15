@@ -157,6 +157,11 @@ function armarGrupos(hayIdeaSinVer: boolean, rol: string, ventasACredito: boolea
           ver: conPermiso("asistencia.gestionar") },
         { href: "/admin/asistencia/colaboradores", label: "Colaboradores", icono: "usuarios" as const,
           ver: conPermiso("asistencia.gestionar") },
+        // Los días que alguien no fue y por qué (reposo, aviso, vacaciones, feriado) y la cuenta de lo que le toca a cada uno.
+        { href: "/admin/asistencia/ausencias", label: "Ausencias", icono: "reservas" as const,
+          ver: conPermiso("asistencia.gestionar") },
+        { href: "/admin/asistencia/liquidacion", label: "Liquidación", icono: "cartera" as const,
+          ver: conPermiso("asistencia.gestionar") },
         { href: "/admin/asistencia/celular", label: "Celular fijo", icono: "pos" as const,
           ver: conPermiso("asistencia.gestionar") },
       ],

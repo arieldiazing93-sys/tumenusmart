@@ -77,6 +77,7 @@ export const MODELOS_POR_LOCAL = new Set([
   "HorarioCanchas",
   "Colaborador",
   "MarcacionAsistencia",
+  "AusenciaColaborador",
   "Mozo",
   "CuentaMesa",
   "ItemCuentaMesa",
