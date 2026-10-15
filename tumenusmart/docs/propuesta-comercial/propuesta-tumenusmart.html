@@ -1,0 +1,684 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Propuesta comercial · TuMenuSmart</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --brand: #D2501F;
+    --brand-oscuro: #B0401A;
+    --brand-luz: #FCEDE6;
+    --brand-tinte: #F7D9CB;
+    --tinta: #131417;
+    --tinta-media: #4B4F58;
+    --tinta-suave: #83878F;
+    --linea: #E4E5E8;
+    --papel: #FAF9F7;
+    --azul: #1668C4;
+    --azul-luz: #E9F1FB;
+    --verde: #1F6B4F;
+    --verde-luz: #E6F2EC;
+    --violeta: #6D4AA8;
+    --violeta-luz: #F1ECFA;
+  }
+  @page { size: A4; margin: 15mm 14mm 17mm 14mm; }
+  @page :first { margin: 0; }
+  * { box-sizing: border-box; }
+  html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body {
+    margin: 0;
+    font-family: "Instrument Sans", "Segoe UI", Arial, sans-serif;
+    color: var(--tinta);
+    font-size: 10.2pt;
+    line-height: 1.5;
+  }
+  h1, h2, h3, p, ul { margin: 0; }
+  ul { padding: 0; list-style: none; }
+
+  /* ---------------- portada ---------------- */
+  .portada {
+    height: 297mm;
+    padding: 22mm 20mm 18mm;
+    background: linear-gradient(160deg, #D2501F 0%, #B0401A 62%, #8E3214 100%);
+    color: #fff;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    overflow: hidden;
+    break-after: page;
+  }
+  .portada::after {
+    content: "";
+    position: absolute;
+    right: -40mm;
+    bottom: -40mm;
+    width: 130mm;
+    height: 130mm;
+    border-radius: 50%;
+    background: rgba(255,255,255,.07);
+  }
+  .portada::before {
+    content: "";
+    position: absolute;
+    right: 10mm;
+    top: 60mm;
+    width: 55mm;
+    height: 55mm;
+    border-radius: 50%;
+    background: rgba(255,255,255,.06);
+  }
+  .marca { display: flex; align-items: center; gap: 3.5mm; font-weight: 700; font-size: 17pt; letter-spacing: -.01em; }
+  .portada .etiqueta {
+    margin-top: 58mm;
+    font-size: 9.5pt;
+    font-weight: 600;
+    letter-spacing: .22em;
+    text-transform: uppercase;
+    opacity: .85;
+  }
+  .portada h1 {
+    margin-top: 6mm;
+    font-size: 38pt;
+    line-height: 1.08;
+    font-weight: 700;
+    letter-spacing: -.02em;
+    max-width: 150mm;
+  }
+  .portada .bajada {
+    margin-top: 9mm;
+    font-size: 13.5pt;
+    line-height: 1.45;
+    max-width: 135mm;
+    opacity: .95;
+  }
+  .portada .datos {
+    margin-top: auto;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6mm 10mm;
+    border-top: 1px solid rgba(255,255,255,.35);
+    padding-top: 7mm;
+    font-size: 10pt;
+    position: relative;
+    z-index: 1;
+  }
+  .portada .datos dt { font-size: 8pt; letter-spacing: .14em; text-transform: uppercase; opacity: .75; }
+  .portada .datos dd { margin: 1mm 0 0; font-weight: 600; font-size: 11pt; }
+  .portada .linea-completar { border-bottom: 1px solid rgba(255,255,255,.6); min-width: 70mm; display: inline-block; height: 6mm; }
+
+  /* ---------------- secciones ---------------- */
+  /* Cada parte sigue a la anterior sin dejar media hoja en blanco; solo la primera arranca en hoja nueva. */
+  .seccion { margin-top: 8mm; }
+  .seccion.nueva-pagina { break-before: page; margin-top: 0; }
+  .seccion:first-of-type { margin-top: 0; }
+  .encabezado-seccion {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 8mm;
+    padding-bottom: 4mm;
+    margin-bottom: 6mm;
+    border-bottom: 2px solid var(--brand);
+    break-after: avoid;
+  }
+  .encabezado-seccion .num {
+    font-size: 8.5pt;
+    font-weight: 700;
+    letter-spacing: .2em;
+    text-transform: uppercase;
+    color: var(--brand);
+  }
+  .encabezado-seccion h2 { font-size: 21pt; line-height: 1.15; letter-spacing: -.015em; margin-top: 1mm; }
+  .encabezado-seccion p { max-width: 70mm; font-size: 9.2pt; color: var(--tinta-media); text-align: right; }
+
+  .intro { font-size: 10.6pt; color: var(--tinta-media); max-width: 165mm; margin-bottom: 5mm; }
+  .intro strong { color: var(--tinta); }
+
+  /* flujo */
+  .flujo { display: grid; grid-template-columns: repeat(5, 1fr); gap: 3mm; margin: 3mm 0 6mm; counter-reset: paso; }
+  .flujo li {
+    counter-increment: paso;
+    background: var(--papel);
+    border: 1px solid var(--linea);
+    border-radius: 3mm;
+    padding: 4mm 3.2mm 3.6mm;
+    position: relative;
+  }
+  .flujo li::before {
+    content: counter(paso);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 6.5mm;
+    height: 6.5mm;
+    border-radius: 50%;
+    background: var(--brand);
+    color: #fff;
+    font-weight: 700;
+    font-size: 9pt;
+    margin-bottom: 2.4mm;
+  }
+  .flujo b { display: block; font-size: 9.6pt; margin-bottom: 1mm; }
+  .flujo span { font-size: 8.4pt; color: var(--tinta-media); line-height: 1.38; display: block; }
+
+  .dos-columnas { display: grid; grid-template-columns: 1fr 1fr; gap: 5mm; margin-bottom: 5mm; }
+  .caja-resumen { border-radius: 3.5mm; padding: 5mm 5.5mm; }
+  .caja-resumen.op { background: var(--brand-luz); border: 1px solid var(--brand-tinte); }
+  .caja-resumen.ad { background: var(--azul-luz); border: 1px solid #CFE1F7; }
+  .caja-resumen h3 { font-size: 12.5pt; margin-bottom: 1.5mm; }
+  .caja-resumen.op h3 { color: var(--brand-oscuro); }
+  .caja-resumen.ad h3 { color: #12539C; }
+  .caja-resumen p { font-size: 9.2pt; color: var(--tinta-media); margin-bottom: 3mm; }
+  .caja-resumen li { font-size: 9.4pt; padding: 1.1mm 0 1.1mm 5mm; position: relative; border-top: 1px solid rgba(0,0,0,.07); }
+  .caja-resumen li::before { content: ""; position: absolute; left: 0; top: 2.9mm; width: 2mm; height: 2mm; border-radius: 50%; }
+  .caja-resumen.op li::before { background: var(--brand); }
+  .caja-resumen.ad li::before { background: var(--azul); }
+
+  .rubros { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4mm; }
+  .rubros > div { border: 1px solid var(--linea); border-radius: 3mm; padding: 3.4mm 4mm; }
+  .rubros h4 { margin: 0 0 1.2mm; font-size: 10pt; }
+  .rubros p { font-size: 8.6pt; color: var(--tinta-media); line-height: 1.4; }
+
+  /* módulos */
+  .modulos { display: grid; grid-template-columns: 1fr 1fr; gap: 3.8mm; }
+  .modulo {
+    border: 1px solid var(--linea);
+    border-top: 3px solid var(--brand);
+    border-radius: 3mm;
+    padding: 3.8mm 4.2mm 3.4mm;
+    break-inside: avoid;
+    background: #fff;
+  }
+  .modulo.ancho { grid-column: 1 / -1; }
+  .modulo.admin { border-top-color: var(--azul); }
+  .modulo.verde { border-top-color: var(--verde); }
+  .modulo.violeta { border-top-color: var(--violeta); }
+  .modulo h3 { font-size: 11.6pt; letter-spacing: -.01em; }
+  .modulo .sub { font-size: 8.8pt; color: var(--tinta-media); margin: 0.8mm 0 2.4mm; }
+  .modulo li {
+    font-size: 8.9pt;
+    line-height: 1.4;
+    padding: 0.6mm 0 0.6mm 4.2mm;
+    position: relative;
+  }
+  .modulo li::before {
+    content: "";
+    position: absolute;
+    left: 0.4mm;
+    top: 2.2mm;
+    width: 1.8mm;
+    height: 1.8mm;
+    border-radius: 50%;
+    background: var(--brand);
+  }
+  .modulo.admin li::before { background: var(--azul); }
+  .modulo.verde li::before { background: var(--verde); }
+  .modulo.violeta li::before { background: var(--violeta); }
+  .modulo.ancho ul { columns: 2; column-gap: 8mm; }
+  .modulo.ancho li { break-inside: avoid; }
+  .rotulo-rubro {
+    display: inline-block;
+    font-size: 7.6pt;
+    font-weight: 700;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--brand-oscuro);
+    background: var(--brand-luz);
+    border-radius: 99px;
+    padding: .5mm 2.4mm;
+    margin-bottom: 1.6mm;
+  }
+  .modulo.admin .rotulo-rubro { color: #12539C; background: var(--azul-luz); }
+  .modulo.verde .rotulo-rubro { color: var(--verde); background: var(--verde-luz); }
+  .modulo.violeta .rotulo-rubro { color: var(--violeta); background: var(--violeta-luz); }
+
+  /* cierre */
+  .pasos { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4mm; margin: 3mm 0 5mm; }
+  .pasos li { border: 1px solid var(--linea); border-radius: 3mm; padding: 3.6mm 4mm; background: var(--papel); }
+  .pasos .n { display: inline-flex; width: 7mm; height: 7mm; align-items: center; justify-content: center; border-radius: 50%; background: var(--brand); color: #fff; font-weight: 700; font-size: 9.5pt; margin-bottom: 2mm; }
+  .pasos b { display: block; font-size: 10.2pt; margin-bottom: 1mm; }
+  .pasos span { font-size: 8.9pt; color: var(--tinta-media); }
+
+  .inversion {
+    border: 2px solid var(--brand);
+    border-radius: 4mm;
+    padding: 4.6mm 6mm;
+    display: grid;
+    grid-template-columns: 1.2fr 1fr;
+    gap: 8mm;
+    break-inside: avoid;
+  }
+  .inversion h3 { font-size: 13pt; margin-bottom: 2mm; }
+  .inversion p { font-size: 9.3pt; color: var(--tinta-media); }
+  .inversion li { font-size: 9.2pt; padding: 1mm 0 1mm 5mm; position: relative; }
+  .inversion li::before { content: "✓"; position: absolute; left: 0; color: var(--verde); font-weight: 700; }
+  .campo-completar { margin-top: 4mm; font-size: 9.2pt; }
+  .campo-completar .raya { display: inline-block; border-bottom: 1px solid var(--tinta-suave); width: 52mm; height: 5mm; vertical-align: bottom; }
+
+  .nota {
+    margin-top: 4mm;
+    font-size: 8.2pt;
+    color: var(--tinta-suave);
+    border-top: 1px solid var(--linea);
+    padding-top: 3mm;
+  }
+  .contacto { margin-top: 5mm; display: flex; justify-content: space-between; align-items: center; gap: 6mm; background: var(--tinta); color: #fff; border-radius: 4mm; padding: 5.5mm 7mm; break-inside: avoid; }
+  .contacto b { font-size: 12pt; }
+  .contacto span { font-size: 9.2pt; opacity: .8; display: block; }
+  .contacto .web { font-size: 12pt; font-weight: 700; color: #FFB89C; }
+</style>
+</head>
+<body>
+
+<!-- ======================= PORTADA ======================= -->
+<section class="portada">
+  <div class="marca">
+    <svg viewBox="0 0 48 48" width="46" height="46" role="img" aria-label="TuMenuSmart">
+      <path d="M12.5 6H35.5A5.5 5.5 0 0 1 41 11.5V40L35.33 36.80 L29.67 40.00 L24.00 36.80 L18.33 40.00 L12.67 36.80 L7.00 40.00L2.50 45.50L7.00 35.50V11.5A5.5 5.5 0 0 1 12.5 6Z" fill="#fff"/>
+      <rect x="12" y="14.4" width="24" height="3.7" rx="1.85" fill="#C14A1C"/>
+      <rect x="12" y="21.2" width="24" height="3.7" rx="1.85" fill="#C14A1C"/>
+      <rect x="12" y="28" width="12.5" height="3.7" rx="1.85" fill="#C14A1C"/>
+    </svg>
+    TuMenuSmart
+  </div>
+
+  <p class="etiqueta">Propuesta comercial</p>
+  <h1>Un solo sistema para vender, controlar y administrar su negocio</h1>
+  <p class="bajada">
+    Punto de venta, comedor, delivery, carta digital, reservas, stock, personal y reportes: todo conectado, en una cuota fija mensual y
+    sin comisión por venta.
+  </p>
+
+  <dl class="datos">
+    <div><dt>Preparada para</dt><dd><span class="linea-completar"></span></dd></div>
+    <div><dt>Fecha</dt><dd>Octubre de 2026</dd></div>
+    <div><dt>Rubro</dt><dd><span class="linea-completar"></span></dd></div>
+    <div><dt>Contacto</dt><dd>tumenusmart.com</dd></div>
+  </dl>
+</section>
+
+<!-- ======================= RESUMEN ======================= -->
+<section class="seccion">
+  <div class="encabezado-seccion">
+    <div>
+      <div class="num">Resumen</div>
+      <h2>Todo conectado: lo que pasa en el mostrador llega a la administración</h2>
+    </div>
+  </div>
+
+  <p class="intro">
+    <strong>TuMenuSmart</strong> reúne en una sola herramienta lo que hoy se resuelve con cuadernos, planillas y varios programas.
+    Funciona desde el navegador de la PC, la tablet o el celular: <strong>no hay que instalar nada</strong> para operar.
+    Cada venta alimenta el stock, la caja, la facturación y los reportes, sin cargar los datos dos veces.
+  </p>
+
+  <h3 style="font-size:11pt;margin-bottom:2mm;">El recorrido de una venta</h3>
+  <ol class="flujo">
+    <li><b>Se vende</b><span>En el mostrador, en la mesa, por delivery, por la carta online o al cobrar un turno.</span></li>
+    <li><b>El stock baja solo</b><span>Cada insumo se descuenta del almacén correcto según la receta.</span></li>
+    <li><b>La caja se cuadra</b><span>El cierre de turno ya está hecho cuando se cierra.</span></li>
+    <li><b>Se factura</b><span>Con timbrado, IVA 5 % y 10 % y la numeración que corresponde.</span></li>
+    <li><b>Se ve el resultado</b><span>Ventas, costos y margen en los reportes, al día.</span></li>
+  </ol>
+
+  <div class="dos-columnas">
+    <div class="caja-resumen op">
+      <h3>Funciones operativas</h3>
+      <p>Lo que se usa todos los días, con el local abierto.</p>
+      <ul>
+        <li>Punto de venta y turnos de caja</li>
+        <li>Servicio de comedor con mozos</li>
+        <li>Delivery y repartidores</li>
+        <li>Carta digital y pedidos online</li>
+        <li>Reservas de mesa, de turnos y de canchas</li>
+        <li>Control de stock con recetas</li>
+        <li>Asistencia del personal</li>
+        <li>Impresión de comandas y tickets</li>
+      </ul>
+    </div>
+    <div class="caja-resumen ad">
+      <h3>Funciones administrativas</h3>
+      <p>Lo que le da al dueño el control y la tranquilidad.</p>
+      <ul>
+        <li>Reportes y estadísticas (Excel y PDF)</li>
+        <li>Facturación, timbrado y cotizaciones</li>
+        <li>Contabilidad: libros de IVA y RG 90</li>
+        <li>Cuentas por cobrar, por pagar y gastos</li>
+        <li>Comisiones y liquidación del personal</li>
+        <li>Carta, precios y promociones</li>
+        <li>Seguridad, permisos y bitácora</li>
+        <li>Cada negocio con sus datos separados</li>
+      </ul>
+    </div>
+  </div>
+
+  <h3 style="font-size:11pt;margin-bottom:2mm;">Para qué tipo de negocio</h3>
+  <div class="rubros">
+    <div>
+      <h4>Restaurantes, bares y comidas rápidas</h4>
+      <p>Del pedido en la mesa al delivery, con la cocina enterándose sola.</p>
+    </div>
+    <div>
+      <h4>Barberías, peluquerías y salones</h4>
+      <p>Una agenda que no se pisa y comisiones por profesional que se calculan solas.</p>
+    </div>
+    <div>
+      <h4>Comercios, canchas y servicios</h4>
+      <p>Vender, facturar y saber cuánto queda en el depósito; alquiler de canchas por hora.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ======================= OPERATIVAS ======================= -->
+<section class="seccion nueva-pagina">
+  <div class="encabezado-seccion">
+    <div>
+      <div class="num">Parte 1</div>
+      <h2>Funciones operativas</h2>
+    </div>
+    <p>Lo que el equipo usa durante el servicio: vender, cobrar, atender y reservar.</p>
+  </div>
+
+  <div class="modulos">
+    <div class="modulo ancho">
+      <span class="rotulo-rubro">Ventas</span>
+      <h3>Punto de venta</h3>
+      <p class="sub">La caja del negocio: rápida de usar y lista para el cierre.</p>
+      <ul>
+        <li>Venta ágil por categorías, con cantidad (también por peso, en kilos con decimales), agregados, mitad y mitad y notas por producto.</li>
+        <li>Factura con timbrado o ticket, con IVA 5 % y 10 % y la numeración de cada punto de expedición.</li>
+        <li>Pago dividido: una parte en efectivo y otra con tarjeta o transferencia en la misma venta.</li>
+        <li>Ventas a crédito, con la ficha del cliente y sus cuentas por cobrar.</li>
+        <li>Descuentos por porcentaje o monto, con tipos predefinidos (por ejemplo Cortesía 100 % o Tarjeta 20 %) y promociones por día y hora: 2x1, 3x2 y precios por horario.</li>
+        <li>Turnos de caja: apertura, retiros e ingresos y cierre con el reporte detallado.</li>
+        <li>Verificación del RUC del cliente en la DNIT al cargarlo.</li>
+        <li>Anulación de facturas y cancelación de ventas, siempre con motivo y quedando registrada.</li>
+      </ul>
+    </div>
+
+    <div class="modulo">
+      <span class="rotulo-rubro">Gastronomía</span>
+      <h3>Servicio de comedor</h3>
+      <p class="sub">El mozo atiende desde su celular o tablet.</p>
+      <ul>
+        <li>El mozo abre la mesa y carga los productos con su PIN personal.</li>
+        <li>La comanda sale sola en la impresora de cocina o de barra, según el área de cada producto.</li>
+        <li>La caja controla la cuenta: cancela productos con motivo, da descuentos, imprime la cuenta y cobra con factura o ticket.</li>
+        <li>División de cuenta en partes iguales o por producto.</li>
+        <li>Mesas y sectores, propinas y comisión por mozo, con pago desde la caja.</li>
+      </ul>
+    </div>
+
+    <div class="modulo">
+      <span class="rotulo-rubro">Gastronomía</span>
+      <h3>Delivery y repartidores</h3>
+      <p class="sub">Del pedido a la entrega, sin perder el rastro.</p>
+      <ul>
+        <li>Cuenta de delivery con los datos del cliente y el costo de envío por separado.</li>
+        <li>Cada repartidor tiene su enlace propio y ve únicamente lo que le asignaron.</li>
+        <li>Historial por fechas con la forma de pago de cada entrega.</li>
+        <li>Se cobra con factura o ticket y el stock se descuenta igual que en el mostrador.</li>
+      </ul>
+    </div>
+
+    <div class="modulo">
+      <span class="rotulo-rubro">Gastronomía · Comercio</span>
+      <h3>Carta digital y pedidos online</h3>
+      <p class="sub">Su menú en el celular del cliente, con su marca.</p>
+      <ul>
+        <li>Carta pública con su logo, fotos y colores, a la que se entra por enlace o código QR.</li>
+        <li>Cambia un precio y se actualiza al instante, con promociones y precios por horario.</li>
+        <li>El cliente envía su pedido y llega a una bandeja del local con aviso sonoro: aceptar, listo, entregado y cobrado.</li>
+        <li>Los pedidos también pueden llegar redactados por WhatsApp, con zona de envío, costo y medio de pago.</li>
+      </ul>
+    </div>
+
+    <div class="modulo">
+      <span class="rotulo-rubro">Gastronomía</span>
+      <h3>Reservas de mesa</h3>
+      <p class="sub">Para saber cuánta gente llega y cuándo.</p>
+      <ul>
+        <li>Reservas con turnos, horarios y cupo por franja.</li>
+        <li>Calendario de reservas en el panel, para ver el mes de un vistazo.</li>
+      </ul>
+    </div>
+
+    <div class="modulo violeta">
+      <span class="rotulo-rubro">Belleza y servicios</span>
+      <h3>Reserva de turnos</h3>
+      <p class="sub">Agenda por profesional y página de reservas con su marca.</p>
+      <ul>
+        <li>Calendario en vista Día, Semana y Mes; cada turno mide lo que dura.</li>
+        <li>Horario propio por profesional: solo se ofrecen horas libres, sin pisar otro turno ni el día de descanso.</li>
+        <li>Página pública de reservas con su marca, galería, redes y mapa del local.</li>
+        <li>Aviso por WhatsApp apenas un cliente reserva.</li>
+        <li>Cobro desde la cita, con factura y forma de pago.</li>
+        <li>Comisión por profesional (servicios y productos), con pago desde la caja y un enlace propio donde cada uno ve su agenda y sus números.</li>
+      </ul>
+    </div>
+
+    <div class="modulo verde">
+      <span class="rotulo-rubro">Deportes</span>
+      <h3>Reserva de canchas</h3>
+      <p class="sub">El alquiler por hora de cada cancha.</p>
+      <ul>
+        <li>Tablero con todas las canchas por día, y vistas Día, Semana y Mes.</li>
+        <li>Precios por día y horario (por ejemplo, lunes a viernes y fin de semana distintos).</li>
+        <li>Página pública para que el cliente reserve, con el mapa del complejo.</li>
+        <li>Las horas ocupadas se ven tachadas; el cobro entra como una venta más.</li>
+      </ul>
+    </div>
+
+    <div class="modulo ancho">
+      <span class="rotulo-rubro">Inventario</span>
+      <h3>Control de stock</h3>
+      <p class="sub">Qué se usa, qué queda y cuánto cuesta cada producto.</p>
+      <ul>
+        <li>Insumos, recetas y preparaciones (una salsa o una masa se arma una vez y se usa en muchos productos).</li>
+        <li>El stock baja solo al vender, en el mostrador, la mesa o el delivery.</li>
+        <li>Costo real y utilidad de cada producto, calculados desde su receta.</li>
+        <li>Varios almacenes, con movimientos manuales y registro de inventario para contar lo que hay.</li>
+        <li>Proveedores, compras y cuentas por pagar.</li>
+        <li>Salidas por venta para revisar qué se descontó cuando algo no cierra.</li>
+        <li>Gastos del local, para ver el resultado completo.</li>
+      </ul>
+    </div>
+
+    <div class="modulo">
+      <span class="rotulo-rubro">Personal</span>
+      <h3>Asistencia del personal</h3>
+      <p class="sub">Marcación desde un celular fijo en la entrada.</p>
+      <ul>
+        <li>Sin instalar nada: un enlace propio del local en un celular.</li>
+        <li>Se marca solo con PIN de 3 números, o con PIN y reconocimiento de la cara: lo elige el dueño.</li>
+        <li>Entrada, salida a almorzar, vuelta y salida, con las tardanzas calculadas.</li>
+        <li>Foto de cada marcación para revisar dudas; se borra sola a los 30 días y la hora queda.</li>
+        <li>Días de trabajo por persona y ausencias justificadas (reposo, aviso, vacaciones, feriado) con su comentario.</li>
+      </ul>
+    </div>
+
+    <div class="modulo">
+      <span class="rotulo-rubro">Equipos</span>
+      <h3>Impresión de comandas y tickets</h3>
+      <p class="sub">La cocina y la barra se enteran solas.</p>
+      <ul>
+        <li>Cada producto va al área que corresponde: cocina, barra u otras.</li>
+        <li>Impresión automática en impresoras térmicas, sin que nadie toque un botón.</li>
+        <li>Varias cajas o estaciones, cada una con sus impresoras y su numeración.</li>
+        <li>Copias por área y prueba de impresión para verificar la conexión.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ======================= ADMINISTRATIVAS ======================= -->
+<section class="seccion">
+  <div class="encabezado-seccion">
+    <div>
+      <div class="num">Parte 2</div>
+      <h2>Funciones administrativas</h2>
+    </div>
+    <p>Lo que le permite al dueño controlar, decidir y cumplir con sus obligaciones.</p>
+  </div>
+
+  <div class="modulos">
+    <div class="modulo admin">
+      <span class="rotulo-rubro">Control</span>
+      <h3>Reportes y estadísticas</h3>
+      <p class="sub">El negocio visto desde el celular, donde esté.</p>
+      <ul>
+        <li>Estadísticas de ventas, rentabilidad por producto y reporte general.</li>
+        <li>Cierres de turno con el detalle de cada caja.</li>
+        <li>Cancelaciones y descuentos, con quién los autorizó.</li>
+        <li>Ventas, ticket promedio y comisión de cada mozo.</li>
+        <li>Resultado de cada promoción: lo ahorrado y lo regalado.</li>
+        <li>Una idea concreta cada semana para vender más, a partir de sus propias ventas.</li>
+        <li>Todo se descarga en Excel y PDF.</li>
+      </ul>
+    </div>
+
+    <div class="modulo admin">
+      <span class="rotulo-rubro">Documentos</span>
+      <h3>Facturación y cotizaciones</h3>
+      <p class="sub">Comprobantes en regla, en un solo lugar.</p>
+      <ul>
+        <li>Facturas con timbrado y punto de expedición por estación.</li>
+        <li>Todas las facturas guardadas, con anulación y su motivo.</li>
+        <li>Cotizaciones para presentar a sus clientes.</li>
+        <li>Facturación electrónica (SIFEN) integrada al sistema: firma digital, comprobante impreso, envío, cancelación e inutilización, sujeta a la habilitación del contribuyente.</li>
+      </ul>
+    </div>
+
+    <div class="modulo admin">
+      <span class="rotulo-rubro">Impuestos</span>
+      <h3>Contabilidad</h3>
+      <p class="sub">Los datos listos para su contador.</p>
+      <ul>
+        <li>Libro IVA ventas y Libro IVA compras, con las columnas del libro oficial.</li>
+        <li>Resumen del IVA del mes.</li>
+        <li>Registro de comprobantes RG 90, en el formato de importación.</li>
+        <li>Se descarga en Excel y PDF por período.</li>
+      </ul>
+    </div>
+
+    <div class="modulo admin">
+      <span class="rotulo-rubro">Finanzas</span>
+      <h3>Caja, cobros y pagos</h3>
+      <p class="sub">Qué entra, qué sale y qué se debe.</p>
+      <ul>
+        <li>Turnos de caja con retiros, ingresos y arqueo.</li>
+        <li>Cuentas por cobrar de los clientes a crédito.</li>
+        <li>Compras, cuentas por pagar a proveedores y gastos del local.</li>
+        <li>Pago de comisiones a mozos y profesionales como retiro de caja, con comprobante.</li>
+      </ul>
+    </div>
+
+    <div class="modulo admin">
+      <span class="rotulo-rubro">Personal</span>
+      <h3>Liquidación del personal</h3>
+      <p class="sub">De la asistencia al monto a pagar.</p>
+      <ul>
+        <li>Cómo se le paga a cada persona: salario mensual o jornal por día trabajado.</li>
+        <li>Faltas, ausencias justificadas y días libres tenidos en cuenta, con el detalle día por día.</li>
+        <li>Liquidación por período, en pantalla, Excel y PDF.</li>
+        <li>Perfil propio para cada profesional con sus comisiones pagadas y pendientes.</li>
+      </ul>
+    </div>
+
+    <div class="modulo admin">
+      <span class="rotulo-rubro">Catálogo</span>
+      <h3>Carta, precios y promociones</h3>
+      <p class="sub">Un cambio, y se ve en todos los canales.</p>
+      <ul>
+        <li>Productos, categorías y grupos de agregados reutilizables.</li>
+        <li>Precios por día y horario, y promociones por volumen (2x1, 3x2).</li>
+        <li>Tipos de descuento propios del negocio.</li>
+        <li>El mismo precio en el mostrador, la mesa, el delivery y la carta online.</li>
+      </ul>
+    </div>
+
+    <div class="modulo admin ancho">
+      <span class="rotulo-rubro">Seguridad</span>
+      <h3>Permisos, control y trazabilidad</h3>
+      <p class="sub">Cada persona ve y hace solo lo que le corresponde, y todo queda registrado.</p>
+      <ul>
+        <li>Perfiles de acceso: administrador con acceso total y caja con lo que el dueño habilite.</li>
+        <li>Contraseña para las acciones sensibles: descuentos, cancelaciones, reapertura de cuentas y pago de comisiones.</li>
+        <li>Bitácora de todo lo importante: quién hizo qué y cuándo.</li>
+        <li>Cada negocio ve únicamente sus propios datos, separados de los demás.</li>
+        <li>PIN personal para mozos y personal, con bloqueo ante intentos fallidos.</li>
+        <li>Usuarios del sistema con alta, baja y cambio de contraseña.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ======================= IMPLEMENTACIÓN ======================= -->
+<section class="seccion">
+  <div class="encabezado-seccion">
+    <div>
+      <div class="num">Parte 3</div>
+      <h2>Cómo empezamos</h2>
+    </div>
+    <p>Tres pasos, sin instalaciones largas ni interrupciones del servicio.</p>
+  </div>
+
+  <ol class="pasos">
+    <li>
+      <span class="n">1</span>
+      <b>Hablamos y lo damos de alta</b>
+      <span>Nos indica el nombre del negocio, su WhatsApp y el rubro. Le entregamos su usuario y una carta de ejemplo para arrancar más rápido.</span>
+    </li>
+    <li>
+      <span class="n">2</span>
+      <b>Carga de lo suyo</b>
+      <span>Productos y precios, insumos, personal y servicios. Se hace a su ritmo y se puede ir ajustando mientras se trabaja.</span>
+    </li>
+    <li>
+      <span class="n">3</span>
+      <b>Empieza a vender</b>
+      <span>Cobra en el punto de venta, comparte su QR y su página de reservas, y el personal marca desde el celular fijo.</span>
+    </li>
+  </ol>
+
+  <div class="inversion">
+    <div>
+      <h3>Inversión</h3>
+      <p>
+        Una cuota fija mensual por local. No cobramos comisión por venta: el importe es el mismo venda lo que venda.
+      </p>
+      <div class="campo-completar">Cuota mensual: Gs. <span class="raya"></span></div>
+      <div class="campo-completar">Módulos incluidos: <span class="raya"></span></div>
+      <div class="campo-completar">Validez de la propuesta: <span class="raya"></span></div>
+    </div>
+    <div>
+      <ul>
+        <li>Acceso desde PC, tablet y celular</li>
+        <li>Usuarios para la caja, los mozos, los repartidores y el personal</li>
+        <li>Datos del negocio separados y protegidos</li>
+        <li>Actualizaciones del sistema incluidas</li>
+        <li>Acompañamiento en la puesta en marcha</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="contacto">
+    <div>
+      <b>¿Lo vemos en funcionamiento?</b>
+      <span>Le mostramos el sistema con una demostración, sobre un negocio como el suyo.</span>
+    </div>
+    <div class="web">tumenusmart.com</div>
+  </div>
+
+  <p class="nota">
+    Esta propuesta describe las funciones del sistema a octubre de 2026. Algunas funciones dependen del rubro y de la configuración de
+    cada negocio (por ejemplo, la facturación electrónica requiere certificado digital y habilitación ante la DNIT, y la impresión
+    automática requiere una PC de caja con impresora térmica).
+  </p>
+</section>
+
+</body>
+</html>
