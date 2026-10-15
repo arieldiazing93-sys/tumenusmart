@@ -1,86 +1,101 @@
 "use client";
 
-import { useTransition } from "react";
-import { clasesBoton } from "@/components/ui";
+import { useRef, useState, useTransition } from "react";
+import { Campo, Entrada, MensajeError, Selector, clasesBoton } from "@/components/ui";
 import { crearUsuario } from "./actions";
-
-const CAMPO =
-  "w-full rounded-lg border border-linea px-3 py-2 text-sm focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand";
 
 type Local = { id: string; nombre: string; slug: string };
 
 export function CrearUsuarioForm({ locales }: { locales: Local[] }) {
   const [pendiente, iniciar] = useTransition();
+  const formulario = useRef<HTMLFormElement>(null);
+  const [rol, setRol] = useState("local");
+  const [error, setError] = useState<string | null>(null);
+  const [creado, setCreado] = useState<string | null>(null);
 
-  function alCrear(formData: FormData) {
+  // No se usa `action={...}` del formulario a propósito: React vacía los campos al terminar una acción, y si hubo un error (correo
+  // repetido, contraseña floja) habría que volver a escribir todo.
+  function alCrear(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setError(null);
+    setCreado(null);
+    const formData = new FormData(e.currentTarget);
+    const correo = String(formData.get("email") ?? "");
     iniciar(async () => {
       const resultado = await crearUsuario(formData);
       if (!resultado.ok) {
-        alert(resultado.error);
+        setError(resultado.error);
+        return;
       }
+      // Quedó creado: se limpia el formulario para poder cargar el siguiente sin que quede la contraseña a la vista.
+      formulario.current?.reset();
+      setRol("local");
+      setCreado(correo);
     });
   }
 
   return (
-    <form action={alCrear} className="grid gap-3 border-t border-linea p-4 sm:grid-cols-2">
-      <label className="flex flex-col gap-1 text-sm text-tinta-media">
-        Correo
-        <input
-          type="email"
-          name="email"
-          required
-          placeholder="juan@maspizza.com"
-          className={CAMPO}
-        />
-      </label>
+    <form
+      ref={formulario}
+      onSubmit={alCrear}
+      className="campos-grises grid gap-3 border-t-2 border-azul/30 p-4 sm:grid-cols-2"
+    >
+      <Campo etiqueta="Correo">
+        <Entrada type="email" name="email" required placeholder="juan@maspizza.com" autoComplete="off" />
+      </Campo>
 
-      <label className="flex flex-col gap-1 text-sm text-tinta-media">
-        Nombre
-        <input type="text" name="nombre" placeholder="Juan Pérez" className={CAMPO} />
-      </label>
+      <Campo etiqueta="Nombre">
+        <Entrada type="text" name="nombre" placeholder="Juan Pérez" autoComplete="off" />
+      </Campo>
 
-      <label className="flex flex-col gap-1 text-sm text-tinta-media">
-        Local
-        <select name="storeId" className={CAMPO} defaultValue="">
+      <Campo etiqueta="Nivel">
+        <Selector name="rol" value={rol} onChange={(e) => setRol(e.target.value)}>
+          <option value="local">Local — solo su negocio</option>
+          <option value="superadmin">Administrador — todos los locales</option>
+        </Selector>
+      </Campo>
+
+      <Campo etiqueta="Local" ayuda={rol === "superadmin" ? "Un administrador ve todos los locales: no hace falta elegir uno." : undefined}>
+        <Selector name="storeId" defaultValue="" disabled={rol === "superadmin"}>
           <option value="">— Elegí un local —</option>
           {locales.map((l) => (
             <option key={l.id} value={l.id}>
               {l.nombre} (/{l.slug})
             </option>
           ))}
-        </select>
-      </label>
-
-      <label className="flex flex-col gap-1 text-sm text-tinta-media">
-        Nivel
-        <select name="rol" className={CAMPO} defaultValue="local">
-          <option value="local">Local — solo su negocio</option>
-          <option value="superadmin">Administrador — todos los locales</option>
-        </select>
-      </label>
-
-      <label className="flex flex-col gap-1 text-sm text-tinta-media sm:col-span-2">
-        Contraseña
-        <input
-          type="text"
-          name="password"
-          required
-          autoComplete="off"
-          placeholder="Al menos 8 caracteres, con letras y números"
-          className={CAMPO}
-        />
-        <span className="text-xs text-tinta-suave">
-          Se muestra en claro a propósito, para que puedas copiarla y pasársela. Después
-          de guardar no se puede volver a ver: solo cambiarla. Si elegís Administrador, el
-          local queda ignorado.
-        </span>
-      </label>
+        </Selector>
+      </Campo>
 
       <div className="sm:col-span-2">
-        <button type="submit" disabled={pendiente} className={clasesBoton("nuevo")}>
+        <Campo
+          etiqueta="Contraseña"
+          ayuda="Se muestra en claro a propósito, para que puedas copiarla y pasársela. Después de guardar no se puede volver a ver: solo cambiarla."
+        >
+          <Entrada
+            type="text"
+            name="password"
+            required
+            autoComplete="off"
+            placeholder="Al menos 8 caracteres, con letras y números"
+          />
+        </Campo>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-3 sm:col-span-2">
+        <button type="submit" disabled={pendiente} className={clasesBoton("nuevo", "md")}>
           {pendiente ? "Creando…" : "Crear usuario"}
         </button>
+        {creado && (
+          <span className="text-[0.84rem] font-semibold text-exito">
+            ¡Listo! Se creó {creado}. Aparece abajo en la lista.
+          </span>
+        )}
       </div>
+      {error && (
+        <div className="sm:col-span-2">
+          <MensajeError>{error}</MensajeError>
+        </div>
+      )}
     </form>
   );
 }

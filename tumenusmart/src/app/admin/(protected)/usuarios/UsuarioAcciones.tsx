@@ -39,14 +39,15 @@ export function UsuarioAcciones({
 
   return (
     <div className="flex flex-col items-end gap-2">
-      <div className="flex items-center gap-3 text-sm">
+      <div className="flex flex-wrap items-center justify-end gap-2 text-sm">
+        {/* El estado es un botón: tocarlo activa o desactiva el usuario (verde = entra, gris = no entra). */}
         <button
           type="button"
           disabled={pendiente || esUnoMismo}
-          title={esUnoMismo ? "No podés desactivar tu propio usuario" : undefined}
+          title={esUnoMismo ? "No podés desactivar tu propio usuario" : activo ? "Tocá para desactivarlo" : "Tocá para activarlo"}
           onClick={() => correr(() => alternarActivoUsuario(id, !activo))}
-          className={`rounded-full px-2.5 py-0.5 text-xs font-medium disabled:opacity-50 ${
-            activo ? "bg-exito-luz text-exito" : "bg-papel-hundido text-tinta-media"
+          className={`rounded-full px-3 py-1 text-xs font-semibold transition-colors disabled:opacity-50 ${
+            activo ? "bg-exito-luz text-exito hover:bg-exito-tinte" : "bg-papel-hundido text-tinta-media hover:bg-linea"
           }`}
         >
           {activo ? "Activo" : "Inactivo"}
@@ -59,7 +60,7 @@ export function UsuarioAcciones({
             setAbierto((v) => !v);
             setAviso(null);
           }}
-          className="text-tinta-media hover:text-brand hover:underline disabled:opacity-50"
+          className={clasesBoton("navegar", "sm")}
         >
           Cambiar contraseña
         </button>
@@ -72,7 +73,7 @@ export function UsuarioAcciones({
               if (!confirm(`¿Borrar el usuario ${email}? No se puede deshacer.`)) return;
               correr(() => eliminarUsuario(id));
             }}
-            className="text-peligro hover:underline disabled:opacity-50"
+            className={clasesBoton("peligro", "sm")}
           >
             Borrar
           </button>
@@ -80,14 +81,14 @@ export function UsuarioAcciones({
       </div>
 
       {abierto && (
-        <div className="flex flex-wrap items-center justify-end gap-2">
+        <div className="campos-grises flex flex-wrap items-center justify-end gap-2 rounded-lg border border-azul/40 bg-papel-suave p-2">
           <input
             type="text"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             placeholder="Contraseña nueva"
             autoComplete="off"
-            className="w-48 rounded-lg border border-linea px-2 py-1 text-sm"
+            className="w-48 rounded-lg border border-linea bg-white px-2 py-1.5 text-sm"
           />
           <button
             type="button"
@@ -108,7 +109,7 @@ export function UsuarioAcciones({
         </div>
       )}
 
-      {aviso && <p className="text-xs text-tinta-media">{aviso}</p>}
+      {aviso && <p className="text-xs font-medium text-tinta-media">{aviso}</p>}
     </div>
   );
 }
