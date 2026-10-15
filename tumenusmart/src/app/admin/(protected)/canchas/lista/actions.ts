@@ -3,10 +3,12 @@
 import { revalidatePath } from "next/cache";
 import { exigirPermiso } from "@/lib/auth";
 import { registrarBitacora } from "@/lib/bitacora";
-import { etiquetaDeDeporte, sanearCancha } from "@/lib/canchas";
+import { PRECIO_MAXIMO_CANCHA, etiquetaDeDeporte, sanearCancha } from "@/lib/canchas";
 import { asegurarGrupoDeCanchas, retirarProductoDeCancha, sincronizarProductoDeCancha } from "@/lib/canchas-producto";
 import { descartarImagenes } from "@/lib/imagenes";
+import { formatearGuarani } from "@/lib/format";
 import { idLocalActual } from "@/lib/local-actual";
+import { describirTramo, validarTramos } from "@/lib/precio-promocion";
 import { prismaDelLocal } from "@/lib/prisma-local";
 import { subirImagenPaginaReservas } from "@/lib/supabase-storage";
 
@@ -159,5 +161,69 @@ export async function eliminarCancha(id: string): Promise<ResultadoCancha> {
   });
 
   refrescar();
+  return { ok: true };
+}
+
+/**
+ * Guarda los PRECIOS POR DÍA Y HORARIO de una cancha (sábado y domingo 100.000, lunes a viernes de 18 a 20 a 90.000…): reemplaza
+ * todos los que tenía por los que llegan (una lista vacía los quita). Son los mismos «precios de promoción» de los productos: se
+ * guardan en el producto de la cancha en el punto de venta, así rigen igual en el mostrador (según el día y la hora de la venta) y en las
+ * reservas (según el día y la hora de la reserva). Las reglas del tiempo y la revisión son las de src/lib/precio-promocion.ts: la base
+ * nunca guarda dos precios para un mismo momento.
+ */
+export async function guardarPreciosDeCancha(canchaId: string, entradas: unknown): Promise<ResultadoCancha> {
+  const sesion = await exigirPermiso("canchas.configurar");
+  const storeId = await idLocalActual();
+  const db = prismaDelLocal(storeId);
+
+  const cancha = await db.cancha.findFirst({
+    where: { id: String(canchaId ?? "") },
+    select: { id: true, nombre: true, precioHora: true },
+  });
+  if (!cancha) return { ok: false, error: "No se encontró esa cancha." };
+
+  const validadas = validarTramos(entradas);
+  if (!validadas.ok) return { ok: false, error: validadas.error };
+  if (validadas.tramos.some((t) => t.precio > PRECIO_MAXIMO_CANCHA)) {
+    return { ok: false, error: `Un precio por hora no puede pasar de ${formatearGuarani(PRECIO_MAXIMO_CANCHA)}.` };
+  }
+
+  // Su producto en el punto de venta (si todavía no existe, se crea): ahí viven los precios.
+  const producto = await sincronizarProductoDeCancha(storeId, cancha.id);
+  if (!producto.ok) return producto;
+  const productId = producto.productId;
+
+  // Reemplazo completo en una sola transacción: o queda todo lo nuevo, o no se toca nada.
+  await db.$transaction([
+    db.precioPromocion.deleteMany({ where: { productId } }),
+    db.precioPromocion.createMany({
+      data: validadas.tramos.map((t) => ({
+        storeId,
+        productId,
+        diaInicio: t.diaInicio,
+        horaInicio: t.horaInicio,
+        diaFin: t.diaFin,
+        horaFin: t.horaFin,
+        precio: t.precio,
+      })),
+    }),
+  ]);
+
+  await registrarBitacora(storeId, sesion, {
+    modulo: "canchas",
+    accion: "precios_por_dia_guardados",
+    descripcion:
+      validadas.tramos.length === 0
+        ? `Quitó los precios por día y horario de la cancha ${cancha.nombre}.`
+        : `Guardó ${validadas.tramos.length} ${validadas.tramos.length === 1 ? "precio" : "precios"} por día y horario de la cancha ${cancha.nombre} (precio normal ${formatearGuarani(Number(cancha.precioHora))}): ${validadas.tramos.map(describirTramo).join("; ")}.`,
+    entidad: "Cancha",
+    entidadId: cancha.id,
+    detalle: { cancha: cancha.nombre, precioNormal: Number(cancha.precioHora), precios: validadas.tramos },
+  });
+
+  refrescar();
+  // El mostrador y la carta leen el precio de ahora: se vuelven a leer.
+  revalidatePath("/admin/pos");
+  revalidatePath("/admin/productos");
   return { ok: true };
 }

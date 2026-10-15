@@ -6,7 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { estaSuspendido } from "@/lib/local-por-slug";
 import { horaDeMinutos, iniciales } from "@/lib/agenda";
 import { formatearTelefonoPersonal } from "@/lib/agenda-personal";
-import { etiquetaDeDeporte, textoDeCierre, textoDuracionCancha } from "@/lib/canchas";
+import { etiquetaDeDeporte, lineasDePreciosEspeciales, textoDeCierre, textoDuracionCancha } from "@/lib/canchas";
 import { cargarCanchasPublicas, cargarHorarioCanchas, disponibilidadDeCanchas } from "@/lib/canchas-publicas";
 import { formatearGuarani } from "@/lib/format";
 import { nombreDeDia, type HorarioDia } from "@/lib/horario-trabajo";
@@ -272,6 +272,12 @@ export default async function PaginaPublicaCanchas({ params }: { params: Promise
                           Desde las {c.nocheDesde}: {formatearGuarani(c.precioNocturnoHora)}
                         </p>
                       )}
+                      {/* Los precios por día y horario (por ejemplo, sábado y domingo): cada uno en su línea. */}
+                      {lineasDePreciosEspeciales(c.promos).map((linea) => (
+                        <p key={linea} className="text-[0.74rem] text-tinta-suave">
+                          {linea}
+                        </p>
+                      ))}
                     </div>
                   </li>
                 ))}

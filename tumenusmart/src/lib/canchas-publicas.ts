@@ -20,6 +20,7 @@ import {
   type CanchaPublica,
 } from "./canchas";
 import { DIAS_ADELANTE, MINUTOS_BLOQUEO_SIN_CONFIRMAR, type Ocupado } from "./disponibilidad";
+import { tramosDeFilas, type TramoPromocion } from "./precio-promocion";
 import type { HorarioDia } from "./horario-trabajo";
 import { estaSuspendido } from "./local-por-slug";
 import { prisma } from "./prisma";
@@ -27,12 +28,43 @@ import { claveDiaAsuncion, fechaAsuncionDesdeTexto } from "./timezone";
 
 type Db = PrismaClient | Prisma.TransactionClient;
 
+/**
+ * Los precios por día y horario de cada cancha (los «precios de promoción» del producto de la cancha), por id de cancha. Una cancha
+ * sin producto todavía, o sin precios cargados, no figura en el resultado. Lleva el local explícito, como todo lo de este archivo.
+ */
+export async function cargarPreciosPorDia(
+  db: Db,
+  storeId: string,
+  canchas: { id: string; productId: string | null }[]
+): Promise<Map<string, TramoPromocion[]>> {
+  const idsDeProductos = canchas.flatMap((c) => (c.productId ? [c.productId] : []));
+  const salida = new Map<string, TramoPromocion[]>();
+  if (idsDeProductos.length === 0) return salida;
+  const filas = await db.precioPromocion.findMany({
+    where: { storeId, productId: { in: idsDeProductos } },
+    orderBy: [{ diaInicio: "asc" }],
+    select: { productId: true, diaInicio: true, horaInicio: true, diaFin: true, horaFin: true, precio: true },
+  });
+  const porProducto = new Map<string, TramoPromocion[]>();
+  for (const f of filas) {
+    const lista = porProducto.get(f.productId) ?? [];
+    lista.push(...tramosDeFilas([f]));
+    porProducto.set(f.productId, lista);
+  }
+  for (const c of canchas) {
+    const tramos = c.productId ? porProducto.get(c.productId) : undefined;
+    if (tramos && tramos.length > 0) salida.set(c.id, tramos);
+  }
+  return salida;
+}
+
 /** Las canchas activas del complejo, en el orden en que las acomodó el dueño (con `ids`, solo esas). */
 export async function cargarCanchasPublicas(db: Db, storeId: string, ids?: string[]): Promise<CanchaPublica[]> {
   const filas = await db.cancha.findMany({
     where: { storeId, activa: true, ...(ids ? { id: { in: ids } } : {}) },
     orderBy: [{ orden: "asc" }, { createdAt: "asc" }, { id: "asc" }],
   });
+  const preciosPorDia = await cargarPreciosPorDia(db, storeId, filas.map((f) => ({ id: f.id, productId: f.productId })));
   return filas.map((f) => ({
     id: f.id,
     nombre: f.nombre,
@@ -46,6 +78,7 @@ export async function cargarCanchasPublicas(db: Db, storeId: string, ids?: strin
     nocheDesde: f.nocheDesde,
     duraciones: limpiarDuraciones(f.duraciones),
     pasoMin: normalizarPaso(f.pasoMin),
+    promos: preciosPorDia.get(f.id) ?? [],
   }));
 }
 

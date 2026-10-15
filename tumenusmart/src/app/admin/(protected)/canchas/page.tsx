@@ -17,7 +17,7 @@ import {
   urlReservaCancha,
   type ParametrosCanchas,
 } from "@/lib/canchas";
-import { cargarHorarioCanchas } from "@/lib/canchas-publicas";
+import { cargarHorarioCanchas, cargarPreciosPorDia } from "@/lib/canchas-publicas";
 import { formatearGuarani } from "@/lib/format";
 import { Cabecera, clasesBoton } from "@/components/ui";
 import { BarraCanchas } from "./BarraCanchas";
@@ -195,6 +195,12 @@ export default async function CanchasCalendarioPage({
   // El panel de la derecha: el detalle de la reserva tocada, o una reserva nueva.
   let panel: React.ReactNode = null;
   if (sp.reserva) {
+    // Los precios por día y horario de cada cancha: el panel calcula con ellos lo que cuesta la reserva de cada día.
+    const preciosPorDia = await cargarPreciosPorDia(
+      prisma,
+      storeId,
+      canchasDb.map((c) => ({ id: c.id, productId: c.productId }))
+    );
     const canchasPanel: CanchaDelPanel[] = canchasDb.map((c) => ({
       id: c.id,
       nombre: c.nombre,
@@ -208,6 +214,7 @@ export default async function CanchasCalendarioPage({
       nocheDesde: c.nocheDesde,
       duraciones: limpiarDuraciones(c.duraciones),
       pasoMin: normalizarPaso(c.pasoMin),
+      promos: preciosPorDia.get(c.id) ?? [],
       activa: c.activa,
     }));
     const local = await localActual();

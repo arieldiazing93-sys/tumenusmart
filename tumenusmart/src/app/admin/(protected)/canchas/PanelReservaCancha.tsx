@@ -133,8 +133,11 @@ export function PanelReservaCancha({
 
   const cancha = canchas.find((c) => c.id === canchaId) ?? null;
   const calculado = useMemo(
-    () => (cancha && /^\d{2}:\d{2}$/.test(hora) ? precioDeReserva(cancha, aMinutos(hora), duracion) : null),
-    [cancha, hora, duracion]
+    () =>
+      cancha && /^\d{2}:\d{2}$/.test(hora)
+        ? precioDeReserva(cancha, aMinutos(hora), duracion, /^\d{4}-\d{2}-\d{2}$/.test(fecha) ? fecha : undefined)
+        : null,
+    [cancha, hora, duracion, fecha]
   );
   const precioMostrado = precioManual ? precio : calculado === null ? "" : String(calculado);
   const precioNumero = Number(String(precioMostrado).replace(/[\s.]/g, "")) || 0;

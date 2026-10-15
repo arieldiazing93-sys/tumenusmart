@@ -20,6 +20,14 @@ import { ANTICIPACION_MIN, DIAS_ADELANTE, tramosDeTrabajo, type Ocupado } from "
 import { formatearGuarani } from "./format";
 import { aMinutos, esHoraValida, type HorarioDia } from "./horario-trabajo";
 import { normalizarIva, type TasaIva } from "./iva";
+import {
+  SEGUNDOS_DIA,
+  SEGUNDOS_SEMANA,
+  limiteFinExclusivo,
+  segundosDeHora,
+  tramoEnPosicion,
+  type TramoPromocion,
+} from "./precio-promocion";
 import type { ClienteLimpio } from "./reserva-cliente";
 
 // ---------------------------------------------------------------------------
@@ -123,25 +131,118 @@ export type Tarifa = {
   precioNocturnoHora: number | null;
   /** "HH:MM": desde qué hora rige la tarifa de noche. */
   nocheDesde: string;
+  /**
+   * Precios por día y horario (los «precios de promoción» del producto de la cancha: sábado y domingo 100.000, lunes a viernes de
+   * 18 a 20 a 90.000…). Si el momento cae en alguno, ese precio manda sobre el normal y el de noche.
+   */
+  promos?: TramoPromocion[];
 };
 
 const BLOQUE_TARIFA_MIN = 30;
 
+/** De dónde sale el precio de una hora: un precio por día y horario (lo que se carga en la ficha), la tarifa de noche, o el normal. */
+export type OrigenDePrecio = "especial" | "noche" | "normal";
+
 /**
- * Lo que cuesta jugar `duracionMin` minutos desde `inicioMin`. Se cobra por media hora, con la tarifa que rige a la hora en
- * que empieza cada media hora: un partido de 17:30 a 19:00 con noche desde las 18:00 paga media hora de día y una hora de
- * noche. El resultado es siempre un guaraní entero.
+ * El precio por hora de un momento: el de la hora que empieza `minutos` desde la medianoche de `dia` ("YYYY-MM-DD"; sin día, solo
+ * valen la tarifa de noche y la normal).
+ *
+ * Los precios por día y horario son los mismos «precios de promoción» de los productos (src/lib/precio-promocion.ts): si el momento cae
+ * dentro de alguno, ESE precio manda sobre la tarifa normal y sobre la de noche. Así «de lunes a viernes 80.000 y sábado y domingo
+ * 100.000» se carga una vez y vale igual en las reservas y en el mostrador.
  */
-export function precioDeReserva(tarifa: Tarifa, inicioMin: number, duracionMin: number): number {
+export function tarifaDeLaHora(tarifa: Tarifa, dia: string | undefined, minutos: number): { precio: number; origen: OrigenDePrecio } {
+  if (dia && tarifa.promos && tarifa.promos.length > 0) {
+    // Una reserva que pasa la medianoche sigue en el día siguiente: la semana es un círculo, así que el módulo lo resuelve.
+    const pos = (diaDeLaSemana(dia) * SEGUNDOS_DIA + Math.floor(minutos) * 60) % SEGUNDOS_SEMANA;
+    const especial = tramoEnPosicion(tarifa.promos, pos);
+    if (especial) return { precio: especial.precio, origen: "especial" };
+  }
   const noche =
     tarifa.precioNocturnoHora != null && esHoraValida(tarifa.nocheDesde) ? aMinutos(tarifa.nocheDesde) : null;
+  if (noche !== null && minutos >= noche) return { precio: tarifa.precioNocturnoHora as number, origen: "noche" };
+  return { precio: tarifa.precioHora, origen: "normal" };
+}
+
+/**
+ * Lo que cuesta jugar `duracionMin` minutos desde `inicioMin` del día `dia`. Se cobra por media hora, con la tarifa que rige a la
+ * hora en que empieza cada media hora: un partido de 17:30 a 19:00 con noche desde las 18:00 paga media hora de día y una hora de
+ * noche. Si la cancha tiene precios por día y horario, el `dia` hace falta para saber cuál rige; sin `dia` se ignoran. El resultado
+ * es siempre un guaraní entero.
+ */
+export function precioDeReserva(tarifa: Tarifa, inicioMin: number, duracionMin: number, dia?: string): number {
   let suma = 0;
   for (let desde = inicioMin; desde < inicioMin + duracionMin; desde += BLOQUE_TARIFA_MIN) {
     const minutos = Math.min(BLOQUE_TARIFA_MIN, inicioMin + duracionMin - desde);
-    const porHora = noche !== null && desde >= noche ? (tarifa.precioNocturnoHora as number) : tarifa.precioHora;
-    suma += (porHora * minutos) / 60;
+    suma += (tarifaDeLaHora(tarifa, dia, desde).precio * minutos) / 60;
   }
   return Math.round(suma);
+}
+
+const NOMBRES_CORTOS_DIA = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
+/** La semana como la lee el negocio: lunes primero. */
+const SEMANA_DEL_NEGOCIO = [1, 2, 3, 4, 5, 6, 0];
+
+/** "18:00:00" → "18:00"; un fin "19:59:59" se lee como «hasta el final de ese minuto»: "20:00". */
+function horaCorta(texto: string, esFin: boolean): string {
+  const s = segundosDeHora(texto);
+  if (s === null) return texto;
+  const redondeado = esFin ? limiteFinExclusivo(s) : s;
+  if (redondeado >= SEGUNDOS_DIA) return "24:00";
+  const h = Math.floor(redondeado / 3600);
+  const m = Math.floor((redondeado % 3600) / 60);
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+}
+
+/** Una lista de días de la semana dicha corto: «Lun a vie», «Sáb y dom», «Lun, mié y vie». */
+function diasEnPalabras(dias: number[]): string {
+  const orden = SEMANA_DEL_NEGOCIO.filter((d) => dias.includes(d));
+  const nombres = orden.map((d) => NOMBRES_CORTOS_DIA[d]);
+  if (orden.length === 1) return nombres[0];
+  // Seguidos en la semana del negocio (lunes a domingo): «Lun a vie».
+  const posiciones = orden.map((d) => SEMANA_DEL_NEGOCIO.indexOf(d));
+  const seguidos = posiciones.every((p, i) => i === 0 || p === posiciones[i - 1] + 1);
+  if (seguidos && orden.length >= 3) return `${nombres[0]} a ${nombres[nombres.length - 1].toLowerCase()}`;
+  if (orden.length === 2) return `${nombres[0]} y ${nombres[1].toLowerCase()}`;
+  // «Lun, mié y vie»: solo la primera con mayúscula.
+  const todos = nombres.map((n, i) => (i === 0 ? n : n.toLowerCase()));
+  return `${todos.slice(0, -1).join(", ")} y ${todos[todos.length - 1]}`;
+}
+
+/**
+ * Los precios por día y horario dichos en una línea cada uno, para mostrarlos a quien reserva y en la ficha:
+ * «Sáb y dom, todo el día: Gs. 100.000», «Lun a vie, de 18:00 a 20:00: Gs. 90.000». Los días con la misma franja y el mismo
+ * precio van juntos; una franja que cruza la medianoche se dice entera («Vie 22:00 a sáb 02:00»).
+ */
+export function lineasDePreciosEspeciales(promos: TramoPromocion[] | undefined): string[] {
+  if (!promos || promos.length === 0) return [];
+  const grupos = new Map<string, { dias: number[]; horas: string; precio: number; primero: number }>();
+  const sueltas: { texto: string; orden: number }[] = [];
+  for (const t of promos) {
+    const todoElDia = horaCorta(t.horaInicio, false) === "00:00" && horaCorta(t.horaFin, true) === "24:00";
+    if (t.diaFin !== t.diaInicio) {
+      // Termina otro día (cruza la medianoche): no se junta con otros días.
+      const inicio = `${NOMBRES_CORTOS_DIA[t.diaInicio]} ${horaCorta(t.horaInicio, false)}`;
+      const fin = `${NOMBRES_CORTOS_DIA[t.diaFin].toLowerCase()} ${horaCorta(t.horaFin, true)}`;
+      const orden = SEMANA_DEL_NEGOCIO.indexOf(t.diaInicio);
+      sueltas.push({ texto: `${inicio} a ${fin}: ${formatearGuarani(t.precio)}`, orden });
+      continue;
+    }
+    const horas = todoElDia ? "todo el día" : `de ${horaCorta(t.horaInicio, false)} a ${horaCorta(t.horaFin, true)}`;
+    const clave = `${horas}|${t.precio}`;
+    const g = grupos.get(clave) ?? { dias: [], horas, precio: t.precio, primero: 99 };
+    g.dias.push(t.diaInicio);
+    g.primero = Math.min(g.primero, SEMANA_DEL_NEGOCIO.indexOf(t.diaInicio));
+    grupos.set(clave, g);
+  }
+  const lineas = [
+    ...[...grupos.values()].map((g) => ({
+      texto: `${diasEnPalabras(g.dias)}, ${g.horas}: ${formatearGuarani(g.precio)}`,
+      orden: g.primero,
+    })),
+    ...sueltas,
+  ];
+  return lineas.sort((a, b) => a.orden - b.orden).map((l) => l.texto);
 }
 
 // ---------------------------------------------------------------------------
@@ -290,6 +391,8 @@ export type CanchaPublica = {
   nocheDesde: string;
   duraciones: number[];
   pasoMin: number;
+  /** Los precios por día y horario de la cancha (vacío = siempre la tarifa normal y la de noche). */
+  promos: TramoPromocion[];
 };
 
 /** Una cancha y su próxima disponibilidad (para elegirla en el primer paso). */

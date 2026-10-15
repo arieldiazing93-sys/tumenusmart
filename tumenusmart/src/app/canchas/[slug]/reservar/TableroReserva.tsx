@@ -6,7 +6,9 @@ import { diaCorto, diaLargo, horaDeMinutos, numeroDeDia } from "@/lib/agenda";
 import { claveSumarDias, NOMBRES_MES } from "@/lib/calendario";
 import {
   etiquetaDeDeporte,
+  lineasDePreciosEspeciales,
   precioDeReserva,
+  tarifaDeLaHora,
   textoDuracionCancha,
   type CanchaPublica,
   type DisponibilidadPorDia,
@@ -208,7 +210,8 @@ export function TableroReserva({
   }, [dia, listaDeDias.length]);
 
   const cancha = sel ? (canchas.find((c) => c.id === sel.canchaId) ?? null) : null;
-  const total = cancha && sel ? precioDeReserva(cancha, sel.hora, duracion) : null;
+  // El día cuenta: la cancha puede cobrar distinto de lunes a viernes que el fin de semana.
+  const total = cancha && sel ? precioDeReserva(cancha, sel.hora, duracion, sel.dia) : null;
   const siguienteConHoras = listaDeDias.find((d) => d > dia && diaConHoras(d, true)) ?? null;
   const puedeCargarMas = cubierto !== null && cubierto < ultimoReservable;
 
@@ -490,6 +493,9 @@ export function TableroReserva({
                   ...ocupadasDe(dia, c.id, duracion).map((hora) => ({ hora, libre: false })),
                 ].sort((a, b) => a.hora - b.hora);
                 const otrasDuraciones = c.duraciones.filter((m) => m !== duracion && horasDe(dia, c.id, m).length > 0);
+                // Lo que cuesta la hora ESE día (puede cobrar distinto de lunes a viernes que el fin de semana): la de la primera hora libre.
+                const horaDeReferencia = (franjas.find((f) => f.libre) ?? franjas[0])?.hora;
+                const precioDelDia = horaDeReferencia !== undefined ? tarifaDeLaHora(c, dia, horaDeReferencia).precio : c.precioHora;
                 return (
                   <li key={c.id} className="rounded-2xl bg-superficie p-3.5 shadow-sm ring-1 ring-linea">
                     <div className="flex items-center gap-3">
@@ -511,7 +517,7 @@ export function TableroReserva({
                         </p>
                       </div>
                       <p className="cifra flex-none text-right text-[0.84rem] font-semibold text-tinta">
-                        {formatearGuarani(c.precioHora)}
+                        {formatearGuarani(precioDelDia)}
                         <span className="block text-[0.68rem] font-normal text-tinta-suave">por hora</span>
                       </p>
                     </div>
@@ -600,6 +606,12 @@ export function TableroReserva({
                     {c.precioNocturnoHora !== null && horas.length > 0 && (
                       <p className="mt-2.5 text-[0.72rem] text-tinta-suave">
                         Desde las {c.nocheDesde} la hora cuesta {formatearGuarani(c.precioNocturnoHora)}.
+                      </p>
+                    )}
+
+                    {lineasDePreciosEspeciales(c.promos).length > 0 && horas.length > 0 && (
+                      <p className="mt-1.5 text-[0.72rem] text-tinta-suave">
+                        Precios por día: {lineasDePreciosEspeciales(c.promos).join(" · ")}.
                       </p>
                     )}
                   </li>

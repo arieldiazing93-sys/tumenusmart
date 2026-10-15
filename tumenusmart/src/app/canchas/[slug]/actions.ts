@@ -175,7 +175,8 @@ export async function crearReservaCanchaPublica(slug: string, datos: DatosReserv
   if (!inicio) return { ok: false, error: "El día o la hora no son válidos." };
   const minutosInicio = aMinutos(hora);
   const fin = new Date(inicio.getTime() + duracion * 60_000);
-  const precio = precioDeReserva(cancha, minutosInicio, duracion);
+  // El día cuenta: la cancha puede tener precios distintos por día (lunes a viernes, sábado y domingo…).
+  const precio = precioDeReserva(cancha, minutosInicio, duracion, fecha);
 
   const visible = !pagina.avisoWhatsapp || pagina.entradaCalendario === "al_reservar";
   const extras = [

@@ -93,7 +93,14 @@ export function ListaCanchas({ canchas, grupos }: { canchas: CanchaFila[]; grupo
                         {etiquetaDeDeporte(c.deporte)} · {etiquetaIva(c.iva)}
                       </span>
                     </Td>
-                    <Td className="cifra text-right">{formatearGuarani(c.precioHora)}</Td>
+                    <Td className="cifra text-right">
+                      {formatearGuarani(c.precioHora)}
+                      {c.promos.length > 0 && (
+                        <span className="block text-[0.72rem] text-azul-oscuro">
+                          {c.promos.length === 1 ? "+ 1 precio por día" : `+ ${c.promos.length} precios por día`}
+                        </span>
+                      )}
+                    </Td>
                     <Td className="cifra text-right">
                       {c.precioNocturnoHora == null ? (
                         <span className="text-tinta-suave">—</span>
@@ -135,6 +142,7 @@ export function ListaCanchas({ canchas, grupos }: { canchas: CanchaFila[]; grupo
                   </p>
                   <div className="mt-1 flex flex-wrap gap-1.5">
                     {c.techada && <Pastilla color="azul">Techada</Pastilla>}
+                    {c.promos.length > 0 && <Pastilla color="azul">Precios por día</Pastilla>}
                     {!c.activa && <Pastilla>Inactiva</Pastilla>}
                   </div>
                 </div>

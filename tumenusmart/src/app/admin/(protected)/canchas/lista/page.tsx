@@ -3,7 +3,9 @@ import { idLocalActual } from "@/lib/local-actual";
 import { prismaDelLocal } from "@/lib/prisma-local";
 import { Cabecera } from "@/components/ui";
 import { etiquetaDeDeporte, limpiarDuraciones, normalizarDeporte, normalizarPaso, type CanchaFila } from "@/lib/canchas";
+import { cargarPreciosPorDia } from "@/lib/canchas-publicas";
 import { normalizarIva } from "@/lib/iva";
+import { prisma } from "@/lib/prisma";
 import { ListaCanchas } from "./ListaCanchas";
 
 export const dynamic = "force-dynamic";
@@ -14,7 +16,8 @@ export const dynamic = "force-dynamic";
  */
 export default async function CanchasPage() {
   await pantallaConPermiso("canchas.configurar");
-  const db = prismaDelLocal(await idLocalActual());
+  const storeId = await idLocalActual();
+  const db = prismaDelLocal(storeId);
 
   const [filas, conReservas, grupos] = await Promise.all([
     db.cancha.findMany({
@@ -27,6 +30,12 @@ export default async function CanchasPage() {
     db.category.findMany({ where: { paraCanchas: true }, orderBy: { orden: "asc" }, select: { id: true, nombre: true } }),
   ]);
   const idsConReservas = new Set(conReservas.map((r) => r.canchaId));
+  // Los precios por día y horario de cada cancha (son los precios de promoción de su producto del punto de venta).
+  const preciosPorDia = await cargarPreciosPorDia(
+    prisma,
+    storeId,
+    filas.map((f) => ({ id: f.id, productId: f.productId }))
+  );
   const nombreDelGrupo = new Map(grupos.map((g) => [g.id, g.nombre] as const));
 
   const canchas: CanchaFila[] = filas.map((f) => ({
@@ -42,6 +51,7 @@ export default async function CanchasPage() {
     nocheDesde: f.nocheDesde,
     duraciones: limpiarDuraciones(f.duraciones),
     pasoMin: normalizarPaso(f.pasoMin),
+    promos: preciosPorDia.get(f.id) ?? [],
     activa: f.activa,
     tieneReservas: idsConReservas.has(f.id),
     // Las canchas cargadas antes de los grupos quedan en el del tipo de cancha hasta que se guarden de nuevo.

@@ -9,13 +9,15 @@ import {
   DURACIONES_DISPONIBLES,
   PASOS_DE_CANCHA,
   etiquetaDeDeporte,
+  lineasDePreciosEspeciales,
   textoDuracionCancha,
   type CanchaFila,
   type DatosCancha,
 } from "@/lib/canchas";
 import { comprimirImagen, PARA_LOGO } from "@/lib/comprimir-imagen";
 import { TASAS_IVA } from "@/lib/iva";
-import { actualizarCancha, crearCancha, eliminarCancha, subirFotoDeCancha } from "./actions";
+import { PromocionesProducto } from "../../productos/PromocionesProducto";
+import { actualizarCancha, crearCancha, eliminarCancha, guardarPreciosDeCancha, subirFotoDeCancha } from "./actions";
 
 /** Cómo se escribe un precio en la pantalla: "80000" → "80.000". */
 function textoDePrecio(n: number | null): string {
@@ -308,6 +310,40 @@ export function FormularioCancha({
               </Campo>
             )}
           </div>
+        </div>
+
+        {/* ---------- precios por día y horario (sábado y domingo, una franja…) ---------- */}
+        <div className="rounded-xl border-2 border-azul/50 p-3.5">
+          <h3 className="mb-1 text-[0.92rem] font-semibold tracking-titular text-tinta">Precios por día y horario</h3>
+          <p className="mb-3 text-[0.78rem] leading-snug text-tinta-suave">
+            Si la hora cuesta distinto según el día (por ejemplo, de lunes a viernes 80.000 y sábado y domingo 100.000), cargalo acá: el precio
+            de arriba es el de siempre y estos mandan en sus días y horas. Valen en las reservas y en el mostrador del punto de venta.
+          </p>
+          {editando && cancha ? (
+            <div className="flex flex-col items-start gap-2.5">
+              <PromocionesProducto
+                productId={cancha.id}
+                nombreProducto={cancha.nombre}
+                precioNormal={cancha.precioHora}
+                promociones={cancha.promos}
+                modo="cancha"
+                guardar={guardarPreciosDeCancha}
+              />
+              {cancha.promos.length > 0 ? (
+                <ul className="flex flex-col gap-0.5 text-[0.84rem] text-tinta">
+                  {lineasDePreciosEspeciales(cancha.promos).map((linea) => (
+                    <li key={linea}>• {linea}</li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-[0.8rem] text-tinta-suave">Todavía no cargaste ninguno: la cancha cuesta siempre lo mismo.</p>
+              )}
+            </div>
+          ) : (
+            <p className="rounded-lg border border-dashed border-linea px-3 py-2.5 text-[0.82rem] text-tinta-suave">
+              Guardá la cancha primero; después, abriéndola de nuevo, cargás acá los precios por día y horario.
+            </p>
+          )}
         </div>
 
         {/* ---------- cuánto tiempo y cada cuánto ---------- */}

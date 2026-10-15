@@ -58,9 +58,19 @@ export default async function ReporteMozosPage({
           mozoElegido ? `Solo ${mozoElegido.nombre}: ` : "Elegí un mozo para ver solo el suyo. "
         }Lo que vendió, su ticket promedio, los descuentos que se le dieron a sus cuentas, lo que se canceló y su comisión: ganada, pagada y lo que se le debe.`}
         acciones={
-          <a href={`/admin/reporte-mozos/exportar?${querystringActual()}`} className={clasesBoton("principal", "sm")}>
-            Descargar Excel
-          </a>
+          <>
+            <a href={`/admin/reporte-mozos/exportar?${querystringActual()}`} className={clasesBoton("navegar", "sm")}>
+              Descargar Excel
+            </a>
+            <a
+              href={`/admin/reporte-mozos/imprimir?${querystringActual()}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={clasesBoton("navegar", "sm")}
+            >
+              Ver reporte / PDF
+            </a>
+          </>
         }
       />
 

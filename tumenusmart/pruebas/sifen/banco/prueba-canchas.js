@@ -238,6 +238,63 @@
   igual(c.urlCanchas({ ...pc, vista: "semana", solo: "c2" }, { vista: "dia", fecha: "2026-10-17" }), "/admin/canchas?fecha=2026-10-17&solo=c2", "pasar de la semana al día de una casilla conserva la cancha");
   igual(c.urlReservaCancha({ ...pc, vista: "semana", solo: "c1" }, "nueva", { cancha: "c1", hora: "19:30" }), "/admin/canchas?fecha=2026-10-16&vista=semana&solo=c1&reserva=nueva&cancha=c1&hora=19%3A30", "una reserva nueva conserva la vista y la cancha elegida");
 
+  // =============================================================== precios por día y horario (lunes a viernes 80.000, sábado y domingo 100.000)
+  window.log("== Canchas: precios por día y horario");
+  const franja = (dia, ini, fin, precio, diaFin) => ({ diaInicio: dia, horaInicio: ini, diaFin: diaFin === undefined ? dia : diaFin, horaFin: fin, precio });
+  const finDeSemana = [franja(6, "00:00:00", "23:59:59", 100000), franja(0, "00:00:00", "23:59:59", 100000)];
+  const lunes = "2026-10-12"; // lunes
+  const viernes = "2026-10-16";
+  const sabado = "2026-10-17";
+  const domingo = "2026-10-18";
+  const diaTarifa = { precioHora: 80000, precioNocturnoHora: null, nocheDesde: "18:00", promos: finDeSemana };
+
+  igual(c.precioDeReserva(diaTarifa, 600, 60, lunes), 80000, "lunes, 1 hora: 80.000");
+  igual(c.precioDeReserva(diaTarifa, 600, 60, viernes), 80000, "viernes, 1 hora: 80.000");
+  igual(c.precioDeReserva(diaTarifa, 600, 60, sabado), 100000, "sábado, 1 hora: 100.000");
+  igual(c.precioDeReserva(diaTarifa, 600, 60, domingo), 100000, "domingo, 1 hora: 100.000");
+  igual(c.precioDeReserva(diaTarifa, 600, 90, sabado), 150000, "sábado, 1 h 30: 150.000");
+  igual(c.precioDeReserva(diaTarifa, 600, 120, lunes), 160000, "lunes, 2 horas: 160.000");
+  igual(c.precioDeReserva(diaTarifa, 600, 60), 80000, "sin día no se pueden saber los precios por día: rige el normal");
+  igual(c.precioDeReserva({ ...diaTarifa, promos: undefined }, 600, 60, sabado), 80000, "sin precios por día, el sábado cuesta lo mismo");
+  igual(c.precioDeReserva({ ...diaTarifa, promos: [] }, 600, 60, sabado), 80000, "con la lista vacía también");
+
+  // Con tarifa de noche: el precio del día manda sobre la noche; sin precio del día, rige la noche.
+  const tarifaConNoche = { precioHora: 80000, precioNocturnoHora: 120000, nocheDesde: "18:00", promos: finDeSemana };
+  igual(c.precioDeReserva(tarifaConNoche, 19 * 60, 60, lunes), 120000, "lunes de noche: la tarifa de noche (120.000)");
+  igual(c.precioDeReserva(tarifaConNoche, 19 * 60, 60, sabado), 100000, "sábado de noche: manda el precio del sábado (100.000), no el de noche");
+  igual(c.precioDeReserva(tarifaConNoche, 17 * 60 + 30, 90, lunes), 40000 + 120000, "lunes 17:30 a 19:00: media hora de día y una de noche");
+  igual(c.precioDeReserva(tarifaConNoche, 17 * 60 + 30, 90, sabado), 150000, "sábado 17:30 a 19:00: todo a 100.000");
+
+  // Una reserva que cruza la medianoche cambia de precio al cambiar de día (viernes 23:00 a sábado 01:00).
+  igual(c.precioDeReserva(tarifaConNoche, 23 * 60, 120, viernes), 120000 + 100000, "viernes 23:00 a 01:00: una hora de noche del viernes y una del sábado");
+  // Y de domingo a lunes: la semana es un círculo.
+  igual(c.precioDeReserva(diaTarifa, 23 * 60, 120, domingo), 100000 + 80000, "domingo 23:00 a 01:00: una hora de domingo y una de lunes");
+
+  // Una franja corta (de lunes a viernes de 18 a 20 a 90.000), fuera de la tarifa de noche.
+  const happy = { precioHora: 80000, precioNocturnoHora: null, nocheDesde: "18:00", promos: [1, 2, 3, 4, 5].map((d) => franja(d, "18:00:00", "19:59:59", 90000)) };
+  igual(c.precioDeReserva(happy, 17 * 60, 120, lunes), 80000 + 90000, "17:00 a 19:00: una hora normal y una a 90.000");
+  igual(c.precioDeReserva(happy, 19 * 60, 120, lunes), 90000 + 80000, "19:00 a 21:00: la hora hasta las 20:00 a 90.000 y después normal");
+  igual(c.precioDeReserva(happy, 18 * 60, 60, sabado), 80000, "el sábado esa franja no rige");
+
+  window.log("== Canchas: de dónde sale el precio de una hora");
+  igual(c.tarifaDeLaHora(tarifaConNoche, sabado, 10 * 60), { precio: 100000, origen: "especial" }, "sábado: precio especial");
+  igual(c.tarifaDeLaHora(tarifaConNoche, lunes, 19 * 60), { precio: 120000, origen: "noche" }, "lunes de noche: noche");
+  igual(c.tarifaDeLaHora(tarifaConNoche, lunes, 10 * 60), { precio: 80000, origen: "normal" }, "lunes de día: normal");
+  igual(c.tarifaDeLaHora(tarifaConNoche, undefined, 10 * 60), { precio: 80000, origen: "normal" }, "sin día: normal");
+
+  window.log("== Canchas: los precios por día, dichos en palabras");
+  igual(c.lineasDePreciosEspeciales(finDeSemana), ["Sáb y dom, todo el día: Gs. 100.000"], "sábado y domingo juntos");
+  igual(c.lineasDePreciosEspeciales(happy.promos), ["Lun a vie, de 18:00 a 20:00: Gs. 90.000"], "lunes a viernes de 18 a 20");
+  igual(c.lineasDePreciosEspeciales([franja(1, "00:00:00", "23:59:59", 70000), franja(3, "00:00:00", "23:59:59", 70000), franja(5, "00:00:00", "23:59:59", 70000)]), ["Lun, mié y vie, todo el día: Gs. 70.000"], "días salteados");
+  igual(c.lineasDePreciosEspeciales([franja(5, "22:00:00", "02:00:00", 120000, 6)]), ["Vie 22:00 a sáb 02:00: Gs. 120.000"], "una franja que cruza la medianoche");
+  igual(
+    c.lineasDePreciosEspeciales([franja(6, "00:00:00", "23:59:59", 100000), franja(1, "18:00:00", "19:59:59", 90000)]),
+    ["Lun, de 18:00 a 20:00: Gs. 90.000", "Sáb, todo el día: Gs. 100.000"],
+    "varias franjas: en el orden de la semana"
+  );
+  igual(c.lineasDePreciosEspeciales(undefined), [], "sin precios por día: nada");
+  igual(c.lineasDePreciosEspeciales([]), [], "lista vacía: nada");
+
   // =============================================================== el tablero de la página pública
   window.log("== Canchas: el tablero (todas las canchas por día)");
   const porCancha = new Map([

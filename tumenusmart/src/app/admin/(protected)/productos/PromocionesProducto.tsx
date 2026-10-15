@@ -17,6 +17,34 @@ import {
 } from "@/lib/precio-promocion";
 import { guardarPromocionesProducto } from "./actions";
 
+/** Quién guarda las franjas: la de los productos (por defecto) o la de las canchas (`guardarPreciosDeCancha`). */
+type Guardar = (id: string, entradas: unknown) => Promise<{ ok: true } | { ok: false; error: string }>;
+
+/** Los textos según de qué es el cuadro: un producto («precios de promoción») o una cancha («precios por día y horario»). */
+function textosDe(modo: "producto" | "cancha") {
+  return modo === "cancha"
+    ? {
+        boton: "🏷 Precios por día y horario",
+        titulo: "Precios por día y horario",
+        precioCampo: "Precio por hora",
+        precioHoja: "Precio por hora",
+        guardar: "Guardar precios",
+        normal: "precio normal",
+        etiquetaEspecial: "Precio especial",
+        quitar: "¿Quitar todos los precios por día y horario? La cancha vuelve a costar siempre su precio normal (y el de noche, si lo tiene).",
+      }
+    : {
+        boton: "🏷 Precios de promoción",
+        titulo: "Precios de promoción",
+        precioCampo: "Precio de promoción",
+        precioHoja: "Precio promoción",
+        guardar: "Guardar promociones",
+        normal: "precio normal",
+        etiquetaEspecial: "Promoción",
+        quitar: "¿Quitar todas las promociones de este producto? Vuelve a venderse siempre a su precio normal.",
+      };
+}
+
 /** Una fila de la hoja: un día de inicio, con su franja y su precio. `aplica` = la casilla "Aplica Lunes". */
 type Fila = {
   dia: number;
@@ -71,18 +99,25 @@ export function PromocionesProducto({
   nombreProducto,
   precioNormal,
   promociones,
+  modo = "producto",
+  guardar,
 }: {
   productId: string;
   nombreProducto: string;
   precioNormal: number;
   promociones: TramoPromocion[];
+  /** "cancha": el mismo cuadro, con sus palabras («precios por día y horario», por hora) y su propia acción de guardado. */
+  modo?: "producto" | "cancha";
+  guardar?: Guardar;
 }) {
   const [abierto, setAbierto] = useState(false);
+  const txt = textosDe(modo);
 
   return (
     <>
       <button type="button" onClick={() => setAbierto(true)} className={clasesBoton("navegar", "sm")}>
-        🏷 Precios de promoción{promociones.length > 0 ? ` (${promociones.length})` : ""}
+        {txt.boton}
+        {promociones.length > 0 ? ` (${promociones.length})` : ""}
       </button>
       {abierto && (
         <CuadroPromociones
@@ -90,6 +125,8 @@ export function PromocionesProducto({
           nombreProducto={nombreProducto}
           precioNormal={precioNormal}
           promociones={promociones}
+          modo={modo}
+          guardar={guardar ?? guardarPromocionesProducto}
           onCerrar={() => setAbierto(false)}
         />
       )}
@@ -102,24 +139,30 @@ function CuadroPromociones({
   nombreProducto,
   precioNormal,
   promociones,
+  modo,
+  guardar: guardarFranjas,
   onCerrar,
 }: {
   productId: string;
   nombreProducto: string;
   precioNormal: number;
   promociones: TramoPromocion[];
+  modo: "producto" | "cancha";
+  guardar: Guardar;
   onCerrar: () => void;
 }) {
   const router = useRouter();
+  const txt = textosDe(modo);
+  const esCancha = modo === "cancha";
   const [pendiente, iniciar] = useTransition();
   const [montado, setMontado] = useState(false);
   const [filas, setFilas] = useState<Fila[]>(() => filasDesde(promociones));
   const [errorServidor, setErrorServidor] = useState<string | null>(null);
 
-  // Carga rápida
-  const [diasRapidos, setDiasRapidos] = useState<number[]>([]);
-  const [desde, setDesde] = useState("18:00:00");
-  const [hasta, setHasta] = useState("20:00:00");
+  // Carga rápida (en una cancha, lo común es un día entero: sábado y domingo; en un producto, una franja: de 18 a 20)
+  const [diasRapidos, setDiasRapidos] = useState<number[]>(esCancha ? [6, 0] : []);
+  const [desde, setDesde] = useState(esCancha ? "00:00:00" : "18:00:00");
+  const [hasta, setHasta] = useState(esCancha ? "23:59:59" : "20:00:00");
   const [precioRapido, setPrecioRapido] = useState("");
   const [errorRapido, setErrorRapido] = useState<string | null>(null);
 
@@ -153,7 +196,7 @@ function CuadroPromociones({
     const sf = segundosDeHora(hasta);
     if (si === null || sf === null) return setErrorRapido("Escribí la hora de inicio y la de fin.");
     const precio = Number(precioRapido.replace(",", "."));
-    if (!Number.isFinite(precio) || precio <= 0) return setErrorRapido("Escribí el precio de promoción.");
+    if (!Number.isFinite(precio) || precio <= 0) return setErrorRapido(esCancha ? "Escribí el precio por hora." : "Escribí el precio de promoción.");
     if (si === sf) return setErrorRapido("El inicio y el fin no pueden ser la misma hora.");
     // Si el fin queda antes que el inicio (22:00 a 02:00) la promoción cruza la medianoche: termina al día siguiente.
     const cruza = sf < si;
@@ -194,7 +237,7 @@ function CuadroPromociones({
     setErrorServidor(null);
     if (!validacion.ok) return;
     iniciar(async () => {
-      const r = await guardarPromocionesProducto(productId, entradasDe(filas));
+      const r = await guardarFranjas(productId, entradasDe(filas));
       if (!r.ok) {
         setErrorServidor(r.error);
         return;
@@ -205,7 +248,7 @@ function CuadroPromociones({
   }
 
   function quitarTodas() {
-    if (!confirm("¿Quitar todas las promociones de este producto? Vuelve a venderse siempre a su precio normal.")) return;
+    if (!confirm(txt.quitar)) return;
     setErrorServidor(null);
     setFilas(DIAS_ORDENADOS.map(filaVacia));
   }
@@ -222,13 +265,13 @@ function CuadroPromociones({
       <div
         role="dialog"
         aria-modal="true"
-        aria-label={`Precios de promoción de ${nombreProducto}`}
+        aria-label={`${txt.titulo} de ${nombreProducto}`}
         className="flex max-h-[94vh] w-full max-w-3xl flex-col overflow-hidden rounded-t-2xl bg-white shadow-alta sm:rounded-xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-start justify-between gap-3 border-b border-linea px-4 py-3 sm:px-5">
           <div className="min-w-0">
-            <p className="text-[1.05rem] font-semibold tracking-titular text-tinta">Precios de promoción</p>
+            <p className="text-[1.05rem] font-semibold tracking-titular text-tinta">{txt.titulo}</p>
             <p className="break-words text-[0.85rem] text-tinta-media">
               {nombreProducto} · precio normal <span className="cifra font-semibold">{formatearGuarani(precioNormal)}</span>
             </p>
@@ -245,18 +288,28 @@ function CuadroPromociones({
         </div>
 
         <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-4 py-4 sm:px-5">
-          <p className="text-[0.84rem] leading-snug text-tinta-media">
-            En los días y horas que cargues, el producto se vende al precio de promoción — en el mostrador, el comedor, el delivery, la tablet
-            del mozo y la carta pública. Cuando termina la franja, vuelve solo a su precio normal. Las horas son las de Asunción. A la hora de fin
-            ya rige el precio normal: <strong>“hasta las 20:00”</strong> y <strong>19:59:59</strong> son lo mismo.
-          </p>
+          {esCancha ? (
+            <p className="text-[0.84rem] leading-snug text-tinta-media">
+              En los días y horas que cargues, la hora de la cancha cuesta ese precio — en las reservas (según el día y la hora del partido) y
+              en el mostrador del punto de venta. Fuera de esas franjas rige el precio normal (y el de noche, si la cancha lo tiene). Por ejemplo:
+              lunes a viernes a {formatearGuarani(precioNormal)} (el precio normal) y sábado y domingo a un precio más alto. Las horas son las de
+              Asunción. A la hora de fin ya rige el precio normal: <strong>“hasta las 20:00”</strong> y <strong>19:59:59</strong> son lo mismo.
+            </p>
+          ) : (
+            <p className="text-[0.84rem] leading-snug text-tinta-media">
+              En los días y horas que cargues, el producto se vende al precio de promoción — en el mostrador, el comedor, el delivery, la tablet
+              del mozo y la carta pública. Cuando termina la franja, vuelve solo a su precio normal. Las horas son las de Asunción. A la hora de
+              fin ya rige el precio normal: <strong>“hasta las 20:00”</strong> y <strong>19:59:59</strong> son lo mismo.
+            </p>
+          )}
 
           {/* ---------------- carga rápida ---------------- */}
           <div className="campos-grises flex flex-col gap-3 rounded-xl border border-azul/30 bg-azul-luz p-3.5">
             <p className="rotulo text-[0.78rem] font-bold text-azul-oscuro">Carga rápida</p>
             <p className="text-[0.8rem] text-tinta-media">
-              Elegí los días, el horario y el precio, y se completan esos días en la hoja de abajo. Por ejemplo: lunes a viernes, de 18:00 a 20:00,
-              a {formatearGuarani(Math.round(precioNormal * 0.9))}.
+              {esCancha
+                ? `Elegí los días, el horario y el precio por hora, y se completan esos días en la hoja de abajo. Por ejemplo: sábado y domingo, todo el día (00:00 a 23:59), a ${formatearGuarani(Math.round(precioNormal * 1.25))}.`
+                : `Elegí los días, el horario y el precio, y se completan esos días en la hoja de abajo. Por ejemplo: lunes a viernes, de 18:00 a 20:00, a ${formatearGuarani(Math.round(precioNormal * 0.9))}.`}
             </p>
             <div className="flex flex-wrap items-center gap-1.5">
               {DIAS_ORDENADOS.map((dia) => {
@@ -294,7 +347,7 @@ function CuadroPromociones({
               <Campo etiqueta="Hasta">
                 <Entrada type="time" step={1} value={hasta} onChange={(e) => setHasta(e.target.value)} />
               </Campo>
-              <Campo etiqueta="Precio de promoción">
+              <Campo etiqueta={txt.precioCampo}>
                 <Entrada
                   type="number"
                   inputMode="numeric"
@@ -374,7 +427,7 @@ function CuadroPromociones({
                       onChange={(e) => cambiar(f.dia, { horaFin: e.target.value })}
                     />
                   </Campo>
-                  <Campo etiqueta="Precio promoción">
+                  <Campo etiqueta={txt.precioHoja}>
                     <Entrada
                       type="number"
                       inputMode="numeric"
@@ -405,11 +458,17 @@ function CuadroPromociones({
                   <li key={t.diaInicio}>• {describirTramo(t)}</li>
                 ))}
               </ul>
-              <p className="mt-1 text-[0.78rem] text-tinta-media">Fuera de esas franjas se vende a {formatearGuarani(precioNormal)}.</p>
+              <p className="mt-1 text-[0.78rem] text-tinta-media">
+                {esCancha
+                  ? `Fuera de esas franjas la hora cuesta ${formatearGuarani(precioNormal)} (o la tarifa de noche, si la cancha la tiene).`
+                  : `Fuera de esas franjas se vende a ${formatearGuarani(precioNormal)}.`}
+              </p>
             </div>
           ) : (
             <p className="rounded-lg border border-dashed border-linea px-3 py-3 text-center text-[0.84rem] text-tinta-suave">
-              Sin promociones: este producto se vende siempre a {formatearGuarani(precioNormal)}.
+              {esCancha
+                ? `Sin precios por día y horario: la cancha cuesta siempre ${formatearGuarani(precioNormal)} por hora (o la tarifa de noche, si la tiene).`
+                : `Sin promociones: este producto se vende siempre a ${formatearGuarani(precioNormal)}.`}
             </p>
           )}
 
@@ -434,7 +493,7 @@ function CuadroPromociones({
                   {resultadoProbador ? (
                     <p className="text-[0.88rem] text-tinta">
                       Se vende a <span className="cifra font-semibold">{formatearGuarani(resultadoProbador.precio)}</span>{" "}
-                      {resultadoProbador.enPromocion ? <Pastilla color="exito">Promoción</Pastilla> : <Pastilla color="neutro">Precio normal</Pastilla>}
+                      {resultadoProbador.enPromocion ? <Pastilla color="exito">{txt.etiquetaEspecial}</Pastilla> : <Pastilla color="neutro">{esCancha ? "Tarifa normal" : "Precio normal"}</Pastilla>}
                     </p>
                   ) : (
                     <p className="text-[0.82rem] text-tinta-suave">Escribí una hora válida.</p>
@@ -456,7 +515,7 @@ function CuadroPromociones({
             Cancelar
           </button>
           <button type="button" onClick={guardar} disabled={pendiente || !validacion.ok} className={clasesBoton("navegar")}>
-            {pendiente ? "Guardando…" : "Guardar promociones"}
+            {pendiente ? "Guardando…" : txt.guardar}
           </button>
         </div>
       </div>
