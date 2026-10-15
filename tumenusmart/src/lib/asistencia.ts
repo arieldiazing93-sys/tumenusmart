@@ -245,6 +245,9 @@ export type ColaboradorFila = {
   tipoPago: string | null;
   /** Guaraníes: el salario del mes (mensual) o lo que se le paga por día (jornal). */
   montoPago: number;
+  /** Cuántas marcaciones y ausencias tiene guardadas: es lo que se perdería al eliminarlo. */
+  cantidadMarcaciones?: number;
+  cantidadAusencias?: number;
   activo: boolean;
   /** true = todavía no tiene PIN (no puede marcar hasta que el dueño le ponga uno). */
   sinPin: boolean;

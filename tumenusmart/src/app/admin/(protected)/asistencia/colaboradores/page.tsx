@@ -41,12 +41,15 @@ export default async function ColaboradoresPage() {
       activo: true,
       pinClave: true,
       rostro: true,
+      _count: { select: { marcaciones: true, ausencias: true } },
     },
   });
 
   // Del PIN y del rostro solo se sabe si lo tienen o no: ni la huella del PIN ni los números del rostro salen del servidor.
-  const colaboradores: ColaboradorFila[] = filas.map(({ pinClave, rostro, diasTrabajo, ...f }) => ({
+  const colaboradores: ColaboradorFila[] = filas.map(({ pinClave, rostro, diasTrabajo, _count, ...f }) => ({
     ...f,
+    cantidadMarcaciones: _count.marcaciones,
+    cantidadAusencias: _count.ausencias,
     diasTrabajo: normalizarDiasTrabajo(diasTrabajo),
     sinPin: pinClave === null,
     sinRostro: !tieneRostro(rostro),

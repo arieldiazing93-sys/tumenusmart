@@ -6,6 +6,7 @@
     "src/app/admin/(protected)/agenda/cargar-cita.ts|7006|Parameter \u0027p\u0027 implicitly has an \u0027any\u0027 type.",
     "src/app/admin/(protected)/agenda/citas/page.tsx|7006|Parameter \u0027p\u0027 implicitly has an \u0027any\u0027 type.",
     "src/app/admin/(protected)/agenda/personal/page.tsx|2339|Property \u0027_count\u0027 does not exist on type \u0027MiembroPersonal\u0027.",
+    "src/app/admin/(protected)/asistencia/colaboradores/page.tsx|2339|Property \u0027_count\u0027 does not exist on type \u0027Colaborador\u0027.",
     "src/app/admin/(protected)/categorias/page.tsx|2339|Property \u0027_count\u0027 does not exist on type \u0027Category\u0027.",
     "src/app/admin/(protected)/configuracion/StoreLocationField.tsx|7006|Parameter \u0027la\u0027 implicitly has an \u0027any\u0027 type.",
     "src/app/admin/(protected)/configuracion/StoreLocationField.tsx|7006|Parameter \u0027ln\u0027 implicitly has an \u0027any\u0027 type.",

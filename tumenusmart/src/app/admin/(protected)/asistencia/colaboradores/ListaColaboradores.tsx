@@ -1,12 +1,14 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { Entrada, Pastilla, Vacio, clasesBoton } from "@/components/ui";
+import { useMemo, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import { Entrada, MensajeError, Pastilla, Vacio, clasesBoton } from "@/components/ui";
 import { PanelLateral } from "@/components/PanelLateral";
 import { nombreDeColaborador, type ColaboradorFila, type MetodoAsistencia } from "@/lib/asistencia";
 import { esFormaDePago, etiquetaDeFormaDePago, normalizarDiasTrabajo, resumenDeDiasTrabajo } from "@/lib/ausencias";
 import { formatearGuarani } from "@/lib/format";
 import { AvatarPersonal } from "../../agenda/AvatarPersonal";
+import { cambiarActivoColaborador } from "./actions";
 import { FormularioColaborador } from "./FormularioColaborador";
 
 /** Sin tildes ni mayúsculas, para que "perez" encuentre a "Pérez". */
@@ -32,8 +34,26 @@ export function ListaColaboradores({
   /** Cómo se marca en este local: con solo PIN el rostro no hace falta y no se avisa que falta. */
   metodo?: MetodoAsistencia;
 }) {
+  const router = useRouter();
+  const [pendiente, iniciar] = useTransition();
   const [busqueda, setBusqueda] = useState("");
   const [panel, setPanel] = useState<PanelColaborador>(null);
+  // A quién se le está preguntando «¿dar de baja?» y el error si no se pudo.
+  const [bajaId, setBajaId] = useState<string | null>(null);
+  const [errorEstado, setErrorEstado] = useState<string | null>(null);
+
+  function cambiarEstado(id: string, activo: boolean) {
+    setErrorEstado(null);
+    iniciar(async () => {
+      const r = await cambiarActivoColaborador(id, activo);
+      if (!r.ok) {
+        setErrorEstado(r.error);
+        return;
+      }
+      setBajaId(null);
+      router.refresh();
+    });
+  }
 
   const visibles = useMemo(() => {
     const q = sinTildes(busqueda.trim());
@@ -68,6 +88,8 @@ export function ListaColaboradores({
           <div className="ml-auto">{botonAnadir}</div>
         </div>
       )}
+
+      {errorEstado && <MensajeError>{errorEstado}</MensajeError>}
 
       {colaboradores.length === 0 ? (
         <Vacio
@@ -116,13 +138,48 @@ export function ListaColaboradores({
                   )}
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={() => setPanel({ modo: "editar", id: c.id })}
-                className={clasesBoton("suave", "sm")}
-              >
-                Editar
-              </button>
+              <div className="flex flex-none flex-col items-stretch gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setPanel({ modo: "editar", id: c.id })}
+                  className={clasesBoton("suave", "sm")}
+                >
+                  Editar
+                </button>
+                {!c.activo ? (
+                  <button
+                    type="button"
+                    disabled={pendiente}
+                    onClick={() => cambiarEstado(c.id, true)}
+                    className={clasesBoton("suave", "sm")}
+                  >
+                    Reactivar
+                  </button>
+                ) : bajaId === c.id ? (
+                  <div className="flex max-w-[11rem] flex-col gap-1">
+                    <p className="text-[0.7rem] leading-tight text-tinta-media">
+                      ¿Dar de baja? Su PIN deja de andar; su historial queda.
+                    </p>
+                    <div className="flex gap-1">
+                      <button
+                        type="button"
+                        disabled={pendiente}
+                        onClick={() => cambiarEstado(c.id, false)}
+                        className={clasesBoton("peligro", "sm")}
+                      >
+                        Sí
+                      </button>
+                      <button type="button" onClick={() => setBajaId(null)} className={clasesBoton("suave", "sm")}>
+                        No
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <button type="button" onClick={() => setBajaId(c.id)} className={clasesBoton("suave", "sm")}>
+                    Dar de baja
+                  </button>
+                )}
+              </div>
             </li>
           ))}
         </ul>

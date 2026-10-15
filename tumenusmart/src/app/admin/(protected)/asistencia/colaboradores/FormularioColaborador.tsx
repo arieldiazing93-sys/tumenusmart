@@ -10,7 +10,7 @@ import { LARGO_PIN, pinDemasiadoFacil, type ColaboradorFila, type MetodoAsistenc
 import { DIAS_SEMANA, FORMAS_DE_PAGO, normalizarDiasTrabajo, valorDelDia } from "@/lib/ausencias";
 import { formatearGuarani } from "@/lib/format";
 import { rostroDeFoto, rostroDeFotoGuardada } from "@/lib/reconocimiento-cliente";
-import { actualizarColaborador, crearColaborador, subirFotoDelColaborador } from "./actions";
+import { actualizarColaborador, crearColaborador, eliminarColaborador, subirFotoDelColaborador } from "./actions";
 
 /**
  * El formulario para dar de alta (o editar) a un colaborador. Vive adentro del panel lateral: el cuerpo se
@@ -80,6 +80,7 @@ export function FormularioColaborador({
   const [rostro, setRostro] = useState<number[] | null>(null);
   const [leyendoRostro, setLeyendoRostro] = useState(false);
   const archivo = useRef<HTMLInputElement>(null);
+  const [confirmandoEliminar, setConfirmandoEliminar] = useState(false);
   // Los días que tiene que ir y cómo se le paga (con eso se sabe cuándo faltó y cuánto le toca).
   const [dias, setDias] = useState<number[]>(() => normalizarDiasTrabajo(colaborador?.diasTrabajo));
   const [tipoPago, setTipoPago] = useState<string>(colaborador?.tipoPago ?? "");
@@ -467,18 +468,70 @@ export function FormularioColaborador({
       {/* ---------- pie fijo ---------- */}
       <div className="flex flex-none flex-col gap-2 border-t border-linea bg-superficie px-5 py-4">
         {error && <MensajeError>{error}</MensajeError>}
-        <div className="flex justify-end gap-2">
-          <button type="button" onClick={onCerrar} className={clasesBoton("peligro", "md")}>
-            Cancelar
-          </button>
-          <button
-            type="submit"
-            disabled={pendiente || subiendo || leyendoRostro || camara}
-            className={clasesBoton(editando ? "navegar" : "nuevo", "md")}
-          >
-            {pendiente ? "Guardando…" : editando ? "Guardar" : "Crear"}
-          </button>
-        </div>
+        {confirmandoEliminar && colaborador ? (
+          <div className="flex flex-col gap-2">
+            <p className="text-[0.82rem] leading-snug text-tinta-media">
+              <strong className="text-tinta">¿Eliminar a {colaborador.nombre} para siempre?</strong>{" "}
+              {(colaborador.cantidadMarcaciones ?? 0) > 0 || (colaborador.cantidadAusencias ?? 0) > 0 ? (
+                <>
+                  Se borran sus {colaborador.cantidadMarcaciones ?? 0} marcaciones, sus {colaborador.cantidadAusencias ?? 0}{" "}
+                  ausencias y sus fotos, y desaparece de los reportes y liquidaciones anteriores.{" "}
+                </>
+              ) : (
+                <>No tiene marcaciones ni ausencias. </>
+              )}
+              Si solo se fue o lo querés suspender, mejor «Dar de baja»: queda su historial.
+            </p>
+            <div className="flex flex-wrap justify-end gap-2">
+              <button type="button" onClick={() => setConfirmandoEliminar(false)} className={clasesBoton("suave", "md")}>
+                No, dejarlo
+              </button>
+              <button
+                type="button"
+                disabled={pendiente}
+                onClick={() => {
+                  setError(null);
+                  iniciar(async () => {
+                    const r = await eliminarColaborador(colaborador.id);
+                    if (!r.ok) {
+                      setError(r.error);
+                      setConfirmandoEliminar(false);
+                      return;
+                    }
+                    router.refresh();
+                    onCerrar();
+                  });
+                }}
+                className={clasesBoton("peligro", "md")}
+              >
+                {pendiente ? "Eliminando…" : "Sí, eliminar para siempre"}
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            {editando && (
+              <button
+                type="button"
+                onClick={() => setConfirmandoEliminar(true)}
+                disabled={pendiente}
+                className={`${clasesBoton("peligro", "md")} mr-auto`}
+              >
+                Eliminar
+              </button>
+            )}
+            <button type="button" onClick={onCerrar} className={clasesBoton("peligro", "md")}>
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              disabled={pendiente || subiendo || leyendoRostro || camara}
+              className={clasesBoton(editando ? "navegar" : "nuevo", "md")}
+            >
+              {pendiente ? "Guardando…" : editando ? "Guardar" : "Crear"}
+            </button>
+          </div>
+        )}
       </div>
     </form>
   );

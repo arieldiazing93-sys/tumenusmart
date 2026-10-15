@@ -12,7 +12,7 @@ import { descartarImagenes } from "@/lib/imagenes";
 import { idLocalActual } from "@/lib/local-actual";
 import { prisma as prismaGlobal } from "@/lib/prisma";
 import { prismaDelLocal } from "@/lib/prisma-local";
-import { subirFotoAsistencia } from "@/lib/supabase-storage";
+import { borrarFotosAsistencia, rutaDeFotoAsistencia, subirFotoAsistencia } from "@/lib/supabase-storage";
 
 export type ResultadoColaborador = { ok: true } | { ok: false; error: string };
 export type ResultadoFotoColaborador = { ok: true; url: string } | { ok: false; error: string };
@@ -134,6 +134,8 @@ async function metodoDelLocal(idLocal: string) {
 function refrescarPantallas() {
   revalidatePath("/admin/asistencia");
   revalidatePath("/admin/asistencia/colaboradores");
+  revalidatePath("/admin/asistencia/ausencias");
+  revalidatePath("/admin/asistencia/liquidacion");
 }
 
 /**
@@ -311,6 +313,88 @@ export async function actualizarColaborador(id: string, formData: FormData): Pro
       entidadId: id,
     });
   }
+
+  refrescarPantallas();
+  return { ok: true };
+}
+
+/**
+ * Da de baja (o reactiva) a una persona sin tocar nada más: su PIN deja de funcionar en el celular fijo y no se le cuentan faltas
+ * desde su última marcación, pero sus marcaciones y ausencias quedan en los reportes. Es lo que se hace con quien se fue, o con
+ * quien se suspende por un tiempo.
+ */
+export async function cambiarActivoColaborador(id: string, activo: boolean): Promise<ResultadoColaborador> {
+  const sesion = await exigirPermiso("asistencia.gestionar");
+  const idLocal = await idLocalActual();
+  const prisma = prismaDelLocal(idLocal);
+
+  const persona = await prisma.colaborador.findFirst({ where: { id }, select: { nombre: true, apellido: true, activo: true } });
+  if (!persona) return { ok: false, error: "No se encontró a esa persona." };
+  if (persona.activo === activo) return { ok: true };
+
+  await prisma.colaborador.updateMany({ where: { id }, data: { activo } });
+  await registrarBitacora(idLocal, sesion, {
+    modulo: "asistencia",
+    accion: activo ? "colaborador_activado" : "colaborador_desactivado",
+    descripcion: `${activo ? "Volvió a activar" : "Dio de baja"} a ${nombreDe(persona)} en el registro de asistencia.`,
+    entidad: "Colaborador",
+    entidadId: id,
+  });
+
+  refrescarPantallas();
+  return { ok: true };
+}
+
+/**
+ * Elimina a una persona PARA SIEMPRE, con todo lo que tiene: sus marcaciones, sus ausencias y sus fotos (la base las borra en
+ * cascada). Desaparece de los reportes y de las liquidaciones de meses anteriores, y su PIN queda libre. Para quien solo se fue es
+ * mejor darlo de baja (`cambiarActivoColaborador`), que conserva el historial: por eso la pantalla pide confirmar mostrando cuántas
+ * marcaciones se pierden.
+ */
+export async function eliminarColaborador(id: string): Promise<ResultadoColaborador> {
+  const sesion = await exigirPermiso("asistencia.gestionar");
+  const idLocal = await idLocalActual();
+  const prisma = prismaDelLocal(idLocal);
+
+  const persona = await prisma.colaborador.findFirst({
+    where: { id },
+    select: { nombre: true, apellido: true, cargo: true, fotoUrl: true },
+  });
+  if (!persona) return { ok: false, error: "Esa persona ya no existe." };
+
+  // Las direcciones de las fotos y las cantidades, ANTES de borrar: después de la cascada ya no hay a quién preguntarle.
+  const [marcaciones, ausencias, conFoto] = await Promise.all([
+    prisma.marcacionAsistencia.count({ where: { colaboradorId: id } }),
+    prisma.ausenciaColaborador.count({ where: { colaboradorId: id } }),
+    prisma.marcacionAsistencia.findMany({
+      where: { colaboradorId: id, fotoUrl: { not: null } },
+      select: { fotoUrl: true },
+      take: 5000,
+    }),
+  ]);
+
+  await prisma.colaborador.deleteMany({ where: { id } });
+
+  // Ya borrada la persona, las fotos quedaron sin dueño: se sacan del almacenamiento (lo mejor posible; si algo falla, la limpieza
+  // diaria de imágenes sueltas las recoge).
+  try {
+    const rutas = conFoto
+      .map((m) => (m.fotoUrl ? rutaDeFotoAsistencia(m.fotoUrl) : null))
+      .filter((r): r is string => r !== null);
+    for (let i = 0; i < rutas.length; i += 100) await borrarFotosAsistencia(rutas.slice(i, i + 100));
+  } catch (err) {
+    console.error("[asistencia] no se pudieron borrar las fotos de marcación de un colaborador eliminado", err);
+  }
+  await descartarImagenes([persona.fotoUrl]);
+
+  await registrarBitacora(idLocal, sesion, {
+    modulo: "asistencia",
+    accion: "colaborador_eliminado",
+    descripcion: `Eliminó a ${nombreDe(persona)} del registro de asistencia, con sus ${marcaciones} marcaciones y ${ausencias} ausencias.`,
+    entidad: "Colaborador",
+    entidadId: id,
+    detalle: { cargo: persona.cargo, marcaciones, ausencias },
+  });
 
   refrescarPantallas();
   return { ok: true };
