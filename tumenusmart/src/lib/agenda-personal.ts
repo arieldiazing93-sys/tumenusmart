@@ -176,3 +176,34 @@ export type TrabajoDelPersonal = {
   porcentaje: number | null;
   comision: number;
 };
+
+// ---------------------------------------------------------------------------
+//  Qué turnos ve una persona en su enlace público (/personal/<id>)
+// ---------------------------------------------------------------------------
+
+/** Lo mínimo de una cita para decidir si va en la lista de trabajo de su profesional. */
+export type CitaParaElPerfil = {
+  estado: string;
+  /** false = un turno de la web que todavía espera el aviso por WhatsApp: ni el calendario lo muestra. */
+  visible: boolean;
+  /** "web" | "panel" | "mostrador". */
+  origen: string;
+  /** El cobro de la cita: null = sin cobrar. Una venta anulada (`cancelada`) deja la cita otra vez sin cobrar. */
+  ventaPos: { cancelada: boolean } | null;
+};
+
+/**
+ * Cómo aparece una cita en la lista de trabajo del profesional:
+ *  - "cobrada": ya se cobró en la caja (y el cobro no se anuló): trabajo confirmado, con su plata.
+ *  - "reservada": está agendada pero todavía sin cobrar (la anotó el negocio en el calendario o la pidió el cliente desde la página):
+ *    es trabajo que le toca igual, así que se ve, marcada como sin cobrar.
+ *  - null: no va (cancelada, no vino, un turno web sin confirmar, o algo del mostrador que no es un turno agendado).
+ */
+export function estadoEnElPerfil(c: CitaParaElPerfil): "cobrada" | "reservada" | null {
+  if (c.ventaPos && !c.ventaPos.cancelada) return "cobrada";
+  if (c.estado === "cancelada" || c.estado === "no_asistio") return null;
+  if (!c.visible) return null;
+  // Lo cobrado en el mostrador a alguien sin reserva nace ya cobrado: si su cobro se anuló, no era un turno agendado.
+  if (c.origen === "mostrador") return null;
+  return "reservada";
+}

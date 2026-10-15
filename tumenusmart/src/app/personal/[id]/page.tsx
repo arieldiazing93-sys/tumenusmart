@@ -16,7 +16,7 @@ import {
   tituloAgenda,
   type VistaAgenda,
 } from "@/lib/agenda";
-import { calcularComision, montoDelTrabajo } from "@/lib/agenda-personal";
+import { calcularComision, estadoEnElPerfil, montoDelTrabajo } from "@/lib/agenda-personal";
 import { textoDelPeriodo } from "@/lib/comision-mozo";
 import { saldosDeComisionPersonal } from "@/lib/comision-personal-servidor";
 import { claveSumarDias } from "@/lib/calendario";
@@ -44,8 +44,9 @@ export const metadata: Metadata = {
 
 /**
  * La vista de trabajo de una persona del personal (una barbera, un colorista…): lo que tiene que hacer HOY y en
- * los próximos días de la semana, para que sepa qué le toca. Son las citas que ya se cobraron a su nombre, o sea,
- * las que quedaron confirmadas: si un cliente pagó su turno para dentro de dos o tres días, aparece en ese día.
+ * los próximos días de la semana, para que sepa qué le toca. Son sus turnos agendados: los que ya se cobraron en la
+ * caja ("Cobrado") y los reservados que todavía no se cobraron ("Reservado · sin cobrar", ver `estadoEnElPerfil`).
+ * Lo cancelado, lo que no vino y los turnos de la web que esperan el aviso por WhatsApp no aparecen.
  * Es el mismo criterio que la pantalla del repartidor (/repartidor/[id]): no hay usuario ni contraseña; el enlace
  * lleva el id de la persona (imposible de adivinar) y el dueño se lo pasa por WhatsApp desde Personal.
  *
@@ -100,12 +101,12 @@ export default async function TrabajoDelPersonalPage({
 
   const [store, confirmadas, trabajosPeriodo, ventasProductoPeriodo, canceladasPeriodo] = await Promise.all([
     prisma.store.findUnique({ where: { id: storeId }, select: { nombre: true } }),
+    // Su lista de trabajo: todos los turnos de la semana que le tocan, cobrados o no (ver `estadoEnElPerfil`: lo cancelado y lo que no
+    // es un turno agendado se descarta abajo). La trae completa y la filtra en el servidor con esa misma regla, que está probada.
     prisma.cita.findMany({
       where: {
         storeId,
         personalId: id,
-        // Confirmada = cobrada en la caja (y ese cobro no se anuló).
-        ventaPos: { is: { cancelada: false } },
         // Desde el comienzo de hoy hasta el final del séptimo día.
         inicio: { gte: inicioHoy, lt: finSemana },
       },
@@ -116,9 +117,12 @@ export default async function TrabajoDelPersonalPage({
         clienteNombre: true,
         inicio: true,
         serviciosTexto: true,
+        estado: true,
+        visible: true,
+        origen: true,
         // Lo que valen sus servicios (sin los productos que se haya llevado el cliente en la misma cuenta).
         precio: true,
-        ventaPos: { select: { total: true } },
+        ventaPos: { select: { total: true, cancelada: true } },
       },
     }),
     // "Tus números": los trabajos ya cobrados del período elegido (Día/Semana/Mes), para el total y la comisión.
@@ -238,16 +242,22 @@ export default async function TrabajoDelPersonalPage({
     return `/personal/${id}?${params.toString()}`;
   }
 
-  const trabajos = confirmadas.map((c) => {
+  const trabajos = confirmadas.flatMap((c) => {
+    // Cobrado, o reservado sin cobrar: los dos son trabajo suyo (lo cancelado y lo que no es un turno agendado no va).
+    const enElPerfil = estadoEnElPerfil(c);
+    if (!enElPerfil) return [];
     const { dia, minutos } = partesLocales(c.inicio);
-    return {
-      id: c.id,
-      dia,
-      hora: horaDeMinutos(minutos),
-      cliente: c.clienteNombre,
-      servicios: c.serviciosTexto,
-      total: montoDelTrabajo(c.precio, c.ventaPos?.total),
-    };
+    return [
+      {
+        id: c.id,
+        dia,
+        hora: horaDeMinutos(minutos),
+        cliente: c.clienteNombre,
+        servicios: c.serviciosTexto,
+        total: montoDelTrabajo(c.precio, c.ventaPos?.total),
+        cobrada: enElPerfil === "cobrada",
+      },
+    ];
   });
 
   const deHoy = trabajos.filter((t) => t.dia === hoy);
@@ -267,15 +277,16 @@ export default async function TrabajoDelPersonalPage({
     { rotulo: "Esta semana", valor: trabajos.length },
   ];
 
-  const plural = (n: number) => (n === 1 ? "trabajo confirmado" : "trabajos confirmados");
+  const plural = (n: number) => (n === 1 ? "trabajo" : "trabajos");
+  const sinCobrarDeHoy = deHoy.filter((t) => !t.cobrada).length;
   const mensaje =
     deHoy.length > 0
-      ? `Hoy tenés ${deHoy.length} ${plural(deHoy.length)}.${
-          cantidadProximos > 0 ? ` Y ${cantidadProximos} más en los próximos días.` : ""
-        }`
+      ? `Hoy tenés ${deHoy.length} ${plural(deHoy.length)}${
+          sinCobrarDeHoy > 0 ? ` (${sinCobrarDeHoy} sin cobrar todavía)` : ""
+        }.${cantidadProximos > 0 ? ` Y ${cantidadProximos} más en los próximos días.` : ""}`
       : cantidadProximos > 0
-        ? `Hoy no tenés trabajos confirmados. En los próximos días tenés ${cantidadProximos}.`
-        : "Todavía no tenés trabajos confirmados. Cuando se cobre una cita tuya, aparece acá.";
+        ? `Hoy no tenés trabajos. En los próximos días tenés ${cantidadProximos}.`
+        : "Todavía no tenés trabajos agendados. Cuando te asignen un turno, aparece acá.";
 
   return (
     <main className="mx-auto min-h-screen max-w-md bg-papel-suave pb-10">
@@ -324,15 +335,23 @@ export default async function TrabajoDelPersonalPage({
             <ul className="flex flex-col gap-3">
               {deHoy.map((t) => (
                 <li key={t.id} className="flex gap-3 rounded-2xl bg-superficie p-3.5 shadow-sm ring-1 ring-linea">
-                  <span className="cifra flex h-14 w-16 flex-none items-center justify-center rounded-xl bg-exito-luz text-[1.15rem] font-bold text-exito">
+                  <span
+                    className={`cifra flex h-14 w-16 flex-none items-center justify-center rounded-xl text-[1.15rem] font-bold ${
+                      t.cobrada ? "bg-exito-luz text-exito" : "bg-amarillo-luz text-amarillo-oscuro"
+                    }`}
+                  >
                     {t.hora}
                   </span>
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-[1rem] font-semibold tracking-titular text-tinta">{t.cliente}</p>
                     {t.servicios && <p className="text-[0.84rem] leading-snug text-tinta-media">{t.servicios}</p>}
                     <div className="mt-1.5 flex items-center justify-between gap-2 text-[0.82rem]">
-                      <span className="font-semibold text-exito">✓ Confirmado</span>
-                      <span className="cifra font-bold text-tinta">{formatearGuarani(t.total)}</span>
+                      {t.cobrada ? (
+                        <span className="font-semibold text-exito">✓ Cobrado</span>
+                      ) : (
+                        <span className="font-semibold text-amarillo-oscuro">● Reservado · sin cobrar</span>
+                      )}
+                      {t.total > 0 && <span className="cifra font-bold text-tinta">{formatearGuarani(t.total)}</span>}
                     </div>
                   </div>
                 </li>
@@ -363,7 +382,12 @@ export default async function TrabajoDelPersonalPage({
                           <span className="block truncate font-semibold text-tinta">{t.cliente}</span>
                           {t.servicios && <span className="block truncate text-[0.8rem] text-tinta-media">{t.servicios}</span>}
                         </span>
-                        <span className="cifra flex-none font-bold text-tinta">{formatearGuarani(t.total)}</span>
+                        <span className="flex flex-none flex-col items-end">
+                          {t.total > 0 && <span className="cifra font-bold text-tinta">{formatearGuarani(t.total)}</span>}
+                          <span className={`text-[0.7rem] font-semibold ${t.cobrada ? "text-exito" : "text-amarillo-oscuro"}`}>
+                            {t.cobrada ? "✓ Cobrado" : "Sin cobrar"}
+                          </span>
+                        </span>
                       </li>
                     ))}
                   </ul>
