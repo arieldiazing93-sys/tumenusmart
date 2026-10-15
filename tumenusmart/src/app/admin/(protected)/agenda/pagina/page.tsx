@@ -28,7 +28,8 @@ export default async function PaginaReservasPage() {
         titulo="Página de reservas"
         bajada="La página que ven tus clientes para reservar. Compartí el link en tus redes y por WhatsApp."
       />
-      <EditorPagina inicial={datosIniciales(fila, local.nombre)} yaGuardada={fila !== null} />
+      {/* conMapa: en «Enlaces sociales» se carga la ubicación (enlace de Google Maps) y la página pública muestra el mapa al final. */}
+      <EditorPagina inicial={datosIniciales(fila, local.nombre)} yaGuardada={fila !== null} conMapa />
     </div>
   );
 }

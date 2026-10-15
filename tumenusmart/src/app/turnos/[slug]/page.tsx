@@ -18,6 +18,7 @@ import {
   IconoTiktok,
   IconoWhatsappLinea,
 } from "@/components/IconosRedes";
+import { MapaUbicacion } from "@/components/MapaUbicacion";
 import { CarruselGaleria } from "./CarruselGaleria";
 import { CompartirBoton } from "./CompartirBoton";
 import { IconoCalendario, IconoChevron, IconoReloj } from "./Iconos";
@@ -266,6 +267,19 @@ export default async function PaginaPublicaReservas({ params }: { params: Promis
             <section className="mt-8" aria-label="Galería">
               <h2 className="mb-3 text-[1.1rem] font-semibold tracking-titular text-tinta">Galería</h2>
               <CarruselGaleria items={galeria} />
+            </section>
+          )}
+
+          {/* ---------- la ubicación: el mapa al final, con botones para abrirla y compartirla ---------- */}
+          {pagina.googleMapsUrl && (
+            <section className="mt-8" aria-label="Ubicación">
+              <h2 className="mb-3 text-[1.1rem] font-semibold tracking-titular text-tinta">Dónde estamos</h2>
+              <MapaUbicacion
+                nombre={pagina.nombre}
+                enlace={pagina.googleMapsUrl}
+                lat={pagina.ubicacionLat}
+                lng={pagina.ubicacionLng}
+              />
             </section>
           )}
         </div>

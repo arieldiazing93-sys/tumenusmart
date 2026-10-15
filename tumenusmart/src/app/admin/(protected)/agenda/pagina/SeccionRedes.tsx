@@ -37,11 +37,14 @@ export function SeccionRedes({
   cambiar,
   coloresDeMarca = false,
   conMapa = false,
+  lugar = "local",
 }: PropsSeccion & {
   /** Cada icono con el color de su plataforma (Instagram rosado, TikTok negro, Facebook azul, WhatsApp verde). */
   coloresDeMarca?: boolean;
-  /** El campo del enlace de Google Maps: la página pública muestra el mapa de la ubicación (hoy, la de la Reserva de canchas). */
+  /** El campo del enlace de Google Maps: la página pública muestra el mapa de la ubicación (la de canchas y la de turnos). */
   conMapa?: boolean;
+  /** Cómo se llama el sitio en el texto de ayuda del mapa: «local» (turnos) o «complejo» (canchas). Cada sección conserva su palabra. */
+  lugar?: "local" | "complejo";
 }) {
   const numero = normalizarTelefonoPersonal(datos.whatsappPais, datos.whatsapp);
 
@@ -117,7 +120,7 @@ export function SeccionRedes({
             />
           </div>
           <span className="mt-1 block text-[0.76rem] leading-snug text-tinta-suave">
-            En Google Maps buscá tu complejo, tocá «Compartir» y pegá acá el enlace. Tus clientes ven el mapa en tu página, lo
+            En Google Maps buscá tu {lugar}, tocá «Compartir» y pegá acá el enlace. Tus clientes ven el mapa {lugar === "local" ? "al final de tu página" : "en tu página"}, lo
             abren con un toque y pueden compartirlo (WhatsApp, redes). Al guardar se carga el mapa.
           </span>
         </label>

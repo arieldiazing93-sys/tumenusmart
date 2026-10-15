@@ -2866,6 +2866,10 @@ model PaginaReservas {
   galeria Json @default("[]")
   /// Enlace a la ficha de Google Maps del negocio, para el QR de "dejanos tu reseña".
   googleMapsUrl String?
+  /// Las coordenadas del enlace de Google Maps (se sacan al guardar la página, siguiendo el enlace corto de «Compartir»): con ellas la
+  /// página pública dibuja el mapa al final. NULL = el enlace no trajo coordenadas (se muestra solo el botón de abrirlo).
+  ubicacionLat  Float?
+  ubicacionLng  Float?
   /// El color de la página, "#RRGGBB".
   colorPrimario String @default("#3B82F6")
   /// claro | oscuro | sistema.

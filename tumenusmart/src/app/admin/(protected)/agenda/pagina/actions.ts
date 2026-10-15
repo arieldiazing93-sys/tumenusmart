@@ -9,6 +9,7 @@ import { idLocalActual } from "@/lib/local-actual";
 import { prisma } from "@/lib/prisma";
 import { sanearDatosPagina, type DatosPagina } from "@/lib/pagina-reservas";
 import { subirImagenPaginaReservas } from "@/lib/supabase-storage";
+import { resolverCoordenadasDeMaps } from "@/lib/ubicacion-maps-servidor";
 
 export type ResultadoPagina = { ok: true; slug: string } | { ok: false; error: string };
 export type ResultadoImagenPagina = { ok: true; url: string } | { ok: false; error: string };
@@ -54,8 +55,31 @@ export async function guardarPaginaReservas(entrada: DatosPagina): Promise<Resul
 
   const anterior = await prisma.paginaReservas.findUnique({
     where: { storeId },
-    select: { slug: true, habilitada: true, fotoUrl: true, bannerUrl: true, galeria: true },
+    select: {
+      slug: true,
+      habilitada: true,
+      fotoUrl: true,
+      bannerUrl: true,
+      galeria: true,
+      googleMapsUrl: true,
+      ubicacionLat: true,
+      ubicacionLng: true,
+    },
   });
+
+  // Del enlace de Google Maps se sacan las coordenadas (siguiendo el enlace corto de «Compartir»). Si no se pueden sacar, la página se
+  // guarda igual y muestra el botón de abrir el enlace, sin mapa. Con el mismo enlace de antes no hace falta volver a pedirlas.
+  let ubicacion: { lat: number; lng: number } | null = null;
+  if (d.googleMapsUrl) {
+    const mismoEnlace =
+      !!anterior &&
+      anterior.googleMapsUrl === d.googleMapsUrl &&
+      anterior.ubicacionLat != null &&
+      anterior.ubicacionLng != null;
+    ubicacion = mismoEnlace
+      ? { lat: Number(anterior?.ubicacionLat), lng: Number(anterior?.ubicacionLng) }
+      : await resolverCoordenadasDeMaps(d.googleMapsUrl);
+  }
 
   const datos = {
     slug: d.slug,
@@ -75,6 +99,9 @@ export async function guardarPaginaReservas(entrada: DatosPagina): Promise<Resul
     entradaCalendario: d.entradaCalendario,
     galeria: d.galeria as unknown as Prisma.InputJsonValue,
     googleMapsUrl: d.googleMapsUrl,
+    // Las coordenadas del enlace (ver más arriba): con ellas la página pública dibuja el mapa.
+    ubicacionLat: ubicacion?.lat ?? null,
+    ubicacionLng: ubicacion?.lng ?? null,
     colorPrimario: d.colorPrimario,
     tema: d.tema,
     campos: d.campos as unknown as Prisma.InputJsonValue,

@@ -17,6 +17,8 @@ import {
   type VistaAgenda,
 } from "@/lib/agenda";
 import { calcularComision, montoDelTrabajo } from "@/lib/agenda-personal";
+import { textoDelPeriodo } from "@/lib/comision-mozo";
+import { saldosDeComisionPersonal } from "@/lib/comision-personal-servidor";
 import { claveSumarDias } from "@/lib/calendario";
 import { formatearGuarani } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
@@ -157,6 +159,41 @@ export default async function TrabajoDelPersonalPage({
     comisionProductoPeriodo += calcularComision(base, porcentaje);
   }
 
+  // Lo que ya le pagaron de comisión (desde la caja del negocio) en el período elegido y lo que todavía se le debe a hoy. Si por
+  // cualquier motivo no se pueden leer, el resto de la página sigue andando y solo se oculta esta parte.
+  let pagadoPeriodo = 0;
+  let pendienteHoy = 0;
+  let pagosRecibidos: { id: string; dia: string; hora: string; monto: number; periodo: string; nota: string | null }[] = [];
+  let hayDatosDePagos = true;
+  try {
+    const [saldos, pagos] = await Promise.all([
+      saldosDeComisionPersonal(prisma, storeId, { periodo: rangoPeriodo, personalId: id }),
+      prisma.pagoComisionPersonal.findMany({
+        where: { storeId, personalId: id, createdAt: rangoPeriodo },
+        orderBy: [{ createdAt: "desc" }, { id: "asc" }],
+        take: 60,
+        select: { id: true, monto: true, desde: true, hasta: true, nota: true, createdAt: true },
+      }),
+    ]);
+    const saldo = saldos.get(id);
+    pagadoPeriodo = saldo?.pagadaEnPeriodo ?? 0;
+    pendienteHoy = saldo?.pendiente ?? 0;
+    pagosRecibidos = pagos.map((p) => {
+      const { dia, minutos } = partesLocales(p.createdAt);
+      return {
+        id: p.id,
+        dia,
+        hora: horaDeMinutos(minutos),
+        monto: Number(p.monto),
+        periodo: textoDelPeriodo(p.desde, p.hasta),
+        nota: p.nota,
+      };
+    });
+  } catch (e) {
+    console.error("[personal] no se pudieron leer los pagos de comisión", e);
+    hayDatosDePagos = false;
+  }
+
   const cifrasPeriodo = [
     // Lo cobrado es lo que más se mira: va primero, a todo el ancho y en grande.
     { rotulo: "Cobrado", valor: formatearGuarani(cobradoPeriodo), tono: "marca" as const, principal: true },
@@ -170,6 +207,18 @@ export default async function TrabajoDelPersonalPage({
     },
     { rotulo: "Comisión servicio", valor: formatearGuarani(comisionPeriodo), tono: "exito" as const, principal: false },
     { rotulo: "Comisión producto", valor: formatearGuarani(comisionProductoPeriodo), tono: "exito" as const, principal: false },
+    // Lo que ya le pagaron en este período y lo que todavía se le debe (a hoy, no depende del período). Solo si se pudo leer.
+    ...(hayDatosDePagos
+      ? [
+          { rotulo: "Comisión pagada", valor: formatearGuarani(pagadoPeriodo), tono: "neutro" as const, principal: false },
+          {
+            rotulo: "Te deben (a hoy)",
+            valor: formatearGuarani(pendienteHoy),
+            tono: pendienteHoy > 0 ? ("aviso" as const) : ("neutro" as const),
+            principal: false,
+          },
+        ]
+      : []),
   ];
   // El fondo de cada tarjeta dice de qué se trata de un vistazo: ni tan fuerte como un
   // cartel de aviso, ni tan débil que no se note al lado de las otras tres.
@@ -178,6 +227,7 @@ export default async function TrabajoDelPersonalPage({
     marca: { tarjeta: "bg-brand-light ring-1 ring-brand/20", valor: "text-brand-texto", rotulo: "text-brand-texto/80" },
     exito: { tarjeta: "bg-exito-luz ring-1 ring-exito/20", valor: "text-exito", rotulo: "text-exito/80" },
     peligro: { tarjeta: "bg-peligro-luz ring-1 ring-peligro/25", valor: "text-peligro", rotulo: "text-peligro/80" },
+    aviso: { tarjeta: "bg-amarillo-luz ring-1 ring-amarillo/40", valor: "text-tinta", rotulo: "text-amarillo-oscuro" },
   } as const;
 
   /** La dirección de esta misma página con esos cambios; lo que no se cambia se mantiene. */
@@ -382,6 +432,35 @@ export default async function TrabajoDelPersonalPage({
               );
             })}
           </ul>
+
+          {/* Los pagos de comisión que recibió en ese período (con la fecha en que se le pagó y a qué trabajos corresponde). */}
+          {hayDatosDePagos && (
+            <div className="mt-5">
+              <h3 className="mb-2 text-[1rem] font-semibold tracking-titular text-tinta">Pagos que recibiste</h3>
+              {pagosRecibidos.length === 0 ? (
+                <p className="rounded-2xl border border-dashed border-linea bg-superficie px-3.5 py-3.5 text-[0.84rem] text-tinta-suave">
+                  No te pagaron comisión en este período.
+                  {pendienteHoy > 0 ? ` Te deben ${formatearGuarani(pendienteHoy)} a hoy.` : ""}
+                </p>
+              ) : (
+                <ul className="flex flex-col overflow-hidden rounded-2xl bg-superficie shadow-sm ring-1 ring-linea">
+                  {pagosRecibidos.map((p) => (
+                    <li key={p.id} className="flex items-start gap-3 border-b border-linea-fina px-3.5 py-3 text-[0.88rem] last:border-b-0">
+                      <span className="min-w-0 flex-1">
+                        <span className="block font-semibold text-tinta">{diaLargo(p.dia)}</span>
+                        <span className="block text-[0.78rem] text-tinta-suave">
+                          {p.hora}
+                          {p.periodo ? ` · trabajos ${p.periodo}` : ""}
+                          {p.nota ? ` · ${p.nota}` : ""}
+                        </span>
+                      </span>
+                      <span className="cifra flex-none font-bold text-exito">{formatearGuarani(p.monto)}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
         </section>
 
         <p className="mt-8 text-center text-[0.74rem] text-tinta-suave">Se actualiza sola. Solo ves lo tuyo.</p>

@@ -116,7 +116,15 @@ export function EditorPagina({
 
   const contenido = {
     empresa: <SeccionEmpresa datos={datos} cambiar={cambiar} />,
-    redes: <SeccionRedes datos={datos} cambiar={cambiar} coloresDeMarca={coloresDeMarca} conMapa={conMapa} />,
+    redes: (
+      <SeccionRedes
+        datos={datos}
+        cambiar={cambiar}
+        coloresDeMarca={coloresDeMarca}
+        conMapa={conMapa}
+        lugar={rutaPublica === "canchas" ? "complejo" : "local"}
+      />
+    ),
     galeria: <SeccionGaleria datos={datos} cambiar={cambiar} />,
     apariencia: <SeccionApariencia datos={datos} cambiar={cambiar} />,
     campos: <SeccionCampos datos={datos} cambiar={cambiar} />,
