@@ -18,7 +18,7 @@ import type { ReactNode } from "react";
 //  Botón
 // ===========================================================================
 
-export type Tono = "principal" | "suave" | "navegar" | "violeta" | "exito" | "nuevo" | "peligro" | "fantasma" | "whatsapp";
+export type Tono = "principal" | "suave" | "navegar" | "violeta" | "lila" | "exito" | "nuevo" | "peligro" | "fantasma" | "whatsapp";
 
 const TONOS: Record<Tono, string> = {
   // Naranja: avanzar y ejecutar (cobrar, continuar, enviar, filtrar). Guardar es azul (navegar) y crear es verde (nuevo).
@@ -34,6 +34,10 @@ const TONOS: Record<Tono, string> = {
   // (ej. "Activar" un local en Cartera, al lado de "Registrar pago").
   violeta:
     "bg-violeta text-white hover:bg-violeta-oscuro focus-visible:outline-violeta-oscuro",
+  // Lila suave: el mismo de «Vencimiento» en la barra y de «Vaciar» en el punto de venta (fondo lila claro, letra negra). Para elegir
+  // entre cosas ya hechas, como los grupos de agregados que se pueden usar; al pasar el mouse se llena de violeta.
+  lila:
+    "border border-violeta/30 bg-violeta-tinte text-tinta hover:border-violeta hover:bg-violeta hover:text-white focus-visible:outline-violeta-oscuro",
   // Verde: sacar un archivo (descargar el Excel de un reporte).
   exito:
     "border border-exito/35 bg-exito-luz text-exito hover:border-exito hover:bg-exito hover:text-white",

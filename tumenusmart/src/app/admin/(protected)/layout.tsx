@@ -626,7 +626,7 @@ function AvisoVencimiento({
   const rojo = estado.clase === "vencido" || estado.clase === "suspendido";
   const colores = rojo
     ? "border-peligro/30 bg-peligro-luz text-peligro"
-    : "border-violeta/30 bg-violeta-tinte text-violeta-oscuro";
+    : "border-violeta/30 bg-violeta-tinte text-tinta";
 
   if (enBarra) {
     return (

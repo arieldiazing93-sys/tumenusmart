@@ -189,7 +189,7 @@ export function GruposAgregadosProducto({
                 type="button"
                 disabled={pendiente}
                 onClick={() => usarGrupoExistente(g.id)}
-                className={`${clasesBoton("violeta", "md")} shadow-sm`}
+                className={`${clasesBoton("lila", "md")} shadow-sm`}
               >
                 + {g.nombre} ({g.cantidadModificadores})
               </button>
