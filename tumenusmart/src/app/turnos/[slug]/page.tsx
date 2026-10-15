@@ -52,7 +52,7 @@ const SUMMARY =
   "flex cursor-pointer list-none items-center gap-2 px-4 py-4 text-[0.95rem] font-semibold text-tinta [&::-webkit-details-marker]:hidden";
 
 /** Un botón de la fila de contacto: el círculo con su icono y, abajo, qué hace. */
-type Accion = { nombre: string; href: string; icono: ReactNode; externo: boolean };
+type Accion = { nombre: string; href: string; icono: ReactNode; externo: boolean; color: string };
 
 /** "09:00–20:00", o "Cerrado". */
 function textoDelDia(h: HorarioDia | undefined): string {
@@ -133,45 +133,37 @@ export default async function PaginaPublicaReservas({ params }: { params: Promis
   const enlaceWhatsapp = pagina.whatsapp
     ? construirLinkWhatsapp(pagina.whatsapp, `Hola, quiero reservar un turno en ${pagina.nombre}.`)
     : null;
-  const redes = [
-    { nombre: "Instagram", enlace: pagina.instagram, icono: <IconoInstagram tam={20} /> },
-    { nombre: "TikTok", enlace: pagina.tiktok, icono: <IconoTiktok tam={20} /> },
-    { nombre: "Facebook", enlace: pagina.facebook, icono: <IconoFacebook tam={20} /> },
-    {
-      nombre: "WhatsApp",
-      enlace: enlaceWhatsapp,
-      icono: <IconoWhatsappLinea tam={20} />,
-    },
-  ].filter((r) => r.enlace);
 
-  // La fila de contacto: llamar, correo y las redes, cada una con su nombre debajo.
+  // Los contactos y las redes, en una sola línea debajo del nombre, cada uno con el color de su plataforma.
   const acciones: Accion[] = [];
+  if (enlaceWhatsapp) {
+    acciones.push({ nombre: "WhatsApp", href: enlaceWhatsapp, icono: <IconoWhatsappLinea tam={18} />, externo: true, color: "text-[#25D366]" });
+  }
   if (pagina.telefono) {
-    acciones.push({ nombre: "Llamar", href: `tel:+${pagina.telefono}`, icono: <IconoTelefono tam={20} />, externo: false });
+    acciones.push({ nombre: "Llamar", href: `tel:+${pagina.telefono}`, icono: <IconoTelefono tam={18} />, externo: false, color: "text-brand-texto" });
   }
   if (pagina.email) {
-    acciones.push({ nombre: "Correo", href: `mailto:${pagina.email}`, icono: <IconoCorreo tam={20} />, externo: false });
+    acciones.push({ nombre: "Correo", href: `mailto:${pagina.email}`, icono: <IconoCorreo tam={18} />, externo: false, color: "text-brand-texto" });
   }
-  for (const r of redes) {
-    acciones.push({ nombre: r.nombre, href: r.enlace as string, icono: r.icono, externo: true });
+  if (pagina.instagram) {
+    acciones.push({ nombre: "Instagram", href: pagina.instagram, icono: <IconoInstagram tam={18} />, externo: true, color: "text-[#E1306C]" });
+  }
+  if (pagina.tiktok) {
+    acciones.push({ nombre: "TikTok", href: pagina.tiktok, icono: <IconoTiktok tam={18} />, externo: true, color: "text-tinta" });
+  }
+  if (pagina.facebook) {
+    acciones.push({ nombre: "Facebook", href: pagina.facebook, icono: <IconoFacebook tam={18} />, externo: true, color: "text-[#1877F2]" });
   }
 
   return (
     <div data-tema={tema} style={estilo} className="min-h-screen bg-papel-suave text-tinta">
       <main className="relative mx-auto min-h-screen w-full max-w-xl bg-papel pb-44 sm:shadow-alta">
-        {/* ---------- portada: el color del negocio, con círculos suaves de adorno ---------- */}
-        <div className="relative h-36 overflow-hidden bg-brand sm:h-44">
-          <span aria-hidden="true" className="absolute -right-10 -top-14 h-48 w-48 rounded-full bg-white/10" />
-          <span aria-hidden="true" className="absolute -left-12 top-16 h-40 w-40 rounded-full bg-white/10" />
-          <span aria-hidden="true" className="absolute right-24 top-20 h-20 w-20 rounded-full bg-black/10" />
+        {/* ---------- cabecera: la foto de perfil, redonda y centrada; debajo, el nombre y los enlaces en una sola línea ---------- */}
+        <header className="relative bg-gradient-to-b from-brand-light to-papel px-5 pb-6 pt-12 text-center">
           <div className="absolute right-3 top-3">
             <CompartirBoton nombre={pagina.nombre} />
           </div>
-        </div>
-
-        {/* ---------- el perfil, subiendo sobre la portada ---------- */}
-        <div className="relative -mt-14 px-5">
-          <div className="flex h-28 w-28 flex-none items-center justify-center overflow-hidden rounded-full border-4 border-papel bg-brand-light text-[2.4rem] font-semibold text-brand-texto shadow-media sm:h-32 sm:w-32 sm:text-[2.8rem]">
+          <div className="mx-auto flex h-32 w-32 items-center justify-center overflow-hidden rounded-full border-4 border-papel bg-brand-light text-[2.6rem] font-semibold text-brand-texto shadow-media">
             {pagina.fotoUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={pagina.fotoUrl} alt={pagina.nombre} className="h-full w-full object-cover" />
@@ -179,10 +171,29 @@ export default async function PaginaPublicaReservas({ params }: { params: Promis
               iniciales(pagina.nombre)
             )}
           </div>
-          <h1 className="mt-3 text-[1.75rem] font-semibold leading-tight tracking-titular text-tinta">{pagina.nombre}</h1>
-          {pagina.industria && <p className="mt-0.5 text-[1rem] text-tinta-media">{pagina.industria}</p>}
+          <h1 className="mt-3.5 text-[1.65rem] font-semibold leading-tight tracking-titular text-tinta">{pagina.nombre}</h1>
+          {pagina.industria && <p className="mt-0.5 text-[0.98rem] text-tinta-media">{pagina.industria}</p>}
 
-          <div className="mt-4 flex flex-wrap items-center gap-2">
+          {/* Los enlaces sociales (y llamar, correo, WhatsApp), cada uno con el color de su plataforma, en una sola línea. */}
+          {acciones.length > 0 && (
+            <ul className="mt-4 flex flex-nowrap items-center justify-center gap-2.5 overflow-x-auto px-1 py-1">
+              {acciones.map((a) => (
+                <li key={a.nombre} className="flex-none">
+                  <a
+                    href={a.href}
+                    {...(a.externo ? { target: "_blank", rel: "noopener noreferrer" } : {})}
+                    aria-label={a.nombre}
+                    title={a.nombre}
+                    className="flex h-11 w-11 items-center justify-center rounded-full bg-superficie shadow-sm ring-1 ring-linea transition-all hover:ring-brand active:scale-90"
+                  >
+                    <span className={a.color}>{a.icono}</span>
+                  </a>
+                </li>
+              ))}
+            </ul>
+          )}
+
+          <div className="mt-3.5 flex flex-wrap items-center justify-center gap-2">
             {horarios && (
               <span className="inline-flex items-center gap-1.5 rounded-full bg-brand-light px-3 py-1.5 text-[0.82rem] font-semibold text-brand-texto">
                 <IconoReloj tam={15} />
@@ -193,27 +204,9 @@ export default async function PaginaPublicaReservas({ params }: { params: Promis
               <span className="cifra text-[0.85rem] text-tinta-suave">{formatearTelefonoPersonal(pagina.telefono)}</span>
             )}
           </div>
+        </header>
 
-          {/* ---------- contacto y redes ---------- */}
-          {acciones.length > 0 && (
-            <ul className="mt-5 flex flex-wrap gap-x-2 gap-y-3">
-              {acciones.map((a) => (
-                <li key={a.nombre}>
-                  <a
-                    href={a.href}
-                    {...(a.externo ? { target: "_blank", rel: "noopener noreferrer" } : {})}
-                    aria-label={a.nombre}
-                    className="group flex w-14 flex-col items-center gap-1.5"
-                  >
-                    <span className="flex h-12 w-12 items-center justify-center rounded-full bg-brand-light text-brand-texto transition-all group-hover:bg-brand group-hover:text-white group-active:scale-90">
-                      {a.icono}
-                    </span>
-                    <span className="max-w-full truncate text-[0.72rem] font-medium text-tinta-media">{a.nombre}</span>
-                  </a>
-                </li>
-              ))}
-            </ul>
-          )}
+        <div className="px-5">
 
           {/* ---------- acerca de ---------- */}
           {pagina.descripcion && (
