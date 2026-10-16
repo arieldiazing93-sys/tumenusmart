@@ -118,10 +118,14 @@ export function Cabecera({
   bajada,
   acciones,
   compacta = false,
+  accionesALaDerecha = false,
 }: {
   titulo: string;
   bajada?: ReactNode;
   acciones?: ReactNode;
+  /** Los botones van a la derecha del título en una fila; si no entran, pasan debajo en una grilla de 3 columnas (tablet) o 2 (celular).
+   * Se mide por el ancho de la cabecera (ver `.cabecera-derecha` en globals.css), no por el de la ventana. */
+  accionesALaDerecha?: boolean;
   /** Más baja y con letra más chica: para una pantalla donde el espacio de arriba importa (ej. el Calendario). */
   compacta?: boolean;
 }) {
@@ -129,7 +133,7 @@ export function Cabecera({
     <header
       className={`flex flex-wrap items-start justify-between gap-x-4 border-b border-linea ${
         compacta ? "mb-2 gap-y-2 pb-2" : "mb-4 gap-y-2.5 pb-3"
-      }`}
+      } ${accionesALaDerecha ? "cabecera-derecha" : ""}`}
     >
       <div className="min-w-0">
         <h1 className={`font-semibold tracking-titular text-tinta ${compacta ? "text-[1.1rem]" : "text-[1.3rem]"}`}>
@@ -145,7 +149,9 @@ export function Cabecera({
           </p>
         )}
       </div>
-      {acciones && <div className="flex flex-wrap items-center gap-2">{acciones}</div>}
+      {acciones && (
+        <div className={accionesALaDerecha ? "cabecera-derecha__acciones" : "flex flex-wrap items-center gap-2"}>{acciones}</div>
+      )}
     </header>
   );
 }

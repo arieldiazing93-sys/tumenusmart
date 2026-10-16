@@ -149,6 +149,48 @@
   background-color: rgb(var(--papel-hundido));
 }
 
+/* Cabecera con los botones a la derecha del título (la usa el Punto de venta, ver `Cabecera` con `accionesALaDerecha`).
+
+   Se acomoda según el ANCHO DE LA CABECERA y no el de la ventana: con el menú de la izquierda abierto, una ventana de 1024 px deja
+   la cabecera en ~740 px y un breakpoint de Tailwind (`lg:`) se equivocaría. Ancho (en rem de la cabecera):
+     · 62 o más  → todos en una fila, pegados a la derecha, al lado del título;
+     · 34 a 62   → grilla de 3 columnas debajo del título (tablet): filas parejas, sin un botón suelto a la derecha;
+     · menos de 34 → grilla de 2 columnas (celular).
+   Un navegador que no entienda `@container` se queda con la regla de base (botones que se parten en líneas, a la derecha).
+   Va como regla suelta y NO como utilidad de Tailwind: las utilidades (`flex`, `grid`) pisarían a estas reglas, que tienen que ganar. */
+.cabecera-derecha {
+  container-type: inline-size;
+}
+.cabecera-derecha__acciones {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-left: auto;
+}
+@container (max-width: 61.99rem) {
+  .cabecera-derecha__acciones {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    width: 100%;
+  }
+}
+@container (max-width: 33.99rem) {
+  .cabecera-derecha__acciones {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+/* En un celular muy angosto (320 px) la letra y el relleno bajan un punto para que "Historial de cuentas" entre en su casilla. */
+@container (max-width: 20rem) {
+  .cabecera-derecha__acciones > * {
+    padding-left: 0.4rem;
+    padding-right: 0.4rem;
+    gap: 0.3rem;
+    font-size: 0.76rem;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
   *, *::before, *::after {

@@ -4,6 +4,7 @@ import { useEffect, useState, useTransition } from "react";
 import { Tarjeta, Campo, Entrada, Selector, Pastilla, clasesBoton } from "@/components/ui";
 import { UNIDADES_MEDIDA, etiquetaUnidadMedida } from "@/lib/unidad-medida";
 import { TASAS_IVA } from "@/lib/iva";
+import { estadoDeStock } from "@/lib/alerta-stock";
 import { actualizarInsumo } from "./actions";
 import { RecetaElaborado, type IngredienteDatos } from "./RecetaElaborado";
 
@@ -55,10 +56,10 @@ export function InsumoPanel({
     setCategoriaId(insumo.categoriaId ?? "");
   }, [insumo.categoriaId]);
 
-  // Una preparación no lleva stock propio: no hay nada que avisar.
-  const negativo = !insumo.esElaborado && insumo.stockActual < 0;
-  const bajoMinimo =
-    !insumo.esElaborado && insumo.stockMinimo != null && insumo.stockActual < insumo.stockMinimo;
+  // Una preparación no lleva stock propio: no hay nada que avisar. La regla es la misma de la lista y del reporte (src/lib/alerta-stock.ts).
+  const estadoStock = estadoDeStock(insumo.stockActual, insumo.stockMinimo, insumo.esElaborado);
+  const negativo = estadoStock === "negativo";
+  const bajoMinimo = estadoStock === "bajo";
 
   function alGuardar(formData: FormData) {
     setError(null);
@@ -83,7 +84,7 @@ export function InsumoPanel({
           {insumo.esElaborado && <Pastilla color="azul">Preparación</Pastilla>}
           <Pastilla color={insumo.activo ? "exito" : "neutro"}>{insumo.activo ? "Activo" : "Desactivado"}</Pastilla>
           {negativo && <Pastilla color="peligro">Stock negativo</Pastilla>}
-          {!negativo && bajoMinimo && <Pastilla color="aviso">Bajo el mínimo</Pastilla>}
+          {bajoMinimo && <Pastilla color="aviso">Bajo el mínimo</Pastilla>}
         </div>
       </div>
 

@@ -2,6 +2,7 @@ import { prismaDelLocal } from "./prisma-local";
 import { type RangoDias } from "./rango-dias";
 import { acumularMovimientos, redondear3, SIN_CATEGORIA_INSUMO } from "./reporte-almacen";
 import { etiquetaUnidadMedida } from "./unidad-medida";
+import { estadoDeStock, tieneAlertaDeStock } from "./alerta-stock";
 
 /**
  * Reporte de insumos en un rango de fechas: por cada insumo, con cuánto stock
@@ -60,6 +61,8 @@ export type ReporteInsumos = {
   rango: RangoDias;
   /** Nombre de la categoría por la que se filtró ("Sin categoría" incluida), si se filtró. */
   categoriaFiltrada: string | null;
+  /** Si se pidió «solo stock bajo»: las filas son únicamente las que terminaron negativas o bajo el mínimo. */
+  soloBajo: boolean;
   filas: FilaInsumoReporte[];
   porAlmacen: FilaInsumoPorAlmacen[];
   totalValor: number;
@@ -70,7 +73,9 @@ export type ReporteInsumos = {
 export async function calcularReporteInsumos(
   storeId: string,
   rango: RangoDias,
-  categoria?: string | null
+  categoria?: string | null,
+  /** Dejar solo los insumos negativos o bajo el mínimo (el filtro «Stock bajo» de la pantalla de Insumos). */
+  soloBajo = false
 ): Promise<ReporteInsumos> {
   const db = prismaDelLocal(storeId);
 
@@ -123,7 +128,9 @@ export async function calcularReporteInsumos(
     totalesPorInsumo.set(a.insumoId, t);
   }
 
-  const filas: FilaInsumoReporte[] = insumos.map((i) => {
+  // El estado de cada insumo al final del rango, para dejar afuera (con «solo stock bajo») también sus renglones de «Por almacén».
+  const estadoPorInsumo = new Map<string, ReturnType<typeof estadoDeStock>>();
+  const todasLasFilas: FilaInsumoReporte[] = insumos.map((i) => {
     const t = totalesPorInsumo.get(i.id) ?? sinMovimientos();
     const inicial = redondear3(t.inicial);
     const compras = redondear3(t.compras);
@@ -134,6 +141,8 @@ export async function calcularReporteInsumos(
     const stock = redondear3(inicial + compras + ventas + ajustes + anulaciones + movimientos);
     const stockMinimo = i.stockMinimo != null ? Number(i.stockMinimo) : null;
     const costoUnitario = i.costoUnitario != null ? Number(i.costoUnitario) : null;
+    const estado = estadoDeStock(stock, stockMinimo);
+    estadoPorInsumo.set(i.id, estado);
     return {
       categoria: i.categoria?.nombre ?? "Sin categoría",
       insumo: i.nombre,
@@ -149,9 +158,10 @@ export async function calcularReporteInsumos(
       stockMinimo,
       costoUnitario,
       valor: costoUnitario != null ? stock * costoUnitario : null,
-      estado: stock < 0 ? "negativo" : stockMinimo != null && stock < stockMinimo ? "bajo" : "ok",
+      estado,
     };
   });
+  const filas = soloBajo ? todasLasFilas.filter((f) => tieneAlertaDeStock(f.estado)) : todasLasFilas;
   filas.sort(
     (a, b) => a.categoria.localeCompare(b.categoria, "es") || a.insumo.localeCompare(b.insumo, "es")
   );
@@ -163,6 +173,7 @@ export async function calcularReporteInsumos(
     if (cantidad === 0) continue;
     const i = datosDeInsumo.get(a.insumoId);
     if (!i) continue;
+    if (soloBajo && !tieneAlertaDeStock(estadoPorInsumo.get(a.insumoId) ?? "ok")) continue;
     const costo = i.costoUnitario != null ? Number(i.costoUnitario) : null;
     porAlmacen.push({
       almacen: a.almacenId ? (nombreDeAlmacen.get(a.almacenId) ?? "Almacén eliminado") : "Sin almacén",
@@ -187,6 +198,7 @@ export async function calcularReporteInsumos(
       : categoria === SIN_CATEGORIA_INSUMO
         ? "Sin categoría"
         : (categoriaElegida?.nombre ?? null),
+    soloBajo,
     filas,
     porAlmacen,
     totalValor: filas.reduce((s, f) => s + (f.valor ?? 0), 0),

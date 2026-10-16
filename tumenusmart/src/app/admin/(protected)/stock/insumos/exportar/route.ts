@@ -26,9 +26,11 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const rango = rangoDeDias(searchParams.get("desde"), searchParams.get("hasta"));
   const storeId = await idLocalActual();
+  // «solo=bajo» es el filtro «Stock bajo» de la pantalla de Insumos: solo los negativos y los que están bajo el mínimo.
+  const soloBajo = searchParams.get("solo") === "bajo";
   const [local, reporte] = await Promise.all([
     localActual(),
-    calcularReporteInsumos(storeId, rango, searchParams.get("categoria") || null),
+    calcularReporteInsumos(storeId, rango, searchParams.get("categoria") || null, soloBajo),
   ]);
 
   const periodo = `${diaEnTexto(rango.desde)} - ${diaEnTexto(rango.hasta)}`;
@@ -40,6 +42,7 @@ export async function GET(request: NextRequest) {
     filaTitulo(hoja, ["Reporte", titulo], 2);
     filaTitulo(hoja, ["Período", periodo], 2);
     filaTitulo(hoja, ["Categoría", reporte.categoriaFiltrada ?? "Todas"], 2);
+    filaTitulo(hoja, ["Mostrar", reporte.soloBajo ? "Solo insumos con stock bajo o negativo" : "Todos los insumos"], 2);
     hoja.addRow([]);
   };
 
@@ -63,7 +66,7 @@ export async function GET(request: NextRequest) {
     { width: 18 },
     { width: 10 },
   ];
-  cabeceraComun(hoja, "Insumos — movimiento y existencias");
+  cabeceraComun(hoja, soloBajo ? "Insumos — stock bajo" : "Insumos — movimiento y existencias");
   filaTitulo(
     hoja,
     [
@@ -122,5 +125,5 @@ export async function GET(request: NextRequest) {
     almacenes.addRow([f.almacen, f.categoria, f.insumo, f.unidad, f.cantidad, f.valor != null ? Math.round(f.valor) : ""]);
   }
 
-  return respuestaXlsx(libro, `insumos_${rango.desde}_a_${rango.hasta}.xlsx`);
+  return respuestaXlsx(libro, `insumos${soloBajo ? "_stock_bajo" : ""}_${rango.desde}_a_${rango.hasta}.xlsx`);
 }

@@ -18,12 +18,12 @@ import {
  * repone, un gasto pagado del cajón, un retiro del dueño…). Lo anotado suma o
  * resta al efectivo que tendría que haber al cerrar, así el corte cuadra.
  */
-export function MovimientosCajaBoton({ turnoId }: { turnoId: string }) {
+export function MovimientosCajaBoton({ turnoId, tam = "md" }: { turnoId: string; tam?: "sm" | "md" }) {
   const [abierto, setAbierto] = useState(false);
 
   return (
     <>
-      <button type="button" onClick={() => setAbierto(true)} className={clasesBoton("acceso", "md")}>
+      <button type="button" onClick={() => setAbierto(true)} className={clasesBoton("acceso", tam)}>
         💰 Caja: ingresos y retiros
       </button>
       {abierto && <ModalCaja turnoId={turnoId} onCerrar={() => setAbierto(false)} />}

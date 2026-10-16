@@ -15,9 +15,12 @@ export function AccesosDeServicio({
   pos,
   comedor,
   delivery,
+  tam = "md",
 }: {
   /** En cuál de los tres se está. */
   actual: ServicioDeCaja;
+  /** El tamaño de los botones: «sm» cuando la cabecera tiene que ser baja (el punto de venta). */
+  tam?: "sm" | "md";
   /** Qué accesos puede ver quien mira (cada uno según su permiso). */
   pos: boolean;
   comedor: boolean;
@@ -26,17 +29,17 @@ export function AccesosDeServicio({
   return (
     <>
       {actual !== "pos" && pos && (
-        <Link href="/admin/pos" className={clasesBoton("acceso", "md")}>
+        <Link href="/admin/pos" className={clasesBoton("acceso", tam)}>
           🏪 Punto de venta
         </Link>
       )}
       {actual !== "comedor" && comedor && (
-        <Link href="/admin/comedor" className={clasesBoton("acceso", "md")}>
+        <Link href="/admin/comedor" className={clasesBoton("acceso", tam)}>
           🍽 Servicio comedor
         </Link>
       )}
       {actual !== "delivery" && delivery && (
-        <Link href="/admin/delivery" className={clasesBoton("acceso", "md")}>
+        <Link href="/admin/delivery" className={clasesBoton("acceso", tam)}>
           🛵 Servicio delivery
         </Link>
       )}

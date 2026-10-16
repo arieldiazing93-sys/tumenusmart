@@ -17,16 +17,18 @@ function conSigno(n: number): string {
 export default async function ImprimirInsumosPage({
   searchParams,
 }: {
-  searchParams: Promise<{ categoria?: string; desde?: string; hasta?: string }>;
+  searchParams: Promise<{ categoria?: string; desde?: string; hasta?: string; solo?: string }>;
 }) {
   await pantallaConPermiso("stock.ver");
 
-  const { categoria, desde, hasta } = await searchParams;
+  const { categoria, desde, hasta, solo } = await searchParams;
   const rango = rangoDeDias(desde, hasta);
   const storeId = await idLocalActual();
+  // «solo=bajo» es el filtro «Stock bajo» de la pantalla de Insumos: solo los negativos y los que están bajo el mínimo.
+  const soloBajo = solo === "bajo";
   const [local, reporte] = await Promise.all([
     localActual(),
-    calcularReporteInsumos(storeId, rango, categoria || null),
+    calcularReporteInsumos(storeId, rango, categoria || null, soloBajo),
   ]);
 
   // Una sección por categoría.
@@ -49,15 +51,20 @@ export default async function ImprimirInsumosPage({
           <img src={local.logoUrl} alt={local.nombre} className="h-16 w-16 flex-none rounded-full object-cover" />
         )}
         <div>
-          <h1 className="text-2xl font-bold text-tinta">{local.nombre} — Insumos</h1>
+          <h1 className="text-2xl font-bold text-tinta">
+            {local.nombre} — Insumos{reporte.soloBajo ? " con stock bajo" : ""}
+          </h1>
           <p className="mt-1 text-sm text-tinta-media">
             Período: {diaEnTexto(rango.desde)} – {diaEnTexto(rango.hasta)} · {reporte.categoriaFiltrada ?? "Todas las categorías"}
+            {reporte.soloBajo ? " · Solo negativos y bajo el mínimo" : ""}
           </p>
         </div>
       </div>
 
       {reporte.filas.length === 0 ? (
-        <p className="text-sm text-tinta-suave">No hay insumos para mostrar.</p>
+        <p className="text-sm text-tinta-suave">
+          {reporte.soloBajo ? "Ningún insumo terminó el período con stock bajo ni negativo." : "No hay insumos para mostrar."}
+        </p>
       ) : (
         <>
           <table className="mb-8 w-full border-collapse text-sm">
