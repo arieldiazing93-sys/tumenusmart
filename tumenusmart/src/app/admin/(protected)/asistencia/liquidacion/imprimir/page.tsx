@@ -1,7 +1,7 @@
 import { pantallaConPermiso } from "@/lib/auth";
 import { idLocalActual, localActual } from "@/lib/local-actual";
 import { prismaDelLocal } from "@/lib/prisma-local";
-import { etiquetaDeFormaDePago, resumenDeDiasTrabajo } from "@/lib/ausencias";
+import { AVISO_REFERENCIA_LIQUIDACION, etiquetaDeFormaDePago, resumenDeDiasTrabajo } from "@/lib/ausencias";
 import { formatearGuarani } from "@/lib/format";
 import { cargarLiquidacion, periodoDeLiquidacion } from "@/lib/liquidacion-asistencia";
 import { diaEnTexto } from "@/lib/rango-dias";
@@ -44,6 +44,11 @@ export default async function ImprimirLiquidacionPage({
           <p className="mt-1 text-sm text-tinta-media">Liquidación del personal</p>
           <p className="text-sm text-tinta-media">Período: {textoPeriodo}</p>
         </div>
+      </div>
+
+      {/* Va en el papel también: lo que se imprime o se guarda como PDF no es una liquidación legal. */}
+      <div className="mb-6 rounded-lg border border-aviso/40 bg-aviso-luz px-4 py-3 text-xs leading-relaxed text-tinta [break-inside:avoid]">
+        <strong className="text-aviso">{AVISO_REFERENCIA_LIQUIDACION.titulo}.</strong> {AVISO_REFERENCIA_LIQUIDACION.texto}
       </div>
 
       {filas.length === 0 ? (

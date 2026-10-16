@@ -106,21 +106,36 @@ function diasDelMes(clave: string): number {
 export type TipoAusencia = "reposo" | "aviso" | "permiso" | "vacaciones" | "feriado" | "falta";
 export type ColorAusencia = "azul" | "aviso" | "marca" | "violeta" | "neutro" | "peligro";
 
+/**
+ * Los tipos de ausencia. Ningún tipo trae «se paga» de antemano, A PROPÓSITO: si ese día se le paga lo decide el administrador, registro
+ * por registro, tildando la casilla (un reposo, un permiso o unas vacaciones tampoco se pagan solos). Así la decisión es suya y queda en la
+ * Bitácora con su nombre; el sistema nunca marca por su cuenta.
+ */
 export const TIPOS_AUSENCIA: {
   valor: TipoAusencia;
   etiqueta: string;
-  /** Si ese día se le paga, hasta que el dueño diga otra cosa en cada registro. */
-  pagado: boolean;
   color: ColorAusencia;
   detalle: string;
 }[] = [
-  { valor: "reposo", etiqueta: "Reposo médico", pagado: true, color: "azul", detalle: "Presentó certificado o avisó que estaba enfermo." },
-  { valor: "aviso", etiqueta: "Avisó que no viene", pagado: false, color: "aviso", detalle: "Avisó antes que ese día no iba a venir." },
-  { valor: "permiso", etiqueta: "Permiso autorizado", pagado: true, color: "marca", detalle: "Se le dio permiso con anticipación." },
-  { valor: "vacaciones", etiqueta: "Vacaciones", pagado: true, color: "violeta", detalle: "Días de vacaciones." },
-  { valor: "feriado", etiqueta: "Feriado o día libre", pagado: true, color: "neutro", detalle: "El negocio no abrió o dio el día libre." },
-  { valor: "falta", etiqueta: "Falta sin aviso", pagado: false, color: "peligro", detalle: "No vino ni avisó (sirve para dejar un comentario)." },
+  { valor: "reposo", etiqueta: "Reposo médico", color: "azul", detalle: "Presentó certificado o avisó que estaba enfermo." },
+  { valor: "aviso", etiqueta: "Avisó que no viene", color: "aviso", detalle: "Avisó antes que ese día no iba a venir." },
+  { valor: "permiso", etiqueta: "Permiso autorizado", color: "marca", detalle: "Se le dio permiso con anticipación." },
+  { valor: "vacaciones", etiqueta: "Vacaciones", color: "violeta", detalle: "Días de vacaciones." },
+  { valor: "feriado", etiqueta: "Feriado o día libre", color: "neutro", detalle: "El negocio no abrió o dio el día libre." },
+  { valor: "falta", etiqueta: "Falta sin aviso", color: "peligro", detalle: "No vino ni avisó (sirve para dejar un comentario)." },
 ];
+
+/**
+ * El aviso que lleva la Liquidación (pantalla, PDF y Excel) para que nadie la tome por una liquidación legal ni por algo que el sistema
+ * paga o descuenta: es una referencia, cada empresa puede calcular distinto y el administrador es quien autoriza cada día que se paga.
+ */
+export const AVISO_REFERENCIA_LIQUIDACION = {
+  titulo: "Referencia de cálculo",
+  texto:
+    "Esta liquidación es una guía que arma TuMenuSmart con las marcaciones y con las ausencias que el administrador autorizó. No es una " +
+    "liquidación legal ni un recibo de salario, y no paga ni descuenta nada de la caja. Cada empresa puede calcular distinto (otro divisor " +
+    "del día, descuentos, IPS, aguinaldo, vacaciones, horas extra): confirmá el importe con tu contador antes de pagar.",
+};
 
 export function esTipoAusencia(valor: string): valor is TipoAusencia {
   return TIPOS_AUSENCIA.some((t) => t.valor === valor);

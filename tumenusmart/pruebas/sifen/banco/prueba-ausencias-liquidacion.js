@@ -38,8 +38,10 @@
 
   window.log("== Tipos de ausencia");
   igual(a.TIPOS_AUSENCIA.map((t) => t.valor), ["reposo", "aviso", "permiso", "vacaciones", "feriado", "falta"], "seis tipos");
-  ok(a.datosDeTipo("reposo").pagado === true && a.datosDeTipo("vacaciones").pagado && a.datosDeTipo("feriado").pagado && a.datosDeTipo("permiso").pagado, "reposo, vacaciones, feriado y permiso se pagan por defecto");
-  ok(a.datosDeTipo("aviso").pagado === false && a.datosDeTipo("falta").pagado === false, "avisó y falta sin aviso no");
+  // Si un día se paga lo decide el administrador, registro por registro: NINGÚN tipo (ni un reposo ni unas vacaciones) trae el pago marcado.
+  ok(a.TIPOS_AUSENCIA.every((t) => !("pagado" in t)), "ningún tipo de ausencia trae «se paga» de antemano: el sistema no marca por su cuenta");
+  ok(a.datosDeTipo("reposo").pagado === undefined && a.datosDeTipo("vacaciones").pagado === undefined && a.datosDeTipo("feriado").pagado === undefined, "ni reposo, ni vacaciones, ni feriado");
+  ok(a.AVISO_REFERENCIA_LIQUIDACION.titulo === "Referencia de cálculo" && /no es una\s+liquidación legal/i.test(a.AVISO_REFERENCIA_LIQUIDACION.texto) && a.AVISO_REFERENCIA_LIQUIDACION.texto.includes("administrador autorizó") && a.AVISO_REFERENCIA_LIQUIDACION.texto.includes("contador"), "el aviso de la liquidación dice que es una referencia, que no es legal, que autoriza el administrador y que se confirme con el contador");
   igual(a.etiquetaDeAusencia("reposo"), "Reposo médico", "etiqueta del reposo");
   igual(a.etiquetaDeAusencia("raro"), "raro", "un tipo desconocido devuelve el mismo texto");
   ok(a.esTipoAusencia("aviso") && !a.esTipoAusencia("huelga"), "esTipoAusencia");

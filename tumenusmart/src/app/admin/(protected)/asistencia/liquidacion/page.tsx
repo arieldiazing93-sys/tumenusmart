@@ -5,6 +5,7 @@ import { Aviso, BotonEnlace, Cabecera, Cifra, clasesBoton } from "@/components/u
 import { FiltroFechaReporte } from "@/components/FiltroFechaReporte";
 import { formatearGuarani } from "@/lib/format";
 import { DIAS_MAXIMOS_LIQUIDACION, cargarLiquidacion, periodoDeLiquidacion } from "@/lib/liquidacion-asistencia";
+import { AVISO_REFERENCIA_LIQUIDACION } from "@/lib/ausencias";
 import type { FiltroFecha } from "@/lib/rango-fecha";
 import { diaEnTexto } from "@/lib/rango-dias";
 import { TablaLiquidacion } from "./TablaLiquidacion";
@@ -91,6 +92,11 @@ export default async function LiquidacionPage({
           No se les puede calcular lo que les toca. Entrá a Colaboradores, tocá «Editar» y elegí mensual o jornal con su monto.
         </Aviso>
       )}
+
+      {/* Lo primero que se lee: esto es una referencia, no una liquidación legal ni algo que se pague o descuente solo. */}
+      <Aviso titulo={AVISO_REFERENCIA_LIQUIDACION.titulo} color="aviso">
+        {AVISO_REFERENCIA_LIQUIDACION.texto}
+      </Aviso>
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Cifra valor={formatearGuarani(totales.neto)} rotulo="Total a pagar" detalle={`${totales.personas} ${totales.personas === 1 ? "persona" : "personas"}`} />

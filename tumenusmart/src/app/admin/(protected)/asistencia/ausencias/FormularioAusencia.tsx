@@ -50,9 +50,9 @@ export function FormularioAusencia({
   const [tipo, setTipo] = useState<string>(tipoInicial);
   const [desde, setDesde] = useState(ausencia?.desde ?? inicial?.dia ?? "");
   const [hasta, setHasta] = useState(ausencia?.hasta ?? inicial?.dia ?? "");
-  const [pagado, setPagado] = useState(ausencia ? ausencia.pagado : (datosDeTipo(tipoInicial)?.pagado ?? false));
-  // Mientras el dueño no toque la casilla, sigue lo que corresponde al tipo (un reposo se paga, un aviso no); después, lo que él diga.
-  const [pagadoTocado, setPagadoTocado] = useState(editando);
+  // «Se paga» arranca SIEMPRE sin tildar, sea cual sea el tipo (también un reposo o unas vacaciones): lo autoriza el administrador, tildando.
+  // Al corregir un registro que ya existe, queda lo que se había decidido.
+  const [pagado, setPagado] = useState(ausencia ? ausencia.pagado : false);
   const [nota, setNota] = useState(ausencia?.nota ?? "");
 
   const dias = desde && hasta && desde <= hasta ? diasEntre(desde, hasta, 400).length : 0;
@@ -60,11 +60,6 @@ export function FormularioAusencia({
 
   // La persona de un registro que ya existe no se cambia: se borra y se anota de nuevo. Las inactivas solo aparecen si ya eran la elegida.
   const opciones = personas.filter((p) => p.activo || p.id === colaboradorId);
-
-  function cambiarTipo(nuevo: string) {
-    setTipo(nuevo);
-    if (!pagadoTocado) setPagado(datosDeTipo(nuevo)?.pagado ?? false);
-  }
 
   function cambiarDesde(valor: string) {
     setDesde(valor);
@@ -134,7 +129,7 @@ export function FormularioAusencia({
         </Campo>
 
         <Campo etiqueta="Qué pasó" ayuda={tipoElegido?.detalle}>
-          <Selector value={tipo} onChange={(e) => cambiarTipo(e.target.value)} aria-label="Qué pasó">
+          <Selector value={tipo} onChange={(e) => setTipo(e.target.value)} aria-label="Qué pasó">
             {TIPOS_AUSENCIA.map((t) => (
               <option key={t.valor} value={t.valor}>
                 {t.etiqueta}
@@ -162,16 +157,14 @@ export function FormularioAusencia({
           <input
             type="checkbox"
             checked={pagado}
-            onChange={(e) => {
-              setPagado(e.target.checked);
-              setPagadoTocado(true);
-            }}
+            onChange={(e) => setPagado(e.target.checked)}
             className="mt-0.5 h-4 w-4 flex-none accent-azul"
           />
           <span>
-            <span className="block text-[0.86rem] font-semibold text-tinta">Ese día se le paga</span>
+            <span className="block text-[0.86rem] font-semibold text-tinta">Autorizo que ese día se le pague</span>
             <span className="block text-[0.78rem] leading-snug text-tinta-suave">
-              Si lo tildás, no se le descuenta (mensual) y se le paga el jornal (jornal). Si no, cuenta como día sin goce.
+              Viene sin tildar a propósito: lo decidís vos, en cada caso. Si lo tildás, no se le descuenta (mensual) y se le paga el jornal
+              (jornal). Si no, cuenta como día sin goce. Queda anotado con tu nombre.
             </span>
           </span>
         </label>

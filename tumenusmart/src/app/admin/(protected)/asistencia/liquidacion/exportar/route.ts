@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { exigirPermiso } from "@/lib/auth";
 import { idLocalActual, localActual } from "@/lib/local-actual";
 import { prismaDelLocal } from "@/lib/prisma-local";
-import { etiquetaDeFormaDePago, resumenDeDiasTrabajo } from "@/lib/ausencias";
+import { AVISO_REFERENCIA_LIQUIDACION, etiquetaDeFormaDePago, resumenDeDiasTrabajo } from "@/lib/ausencias";
 import { cargarLiquidacion, periodoDeLiquidacion } from "@/lib/liquidacion-asistencia";
 import { diaEnTexto } from "@/lib/rango-dias";
 import { filaTitulo, nuevoLibro, respuestaXlsx } from "@/lib/excel-reporte";
@@ -53,6 +53,7 @@ export async function GET(request: NextRequest) {
   filaTitulo(hoja, ["Negocio", local.nombre], 2);
   filaTitulo(hoja, ["Reporte", "Liquidación del personal"], 2);
   filaTitulo(hoja, ["Período", textoPeriodo], 2);
+  filaTitulo(hoja, [AVISO_REFERENCIA_LIQUIDACION.titulo, "No es una liquidación legal: ver la nota al pie."], 2);
   hoja.addRow([]);
 
   filaTitulo(
@@ -107,6 +108,7 @@ export async function GET(request: NextRequest) {
   for (const c of [14, 15, 16]) total.getCell(c).numFmt = FORMATO_GUARANIES;
 
   hoja.addRow([]);
+  hoja.addRow([`${AVISO_REFERENCIA_LIQUIDACION.titulo}. ${AVISO_REFERENCIA_LIQUIDACION.texto}`]);
   hoja.addRow([
     "Mensual: el salario del período menos un día (el salario ÷ 30) por cada falta sin aviso y por cada día justificado sin goce. Jornal: un jornal por cada día que fue y por cada día justificado que se le paga.",
   ]);
