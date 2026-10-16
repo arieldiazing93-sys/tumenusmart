@@ -18,7 +18,7 @@ import type { ReactNode } from "react";
 //  Botón
 // ===========================================================================
 
-export type Tono = "principal" | "suave" | "navegar" | "violeta" | "lila" | "exito" | "nuevo" | "peligro" | "fantasma" | "whatsapp";
+export type Tono = "principal" | "suave" | "navegar" | "acceso" | "violeta" | "lila" | "exito" | "nuevo" | "peligro" | "fantasma" | "whatsapp";
 
 const TONOS: Record<Tono, string> = {
   // Naranja: avanzar y ejecutar (cobrar, continuar, enviar, filtrar). Guardar es azul (navegar) y crear es verde (nuevo).
@@ -30,6 +30,10 @@ const TONOS: Record<Tono, string> = {
   // Azul: volver, ir a otro lado y editar datos que ya existen. Nunca confirma nada.
   navegar:
     "border border-azul/35 bg-azul-luz text-azul-oscuro hover:border-azul hover:bg-azul hover:text-white",
+  // Accesos directos de la caja (Punto de venta, Servicio comedor, Servicio delivery, Ver mi carta, Caja, Cerrar turno, Impresión automática):
+  // el mismo fondo azul claro que «navegar», pero con la letra NEGRA, que se lee mejor de un vistazo con el local en marcha.
+  acceso:
+    "border border-azul/35 bg-azul-luz text-tinta hover:border-azul hover:bg-azul hover:text-white",
   // Violeta: una acción destacada que no es "el" botón naranja de la pantalla
   // (ej. "Activar" un local en Cartera, al lado de "Registrar pago").
   violeta:

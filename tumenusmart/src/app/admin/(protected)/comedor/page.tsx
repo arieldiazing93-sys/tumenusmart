@@ -246,7 +246,7 @@ export default async function ComedorPage() {
           <>
             {/* Ver mi carta: abre el enlace público y el QR para imprimir y poner en las mesas. */}
             {urlCarta && (
-              <CompartirCarta nombreNegocio={local?.nombre ?? "Nuestra carta"} url={urlCarta} etiquetaBoton="📱 Ver mi carta" tonoBoton="navegar" />
+              <CompartirCarta nombreNegocio={local?.nombre ?? "Nuestra carta"} url={urlCarta} etiquetaBoton="📱 Ver mi carta" tonoBoton="acceso" />
             )}
             {/* Accesos directos para no salir al menú: el punto de venta y el delivery. */}
             <AccesosDeServicio
@@ -256,7 +256,7 @@ export default async function ComedorPage() {
               delivery={puede(sesion.rol, "delivery.ver")}
             />
             {puedeGestionar && (
-              <BotonEnlace href="/admin/impresion" tono="navegar" tam="md">
+              <BotonEnlace href="/admin/impresion" tono="acceso" tam="md">
                 Impresión automática
               </BotonEnlace>
             )}

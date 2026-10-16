@@ -801,15 +801,15 @@ export function PantallaVenta({
             {/* Accesos directos a lo que más usa la caja, sin pasar por el menú: la carta (enlace y QR para las mesas), el comedor, el
                 delivery y el historial de cuentas. Unos pocos a propósito: los reportes se miran desde el menú. */}
             {carta && (
-              <CompartirCarta nombreNegocio={carta.nombre} url={carta.url} etiquetaBoton="📱 Ver mi carta" tonoBoton="navegar" tamBoton="md" />
+              <CompartirCarta nombreNegocio={carta.nombre} url={carta.url} etiquetaBoton="📱 Ver mi carta" tonoBoton="acceso" tamBoton="md" />
             )}
             {/* Los mismos botones están en la cabecera del Servicio comedor y del Servicio delivery (un solo componente). */}
             <AccesosDeServicio actual="pos" pos={false} comedor={accesos.comedor} delivery={accesos.delivery} />
-            <Link href="/admin/pos/cuentas" className={clasesBoton("navegar", "md")}>
+            <Link href="/admin/pos/cuentas" className={clasesBoton("acceso", "md")}>
               🧾 Historial de cuentas
             </Link>
             <MovimientosCajaBoton turnoId={turnoId} />
-            <Link href="/admin/pos/cerrar" className={clasesBoton("navegar", "md")}>
+            <Link href="/admin/pos/cerrar" className={clasesBoton("acceso", "md")}>
               🔒 Cerrar turno
             </Link>
           </>

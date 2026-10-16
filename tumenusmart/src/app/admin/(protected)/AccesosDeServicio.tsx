@@ -26,17 +26,17 @@ export function AccesosDeServicio({
   return (
     <>
       {actual !== "pos" && pos && (
-        <Link href="/admin/pos" className={clasesBoton("navegar", "md")}>
+        <Link href="/admin/pos" className={clasesBoton("acceso", "md")}>
           🏪 Punto de venta
         </Link>
       )}
       {actual !== "comedor" && comedor && (
-        <Link href="/admin/comedor" className={clasesBoton("navegar", "md")}>
+        <Link href="/admin/comedor" className={clasesBoton("acceso", "md")}>
           🍽 Servicio comedor
         </Link>
       )}
       {actual !== "delivery" && delivery && (
-        <Link href="/admin/delivery" className={clasesBoton("navegar", "md")}>
+        <Link href="/admin/delivery" className={clasesBoton("acceso", "md")}>
           🛵 Servicio delivery
         </Link>
       )}

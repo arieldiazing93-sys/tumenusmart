@@ -274,7 +274,7 @@ export default async function DeliveryPage() {
           <>
             {/* Accesos directos para no salir al menú: la carta (enlace y QR), el punto de venta y el comedor. */}
             {urlCarta && (
-              <CompartirCarta nombreNegocio={local?.nombre ?? "Nuestra carta"} url={urlCarta} etiquetaBoton="📱 Ver mi carta" tonoBoton="navegar" />
+              <CompartirCarta nombreNegocio={local?.nombre ?? "Nuestra carta"} url={urlCarta} etiquetaBoton="📱 Ver mi carta" tonoBoton="acceso" />
             )}
             <AccesosDeServicio
               actual="delivery"
@@ -283,7 +283,7 @@ export default async function DeliveryPage() {
               delivery={false}
             />
             {puedeGestionar && (
-              <BotonEnlace href="/admin/impresion" tono="navegar" tam="md">
+              <BotonEnlace href="/admin/impresion" tono="acceso" tam="md">
                 Impresión automática
               </BotonEnlace>
             )}

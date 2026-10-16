@@ -35,7 +35,7 @@ export function CompartirCarta({
   url: string;
   /** Lo que dice el botón que abre la ventana (en el Servicio comedor: "Ver mi carta"). */
   etiquetaBoton?: string;
-  tonoBoton?: "principal" | "navegar" | "suave";
+  tonoBoton?: "principal" | "navegar" | "acceso" | "suave";
   tamBoton?: "sm" | "md" | "lg";
 }) {
   const [abierto, setAbierto] = useState(false);
