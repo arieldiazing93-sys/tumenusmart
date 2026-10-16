@@ -27,6 +27,7 @@ import { MitadYMitadPickerPos } from "./MitadYMitadPickerPos";
 import { AgregadosPickerPos } from "./AgregadosPickerPos";
 import { CantidadPrevia } from "./CantidadPrevia";
 import { FilaDeGrupos } from "./FilaDeGrupos";
+import { colorDeCategoria, variablesDeColor } from "@/lib/colores-categoria";
 import { CANTIDAD_MAXIMA_EN_CAJA, cargaDeProducto, leerCantidadEscrita, sumarPesos } from "@/lib/cantidad-escrita";
 import { medidaDelPrecio, pesoValido, seVendePorPeso, textoDePeso } from "@/lib/unidad-medida";
 import { imprimirComprobante, type ResultadoImpresion } from "@/lib/impresion-comprobantes";
@@ -230,6 +231,12 @@ export function PantallaVenta({
       : null;
 
   const productosVisibles = resultadosBusqueda ?? categorias.find((c) => c.id === categoriaId)?.productos ?? [];
+
+  // El color de la categoría de cada producto (para pintar su tarjeta, también en los resultados de la búsqueda).
+  const colorPorProducto = useMemo(
+    () => new Map(categorias.flatMap((c) => c.productos.map((p) => [p.id, c.color ?? null] as const))),
+    [categorias]
+  );
 
   // Los mitad y mitad son de un grupo: no se muestran mientras se buscan productos por nombre.
   const gruposVisibles = resultadosBusqueda ? [] : gruposMitad.filter((g) => g.categoriaId === categoriaId);
@@ -814,7 +821,7 @@ export function PantallaVenta({
           {/* Los grupos, en dos filas como máximo: si no entran todos, unas flechas pasan a la página siguiente de grupos. Mientras se
               busca un producto por nombre ningún grupo queda resaltado; tocar uno cierra la búsqueda. */}
           <FilaDeGrupos
-            grupos={categorias.map((c) => ({ id: c.id, nombre: c.nombre, cantidad: c.productos.length }))}
+            grupos={categorias.map((c) => ({ id: c.id, nombre: c.nombre, cantidad: c.productos.length, color: c.color }))}
             activo={resultadosBusqueda ? "" : categoriaId}
             onElegir={(id) => {
               setCategoriaId(id);
@@ -881,19 +888,32 @@ export function PantallaVenta({
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
             {productosVisibles.map((p) => {
               const cantidadEnCarrito = cantidadesPorProducto.get(p.id) ?? 0;
+              // Cada tarjeta toma el color de SU categoría (también al buscar: los resultados de distintos grupos se distinguen).
+              const claveColor = colorPorProducto.get(p.id) ?? null;
+              const conColor = colorDeCategoria(claveColor) !== null;
               return (
                 <button
                   key={p.id}
                   type="button"
                   onClick={() => agregarProducto(p)}
+                  data-color={conColor ? claveColor : undefined}
+                  style={variablesDeColor(claveColor)}
                   className={`relative flex flex-col rounded-xl border p-3.5 text-left shadow-sm transition-all active:scale-[0.96] ${
-                    cantidadEnCarrito > 0
-                      ? "border-brand/50 bg-brand-light ring-1 ring-brand/20"
-                      : "border-linea bg-brand-light/40 hover:-translate-y-0.5 hover:border-brand/40 hover:bg-brand-light/70 hover:shadow-media"
+                    conColor
+                      ? cantidadEnCarrito > 0
+                        ? "border-[var(--cat)] bg-[var(--cat-18)] ring-1 ring-[var(--cat-45)]"
+                        : "border-[var(--cat-45)] bg-[var(--cat-10)] hover:-translate-y-0.5 hover:border-[var(--cat)] hover:bg-[var(--cat-18)] hover:shadow-media"
+                      : cantidadEnCarrito > 0
+                        ? "border-brand/50 bg-brand-light ring-1 ring-brand/20"
+                        : "border-linea bg-brand-light/40 hover:-translate-y-0.5 hover:border-brand/40 hover:bg-brand-light/70 hover:shadow-media"
                   }`}
                 >
                   {cantidadEnCarrito > 0 && (
-                    <span className="absolute -right-2 -top-2 flex h-6 min-w-6 items-center justify-center rounded-full border-2 border-papel-suave bg-brand px-1.5 text-[0.74rem] font-bold text-white shadow-sm">
+                    <span
+                      className={`absolute -right-2 -top-2 flex h-6 min-w-6 items-center justify-center rounded-full border-2 border-papel-suave px-1.5 text-[0.74rem] font-bold text-white shadow-sm ${
+                        conColor ? "bg-[var(--cat)]" : "bg-brand"
+                      }`}
+                    >
                       {cantidadEnCarrito}
                     </span>
                   )}

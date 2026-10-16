@@ -537,6 +537,9 @@ model Category {
   /// true = es un grupo de canchas de la Reserva de canchas («Fútbol 5», «Pádel»…). Sus productos son las canchas (alquiler por hora): se
   /// ven y se venden en el punto de venta como cualquier producto, pero NO aparecen en la carta pública ni en el menú del cliente.
   paraCanchas Boolean @default(false)
+  /// El color de la categoría en el punto de venta: la clave de una paleta fija (ver src/lib/colores-categoria.ts: "rojo", "azul"...). NULL = sin color
+  /// (se ve como siempre). La pastilla del grupo y las tarjetas de sus productos toman ese color.
+  color     String?
   productos Product[]
   createdAt DateTime  @default(now())
   // Días y horarios en que esta categoría se OCULTA de la carta pública —

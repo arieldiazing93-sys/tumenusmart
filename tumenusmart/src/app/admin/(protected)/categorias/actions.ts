@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { idLocalActual } from "@/lib/local-actual";
 import { prismaDelLocal } from "@/lib/prisma-local";
 import { moverEnLista, cambiosDeOrden, type Direccion } from "@/lib/ordenar";
+import { esColorCategoria } from "@/lib/colores-categoria";
 
 export type ResultadoCategoria = { ok: true } | { ok: false; error: string };
 
@@ -186,4 +187,21 @@ export async function eliminarTramoCategoria(categoryId: string, id: string): Pr
   revalidatePath("/admin/categorias");
   revalidatePath(`/admin/categorias/${categoryId}/horario`);
   revalidatePath("/[slug]", "layout");
+}
+
+/**
+ * Le pone (o le saca) el color a una categoría. `color` es la clave de la paleta (ver src/lib/colores-categoria.ts); NULL la deja sin color.
+ * Solo se aceptan claves conocidas. En el punto de venta, la pastilla del grupo y las tarjetas de sus productos toman ese color.
+ */
+export async function cambiarColorCategoria(id: string, color: string | null): Promise<ResultadoCategoria> {
+  await exigirPermiso("categorias.editar");
+  // Todas las consultas de acá abajo quedan atadas a este local.
+  const prisma = prismaDelLocal(await idLocalActual());
+
+  if (color !== null && !esColorCategoria(color)) return { ok: false, error: "Ese color no está en la paleta." };
+  const r = await prisma.category.updateMany({ where: { id }, data: { color } });
+  if (r.count === 0) return { ok: false, error: "No se encontró la categoría." };
+  revalidatePath("/admin/categorias");
+  revalidatePath("/admin/pos");
+  return { ok: true };
 }

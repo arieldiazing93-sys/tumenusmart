@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { IconoPlegar } from "@/components/iconos";
+import { colorDeCategoria, variablesDeColor } from "@/lib/colores-categoria";
 
 const CHIP_ACTIVO = "border-brand bg-brand text-white";
 const CHIP_INACTIVO = "border-linea bg-white text-tinta-media hover:border-brand hover:text-brand";
@@ -14,7 +15,13 @@ const ALTO_GRUPO = "2.25rem";
 const ESPACIO = "0.5rem";
 const FILAS_POR_PAGINA = 2;
 
-export type GrupoDeLaCarta = { id: string; nombre: string; cantidad: number };
+export type GrupoDeLaCarta = {
+  id: string;
+  nombre: string;
+  cantidad: number;
+  /** La clave del color de la categoría (ver src/lib/colores-categoria.ts); NULL o ausente = sin color. */
+  color?: string | null;
+};
 
 /**
  * Los grupos de la carta (categorías) del punto de venta, en un máximo de DOS filas para no gastar pantalla: si no entran todos, aparecen
@@ -61,6 +68,17 @@ export function FilaDeGrupos({
     return () => observador.disconnect();
   }, [grupos, medir]);
 
+  // El grupo elegido tiene que verse: si cambia el grupo (por ejemplo al cerrar la búsqueda) o las páginas se recalculan (cambió el ancho),
+  // se pasa a la página donde está. Mirar las otras páginas con las flechas no lo mueve: eso no cambia ni el grupo ni las páginas.
+  useEffect(() => {
+    const v = ventana.current;
+    if (!v || !activo) return;
+    const chip = [...v.querySelectorAll<HTMLElement>("[data-grupo]")].find((c) => c.dataset.id === activo);
+    if (!chip) return;
+    const fila = alturasDeFilas().indexOf(chip.offsetTop);
+    if (fila >= 0) setPagina(Math.floor(fila / FILAS_POR_PAGINA));
+  }, [activo, paginas, alturasDeFilas]);
+
   // Pasar de página = correr la ventana hasta la primera fila de esa página.
   useEffect(() => {
     const v = ventana.current;
@@ -96,16 +114,26 @@ export function FilaDeGrupos({
       >
         {grupos.map((g) => {
           const esActivo = g.id === activo;
+          // Con color: la pastilla toma el de su categoría (suave sin elegir, plena al elegirla). Sin color: como siempre.
+          const conColor = colorDeCategoria(g.color) !== null;
           return (
             <button
               key={g.id}
               type="button"
               data-grupo=""
+              data-id={g.id}
+              data-color={conColor ? g.color : undefined}
               aria-pressed={esActivo}
               onClick={() => onElegir(g.id)}
-              style={{ height: ALTO_GRUPO, flex: "none", maxWidth: "100%" }}
+              style={{ height: ALTO_GRUPO, flex: "none", maxWidth: "100%", ...variablesDeColor(g.color) }}
               className={`inline-flex items-center whitespace-nowrap rounded-full border px-3.5 text-[0.85rem] font-medium transition-colors ${
-                esActivo ? CHIP_ACTIVO : CHIP_INACTIVO
+                conColor
+                  ? esActivo
+                    ? "border-[var(--cat)] bg-[var(--cat)] text-white"
+                    : "border-[var(--cat-45)] bg-[var(--cat-10)] text-tinta hover:border-[var(--cat)] hover:bg-[var(--cat-18)]"
+                  : esActivo
+                    ? CHIP_ACTIVO
+                    : CHIP_INACTIVO
               }`}
             >
               <span className="truncate">{g.nombre}</span>

@@ -57,6 +57,7 @@ export default async function AdminCategoriasPage({
             id: c.id,
             nombre: c.nombre,
             activa: c.activa,
+            color: c.color,
             cantidadProductos: c._count.productos,
             ocultaAhora: categoriaOcultaPorHorario(tramosDeCategoria),
             tramos: tramosDeCategoria.map((t) => ({ id: t.id, diaSemana: t.diaSemana, abre: t.abre, cierra: t.cierra })),

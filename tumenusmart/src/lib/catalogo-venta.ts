@@ -54,7 +54,13 @@ export type ProductoVenta = {
   /** Solo después de `conPromosVigentes`: la promoción por descuento o por volumen que rige ahora para este producto. */
   promo?: PromoDeTarjeta;
 };
-export type CategoriaVenta = { id: string; nombre: string; productos: ProductoVenta[] };
+export type CategoriaVenta = {
+  id: string;
+  nombre: string;
+  /** La clave del color de la categoría (ver src/lib/colores-categoria.ts); NULL o ausente = sin color. */
+  color?: string | null;
+  productos: ProductoVenta[];
+};
 export type ProductoMitadVenta = {
   id: string;
   nombre: string;
@@ -80,6 +86,7 @@ export async function cargarCatalogoDeVenta(
     select: {
       id: true,
       nombre: true,
+      color: true,
       productos: {
         where: { disponible: true },
         orderBy: { orden: "asc" },
@@ -136,6 +143,7 @@ export async function cargarCatalogoDeVenta(
     .map((c) => ({
       id: c.id,
       nombre: c.nombre,
+      color: c.color,
       productos: c.productos.map((p) => ({
         id: p.id,
         nombre: p.nombre,

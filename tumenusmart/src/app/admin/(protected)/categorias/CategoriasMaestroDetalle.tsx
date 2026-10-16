@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Tarjeta, clasesBoton } from "@/components/ui";
 import { BotonesMover } from "@/components/BotonesMover";
+import { colorDeCategoria } from "@/lib/colores-categoria";
 import { CategoriaPanel, type CategoriaDatos } from "./CategoriaPanel";
 import { CrearCategoriaForm } from "./CrearCategoriaForm";
 import { moverCategoria } from "./actions";
@@ -119,6 +120,13 @@ export function CategoriasMaestroDetalle({
                     </td>
                   )}
                   <td className="px-3 py-2 font-medium">
+                    {colorDeCategoria(c.color) && (
+                      <span
+                        aria-label={`Color ${colorDeCategoria(c.color)?.etiqueta}`}
+                        className="mr-2 inline-block h-3 w-3 flex-none rounded-full align-middle"
+                        style={{ backgroundColor: colorDeCategoria(c.color)?.hex }}
+                      />
+                    )}
                     <span className="break-words">{c.nombre}</span>
                     {!c.activa && <span className="ml-1.5 text-xs font-normal text-tinta-suave">(oculta)</span>}
                   </td>
