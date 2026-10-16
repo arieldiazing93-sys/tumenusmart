@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Boton, Cabecera, Campo, Entrada, Tarjeta, clasesBoton } from "@/components/ui";
@@ -26,7 +26,11 @@ import { ClienteRapidoModal } from "./ClienteRapidoModal";
 import { MitadYMitadPickerPos } from "./MitadYMitadPickerPos";
 import { AgregadosPickerPos } from "./AgregadosPickerPos";
 import { CantidadPrevia } from "./CantidadPrevia";
+import { AsignarCodigoPos } from "./AsignarCodigoPos";
 import { FilaDeGrupos } from "./FilaDeGrupos";
+import { useLectorDeCodigos } from "@/components/useLectorDeCodigos";
+import { limpiarCodigo, variantesDeCodigo } from "@/lib/codigo-barras";
+import { pitar, prepararPitido } from "@/lib/pitido";
 import { colorDeCategoria, variablesDeColor } from "@/lib/colores-categoria";
 import { CANTIDAD_MAXIMA_EN_CAJA, cargaDeProducto, leerCantidadEscrita, sumarPesos } from "@/lib/cantidad-escrita";
 import { medidaDelPrecio, pesoValido, seVendePorPeso, textoDePeso } from "@/lib/unidad-medida";
@@ -107,6 +111,7 @@ export function PantallaVenta({
   personal,
   accesos,
   carta,
+  puedeAsignarCodigos = false,
 }: {
   turnoId: string;
   categorias: Categoria[];
@@ -140,6 +145,8 @@ export function PantallaVenta({
   accesos: { comedor: boolean; delivery: boolean };
   /** El nombre y la dirección pública de la carta, para el botón "Ver mi carta" (enlace y QR para imprimir). Null si no se pudo armar. */
   carta: { nombre: string; url: string } | null;
+  /** Si quien vende puede guardar códigos de barras en los productos (permiso de editar productos): ofrece «Asignar a un producto» al escanear uno nuevo. */
+  puedeAsignarCodigos?: boolean;
 }) {
   const router = useRouter();
   // El cuadro que pide la contraseña de un usuario autorizado cuando el descuento está protegido (Ajustes → Seguridad).
@@ -346,21 +353,114 @@ export function PantallaVenta({
     return true;
   }
 
-  function agregarProducto(p: Producto) {
+  /**
+   * Suma el producto tocado (o escaneado). Devuelve qué pasó: "agregado", "elige" (tiene agregados: se abrió el selector y la cuenta se
+   * completa al confirmarlo) o "error" (la cantidad escrita no sirve para ese producto; ya se avisó el motivo).
+   */
+  function agregarProducto(p: Producto): "agregado" | "elige" | "error" {
     setError(null);
     const carga = cargaPara(p);
-    if (!carga) return;
+    if (!carga) return "error";
     // Con agregados para elegir, siempre abre el selector — igual que "Elegir agregados" en el menú público, en vez de sumar a ciegas
     // sin preguntar. Lo escrito en «Cantidad» espera ahí.
     if (p.agregados.length > 0) {
       setCargaPendiente(carga);
       setProductoEligiendo(p);
-      return;
+      return "elige";
     }
     if (sumarProductoAlCarrito({ key: p.id, productId: p.id, agregadoIds: [], nombre: p.nombre, precio: p.precio }, carga)) {
       setCantidadPrevia("");
+      return "agregado";
     }
+    return "error";
   }
+
+  // ---------------------------------------------------------------------------------------------------------------------------------
+  //  El lector de códigos de barras. Un lector (de cualquier marca) escribe los números del código de golpe y termina con Enter; el gancho
+  //  lo reconoce por la velocidad y avisa acá, sin importar dónde esté el foco (salvo en campos de otro tipo: nombre del cliente, RUC…).
+  //  Escanear un producto hace lo mismo que tocar su tarjeta: respeta lo escrito en «Cantidad», abre los agregados si los tiene y pide el
+  //  peso si es por kilo. Un código que no se conoce ofrece asignarlo a un producto.
+  // ---------------------------------------------------------------------------------------------------------------------------------
+  const [avisoLector, setAvisoLector] = useState<
+    { tipo: "ok" | "elige" | "error"; texto: string } | { tipo: "desconocido"; texto: string; codigo: string } | null
+  >(null);
+  const [asignandoCodigo, setAsignandoCodigo] = useState<string | null>(null);
+  // Los códigos que se asignaron en esta pantalla (código → producto) y todavía no llegaron con los datos del servidor.
+  const [codigosNuevos, setCodigosNuevos] = useState<Record<string, string>>({});
+
+  const productoPorCodigo = useMemo(() => {
+    const mapa = new Map<string, Producto>();
+    for (const c of categorias) {
+      for (const p of c.productos) {
+        if (!p.codigoBarras) continue;
+        for (const v of variantesDeCodigo(p.codigoBarras)) mapa.set(v, p);
+      }
+    }
+    for (const [codigo, productId] of Object.entries(codigosNuevos)) {
+      const p = productoPorId.get(productId);
+      if (p) for (const v of variantesDeCodigo(codigo)) mapa.set(v, p);
+    }
+    return mapa;
+  }, [categorias, codigosNuevos, productoPorId]);
+
+  function alEscanear(texto: string) {
+    const codigo = limpiarCodigo(texto);
+    if (!codigo) return;
+    const p = productoPorCodigo.get(codigo) ?? variantesDeCodigo(codigo).map((v) => productoPorCodigo.get(v)).find(Boolean);
+    if (!p) {
+      pitar("error");
+      setAvisoLector({ tipo: "desconocido", texto: `El código ${codigo} no está registrado.`, codigo });
+      return;
+    }
+    const r = agregarProducto(p);
+    if (r === "error") {
+      pitar("error");
+      setAvisoLector({ tipo: "error", texto: `${p.nombre}: revisá la cantidad escrita (mirá el aviso rojo de «Cantidad»).` });
+      return;
+    }
+    pitar("ok");
+    setAvisoLector(
+      r === "elige"
+        ? { tipo: "elige", texto: `${p.nombre}: elegí sus agregados para sumarlo.` }
+        : { tipo: "ok", texto: `✓ ${p.nombre}` }
+    );
+  }
+
+  // Los productos que todavía no tienen código (los únicos a los que se puede asignar uno desde acá).
+  const productosSinCodigo = useMemo(() => {
+    const yaAsignados = new Set(Object.values(codigosNuevos));
+    return categorias.flatMap((c) =>
+      c.productos
+        .filter((p) => !p.codigoBarras && !p.esServicio && !yaAsignados.has(p.id))
+        .map((p) => ({ id: p.id, nombre: p.nombre, categoria: c.nombre, precio: p.precio }))
+    );
+  }, [categorias, codigosNuevos]);
+
+  // El sonido del lector queda listo al abrir la pantalla: crearlo tarda y no tiene que demorar el primer producto escaneado.
+  useEffect(() => {
+    prepararPitido();
+  }, []);
+
+  // El aviso verde se va solo; el de código desconocido o con error se queda hasta que se lo cierre o se escanee otra cosa.
+  useEffect(() => {
+    if (!avisoLector || avisoLector.tipo !== "ok") return;
+    const t = window.setTimeout(() => setAvisoLector(null), 2500);
+    return () => window.clearTimeout(t);
+  }, [avisoLector]);
+
+  // Con el cobro, un cuadro o la contraseña abiertos, el lector no suma nada a la cuenta.
+  useLectorDeCodigos({
+    activo:
+      !mostrarCobro &&
+      !cobrando &&
+      !productoEligiendo &&
+      !mostrarModalClienteFiscal &&
+      !mostrarModalClienteRapido &&
+      !pidiendoClave &&
+      !asignandoCodigo &&
+      !bloqueadoSinFacturar,
+    alLeer: alEscanear,
+  });
 
   function confirmarAgregadosProducto(agregadoIds: string[], cantidad: number) {
     const p = productoEligiendo;
@@ -855,10 +955,45 @@ export function PantallaVenta({
             }
           />
 
+          {/* El resultado del último escaneo: verde y breve si el producto se sumó; con el motivo si no. Un código desconocido ofrece asignarlo. */}
+          {avisoLector && (
+            <div
+              role="status"
+              aria-live="polite"
+              className={`mb-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-lg border px-3 py-2 text-[0.88rem] font-medium ${
+                avisoLector.tipo === "ok"
+                  ? "border-exito/30 bg-exito-luz text-exito"
+                  : avisoLector.tipo === "elige"
+                    ? "border-azul/30 bg-azul-luz text-azul-oscuro"
+                    : "border-peligro/30 bg-peligro-luz text-peligro"
+              }`}
+            >
+              <span className="min-w-0 break-words">{avisoLector.texto}</span>
+              {avisoLector.tipo === "desconocido" && puedeAsignarCodigos && (
+                <button
+                  type="button"
+                  onClick={() => setAsignandoCodigo(avisoLector.codigo)}
+                  className={clasesBoton("navegar", "sm")}
+                >
+                  Asignar a un producto
+                </button>
+              )}
+              {avisoLector.tipo === "desconocido" && !puedeAsignarCodigos && (
+                <span className="text-[0.78rem] font-normal text-tinta-media">Para guardarlo hace falta el permiso de editar productos.</span>
+              )}
+              {avisoLector.tipo !== "ok" && (
+                <button type="button" onClick={() => setAvisoLector(null)} className="ml-auto text-[0.78rem] font-semibold underline">
+                  Cerrar
+                </button>
+              )}
+            </div>
+          )}
+
           {buscando && (
             <div className="mb-3">
               <Entrada
                 id="pos-buscar-producto"
+                data-lector="si"
                 type="search"
                 autoFocus
                 autoComplete="off"
@@ -1480,6 +1615,24 @@ export function PantallaVenta({
             setCargaPendiente(null);
           }}
           onAgregar={confirmarAgregadosProducto}
+        />
+      )}
+
+      {/* Un código escaneado que no se conocía: se elige de qué producto es y queda guardado. Después se suma el producto a la cuenta. */}
+      {asignandoCodigo && (
+        <AsignarCodigoPos
+          codigo={asignandoCodigo}
+          productos={productosSinCodigo}
+          onCerrar={() => setAsignandoCodigo(null)}
+          onAsignado={(p) => {
+            const codigo = asignandoCodigo;
+            setCodigosNuevos((actuales) => ({ ...actuales, [codigo]: p.id }));
+            setAsignandoCodigo(null);
+            setAvisoLector(null);
+            const completo = productoPorId.get(p.id);
+            if (completo) agregarProducto(completo);
+            pitar("ok");
+          }}
         />
       )}
 

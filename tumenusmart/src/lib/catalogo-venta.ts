@@ -46,6 +46,8 @@ export type ProductoVenta = {
    * "unidad" | "kilogramo" | "litro". Con kilogramo o litro el precio es por esa unidad y en el mostrador se puede cargar lo que se
    * pesó (gramos o kilos) para que la pantalla calcule el monto. Ausente = "unidad".
    */
+  /** El código de barras del producto (ver src/lib/codigo-barras.ts): con él el punto de venta lo suma al escanearlo. Ausente o null = sin código. */
+  codigoBarras?: string | null;
   unidadMedida?: string;
   agregados: AgregadoVenta[];
   promos?: TramoPromocion[];
@@ -96,6 +98,7 @@ export async function cargarCatalogoDeVenta(
           precio: true,
           esServicio: true,
           unidadMedida: true,
+          codigoBarras: true,
           mitadYMitadGrupo: true,
           mitadYMitadModo: true,
           ...PROMOS,
@@ -150,6 +153,7 @@ export async function cargarCatalogoDeVenta(
         precio: Number(p.precio),
         esServicio: p.esServicio,
         unidadMedida: p.unidadMedida,
+        codigoBarras: p.codigoBarras,
         agregados: agregadosDe(p),
         promos: tramosDeFilas(p.promociones),
       })),

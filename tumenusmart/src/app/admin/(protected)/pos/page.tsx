@@ -103,6 +103,7 @@ export default async function PosPage() {
       personal={personalParaVenta}
       accesos={{ comedor: puede(sesion.rol, "comedor.ver"), delivery: puede(sesion.rol, "delivery.ver") }}
       carta={store && urlCarta ? { nombre: store.nombre, url: urlCarta } : null}
+      puedeAsignarCodigos={puede(sesion.rol, "productos.editar")}
     />
   );
 }

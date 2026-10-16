@@ -102,6 +102,8 @@ model Store {
   intentosAutorizacion    Int       @default(0)
   bloqueoAutorizacionHasta DateTime?
   ultimoIntentoAutorizacionEn DateTime?
+  /// El correlativo de los códigos de barras propios que genera el sistema para los productos que no traen uno (el próximo es este número + 1).
+  contadorCodigosInternos Int     @default(0)
   /// El correlativo de las cuentas de mesa del local (la próxima es este número + 1).
   contadorCuentasMesa   Int       @default(0)
   /// El correlativo de las cuentas de delivery del local (la próxima es este número + 1).
@@ -709,6 +711,10 @@ model Product {
   // que iva: todavía no lo consume ningún cálculo acá, pero es un dato que
   // va a pedir la futura API de factura electrónica por cada ítem.
   unidadMedida String         @default("unidad")
+  /// El código de barras del producto (el de fábrica, que se escanea y se guarda, o uno propio que genera el sistema: EAN-13 que empieza con 2).
+  /// UNO por producto y no se repite dentro del local (varios productos sin código = varios NULL, que la base permite). Con él, el punto de
+  /// venta suma el producto al escanearlo. Ver src/lib/codigo-barras.ts.
+  codigoBarras String?
   /// true = es un servicio (un corte de pelo, una revisión, una consulta), no
   /// una mercadería. La factura electrónica distingue "venta de mercadería" de
   /// "prestación de servicios" (iTipTra de SIFEN); con esto el comprobante
@@ -762,6 +768,7 @@ model Product {
   createdAt   DateTime        @default(now())
   updatedAt   DateTime        @updatedAt
 
+  @@unique([storeId, codigoBarras])
   @@index([storeId])
   @@index([categoryId])
   @@index([almacenId])

@@ -14,6 +14,7 @@ import { aplanarReceta } from "@/lib/insumo-elaborado";
 import { cargarElaborados } from "@/lib/cargar-elaborados";
 import { SELECCION_PROMOCIONES, tramosDeFilas } from "@/lib/precio-promocion";
 import { PromocionesProducto } from "./PromocionesProducto";
+import { CodigoBarrasProducto } from "../codigos-barras/CodigoBarrasProducto";
 import { Tarjeta } from "@/components/ui";
 
 /**
@@ -185,6 +186,21 @@ export async function FichaProducto({ productoId }: { productoId: string }) {
         almacenes={almacenes}
         estiloCarta={tienda?.estiloCarta === "tarjetas" ? "tarjetas" : "lista"}
       />
+
+      {/* El código de barras: para vender escaneando el producto en el punto de venta. Un servicio no lleva (no hay nada que escanear).
+          Guarda por su cuenta, sin esperar al «Guardar» del formulario de arriba. */}
+      {!producto.esServicio && (
+        <div className="flex flex-col gap-2 rounded-xl border border-linea bg-superficie p-3">
+          <div>
+            <p className="rotulo text-[0.8rem] font-bold">Código de barras</p>
+            <p className="text-[0.82rem] text-tinta-media">
+              Con el código, el punto de venta suma este producto al escanearlo con un lector, sin buscarlo entre los grupos. Un solo código por
+              producto.
+            </p>
+          </div>
+          <CodigoBarrasProducto productId={producto.id} codigo={producto.codigoBarras} />
+        </div>
+      )}
 
       {producto.opciones.length > 0 && (
         <Tarjeta className="flex flex-col gap-3">

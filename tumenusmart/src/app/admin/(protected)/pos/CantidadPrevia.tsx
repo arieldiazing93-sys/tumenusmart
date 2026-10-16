@@ -32,6 +32,8 @@ export function CantidadPrevia({
       </label>
       <Entrada
         id="pos-cantidad-previa"
+        // Un escaneo con el foco acá NO se escribe en la cantidad: el lector de códigos lo reconoce y deja este campo como estaba.
+        data-lector="si"
         value={valor}
         onChange={(e) => onCambio(e.target.value.replace(/[^\d.,]/g, "").slice(0, 8))}
         inputMode="decimal"

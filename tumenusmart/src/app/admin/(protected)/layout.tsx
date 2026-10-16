@@ -108,6 +108,9 @@ function armarGrupos(hayIdeaSinVer: boolean, rol: string, ventasACredito: boolea
         // Descuentos ("PROMO 20 %") y promociones por volumen ("2 por 1") que rigen en ciertos días y horas, en todos los canales de venta.
         { href: "/admin/promociones", label: "Promociones", icono: "productos" as const,
           ver: conPermiso("productos.ver") },
+        // El código de barras de cada producto (para venderlo escaneándolo con un lector) y las etiquetas para pegárselo.
+        { href: "/admin/codigos-barras", label: "Códigos de barras", icono: "productos" as const,
+          ver: conPermiso("productos.ver") },
       ],
     },
     {
