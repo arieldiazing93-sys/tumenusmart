@@ -183,7 +183,7 @@ export function CategoriaPanel({
         <div className="mt-3 flex flex-wrap items-center gap-2" style={variablesDeColor(color)} aria-label="Así se ve en el punto de venta">
           <span
             className={`inline-flex h-9 items-center rounded-full border px-3.5 text-[0.85rem] font-medium ${
-              color ? "border-[var(--cat-45)] bg-[var(--cat-10)] text-tinta" : "border-linea bg-white text-tinta-media"
+              color ? "border-[var(--cat-60)] bg-[var(--cat-28)] text-tinta" : "border-linea bg-white text-tinta-media"
             }`}
           >
             {categoria.nombre} <span className="ml-1.5 text-tinta-suave">{categoria.cantidadProductos}</span>

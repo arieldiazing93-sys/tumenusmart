@@ -50,7 +50,9 @@ export function conTransparencia(hex: string, alfa: number): string {
  * Las variables CSS de un color, para ponerlas en `style` de un elemento y que sus clases las usen (`bg-[var(--cat-10)]`,
  * `hover:bg-[var(--cat-18)]`, `border-[var(--cat-45)]`, `bg-[var(--cat)]`). Sin color devuelve undefined: el elemento queda con sus clases de siempre.
  *
- * --cat: el color pleno · --cat-10 / --cat-18: fondos suaves (normal y al pasar el mouse) · --cat-45: bordes suaves.
+ * --cat: el color pleno · --cat-10 / --cat-18: fondos suaves de las tarjetas (normal y al pasar el mouse) · --cat-45: borde de las tarjetas ·
+ * --cat-28 / --cat-40 / --cat-60: la pastilla del grupo SIN elegir (fondo, fondo al pasar el mouse y borde): un tono intermedio, que ya se nota
+ * de lejos para distinguir los grupos sin tener que elegirlos.
  */
 export function variablesDeColor(clave: string | null | undefined): CSSProperties | undefined {
   const color = colorDeCategoria(clave);
@@ -59,6 +61,9 @@ export function variablesDeColor(clave: string | null | undefined): CSSPropertie
     "--cat": color.hex,
     "--cat-10": conTransparencia(color.hex, 0.1),
     "--cat-18": conTransparencia(color.hex, 0.18),
+    "--cat-28": conTransparencia(color.hex, 0.28),
+    "--cat-40": conTransparencia(color.hex, 0.4),
     "--cat-45": conTransparencia(color.hex, 0.45),
+    "--cat-60": conTransparencia(color.hex, 0.6),
   } as CSSProperties;
 }

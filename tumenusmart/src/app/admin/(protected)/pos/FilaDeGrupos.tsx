@@ -130,7 +130,7 @@ export function FilaDeGrupos({
                 conColor
                   ? esActivo
                     ? "border-[var(--cat)] bg-[var(--cat)] text-white"
-                    : "border-[var(--cat-45)] bg-[var(--cat-10)] text-tinta hover:border-[var(--cat)] hover:bg-[var(--cat-18)]"
+                    : "border-[var(--cat-60)] bg-[var(--cat-28)] text-tinta hover:border-[var(--cat)] hover:bg-[var(--cat-40)]"
                   : esActivo
                     ? CHIP_ACTIVO
                     : CHIP_INACTIVO

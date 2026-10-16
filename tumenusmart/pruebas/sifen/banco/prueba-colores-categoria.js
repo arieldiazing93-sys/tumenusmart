@@ -21,9 +21,11 @@
   igual(c.variablesDeColor(null), undefined, "sin color no hay variables");
   igual(c.variablesDeColor("nada"), undefined, "con una clave rara tampoco");
   const v = c.variablesDeColor("verde");
-  igual(Object.keys(v), ["--cat", "--cat-10", "--cat-18", "--cat-45"], "las cuatro variables de un color");
+  igual(Object.keys(v), ["--cat", "--cat-10", "--cat-18", "--cat-28", "--cat-40", "--cat-45", "--cat-60"], "las siete variables de un color");
   igual(v["--cat"], "#15803D", "--cat es el color pleno");
-  igual(v["--cat-10"], "rgba(21, 128, 61, 0.1)", "--cat-10 es el fondo suave");
+  igual(v["--cat-10"], "rgba(21, 128, 61, 0.1)", "--cat-10 es el fondo suave de la tarjeta");
+  igual(v["--cat-28"], "rgba(21, 128, 61, 0.28)", "--cat-28 es el fondo intermedio de la pastilla sin elegir");
+  igual(v["--cat-60"], "rgba(21, 128, 61, 0.6)", "--cat-60 es el borde de la pastilla sin elegir");
 
   window.log("== Colores de categoría: se lee el texto");
   const lum = (hex) => {
@@ -41,6 +43,10 @@
     const m = (canal) => Math.round(255 + (canal - 255) * alfa).toString(16).padStart(2, "0");
     return "#" + m((n >> 16) & 255) + m((n >> 8) & 255) + m(n & 255);
   };
+  // La pastilla sin elegir (28 %, y 40 % al pasar el mouse): también con el texto de siempre.
+  for (const x of c.COLORES_CATEGORIA) {
+    ok(contraste("#131417", mezcla(x.hex, 0.4)) >= 7, "texto oscuro sobre la pastilla de " + x.etiqueta + " al pasar el mouse (40 %): " + contraste("#131417", mezcla(x.hex, 0.4)).toFixed(1) + ":1");
+  }
   for (const x of c.COLORES_CATEGORIA) {
     ok(contraste("#131417", mezcla(x.hex, 0.18)) >= 7, "texto oscuro sobre el fondo suave de " + x.etiqueta + ": " + contraste("#131417", mezcla(x.hex, 0.18)).toFixed(1) + ":1");
   }
