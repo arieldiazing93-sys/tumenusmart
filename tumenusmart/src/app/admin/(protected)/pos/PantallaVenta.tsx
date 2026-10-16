@@ -26,6 +26,7 @@ import { ClienteRapidoModal } from "./ClienteRapidoModal";
 import { MitadYMitadPickerPos } from "./MitadYMitadPickerPos";
 import { AgregadosPickerPos } from "./AgregadosPickerPos";
 import { CantidadPrevia } from "./CantidadPrevia";
+import { FilaDeGrupos } from "./FilaDeGrupos";
 import { CANTIDAD_MAXIMA_EN_CAJA, cargaDeProducto, leerCantidadEscrita, sumarPesos } from "@/lib/cantidad-escrita";
 import { medidaDelPrecio, pesoValido, seVendePorPeso, textoDePeso } from "@/lib/unidad-medida";
 import { imprimirComprobante, type ResultadoImpresion } from "@/lib/impresion-comprobantes";
@@ -63,15 +64,19 @@ type ItemCarrito = { key: string; nombre: string; precio: number; cantidad: numb
   | { tipo: "combo"; productIdA: string; productIdB: string; agregadoIds: string[] }
 );
 
-const TODOS = "__todos__";
+/** Sin tildes ni mayúsculas, para que «cafe» encuentre «Café» al buscar un producto escribiendo. */
+function sinTildes(texto: string): string {
+  return texto
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "");
+}
 
 const TIPOS_ENTREGA_POS: { value: TipoEntregaPos; label: string }[] = [
   { value: "local", label: "🏪 En el local" },
   { value: "llevar", label: "🛵 Para llevar" },
 ];
 
-const CHIP_ACTIVO = "border-brand bg-brand text-white";
-const CHIP_INACTIVO = "border-linea text-tinta-media hover:border-brand hover:text-brand";
 
 /**
  * La pantalla de venta rápida de mostrador.
@@ -147,7 +152,11 @@ export function PantallaVenta({
   // se puede vender nada (ver bloqueadoSinFacturar más abajo).
   const facturaForzada = facturaObligatoria && puedeFacturar;
   const bloqueadoSinFacturar = facturaObligatoria && !puedeFacturar;
-  const [categoriaId, setCategoriaId] = useState<string>(categorias[0]?.id ?? TODOS);
+  // Arranca en el primer grupo de la carta (ya no hay un «Todos»: para llegar a cualquier producto está la búsqueda por nombre).
+  const [categoriaId, setCategoriaId] = useState<string>(categorias[0]?.id ?? "");
+  // «Buscar producto escribiendo»: mientras está abierto y hay texto, se muestran los productos de TODA la carta que coinciden con él.
+  const [buscando, setBuscando] = useState(false);
+  const [textoBusqueda, setTextoBusqueda] = useState("");
   // Lo que se pidió (producto, agregados, cantidad). El precio de cada línea NO se queda con el de cuando se tocó el producto: se vuelve a
   // calcular con los precios vigentes (si una promoción empieza o termina con la cuenta a medio armar, el total la sigue).
   const [carritoGuardado, setCarrito] = useState<ItemCarrito[]>([]);
@@ -210,15 +219,20 @@ export function PantallaVenta({
   // tiene un único producto al que asignarle la venta).
   const personalAAsignar = carrito.some((i) => i.tipo === "producto") ? personal : [];
 
-  const productosVisibles =
-    categoriaId === TODOS
-      ? categorias.flatMap((c) => c.productos)
-      : categorias.find((c) => c.id === categoriaId)?.productos ?? [];
+  // Los productos que coinciden con lo escrito en la búsqueda (de todos los grupos); null = no se está buscando nada. Se busca en el
+  // nombre del producto y también en el de su grupo: «pizza» encuentra todas las pizzas aunque cada una se llame por su sabor.
+  const textoBuscado = sinTildes(textoBusqueda.trim());
+  const resultadosBusqueda: Producto[] | null =
+    buscando && textoBuscado
+      ? categorias.flatMap((c) =>
+          c.productos.filter((p) => sinTildes(`${p.nombre} ${c.nombre}`).includes(textoBuscado))
+        )
+      : null;
 
-  const gruposVisibles =
-    categoriaId === TODOS ? gruposMitad : gruposMitad.filter((g) => g.categoriaId === categoriaId);
+  const productosVisibles = resultadosBusqueda ?? categorias.find((c) => c.id === categoriaId)?.productos ?? [];
 
-  const totalProductos = categorias.reduce((s, c) => s + c.productos.length, 0);
+  // Los mitad y mitad son de un grupo: no se muestran mientras se buscan productos por nombre.
+  const gruposVisibles = resultadosBusqueda ? [] : gruposMitad.filter((g) => g.categoriaId === categoriaId);
   // El producto cuyo selector de agregados está abierto, con los precios de este momento.
   const productoVivo = productoEligiendo
     ? categorias.flatMap((c) => c.productos).find((p) => p.id === productoEligiendo.id)
@@ -797,40 +811,63 @@ export function PantallaVenta({
 
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1fr_23rem] lg:items-start">
         <div className="min-w-0">
-          {/* Los grupos se acomodan en varias filas (sin barra para deslizar a la derecha): todos a la vista, de un toque. */}
-          <div className="mb-4 flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={() => setCategoriaId(TODOS)}
-              className={`flex-none rounded-full border px-3.5 py-1.5 text-[0.85rem] font-medium transition-colors ${
-                categoriaId === TODOS ? CHIP_ACTIVO : CHIP_INACTIVO
-              }`}
-            >
-              ✨ Todos{" "}
-              <span className={categoriaId === TODOS ? "text-white/80" : "text-tinta-suave"}>
-                {totalProductos}
-              </span>
-            </button>
-            {categorias.map((c) => (
-              <button
-                key={c.id}
-                type="button"
-                onClick={() => setCategoriaId(c.id)}
-                className={`flex-none rounded-full border px-3.5 py-1.5 text-[0.85rem] font-medium transition-colors ${
-                  c.id === categoriaId ? CHIP_ACTIVO : CHIP_INACTIVO
-                }`}
-              >
-                {c.nombre}{" "}
-                <span className={c.id === categoriaId ? "text-white/80" : "text-tinta-suave"}>
-                  {c.productos.length}
-                </span>
-              </button>
-            ))}
-          </div>
+          {/* Los grupos, en dos filas como máximo: si no entran todos, unas flechas pasan a la página siguiente de grupos. Mientras se
+              busca un producto por nombre ningún grupo queda resaltado; tocar uno cierra la búsqueda. */}
+          <FilaDeGrupos
+            grupos={categorias.map((c) => ({ id: c.id, nombre: c.nombre, cantidad: c.productos.length }))}
+            activo={resultadosBusqueda ? "" : categoriaId}
+            onElegir={(id) => {
+              setCategoriaId(id);
+              setBuscando(false);
+              setTextoBusqueda("");
+            }}
+          />
 
           {/* La cantidad se escribe ANTES de tocar el producto (35 empanadas; 0,285 de un producto por kilo, el peso de la balanza). En
-              blanco, sin atajos y sin nada elegido: opcional, para las cantidades grandes. Vacía, cada toque suma de a uno. */}
-          <CantidadPrevia valor={cantidadPrevia} onCambio={(t) => { setCantidadPrevia(t); setErrorCantidad(null); }} error={errorCantidad} />
+              blanco, sin atajos y sin nada elegido: opcional, para las cantidades grandes. Vacía, cada toque suma de a uno. Al lado, el
+              botón para buscar un producto de cualquier grupo escribiendo su nombre. */}
+          <CantidadPrevia
+            valor={cantidadPrevia}
+            onCambio={(t) => { setCantidadPrevia(t); setErrorCantidad(null); }}
+            error={errorCantidad}
+            accion={
+              <button
+                type="button"
+                aria-pressed={buscando}
+                onClick={() => {
+                  setBuscando((b) => !b);
+                  setTextoBusqueda("");
+                }}
+                className={clasesBoton(buscando ? "suave" : "navegar", "md")}
+              >
+                {buscando ? "✕ Cerrar búsqueda" : "🔍 Buscar producto escribiendo"}
+              </button>
+            }
+          />
+
+          {buscando && (
+            <div className="mb-3">
+              <Entrada
+                id="pos-buscar-producto"
+                type="search"
+                autoFocus
+                autoComplete="off"
+                value={textoBusqueda}
+                onChange={(e) => setTextoBusqueda(e.target.value.slice(0, 60))}
+                onKeyDown={(e) => {
+                  // Enter agrega el producto si quedó uno solo (sin adivinar cuando hay varios).
+                  if (e.key === "Enter" && resultadosBusqueda && resultadosBusqueda.length === 1) {
+                    e.preventDefault();
+                    agregarProducto(resultadosBusqueda[0]);
+                    setTextoBusqueda("");
+                  }
+                }}
+                placeholder="Escribí el nombre del producto (de cualquier grupo)"
+                aria-label="Buscar producto por nombre"
+                className="max-w-md !border-2 !border-azul/50"
+              />
+            </div>
+          )}
 
           {gruposVisibles.map((g) => (
             <MitadYMitadPickerPos
@@ -900,7 +937,9 @@ export function PantallaVenta({
             })}
             {productosVisibles.length === 0 && (
               <p className="col-span-full text-[0.85rem] text-tinta-suave">
-                Esta categoría no tiene productos disponibles.
+                {resultadosBusqueda
+                  ? `Ningún producto coincide con «${textoBusqueda.trim()}».`
+                  : "Esta categoría no tiene productos disponibles."}
               </p>
             )}
           </div>

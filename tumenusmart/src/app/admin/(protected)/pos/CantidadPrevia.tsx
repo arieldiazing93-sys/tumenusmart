@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { Entrada } from "@/components/ui";
 import { leerCantidadEscrita } from "@/lib/cantidad-escrita";
 
@@ -14,11 +15,14 @@ export function CantidadPrevia({
   valor,
   onCambio,
   error,
+  accion,
 }: {
   valor: string;
   onCambio: (texto: string) => void;
   /** Por qué no se pudo cargar con esa cantidad (se muestra en rojo al lado). */
   error: string | null;
+  /** Un botón que va pegado al campo (por ejemplo, «Buscar producto escribiendo»). */
+  accion?: ReactNode;
 }) {
   const escrita = leerCantidadEscrita(valor);
   return (
@@ -41,6 +45,7 @@ export function CantidadPrevia({
           escrita.tipo === "invalida" || error ? "!border-peligro" : "!border-tinta/70"
         }`}
       />
+      {accion}
       <span id="pos-cantidad-ayuda" className="min-w-0 text-[0.78rem] leading-snug text-tinta-suave">
         {escrita.tipo === "entera" ? (
           <span className="font-medium text-tinta">
