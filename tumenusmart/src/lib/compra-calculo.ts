@@ -80,6 +80,31 @@ export function costoConIvaDesdeNeto(neto: number, iva: string): number {
   return Math.abs(conIva - entero) < 0.008 ? entero : redondear(conIva);
 }
 
+/**
+ * El costo de reposición POR UNIDAD DE STOCK que dejó una línea ya guardada (CompraItem): su costo neto con los dos descuentos, repartido
+ * entre las unidades que trae cada unidad de compra. Es el mismo número que se le puso al insumo al comprar; sirve para devolverle ese
+ * costo cuando una compra más nueva se cancela. Una línea de costo 0 da 0 (y no debe pisar el costo del insumo).
+ */
+export function costoDeReposicionDeLinea(
+  linea: { costoUnitario: number; descuentoPorcentaje: number | null; rendimiento: number; iva: string },
+  descuentoGeneralPorcentaje: number | null
+): number {
+  const { lineas } = calcularCompra(
+    [
+      {
+        cantidad: 1,
+        costoUnitario: linea.costoUnitario,
+        costoIncluyeIva: false,
+        descuentoPorcentaje: linea.descuentoPorcentaje ?? 0,
+        iva: linea.iva,
+      },
+    ],
+    descuentoGeneralPorcentaje ?? 0
+  );
+  const rendimiento = Number.isFinite(linea.rendimiento) && linea.rendimiento > 0 ? linea.rendimiento : 1;
+  return Math.round((lineas[0].costoUnitarioEfectivo / rendimiento) * 100) / 100;
+}
+
 export function calcularCompra(
   lineas: LineaParaCalcular[],
   descuentoGeneralPorcentaje: number

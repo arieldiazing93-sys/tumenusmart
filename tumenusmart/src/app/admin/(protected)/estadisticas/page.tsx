@@ -23,11 +23,9 @@ const ETIQUETAS_TIPO_ENTREGA: Record<"delivery" | "retiro" | "mesa", string> = {
   mesa: "Comer en el local",
 };
 
+// Los tres períodos del protocolo de reportes: hoy, este mes y un rango de fechas (el rango lo trae el propio filtro, aparte de los atajos).
 const FILTROS_FECHA: { value: FiltroFecha; label: string }[] = [
   { value: "hoy", label: "Hoy" },
-  { value: "ayer", label: "Ayer" },
-  { value: "7dias", label: "Últimos 7 días" },
-  { value: "30dias", label: "Últimos 30 días" },
   { value: "mes", label: "Este mes" },
 ];
 
@@ -86,10 +84,10 @@ export default async function AdminEstadisticasPage({
   await pantallaConPermiso("estadisticas.ver");
 
   const { fecha, desde, hasta } = await searchParams;
-  const fechaActiva: FiltroFecha = (fecha as FiltroFecha) ?? "30dias";
+  const fechaActiva: FiltroFecha = (fecha as FiltroFecha) ?? "mes";
   const rango =
     calcularRangoFecha(fechaActiva, desde, hasta) ??
-    calcularRangoFecha("30dias", undefined, undefined)!;
+    calcularRangoFecha("mes", undefined, undefined)!;
 
   function hrefFecha(nuevaFecha: FiltroFecha) {
     return `/admin/estadisticas?fecha=${nuevaFecha}`;

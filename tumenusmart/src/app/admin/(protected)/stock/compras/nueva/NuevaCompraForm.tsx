@@ -166,6 +166,9 @@ export function NuevaCompraForm({
     [lineas, descuentoGeneral]
   );
 
+  // Las líneas con el costo escrito en 0: entran al stock pero no cambian el costo del insumo (ver registrarCompra). Se avisa al confirmar.
+  const lineasConCostoCero = lineas.filter((l) => l.costo !== "" && aNumero(l.cantidad) > 0 && aNumero(l.costo) === 0).length;
+
   function agregarLinea(insumo: InsumoParaCompra) {
     setError(null);
     contador.current += 1;
@@ -571,6 +574,12 @@ export function NuevaCompraForm({
             <p className="cifra mt-3 rounded-lg bg-papel-suave px-3 py-2 text-[0.88rem] text-tinta">
               {lineas.length} {lineas.length === 1 ? "insumo" : "insumos"} · Total {formatearGuarani(calculo.total)}
             </p>
+            {lineasConCostoCero > 0 && (
+              <p className="mt-3 rounded-lg border border-aviso/30 bg-aviso-luz px-3 py-2 text-[0.82rem] text-tinta">
+                {lineasConCostoCero === 1 ? "Hay 1 insumo con costo 0" : `Hay ${lineasConCostoCero} insumos con costo 0`}: entra al stock, pero NO
+                cambia el costo que ya tiene el insumo. Si fue un error, tocá «No» y corregilo.
+              </p>
+            )}
             <div className="mt-5 flex justify-end gap-2">
               <button
                 type="button"

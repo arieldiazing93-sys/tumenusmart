@@ -18,10 +18,10 @@ export default async function ImprimirAnalyticsPage({
   await pantallaConPermiso("analytics.ver");
 
   const { fecha, desde, hasta } = await searchParams;
-  const fechaActiva: FiltroFecha = (fecha as FiltroFecha) ?? "30dias";
+  const fechaActiva: FiltroFecha = (fecha as FiltroFecha) ?? "mes";
   const rango =
     calcularRangoFecha(fechaActiva, desde, hasta) ??
-    calcularRangoFecha("30dias", undefined, undefined)!;
+    calcularRangoFecha("mes", undefined, undefined)!;
 
   const storeId = await idLocalActual();
   const [local, clientes] = await Promise.all([

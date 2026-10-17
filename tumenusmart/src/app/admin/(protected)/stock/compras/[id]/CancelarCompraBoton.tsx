@@ -44,7 +44,7 @@ export function CancelarCompraBoton({ compraId }: { compraId: string }) {
       <p className="text-[0.88rem] font-semibold text-peligro">¿Cancelar esta compra?</p>
       <p className="text-[0.84rem] leading-relaxed text-tinta-media">
         Se le resta a cada insumo lo que esta compra había sumado, y la compra queda marcada como
-        cancelada (no se borra). El costo de reposición de los insumos no se revierte.
+        cancelada (no se borra). El costo de reposición de cada insumo vuelve al de su compra anterior (si no hay otra, queda como estaba).
       </p>
       <Area
         rows={2}

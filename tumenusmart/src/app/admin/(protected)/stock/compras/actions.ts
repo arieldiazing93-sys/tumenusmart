@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { idLocalActual } from "@/lib/local-actual";
 import { prismaDelLocal } from "@/lib/prisma-local";
-import { calcularCompra, type ResultadoCalculoCompra } from "@/lib/compra-calculo";
+import { calcularCompra, costoDeReposicionDeLinea, type ResultadoCalculoCompra } from "@/lib/compra-calculo";
 import { etiquetaUnidadMedida } from "@/lib/unidad-medida";
 import { formatearGuarani } from "@/lib/format";
 import { registrarBitacora } from "@/lib/bitacora";
@@ -121,6 +121,55 @@ function unidadesQueEntran(cantidad: number, rendimiento: number): number {
 /** Costo de reposición POR UNIDAD de stock: lo que costó cada pack (neto y con los descuentos), repartido entre las unidades que trae. */
 function costoDeReposicion(costoEfectivoPorCompra: number, rendimiento: number): number {
   return Math.round((costoEfectivoPorCompra / rendimiento) * 100) / 100;
+}
+
+/**
+ * Cuando una compra deja de aportar el costo de un insumo (se canceló, se le sacó el insumo, o su costo quedó en 0), el insumo vuelve al
+ * costo de la compra ANTERIOR que sí lo traía — pero solo si esa compra era la más reciente con costo: si hay una más nueva, el costo
+ * del insumo ya es el de esa y no se toca. Si no queda ninguna compra anterior con costo, se deja como estaba (no hay de dónde sacar otro).
+ *
+ * Va después de la transacción de la compra (con el cliente del local, que es lo que se le puede pasar a una función con seguridad):
+ * el costo es un dato que se deriva de las compras, y si este paso fallara solo queda el costo de antes, como pasaba hasta ahora.
+ */
+async function volverAlCostoDeLaCompraAnterior(
+  prisma: ReturnType<typeof prismaDelLocal>,
+  insumoId: string,
+  compraId: string,
+  compraCreadaEn: Date
+): Promise<void> {
+  const masNueva = await prisma.compraItem.count({
+    where: {
+      insumoId,
+      compraId: { not: compraId },
+      costoUnitario: { gt: 0 },
+      compra: { cancelada: false, createdAt: { gt: compraCreadaEn } },
+    },
+  });
+  if (masNueva > 0) return;
+
+  const anterior = await prisma.compraItem.findFirst({
+    where: { insumoId, compraId: { not: compraId }, costoUnitario: { gt: 0 }, compra: { cancelada: false } },
+    orderBy: { compra: { createdAt: "desc" } },
+    select: {
+      costoUnitario: true,
+      descuentoPorcentaje: true,
+      rendimiento: true,
+      iva: true,
+      compra: { select: { descuentoGeneralPorcentaje: true } },
+    },
+  });
+  if (!anterior) return;
+
+  const costo = costoDeReposicionDeLinea(
+    {
+      costoUnitario: Number(anterior.costoUnitario),
+      descuentoPorcentaje: anterior.descuentoPorcentaje != null ? Number(anterior.descuentoPorcentaje) : null,
+      rendimiento: Number(anterior.rendimiento),
+      iva: anterior.iva,
+    },
+    anterior.compra.descuentoGeneralPorcentaje != null ? Number(anterior.compra.descuentoGeneralPorcentaje) : null
+  );
+  if (costo > 0) await prisma.insumo.update({ where: { id: insumoId }, data: { costoUnitario: costo } });
 }
 
 type CompraPreparada = {
@@ -277,11 +326,14 @@ export async function registrarCompra(datos: DatosCompra): Promise<ResultadoComp
       const linea = lineas[i];
       const rendimiento = rendimientoDe(linea.insumoId);
       const unidades = unidadesQueEntran(linea.cantidad, rendimiento);
+      const costoNuevo = costoDeReposicion(calculo.lineas[i].costoUnitarioEfectivo, rendimiento);
       await tx.insumo.update({
         where: { id: linea.insumoId },
         data: {
           stockActual: { increment: unidades },
-          costoUnitario: costoDeReposicion(calculo.lineas[i].costoUnitarioEfectivo, rendimiento),
+          // Una línea de costo 0 (un regalo, una muestra, o un 0 por error) suma al stock pero NO pisa el costo del insumo con 0:
+          // eso hacía parecer gratis todo lo que lo lleva y inflaba la ganancia en los reportes.
+          ...(costoNuevo > 0 ? { costoUnitario: costoNuevo } : {}),
         },
       });
       await tx.movimientoStock.create({
@@ -331,7 +383,8 @@ export async function registrarCompra(datos: DatosCompra): Promise<ResultadoComp
  *
  * El costo de reposición de un insumo se actualiza solo si esta compra es la
  * última que lo trajo: corregir una compra vieja no pisa el precio de una más
- * nueva. (Un insumo que se quita de la compra conserva el costo que tenía.)
+ * nueva. Un insumo que se quita de la compra, o que queda en costo 0, deja de
+ * aportar su costo: vuelve al de la compra anterior (si esta era la última).
  */
 export async function actualizarCompra(
   compraId: string,
@@ -371,6 +424,10 @@ export async function actualizarCompra(
   }
 
   const registradoPor = sesion.nombre?.trim() || sesion.email;
+
+  // Qué insumos traía la compra ANTES de corregirla (para devolverle el costo a los que se quiten) y cuáles hay que revisar al final.
+  const insumosQueTraia = (await prisma.compraItem.findMany({ where: { compraId }, select: { insumoId: true } })).map((i) => i.insumoId);
+  const insumosParaRevisarElCosto = new Set<string>();
 
   await prisma.$transaction(async (tx) => {
     // Lo que esta compra tiene hoy en el stock, por insumo y almacén: la suma
@@ -440,25 +497,42 @@ export async function actualizarCompra(
       },
     });
 
-    // El costo de reposición sigue a la compra más reciente de cada insumo.
+    // El costo de reposición sigue a la compra más reciente de cada insumo (con costo: una compra de costo 0 no cuenta ni pisa nada).
     for (let i = 0; i < lineas.length; i++) {
       const linea = lineas[i];
+      const costoNuevo = costoDeReposicion(calculo.lineas[i].costoUnitarioEfectivo, rendimientoDe(linea.insumoId));
+      if (costoNuevo <= 0) {
+        // La línea quedó en costo 0: ya no aporta el costo del insumo (se revisa después de la transacción).
+        insumosParaRevisarElCosto.add(linea.insumoId);
+        continue;
+      }
       const conCompraMasNueva = await tx.compraItem.count({
         where: {
           insumoId: linea.insumoId,
           compraId: { not: compraId },
+          costoUnitario: { gt: 0 },
           compra: { cancelada: false, createdAt: { gt: compra.createdAt } },
         },
       });
       if (conCompraMasNueva > 0) continue;
       await tx.insumo.update({
         where: { id: linea.insumoId },
-        data: {
-          costoUnitario: costoDeReposicion(calculo.lineas[i].costoUnitarioEfectivo, rendimientoDe(linea.insumoId)),
-        },
+        data: { costoUnitario: costoNuevo },
       });
     }
   });
+
+  // Los insumos que esta compra ya no trae (se los quitó de la lista) o que quedaron en costo 0 dejan de aportar su costo: si esta era
+  // la compra más reciente de cada uno, vuelven al costo de la compra anterior.
+  const siguenEnLaCompra = new Set(lineas.map((l) => l.insumoId));
+  for (const id of insumosQueTraia) if (!siguenEnLaCompra.has(id)) insumosParaRevisarElCosto.add(id);
+  for (const id of insumosParaRevisarElCosto) {
+    try {
+      await volverAlCostoDeLaCompraAnterior(prisma, id, compraId, compra.createdAt);
+    } catch {
+      // Es un dato derivado: si este paso falla, el costo queda como estaba y la corrección de la compra ya se guardó.
+    }
+  }
 
   await registrarBitacora(idLocal, sesion, {
     modulo: "compras",
@@ -489,8 +563,10 @@ export async function actualizarCompra(
  * cancelada con quién y por qué — la fila nunca se borra, igual que una
  * venta cancelada.
  *
- * Ojo: el costo de reposición del insumo NO se revierte — no hay forma de
- * saber cuál era antes. Se corrige solo con la próxima compra.
+ * El costo de reposición de cada insumo vuelve al de la compra anterior que lo
+ * traía (si esta era la más reciente): cancelar una compra cargada con un
+ * precio equivocado no deja ese precio en el insumo. Si no hay una compra
+ * anterior con costo, el insumo queda con el que tenía.
  */
 export async function cancelarCompra(
   compraId: string,
@@ -511,6 +587,8 @@ export async function cancelarCompra(
       cancelada: true,
       total: true,
       numeroComprobante: true,
+      createdAt: true,
+      items: { select: { insumoId: true } },
       _count: { select: { pagos: true } },
     },
   });
@@ -578,6 +656,15 @@ export async function cancelarCompra(
     }
   });
   if (yaCancelada) return { ok: false, error: "Esa compra ya estaba cancelada." };
+
+  // La compra cancelada deja de aportar el costo de sus insumos: cada uno vuelve al costo de su compra anterior (si esta era la última).
+  for (const insumoId of new Set(compra.items.map((i) => i.insumoId))) {
+    try {
+      await volverAlCostoDeLaCompraAnterior(prisma, insumoId, compraId, compra.createdAt);
+    } catch {
+      // Es un dato derivado: si este paso falla, el costo queda como estaba y la cancelación ya se guardó.
+    }
+  }
 
   await registrarBitacora(idLocal, sesion, {
     modulo: "compras",

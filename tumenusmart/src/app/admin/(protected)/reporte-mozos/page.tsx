@@ -9,12 +9,10 @@ import { SelectorMozo } from "./SelectorMozo";
 
 export const dynamic = "force-dynamic";
 
+// Los tres períodos del protocolo de reportes: hoy, este mes y un rango de fechas (el rango lo trae el propio filtro, aparte de los atajos).
 const FILTROS_FECHA: { value: FiltroFecha; label: string }[] = [
   { value: "hoy", label: "Hoy" },
-  { value: "ayer", label: "Ayer" },
-  { value: "7dias", label: "Últimos 7 días" },
   { value: "mes", label: "Este mes" },
-  { value: "mesAnterior", label: "Mes anterior" },
 ];
 
 /**

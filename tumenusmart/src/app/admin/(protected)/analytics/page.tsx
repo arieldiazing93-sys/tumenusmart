@@ -14,10 +14,10 @@ import { FiltroFechaReporte } from "@/components/FiltroFechaReporte";
 
 export const dynamic = "force-dynamic";
 
+// Los tres períodos del protocolo de reportes: hoy, este mes y un rango de fechas (el rango lo trae el propio filtro, aparte de los atajos).
 const FILTROS_FECHA: { value: FiltroFecha; label: string }[] = [
-  { value: "30dias", label: "Últimos 30 días" },
-  { value: "45dias", label: "Últimos 45 días" },
-  { value: "60dias", label: "Últimos 60 días" },
+  { value: "hoy", label: "Hoy" },
+  { value: "mes", label: "Este mes" },
 ];
 
 const TOPE_TABLA = 100;
@@ -77,10 +77,10 @@ export default async function AnalyticsPage({
 
   const { fecha, desde, hasta, telefono } = await searchParams;
   const telefonoBuscado = telefono?.trim() ?? "";
-  const fechaActiva: FiltroFecha = (fecha as FiltroFecha) ?? "30dias";
+  const fechaActiva: FiltroFecha = (fecha as FiltroFecha) ?? "mes";
   const rango =
     calcularRangoFecha(fechaActiva, desde, hasta) ??
-    calcularRangoFecha("30dias", undefined, undefined)!;
+    calcularRangoFecha("mes", undefined, undefined)!;
 
   function hrefFecha(nuevaFecha: FiltroFecha) {
     return `/admin/analytics?fecha=${nuevaFecha}`;

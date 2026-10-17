@@ -20,12 +20,12 @@ export async function GET(request: NextRequest) {
   if (negado) return negado;
 
   const { searchParams } = new URL(request.url);
-  const fecha = searchParams.get("fecha") ?? "30dias";
+  const fecha = searchParams.get("fecha") ?? "mes";
   const desde = searchParams.get("desde") ?? undefined;
   const hasta = searchParams.get("hasta") ?? undefined;
 
   const rango =
-    calcularRangoFecha(fecha, desde, hasta) ?? calcularRangoFecha("30dias", undefined, undefined)!;
+    calcularRangoFecha(fecha, desde, hasta) ?? calcularRangoFecha("mes", undefined, undefined)!;
 
   const storeId = await idLocalActual();
 
