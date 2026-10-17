@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Boton } from "@/components/ui";
 import { Segmentado } from "@/components/Segmentado";
 import { useAutorizacion } from "@/components/Autorizacion";
+import { llamarAlServidor, MENSAJE_DUDOSO } from "@/lib/llamar-servidor";
 import { esDeMesAnterior, nombreDelMes } from "@/lib/mes-fiscal";
 import { cancelarFactura } from "./actions";
 
@@ -50,8 +51,10 @@ export function CancelarFacturaBoton({
     if (!puedeConfirmar) return;
     setCancelando(true);
     setError(null);
-    const r = await autorizar((clave) =>
-      cancelarFactura(origen, id, motivo, tambienCuenta === "si", mesAnterior && entiendoElAviso, clave)
+    // Anula una factura: si se corta la red no sabemos si quedó anulada → MENSAJE_DUDOSO (que mire el historial antes de repetir).
+    const r = await llamarAlServidor(
+      () => autorizar((clave) => cancelarFactura(origen, id, motivo, tambienCuenta === "si", mesAnterior && entiendoElAviso, clave)),
+      MENSAJE_DUDOSO
     );
     setCancelando(false);
     if (!r.ok) {

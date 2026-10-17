@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Area, Boton, clasesDeCampo } from "@/components/ui";
 import { EntradaMonto } from "@/components/EntradaMonto";
 import { formatearGuarani } from "@/lib/format";
+import { llamarAlServidor, MENSAJE_DUDOSO } from "@/lib/llamar-servidor";
 import { FORMAS_PAGO_POS, type FormaPagoPos } from "@/lib/turno-pos";
 import { cerrarTurno } from "../actions";
 
@@ -49,17 +50,22 @@ export function CerrarTurnoForm({ turnoId, cantidad, totalGeneral }: Props) {
   async function confirmar() {
     setCerrando(true);
     setError(null);
-    const r = await cerrarTurno(
-      turnoId,
-      {
-        efectivo: parseFloat(declarado.efectivo) || 0,
-        transferencia: parseFloat(declarado.transferencia) || 0,
-        tarjetaDebito: parseFloat(declarado.tarjeta_debito) || 0,
-        tarjetaCredito: parseFloat(declarado.tarjeta_credito) || 0,
-      },
-      notas,
-      cantidad,
-      totalGeneral
+    // Cierra plata: si se corta la red no sabemos si el servidor llegó a cerrarlo → MENSAJE_DUDOSO.
+    const r = await llamarAlServidor(
+      () =>
+        cerrarTurno(
+          turnoId,
+          {
+            efectivo: parseFloat(declarado.efectivo) || 0,
+            transferencia: parseFloat(declarado.transferencia) || 0,
+            tarjetaDebito: parseFloat(declarado.tarjeta_debito) || 0,
+            tarjetaCredito: parseFloat(declarado.tarjeta_credito) || 0,
+          },
+          notas,
+          cantidad,
+          totalGeneral
+        ),
+      MENSAJE_DUDOSO
     );
     setCerrando(false);
     if (!r.ok) {

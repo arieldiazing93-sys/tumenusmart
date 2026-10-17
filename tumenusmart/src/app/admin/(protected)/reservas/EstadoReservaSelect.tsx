@@ -2,6 +2,7 @@
 
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { llamarAlServidor } from "@/lib/llamar-servidor";
 import { actualizarEstadoReserva } from "./actions";
 import { ESTADOS_RESERVA, colorEstadoReserva } from "@/lib/reservas";
 
@@ -11,7 +12,7 @@ export function EstadoReservaSelect({ id, estado }: { id: string; estado: string
 
   function cambiar(nuevoEstado: string) {
     startTransition(async () => {
-      const resultado = await actualizarEstadoReserva(id, nuevoEstado);
+      const resultado = await llamarAlServidor(() => actualizarEstadoReserva(id, nuevoEstado));
       if (!resultado.ok) {
         alert(resultado.error);
         return;

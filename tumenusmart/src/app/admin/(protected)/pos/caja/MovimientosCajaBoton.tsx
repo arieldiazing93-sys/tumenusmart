@@ -1,7 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useState, useTransition } from "react";
+import { createPortal } from "react-dom";
 import { clasesBoton, Entrada, Pastilla } from "@/components/ui";
+import { useCapa } from "@/components/capas";
+import { MENSAJE_DUDOSO, llamarAlServidor } from "@/lib/llamar-servidor";
 import { Segmentado } from "@/components/Segmentado";
 import { formatearGuarani } from "@/lib/format";
 import {
@@ -46,7 +49,8 @@ function ModalCaja({ turnoId, onCerrar }: { turnoId: string; onCerrar: () => voi
   const [totales, setTotales] = useState({ ingresos: 0, retiros: 0, neto: 0 });
 
   const cargar = useCallback(async () => {
-    const r = await listarMovimientosCaja(turnoId);
+    // Sin internet la lista no llega: se avisa en vez de quedarse en «Cargando…» para siempre.
+    const r = await llamarAlServidor(() => listarMovimientosCaja(turnoId));
     setCargando(false);
     if (!r.ok) {
       setError(r.error);
@@ -60,13 +64,13 @@ function ModalCaja({ turnoId, onCerrar }: { turnoId: string; onCerrar: () => voi
     void cargar();
   }, [cargar]);
 
-  useEffect(() => {
-    function alTeclado(e: KeyboardEvent) {
-      if (e.key === "Escape" && !pendiente) onCerrar();
-    }
-    window.addEventListener("keydown", alTeclado);
-    return () => window.removeEventListener("keydown", alTeclado);
-  }, [onCerrar, pendiente]);
+  // Escape cierra el cuadro (si es la capa de arriba) y la página de atrás no se mueve mientras está abierto.
+  useCapa(
+    () => {
+      if (!pendiente) onCerrar();
+    },
+    { bloquearScroll: true }
+  );
 
   function registrar() {
     setError(null);
@@ -80,7 +84,8 @@ function ModalCaja({ turnoId, onCerrar }: { turnoId: string; onCerrar: () => voi
       return;
     }
     iniciar(async () => {
-      const r = await registrarMovimientoCaja(turnoId, { tipo, monto: valor, concepto });
+      // Es plata: si se corta la comunicación, puede que SÍ se haya anotado (se avisa que lo mire antes de repetir).
+      const r = await llamarAlServidor(() => registrarMovimientoCaja(turnoId, { tipo, monto: valor, concepto }), MENSAJE_DUDOSO);
       if (!r.ok) {
         setError(r.error);
         return;
@@ -95,7 +100,7 @@ function ModalCaja({ turnoId, onCerrar }: { turnoId: string; onCerrar: () => voi
     if (!confirm("¿Eliminar este movimiento de caja?")) return;
     setError(null);
     iniciar(async () => {
-      const r = await eliminarMovimientoCaja(id);
+      const r = await llamarAlServidor(() => eliminarMovimientoCaja(id));
       if (!r.ok) {
         setError(r.error);
         return;
@@ -104,7 +109,10 @@ function ModalCaja({ turnoId, onCerrar }: { turnoId: string; onCerrar: () => voi
     });
   }
 
-  return (
+  // Se dibuja en un portal directo en <body>, como el panel lateral y las demás ventanas: adentro de la cabecera del punto de venta (que
+  // se acomoda según su ancho con «container-type») un «fixed» podría medirse contra la cabecera y no contra la pantalla en algunos
+  // navegadores, y la ventana quedaría hecha una tira.
+  return createPortal(
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-tinta/45 p-4"
       onClick={() => {
@@ -229,6 +237,7 @@ function ModalCaja({ turnoId, onCerrar }: { turnoId: string; onCerrar: () => voi
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

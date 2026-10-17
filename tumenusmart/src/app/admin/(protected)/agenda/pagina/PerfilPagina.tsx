@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useCapa } from "@/components/capas";
 import { Campo, Entrada, Pastilla, Selector, Tarjeta, clasesBoton } from "@/components/ui";
 import { Interruptor } from "@/components/Interruptor";
 import { normalizarSlug } from "@/lib/alcance-local";
@@ -340,13 +341,7 @@ function ModalQR({
   const [error, setError] = useState<string | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  useEffect(() => {
-    const alPresionar = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onCerrar();
-    };
-    window.addEventListener("keydown", alPresionar);
-    return () => window.removeEventListener("keydown", alPresionar);
-  }, [onCerrar]);
+  useCapa(onCerrar);
 
   const svg = useMemo(() => {
     try {

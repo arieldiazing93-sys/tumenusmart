@@ -1,9 +1,11 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useState, useTransition } from "react";
+import { useCapa } from "@/components/capas";
 import { useRouter } from "next/navigation";
 import { Campo, Entrada, Selector, clasesBoton } from "@/components/ui";
 import { formatearGuarani } from "@/lib/format";
+import { MENSAJE_DUDOSO } from "@/lib/llamar-servidor";
 import { FORMAS_PAGO_POS } from "@/lib/turno-pos";
 import { rutaParaAbrirTurno } from "@/lib/turno-requerido";
 import { registrarCobroVenta } from "./actions";
@@ -65,13 +67,9 @@ function ModalCobro({
   const [notas, setNotas] = useState("");
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    function alTeclado(e: KeyboardEvent) {
-      if (e.key === "Escape" && !pendiente) onCerrar();
-    }
-    window.addEventListener("keydown", alTeclado);
-    return () => window.removeEventListener("keydown", alTeclado);
-  }, [onCerrar, pendiente]);
+  useCapa(() => {
+    if (!pendiente) onCerrar();
+  });
 
   function guardar() {
     setError(null);
@@ -81,12 +79,19 @@ function ModalCobro({
       return;
     }
     iniciar(async () => {
-      const resultado = await registrarCobroVenta(ventaId, {
-        monto: valor,
-        fecha,
-        formaPago,
-        notas: notas.trim() || null,
-      });
+      // Registra un cobro (entra a la caja): si se corta la red no sabemos si quedó anotado → MENSAJE_DUDOSO.
+      let resultado: Awaited<ReturnType<typeof registrarCobroVenta>>;
+      try {
+        resultado = await registrarCobroVenta(ventaId, {
+          monto: valor,
+          fecha,
+          formaPago,
+          notas: notas.trim() || null,
+        });
+      } catch {
+        setError(MENSAJE_DUDOSO);
+        return;
+      }
       if (!resultado.ok) {
         // Cobrar en efectivo sin turno abierto: se va directo a abrirlo y se vuelve a esta lista.
         if (resultado.sinTurno) {

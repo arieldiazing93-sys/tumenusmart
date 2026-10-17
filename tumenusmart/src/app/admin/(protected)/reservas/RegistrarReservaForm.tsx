@@ -2,6 +2,7 @@
 
 import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { llamarAlServidor } from "@/lib/llamar-servidor";
 import { crearReservaManual, type ResultadoReservaManual } from "./actions";
 import { TURNOS, MOTIVOS_RESERVA } from "@/lib/reservas";
 import { Campo, Entrada, Selector, Area, clasesBoton } from "@/components/ui";
@@ -18,7 +19,7 @@ export function RegistrarReservaForm({ diaSugerido }: { diaSugerido: string }) {
     datos.set("turno", turno);
     setResultado(null);
     iniciar(async () => {
-      const r = await crearReservaManual(datos);
+      const r = await llamarAlServidor(() => crearReservaManual(datos));
       setResultado(r);
       if (r.ok) {
         formRef.current?.reset();

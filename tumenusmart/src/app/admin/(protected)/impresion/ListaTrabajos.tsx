@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Pastilla, clasesBoton } from "@/components/ui";
+import { llamarAlServidor } from "@/lib/llamar-servidor";
 import { reimprimirTrabajo } from "./actions";
 
 export type TrabajoFila = {
@@ -34,7 +35,7 @@ export function ListaTrabajos({ trabajos }: { trabajos: TrabajoFila[] }) {
   function reimprimir(id: string) {
     setError(null);
     iniciar(async () => {
-      const r = await reimprimirTrabajo(id);
+      const r = await llamarAlServidor(() => reimprimirTrabajo(id));
       if (!r.ok) {
         setError(r.error);
         return;

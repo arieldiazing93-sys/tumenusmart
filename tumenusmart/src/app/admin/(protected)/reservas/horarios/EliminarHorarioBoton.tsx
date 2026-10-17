@@ -2,6 +2,7 @@
 
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { MENSAJE_SIN_RED } from "@/lib/llamar-servidor";
 import { eliminarHorario } from "../actions";
 
 export function EliminarHorarioBoton({ id }: { id: string }) {
@@ -11,8 +12,12 @@ export function EliminarHorarioBoton({ id }: { id: string }) {
   function eliminar() {
     if (!confirm("¿Quitar este horario? Ya no va a aparecer para nuevas reservas.")) return;
     startTransition(async () => {
-      await eliminarHorario(id);
-      router.refresh();
+      try {
+        await eliminarHorario(id);
+        router.refresh();
+      } catch {
+        alert(MENSAJE_SIN_RED);
+      }
     });
   }
 

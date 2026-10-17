@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Boton } from "@/components/ui";
 import { EntradaMonto } from "@/components/EntradaMonto";
+import { llamarAlServidor } from "@/lib/llamar-servidor";
 import { abrirTurno } from "../actions";
 
 export function AbrirTurnoForm({ estacionId, volverA }: { estacionId: string; volverA: string }) {
@@ -15,7 +16,7 @@ export function AbrirTurnoForm({ estacionId, volverA }: { estacionId: string; vo
   async function abrir() {
     setAbriendo(true);
     setError(null);
-    const r = await abrirTurno(estacionId, parseFloat(monto) || 0);
+    const r = await llamarAlServidor(() => abrirTurno(estacionId, parseFloat(monto) || 0));
     setAbriendo(false);
     if (!r.ok) {
       setError(r.error);

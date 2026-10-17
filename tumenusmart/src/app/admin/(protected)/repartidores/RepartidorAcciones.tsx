@@ -1,6 +1,7 @@
 "use client";
 
 import { useTransition } from "react";
+import { llamarAlServidor } from "@/lib/llamar-servidor";
 import { alternarActivoRepartidor, eliminarRepartidor } from "./actions";
 
 export function RepartidorAcciones({ id, activo }: { id: string; activo: boolean }) {
@@ -11,7 +12,15 @@ export function RepartidorAcciones({ id, activo }: { id: string; activo: boolean
       <button
         type="button"
         disabled={pending}
-        onClick={() => startTransition(() => alternarActivoRepartidor(id, !activo))}
+        onClick={() =>
+          startTransition(async () => {
+            const r = await llamarAlServidor(async () => {
+              await alternarActivoRepartidor(id, !activo);
+              return { ok: true as const };
+            });
+            if (!r.ok) alert(r.error);
+          })
+        }
         className={`rounded-full px-2.5 py-0.5 text-xs font-medium disabled:opacity-50 ${
           activo ? "bg-exito-luz text-exito" : "bg-papel-hundido text-tinta-media"
         }`}
@@ -24,7 +33,7 @@ export function RepartidorAcciones({ id, activo }: { id: string; activo: boolean
         onClick={() => {
           if (!confirm("¿Borrar este repartidor?")) return;
           startTransition(async () => {
-            const resultado = await eliminarRepartidor(id);
+            const resultado = await llamarAlServidor(() => eliminarRepartidor(id));
             if (!resultado.ok) alert(resultado.error);
           });
         }}

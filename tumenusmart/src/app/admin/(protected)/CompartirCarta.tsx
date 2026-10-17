@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { useCapa } from "@/components/capas";
 import { generarMatrizQR } from "@/lib/qr";
 import { dibujarPoster, matrizASvg } from "@/lib/poster-qr";
 import { clasesBoton } from "@/components/ui";
@@ -58,27 +60,10 @@ export function CompartirCarta({
   // Texto que acompaña al link cuando se usa el menú de compartir del sistema.
   const mensajeCompartir = `¡Hola! Te paso la carta de ${nombreNegocio} para que pidas directo desde tu celular: ${url}`;
 
-  // Cerrar con la tecla Escape, que es lo que uno espera de una ventana así.
-  useEffect(() => {
-    if (!abierto) return;
-    const alPresionar = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setAbierto(false);
-    };
-    window.addEventListener("keydown", alPresionar);
-    return () => window.removeEventListener("keydown", alPresionar);
-  }, [abierto]);
-
-  // Mientras la ventana está abierta, la lista de atrás no se mueve. Si se
-  // moviera, la rueda del mouse haría desfilar los pedidos por detrás del velo
-  // y al cerrar uno queda en otro lugar del listado.
-  useEffect(() => {
-    if (!abierto) return;
-    const anterior = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = anterior;
-    };
-  }, [abierto]);
+  // Cerrar con la tecla Escape, que es lo que uno espera de una ventana así (solo si es la capa de arriba). Y mientras la ventana está
+  // abierta, la lista de atrás no se mueve: si se moviera, la rueda del mouse haría desfilar los pedidos por detrás del velo y al cerrar
+  // uno queda en otro lugar del listado.
+  useCapa(() => setAbierto(false), { activa: abierto, bloquearScroll: true });
 
   async function copiarLink() {
     setError(null);
@@ -144,7 +129,11 @@ export function CompartirCarta({
         {etiquetaBoton}
       </button>
 
-      {abierto && (
+      {/* En un portal directo en <body>, como el panel lateral y las demás ventanas: el botón vive adentro de la cabecera del punto de venta
+          (que se acomoda según su ancho con «container-type»), y un «fixed» ahí adentro podría medirse contra la cabecera en algunos
+          navegadores y no contra la pantalla. */}
+      {abierto &&
+        createPortal(
         <div
           role="dialog"
           aria-modal="true"
@@ -272,7 +261,8 @@ export function CompartirCarta({
 
             {error && <p className="mt-3 text-sm text-peligro">{error}</p>}
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </>
   );

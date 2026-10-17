@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { clasesBoton } from "@/components/ui";
+import { llamarAlServidor } from "@/lib/llamar-servidor";
 import { eliminarCotizacion } from "./actions";
 
 /**
@@ -18,7 +19,7 @@ export function EliminarCotizacionBoton({ cotizacionId }: { cotizacionId: string
   function eliminar() {
     setError(null);
     iniciar(async () => {
-      const resultado = await eliminarCotizacion(cotizacionId);
+      const resultado = await llamarAlServidor(() => eliminarCotizacion(cotizacionId));
       if (!resultado.ok) {
         setError(resultado.error);
         setConfirmando(false);

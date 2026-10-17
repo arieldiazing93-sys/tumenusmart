@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { useCapa } from "@/components/capas";
 import { Boton } from "@/components/ui";
 import { formatearGuarani } from "@/lib/format";
 
@@ -41,13 +42,8 @@ export function AgregadosPickerPos({
     setSeleccionados((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
   }
 
-  useEffect(() => {
-    function alTeclado(e: KeyboardEvent) {
-      if (e.key === "Escape") onCerrar();
-    }
-    window.addEventListener("keydown", alTeclado);
-    return () => window.removeEventListener("keydown", alTeclado);
-  }, [onCerrar]);
+  // Escape cierra el selector (no el panel o la pantalla de atrás, que siguen con lo que tenían cargado).
+  useCapa(onCerrar);
 
   return (
     <div

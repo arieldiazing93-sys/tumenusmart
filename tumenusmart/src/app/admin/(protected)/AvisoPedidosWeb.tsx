@@ -10,6 +10,8 @@ import { formatearGuarani, formatearNumero } from "@/lib/format";
 const CLAVE_SONIDO = "tumenusmart:avisoPedidosWeb";
 const CLAVE_VISTOS = "tumenusmart:pedidosWebVistos";
 const SEGUNDOS_ENTRE_CHEQUEOS = 10;
+/** Cuántos chequeos seguidos tienen que fallar para que la campana avise que dejó de revisar (un fallo suelto es normal). */
+const FALLOS_PARA_AVISAR = 3;
 /** Cuántos carteles se ven a la vez; el resto se cuenta ("y 2 más"). */
 const MAXIMO_VISIBLES = 3;
 
@@ -50,6 +52,10 @@ export function AvisoPedidosWeb() {
   const [audioListo, setAudioListo] = useState(false);
   const [avisos, setAvisos] = useState<PedidoNuevo[]>([]);
   const [pendientes, setPendientes] = useState(0);
+  // Si el chequeo falla varias veces seguidas (sin internet, sesión vencida, error del servidor) la campana lo dice: de otro modo
+  // seguiría verde y un pedido nuevo entraría sin que suene nada.
+  const [sinConexion, setSinConexion] = useState(false);
+  const fallosSeguidos = useRef(0);
   const contexto = useRef<AudioContext | null>(null);
   const vistos = useRef<Set<string>>(new Set());
   const sonidoRef = useRef(true);
@@ -147,8 +153,11 @@ export function AvisoPedidosWeb() {
     async function revisar() {
       try {
         const respuesta = await fetch("/admin/api/pedidos-web-nuevos", { cache: "no-store" });
-        if (!respuesta.ok || cancelado) return;
+        if (cancelado) return;
+        if (!respuesta.ok) throw new Error(`estado ${respuesta.status}`);
         const datos: { pendientes?: number; pedidos?: PedidoNuevo[] } = await respuesta.json();
+        fallosSeguidos.current = 0;
+        setSinConexion(false);
         setPendientes(datos.pendientes ?? 0);
         const nuevos = (datos.pedidos ?? []).filter((p) => !vistos.current.has(p.id));
         if (nuevos.length === 0) return;
@@ -160,7 +169,10 @@ export function AvisoPedidosWeb() {
         // Con la bandeja abierta, el pedido aparece solo.
         if (rutaRef.current.startsWith("/admin/pedidos-web")) router.refresh();
       } catch {
-        // Sin conexión un momento: se reintenta en el próximo ciclo.
+        // Sin conexión un momento: se reintenta en el próximo ciclo. Si fallan varios seguidos, la campana avisa.
+        if (cancelado) return;
+        fallosSeguidos.current += 1;
+        if (fallosSeguidos.current >= FALLOS_PARA_AVISAR) setSinConexion(true);
       }
     }
 
@@ -197,7 +209,13 @@ export function AvisoPedidosWeb() {
     setAvisos((previos) => previos.filter((a) => a.id !== id));
   }
 
-  const estado: "apagado" | "trabado" | "andando" = !sonidoActivo ? "apagado" : audioListo ? "andando" : "trabado";
+  const estado: "apagado" | "trabado" | "andando" | "sinconexion" = sinConexion
+    ? "sinconexion"
+    : !sonidoActivo
+      ? "apagado"
+      : audioListo
+        ? "andando"
+        : "trabado";
   const visibles = avisos.slice(0, MAXIMO_VISIBLES);
   const ocultos = avisos.length - visibles.length;
 
@@ -210,14 +228,18 @@ export function AvisoPedidosWeb() {
         aria-pressed={sonidoActivo}
         aria-label="Aviso sonoro de pedidos nuevos del menú"
         title={
-          estado === "andando"
-            ? "Suena cuando entra un pedido del menú. Tocá para apagarlo."
-            : estado === "trabado"
-              ? "El navegador todavía no deja sonar. Se destraba tocando cualquier parte de la pantalla."
-              : "Activá el aviso y el panel suena cuando entra un pedido del menú."
+          estado === "sinconexion"
+            ? "No se están revisando los pedidos del menú: se perdió la conexión con el servidor. Se reintenta solo; mientras tanto no suena."
+            : estado === "andando"
+              ? "Suena cuando entra un pedido del menú. Tocá para apagarlo."
+              : estado === "trabado"
+                ? "El navegador todavía no deja sonar. Se destraba tocando cualquier parte de la pantalla."
+                : "Activá el aviso y el panel suena cuando entra un pedido del menú."
         }
         className={`relative flex h-8 w-8 flex-none items-center justify-center rounded-lg border transition-colors duration-150 ${
-          estado === "andando"
+          estado === "sinconexion"
+            ? "border-peligro/45 bg-peligro-luz text-peligro"
+            : estado === "andando"
             ? "border-brand/40 bg-brand-light text-brand-texto"
             : estado === "trabado"
               ? "border-aviso/45 bg-aviso-tinte text-aviso"

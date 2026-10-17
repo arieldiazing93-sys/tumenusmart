@@ -2,6 +2,7 @@
 
 import { useRef, useState, useTransition } from "react";
 import { clasesBoton } from "@/components/ui";
+import { llamarAlServidor } from "@/lib/llamar-servidor";
 import { crearRepartidor } from "./actions";
 
 export function CrearRepartidorForm() {
@@ -11,7 +12,7 @@ export function CrearRepartidorForm() {
 
   function alCrear(formData: FormData) {
     iniciar(async () => {
-      const resultado = await crearRepartidor(formData);
+      const resultado = await llamarAlServidor(() => crearRepartidor(formData));
       if (!resultado.ok) {
         alert(resultado.error);
         return;

@@ -255,7 +255,11 @@ export function MozoApp({
   }, [vista, refrescarSalon]);
 
   async function salir() {
-    await salirDelSalon(token);
+    try {
+      await salirDelSalon(token);
+    } catch {
+      // Sin internet no se pudo cerrar la sesión en el servidor: igual se vuelve a mirar la pantalla (si la sesión sigue, sigue el salón).
+    }
     router.refresh();
   }
 

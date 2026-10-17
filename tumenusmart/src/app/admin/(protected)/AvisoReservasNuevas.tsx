@@ -10,6 +10,8 @@ import { urlCita } from "@/lib/agenda";
 const CLAVE_SONIDO = "tumenusmart:avisoReservas";
 const CLAVE_VISTAS = "tumenusmart:reservasVistas";
 const SEGUNDOS_ENTRE_CHEQUEOS = 15;
+/** Cuántos chequeos seguidos tienen que fallar para que la campana avise que dejó de revisar (un fallo suelto es normal). */
+const FALLOS_PARA_AVISAR = 3;
 /** Cuántos carteles se ven a la vez; el resto se cuenta ("y 2 más"). */
 const MAXIMO_VISIBLES = 3;
 
@@ -70,6 +72,10 @@ export function AvisoReservasNuevas() {
   // "Lo quiere" y "puede sonar" son dos cosas: la segunda la da el navegador y se pierde en cada visita.
   const [audioListo, setAudioListo] = useState(false);
   const [avisos, setAvisos] = useState<Reserva[]>([]);
+  // Si el chequeo falla varias veces seguidas (sin internet, sesión vencida, error del servidor) la campana lo dice: de otro modo
+  // seguiría azul y una reserva nueva entraría sin que suene nada.
+  const [sinConexion, setSinConexion] = useState(false);
+  const fallosSeguidos = useRef(0);
   const contexto = useRef<AudioContext | null>(null);
   const vistas = useRef<Set<string>>(new Set());
   // Los chequeos corren en un intervalo: leen esto en vez de las variables del render para no quedar desactualizados.
@@ -168,8 +174,11 @@ export function AvisoReservasNuevas() {
     async function revisar() {
       try {
         const respuesta = await fetch("/admin/api/reservas-nuevas", { cache: "no-store" });
-        if (!respuesta.ok || cancelado) return;
+        if (cancelado) return;
+        if (!respuesta.ok) throw new Error(`estado ${respuesta.status}`);
         const datos: { reservas?: Reserva[] } = await respuesta.json();
+        fallosSeguidos.current = 0;
+        setSinConexion(false);
         const nuevas = (datos.reservas ?? []).filter((r) => !vistas.current.has(r.id));
         if (nuevas.length === 0) return;
 
@@ -180,7 +189,10 @@ export function AvisoReservasNuevas() {
         // Con el calendario (o Citas) abierto, la reserva aparece sola.
         if (rutaRef.current.startsWith("/admin/agenda") || rutaRef.current.startsWith("/admin/canchas")) router.refresh();
       } catch {
-        // Sin conexión un momento: se reintenta en el próximo ciclo.
+        // Sin conexión un momento: se reintenta en el próximo ciclo. Si fallan varios seguidos, la campana avisa.
+        if (cancelado) return;
+        fallosSeguidos.current += 1;
+        if (fallosSeguidos.current >= FALLOS_PARA_AVISAR) setSinConexion(true);
       }
     }
 
@@ -217,7 +229,13 @@ export function AvisoReservasNuevas() {
     setAvisos((previos) => previos.filter((a) => a.id !== id));
   }
 
-  const estado: "apagado" | "trabado" | "andando" = !sonidoActivo ? "apagado" : audioListo ? "andando" : "trabado";
+  const estado: "apagado" | "trabado" | "andando" | "sinconexion" = sinConexion
+    ? "sinconexion"
+    : !sonidoActivo
+      ? "apagado"
+      : audioListo
+        ? "andando"
+        : "trabado";
   const visibles = avisos.slice(0, MAXIMO_VISIBLES);
   const ocultos = avisos.length - visibles.length;
 
@@ -230,14 +248,18 @@ export function AvisoReservasNuevas() {
         aria-pressed={sonidoActivo}
         aria-label="Aviso sonoro de reservas nuevas"
         title={
-          estado === "andando"
-            ? "Suena cuando entra una reserva. Tocá para apagarlo."
-            : estado === "trabado"
-              ? "El navegador todavía no deja sonar. Se destraba tocando cualquier parte de la pantalla."
-              : "Activá el aviso y el panel suena cuando entra una reserva."
+          estado === "sinconexion"
+            ? "No se están revisando las reservas: se perdió la conexión con el servidor. Se reintenta solo; mientras tanto no suena."
+            : estado === "andando"
+              ? "Suena cuando entra una reserva. Tocá para apagarlo."
+              : estado === "trabado"
+                ? "El navegador todavía no deja sonar. Se destraba tocando cualquier parte de la pantalla."
+                : "Activá el aviso y el panel suena cuando entra una reserva."
         }
         className={`relative flex h-8 w-8 flex-none items-center justify-center rounded-lg border transition-colors duration-150 ${
-          estado === "andando"
+          estado === "sinconexion"
+            ? "border-peligro/45 bg-peligro-luz text-peligro"
+            : estado === "andando"
             ? "border-azul/40 bg-azul-luz text-azul-oscuro"
             : estado === "trabado"
               ? "border-aviso/45 bg-aviso-tinte text-aviso"

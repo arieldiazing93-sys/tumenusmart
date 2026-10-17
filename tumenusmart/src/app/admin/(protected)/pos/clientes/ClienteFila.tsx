@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { useCapa } from "@/components/capas";
 import { createPortal } from "react-dom";
 import { Td, Tr, clasesBoton } from "@/components/ui";
 import { etiquetaTipoIdentificacion } from "@/lib/tipo-cliente";
@@ -21,13 +22,7 @@ type Props = {
 
 /** La foto grande sola, para el link "Ver imagen" de la columna Imagen. */
 function VerFotoModal({ nombre, fotoUrl, onCerrar }: { nombre: string; fotoUrl: string; onCerrar: () => void }) {
-  useEffect(() => {
-    function alTeclado(e: KeyboardEvent) {
-      if (e.key === "Escape") onCerrar();
-    }
-    window.addEventListener("keydown", alTeclado);
-    return () => window.removeEventListener("keydown", alTeclado);
-  }, [onCerrar]);
+  useCapa(onCerrar);
 
   return (
     <div

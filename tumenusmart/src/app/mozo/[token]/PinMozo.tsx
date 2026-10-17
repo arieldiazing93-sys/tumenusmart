@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { PIN_MOZO_MAXIMO_AL_ENTRAR, PIN_MOZO_MINIMO } from "@/lib/comedor";
+import { llamarAlServidor } from "@/lib/llamar-servidor";
 import { entrarConPin } from "./actions";
 
 const TECLAS = ["1", "2", "3", "4", "5", "6", "7", "8", "9"] as const;
@@ -28,7 +29,7 @@ export function PinMozo({ token, nombreLocal }: { token: string; nombreLocal: st
     if (pin.length < PIN_MOZO_MINIMO || entrando) return;
     setError(null);
     iniciar(async () => {
-      const r = await entrarConPin(token, pin);
+      const r = await llamarAlServidor(() => entrarConPin(token, pin));
       if (!r.ok) {
         setError(r.error);
         setPin("");

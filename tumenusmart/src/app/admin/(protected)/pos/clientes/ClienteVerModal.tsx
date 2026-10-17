@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useCapa } from "@/components/capas";
 import { Boton, Campo, Entrada } from "@/components/ui";
 import { etiquetaTipoIdentificacion } from "@/lib/tipo-cliente";
 import { formatearNumero } from "@/lib/format";
@@ -31,13 +31,7 @@ export function ClienteVerModal({
   onCerrar: () => void;
   onEditar: () => void;
 }) {
-  useEffect(() => {
-    function alTeclado(e: KeyboardEvent) {
-      if (e.key === "Escape") onCerrar();
-    }
-    window.addEventListener("keydown", alTeclado);
-    return () => window.removeEventListener("keydown", alTeclado);
-  }, [onCerrar]);
+  useCapa(onCerrar);
 
   return (
     <div

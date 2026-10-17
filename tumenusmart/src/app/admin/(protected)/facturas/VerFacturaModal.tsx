@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useCapa } from "@/components/capas";
 import Link from "next/link";
 import { Pastilla, clasesBoton } from "@/components/ui";
 import { formatearGuarani } from "@/lib/format";
@@ -63,13 +64,8 @@ export function VerFacturaModal({
   const [detalle, setDetalle] = useState<DetalleFactura | null>(null);
   const [cargandoDetalle, setCargandoDetalle] = useState(true);
 
-  useEffect(() => {
-    function alTeclado(e: KeyboardEvent) {
-      if (e.key === "Escape") onCerrar();
-    }
-    window.addEventListener("keydown", alTeclado);
-    return () => window.removeEventListener("keydown", alTeclado);
-  }, [onCerrar]);
+  // Escape cierra la factura solo si es la capa de arriba (con el cuadro de la contraseña de anular encima, lo cierra a él).
+  useCapa(onCerrar);
 
   useEffect(() => {
     let vigente = true;

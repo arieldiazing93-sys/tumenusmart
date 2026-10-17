@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, useTransition, type ReactNode } from "react";
+import { useCapa } from "@/components/capas";
 import Link from "next/link";
 import { Tarjeta, Campo, Entrada, Selector, clasesBoton } from "@/components/ui";
 import { formatearGuarani } from "@/lib/format";
@@ -131,14 +132,12 @@ export function NuevaCompraForm({
   }, [editando]);
 
   // Escape en el modal de confirmación = "No" (salvo mientras ya está guardando).
-  useEffect(() => {
-    if (!confirmando) return;
-    function alTeclado(e: KeyboardEvent) {
-      if (e.key === "Escape" && !pendiente) setConfirmando(false);
-    }
-    window.addEventListener("keydown", alTeclado);
-    return () => window.removeEventListener("keydown", alTeclado);
-  }, [confirmando, pendiente]);
+  useCapa(
+    () => {
+      if (!pendiente) setConfirmando(false);
+    },
+    { activa: confirmando }
+  );
 
   // Después de elegir un insumo el cursor sigue en su cantidad (la línea ya
   // existe en pantalla), así se carga todo con el teclado: buscar, elegir,

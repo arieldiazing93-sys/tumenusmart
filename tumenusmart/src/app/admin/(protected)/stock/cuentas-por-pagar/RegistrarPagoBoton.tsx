@@ -1,9 +1,11 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useState, useTransition } from "react";
+import { useCapa } from "@/components/capas";
 import { useRouter } from "next/navigation";
 import { Campo, Entrada, Selector, clasesBoton } from "@/components/ui";
 import { formatearGuarani } from "@/lib/format";
+import { llamarAlServidor, MENSAJE_DUDOSO } from "@/lib/llamar-servidor";
 import { FORMAS_PAGO_PROVEEDOR } from "@/lib/pagos-compra";
 import { registrarPagoCompra } from "./actions";
 
@@ -64,13 +66,9 @@ function ModalPago({
   const [notas, setNotas] = useState("");
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    function alTeclado(e: KeyboardEvent) {
-      if (e.key === "Escape" && !pendiente) onCerrar();
-    }
-    window.addEventListener("keydown", alTeclado);
-    return () => window.removeEventListener("keydown", alTeclado);
-  }, [onCerrar, pendiente]);
+  useCapa(() => {
+    if (!pendiente) onCerrar();
+  });
 
   function guardar() {
     setError(null);
@@ -80,12 +78,17 @@ function ModalPago({
       return;
     }
     iniciar(async () => {
-      const resultado = await registrarPagoCompra(compraId, {
-        monto: valor,
-        fecha,
-        formaPago,
-        notas: notas.trim() || null,
-      });
+      // Registra un pago a proveedor: si se corta la red no sabemos si quedó anotado → MENSAJE_DUDOSO.
+      const resultado = await llamarAlServidor(
+        () =>
+          registrarPagoCompra(compraId, {
+            monto: valor,
+            fecha,
+            formaPago,
+            notas: notas.trim() || null,
+          }),
+        MENSAJE_DUDOSO
+      );
       if (!resultado.ok) {
         setError(resultado.error);
         return;

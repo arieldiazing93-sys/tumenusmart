@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { useCapa } from "@/components/capas";
 import { createPortal } from "react-dom";
 import { Boton, Campo, Entrada, Selector, MensajeError } from "@/components/ui";
 import { TIPOS_IDENTIFICACION_FISCAL } from "@/lib/tipo-cliente";
@@ -68,13 +69,7 @@ export function ClienteFiscalModal({
     ponerRazonSocial: setRazonSocial,
   });
 
-  useEffect(() => {
-    function alTeclado(e: KeyboardEvent) {
-      if (e.key === "Escape") onCerrar();
-    }
-    window.addEventListener("keydown", alTeclado);
-    return () => window.removeEventListener("keydown", alTeclado);
-  }, [onCerrar]);
+  useCapa(onCerrar);
 
   async function guardar() {
     const n = numero.trim();

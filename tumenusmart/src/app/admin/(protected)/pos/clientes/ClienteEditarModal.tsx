@@ -1,9 +1,11 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
+import { useCapa } from "@/components/capas";
 import { Boton, Campo, Entrada, Selector, MensajeError, clasesBoton } from "@/components/ui";
 import { TIPOS_IDENTIFICACION_FISCAL } from "@/lib/tipo-cliente";
 import { formatearNumero } from "@/lib/format";
+import { llamarAlServidor } from "@/lib/llamar-servidor";
 import { comprimirImagen, PARA_PRODUCTO } from "@/lib/comprimir-imagen";
 import { actualizarCliente, subirFotoDelCliente } from "./actions";
 
@@ -54,13 +56,7 @@ export function ClienteEditarModal({
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
-  useEffect(() => {
-    function alTeclado(e: KeyboardEvent) {
-      if (e.key === "Escape") onCerrar();
-    }
-    window.addEventListener("keydown", alTeclado);
-    return () => window.removeEventListener("keydown", alTeclado);
-  }, [onCerrar]);
+  useCapa(onCerrar);
 
   async function alElegirFoto(e: React.ChangeEvent<HTMLInputElement>) {
     const elegido = e.target.files?.[0];
@@ -91,15 +87,17 @@ export function ClienteEditarModal({
   function guardar() {
     setError(null);
     startTransition(async () => {
-      const r = await actualizarCliente(id, {
-        nombre: valorNombre,
-        telefono: valorTelefono,
-        email: valorEmail,
-        // Sin número no hay identificación: el tipo solo vale acompañando a un número.
-        tipoIdentificacion: valorNumeroIdent.trim() ? valorTipo : "",
-        numeroIdentificacion: valorNumeroIdent,
-        fotoUrl: valorFoto,
-      });
+      const r = await llamarAlServidor(() =>
+        actualizarCliente(id, {
+          nombre: valorNombre,
+          telefono: valorTelefono,
+          email: valorEmail,
+          // Sin número no hay identificación: el tipo solo vale acompañando a un número.
+          tipoIdentificacion: valorNumeroIdent.trim() ? valorTipo : "",
+          numeroIdentificacion: valorNumeroIdent,
+          fotoUrl: valorFoto,
+        })
+      );
       if (!r.ok) {
         setError(r.error);
         return;

@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useId, useState, useTransition, type ReactNode } from "react";
+import { useId, useState, useTransition, type ReactNode } from "react";
+import { useCapa } from "@/components/capas";
 import { Campo, Entrada, Pastilla, Selector, clasesBoton } from "@/components/ui";
 import { TIPOS_DE_NEGOCIO, etiquetaTipoNegocio } from "@/lib/tipo-negocio";
 import { actualizarDatosLocal } from "./actions";
@@ -99,19 +100,14 @@ export function FichaLocalModal({
   const [error, setError] = useState<string | null>(null);
   const [guardado, setGuardado] = useState(false);
 
-  useEffect(() => {
-    function alTeclado(e: KeyboardEvent) {
-      if (e.key !== "Escape") return;
-      if (editando) {
-        setEditando(false);
-        setError(null);
-      } else {
-        onCerrar();
-      }
+  useCapa(() => {
+    if (editando) {
+      setEditando(false);
+      setError(null);
+    } else {
+      onCerrar();
     }
-    window.addEventListener("keydown", alTeclado);
-    return () => window.removeEventListener("keydown", alTeclado);
-  }, [editando, onCerrar]);
+  });
 
   function empezarAEditar() {
     setGuardado(false);

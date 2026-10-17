@@ -19,6 +19,7 @@ import {
 import { formatearGuarani } from "@/lib/format";
 import { aMinutos } from "@/lib/horario-trabajo";
 import { imprimirComprobante } from "@/lib/impresion-comprobantes";
+import { llamarAlServidor, MENSAJE_DUDOSO } from "@/lib/llamar-servidor";
 import { TIPOS_IDENTIFICACION_FISCAL } from "@/lib/tipo-cliente";
 import { rutaParaAbrirTurno } from "@/lib/turno-requerido";
 import { construirLinkWhatsapp } from "@/lib/whatsapp";
@@ -193,7 +194,14 @@ export function PanelReservaCancha({
     setError(null);
     setFueraDeHorario(null);
     iniciar(async () => {
-      const resultado = await guardarReservaCancha(reserva?.id ?? null, datos(forzar));
+      let resultado: Awaited<ReturnType<typeof guardarReservaCancha>>;
+      try {
+        resultado = await guardarReservaCancha(reserva?.id ?? null, datos(forzar));
+      } catch {
+        // Sin internet: la reserva escrita queda en el panel (no se pierde tras un «Algo salió mal») y se puede volver a guardar.
+        setError(MENSAJE_DUDOSO);
+        return;
+      }
       if (!resultado.ok) {
         setError(resultado.error);
         setFueraDeHorario(resultado.fueraDeHorario === true ? "guardar" : null);
@@ -295,7 +303,7 @@ export function PanelReservaCancha({
     if (!reserva) return;
     setError(null);
     iniciar(async () => {
-      const resultado = await cambiarEstadoReservaCancha(reserva.id, nuevo);
+      const resultado = await llamarAlServidor(() => cambiarEstadoReservaCancha(reserva.id, nuevo), MENSAJE_DUDOSO);
       if (!resultado.ok) {
         setError(resultado.error);
         return;

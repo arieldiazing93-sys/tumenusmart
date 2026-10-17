@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import { clasesBoton } from "@/components/ui";
+import { MENSAJE_SIN_RED } from "@/lib/llamar-servidor";
 import { buscarClientesParaCotizacion, type ClienteParaCotizacion } from "./actions";
 
 /**
@@ -17,6 +18,7 @@ export function BuscarClienteParaCotizacion({
   const [query, setQuery] = useState("");
   const [resultados, setResultados] = useState<ClienteParaCotizacion[]>([]);
   const [buscando, setBuscando] = useState(false);
+  const [sinRed, setSinRed] = useState(false);
   const ultimaBusqueda = useRef(0);
 
   async function buscar(texto: string) {
@@ -28,7 +30,18 @@ export function BuscarClienteParaCotizacion({
       return;
     }
     setBuscando(true);
-    const r = await buscarClientesParaCotizacion(texto);
+    setSinRed(false);
+    let r: ClienteParaCotizacion[];
+    try {
+      r = await buscarClientesParaCotizacion(texto);
+    } catch {
+      // Sin internet: se frena el «Buscando…» y se avisa (no se dice «no encontré», que sería mentira).
+      if (numero === ultimaBusqueda.current) {
+        setBuscando(false);
+        setSinRed(true);
+      }
+      return;
+    }
     if (numero !== ultimaBusqueda.current) return;
     setBuscando(false);
     setResultados(r);
@@ -43,7 +56,8 @@ export function BuscarClienteParaCotizacion({
         className="rounded-lg border border-linea bg-superficie px-3 py-2.5 text-[0.88rem] focus:border-brand focus:outline-none"
       />
       {buscando && <p className="text-xs text-tinta-suave">Buscando…</p>}
-      {!buscando && query.trim() && resultados.length === 0 && (
+      {sinRed && <p className="text-xs font-medium text-peligro">{MENSAJE_SIN_RED}</p>}
+      {!buscando && !sinRed && query.trim() && resultados.length === 0 && (
         <p className="text-xs text-tinta-suave">No encontré ningún cliente: escribí sus datos acá abajo.</p>
       )}
       {resultados.length > 0 && (

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Boton, clasesBoton } from "@/components/ui";
 import { useAutorizacion } from "@/components/Autorizacion";
+import { llamarAlServidor, MENSAJE_DUDOSO } from "@/lib/llamar-servidor";
 import { cancelarVenta } from "../../actions";
 
 /**
@@ -46,7 +47,8 @@ export function CancelarVentaBoton({
     if (!motivo.trim()) return;
     setCancelando(true);
     setError(null);
-    const r = await autorizar((clave) => cancelarVenta(ventaId, motivo, clave));
+    // Cancela una venta (devuelve stock, toca la caja): si se corta la red no sabemos si quedó cancelada → MENSAJE_DUDOSO.
+    const r = await llamarAlServidor(() => autorizar((clave) => cancelarVenta(ventaId, motivo, clave)), MENSAJE_DUDOSO);
     setCancelando(false);
     if (!r.ok) {
       setError(r.error);

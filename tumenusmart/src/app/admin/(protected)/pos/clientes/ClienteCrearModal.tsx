@@ -1,8 +1,10 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useState, useTransition } from "react";
+import { useCapa } from "@/components/capas";
 import { Boton, Campo, Entrada, Selector, MensajeError } from "@/components/ui";
 import { TIPOS_IDENTIFICACION_FISCAL } from "@/lib/tipo-cliente";
+import { llamarAlServidor } from "@/lib/llamar-servidor";
 import { crearCliente } from "./actions";
 
 /**
@@ -27,13 +29,7 @@ export function ClienteCrearModal({
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
-  useEffect(() => {
-    function alTeclado(e: KeyboardEvent) {
-      if (e.key === "Escape") onCerrar();
-    }
-    window.addEventListener("keydown", alTeclado);
-    return () => window.removeEventListener("keydown", alTeclado);
-  }, [onCerrar]);
+  useCapa(onCerrar);
 
   function guardar() {
     setError(null);
@@ -41,13 +37,15 @@ export function ClienteCrearModal({
       // Sin identificación cargada, no se manda tipo tampoco: un cliente
       // común no tiene por qué llevar un "RUC" vacío colgando.
       const conIdentificacion = !!numeroIdent.trim();
-      const r = await crearCliente({
-        nombre,
-        telefono,
-        email,
-        tipoIdentificacion: conIdentificacion ? tipo : "",
-        numeroIdentificacion: conIdentificacion ? numeroIdent : "",
-      });
+      const r = await llamarAlServidor(() =>
+        crearCliente({
+          nombre,
+          telefono,
+          email,
+          tipoIdentificacion: conIdentificacion ? tipo : "",
+          numeroIdentificacion: conIdentificacion ? numeroIdent : "",
+        })
+      );
       if (!r.ok) {
         setError(r.error);
         return;

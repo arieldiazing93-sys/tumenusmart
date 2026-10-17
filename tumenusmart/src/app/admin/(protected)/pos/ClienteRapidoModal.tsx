@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { useCapa } from "@/components/capas";
 import { createPortal } from "react-dom";
 import { Boton, Campo, Entrada, MensajeError } from "@/components/ui";
 
@@ -36,13 +37,7 @@ export function ClienteRapidoModal({
   const [telefono, setTelefono] = useState(telefonoInicial);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    function alTeclado(e: KeyboardEvent) {
-      if (e.key === "Escape") onCerrar();
-    }
-    window.addEventListener("keydown", alTeclado);
-    return () => window.removeEventListener("keydown", alTeclado);
-  }, [onCerrar]);
+  useCapa(onCerrar);
 
   function guardar() {
     if (!nombre.trim() || !telefono.trim()) {

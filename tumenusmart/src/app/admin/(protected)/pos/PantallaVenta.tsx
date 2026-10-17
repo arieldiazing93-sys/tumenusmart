@@ -7,6 +7,7 @@ import { Boton, Cabecera, Campo, Entrada, Tarjeta, clasesBoton } from "@/compone
 import { Segmentado } from "@/components/Segmentado";
 import { useAutorizacion } from "@/components/Autorizacion";
 import { formatearGuarani } from "@/lib/format";
+import { MENSAJE_SIN_RED } from "@/lib/llamar-servidor";
 import { calcularDescuento, textoPorcentaje } from "@/lib/descuento-venta";
 import { resolverDescuentoConTipos, type TipoDescuentoDef } from "@/lib/tipos-descuento";
 import { FORMA_PAGO_A_CREDITO } from "@/lib/turno-pos";
@@ -544,7 +545,15 @@ export function PantallaVenta({
     if (!telefono) return;
     setBuscandoCliente(true);
     setClienteEsNuevo(false);
-    const r = await buscarClientePorTelefono(telefono);
+    let r: Awaited<ReturnType<typeof buscarClientePorTelefono>>;
+    try {
+      r = await buscarClientePorTelefono(telefono);
+    } catch {
+      // Sin internet no sabemos si es cliente: NO se lo marca como «nuevo» (se crearía un duplicado), solo se frena la ruedita y se avisa.
+      setBuscandoCliente(false);
+      setError(MENSAJE_SIN_RED);
+      return;
+    }
     setBuscandoCliente(false);
     if (r.ok) {
       setClienteNombre(r.nombre);
@@ -562,7 +571,14 @@ export function PantallaVenta({
     setBuscandoClienteFiscal(true);
     setClienteFiscalEsNuevo(false);
     setClienteFiscalEncontrado(false);
-    const r = await buscarClientePorIdentificacion(numero);
+    let r: Awaited<ReturnType<typeof buscarClientePorIdentificacion>>;
+    try {
+      r = await buscarClientePorIdentificacion(numero);
+    } catch {
+      setBuscandoClienteFiscal(false);
+      setError(MENSAJE_SIN_RED);
+      return;
+    }
     setBuscandoClienteFiscal(false);
     // Aunque ya sea cliente, se vuelve a mirar en la DNIT: su RUC pudo suspenderse desde la última vez. No espera ni frena la búsqueda.
     if (pareceRucConDigito(numero) && (!r.ok || r.tipoIdentificacion === "ruc")) void verificarRuc(numero);

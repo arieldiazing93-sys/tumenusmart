@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState, useTransition, type ReactNode } f
 import Link from "next/link";
 import { Area, Campo, Entrada, Selector, Tarjeta, clasesBoton } from "@/components/ui";
 import { formatearGuarani } from "@/lib/format";
+import { MENSAJE_DUDOSO } from "@/lib/llamar-servidor";
 import { TASAS_IVA, etiquetaIva } from "@/lib/iva";
 import { calcularCotizacion, VALIDEZ_DIAS_POR_DEFECTO } from "@/lib/cotizacion";
 import {
@@ -181,9 +182,16 @@ export function CotizacionForm({ inicial }: { inicial?: CotizacionInicial }) {
       })),
     };
     iniciar(async () => {
-      const resultado = inicial ? await actualizarCotizacion(inicial.id, datos) : await crearCotizacion(datos);
-      // Si sale bien, la acción redirige sola al presupuesto — este código no sigue.
-      if (resultado && !resultado.ok) setError(resultado.error);
+      try {
+        const resultado = inicial ? await actualizarCotizacion(inicial.id, datos) : await crearCotizacion(datos);
+        // Si sale bien, la acción redirige sola al presupuesto — este código no sigue.
+        if (resultado && !resultado.ok) setError(resultado.error);
+      } catch (e) {
+        // La redirección de Next también viaja como excepción: esa se deja pasar. Sin internet, en cambio, el presupuesto (que puede
+        // tener muchas líneas) queda en pantalla con el aviso en vez de perderse tras un «Algo salió mal».
+        if (String((e as { digest?: unknown })?.digest ?? "").startsWith("NEXT_REDIRECT")) throw e;
+        setError(MENSAJE_DUDOSO);
+      }
     });
   }
 

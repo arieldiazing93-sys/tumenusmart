@@ -1,8 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
+import { useCapa } from "@/components/capas";
 import { Entrada, MensajeError, clasesBoton } from "@/components/ui";
 import { formatearGuarani } from "@/lib/format";
+import { llamarAlServidor } from "@/lib/llamar-servidor";
 import { asignarCodigoProducto } from "../codigos-barras/actions";
 
 export type ProductoParaAsignar = { id: string; nombre: string; categoria: string; precio: number };
@@ -38,13 +40,7 @@ export function AsignarCodigoPos({
   const [busqueda, setBusqueda] = useState("");
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    function alTeclear(e: KeyboardEvent) {
-      if (e.key === "Escape") onCerrar();
-    }
-    window.addEventListener("keydown", alTeclear);
-    return () => window.removeEventListener("keydown", alTeclear);
-  }, [onCerrar]);
+  useCapa(onCerrar);
 
   const texto = sinTildes(busqueda.trim());
   const resultados = useMemo(
@@ -55,7 +51,7 @@ export function AsignarCodigoPos({
   function elegir(producto: ProductoParaAsignar) {
     setError(null);
     iniciar(async () => {
-      const r = await asignarCodigoProducto(producto.id, codigo);
+      const r = await llamarAlServidor(() => asignarCodigoProducto(producto.id, codigo));
       if (!r.ok) return setError(r.error);
       onAsignado(producto);
     });

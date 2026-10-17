@@ -8,6 +8,7 @@ import { TIPOS_IDENTIFICACION_FISCAL, etiquetaTipoIdentificacion } from "@/lib/t
 import { formatearGuarani, formatearNumero } from "@/lib/format";
 import { ZONA_NEGOCIO } from "@/lib/timezone";
 import { imprimirComprobante } from "@/lib/impresion-comprobantes";
+import { llamarAlServidor, MENSAJE_DUDOSO, MENSAJE_SIN_RED } from "@/lib/llamar-servidor";
 import { AvisoRucDnit, useVerificacionDeCliente } from "../../pos/AvisoRucDnit";
 import { ClienteFiscalModal, type DatosClienteFiscal } from "../../pos/ClienteFiscalModal";
 import {
@@ -45,6 +46,7 @@ export function NuevaFacturaForm({
   const [resultadosCliente, setResultadosCliente] = useState<ClienteEncontrado[] | null>(null);
   const [clienteAsignado, setClienteAsignado] = useState<ClienteEncontrado | null>(null);
   const [cargandoClienteNuevo, setCargandoClienteNuevo] = useState(false);
+  const [errorCliente, setErrorCliente] = useState<string | null>(null);
 
   const [tipoIdentificacion, setTipoIdentificacion] = useState(TIPOS_IDENTIFICACION_FISCAL[0].valor as string);
   const [numeroIdentificacion, setNumeroIdentificacion] = useState("");
@@ -114,8 +116,16 @@ export function NuevaFacturaForm({
   function buscarCliente() {
     const texto = busquedaCliente.trim();
     if (!texto) return;
+    setErrorCliente(null);
     startBusquedaCliente(async () => {
-      const r = await buscarClientesFiscales(texto);
+      let r: ClienteEncontrado[];
+      try {
+        r = await buscarClientesFiscales(texto);
+      } catch {
+        // Sin internet NO se pasa a «cliente nuevo» (no sabemos si existe): se avisa y se puede volver a buscar.
+        setErrorCliente(MENSAJE_SIN_RED);
+        return;
+      }
       setResultadosCliente(r);
       // Ninguna coincidencia: se pasa derecho a cargar los datos de un
       // cliente nuevo, sin un paso de más para confirmarlo.
@@ -136,7 +146,7 @@ export function NuevaFacturaForm({
     }
     setErrorBusqueda(null);
     startBusqueda(async () => {
-      const r = await buscarParaRemision(origen, numero);
+      const r = await llamarAlServidor(() => buscarParaRemision(origen, numero));
       if (!r.ok) {
         setErrorBusqueda(r.error);
         setResumen(null);
@@ -150,11 +160,16 @@ export function NuevaFacturaForm({
     if (!resumen) return;
     setErrorEnvio(null);
     startEnvio(async () => {
-      const r = await remitirFactura(
-        resumen.origen,
-        resumen.id,
-        { tipoIdentificacion, numeroIdentificacion, razonSocial, email, telefono },
-        motivo
+      // Emite una factura: si se corta la red no sabemos si quedó emitida → MENSAJE_DUDOSO (que mire el historial antes de repetir).
+      const r = await llamarAlServidor(
+        () =>
+          remitirFactura(
+            resumen.origen,
+            resumen.id,
+            { tipoIdentificacion, numeroIdentificacion, razonSocial, email, telefono },
+            motivo
+          ),
+        MENSAJE_DUDOSO
       );
       if (!r.ok) {
         setErrorEnvio(r.error);
@@ -213,6 +228,12 @@ export function NuevaFacturaForm({
                 {buscandoCliente ? "Buscando…" : "Buscar"}
               </Boton>
             </div>
+
+            {errorCliente && (
+              <div className="mt-2">
+                <MensajeError>{errorCliente}</MensajeError>
+              </div>
+            )}
 
             {resultadosCliente && resultadosCliente.length > 0 && (
               <div className="mt-2 flex flex-col gap-1.5">

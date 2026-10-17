@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useRef, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import { createPortal } from "react-dom";
+import { useCapa } from "./capas";
 
 /**
  * Un panel que entra desde la derecha y ocupa todo el alto de la pantalla, para
@@ -46,27 +47,9 @@ export function PanelLateral({
   encabezado?: ReactNode;
   children: ReactNode;
 }) {
-  // Se guarda la función más reciente para no rearmar los listeners en cada
-  // render de quien abre el panel.
-  const cerrar = useRef(onCerrar);
-  useEffect(() => {
-    cerrar.current = onCerrar;
-  });
-
-  useEffect(() => {
-    const alTeclear = (e: KeyboardEvent) => {
-      if (e.key === "Escape") cerrar.current();
-    };
-    window.addEventListener("keydown", alTeclear);
-
-    const overflowAnterior = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-
-    return () => {
-      window.removeEventListener("keydown", alTeclear);
-      document.body.style.overflow = overflowAnterior;
-    };
-  }, []);
+  // Escape cierra el panel solo si es la capa de arriba (con un cuadro encima, lo cierra a él y el panel sigue), y la página de atrás
+  // no se mueve mientras haya algo abierto: las dos cosas, de a una para toda la pantalla (ver capas.ts).
+  useCapa(onCerrar, { bloquearScroll: true });
 
   if (typeof document === "undefined") return null;
 

@@ -2,6 +2,7 @@
 
 import { useRef, useState, useTransition } from "react";
 import { clasesBoton } from "@/components/ui";
+import { llamarAlServidor } from "@/lib/llamar-servidor";
 import { crearHorario } from "../actions";
 
 export function CrearHorarioForm({ turno, turnoLabel }: { turno: string; turnoLabel: string }) {
@@ -11,7 +12,7 @@ export function CrearHorarioForm({ turno, turnoLabel }: { turno: string; turnoLa
 
   function alCrear(formData: FormData) {
     iniciar(async () => {
-      const resultado = await crearHorario(formData);
+      const resultado = await llamarAlServidor(() => crearHorario(formData));
       if (!resultado.ok) {
         alert(resultado.error);
         return;

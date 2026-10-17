@@ -1,10 +1,8 @@
 "use client";
 
-import { useEffect, useRef, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import { createPortal } from "react-dom";
-
-/** Las ventanas abiertas ahora, de la más vieja a la más nueva: Escape solo le hace caso a la última. */
-const ventanasAbiertas: object[] = [];
+import { useCapa } from "./capas";
 
 /**
  * Una ventana centrada con un velo oscuro detrás, para formularios cortos (un
@@ -24,32 +22,9 @@ export function Modal({
   onCerrar: () => void;
   children: ReactNode;
 }) {
-  // Se guarda la función más reciente para no rearmar los listeners en cada
-  // render de quien abre la ventana.
-  const cerrar = useRef(onCerrar);
-  useEffect(() => {
-    cerrar.current = onCerrar;
-  });
-
-  useEffect(() => {
-    // Con una ventana abierta encima de otra (el cuadro de la contraseña sobre el de un descuento), Escape cierra solo la de arriba.
-    const yo = {};
-    ventanasAbiertas.push(yo);
-    const alTeclear = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && ventanasAbiertas[ventanasAbiertas.length - 1] === yo) cerrar.current();
-    };
-    window.addEventListener("keydown", alTeclear);
-
-    const overflowAnterior = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-
-    return () => {
-      window.removeEventListener("keydown", alTeclear);
-      const lugar = ventanasAbiertas.indexOf(yo);
-      if (lugar >= 0) ventanasAbiertas.splice(lugar, 1);
-      document.body.style.overflow = overflowAnterior;
-    };
-  }, []);
+  // Con una ventana abierta encima de otra (el cuadro de la contraseña sobre un panel), Escape cierra solo la de arriba, y la página de
+  // atrás no se mueve mientras haya algo abierto (ver capas.ts: es de a una para TODAS las capas, no solo entre ventanas como esta).
+  useCapa(onCerrar, { bloquearScroll: true });
 
   if (typeof document === "undefined") return null;
 

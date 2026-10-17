@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, useTransition } from "react";
+import { useCapa } from "@/components/capas";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { Campo, Entrada, Pastilla, Selector, clasesBoton } from "@/components/ui";
@@ -171,18 +172,13 @@ function CuadroPromociones({
   const [horaProbada, setHoraProbada] = useState("19:00:00");
 
   useEffect(() => setMontado(true), []);
-  useEffect(() => {
-    function alTeclado(e: KeyboardEvent) {
-      if (e.key === "Escape" && !pendiente) onCerrar();
-    }
-    window.addEventListener("keydown", alTeclado);
-    const previo = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      window.removeEventListener("keydown", alTeclado);
-      document.body.style.overflow = previo;
-    };
-  }, [onCerrar, pendiente]);
+  // Escape cierra el cuadro (si es la capa de arriba, y no mientras guarda) y la página de atrás no se mueve.
+  useCapa(
+    () => {
+      if (!pendiente) onCerrar();
+    },
+    { bloquearScroll: true }
+  );
 
   function cambiar(dia: number, cambios: Partial<Fila>) {
     setErrorServidor(null);

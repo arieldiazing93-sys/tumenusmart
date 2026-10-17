@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { clasesBoton } from "@/components/ui";
+import { llamarAlServidor, MENSAJE_DUDOSO } from "@/lib/llamar-servidor";
 import { eliminarCobroVenta } from "./actions";
 
 /**
@@ -19,7 +20,8 @@ export function EliminarCobroBoton({ cobroId }: { cobroId: string }) {
   function eliminar() {
     setError(null);
     iniciar(async () => {
-      const resultado = await eliminarCobroVenta(cobroId);
+      // Borra un cobro (y su ingreso de caja): si se corta la red no sabemos si quedó borrado → MENSAJE_DUDOSO.
+      const resultado = await llamarAlServidor(() => eliminarCobroVenta(cobroId), MENSAJE_DUDOSO);
       if (!resultado.ok) {
         setError(resultado.error);
         setConfirmando(false);

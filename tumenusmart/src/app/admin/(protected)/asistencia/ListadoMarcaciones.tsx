@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { useCapa } from "@/components/capas";
 import { Pastilla, clasesBoton } from "@/components/ui";
 import {
   DIAS_CONSERVAR_FOTOS_MARCACION,
@@ -162,13 +163,7 @@ function ModalFoto({ abierta, onCerrar }: { abierta: NonNullable<Abierta>; onCer
   const { fila, tipo } = abierta;
   const celda = fila.celdas[tipo];
 
-  useEffect(() => {
-    const alPresionar = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onCerrar();
-    };
-    window.addEventListener("keydown", alPresionar);
-    return () => window.removeEventListener("keydown", alPresionar);
-  }, [onCerrar]);
+  useCapa(onCerrar);
 
   if (!celda) return null;
 
