@@ -5,6 +5,7 @@ import {
   IconoAsistencia,
   IconoCaja,
   IconoCheck,
+  IconoContabilidad,
   IconoReporte,
   IconoStock,
   IconoTurnos,
@@ -583,6 +584,235 @@ export function MaquetaTurnos() {
           <p className="cifra mt-1.5 border-t border-linea-fina pt-1.5 text-[0.68rem] text-exito">
             ✓ Factura N° 001-002-0000047
           </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+//  Reserva de canchas
+// ---------------------------------------------------------------------------
+
+const CANCHAS = ["Cancha 1", "Cancha 2", "Cancha 3"];
+const HORA_INICIAL_CANCHAS = 18;
+const HORAS_DE_CANCHAS = 5;
+
+const TONO_RESERVA = {
+  exito: "border-exito bg-exito-luz text-exito",
+  azul: "border-azul bg-azul-luz text-azul-oscuro",
+  amarillo: "border-amarillo bg-amarillo-luz text-amarillo-oscuro",
+} as const;
+
+/** [cancha (0 = la primera), hora de inicio, horas de duración, quién reservó, estado] */
+const RESERVAS_DEL_DIA: [number, number, number, string, keyof typeof TONO_RESERVA][] = [
+  [0, 18, 1, "Los Pumas", "exito"],
+  [0, 20, 1.5, "Dani", "azul"],
+  [1, 18, 2, "Torneo", "azul"],
+  [1, 21, 1, "Rafa", "amarillo"],
+  [2, 19, 1, "Nico", "exito"],
+  [2, 20.5, 1.5, "Cumple Sol", "azul"],
+];
+
+/** Lo que ve el cliente en «Jugá hoy»: las horas de cada cancha, con lo ocupado tachado. [cancha, libre?][] */
+const JUGA_HOY: { cancha: string; precio: string; horas: [string, boolean][] }[] = [
+  { cancha: "Cancha 1 · Fútbol 5", precio: "Gs. 100.000", horas: [["18:00", false], ["19:00", true], ["20:00", false], ["21:00", true]] },
+  { cancha: "Cancha 2 · Fútbol 5", precio: "Gs. 100.000", horas: [["18:00", false], ["19:00", false], ["20:00", true], ["21:00", false]] },
+];
+
+export function MaquetaCanchas() {
+  return (
+    <div aria-hidden="true">
+      <div className="overflow-hidden rounded-2xl border border-linea bg-superficie shadow-alta">
+        <div className="flex items-center justify-between border-b border-linea-fina bg-papel-suave px-4 py-2.5">
+          <p className="text-[0.84rem] font-semibold tracking-titular">Canchas de hoy</p>
+          <span className="rounded-full bg-superficie px-2.5 py-0.5 font-mono text-[0.6rem] uppercase tracking-wide text-tinta-suave ring-1 ring-linea">
+            Día
+          </span>
+        </div>
+
+        <ul className="flex flex-wrap gap-x-4 gap-y-1 border-b border-linea-fina px-4 py-2 text-[0.62rem] font-medium text-tinta-media">
+          <li className="flex items-center gap-1.5">
+            <span className="h-2 w-2 rounded-full bg-exito" /> Cobrada
+          </li>
+          <li className="flex items-center gap-1.5">
+            <span className="h-2 w-2 rounded-full bg-azul" /> Reservada
+          </li>
+          <li className="flex items-center gap-1.5">
+            <span className="h-2 w-2 rounded-full bg-amarillo" /> Por confirmar
+          </li>
+        </ul>
+
+        <div className="grid grid-cols-[30px_repeat(3,1fr)]">
+          <span />
+          {CANCHAS.map((c) => (
+            <span key={c} className="py-2 text-center text-[0.66rem] font-semibold text-tinta-media">
+              {c}
+            </span>
+          ))}
+
+          <div className="relative border-t border-linea-fina" style={{ height: HORA_PX * HORAS_DE_CANCHAS }}>
+            {Array.from({ length: HORAS_DE_CANCHAS }, (_, i) => (
+              <span
+                key={i}
+                className="cifra absolute right-1.5 text-[0.56rem] text-tinta-suave"
+                style={{ top: i * HORA_PX + 3 }}
+              >
+                {String(HORA_INICIAL_CANCHAS + i).padStart(2, "0")}
+              </span>
+            ))}
+          </div>
+          {CANCHAS.map((c, cancha) => (
+            <div
+              key={c}
+              className="relative border-l border-t border-linea-fina"
+              style={{ height: HORA_PX * HORAS_DE_CANCHAS, backgroundImage: LINEAS_DE_HORAS }}
+            >
+              {RESERVAS_DEL_DIA.filter((r) => r[0] === cancha).map(([, inicio, duracion, quien, tono]) => (
+                <span
+                  key={quien}
+                  className={`absolute inset-x-0.5 block overflow-hidden rounded border-l-[3px] px-1 py-0.5 text-[0.58rem] font-semibold leading-tight ${TONO_RESERVA[tono]}`}
+                  style={{ top: (inicio - HORA_INICIAL_CANCHAS) * HORA_PX + 1, height: duracion * HORA_PX - 2 }}
+                >
+                  {quien}
+                </span>
+              ))}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="relative mt-3 w-full overflow-hidden rounded-2xl border border-linea bg-superficie shadow-media sm:-mt-5 sm:ml-auto sm:w-[84%]">
+        <div className="flex items-center justify-between bg-brand-light px-3 py-1.5">
+          <span className="text-[0.72rem] font-semibold text-brand-texto">Jugá hoy</span>
+          <span className="text-[0.6rem] font-medium text-tinta-media">Tu página de reservas</span>
+        </div>
+        <ul className="divide-y divide-linea-fina">
+          {JUGA_HOY.map((c) => (
+            <li key={c.cancha} className="px-3 py-2.5">
+              <p className="flex items-baseline justify-between gap-2 text-[0.74rem] font-semibold">
+                <span>{c.cancha}</span>
+                <span className="cifra text-[0.68rem] font-medium text-tinta-media">{c.precio} la hora</span>
+              </p>
+              <p className="mt-1.5 flex flex-wrap gap-1.5">
+                {c.horas.map(([hora, libre]) => (
+                  <span
+                    key={hora}
+                    className={`cifra rounded-md px-1.5 py-0.5 text-[0.62rem] font-semibold ${
+                      libre ? "bg-exito-luz text-exito" : "bg-peligro-luz text-peligro line-through"
+                    }`}
+                  >
+                    {hora}
+                  </span>
+                ))}
+              </p>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+//  Contabilidad: el libro IVA de ventas y el resumen del mes
+// ---------------------------------------------------------------------------
+
+/**
+ * Cuatro facturas de ejemplo con las cuentas del libro: gravadas con el IVA adentro, IVA 10 % = gravadas ÷ 11 e IVA 5 % = gravadas ÷ 21, y el
+ * total de cada fila igual a la suma de sus partes. Los totales de abajo son la suma de cada columna.
+ */
+const LIBRO_VENTAS: { fecha: string; factura: string; exenta: string; g5: string; iva5: string; g10: string; iva10: string; total: string }[] = [
+  { fecha: "03/10", factura: "0000412", exenta: "—", g5: "—", iva5: "—", g10: "55.000", iva10: "5.000", total: "55.000" },
+  { fecha: "03/10", factura: "0000413", exenta: "—", g5: "—", iva5: "—", g10: "330.000", iva10: "30.000", total: "330.000" },
+  { fecha: "04/10", factura: "0000414", exenta: "—", g5: "21.000", iva5: "1.000", g10: "110.000", iva10: "10.000", total: "131.000" },
+  { fecha: "04/10", factura: "0000415", exenta: "18.000", g5: "—", iva5: "—", g10: "44.000", iva10: "4.000", total: "62.000" },
+];
+
+export function MaquetaContabilidad() {
+  /** Las columnas que se esconden en el celular (queda lo esencial: fecha, factura, gravada 10 %, IVA 10 % y total). */
+  const soloGrande = "hidden sm:table-cell";
+  const celda = "px-1.5 py-2 text-right";
+  return (
+    <div aria-hidden="true">
+      <div className="overflow-hidden rounded-2xl border border-linea bg-superficie shadow-alta">
+        <div className="flex items-center justify-between border-b border-linea-fina bg-papel-suave px-4 py-2.5">
+          <p className="text-[0.84rem] font-semibold tracking-titular">Libro IVA · Ventas</p>
+          <span className="rounded-full bg-superficie px-2.5 py-0.5 font-mono text-[0.6rem] uppercase tracking-wide text-tinta-suave ring-1 ring-linea">
+            Octubre
+          </span>
+        </div>
+
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-linea-fina px-4 py-2">
+          <p className="text-[0.64rem] text-tinta-suave">1 factura anulada: no suma.</p>
+          <span className="flex gap-1.5">
+            <span className="rounded-full bg-azul-luz px-2.5 py-0.5 text-[0.62rem] font-semibold text-azul-oscuro">Excel</span>
+            <span className="rounded-full bg-azul-luz px-2.5 py-0.5 text-[0.62rem] font-semibold text-azul-oscuro">PDF</span>
+          </span>
+        </div>
+
+        <table className="w-full border-collapse text-[0.62rem]">
+          <thead>
+            <tr className="border-b border-linea-fina text-[0.56rem] font-semibold uppercase tracking-wide text-tinta-suave">
+              <th className="px-1.5 py-2 pl-4 text-left">Fecha</th>
+              <th className="px-1.5 py-2 text-left">Factura</th>
+              <th className={`${soloGrande} ${celda}`}>Exenta</th>
+              <th className={`${soloGrande} ${celda}`}>Grav. 5 %</th>
+              <th className={`${soloGrande} ${celda}`}>IVA 5 %</th>
+              <th className={celda}>Grav. 10 %</th>
+              <th className={celda}>IVA 10 %</th>
+              <th className={`${celda} pr-4`}>Total</th>
+            </tr>
+          </thead>
+          <tbody className="cifra">
+            {LIBRO_VENTAS.map((f) => (
+              <tr key={f.factura} className="border-b border-linea-fina">
+                <td className="px-1.5 py-2 pl-4 text-left text-tinta-media">{f.fecha}</td>
+                <td className="px-1.5 py-2 text-left text-tinta-media">{f.factura}</td>
+                <td className={`${soloGrande} ${celda}`}>{f.exenta}</td>
+                <td className={`${soloGrande} ${celda}`}>{f.g5}</td>
+                <td className={`${soloGrande} ${celda} text-tinta-media`}>{f.iva5}</td>
+                <td className={celda}>{f.g10}</td>
+                <td className={`${celda} text-tinta-media`}>{f.iva10}</td>
+                <td className={`${celda} pr-4 font-semibold`}>{f.total}</td>
+              </tr>
+            ))}
+            <tr className="bg-papel-suave font-semibold">
+              <td className="px-1.5 py-2 pl-4 text-left" colSpan={2}>
+                Total del mes
+              </td>
+              <td className={`${soloGrande} ${celda}`}>18.000</td>
+              <td className={`${soloGrande} ${celda}`}>21.000</td>
+              <td className={`${soloGrande} ${celda}`}>1.000</td>
+              <td className={celda}>539.000</td>
+              <td className={celda}>49.000</td>
+              <td className={`${celda} pr-4`}>578.000</td>
+            </tr>
+          </tbody>
+        </table>
+        {/* Lugar para que la tarjeta del resumen, que se monta un poco encima, no tape la fila de totales. */}
+        <div className="hidden h-6 sm:block" />
+      </div>
+
+      <div className="relative mt-3 w-full overflow-hidden rounded-2xl border border-linea bg-superficie shadow-media sm:-mt-5 sm:ml-auto sm:w-[78%]">
+        <div className="flex items-center gap-1.5 bg-papel-hundido px-3 py-1.5 text-[0.68rem] font-semibold text-tinta">
+          <IconoContabilidad tam={13} />
+          Resumen del IVA del mes
+        </div>
+        <div className="p-3 text-[0.74rem] leading-relaxed text-tinta-media">
+          <p className="flex justify-between">
+            <span>IVA de las ventas</span>
+            <span className="cifra text-tinta">Gs. 4.850.000</span>
+          </p>
+          <p className="mt-1 flex justify-between">
+            <span>IVA de las compras</span>
+            <span className="cifra text-tinta">Gs. 3.120.000</span>
+          </p>
+          <p className="mt-1.5 flex justify-between border-t border-linea-fina pt-1.5 font-semibold text-tinta">
+            <span>Diferencia</span>
+            <span className="cifra">Gs. 1.730.000</span>
+          </p>
+          <p className="mt-1.5 text-[0.64rem] text-tinta-suave">De referencia: la declaración se presenta en Marangatú.</p>
         </div>
       </div>
     </div>

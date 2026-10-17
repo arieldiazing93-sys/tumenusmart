@@ -7,8 +7,10 @@ import { construirLinkWhatsapp } from "@/lib/whatsapp";
 import {
   IconoAsistencia,
   IconoCaja,
+  IconoCancha,
   IconoCarta,
   IconoCheck,
+  IconoContabilidad,
   IconoFlecha,
   IconoMas,
   IconoStock,
@@ -19,6 +21,8 @@ import {
   ADEMAS,
   FLUJO,
   FUNCIONES_ASISTENCIA,
+  FUNCIONES_CANCHAS,
+  FUNCIONES_CONTABILIDAD,
   FUNCIONES_POS,
   FUNCIONES_RESTAURANTE,
   FUNCIONES_STOCK,
@@ -31,7 +35,9 @@ import {
 } from "./_portada/contenido";
 import {
   MaquetaAsistencia,
+  MaquetaCanchas,
   MaquetaCarta,
+  MaquetaContabilidad,
   MaquetaPos,
   MaquetaStock,
   MaquetaTurnos,
@@ -40,10 +46,10 @@ import {
 import MenuMovil from "./_portada/MenuMovil";
 
 const DESCRIPCION =
-  "Un solo sistema para tu negocio en Paraguay: punto de venta con factura, control de stock, asistencia del personal con reconocimiento de cara y reserva de turnos. Sin comisiones por venta y sin instalar nada.";
+  "Un solo sistema para tu negocio en Paraguay: punto de venta con factura, control de stock, asistencia del personal con reconocimiento de cara, reserva de turnos y de canchas, y libros de IVA para tu contador. Sin comisiones por venta y sin instalar nada.";
 
 export const metadata: Metadata = {
-  title: "TuMenuSmart — Punto de venta, control de stock, asistencia y reserva de turnos",
+  title: "TuMenuSmart — Punto de venta, stock, asistencia, reserva de turnos y canchas, y libros de IVA",
   description: DESCRIPCION,
   openGraph: {
     title: "TuMenuSmart — Tu negocio entero, en un solo sistema",
@@ -69,11 +75,14 @@ const WHATSAPP_VENTAS = "595984792335";
 
 const MENSAJE_VENTAS = "Hola, quiero ver una demo de TuMenuSmart";
 
-const ENLACES = [
-  { href: "#pos", texto: "Punto de venta" },
+/** `corto`: cómo se llama en la barra de arriba, donde hay ocho enlaces en 1.150 px y cada palabra cuenta (el menú del celular y el pie usan `texto`). */
+const ENLACES: { href: string; texto: string; corto?: string }[] = [
+  { href: "#pos", texto: "Punto de venta", corto: "Ventas" },
   { href: "#stock", texto: "Stock" },
   { href: "#asistencia", texto: "Asistencia" },
   { href: "#turnos", texto: "Turnos" },
+  { href: "#canchas", texto: "Canchas" },
+  { href: "#contabilidad", texto: "Contabilidad" },
   { href: "#restaurantes", texto: "Restaurantes" },
   { href: "#preguntas", texto: "Preguntas" },
 ];
@@ -97,8 +106,18 @@ export default async function PortadaPage() {
     })
     .catch(() => null);
 
+  // Lo mismo para las canchas: una página de reservas de canchas habilitada de verdad (tabla propia, aparte de la de turnos).
+  const paginaCanchasDemo = await prisma.paginaCanchas
+    .findFirst({
+      where: { habilitada: true },
+      orderBy: { createdAt: "asc" },
+      select: { slug: true },
+    })
+    .catch(() => null);
+
   const cartaReal = vitrina ? `/${vitrina.slug}` : "#restaurantes";
   const reservaReal = paginaDemo ? `/turnos/${paginaDemo.slug}` : "#turnos";
+  const canchasReal = paginaCanchasDemo ? `/canchas/${paginaCanchasDemo.slug}` : "#canchas";
   const linkVentas = construirLinkWhatsapp(WHATSAPP_VENTAS, MENSAJE_VENTAS);
 
   // Datos para los buscadores: qué es el producto y las preguntas que ya contestamos en pantalla.
@@ -140,10 +159,13 @@ export default async function PortadaPage() {
             TuMenuSmart
           </Link>
 
-          <nav aria-label="Secciones de la página" className="hidden items-center gap-7 text-[0.92rem] text-tinta-media xl:flex">
+          <nav
+            aria-label="Secciones de la página"
+            className="hidden items-center gap-4 whitespace-nowrap text-[0.9rem] text-tinta-media xl:flex"
+          >
             {ENLACES.map((e) => (
               <a key={e.href} href={e.href} className="transition-colors hover:text-tinta">
-                {e.texto}
+                {e.corto ?? e.texto}
               </a>
             ))}
           </nav>
@@ -153,7 +175,7 @@ export default async function PortadaPage() {
                 botón: el botón naranja es para el que todavía no contrató. */}
             <Link
               href="/admin/login"
-              className="hidden text-[0.92rem] font-medium text-tinta transition-colors hover:text-brand sm:inline"
+              className="hidden whitespace-nowrap text-[0.92rem] font-medium text-tinta transition-colors hover:text-brand sm:inline"
             >
               Iniciar sesión
             </Link>
@@ -193,8 +215,8 @@ export default async function PortadaPage() {
                 Tu negocio entero, <span className="text-brand">en un solo sistema.</span>
               </h1>
               <p className="mt-5 max-w-[46ch] animate-subir text-[clamp(1.05rem,2vw,1.22rem)] leading-relaxed text-tinta-media [animation-delay:140ms]">
-                Punto de venta con factura, control de stock, asistencia del personal y reserva de turnos.
-                Todo conectado, en el navegador y sin instalar nada.
+                Punto de venta con factura, control de stock, asistencia del personal, reserva de turnos y de
+                canchas, y los libros de IVA para tu contador. Todo conectado, en el navegador y sin instalar nada.
               </p>
 
               <div className="mt-7 flex animate-subir flex-wrap gap-2.5 [animation-delay:200ms]">
@@ -241,19 +263,19 @@ export default async function PortadaPage() {
           </div>
         </section>
 
-        {/* ---------------- las cuatro herramientas ---------------- */}
+        {/* ---------------- las seis herramientas ---------------- */}
         <section className="border-y border-linea bg-papel-suave py-16 lg:py-20">
           <div className="mx-auto max-w-6xl px-5 sm:px-8">
             <div className="max-w-[56ch]">
               <span className="rotulo">Todo en uno</span>
-              <h2 className={H2}>Cuatro herramientas que trabajan juntas.</h2>
+              <h2 className={H2}>Seis herramientas que trabajan juntas.</h2>
               <p className="mt-4 text-[1.04rem] text-tinta-media">
                 Comparten los mismos productos, clientes, personal y caja: lo que cargás una vez sirve en todo el
                 sistema.
               </p>
             </div>
 
-            <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {MODULOS.map((m) => (
                 <a
                   key={m.id}
@@ -351,6 +373,47 @@ export default async function PortadaPage() {
           </div>
         </section>
 
+        {/* ---------------- reserva de canchas ---------------- */}
+        <section id="canchas" className="scroll-mt-16 bg-papel-suave py-16 lg:py-24">
+          <div className="mx-auto grid max-w-6xl items-center gap-12 px-5 sm:px-8 lg:grid-cols-2 lg:gap-16">
+            <div>
+              <Etiqueta icono={IconoCancha} texto="Reserva de canchas" tono="bg-aviso-luz text-aviso" />
+              <h2 className={H2}>Canchas con horarios que no se pisan, y el alquiler se cobra en la caja.</h2>
+              <p className="mt-4 max-w-[54ch] text-[1.04rem] leading-relaxed text-tinta-media">
+                Para complejos de fútbol, pádel, tenis, vóley y básquet. El cliente entra a tu página, elige el día y
+                cuánto quiere jugar, y ve las horas libres de cada cancha con el precio de ese día. Vos ves todo en
+                un tablero por cancha y, cuando llega el partido, cobrás desde la misma reserva. Tu página también
+                muestra el mapa para llegar.
+              </p>
+              <ListaFunciones items={FUNCIONES_CANCHAS} />
+              <div className="mt-8">
+                <Link href={canchasReal} className={BOTON}>
+                  Ver una página de canchas real
+                  <IconoFlecha tam={16} />
+                </Link>
+              </div>
+            </div>
+            <MaquetaCanchas />
+          </div>
+        </section>
+
+        {/* ---------------- contabilidad ---------------- */}
+        <section id="contabilidad" className="scroll-mt-16 py-16 lg:py-24">
+          <div className="mx-auto grid max-w-6xl items-center gap-12 px-5 sm:px-8 lg:grid-cols-2 lg:gap-16">
+            <div className="lg:order-last">
+              <Etiqueta icono={IconoContabilidad} texto="Contabilidad" tono="bg-papel-hundido text-tinta" />
+              <h2 className={H2}>Los libros de IVA ya armados, para que tu contador no empiece de cero.</h2>
+              <p className="mt-4 max-w-[54ch] text-[1.04rem] leading-relaxed text-tinta-media">
+                Cada factura que emitís y cada compra o gasto que cargás entran solos al libro de IVA de ventas y al
+                de compras. Elegís el mes y lo bajás en Excel o PDF, con el IVA 5 % y 10 % separado y los totales que
+                cierran. La declaración se presenta en Marangatú: el sistema te deja los números preparados.
+              </p>
+              <ListaFunciones items={FUNCIONES_CONTABILIDAD} />
+            </div>
+            <MaquetaContabilidad />
+          </div>
+        </section>
+
         {/* ---------------- restaurantes ---------------- */}
         <section id="restaurantes" className="scroll-mt-16 bg-papel-suave py-16 lg:py-24">
           <div className="mx-auto grid max-w-6xl items-center gap-12 px-5 sm:px-8 lg:grid-cols-2 lg:gap-16">
@@ -401,7 +464,7 @@ export default async function PortadaPage() {
               <span className="rotulo">Todo conectado</span>
               <h2 className={H2}>Una venta, y el resto se acomoda solo.</h2>
               <p className="mt-4 text-[1.04rem] text-tinta-media">
-                Es la diferencia de tener un solo sistema en lugar de cuatro programas sueltos: no cargás nada dos
+                Es la diferencia de tener un solo sistema en lugar de varios programas sueltos: no cargás nada dos
                 veces y los números siempre coinciden.
               </p>
             </div>
@@ -436,9 +499,9 @@ export default async function PortadaPage() {
           <div className="mx-auto max-w-6xl px-5 sm:px-8">
             <div className="max-w-[56ch]">
               <span className="rotulo">Para quién es</span>
-              <h2 className={H2}>Pensado para negocios de comida y de servicios.</h2>
+              <h2 className={H2}>Pensado para negocios de comida, de servicios y de deportes.</h2>
             </div>
-            <div className="mt-10 grid gap-4 lg:grid-cols-3">
+            <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               {PARA_QUIEN.map((p) => (
                 <div key={p.titulo} className="flex flex-col rounded-2xl border border-linea bg-superficie p-6">
                   <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-brand-light text-brand">
@@ -541,6 +604,9 @@ export default async function PortadaPage() {
                 <Link href={reservaReal} className={`${BOTON_SOBRE_OSCURO} w-full sm:w-auto`}>
                   Ver una reserva real
                 </Link>
+                <Link href={canchasReal} className={`${BOTON_SOBRE_OSCURO} w-full sm:w-auto`}>
+                  Ver canchas reales
+                </Link>
               </div>
             </div>
           </div>
@@ -556,14 +622,15 @@ export default async function PortadaPage() {
               TuMenuSmart
             </span>
             <p className="mt-3 max-w-[34ch] text-[0.9rem] text-tinta-media">
-              Punto de venta, control de stock, asistencia y reserva de turnos en un solo sistema.
+              Punto de venta, control de stock, asistencia, reserva de turnos y de canchas, y libros de IVA en un solo
+              sistema.
             </p>
           </div>
 
           <div>
             <p className="text-[0.82rem] font-semibold uppercase tracking-wider text-tinta-suave">Herramientas</p>
             <ul className="mt-3 flex flex-col gap-2 text-[0.92rem] text-tinta-media">
-              {ENLACES.slice(0, 5).map((e) => (
+              {ENLACES.slice(0, 7).map((e) => (
                 <li key={e.href}>
                   <a href={e.href} className="transition-colors hover:text-brand">
                     {e.texto}
@@ -584,6 +651,11 @@ export default async function PortadaPage() {
               <li>
                 <Link href={reservaReal} className="transition-colors hover:text-brand">
                   Una reserva real
+                </Link>
+              </li>
+              <li>
+                <Link href={canchasReal} className="transition-colors hover:text-brand">
+                  Una página de canchas real
                 </Link>
               </li>
               <li>

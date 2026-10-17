@@ -2,8 +2,10 @@ import type { ComponentType } from "react";
 import {
   IconoAsistencia,
   IconoCaja,
+  IconoCancha,
   IconoClientes,
   IconoComedor,
+  IconoContabilidad,
   IconoDocumento,
   IconoEscudo,
   IconoIdea,
@@ -28,7 +30,7 @@ export type Funcion = { titulo: string; texto: string };
 
 type Icono = ComponentType<{ className?: string; tam?: number }>;
 
-/** Las cuatro herramientas que se ven al empezar la página, antes de entrar al detalle. */
+/** Las seis herramientas que se ven al empezar la página, antes de entrar al detalle (en este mismo orden van sus secciones). */
 export const MODULOS: {
   id: string;
   titulo: string;
@@ -64,6 +66,20 @@ export const MODULOS: {
     texto: "Agenda por profesional y una página de reservas con tu marca.",
     icono: IconoTurnos,
     tono: "bg-violeta-luz text-violeta",
+  },
+  {
+    id: "canchas",
+    titulo: "Reserva de canchas",
+    texto: "Un tablero por cancha, reservas desde tu página y cobro en la caja.",
+    icono: IconoCancha,
+    tono: "bg-aviso-luz text-aviso",
+  },
+  {
+    id: "contabilidad",
+    titulo: "Contabilidad",
+    texto: "Libros de IVA de ventas y compras, listos para tu contador.",
+    icono: IconoContabilidad,
+    tono: "bg-papel-hundido text-tinta",
   },
 ];
 
@@ -163,6 +179,60 @@ export const FUNCIONES_TURNOS: Funcion[] = [
   },
 ];
 
+export const FUNCIONES_CANCHAS: Funcion[] = [
+  {
+    titulo: "Calendario Día, Semana y Mes",
+    texto: "Todas las canchas del día en un tablero, y la semana y el mes de un vistazo.",
+  },
+  {
+    titulo: "Página de reservas con tu marca",
+    texto: "Con «Jugá hoy»: los próximos horarios libres de cada cancha y la reserva en pocos toques.",
+  },
+  {
+    titulo: "Solo horas libres",
+    texto: "Lo ocupado se ve tachado y no se puede reservar: nadie pisa a nadie.",
+  },
+  {
+    titulo: "Precios por día y horario",
+    texto: "De lunes a viernes un precio, fin de semana otro, la noche otro. El cliente ve el de su día.",
+  },
+  {
+    titulo: "Cobro en la caja",
+    texto: "Factura o ticket y forma de pago con el mismo punto de venta: entra al cierre del turno.",
+  },
+  {
+    titulo: "Alquiler en el mostrador",
+    texto: "Cada cancha es un producto: una hora, un toque; una hora y media, escribís 1,5.",
+  },
+];
+
+export const FUNCIONES_CONTABILIDAD: Funcion[] = [
+  {
+    titulo: "Libro IVA de ventas",
+    texto: "Cada factura con su IVA 5 % y 10 % y las exentas, en las columnas del modelo oficial. Las anuladas no suman.",
+  },
+  {
+    titulo: "Libro IVA de compras",
+    texto: "Compras y gastos con factura. Si a una le falta el timbrado o el RUC, se marca y no cuenta como crédito fiscal.",
+  },
+  {
+    titulo: "Resumen del IVA del mes",
+    texto: "El IVA de lo que vendiste menos el de lo que compraste, como referencia para tu declaración.",
+  },
+  {
+    titulo: "Registro de comprobantes (RG 90)",
+    texto: "El archivo de ventas y compras para importar en Marangatú, armado con el formato de la DNIT.",
+  },
+  {
+    titulo: "Excel y PDF",
+    texto: "Cada libro se descarga por período: el mes anterior, este mes o las fechas que elijas.",
+  },
+  {
+    titulo: "Sale de lo que ya cargaste",
+    texto: "Las facturas del punto de venta y las compras de stock entran solas: no se carga nada dos veces.",
+  },
+];
+
 export const FUNCIONES_RESTAURANTE: Funcion[] = [
   {
     titulo: "Carta digital propia",
@@ -222,10 +292,10 @@ export const ADEMAS: { titulo: string; texto: string; icono: Icono }[] = [
 
 /** "Todo conectado": el recorrido de una venta por el sistema. */
 export const FLUJO: { titulo: string; texto: string }[] = [
-  { titulo: "Vendés", texto: "En el mostrador, en la mesa, por delivery o al cobrar un turno." },
+  { titulo: "Vendés", texto: "En el mostrador, en la mesa, por delivery o al cobrar un turno o una cancha." },
   { titulo: "El stock baja solo", texto: "Cada insumo se descuenta del almacén correcto." },
   { titulo: "La caja se cuadra", texto: "El arqueo del turno ya está hecho cuando cerrás." },
-  { titulo: "Se factura", texto: "Con timbrado, con IVA y con la numeración que corresponde." },
+  { titulo: "Se factura", texto: "Con timbrado, con IVA y con la numeración que corresponde. Entra sola al libro de IVA." },
   { titulo: "Ves el resultado", texto: "Ventas, costos y margen en los reportes, al día." },
 ];
 
@@ -248,10 +318,16 @@ export const PARA_QUIEN: {
     usa: ["Reserva de turnos", "Comisión por profesional", "Cobro en caja", "Asistencia"],
   },
   {
+    titulo: "Canchas de fútbol, pádel y otros deportes",
+    texto: "Horarios que no se pisan, precios por día y hora, y el alquiler cobrado en la caja.",
+    icono: IconoCancha,
+    usa: ["Reserva de canchas", "Precios por día y horario", "Cobro en caja", "Asistencia"],
+  },
+  {
     titulo: "Heladerías, bodegas, talleres, veterinarias y comercios",
     texto: "Vender, facturar y saber cuánto queda en el depósito.",
     icono: IconoTienda,
-    usa: ["Punto de venta", "Stock y compras", "Clientes y crédito", "Factura con timbrado"],
+    usa: ["Punto de venta", "Stock y compras", "Clientes y crédito", "Factura con timbrado", "Libros de IVA"],
   },
 ];
 
@@ -262,11 +338,11 @@ export const PASOS: Funcion[] = [
   },
   {
     titulo: "Cargás lo tuyo",
-    texto: "Productos y precios, insumos, personal y servicios. Arrancás con una carta de ejemplo para ir más rápido.",
+    texto: "Productos y precios, insumos, personal, servicios y canchas. Arrancás con una carta de ejemplo para ir más rápido.",
   },
   {
     titulo: "Empezás a vender",
-    texto: "Cobrás en el punto de venta, compartís tu QR y tu página de reservas, y el personal marca desde el celular fijo.",
+    texto: "Cobrás en el punto de venta, compartís tu QR y tus páginas de reservas, y el personal marca desde el celular fijo. A fin de mes, bajás los libros de IVA.",
   },
 ];
 
@@ -279,7 +355,7 @@ export const PREGUNTAS: { pregunta: string; respuesta: string }[] = [
   {
     pregunta: "¿Sirve para mi tipo de negocio?",
     respuesta:
-      "Está pensado para restaurantes y comidas rápidas, y para barberías, peluquerías y salones. También sirve para heladerías, bodegas, talleres y veterinarias. Escribinos y te contamos cómo se adaptaría al tuyo.",
+      "Está pensado para restaurantes y comidas rápidas, para barberías, peluquerías y salones, y para complejos de canchas de fútbol, pádel y otros deportes. También sirve para heladerías, bodegas, talleres y veterinarias. Escribinos y te contamos cómo se adaptaría al tuyo.",
   },
   {
     pregunta: "¿Cuánto cuesta?",
@@ -290,6 +366,11 @@ export const PREGUNTAS: { pregunta: string; respuesta: string }[] = [
     pregunta: "¿Emite factura legal?",
     respuesta:
       "Sí. Emite factura con timbrado, con IVA 5 % y 10 %, y cada estación usa la numeración de su punto de expedición. También podés cobrar con ticket cuando no hace falta factura.",
+  },
+  {
+    pregunta: "¿Me sirve para el IVA y para mi contador?",
+    respuesta:
+      "Sí. El sistema arma el libro de IVA de ventas y el de compras, el resumen del IVA del mes y el archivo del Registro de Comprobantes (RG 90), todo por período y en Excel o PDF. Son los números preparados para tu contador: la declaración se presenta en Marangatú.",
   },
   {
     pregunta: "¿Y la factura electrónica (SIFEN)?",

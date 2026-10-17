@@ -183,6 +183,29 @@ export function IconoTienda(p: Props) {
   );
 }
 
+/** Una cancha vista desde arriba (líneas, círculo central y áreas): la reserva de canchas. */
+export function IconoCancha(p: Props) {
+  return (
+    <Base {...p}>
+      <rect x="2" y="5" width="20" height="14" rx="2" />
+      <path d="M12 5v14" />
+      <circle cx="12" cy="12" r="3" />
+      <path d="M2 9.5h3v5H2M22 9.5h-3v5h3" />
+    </Base>
+  );
+}
+
+/** Una calculadora: la contabilidad (libros de IVA). */
+export function IconoContabilidad(p: Props) {
+  return (
+    <Base {...p}>
+      <rect x="5" y="2" width="14" height="20" rx="2" />
+      <path d="M8 6h8" />
+      <path d="M8.5 11h.01M12 11h.01M15.5 11h.01M8.5 14.5h.01M12 14.5h.01M15.5 14.5h.01M8.5 18h.01M12 18h.01M15.5 18h.01" />
+    </Base>
+  );
+}
+
 export function IconoAlerta(p: Props) {
   return (
     <Base {...p}>
