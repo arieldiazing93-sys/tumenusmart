@@ -92,6 +92,17 @@ async function verificarCategoriaYArea(
 export type ResultadoProducto = { ok: true } | { ok: false; error: string };
 
 /**
+ * El precio de lista de un producto: cero o más y que quepa en la base (Decimal(10,2): hasta 99.999.999). Un negativo —un "-25000" por un
+ * dedo de más— restaría plata de las cuentas en que figure, y un número demasiado grande hacía fallar el guardado con un error genérico.
+ */
+function errorDelPrecio(precio: number): string | null {
+  if (!Number.isFinite(precio)) return "El precio no es un número válido";
+  if (precio < 0) return "El precio no puede ser negativo";
+  if (precio > 99_999_999) return "El precio es demasiado grande (el máximo es 99.999.999)";
+  return null;
+}
+
+/**
  * La dirección de la lista de Productos con un producto abierto a la derecha
  * (y, si se pide, el cartel "Guardado"). Ver `ProductosMaestroDetalle`.
  */
@@ -123,6 +134,8 @@ export async function crearProducto(formData: FormData): Promise<ResultadoProduc
   if (!nombre || !categoryId || isNaN(precio)) {
     return { ok: false, error: "Faltan datos obligatorios" };
   }
+  const errorDePrecio = errorDelPrecio(precio);
+  if (errorDePrecio) return { ok: false, error: errorDePrecio };
 
   // La categoría y el área de impresión vienen del navegador: se verifican por
   // el cliente del local (los de otro negocio simplemente no aparecen).
@@ -184,6 +197,8 @@ export async function actualizarProducto(
   if (!nombre || !categoryId || isNaN(precioEscrito)) {
     return { ok: false, error: "Faltan datos obligatorios" };
   }
+  const errorDePrecio = errorDelPrecio(precioEscrito);
+  if (errorDePrecio) return { ok: false, error: errorDePrecio };
 
   // La categoría y el área de impresión vienen del navegador: se verifican por
   // el cliente del local (los de otro negocio simplemente no aparecen).

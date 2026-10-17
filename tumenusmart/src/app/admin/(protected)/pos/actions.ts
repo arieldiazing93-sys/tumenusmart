@@ -189,6 +189,9 @@ export type DatosVenta = {
 const CITA_NO_COBRABLE = "CITA_NO_COBRABLE";
 /** Igual, para una reserva de cancha. */
 const RESERVA_NO_COBRABLE = "RESERVA_NO_COBRABLE";
+/** Lo que se lanza dentro de la transacción si el turno se cerró mientras se armaba el cobro. */
+const TURNO_YA_CERRADO = "TURNO_YA_CERRADO";
+const TURNO_CERRADO_AL_CANCELAR = "El turno de esta cuenta ya está cerrado. Una vez cerrado el turno, la cuenta no se puede cancelar.";
 
 /**
  * Cobra el carrito y cierra la cuenta.
@@ -695,6 +698,12 @@ export async function registrarVenta(turnoId: string, datos: DatosVenta): Promis
 
   const ventaCreada = await prisma
     .$transaction(async (tx) => {
+    // El turno se mira otra vez ADENTRO de la transacción, pegado al momento de guardar: entre la primera revisión (al empezar, antes de
+    // leer la carta y las promociones) y acá puede haber pasado casi un segundo, y en ese tiempo otra persona pudo cerrar el turno. Una
+    // venta que entra a un turno ya cerrado no figuraría en los totales que se firmaron al cierre.
+    const turnoSigueAbierto = await tx.turnoPos.findFirst({ where: { id: turnoId, storeId, estado: "abierto" }, select: { id: true } });
+    if (!turnoSigueAbierto) throw new Error(TURNO_YA_CERRADO);
+
     let datosFactura: Record<string, unknown> = { comprobanteTipo: "ticket" };
     // El número que consumió esta factura, para armar su Comprobante más abajo.
     let correlativoFactura: number | null = null;
@@ -944,6 +953,10 @@ export async function registrarVenta(turnoId: string, datos: DatosVenta): Promis
     return venta.id;
   })
     .catch((e: unknown) => {
+      // El turno se cerró justo antes de guardar: la pantalla manda a abrir uno nuevo.
+      if (e instanceof Error && e.message === TURNO_YA_CERRADO) {
+        return { errorFactura: "Ese turno ya está cerrado. Abrí uno nuevo para seguir vendiendo.", sinTurno: true as const };
+      }
       // La cita se cobró (o se canceló) en el mismo instante desde otra pantalla.
       if (e instanceof Error && e.message === CITA_NO_COBRABLE) {
         return { errorFactura: "Esa cita ya se cobró o se canceló mientras tanto. Actualizá la pantalla." };
@@ -956,7 +969,9 @@ export async function registrarVenta(turnoId: string, datos: DatosVenta): Promis
       if (e instanceof ErrorFacturaElectronica) return { errorFactura: e.message };
       throw e;
     });
-  if (typeof ventaCreada === "object") return { ok: false, error: ventaCreada.errorFactura };
+  if (typeof ventaCreada === "object") {
+    return { ok: false, error: ventaCreada.errorFactura, ...("sinTurno" in ventaCreada ? { sinTurno: true as const } : {}) };
+  }
   const ventaId = ventaCreada;
 
   // Solo lo que conviene poder revisar después: las ventas con descuento y las
@@ -1080,8 +1095,11 @@ export async function cerrarTurno(
   // efectivo que tendría que haber.
   const movimientos = await netoMovimientosCaja(db, turnoId);
 
-  await db.turnoPos.update({
-    where: { id: turnoId },
+  // El cierre se "reclama" con el estado en la condición: si otro cierre (otra pestaña, otro equipo) llegó primero, este no encuentra un
+  // turno abierto y NO pisa lo que ya quedó firmado (los montos declarados, quién cerró y cuándo). Con `update` a secas, el segundo cierre
+  // sobrescribía los declarados del primero.
+  const cierre = await db.turnoPos.updateMany({
+    where: { id: turnoId, estado: "abierto" },
     data: {
       estado: "cerrado",
       movimientosEfectivoNeto: movimientos.neto,
@@ -1099,6 +1117,7 @@ export async function cerrarTurno(
       cerradoEn: new Date(),
     },
   });
+  if (cierre.count !== 1) return { ok: false, error: "Ese turno ya está cerrado." };
 
   const totalDeclarado =
     declarado.efectivo + declarado.transferencia + declarado.tarjetaDebito + declarado.tarjetaCredito;
@@ -1198,6 +1217,11 @@ export async function cancelarVenta(ventaId: string, motivo: string, autorizacio
   const storeId = await idLocalActual();
   const db = prismaDelLocal(storeId);
 
+  // La pantalla ya lo pide, pero lo que viene del navegador no es de fiar: toda cancelación deja su motivo en el historial.
+  if (typeof motivo !== "string" || !motivo.trim()) {
+    return { ok: false, error: "Escribí por qué se cancela la cuenta — queda en el historial." };
+  }
+
   const venta = await db.ventaPos.findUnique({
     where: { id: ventaId },
     select: {
@@ -1205,6 +1229,7 @@ export async function cancelarVenta(ventaId: string, motivo: string, autorizacio
       numero: true,
       total: true,
       cancelada: true,
+      turnoPosId: true,
       turnoPos: { select: { estado: true } },
       facturaNumero: true,
       facturaAnulada: true,
@@ -1219,12 +1244,7 @@ export async function cancelarVenta(ventaId: string, motivo: string, autorizacio
       error: "Esta venta a crédito ya tiene cobros registrados. Eliminá primero sus cobros (en Cuentas por cobrar) y después cancelala.",
     };
   }
-  if (venta.turnoPos.estado !== "abierto") {
-    return {
-      ok: false,
-      error: "El turno de esta cuenta ya está cerrado. Una vez cerrado el turno, la cuenta no se puede cancelar.",
-    };
-  }
+  if (venta.turnoPos.estado !== "abierto") return { ok: false, error: TURNO_CERRADO_AL_CANCELAR };
 
   // Seguridad (Ajustes): si las cancelaciones piden contraseña, se exige acá, antes de tocar nada. Es la única puerta: la usan el
   // Historial de cuentas, Facturas ("cancelar todo") y el cobro de una cita, que le pasan la contraseña que se escribió.
@@ -1237,7 +1257,19 @@ export async function cancelarVenta(ventaId: string, motivo: string, autorizacio
   // En transacción: cancelar la cuenta y devolverle el stock a sus insumos
   // quedan como una sola cosa, nunca a medias.
   let yaCancelada = false;
+  let turnoCerrado = false;
   await prisma.$transaction(async (tx) => {
+    // El turno se vuelve a mirar acá adentro: entre la primera revisión y el guardado (la contraseña, la red) otra persona pudo
+    // cerrarlo, y una cuenta cancelada después del cierre cambiaría números que el cajero ya firmó.
+    const turnoSigueAbierto = await tx.turnoPos.findFirst({
+      where: { id: venta.turnoPosId, storeId, estado: "abierto" },
+      select: { id: true },
+    });
+    if (!turnoSigueAbierto) {
+      turnoCerrado = true;
+      return;
+    }
+
     // Se "reclama" la cancelación con la condición adentro de la transacción: si otra persona (u otra pestaña) la canceló un instante
     // antes, esta no encuentra nada que cancelar y NO devuelve el stock, la propina ni la cita una segunda vez.
     const reclamada = await tx.ventaPos.updateMany({
@@ -1353,6 +1385,7 @@ export async function cancelarVenta(ventaId: string, motivo: string, autorizacio
       data: { ventaPosId: null, estado: "proxima" },
     });
   });
+  if (turnoCerrado) return { ok: false, error: TURNO_CERRADO_AL_CANCELAR };
   if (yaCancelada) return { ok: false, error: "Esa cuenta ya estaba cancelada." };
 
   await registrarBitacora(storeId, sesion, {

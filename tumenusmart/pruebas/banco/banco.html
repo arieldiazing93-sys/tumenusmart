@@ -1,0 +1,35 @@
+<!doctype html><html><head><meta charset="utf-8"><title>banco</title>
+<!-- Abrir:  http://localhost:8768/banco.html?p=NOMBRE   (corre pruebas/banco/NOMBRE.js). Ver LEEME.md. -->
+<script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7.25.6/babel.min.js"></script>
+<script src="cargador.js"></script>
+</head><body><pre id="salida" style="font-size:11px;white-space:pre-wrap"></pre><div id="raiz"></div>
+<script type="module">
+  const salida = document.getElementById("salida");
+  window.__aciertos = 0; window.__fallas = 0;
+  window.log = (t) => { salida.textContent += "\n" + t; };
+  window.ok = (c, m) => { if (c) window.__aciertos++; else { window.__fallas++; window.log("FALLA: " + m); } };
+  window.igual = (a, b, m) => window.ok(JSON.stringify(a) === JSON.stringify(b), m + " -> esperado " + JSON.stringify(b) + " y salio " + JSON.stringify(a));
+  window.pausa = (ms) => new Promise((r) => setTimeout(r, ms));
+  try {
+    const nombre = new URLSearchParams(location.search).get("p") || "";
+    if (!/^[a-z0-9-]+$/.test(nombre)) throw new Error("Falta ?p=nombre-de-la-prueba");
+    // React 19 real (la misma versión del proyecto) para las pruebas de pantallas.
+    const R = (await import("https://esm.sh/react@19.0.0")).default;
+    const D = await import("https://esm.sh/react-dom@19.0.0/client?deps=react@19.0.0");
+    const J = await import("https://esm.sh/react@19.0.0/jsx-runtime");
+    window.React = R;
+    const S = window.Cargador.simulacros;
+    S["react"] = R; S["react/jsx-runtime"] = J; S["react/jsx-dev-runtime"] = J;
+    window.RouterCtx = R.createContext({ push() {}, refresh() {} });
+    S["next/navigation"] = { useRouter: () => R.useContext(window.RouterCtx), useParams: () => ({ slug: "lafogata" }), usePathname: () => "/", useSearchParams: () => new URLSearchParams() };
+    S["react-dom"] = await import("https://esm.sh/react-dom@19.0.0?deps=react@19.0.0");
+    S["next/link"] = { __esModule: true, default: ({ href, children, ...r }) => R.createElement("a", { href, ...r }, children) };
+    let raiz = null;
+    window.montar = (el) => { if (!raiz) raiz = (D.default ?? D).createRoot(document.getElementById("raiz")); raiz.render(el); };
+    window.$ = (s, r = document) => r.querySelector(s);
+    window.$$ = (s, r = document) => [...r.querySelectorAll(s)];
+    window.clic = (el) => el.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+    window.esperar = async (f, ms = 2500) => { const t = Date.now(); while (Date.now() - t < ms) { try { const v = f(); if (v) return v; } catch {} await window.pausa(30); } return false; };
+    const s = document.createElement("script"); s.src = nombre + ".js"; document.body.appendChild(s);
+  } catch (e) { salida.textContent = "ERROR: " + e; window.__listo = true; }
+</script></body></html>

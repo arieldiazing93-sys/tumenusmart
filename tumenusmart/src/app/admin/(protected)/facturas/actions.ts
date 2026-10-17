@@ -263,9 +263,19 @@ export async function cancelarFactura(
       return { ok: false, error: "Esa cuenta ya está cancelada — la factura ya quedó anulada con ella." };
     }
     if (venta.facturaAnulada) return { ok: false, error: "Esa factura ya estaba anulada." };
-    // La venta y el comprobante de su factura se anulan juntos.
+    // La venta y el comprobante de su factura se anulan juntos. Se "reclama" la anulación con la condición adentro de la
+    // transacción: si otra persona (u otra pestaña) la anuló o canceló la cuenta un instante antes, esta no hace nada y no
+    // le pide a la DNIT una segunda cancelación del mismo documento.
+    let yaAnulada = false;
     await prisma.$transaction(async (tx) => {
-      await tx.ventaPos.update({ where: { id, storeId }, data: datosAnulacion });
+      const reclamada = await tx.ventaPos.updateMany({
+        where: { id, storeId, cancelada: false, facturaAnulada: false, facturaNumero: { not: null } },
+        data: datosAnulacion,
+      });
+      if (reclamada.count !== 1) {
+        yaAnulada = true;
+        return;
+      }
       await anularComprobantes(tx, {
         storeId,
         origen: { ventaPosId: id },
@@ -274,6 +284,7 @@ export async function cancelarFactura(
         motivo: motivo.trim(),
       });
     });
+    if (yaAnulada) return { ok: false, error: "Esa factura ya estaba anulada (o la cuenta se canceló). Actualizá la pantalla." };
     revalidatePath(`/admin/pos/venta/${id}`);
   } else {
     const pedido = await db.order.findUnique({

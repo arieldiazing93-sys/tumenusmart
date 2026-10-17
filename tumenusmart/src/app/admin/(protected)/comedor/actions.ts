@@ -883,6 +883,9 @@ export type DatosCobroCuenta = {
   propina?: DatosPropina;
 };
 
+/** Lo que se avisa si el turno de caja se cerró mientras se armaba el cobro. */
+const MENSAJE_TURNO_CERRADO = "Ese turno de caja ya está cerrado. Abrí uno nuevo y volvé a cobrar.";
+
 export type ResultadoPagoCuenta =
   | { ok: true; ventaId: string; total: number }
   /** `sinTurno`: no hay turno de caja abierto; la pantalla manda directo a abrirlo (ver src/lib/turno-requerido.ts). */
@@ -1103,6 +1106,11 @@ export async function pagarCuenta(cuentaId: string, datos: DatosCobroCuenta): Pr
   let ventaId = "";
   try {
     ventaId = await prisma.$transaction(async (tx) => {
+      // El turno de caja se mira otra vez adentro de la transacción, pegado al momento de guardar: si otra persona lo cerró mientras se
+      // armaba el cobro, la venta no puede entrar a un turno ya firmado (no figuraría en sus totales).
+      const turnoSigueAbierto = await tx.turnoPos.findFirst({ where: { id: turno.id, storeId, estado: "abierto" }, select: { id: true } });
+      if (!turnoSigueAbierto) throw new ErrorDeUsuario(MENSAJE_TURNO_CERRADO);
+
       // Primero se cierra la cuenta, con el estado en la condición: si otra caja la cobró (o se canceló) en el mismo
       // instante, acá no encuentra nada, se deshace todo y no queda una factura de más.
       const cerrada = await tx.cuentaMesa.updateMany({
@@ -1255,7 +1263,10 @@ export async function pagarCuenta(cuentaId: string, datos: DatosCobroCuenta): Pr
       return venta.id;
     }, OPCIONES_TX);
   } catch (e) {
-    if (e instanceof ErrorDeUsuario || e instanceof ErrorFacturaElectronica) return { ok: false, error: e.message };
+    if (e instanceof ErrorDeUsuario || e instanceof ErrorFacturaElectronica) {
+      // Con el turno cerrado, la pantalla manda directo a abrir uno nuevo.
+      return { ok: false, error: e.message, ...(e.message === MENSAJE_TURNO_CERRADO ? { sinTurno: true as const } : {}) };
+    }
     console.error("[comedor] pagarCuenta falló", e);
     return {
       ok: false,
