@@ -190,7 +190,9 @@ type CompraPreparada = {
  */
 async function prepararCompra(
   prisma: ReturnType<typeof prismaDelLocal>,
-  datos: DatosCompra
+  datos: DatosCompra,
+  /** Al corregir una compra: el rendimiento con que se compró cada insumo (el guardado en la línea), no el de hoy. */
+  rendimientosDeLaCompra?: Map<string, number>
 ): Promise<{ error: string } | CompraPreparada> {
   const lineas = datos.lineas.filter(
     (l) =>
@@ -244,7 +246,9 @@ async function prepararCompra(
   // El rendimiento sale de la base, nunca del navegador: define cuántas
   // unidades entran al stock por cada unidad de compra (ver Insumo.rendimiento).
   const rendimientoPorInsumo = new Map(insumos.map((i) => [i.id, Number(i.rendimiento)]));
-  const rendimientoDe = (insumoId: string) => rendimientoPorInsumo.get(insumoId) ?? 1;
+  // Un insumo que YA estaba en la compra conserva el rendimiento con el que se compró: si después se cambió el rendimiento del insumo,
+  // corregir una compra vieja con el de hoy desajustaba el stock (calculaba otras unidades que las que habían entrado).
+  const rendimientoDe = (insumoId: string) => rendimientosDeLaCompra?.get(insumoId) ?? rendimientoPorInsumo.get(insumoId) ?? 1;
 
   const calculo = calcularCompra(
     lineas.map((l) => ({
@@ -401,7 +405,13 @@ export async function actualizarCompra(
   if (!compra) return { ok: false, error: "Esa compra no existe." };
   if (compra.cancelada) return { ok: false, error: "Una compra cancelada no se puede editar." };
 
-  const preparada = await prepararCompra(prisma, datos);
+  // Lo que traía la compra ANTES de corregirla: qué insumos (para devolverle el costo a los que se quiten) y con qué rendimiento se
+  // compró cada uno (para que corregirla no use el rendimiento de hoy si el del insumo cambió después).
+  const itemsAntes = await prisma.compraItem.findMany({ where: { compraId }, select: { insumoId: true, rendimiento: true } });
+  const insumosQueTraia = itemsAntes.map((i) => i.insumoId);
+  const rendimientosDeLaCompra = new Map(itemsAntes.map((i) => [i.insumoId, Number(i.rendimiento)]));
+
+  const preparada = await prepararCompra(prisma, datos, rendimientosDeLaCompra);
   if ("error" in preparada) return { ok: false, error: preparada.error };
   const { lineas, calculo, rendimientoDe, condicionPago, descuentoGeneral, timbrado } = preparada;
 
@@ -425,8 +435,7 @@ export async function actualizarCompra(
 
   const registradoPor = sesion.nombre?.trim() || sesion.email;
 
-  // Qué insumos traía la compra ANTES de corregirla (para devolverle el costo a los que se quiten) y cuáles hay que revisar al final.
-  const insumosQueTraia = (await prisma.compraItem.findMany({ where: { compraId }, select: { insumoId: true } })).map((i) => i.insumoId);
+  // Cuáles insumos hay que revisar al final para devolverles el costo de la compra anterior.
   const insumosParaRevisarElCosto = new Set<string>();
 
   await prisma.$transaction(async (tx) => {

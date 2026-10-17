@@ -1,6 +1,7 @@
 import { prisma } from "./prisma";
 import { listarDias, claveDia } from "./rango-fecha";
 import { factorDeDescuentoDeProductos, totalDeEnvio } from "./descuento-venta";
+import { claveDeCliente } from "./agrupar-clientes";
 
 export type RangoFecha = { gte: Date; lt: Date };
 
@@ -37,9 +38,11 @@ export async function calcularEstadisticas(storeId: string, rango: RangoFecha) {
       include: { items: true },
       orderBy: { creadoEn: "asc" },
     }),
+    // La primera compra de SIEMPRE de cada cliente: una venta cancelada no cuenta (si la primera se canceló, la primera de verdad es la
+    // siguiente, y ahí recién es «nuevo»).
     prisma.order.groupBy({
       by: ["clienteTelefono"],
-      where: { storeId, ...PEDIDO_REAL },
+      where: { storeId, ...PEDIDO_REAL, estado: { not: "cancelado" } },
       _min: { createdAt: true },
     }),
     // Mucha venta de mostrador es un cliente de paso sin teléfono cargado
@@ -48,7 +51,7 @@ export async function calcularEstadisticas(storeId: string, rango: RangoFecha) {
     // depende del teléfono.
     prisma.ventaPos.groupBy({
       by: ["clienteTelefono"],
-      where: { storeId, clienteTelefono: { not: null } },
+      where: { storeId, clienteTelefono: { not: null }, cancelada: false },
       _min: { creadoEn: true },
     }),
   ]);
@@ -72,25 +75,39 @@ export async function calcularEstadisticas(storeId: string, rango: RangoFecha) {
   const productosPorPedido = ventasValidas > 0 ? unidadesVendidas / ventasValidas : 0;
 
   // Clientes únicos por teléfono, combinando las dos fuentes — el mismo
-  // cliente que compró online y en el mostrador cuenta una sola vez.
+  // cliente que compró online y en el mostrador cuenta una sola vez. Solo
+  // cuentan las ventas VÁLIDAS (una cancelada no es un cliente que compró), y
+  // el teléfono se reconoce sin importar cómo lo escribieron (ver claveDeCliente):
+  // «0981 123 456» y «+595981123456» son la misma persona.
   const telefonos = new Set<string>();
-  for (const p of pedidos) if (p.clienteTelefono) telefonos.add(p.clienteTelefono);
-  for (const v of ventasPos) if (v.clienteTelefono) telefonos.add(v.clienteTelefono);
+  for (const p of validosPedidos) {
+    const clave = claveDeCliente(p.clienteTelefono);
+    if (clave) telefonos.add(clave);
+  }
+  for (const v of validasVentas) {
+    const clave = claveDeCliente(v.clienteTelefono);
+    if (clave) telefonos.add(clave);
+  }
   const clientesUnicos = telefonos.size;
 
   // "Nuevo" = su primera compra de SIEMPRE (por cualquiera de los dos
   // canales) cae en este período — si ya había comprado antes por el otro
-  // canal, no es nuevo aunque sea su primer pedido online.
+  // canal, no es nuevo aunque sea su primer pedido online. La primera compra
+  // se busca entre las ventas válidas y con el teléfono reconocido igual que arriba.
   const primeraCompraPorTelefono = new Map<string, Date>();
   for (const c of primerPedidoPorCliente) {
     if (!c._min.createdAt) continue;
-    const actual = primeraCompraPorTelefono.get(c.clienteTelefono);
-    if (!actual || c._min.createdAt < actual) primeraCompraPorTelefono.set(c.clienteTelefono, c._min.createdAt);
+    const clave = claveDeCliente(c.clienteTelefono);
+    if (!clave) continue;
+    const actual = primeraCompraPorTelefono.get(clave);
+    if (!actual || c._min.createdAt < actual) primeraCompraPorTelefono.set(clave, c._min.createdAt);
   }
   for (const c of primeraVentaPorCliente) {
     if (!c._min.creadoEn || !c.clienteTelefono) continue;
-    const actual = primeraCompraPorTelefono.get(c.clienteTelefono);
-    if (!actual || c._min.creadoEn < actual) primeraCompraPorTelefono.set(c.clienteTelefono, c._min.creadoEn);
+    const clave = claveDeCliente(c.clienteTelefono);
+    if (!clave) continue;
+    const actual = primeraCompraPorTelefono.get(clave);
+    if (!actual || c._min.creadoEn < actual) primeraCompraPorTelefono.set(clave, c._min.creadoEn);
   }
   const clientesNuevos = [...primeraCompraPorTelefono.values()].filter(
     (primera) => primera >= rango.gte && primera < rango.lt

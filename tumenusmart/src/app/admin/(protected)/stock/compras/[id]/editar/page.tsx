@@ -91,7 +91,9 @@ export default async function EditarCompraPage({ params }: { params: Promise<{ i
       nombre: i.insumo.nombre,
       unidadMedida: etiquetaUnidadMedida(i.insumo.unidadMedida),
       iva: i.insumo.iva,
-      rendimiento: Number(i.insumo.rendimiento),
+      // El rendimiento con que se compró (el guardado en la línea), no el de hoy: si el del insumo cambió después, las unidades que
+      // entraron al stock se calcularon con el de esa fecha.
+      rendimiento: Number(i.rendimiento),
       almacenId: i.almacenId ?? almacenes[0]?.id ?? "",
       cantidad: String(Number(i.cantidad)),
       // Se guardó el costo neto: acá se vuelve a mostrar con IVA, como se cargó.

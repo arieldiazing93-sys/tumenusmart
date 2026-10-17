@@ -166,9 +166,40 @@ export async function actualizarInsumo(
   // de pisarlo con el redondeado, que cambiaría en silencio el costo de las recetas.
   const actual = await prisma.insumo.findUnique({
     where: { id },
-    select: { nombre: true, costoUnitario: true, activo: true, esElaborado: true, rindeTanda: true },
+    select: {
+      nombre: true,
+      costoUnitario: true,
+      activo: true,
+      esElaborado: true,
+      rindeTanda: true,
+      unidadMedida: true,
+      rendimiento: true,
+      stockActual: true,
+    },
   });
   if (!actual) return { ok: false, error: "Ese insumo ya no existe." };
+
+  // Cambiar la UNIDAD o el RENDIMIENTO no convierte nada de lo que ya está cargado: cambia solo la etiqueta (5 kg pasan a ser «5 unidades»,
+  // la receta de 0,2 pasa a ser 0,2 de lo nuevo) y las compras que se carguen desde ahora. Si el insumo ya tiene stock, compras,
+  // movimientos o recetas, hace falta que quien guarda lo haya confirmado (la pantalla lo pregunta y manda la confirmación).
+  const rendimientoAnterior = Number(actual.rendimiento);
+  const cambioUnidad = actual.unidadMedida !== unidadMedida;
+  const cambioRendimiento = !actual.esElaborado && Math.abs(rendimiento - rendimientoAnterior) > 0.0005;
+  if ((cambioUnidad || cambioRendimiento) && formData.get("confirmoCambioDeMedida") !== "1") {
+    const [conMovimientos, enRecetas, enPreparaciones, enCompras] = await Promise.all([
+      prisma.movimientoStock.findFirst({ where: { insumoId: id }, select: { id: true } }),
+      prisma.recetaItem.findFirst({ where: { insumoId: id }, select: { id: true } }),
+      prisma.ingredienteElaborado.findFirst({ where: { OR: [{ ingredienteId: id }, { elaboradoId: id }] }, select: { id: true } }),
+      prisma.compraItem.findFirst({ where: { insumoId: id }, select: { id: true } }),
+    ]);
+    if (Number(actual.stockActual) !== 0 || conMovimientos || enRecetas || enPreparaciones || enCompras) {
+      return {
+        ok: false,
+        error:
+          "Este insumo ya tiene stock, compras, movimientos o recetas, y cambiar su unidad o su rendimiento NO convierte lo que ya está cargado. Confirmá el cambio al guardar si de verdad lo querés.",
+      };
+    }
+  }
 
   // Una preparación solo cambia lo suyo: cuánto rinde una tanda. No tiene
   // rendimiento de compra, stock mínimo ni costo (sale de sus ingredientes).
@@ -226,6 +257,11 @@ export async function actualizarInsumo(
     cambios.push(`rinde por tanda ${rindeAntes ?? "sin dato"} → ${rindeTanda}`);
   }
   if (actual.activo !== activo) cambios.push(activo ? "lo activó" : "lo desactivó");
+  // Quedan anotados en la bitácora: son cambios que no convierten lo ya cargado y conviene poder rastrearlos.
+  if (cambioUnidad) {
+    cambios.push(`unidad ${etiquetaUnidadMedida(actual.unidadMedida)} → ${etiquetaUnidadMedida(unidadMedida)} (no convierte el stock ni las recetas)`);
+  }
+  if (cambioRendimiento) cambios.push(`rendimiento ${rendimientoAnterior} → ${rendimiento} (solo cuenta para las compras nuevas)`);
   if (cambios.length > 0) {
     await registrarBitacora(idLocal, sesion, {
       modulo: "stock",

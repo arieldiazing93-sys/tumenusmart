@@ -24,6 +24,26 @@ export type PedidoParaAgrupar = {
   total: number;
 };
 
+/**
+ * Con qué se reconoce que dos ventas son del MISMO cliente: el teléfono, pero sin importar cómo lo escribió el cajero. El teléfono se
+ * guarda tal cual se tipeó, así que «0981 123 456», «0981123456» y «+595 981 123 456» son la misma persona; esta clave es solo los
+ * números, sin el 0 del principio ni el 595 del país: las tres dan «981123456».
+ *
+ * (Cuando un cliente no deja teléfono pero pide factura, se guarda su cédula o RUC en ese lugar: también se reconoce por sus números,
+ * sin guiones ni puntos.) Devuelve vacío si no hay ningún número: esa venta no es de un cliente que se pueda reconocer.
+ */
+export function claveDeCliente(telefono: string | null | undefined): string {
+  let digitos = (telefono ?? "").replace(/\D/g, "");
+  if (!digitos) return "";
+  // El 595 solo se saca si lo que queda sigue siendo un teléfono entero: una cédula corta que empiece con 595 no se toca.
+  if (digitos.startsWith("595") && digitos.length >= 11) digitos = digitos.slice(3);
+  if (digitos.startsWith("0")) digitos = digitos.slice(1);
+  return digitos;
+}
+
+// OJO: esta lista (Analytics, Ideas) sigue agrupando por el teléfono EXACTO como está escrito, a propósito: el programa de fidelidad
+// (src/lib/fidelidad.ts) cuenta las compras y los canjes por ese mismo texto, y unir acá lo que allá está separado desacomodaría el
+// progreso de cada cliente. Hoy `claveDeCliente` la usa solo Estadísticas (tarjetas «Clientes únicos» y «Clientes nuevos»).
 export function agruparPorCliente(pedidos: PedidoParaAgrupar[]): ClienteAgrupado[] {
   const mapa = new Map<string, ClienteAgrupado>();
   for (const p of pedidos) {

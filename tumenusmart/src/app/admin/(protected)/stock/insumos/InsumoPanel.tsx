@@ -63,8 +63,39 @@ export function InsumoPanel({
   const negativo = estadoStock === "negativo";
   const bajoMinimo = estadoStock === "bajo";
 
+  // Lo que se está eligiendo para la unidad y el rendimiento: cambiar cualquiera de los dos NO convierte lo que ya está cargado (stock,
+  // recetas, compras), y hay que avisarlo antes de que se guarde.
+  const [unidadElegida, setUnidadElegida] = useState(insumo.unidadMedida);
+  const [rendimientoEscrito, setRendimientoEscrito] = useState(String(insumo.rendimiento));
+  useEffect(() => {
+    setUnidadElegida(insumo.unidadMedida);
+    setRendimientoEscrito(String(insumo.rendimiento));
+  }, [insumo.unidadMedida, insumo.rendimiento]);
+  const rendimientoNuevo = Number(rendimientoEscrito);
+  const cambioUnidad = unidadElegida !== insumo.unidadMedida;
+  const cambioRendimiento =
+    !insumo.esElaborado && Number.isFinite(rendimientoNuevo) && rendimientoNuevo > 0 && Math.abs(rendimientoNuevo - insumo.rendimiento) > 0.0005;
+  const avisosDeMedida: string[] = [];
+  if (cambioUnidad) {
+    avisosDeMedida.push(
+      `La unidad pasa de «${etiquetaUnidadMedida(insumo.unidadMedida)}» a «${etiquetaUnidadMedida(unidadElegida)}»: cambia solo la etiqueta. El stock, las recetas y el historial siguen con los mismos números (5 ${etiquetaUnidadMedida(insumo.unidadMedida).toLowerCase()} pasan a ser 5 ${etiquetaUnidadMedida(unidadElegida).toLowerCase()}).`
+    );
+  }
+  if (cambioRendimiento) {
+    avisosDeMedida.push(
+      `El rendimiento pasa de ${insumo.rendimiento} a ${rendimientoNuevo}: solo cuenta para las compras que cargues desde ahora. El stock que ya tenés y el costo por unidad ya guardado no se recalculan (el costo se corrige con la próxima compra).`
+    );
+  }
+
   function alGuardar(formData: FormData) {
     setError(null);
+    if (avisosDeMedida.length > 0) {
+      const seguir = confirm(
+        `${avisosDeMedida.join("\n\n")}\n\nNada de lo que ya está cargado se convierte solo. ¿Guardar el cambio igual?`
+      );
+      if (!seguir) return;
+      formData.set("confirmoCambioDeMedida", "1");
+    }
     iniciar(async () => {
       const resultado = await llamarAlServidor(() => actualizarInsumo(insumo.id, formData));
       if (!resultado.ok) {
@@ -121,7 +152,7 @@ export function InsumoPanel({
           </div>
 
           <Campo etiqueta="Unidad de medida">
-            <Selector name="unidadMedida" defaultValue={insumo.unidadMedida}>
+            <Selector name="unidadMedida" defaultValue={insumo.unidadMedida} onChange={(e) => setUnidadElegida(e.target.value)}>
               {UNIDADES_MEDIDA.map((u) => (
                 <option key={u.valor} value={u.valor}>
                   {u.etiqueta}
@@ -165,6 +196,7 @@ export function InsumoPanel({
                   min="0.001"
                   required
                   defaultValue={insumo.rendimiento}
+                  onChange={(e) => setRendimientoEscrito(e.target.value)}
                 />
               </Campo>
               <Campo etiqueta="Stock mínimo (opcional)">
@@ -191,6 +223,17 @@ export function InsumoPanel({
             </>
           )}
         </div>
+
+        {avisosDeMedida.length > 0 && (
+          <div role="alert" className="rounded-lg border border-aviso/30 bg-aviso-luz px-3 py-2 text-[0.82rem] text-tinta">
+            <p className="font-semibold">Ojo: esto no convierte lo que ya está cargado</p>
+            <ul className="mt-1 flex list-disc flex-col gap-1 pl-5">
+              {avisosDeMedida.map((a) => (
+                <li key={a}>{a}</li>
+              ))}
+            </ul>
+          </div>
+        )}
 
         <label className="flex items-center gap-2 text-sm">
           <input type="checkbox" name="activo" defaultChecked={insumo.activo} />
