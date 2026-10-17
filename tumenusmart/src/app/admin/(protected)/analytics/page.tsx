@@ -134,7 +134,7 @@ export default async function AnalyticsPage({
           <>
             <a
               href={`/admin/analytics/exportar?${querystringActual()}`}
-              className={clasesBoton("principal", "sm")}
+              className={clasesBoton("navegar", "sm")}
             >
               Descargar Excel
             </a>

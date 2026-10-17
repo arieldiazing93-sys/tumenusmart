@@ -61,6 +61,11 @@ export async function crearInsumo(formData: FormData): Promise<ResultadoCrearIns
   const stockInicial = esElaborado ? 0 : (aDecimalOpcional(formData.get("stockInicial")) ?? 0);
   const stockMinimo = esElaborado ? null : aDecimalOpcional(formData.get("stockMinimo"));
   const costoUnitario = esElaborado ? null : aDecimalOpcional(formData.get("costoUnitario"));
+  // Un negativo no tiene sentido y rompe cuentas: un costo negativo infla la ganancia de todo lo que lleva este insumo, y un mínimo
+  // negativo apaga el aviso de "stock bajo".
+  if (stockInicial < 0) return { ok: false, error: "El stock inicial no puede ser negativo" };
+  if (stockMinimo !== null && stockMinimo < 0) return { ok: false, error: "El stock mínimo no puede ser negativo" };
+  if (costoUnitario !== null && costoUnitario < 0) return { ok: false, error: "El costo no puede ser negativo" };
   const registradoPor = sesion.nombre?.trim() || sesion.email;
 
   // El stock siempre está en un almacén: si se carga stock inicial, hay que
@@ -152,6 +157,9 @@ export async function actualizarInsumo(
   const stockMinimo = aDecimalOpcional(formData.get("stockMinimo"));
   const costoEscrito = aDecimalOpcional(formData.get("costoUnitario"));
   const activo = formData.get("activo") === "on";
+  // Un negativo no tiene sentido y rompe cuentas (ver crearInsumo).
+  if (stockMinimo !== null && stockMinimo < 0) return { ok: false, error: "El stock mínimo no puede ser negativo" };
+  if (costoEscrito !== null && costoEscrito < 0) return { ok: false, error: "El costo no puede ser negativo" };
 
   // El campo muestra el costo redondeado a guaraníes enteros. Si quedó tal como
   // se mostró (no lo tocaron), se conserva el exacto de la última compra en vez

@@ -164,7 +164,7 @@ export default async function CuentasPorPagarPage({
           <button
             type="submit"
             formAction="/admin/stock/cuentas-por-pagar/exportar"
-            className={clasesBoton("principal", "sm")}
+            className={clasesBoton("navegar", "sm")}
           >
             Descargar Excel
           </button>

@@ -3,6 +3,8 @@
 import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { clasesBoton } from "@/components/ui";
+import { llamarAlServidor } from "@/lib/llamar-servidor";
+import { alEnviar } from "@/lib/formulario";
 import { agregarTramoCategoria } from "../actions";
 
 export function AgregarTramoCategoriaForm({
@@ -26,7 +28,7 @@ export function AgregarTramoCategoriaForm({
       formData.set("cierra", "23:59");
     }
     iniciar(async () => {
-      const resultado = await agregarTramoCategoria(categoryId, formData);
+      const resultado = await llamarAlServidor(() => agregarTramoCategoria(categoryId, formData));
       if (!resultado.ok) {
         alert(resultado.error);
         return;
@@ -41,7 +43,7 @@ export function AgregarTramoCategoriaForm({
   }
 
   return (
-    <form ref={formRef} action={alAgregar} className="flex w-full flex-none flex-col gap-1.5 sm:w-64">
+    <form ref={formRef} onSubmit={alEnviar(alAgregar)} className="flex w-full flex-none flex-col gap-1.5 sm:w-64">
       <input type="hidden" name="diaSemana" value={dia} />
       <label className="flex items-center gap-1.5 text-xs text-tinta-media">
         <input

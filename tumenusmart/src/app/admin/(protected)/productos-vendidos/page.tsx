@@ -47,7 +47,7 @@ export default async function ProductosVendidosPage({
           <>
             <a
               href={`/admin/productos-vendidos/exportar?${querystringActual()}`}
-              className={clasesBoton("principal", "sm")}
+              className={clasesBoton("navegar", "sm")}
             >
               Descargar Excel
             </a>

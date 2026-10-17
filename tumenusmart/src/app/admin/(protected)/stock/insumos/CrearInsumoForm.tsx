@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { Tarjeta, Campo, Entrada, Selector, clasesBoton } from "@/components/ui";
 import { UNIDADES_MEDIDA } from "@/lib/unidad-medida";
 import { TASAS_IVA } from "@/lib/iva";
+import { llamarAlServidor, MENSAJE_DUDOSO } from "@/lib/llamar-servidor";
+import { alEnviar } from "@/lib/formulario";
 import { crearInsumo } from "./actions";
 
 type Categoria = { id: string; nombre: string };
@@ -39,7 +41,7 @@ export function CrearInsumoForm({
 
   function alCrear(formData: FormData) {
     iniciar(async () => {
-      const resultado = await crearInsumo(formData);
+      const resultado = await llamarAlServidor(() => crearInsumo(formData), MENSAJE_DUDOSO);
       if (!resultado.ok) {
         alert(resultado.error);
         return;
@@ -65,7 +67,7 @@ export function CrearInsumoForm({
           </p>
         )}
       </div>
-      <form ref={formRef} action={alCrear} className="campos-grises grid grid-cols-1 gap-3 sm:grid-cols-2">
+      <form ref={formRef} onSubmit={alEnviar(alCrear)} className="campos-grises grid grid-cols-1 gap-3 sm:grid-cols-2">
         {esPreparacion && <input type="hidden" name="esElaborado" value="on" />}
 
         <Campo etiqueta="Nombre">

@@ -180,7 +180,7 @@ export default async function CuentasPosPage({
           <>
             <a
               href={`/admin/pos/cuentas/exportar?${querystringActual()}`}
-              className={clasesBoton("principal", "sm")}
+              className={clasesBoton("navegar", "sm")}
             >
               Descargar Excel
             </a>

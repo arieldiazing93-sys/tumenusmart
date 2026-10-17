@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useTransition } from "react";
 import type { Direccion } from "@/lib/ordenar";
+import { MENSAJE_SIN_RED } from "@/lib/llamar-servidor";
 
 /**
  * Las flechitas para subir y bajar un elemento de la lista.
@@ -74,8 +75,16 @@ export function BotonesMover({
     // botón: deshabilitarlo le sacaría el foco al que lo está usando.
     if (pendiente) return;
     ultimaDireccion.current = direccion;
-    iniciar(() => {
-      void accion(id, direccion);
+    // Se ESPERA a la acción: mientras viaja al servidor `pendiente` sigue en true y un segundo toque no mueve otro lugar. Antes se
+    // lanzaba con `void`: la transición terminaba al instante, el bloqueo no duraba nada y un doble toque movía dos lugares. Sin
+    // internet, el aviso evita que la fila parezca ignorar el toque (y que la pantalla se rompa con «Algo salió mal»).
+    iniciar(async () => {
+      try {
+        await accion(id, direccion);
+      } catch {
+        ultimaDireccion.current = null;
+        alert(MENSAJE_SIN_RED);
+      }
     });
   }
 

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Tarjeta, Campo, Entrada, Selector, Tabla, Th, clasesBoton } from "@/components/ui";
 import { formatearGuarani } from "@/lib/format";
+import { llamarAlServidor, MENSAJE_DUDOSO } from "@/lib/llamar-servidor";
 import { guardarInventario } from "../actions";
 
 type Almacen = { id: string; nombre: string };
@@ -176,11 +177,16 @@ export function NuevoInventario({
     if (!confirm(mensaje)) return;
 
     iniciar(async () => {
-      const resultado = await guardarInventario(
-        almacenId,
-        // Toda la planilla, también lo que no se contó: queda en el registro.
-        calculadas.map((c) => ({ insumoId: c.insumo.id, contado: c.contado })),
-        categoriasElegidas.join(", ")
+      // Ajusta el stock de todo el almacén: si se corta la red no sabemos si quedó guardado → MENSAJE_DUDOSO. Lo contado sigue en pantalla.
+      const resultado = await llamarAlServidor(
+        () =>
+          guardarInventario(
+            almacenId,
+            // Toda la planilla, también lo que no se contó: queda en el registro.
+            calculadas.map((c) => ({ insumoId: c.insumo.id, contado: c.contado })),
+            categoriasElegidas.join(", ")
+          ),
+        MENSAJE_DUDOSO
       );
       if (!resultado.ok) {
         setError(resultado.error);

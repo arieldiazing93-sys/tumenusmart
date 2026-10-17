@@ -70,7 +70,7 @@ export default async function ReporteGeneralPosPage({
           <>
             <a
               href={`/admin/pos/reporte-general/exportar?${querystringActual()}`}
-              className={clasesBoton("principal", "sm")}
+              className={clasesBoton("navegar", "sm")}
             >
               Descargar Excel
             </a>

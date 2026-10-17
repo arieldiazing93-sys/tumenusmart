@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useTransition, type ReactNode } from "reac
 import { useRouter } from "next/navigation";
 import { Entrada, Selector, Tarjeta, clasesBoton } from "@/components/ui";
 import { motivosDe, type TipoMovimientoAlmacen } from "@/lib/movimiento-almacen";
+import { llamarAlServidor, MENSAJE_DUDOSO, MENSAJE_SIN_RED } from "@/lib/llamar-servidor";
 import { buscarInsumosParaCompra, type InsumoParaCompra } from "../compras/actions";
 import { consultarStockEnAlmacen, registrarMovimientoAlmacen } from "./actions";
 
@@ -49,9 +50,12 @@ export function NuevoMovimientoAlmacenForm({ almacenes }: { almacenes: Almacen[]
     let vigente = true;
     setStock(null);
     if (!insumo || !almacenId) return;
-    consultarStockEnAlmacen(insumo.id, almacenId).then((r) => {
-      if (vigente) setStock(r);
-    });
+    consultarStockEnAlmacen(insumo.id, almacenId)
+      .then((r) => {
+        if (vigente) setStock(r);
+      })
+      // Sin internet solo falta esta ayuda («hay N en el almacén»): el formulario sigue andando.
+      .catch(() => undefined);
     return () => {
       vigente = false;
     };
@@ -72,7 +76,11 @@ export function NuevoMovimientoAlmacenForm({ almacenes }: { almacenes: Almacen[]
     if (!Number.isFinite(valor) || valor <= 0) return setError("Escribí la cantidad.");
     if (!motivo) return setError("Elegí el motivo.");
     iniciar(async () => {
-      const r = await registrarMovimientoAlmacen({ tipo, almacenId, insumoId: insumo.id, cantidad: valor, motivo, detalle });
+      // Mueve stock: si se corta la red no sabemos si quedó registrado → MENSAJE_DUDOSO (mirar el historial antes de repetir).
+      const r = await llamarAlServidor(
+        () => registrarMovimientoAlmacen({ tipo, almacenId, insumoId: insumo.id, cantidad: valor, motivo, detalle }),
+        MENSAJE_DUDOSO
+      );
       if (!r.ok) {
         setError(r.error);
         return;
@@ -201,6 +209,7 @@ function BuscadorInsumo({ onElegir }: { onElegir: (insumo: InsumoParaCompra) => 
   const [buscando, setBuscando] = useState(false);
   // Si se escribe rápido, la respuesta de una búsqueda vieja no pisa a la nueva.
   const ultimaBusqueda = useRef(0);
+  const [sinRed, setSinRed] = useState(false);
 
   async function buscar(texto: string) {
     setQuery(texto);
@@ -208,10 +217,22 @@ function BuscadorInsumo({ onElegir }: { onElegir: (insumo: InsumoParaCompra) => 
     if (!texto.trim()) {
       setResultados([]);
       setBuscando(false);
+      setSinRed(false);
       return;
     }
     setBuscando(true);
-    const r = await buscarInsumosParaCompra(texto);
+    setSinRed(false);
+    let r: InsumoParaCompra[];
+    try {
+      r = await buscarInsumosParaCompra(texto);
+    } catch {
+      // Sin internet: se frena el «Buscando…» y se avisa (no se dice «no encontré ningún insumo», que sería mentira).
+      if (numero === ultimaBusqueda.current) {
+        setBuscando(false);
+        setSinRed(true);
+      }
+      return;
+    }
     if (numero !== ultimaBusqueda.current) return;
     setBuscando(false);
     setResultados(r);
@@ -226,7 +247,8 @@ function BuscadorInsumo({ onElegir }: { onElegir: (insumo: InsumoParaCompra) => 
         className="w-full rounded-lg border border-linea bg-superficie px-3 py-1.5 text-[0.85rem] focus:border-brand focus:outline-none"
       />
       {buscando && <p className="text-xs text-tinta-suave">Buscando…</p>}
-      {!buscando && query.trim() && resultados.length === 0 && (
+      {sinRed && <p className="text-xs font-medium text-peligro">{MENSAJE_SIN_RED}</p>}
+      {!buscando && !sinRed && query.trim() && resultados.length === 0 && (
         <p className="text-xs text-tinta-suave">No encontré ningún insumo con ese nombre.</p>
       )}
       {resultados.length > 0 && (

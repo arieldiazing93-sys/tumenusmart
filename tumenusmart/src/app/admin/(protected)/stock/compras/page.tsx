@@ -8,6 +8,9 @@ import { saldoDeCompra } from "@/lib/pagos-compra";
 
 export const dynamic = "force-dynamic";
 
+/** Cuántas compras se listan en pantalla (las más recientes que coinciden con el filtro). */
+const LIMITE_COMPRAS = 200;
+
 type Filtros = { proveedor?: string; desde?: string; hasta?: string; folio?: string };
 
 function aFecha(texto: string | undefined): Date | undefined {
@@ -40,7 +43,7 @@ export default async function ComprasPage({ searchParams }: { searchParams: Prom
         pagos: { select: { monto: true } },
         _count: { select: { items: true } },
       },
-      take: 200,
+      take: LIMITE_COMPRAS,
     }),
     prisma.proveedor.findMany({ orderBy: { nombre: "asc" }, select: { id: true, nombre: true } }),
   ]);
@@ -97,7 +100,7 @@ export default async function ComprasPage({ searchParams }: { searchParams: Prom
             formulario a su propia dirección. Sin fechas, es el mes actual. */}
         <div className="flex flex-wrap items-center gap-2 border-t border-linea pt-2 sm:col-span-2 lg:col-span-5">
           <span className="text-sm font-medium text-tinta">Reporte de compras</span>
-          <button type="submit" formAction="/admin/stock/compras/exportar" className={clasesBoton("principal", "sm")}>
+          <button type="submit" formAction="/admin/stock/compras/exportar" className={clasesBoton("navegar", "sm")}>
             Descargar Excel
           </button>
           <button
@@ -111,6 +114,12 @@ export default async function ComprasPage({ searchParams }: { searchParams: Prom
         </div>
       </form>
 
+      {compras.length >= LIMITE_COMPRAS && (
+        <p className="mb-2 text-[0.8rem] text-tinta-media">
+          Acá se ven las últimas {LIMITE_COMPRAS} compras que coinciden con el filtro. Para ver las demás, acotá las fechas o el proveedor, o
+          descargá el reporte.
+        </p>
+      )}
       {compras.length === 0 ? (
         <Vacio
           titulo={hayFiltros ? "Ninguna compra coincide con esa búsqueda" : "Todavía no registraste ninguna compra"}

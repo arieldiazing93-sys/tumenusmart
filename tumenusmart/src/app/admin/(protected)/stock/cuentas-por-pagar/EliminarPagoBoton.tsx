@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { clasesBoton } from "@/components/ui";
+import { llamarAlServidor, MENSAJE_DUDOSO } from "@/lib/llamar-servidor";
 import { eliminarPagoCompra } from "./actions";
 
 /**
@@ -18,7 +19,7 @@ export function EliminarPagoBoton({ pagoId }: { pagoId: string }) {
   function eliminar() {
     setError(null);
     iniciar(async () => {
-      const resultado = await eliminarPagoCompra(pagoId);
+      const resultado = await llamarAlServidor(() => eliminarPagoCompra(pagoId), MENSAJE_DUDOSO);
       if (!resultado.ok) {
         setError(resultado.error);
         setConfirmando(false);

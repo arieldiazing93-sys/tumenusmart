@@ -7,6 +7,9 @@ import { NuevoClienteBoton } from "./NuevoClienteBoton";
 
 export const dynamic = "force-dynamic";
 
+/** Cuántos clientes se listan en pantalla (los más nuevos, o los que coinciden con la búsqueda). */
+const LIMITE_CLIENTES = 200;
+
 export default async function ClientesPosPage({
   searchParams,
 }: {
@@ -43,7 +46,7 @@ export default async function ClientesPosPage({
       numeroIdentificacion: true,
       fotoUrl: true,
     },
-    take: 200,
+    take: LIMITE_CLIENTES,
   });
 
   return (
@@ -70,6 +73,11 @@ export default async function ClientesPosPage({
         </button>
       </form>
 
+      {clientes.length >= LIMITE_CLIENTES && (
+        <p className="mb-2 text-[0.8rem] text-tinta-media">
+          Se ven los últimos {LIMITE_CLIENTES} clientes. Para encontrar a otro, usá el buscador (por nombre, RUC/cédula o teléfono).
+        </p>
+      )}
       {clientes.length === 0 ? (
         <Vacio
           titulo={busqueda ? "Ningún cliente coincide con esa búsqueda" : "Todavía no hay clientes cargados"}

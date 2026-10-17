@@ -2,6 +2,8 @@
 
 import { useTransition } from "react";
 import { clasesBoton, CLASES_CAMPO_UBICACION } from "@/components/ui";
+import { llamarAlServidor, MENSAJE_DUDOSO } from "@/lib/llamar-servidor";
+import { alEnviar } from "@/lib/formulario";
 import { crearProducto } from "./actions";
 import { ImagenProductoField } from "./ImagenProductoField";
 import { IngredientesField } from "./IngredientesField";
@@ -30,13 +32,13 @@ export function CrearProductoForm({
   function alCrear(formData: FormData) {
     iniciar(async () => {
       // Si sale bien, crearProducto redirige sola — este código no sigue.
-      const resultado = await crearProducto(formData);
+      const resultado = await llamarAlServidor(() => crearProducto(formData), MENSAJE_DUDOSO);
       if (resultado && !resultado.ok) alert(resultado.error);
     });
   }
 
   return (
-    <form action={alCrear} className="campos-grises mt-4 flex flex-col gap-3">
+    <form onSubmit={alEnviar(alCrear)} className="campos-grises mt-4 flex flex-col gap-3">
       {/* Dos columnas desde sm: menos scroll para llegar al botón de crear. */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <input

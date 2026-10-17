@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { clasesBoton } from "@/components/ui";
+import { llamarAlServidor } from "@/lib/llamar-servidor";
 import { aplicarGruposACategoria } from "../actions";
 
 /**
@@ -34,7 +35,7 @@ export function AplicarGruposBoton({
 
     setMensaje(null);
     iniciar(async () => {
-      const resultado = await aplicarGruposACategoria(productId);
+      const resultado = await llamarAlServidor(() => aplicarGruposACategoria(productId));
       if (!resultado.ok) {
         setMensaje({ texto: resultado.error, esError: true });
         return;

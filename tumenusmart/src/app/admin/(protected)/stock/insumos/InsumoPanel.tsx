@@ -5,6 +5,8 @@ import { Tarjeta, Campo, Entrada, Selector, Pastilla, clasesBoton } from "@/comp
 import { UNIDADES_MEDIDA, etiquetaUnidadMedida } from "@/lib/unidad-medida";
 import { TASAS_IVA } from "@/lib/iva";
 import { estadoDeStock } from "@/lib/alerta-stock";
+import { llamarAlServidor } from "@/lib/llamar-servidor";
+import { alEnviar } from "@/lib/formulario";
 import { actualizarInsumo } from "./actions";
 import { RecetaElaborado, type IngredienteDatos } from "./RecetaElaborado";
 
@@ -64,7 +66,7 @@ export function InsumoPanel({
   function alGuardar(formData: FormData) {
     setError(null);
     iniciar(async () => {
-      const resultado = await actualizarInsumo(insumo.id, formData);
+      const resultado = await llamarAlServidor(() => actualizarInsumo(insumo.id, formData));
       if (!resultado.ok) {
         setError(resultado.error);
         return;
@@ -88,7 +90,7 @@ export function InsumoPanel({
         </div>
       </div>
 
-      <form action={alGuardar} className="campos-grises flex flex-col gap-3">
+      <form onSubmit={alEnviar(alGuardar)} className="campos-grises flex flex-col gap-3">
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Campo etiqueta="Nombre">
             <Entrada name="nombre" required defaultValue={insumo.nombre} />

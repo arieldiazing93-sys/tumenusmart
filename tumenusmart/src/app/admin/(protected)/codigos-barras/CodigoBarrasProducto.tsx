@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Entrada, MensajeError, clasesBoton } from "@/components/ui";
 import { BarrasSvg } from "@/components/BarrasSvg";
 import { barrasDeCodigo, esCodigoInterno, medirBarras } from "@/lib/codigo-barras";
+import { llamarAlServidor, MENSAJE_SIN_RED } from "@/lib/llamar-servidor";
 import { asignarCodigoProducto, generarCodigoProducto, quitarCodigoProducto } from "./actions";
 
 /**
@@ -54,7 +55,13 @@ export function CodigoBarrasProducto({
     setAviso(null);
     if (!moverDeOtro) setConflicto(null);
     iniciar(async () => {
-      const r = await asignarCodigoProducto(productId, texto, moverDeOtro);
+      let r: Awaited<ReturnType<typeof asignarCodigoProducto>>;
+      try {
+        r = await asignarCodigoProducto(productId, texto, moverDeOtro);
+      } catch {
+        setError(MENSAJE_SIN_RED);
+        return;
+      }
       if (!r.ok) {
         setError(r.error);
         setConflicto(r.conflicto ?? null);
@@ -69,7 +76,7 @@ export function CodigoBarrasProducto({
     setError(null);
     setConflicto(null);
     iniciar(async () => {
-      const r = await generarCodigoProducto(productId);
+      const r = await llamarAlServidor(() => generarCodigoProducto(productId));
       if (!r.ok) return setError(r.error);
       terminar(r.codigo, "✓ Código generado");
     });
@@ -80,7 +87,7 @@ export function CodigoBarrasProducto({
     setError(null);
     setConflicto(null);
     iniciar(async () => {
-      const r = await quitarCodigoProducto(productId);
+      const r = await llamarAlServidor(() => quitarCodigoProducto(productId));
       if (!r.ok) return setError(r.error);
       terminar(null, "Código quitado");
     });

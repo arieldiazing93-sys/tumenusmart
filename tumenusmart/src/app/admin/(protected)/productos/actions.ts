@@ -286,11 +286,20 @@ export async function eliminarProducto(productId: string): Promise<ResultadoProd
   const idLocal = await idLocalActual();
   const prisma = prismaDelLocal(idLocal);
 
-  const pedidosConEsteProducto = await prisma.orderItem.count({ where: { productId } });
-  if (pedidosConEsteProducto > 0) {
+  // Hoy casi todo se vende por el Punto de Venta (VentaPosItem), el Servicio comedor y el Servicio delivery: se mira en TODAS las tablas
+  // donde un producto queda anotado. Antes solo se miraba OrderItem (el módulo Pedidos, que ya no existe) y se podía borrar un producto
+  // ya vendido: su historial pasaba a "Mitad y mitad / combos" en Rentabilidad.
+  const [enPedidos, enVentas, enMesas, enDeliveries] = await Promise.all([
+    prisma.orderItem.count({ where: { productId } }),
+    prisma.ventaPosItem.count({ where: { productId } }),
+    prisma.itemCuentaMesa.count({ where: { productId } }),
+    prisma.itemCuentaDelivery.count({ where: { productId } }),
+  ]);
+  const vecesVendido = enPedidos + enVentas + enMesas + enDeliveries;
+  if (vecesVendido > 0) {
     return {
       ok: false,
-      error: `No se puede borrar: hay ${pedidosConEsteProducto} pedido(s) que incluyen este producto en su historial. Si ya no lo querés vender, marcalo como "No disponible" en el formulario de arriba — así dejás de venderlo sin perder ese historial en los reportes.`,
+      error: `No se puede borrar: este producto ya figura en ${vecesVendido} ${vecesVendido === 1 ? "venta o pedido" : "ventas o pedidos"} de tu historial. Si ya no lo querés vender, marcalo como "No disponible" en el formulario de arriba — así dejás de venderlo sin perder ese historial en los reportes.`,
     };
   }
 

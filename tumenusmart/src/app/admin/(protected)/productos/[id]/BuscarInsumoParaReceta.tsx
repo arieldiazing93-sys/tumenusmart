@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { llamarAlServidor, MENSAJE_SIN_RED } from "@/lib/llamar-servidor";
 import { buscarInsumosParaReceta, asignarInsumoAProducto, type InsumoParaReceta } from "../actions";
 
 /**
@@ -21,16 +22,32 @@ export function BuscarInsumoParaReceta({ productId }: { productId: string }) {
   const [error, setError] = useState<string | null>(null);
   const [agregadoId, setAgregadoId] = useState<string | null>(null);
 
+  // Si se escribe rápido, la respuesta de una búsqueda vieja no pisa a la nueva (se cargaría un insumo equivocado en la receta).
+  const ultimaBusqueda = useRef(0);
+
   async function buscar(texto: string) {
     setQuery(texto);
     setAgregadoId(null);
     setError(null);
+    const numero = ++ultimaBusqueda.current;
     if (!texto.trim()) {
       setResultados([]);
+      setBuscando(false);
       return;
     }
     setBuscando(true);
-    const r = await buscarInsumosParaReceta(productId, texto);
+    let r: InsumoParaReceta[];
+    try {
+      r = await buscarInsumosParaReceta(productId, texto);
+    } catch {
+      // Sin internet: se frena el «Buscando…» y se avisa (no se muestra «sin resultados», que sería mentira).
+      if (numero === ultimaBusqueda.current) {
+        setBuscando(false);
+        setError(MENSAJE_SIN_RED);
+      }
+      return;
+    }
+    if (numero !== ultimaBusqueda.current) return;
     setBuscando(false);
     setResultados(r);
   }
@@ -43,7 +60,7 @@ export function BuscarInsumoParaReceta({ productId }: { productId: string }) {
       return;
     }
     iniciar(async () => {
-      const r = await asignarInsumoAProducto(productId, insumoId, cantidad);
+      const r = await llamarAlServidor(() => asignarInsumoAProducto(productId, insumoId, cantidad));
       if (!r.ok) {
         setError(r.error);
         return;

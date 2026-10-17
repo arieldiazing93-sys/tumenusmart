@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Pastilla, clasesBoton } from "@/components/ui";
+import { llamarAlServidor } from "@/lib/llamar-servidor";
 import { asignarInsumoAProducto } from "../actions";
 import { BuscarInsumoParaReceta } from "./BuscarInsumoParaReceta";
 import { QuitarInsumoDeRecetaBoton } from "./QuitarInsumoDeRecetaBoton";
@@ -38,7 +39,7 @@ export function RecetaProducto({ productId, receta }: { productId: string; recet
       return;
     }
     iniciar(async () => {
-      const r = await asignarInsumoAProducto(productId, insumoId, cantidad);
+      const r = await llamarAlServidor(() => asignarInsumoAProducto(productId, insumoId, cantidad));
       if (!r.ok) {
         setError(r.error);
         return;

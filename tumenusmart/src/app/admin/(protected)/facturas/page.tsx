@@ -58,7 +58,7 @@ export default async function FacturasPage({
         bajada="Todas las facturas emitidas, de pedidos y de mostrador, juntas en un solo lugar."
         acciones={
           <>
-            <a href={`/admin/facturas/exportar?${consultaReporte}`} className={clasesBoton("suave", "sm")}>
+            <a href={`/admin/facturas/exportar?${consultaReporte}`} className={clasesBoton("navegar", "sm")}>
               Descargar Excel
             </a>
             <a

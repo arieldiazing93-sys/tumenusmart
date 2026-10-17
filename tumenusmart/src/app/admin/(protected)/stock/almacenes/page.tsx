@@ -73,7 +73,7 @@ export default async function AlmacenesPage() {
               <button
                 type="submit"
                 formAction="/admin/stock/almacenes/exportar"
-                className={clasesBoton("principal", "sm")}
+                className={clasesBoton("navegar", "sm")}
               >
                 Descargar Excel
               </button>

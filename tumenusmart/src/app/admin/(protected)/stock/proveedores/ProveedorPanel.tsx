@@ -2,6 +2,8 @@
 
 import { useState, useTransition } from "react";
 import { Tarjeta, Campo, Entrada, Pastilla, clasesBoton } from "@/components/ui";
+import { llamarAlServidor } from "@/lib/llamar-servidor";
+import { alEnviar } from "@/lib/formulario";
 import { editarProveedor } from "./actions";
 
 export type ProveedorDatos = {
@@ -31,7 +33,7 @@ export function ProveedorPanel({
   function guardar(formData: FormData) {
     setError(null);
     iniciar(async () => {
-      const resultado = await editarProveedor(proveedor.id, formData);
+      const resultado = await llamarAlServidor(() => editarProveedor(proveedor.id, formData));
       if (!resultado.ok) {
         setError(resultado.error);
         return;
@@ -53,7 +55,7 @@ export function ProveedorPanel({
         </div>
       </div>
 
-      <form action={guardar} className="flex flex-col gap-3">
+      <form onSubmit={alEnviar(guardar)} className="flex flex-col gap-3">
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Campo etiqueta="Nombre comercial">
             <Entrada name="nombre" required defaultValue={proveedor.nombre} />

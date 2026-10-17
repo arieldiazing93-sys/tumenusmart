@@ -7,6 +7,7 @@ import { BotonesMover } from "@/components/BotonesMover";
 import { BuscarProductoParaGrupo } from "@/components/BuscarProductoParaGrupo";
 import { QuitarProductoDeGrupoBoton } from "@/components/QuitarProductoDeGrupoBoton";
 import { formatearGuarani } from "@/lib/format";
+import { llamarAlServidor } from "@/lib/llamar-servidor";
 import { eliminarGrupo, moverModificadorDeGrupo, renombrarGrupo } from "./actions";
 
 export type ModificadorDatos = {
@@ -61,7 +62,7 @@ export function GrupoPanel({
     e.preventDefault();
     setError(null);
     iniciar(async () => {
-      const r = await renombrarGrupo(grupo.id, nombre);
+      const r = await llamarAlServidor(() => renombrarGrupo(grupo.id, nombre));
       if (!r.ok) {
         setError(r.error);
         return;
@@ -76,7 +77,7 @@ export function GrupoPanel({
     if (!confirm(`¿Borrar el grupo "${grupo.nombre}"? No se puede deshacer.`)) return;
     setError(null);
     iniciar(async () => {
-      const r = await eliminarGrupo(grupo.id);
+      const r = await llamarAlServidor(() => eliminarGrupo(grupo.id));
       // El motivo se muestra en una ventana: es largo ("desadjuntalo de cada producto primero").
       if (!r.ok) {
         alert(r.error);

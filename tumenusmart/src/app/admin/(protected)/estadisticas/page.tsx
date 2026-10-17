@@ -137,9 +137,9 @@ export default async function AdminEstadisticasPage({
             */}
             <a
               href={`/admin/estadisticas/exportar?${querystringActual()}`}
-              className={clasesBoton("principal", "sm")}
+              className={clasesBoton("navegar", "sm")}
             >
-              Descargar CSV
+              Descargar Excel
             </a>
             <a
               href={`/admin/estadisticas/imprimir?${querystringActual()}`}

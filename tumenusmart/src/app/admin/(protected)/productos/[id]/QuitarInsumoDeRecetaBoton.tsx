@@ -2,6 +2,7 @@
 
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { llamarAlServidor } from "@/lib/llamar-servidor";
 import { quitarInsumoDeProducto } from "../actions";
 
 export function QuitarInsumoDeRecetaBoton({
@@ -19,7 +20,14 @@ export function QuitarInsumoDeRecetaBoton({
       disabled={pending}
       onClick={() =>
         startTransition(async () => {
-          await quitarInsumoDeProducto(productId, insumoId);
+          const r = await llamarAlServidor(async () => {
+            await quitarInsumoDeProducto(productId, insumoId);
+            return { ok: true as const };
+          });
+          if (!r.ok) {
+            alert(r.error);
+            return;
+          }
           router.refresh();
         })
       }

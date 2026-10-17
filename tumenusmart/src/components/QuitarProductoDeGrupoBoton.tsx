@@ -2,6 +2,7 @@
 
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { llamarAlServidor } from "@/lib/llamar-servidor";
 import { quitarProductoDeGrupo } from "@/app/admin/(protected)/grupos-agregados/actions";
 
 export function QuitarProductoDeGrupoBoton({
@@ -19,7 +20,14 @@ export function QuitarProductoDeGrupoBoton({
       disabled={pending}
       onClick={() =>
         startTransition(async () => {
-          await quitarProductoDeGrupo(groupId, productId);
+          const r = await llamarAlServidor(async () => {
+            await quitarProductoDeGrupo(groupId, productId);
+            return { ok: true as const };
+          });
+          if (!r.ok) {
+            alert(r.error);
+            return;
+          }
           router.refresh();
         })
       }

@@ -7,6 +7,7 @@ import { Tarjeta, Campo, Entrada, Selector, clasesBoton } from "@/components/ui"
 import { formatearGuarani } from "@/lib/format";
 import { etiquetaIva, TASAS_IVA } from "@/lib/iva";
 import { calcularCompra } from "@/lib/compra-calculo";
+import { llamarAlServidor, MENSAJE_DUDOSO } from "@/lib/llamar-servidor";
 import { actualizarCompra, registrarCompra, type InsumoParaCompra } from "../actions";
 import { BuscarInsumoParaCompra } from "./BuscarInsumoParaCompra";
 
@@ -267,7 +268,11 @@ export function NuevaCompraForm({
       })),
     };
     iniciar(async () => {
-      const resultado = inicial ? await actualizarCompra(inicial.compraId, datos) : await registrarCompra(datos);
+      // Mueve stock y plata: si se corta la red no sabemos si quedó registrada → MENSAJE_DUDOSO. La compra cargada sigue en pantalla.
+      const resultado = await llamarAlServidor(
+        () => (inicial ? actualizarCompra(inicial.compraId, datos) : registrarCompra(datos)),
+        MENSAJE_DUDOSO
+      );
       // Si sale bien, la acción redirige sola — este código no sigue.
       if (resultado && !resultado.ok) {
         setConfirmando(false);

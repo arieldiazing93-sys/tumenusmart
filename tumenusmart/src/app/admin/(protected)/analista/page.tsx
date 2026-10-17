@@ -91,6 +91,11 @@ export default async function AnalistaPage() {
 
   const sinCosto = productos.filter((p) => p.costo == null).length;
 
+  // Si el local vendió más que el tope en estos días, solo entran las ventas más recientes: se dice hasta qué fecha llega lo que se
+  // analizó, en vez de afirmar que son los últimos 180 días completos (las ventas vienen de la más nueva a la más vieja).
+  const analisisRecortado = pedidos.length >= TOPE_PEDIDOS;
+  const desdeReal = pedidos.reduce<Date | null>((min, p) => (min === null || p.creado < min ? p.creado : min), null);
+
   // Entrar acá cuenta como haberla leído: se apaga el aviso del menú. La
   // escritura solo ocurre si estaba sin ver, así que volver a entrar no hace
   // nada.
@@ -103,7 +108,9 @@ export default async function AnalistaPage() {
     <div>
       <h1 className="mb-1 text-[1.4rem] font-semibold tracking-titular text-tinta">Ideas para vender más</h1>
       <p className="mb-6 text-sm text-tinta-media">
-        Sale de tus propios pedidos de los últimos {DIAS_DE_HISTORIA} días. Se actualiza solo.
+        {analisisRecortado && desdeReal
+          ? `Sale de tus últimas ${TOPE_PEDIDOS.toLocaleString("es-PY")} ventas (desde el ${desdeReal.toLocaleDateString("es-PY", { timeZone: ZONA_NEGOCIO })}): vendés más que eso en ${DIAS_DE_HISTORIA} días, así que se analiza lo más reciente. Se actualiza solo.`
+          : `Sale de tus propios pedidos de los últimos ${DIAS_DE_HISTORIA} días. Se actualiza solo.`}
       </p>
 
       {deLaSemana && (

@@ -3,6 +3,7 @@
 import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { llamarAlServidor } from "@/lib/llamar-servidor";
+import { alEnviar } from "@/lib/formulario";
 import { crearReservaManual, type ResultadoReservaManual } from "./actions";
 import { TURNOS, MOTIVOS_RESERVA } from "@/lib/reservas";
 import { Campo, Entrada, Selector, Area, clasesBoton } from "@/components/ui";
@@ -30,7 +31,7 @@ export function RegistrarReservaForm({ diaSugerido }: { diaSugerido: string }) {
   }
 
   return (
-    <form ref={formRef} action={enviar} className="flex flex-col gap-4">
+    <form ref={formRef} onSubmit={alEnviar(enviar)} className="flex flex-col gap-4">
       {resultado && !resultado.ok && (
         <p className="rounded-lg bg-peligro-luz px-3 py-2 text-sm text-peligro">
           {resultado.error}

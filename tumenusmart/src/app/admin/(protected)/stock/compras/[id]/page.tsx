@@ -6,6 +6,7 @@ import { idLocalActual } from "@/lib/local-actual";
 import { Cabecera, Tarjeta, Tabla, Th, Td, Tr, Pastilla, BotonEnlace, type ColorEstado } from "@/components/ui";
 import { Volver } from "@/components/Volver";
 import { formatearGuarani } from "@/lib/format";
+import { ZONA_NEGOCIO } from "@/lib/timezone";
 import { etiquetaIva } from "@/lib/iva";
 import { etiquetaUnidadMedida } from "@/lib/unidad-medida";
 import { calcularCompra } from "@/lib/compra-calculo";
@@ -76,7 +77,7 @@ export default async function CompraDetallePage({ params }: { params: Promise<{ 
       <Volver href="/admin/stock/compras" texto="Volver a Compras" className="self-start" />
       <Cabecera
         titulo={`Compra ${compra.numeroComprobante ? `— folio ${compra.numeroComprobante}` : "sin folio"}`}
-        bajada={`Registrada por ${compra.registradoPor ?? "—"} el ${compra.createdAt.toLocaleString("es-PY")}.`}
+        bajada={`Registrada por ${compra.registradoPor ?? "—"} el ${compra.createdAt.toLocaleString("es-PY", { timeZone: ZONA_NEGOCIO })}.`}
         acciones={
           compra.cancelada ? (
             <Pastilla color="peligro">Cancelada</Pastilla>
@@ -93,7 +94,7 @@ export default async function CompraDetallePage({ params }: { params: Promise<{ 
         <div className="rounded-xl border border-peligro/25 bg-peligro-luz p-4 text-[0.86rem] text-tinta-media">
           <p className="font-semibold text-peligro">Compra cancelada</p>
           <p>
-            Por {compra.canceladaPor ?? "—"} el {compra.canceladaEn?.toLocaleString("es-PY") ?? "—"}.
+            Por {compra.canceladaPor ?? "—"} el {compra.canceladaEn?.toLocaleString("es-PY", { timeZone: ZONA_NEGOCIO }) ?? "—"}.
             Motivo: {compra.motivoCancelacion ?? "—"}
           </p>
         </div>

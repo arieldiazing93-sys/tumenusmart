@@ -2,6 +2,8 @@
 
 import { useTransition } from "react";
 import { Tarjeta, Campo, Entrada, Area, Selector, clasesBoton, CLASES_CAMPO_UBICACION } from "@/components/ui";
+import { llamarAlServidor } from "@/lib/llamar-servidor";
+import { alEnviar } from "@/lib/formulario";
 import { actualizarProducto } from "../actions";
 import { ImagenProductoField } from "../ImagenProductoField";
 import { IngredientesField } from "../IngredientesField";
@@ -67,13 +69,13 @@ export function EditarProductoForm({
   function alGuardar(formData: FormData) {
     iniciar(async () => {
       // Si sale bien, actualizarProducto redirige sola — este código no sigue.
-      const resultado = await actualizarProducto(producto.id, formData);
+      const resultado = await llamarAlServidor(() => actualizarProducto(producto.id, formData));
       if (resultado && !resultado.ok) alert(resultado.error);
     });
   }
 
   return (
-    <form action={alGuardar} className="campos-grises flex flex-col gap-3">
+    <form onSubmit={alEnviar(alGuardar)} className="campos-grises flex flex-col gap-3">
       <Tarjeta className="flex flex-col gap-2 !p-3">
         <p className="rotulo text-[0.8rem] font-bold">Datos básicos</p>
         {/*

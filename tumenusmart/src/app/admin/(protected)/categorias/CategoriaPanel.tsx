@@ -4,6 +4,7 @@ import { useEffect, useState, useTransition } from "react";
 import Link from "next/link";
 import { Tarjeta, Campo, Entrada, Pastilla, clasesBoton } from "@/components/ui";
 import { COLORES_CATEGORIA, colorDeCategoria, variablesDeColor } from "@/lib/colores-categoria";
+import { llamarAlServidor } from "@/lib/llamar-servidor";
 import { alternarActivaCategoria, cambiarColorCategoria, eliminarCategoria, renombrarCategoria } from "./actions";
 import { HorarioCategoria, type TramoDatos } from "./HorarioCategoria";
 
@@ -58,7 +59,7 @@ export function CategoriaPanel({
     setError(null);
     setColorGuardado(false);
     iniciar(async () => {
-      const r = await cambiarColorCategoria(categoria.id, nuevo);
+      const r = await llamarAlServidor(() => cambiarColorCategoria(categoria.id, nuevo));
       if (!r.ok) {
         setColor(anterior);
         setError(r.error);
@@ -74,7 +75,7 @@ export function CategoriaPanel({
     e.preventDefault();
     setError(null);
     iniciar(async () => {
-      const r = await renombrarCategoria(categoria.id, nombre);
+      const r = await llamarAlServidor(() => renombrarCategoria(categoria.id, nombre));
       if (!r.ok) {
         setError(r.error);
         return;
@@ -88,7 +89,14 @@ export function CategoriaPanel({
   function alternarVisibilidad() {
     setError(null);
     iniciar(async () => {
-      await alternarActivaCategoria(categoria.id, !categoria.activa);
+      const r = await llamarAlServidor(async () => {
+        await alternarActivaCategoria(categoria.id, !categoria.activa);
+        return { ok: true as const };
+      });
+      if (!r.ok) {
+        setError(r.error);
+        return;
+      }
       onCambio();
     });
   }
@@ -97,7 +105,7 @@ export function CategoriaPanel({
     if (!confirm(`¿Borrar la categoría "${categoria.nombre}"?`)) return;
     setError(null);
     iniciar(async () => {
-      const r = await eliminarCategoria(categoria.id);
+      const r = await llamarAlServidor(() => eliminarCategoria(categoria.id));
       // El motivo se muestra en una ventana: es largo ("movelos o borralos primero").
       if (!r.ok) {
         alert(r.error);

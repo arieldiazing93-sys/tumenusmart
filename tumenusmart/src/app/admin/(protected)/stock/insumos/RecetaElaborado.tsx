@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Pastilla, clasesBoton } from "@/components/ui";
 import { formatearGuarani } from "@/lib/format";
+import { llamarAlServidor, MENSAJE_SIN_RED } from "@/lib/llamar-servidor";
 import {
   asignarIngredienteAElaborado,
   buscarIngredientesParaElaborado,
@@ -57,15 +58,31 @@ export function RecetaElaborado({
   const [buscando, setBuscando] = useState(false);
   const [cantidades, setCantidades] = useState<Record<string, string>>({});
 
+  // Si se escribe rápido, la respuesta de una búsqueda vieja no pisa a la nueva.
+  const ultimaBusqueda = useRef(0);
+
   async function buscar(texto: string) {
     setQuery(texto);
     setError(null);
+    const numero = ++ultimaBusqueda.current;
     if (!texto.trim()) {
       setResultados([]);
+      setBuscando(false);
       return;
     }
     setBuscando(true);
-    const r = await buscarIngredientesParaElaborado(elaboradoId, texto);
+    let r: IngredienteParaElaborado[];
+    try {
+      r = await buscarIngredientesParaElaborado(elaboradoId, texto);
+    } catch {
+      // Sin internet: se frena el «Buscando…» y se avisa.
+      if (numero === ultimaBusqueda.current) {
+        setBuscando(false);
+        setError(MENSAJE_SIN_RED);
+      }
+      return;
+    }
+    if (numero !== ultimaBusqueda.current) return;
     setBuscando(false);
     setResultados(r);
   }
@@ -77,7 +94,7 @@ export function RecetaElaborado({
       return;
     }
     iniciar(async () => {
-      const r = await asignarIngredienteAElaborado(elaboradoId, ingredienteId, cantidad);
+      const r = await llamarAlServidor(() => asignarIngredienteAElaborado(elaboradoId, ingredienteId, cantidad));
       if (!r.ok) {
         setError(r.error);
         return;
@@ -90,7 +107,7 @@ export function RecetaElaborado({
   function quitar(ingredienteId: string) {
     setError(null);
     iniciar(async () => {
-      const r = await quitarIngredienteDeElaborado(elaboradoId, ingredienteId);
+      const r = await llamarAlServidor(() => quitarIngredienteDeElaborado(elaboradoId, ingredienteId));
       if (!r.ok) {
         setError(r.error);
         return;

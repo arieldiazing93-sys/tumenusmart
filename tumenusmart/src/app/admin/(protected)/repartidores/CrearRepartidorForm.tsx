@@ -3,6 +3,7 @@
 import { useRef, useState, useTransition } from "react";
 import { clasesBoton } from "@/components/ui";
 import { llamarAlServidor } from "@/lib/llamar-servidor";
+import { alEnviar } from "@/lib/formulario";
 import { crearRepartidor } from "./actions";
 
 export function CrearRepartidorForm() {
@@ -24,7 +25,7 @@ export function CrearRepartidorForm() {
   }
 
   return (
-    <form ref={formRef} action={alCrear} className="mb-6 flex flex-wrap items-center gap-2">
+    <form ref={formRef} onSubmit={alEnviar(alCrear)} className="mb-6 flex flex-wrap items-center gap-2">
       <input
         name="nombre"
         required

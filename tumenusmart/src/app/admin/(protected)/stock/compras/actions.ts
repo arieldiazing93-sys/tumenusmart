@@ -525,9 +525,13 @@ export async function cancelarCompra(
 
   const identidad = sesion.nombre?.trim() || sesion.email;
 
+  let yaCancelada = false;
   await prisma.$transaction(async (tx) => {
-    await tx.compra.update({
-      where: { id: compraId },
+    // Se "reclama" la cancelación con la condición adentro de la transacción: si otra persona (u otra pestaña) la canceló un instante
+    // antes, esta no encuentra nada que cancelar y NO devuelve el stock una segunda vez. La revisión de arriba sola no alcanza: las
+    // dos podían pasarla antes de que cualquiera de las dos escribiera.
+    const reclamada = await tx.compra.updateMany({
+      where: { id: compraId, cancelada: false },
       data: {
         cancelada: true,
         canceladaPor: identidad,
@@ -535,6 +539,10 @@ export async function cancelarCompra(
         motivoCancelacion: motivo.trim(),
       },
     });
+    if (reclamada.count !== 1) {
+      yaCancelada = true;
+      return;
+    }
 
     // El ledger es la fuente de verdad: se devuelve lo que esta compra tiene
     // hoy en el stock de cada insumo y almacén, sin re-derivar nada desde las
@@ -569,6 +577,7 @@ export async function cancelarCompra(
       });
     }
   });
+  if (yaCancelada) return { ok: false, error: "Esa compra ya estaba cancelada." };
 
   await registrarBitacora(idLocal, sesion, {
     modulo: "compras",

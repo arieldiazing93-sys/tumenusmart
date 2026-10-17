@@ -53,7 +53,7 @@ export default async function EnviosPage({
           <>
             <a
               href={`/admin/envios/exportar?${querystringActual()}`}
-              className={clasesBoton("principal", "sm")}
+              className={clasesBoton("navegar", "sm")}
             >
               Descargar Excel
             </a>

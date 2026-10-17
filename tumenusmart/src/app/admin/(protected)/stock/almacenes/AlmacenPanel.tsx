@@ -2,6 +2,8 @@
 
 import { useState, useTransition } from "react";
 import { Tarjeta, Campo, Entrada, Pastilla, clasesBoton } from "@/components/ui";
+import { llamarAlServidor } from "@/lib/llamar-servidor";
+import { alEnviar } from "@/lib/formulario";
 import { editarAlmacen } from "./actions";
 
 export type AlmacenDatos = { id: string; nombre: string; activo: boolean };
@@ -15,7 +17,7 @@ export function AlmacenPanel({ almacen, alGuardar }: { almacen: AlmacenDatos; al
   function guardar(formData: FormData) {
     setError(null);
     iniciar(async () => {
-      const resultado = await editarAlmacen(almacen.id, formData);
+      const resultado = await llamarAlServidor(() => editarAlmacen(almacen.id, formData));
       if (!resultado.ok) {
         setError(resultado.error);
         return;
@@ -35,7 +37,7 @@ export function AlmacenPanel({ almacen, alGuardar }: { almacen: AlmacenDatos; al
         </div>
       </div>
 
-      <form action={guardar} className="flex flex-col gap-3">
+      <form onSubmit={alEnviar(guardar)} className="flex flex-col gap-3">
         <Campo etiqueta="Nombre">
           <Entrada name="nombre" required defaultValue={almacen.nombre} />
         </Campo>

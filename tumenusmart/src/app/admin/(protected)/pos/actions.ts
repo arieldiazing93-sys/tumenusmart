@@ -1236,9 +1236,12 @@ export async function cancelarVenta(ventaId: string, motivo: string, autorizacio
 
   // En transacción: cancelar la cuenta y devolverle el stock a sus insumos
   // quedan como una sola cosa, nunca a medias.
+  let yaCancelada = false;
   await prisma.$transaction(async (tx) => {
-    await tx.ventaPos.update({
-      where: { id: ventaId, storeId },
+    // Se "reclama" la cancelación con la condición adentro de la transacción: si otra persona (u otra pestaña) la canceló un instante
+    // antes, esta no encuentra nada que cancelar y NO devuelve el stock, la propina ni la cita una segunda vez.
+    const reclamada = await tx.ventaPos.updateMany({
+      where: { id: ventaId, storeId, cancelada: false },
       data: {
         cancelada: true,
         canceladaPor: identidad,
@@ -1256,6 +1259,10 @@ export async function cancelarVenta(ventaId: string, motivo: string, autorizacio
           : {}),
       },
     });
+    if (reclamada.count !== 1) {
+      yaCancelada = true;
+      return;
+    }
 
     // El comprobante de la factura también queda anulado (el número no se reutiliza).
     if (venta.facturaNumero && !venta.facturaAnulada) {
@@ -1346,6 +1353,7 @@ export async function cancelarVenta(ventaId: string, motivo: string, autorizacio
       data: { ventaPosId: null, estado: "proxima" },
     });
   });
+  if (yaCancelada) return { ok: false, error: "Esa cuenta ya estaba cancelada." };
 
   await registrarBitacora(storeId, sesion, {
     modulo: "ventas",

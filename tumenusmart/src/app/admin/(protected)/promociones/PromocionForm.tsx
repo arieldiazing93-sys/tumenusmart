@@ -12,6 +12,7 @@ import {
   type DatosPromocion,
   type PromoDef,
 } from "@/lib/promociones";
+import { llamarAlServidor, MENSAJE_DUDOSO } from "@/lib/llamar-servidor";
 import { cambiarEstadoPromocion, duplicarPromocion, eliminarPromocion, guardarPromocion } from "./actions";
 import { FranjasPromocion, filasDesde, franjasDe, type FilaDeDia } from "./FranjasPromocion";
 import { SelectorDeProductos, type CategoriaConProductos } from "./SelectorDeProductos";
@@ -134,7 +135,7 @@ export function PromocionForm({
     setError(null);
     if (problema) return;
     iniciar(async () => {
-      const r = await guardarPromocion(inicial?.id ?? null, datos);
+      const r = await llamarAlServidor(() => guardarPromocion(inicial?.id ?? null, datos), MENSAJE_DUDOSO);
       if (!r.ok) {
         setError(r.error);
         return;
@@ -149,7 +150,7 @@ export function PromocionForm({
     if (!confirm(`¿Eliminar la promoción “${inicial.nombre}”? Lo ya vendido no cambia.`)) return;
     setError(null);
     iniciar(async () => {
-      const r = await eliminarPromocion(inicial.id);
+      const r = await llamarAlServidor(() => eliminarPromocion(inicial.id));
       if (!r.ok) {
         setError(r.error);
         return;
@@ -162,7 +163,7 @@ export function PromocionForm({
     if (!inicial) return;
     setError(null);
     iniciar(async () => {
-      const r = await duplicarPromocion(inicial.id);
+      const r = await llamarAlServidor(() => duplicarPromocion(inicial.id), MENSAJE_DUDOSO);
       if (!r.ok) {
         setError(r.error);
         return;
@@ -175,7 +176,7 @@ export function PromocionForm({
     if (!inicial) return;
     setError(null);
     iniciar(async () => {
-      const r = await cambiarEstadoPromocion(inicial.id, !inicial.activa);
+      const r = await llamarAlServidor(() => cambiarEstadoPromocion(inicial.id, !inicial.activa));
       if (!r.ok) {
         setError(r.error);
         return;

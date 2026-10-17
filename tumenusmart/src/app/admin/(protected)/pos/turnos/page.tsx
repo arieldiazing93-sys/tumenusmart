@@ -179,7 +179,7 @@ export default async function TurnosPosPage({
           <>
             <a
               href={`/admin/pos/turnos/exportar?${querystringActual()}`}
-              className={clasesBoton("principal", "sm")}
+              className={clasesBoton("navegar", "sm")}
             >
               Descargar Excel
             </a>

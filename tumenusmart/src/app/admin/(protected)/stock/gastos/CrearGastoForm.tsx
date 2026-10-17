@@ -4,6 +4,8 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import { Tarjeta, Campo, Entrada, Selector, clasesBoton } from "@/components/ui";
 import { type OpcionCategoriaGasto } from "@/lib/categoria-gasto";
 import { TASAS_IVA } from "@/lib/iva";
+import { llamarAlServidor, MENSAJE_DUDOSO } from "@/lib/llamar-servidor";
+import { alEnviar } from "@/lib/formulario";
 import { crearGasto } from "./actions";
 
 type Proveedor = { id: string; nombre: string; ruc: string | null; razonSocial: string | null };
@@ -33,7 +35,7 @@ export function CrearGastoForm({
 
   function alCrear(formData: FormData) {
     iniciar(async () => {
-      const resultado = await crearGasto(formData);
+      const resultado = await llamarAlServidor(() => crearGasto(formData), MENSAJE_DUDOSO);
       if (!resultado.ok) {
         alert(resultado.error);
         return;
@@ -50,7 +52,7 @@ export function CrearGastoForm({
   return (
     <Tarjeta className="!border-2 !border-azul/50 mb-6 flex flex-col gap-3">
       <p className="rotulo text-[0.8rem] font-bold">Nuevo gasto</p>
-      <form ref={formRef} action={alCrear} className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+      <form ref={formRef} onSubmit={alEnviar(alCrear)} className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <Campo etiqueta="Concepto">
           <Entrada name="concepto" required placeholder="Ej: Alquiler de septiembre" />
         </Campo>

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Tr, Td, Entrada, Selector, clasesBoton } from "@/components/ui";
 import { etiquetaUnidadMedida } from "@/lib/unidad-medida";
+import { llamarAlServidor, MENSAJE_DUDOSO } from "@/lib/llamar-servidor";
 import { ajustarInventario } from "./actions";
 
 type StockDeUnAlmacen = { almacenId: string | null; nombre: string; cantidad: number };
@@ -63,7 +64,7 @@ export function InsumoInventarioFila({
     setError(null);
     const cantidad = Number(contado);
     iniciar(async () => {
-      const resultado = await ajustarInventario(id, almacenId, cantidad, motivo);
+      const resultado = await llamarAlServidor(() => ajustarInventario(id, almacenId, cantidad, motivo), MENSAJE_DUDOSO);
       if (!resultado.ok) {
         setError(resultado.error);
         return;

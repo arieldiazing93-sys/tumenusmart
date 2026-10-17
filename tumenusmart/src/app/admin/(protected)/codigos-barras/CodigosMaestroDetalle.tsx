@@ -6,6 +6,7 @@ import { Entrada, MensajeError, Pastilla, Selector, Tarjeta, clasesBoton } from 
 import { BarrasSvg } from "@/components/BarrasSvg";
 import { barrasDeCodigo, esCodigoInterno, medirBarras } from "@/lib/codigo-barras";
 import { formatearGuarani } from "@/lib/format";
+import { llamarAlServidor, MENSAJE_DUDOSO, MENSAJE_SIN_RED } from "@/lib/llamar-servidor";
 import { asignarCodigoProducto, generarCodigosFaltantes } from "./actions";
 import { CodigoBarrasProducto } from "./CodigoBarrasProducto";
 import { ProbarLector } from "./ProbarLector";
@@ -140,7 +141,14 @@ export function CodigosMaestroDetalle({
     setErrorEscaneo(null);
     if (!moverDeOtro) setConflicto(null);
     iniciar(async () => {
-      const r = await asignarCodigoProducto(producto.id, textoEscaneo, moverDeOtro);
+      let r: Awaited<ReturnType<typeof asignarCodigoProducto>>;
+      try {
+        r = await asignarCodigoProducto(producto.id, textoEscaneo, moverDeOtro);
+      } catch {
+        // Sin internet: el código escaneado queda en el campo para volver a guardarlo.
+        setErrorEscaneo(MENSAJE_SIN_RED);
+        return;
+      }
       if (!r.ok) {
         setErrorEscaneo(r.error);
         setConflicto(r.conflicto ?? null);
@@ -171,7 +179,7 @@ export function CodigosMaestroDetalle({
       return;
     setMensajeGeneracion(null);
     iniciarGeneracion(async () => {
-      const r = await generarCodigosFaltantes();
+      const r = await llamarAlServidor(() => generarCodigosFaltantes(), MENSAJE_DUDOSO);
       if (!r.ok) return setMensajeGeneracion({ texto: r.error, error: true });
       setMensajeGeneracion({
         texto:

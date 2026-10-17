@@ -8,6 +8,9 @@ import { opcionesCategoriaGasto, etiquetaCategoriaGasto } from "@/lib/categoria-
 
 export const dynamic = "force-dynamic";
 
+/** Cuántos gastos se listan en pantalla (los más recientes); el reporte con fechas trae todos. */
+const LIMITE_GASTOS = 100;
+
 export default async function GastosPage() {
   await pantallaConPermiso("stock.ver");
   const prisma = prismaDelLocal(await idLocalActual());
@@ -16,7 +19,7 @@ export default async function GastosPage() {
     prisma.gasto.findMany({
       orderBy: { fecha: "desc" },
       include: { proveedor: { select: { nombre: true } } },
-      take: 100,
+      take: LIMITE_GASTOS,
     }),
     prisma.proveedor.findMany({
       where: { activo: true },
@@ -70,7 +73,7 @@ export default async function GastosPage() {
             </Selector>
           </Campo>
           <div className="flex flex-wrap items-center gap-2 sm:col-span-2 lg:col-span-4">
-            <button type="submit" formAction="/admin/stock/gastos/exportar" className={clasesBoton("principal", "sm")}>
+            <button type="submit" formAction="/admin/stock/gastos/exportar" className={clasesBoton("navegar", "sm")}>
               Descargar Excel
             </button>
             <button
@@ -88,6 +91,11 @@ export default async function GastosPage() {
         </form>
       </Tarjeta>
 
+      {gastos.length >= LIMITE_GASTOS && (
+        <p className="mb-2 text-[0.8rem] text-tinta-media">
+          Acá se ven los últimos {LIMITE_GASTOS} gastos. Para ver todos los de un período, descargá el reporte con fechas (arriba).
+        </p>
+      )}
       {gastos.length === 0 ? (
         <Vacio titulo="Todavía no cargaste ningún gasto" />
       ) : (

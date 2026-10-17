@@ -2,6 +2,8 @@
 
 import { useRef, useTransition } from "react";
 import { Tarjeta, Campo, Entrada, clasesBoton } from "@/components/ui";
+import { llamarAlServidor } from "@/lib/llamar-servidor";
+import { alEnviar } from "@/lib/formulario";
 import { crearProveedor } from "./actions";
 
 export function CrearProveedorForm({ onCreado }: { onCreado: (proveedorId: string) => void }) {
@@ -10,7 +12,7 @@ export function CrearProveedorForm({ onCreado }: { onCreado: (proveedorId: strin
 
   function alCrear(formData: FormData) {
     iniciar(async () => {
-      const resultado = await crearProveedor(formData);
+      const resultado = await llamarAlServidor(() => crearProveedor(formData));
       if (!resultado.ok) {
         alert(resultado.error);
         return;
@@ -23,7 +25,7 @@ export function CrearProveedorForm({ onCreado }: { onCreado: (proveedorId: strin
   return (
     <Tarjeta className="!border-2 !border-azul/50 flex flex-col gap-3">
       <p className="rotulo text-[0.8rem] font-bold">Nuevo proveedor</p>
-      <form ref={formRef} action={alCrear} className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+      <form ref={formRef} onSubmit={alEnviar(alCrear)} className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <Campo etiqueta="Nombre comercial">
           <Entrada name="nombre" required autoFocus placeholder="Ej: Distribuidora Central" />
         </Campo>

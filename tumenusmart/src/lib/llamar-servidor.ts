@@ -23,7 +23,11 @@ export async function llamarAlServidor<R>(
 ): Promise<R | { ok: false; error: string }> {
   try {
     return await accion();
-  } catch {
+  } catch (e) {
+    // Las acciones que terminan con redirect() (o notFound()) lo hacen lanzando una señal propia de Next: esa NO es un error de red y
+    // tiene que llegar al framework para que la pantalla cambie. Se la reconoce por su "digest" (empieza con NEXT_).
+    const digest = (e as { digest?: unknown } | null)?.digest;
+    if (typeof digest === "string" && digest.startsWith("NEXT_")) throw e;
     return { ok: false, error: mensaje };
   }
 }

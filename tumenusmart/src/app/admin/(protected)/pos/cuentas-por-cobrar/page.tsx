@@ -5,6 +5,7 @@ import { idLocalActual } from "@/lib/local-actual";
 import { formatearGuarani, formatearNumero } from "@/lib/format";
 import { listarCuentasPorCobrar, type FiltroEstadoCobros } from "@/lib/cuentas-por-cobrar";
 import { ETIQUETA_ESTADO_CUENTA, type EstadoCuenta } from "@/lib/pagos-compra";
+import { ZONA_NEGOCIO } from "@/lib/timezone";
 import {
   BotonEnlace,
   Cabecera,
@@ -174,7 +175,7 @@ export default async function CuentasPorCobrarPage({
           <button
             type="submit"
             formAction="/admin/pos/cuentas-por-cobrar/exportar"
-            className={clasesBoton("principal", "sm")}
+            className={clasesBoton("navegar", "sm")}
           >
             Descargar Excel
           </button>
@@ -225,7 +226,7 @@ export default async function CuentasPorCobrarPage({
                   {formatearNumero(f.numero)}
                   {f.facturaNumero && <span className="block text-xs font-normal text-tinta-suave">Fact. {f.facturaNumero}</span>}
                 </Td>
-                <Td>{f.fecha.toLocaleDateString("es-PY")}</Td>
+                <Td>{f.fecha.toLocaleDateString("es-PY", { timeZone: ZONA_NEGOCIO })}</Td>
                 <Td className="font-medium text-tinta">
                   {f.cliente}
                   {(f.identificacion || f.telefono) && (

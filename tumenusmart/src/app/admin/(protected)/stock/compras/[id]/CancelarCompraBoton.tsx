@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Area, clasesBoton } from "@/components/ui";
+import { llamarAlServidor, MENSAJE_DUDOSO } from "@/lib/llamar-servidor";
 import { cancelarCompra } from "../actions";
 
 /**
@@ -20,7 +21,7 @@ export function CancelarCompraBoton({ compraId }: { compraId: string }) {
   function confirmar() {
     setError(null);
     iniciar(async () => {
-      const resultado = await cancelarCompra(compraId, motivo);
+      const resultado = await llamarAlServidor(() => cancelarCompra(compraId, motivo), MENSAJE_DUDOSO);
       if (!resultado.ok) {
         setError(resultado.error);
         return;

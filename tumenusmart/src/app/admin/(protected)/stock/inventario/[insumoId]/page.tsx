@@ -5,6 +5,7 @@ import { idLocalActual } from "@/lib/local-actual";
 import { Cabecera, Tabla, Th, Td, Tr, Vacio, Pastilla, type ColorEstado } from "@/components/ui";
 import { Volver } from "@/components/Volver";
 import { etiquetaUnidadMedida } from "@/lib/unidad-medida";
+import { ZONA_NEGOCIO } from "@/lib/timezone";
 
 export const dynamic = "force-dynamic";
 
@@ -88,7 +89,7 @@ export default async function HistorialInsumoPage({
                     : m.motivo ?? "—";
               return (
                 <Tr key={m.id}>
-                  <Td>{m.createdAt.toLocaleString("es-PY")}</Td>
+                  <Td>{m.createdAt.toLocaleString("es-PY", { timeZone: ZONA_NEGOCIO })}</Td>
                   <Td>
                     <Pastilla color={COLOR_TIPO[m.tipo] ?? "neutro"}>
                       {ETIQUETA_TIPO[m.tipo] ?? m.tipo}

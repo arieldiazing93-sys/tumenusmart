@@ -2,6 +2,8 @@
 
 import { useState, useTransition } from "react";
 import { Tarjeta, Campo, Entrada, clasesBoton } from "@/components/ui";
+import { llamarAlServidor } from "@/lib/llamar-servidor";
+import { alEnviar } from "@/lib/formulario";
 import { crearGrupo } from "./actions";
 
 /**
@@ -21,7 +23,7 @@ export function CrearGrupoForm({
   function alCrear(formData: FormData) {
     setError(null);
     iniciar(async () => {
-      const resultado = await crearGrupo(formData);
+      const resultado = await llamarAlServidor(() => crearGrupo(formData));
       if (!resultado.ok) {
         setError(resultado.error);
         return;
@@ -38,7 +40,7 @@ export function CrearGrupoForm({
           Cancelar
         </button>
       </div>
-      <form action={alCrear} className="campos-grises flex flex-wrap items-end gap-3">
+      <form onSubmit={alEnviar(alCrear)} className="campos-grises flex flex-wrap items-end gap-3">
         <div className="min-w-[14rem] flex-1">
           <Campo etiqueta="Nombre">
             <Entrada name="nombre" required autoFocus placeholder="Ej: Salsas, Quesos, Toppings" />

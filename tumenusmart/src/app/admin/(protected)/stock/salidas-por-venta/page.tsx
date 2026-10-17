@@ -143,7 +143,7 @@ export default async function SalidasPorVentaPage({
           )}
           <span className="text-xs text-tinta-suave">Sin fechas, muestra el mes actual.</span>
           <div className="flex flex-wrap items-center gap-2 sm:ml-auto">
-            <a href={`/admin/stock/salidas-por-venta/exportar${consulta}`} className={clasesBoton("exito", "sm")}>
+            <a href={`/admin/stock/salidas-por-venta/exportar${consulta}`} className={clasesBoton("navegar", "sm")}>
               Descargar Excel
             </a>
             <a

@@ -7,6 +7,7 @@ import { clasesBoton } from "@/components/ui";
 import { BuscarProductoParaGrupo } from "@/components/BuscarProductoParaGrupo";
 import { QuitarProductoDeGrupoBoton } from "@/components/QuitarProductoDeGrupoBoton";
 import { AplicarGruposBoton } from "./AplicarGruposBoton";
+import { llamarAlServidor } from "@/lib/llamar-servidor";
 import { asignarGrupoAProducto, crearGrupoYAdjuntar } from "../actions";
 
 type Modificador = {
@@ -56,7 +57,7 @@ export function GruposAgregadosProducto({
       return;
     }
     iniciar(async () => {
-      const r = await crearGrupoYAdjuntar(productId, nombre);
+      const r = await llamarAlServidor(() => crearGrupoYAdjuntar(productId, nombre));
       if (!r.ok) {
         setError(r.error);
         return;
@@ -69,7 +70,7 @@ export function GruposAgregadosProducto({
 
   function usarGrupoExistente(groupId: string) {
     iniciar(async () => {
-      const r = await asignarGrupoAProducto(productId, groupId, true);
+      const r = await llamarAlServidor(() => asignarGrupoAProducto(productId, groupId, true));
       if (!r.ok) {
         alert(r.error);
         return;
@@ -81,7 +82,7 @@ export function GruposAgregadosProducto({
   function quitarGrupo(groupId: string) {
     if (!confirm("¿Quitar este grupo de este producto? El grupo y sus modificadores no se borran, solo dejan de ofrecerse acá.")) return;
     iniciar(async () => {
-      const r = await asignarGrupoAProducto(productId, groupId, false);
+      const r = await llamarAlServidor(() => asignarGrupoAProducto(productId, groupId, false));
       if (!r.ok) {
         alert(r.error);
         return;

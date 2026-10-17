@@ -10,6 +10,9 @@ import { InventariosRegistrados } from "./InventariosRegistrados";
 
 export const dynamic = "force-dynamic";
 
+/** Cuántos inventarios guardados se listan en pantalla (los más recientes). */
+const LIMITE_INVENTARIOS = 200;
+
 /**
  * Registro de inventario, en dos vistas: los inventarios que ya se guardaron
  * (el historial, se abre con doble clic) y el stock actual de cada insumo, con
@@ -60,7 +63,7 @@ async function vistaHistorial(idLocal: string) {
   const [inventarios, almacenes] = await Promise.all([
     prisma.inventario.findMany({
       orderBy: { createdAt: "desc" },
-      take: 200,
+      take: LIMITE_INVENTARIOS,
       select: {
         id: true,
         createdAt: true,
@@ -79,6 +82,11 @@ async function vistaHistorial(idLocal: string) {
 
   return (
     <>
+      {inventarios.length >= LIMITE_INVENTARIOS && (
+        <p className="mb-2 text-[0.8rem] text-tinta-media">
+          Se ven los últimos {LIMITE_INVENTARIOS} inventarios guardados. Para ver los más viejos, usá el reporte de inventarios con fechas (abajo).
+        </p>
+      )}
       <InventariosRegistrados
         inventarios={inventarios.map((i) => ({
           id: i.id,
@@ -126,7 +134,7 @@ async function vistaHistorial(idLocal: string) {
               <button
                 type="submit"
                 formAction="/admin/stock/inventario/exportar"
-                className={clasesBoton("principal", "sm")}
+                className={clasesBoton("navegar", "sm")}
               >
                 Descargar Excel
               </button>

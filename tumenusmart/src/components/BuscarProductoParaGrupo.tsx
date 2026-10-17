@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { formatearGuarani } from "@/lib/format";
+import { llamarAlServidor, MENSAJE_SIN_RED } from "@/lib/llamar-servidor";
 import { clasesBoton } from "@/components/ui";
 import {
   buscarProductosParaGrupo,
@@ -28,23 +29,41 @@ export function BuscarProductoParaGrupo({ groupId }: { groupId: string }) {
   const [buscando, setBuscando] = useState(false);
   const [agregando, iniciar] = useTransition();
   const [agregadoId, setAgregadoId] = useState<string | null>(null);
+  const [sinRed, setSinRed] = useState(false);
+  // Si se escribe rápido, la respuesta de una búsqueda vieja no pisa a la nueva (se sumaría un producto equivocado al grupo).
+  const ultimaBusqueda = useRef(0);
 
   async function buscar(texto: string) {
     setQuery(texto);
     setAgregadoId(null);
+    const numero = ++ultimaBusqueda.current;
     if (!texto.trim()) {
       setResultados([]);
+      setBuscando(false);
+      setSinRed(false);
       return;
     }
     setBuscando(true);
-    const r = await buscarProductosParaGrupo(groupId, texto);
+    setSinRed(false);
+    let r: ProductoParaGrupo[];
+    try {
+      r = await buscarProductosParaGrupo(groupId, texto);
+    } catch {
+      // Sin internet: se frena el «Buscando…» y se avisa (no se dice «no encontré ningún producto», que sería mentira).
+      if (numero === ultimaBusqueda.current) {
+        setBuscando(false);
+        setSinRed(true);
+      }
+      return;
+    }
+    if (numero !== ultimaBusqueda.current) return;
     setBuscando(false);
     setResultados(r);
   }
 
   function agregar(productId: string) {
     iniciar(async () => {
-      const r = await agregarProductoAGrupo(groupId, productId);
+      const r = await llamarAlServidor(() => agregarProductoAGrupo(groupId, productId));
       if (!r.ok) {
         alert(r.error);
         return;
@@ -65,7 +84,8 @@ export function BuscarProductoParaGrupo({ groupId }: { groupId: string }) {
         className="rounded-lg border border-linea px-3 py-2 text-sm"
       />
       {buscando && <p className="text-xs text-tinta-suave">Buscando…</p>}
-      {!buscando && query.trim() && resultados.length === 0 && (
+      {sinRed && <p className="text-xs font-medium text-peligro">{MENSAJE_SIN_RED}</p>}
+      {!buscando && !sinRed && query.trim() && resultados.length === 0 && (
         <p className="text-xs text-tinta-suave">
           No encontré ningún producto con ese nombre — creálo primero en Productos.
         </p>
