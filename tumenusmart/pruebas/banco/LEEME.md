@@ -27,6 +27,7 @@ Corre el código REAL de `src/` en el navegador (Microsoft Edge), con una base d
 | `asistencia-logica` | tardanza (turno noche), días/faltas/ausencias, salario ÷ 30 y jornal, turnos: miles de casos al azar que cierran al guaraní |
 | `agenda-cobro-logica` | `cobrarCita`: cobrar menos que el precio de lista (descuento o precio bajado a mano) pide la contraseña de Seguridad |
 | `canchas-guardar-logica` | `guardarReservaCancha`: un precio menor que la tarifa pide la contraseña de Seguridad; las reservas que no se tocan no |
+| `historial-estacion-logica` | Historial de cuentas por estación (caja): el filtro y la columna «Estación» del Excel con la ruta real; con una sola caja la planilla queda igual |
 
 `cripto.js` es un `node:crypto` mínimo y síncrono (SHA-256, HMAC, scrypt lento simulado) comprobado contra vectores oficiales; lo usan las pruebas de
 login, sesión y enlace.

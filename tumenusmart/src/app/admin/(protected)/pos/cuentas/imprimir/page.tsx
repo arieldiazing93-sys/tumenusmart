@@ -9,30 +9,33 @@ import { ZONA_NEGOCIO } from "@/lib/timezone";
 import { ImprimirBoton } from "../../../estadisticas/imprimir/ImprimirBoton";
 import { nombreCompleto } from "@/lib/agenda-personal";
 import { cargarCuentasCanceladas, type CuentaCancelada } from "@/lib/cuentas-canceladas";
+import { cargarEstacionesParaFiltro, filtroPorEstacion } from "@/lib/estacion-filtro";
 
 export const dynamic = "force-dynamic";
 
 export default async function ImprimirCuentasPosPage({
   searchParams,
 }: {
-  searchParams: Promise<{ fecha?: string; desde?: string; hasta?: string; formaPago?: string }>;
+  searchParams: Promise<{ fecha?: string; desde?: string; hasta?: string; formaPago?: string; estacion?: string }>;
 }) {
   await pantallaConPermiso("pos.vender");
 
-  const { fecha, desde, hasta, formaPago } = await searchParams;
+  const { fecha, desde, hasta, formaPago, estacion } = await searchParams;
   const fechaActiva = fecha ?? "hoy";
   const rango =
     calcularRangoFecha(fechaActiva, desde, hasta) ?? calcularRangoFecha("hoy", undefined, undefined)!;
 
   const storeId = await idLocalActual();
   const db = prismaDelLocal(storeId);
+  // Con más de una caja, cada cuenta dice de cuál estación fue; el filtro de la pantalla (si lo hay) también rige acá.
+  const { elegida: estacionElegida, varias } = await cargarEstacionesParaFiltro(db, estacion);
   const [local, canceladasMesa, ventas] = await Promise.all([
     localActual(),
     // Las cuentas (de mesa y de delivery) cerradas sin cobrar también van en el reporte (con una forma de pago filtrada no entran:
     // una cuenta sin cobrar no tiene forma de pago). Es la misma función que usan la pantalla y el Excel.
-    formaPago ? Promise.resolve<CuentaCancelada[]>([]) : cargarCuentasCanceladas(db, rango),
+    formaPago || estacionElegida ? Promise.resolve<CuentaCancelada[]>([]) : cargarCuentasCanceladas(db, rango),
     db.ventaPos.findMany({
-      where: { creadoEn: { gte: rango.gte, lt: rango.lt }, ...filtroPorFormaPago(formaPago) },
+      where: { creadoEn: { gte: rango.gte, lt: rango.lt }, ...filtroPorFormaPago(formaPago), ...filtroPorEstacion(estacionElegida?.id) },
       orderBy: { creadoEn: "asc" },
       select: {
         id: true,
@@ -44,6 +47,7 @@ export default async function ImprimirCuentasPosPage({
         creadoEn: true,
         cancelada: true,
         personal: { select: { nombre: true, apellido: true } },
+        turnoPos: { select: { estacion: { select: { nombre: true } } } },
       },
     }),
   ]);
@@ -92,6 +96,7 @@ export default async function ImprimirCuentasPosPage({
       <div className="mb-8 border-b border-linea pb-6">
         <h1 className="text-2xl font-bold text-tinta">Historial de cuentas — {local.nombre}</h1>
         <p className="mt-1 text-sm text-tinta-media">Período: {periodoTexto}</p>
+        {estacionElegida && <p className="mt-0.5 text-sm text-tinta-media">Estación: {estacionElegida.nombre}</p>}
       </div>
 
       {filas.length === 0 ? (
@@ -104,6 +109,7 @@ export default async function ImprimirCuentasPosPage({
               <th className="py-1.5">Fecha</th>
               <th className="py-1.5">Forma de pago</th>
               <th className="py-1.5">Cajero</th>
+              {varias && <th className="py-1.5">Estación</th>}
               <th className="py-1.5">Personal</th>
               <th className="py-1.5">Estado</th>
               <th className="py-1.5 text-right">Total</th>
@@ -140,6 +146,7 @@ export default async function ImprimirCuentasPosPage({
                       {c.cerradaPor ?? "—"}
                       <span className="block text-[10px] text-tinta-suave">la canceló</span>
                     </td>
+                    {varias && <td className="py-1.5 text-tinta-media">—</td>}
                     <td className="py-1.5 text-tinta-media">
                       {c.responsable}
                       <span className="block text-[10px] text-tinta-suave">{c.rolResponsable}</span>
@@ -174,6 +181,7 @@ export default async function ImprimirCuentasPosPage({
                     : etiquetaFormaPagoPos(v.formaPago)}
                 </td>
                 <td className="py-1.5 text-tinta-media">{v.registradoPor}</td>
+                {varias && <td className="py-1.5 text-tinta-media">{v.turnoPos.estacion.nombre}</td>}
                 <td className="py-1.5 text-tinta-media">{v.personal ? nombreCompleto(v.personal) : "—"}</td>
                 <td className="py-1.5 text-tinta-media">{v.cancelada ? "Cancelada" : "Activa"}</td>
                 <td
@@ -187,7 +195,7 @@ export default async function ImprimirCuentasPosPage({
           </tbody>
           <tfoot>
             <tr className="border-t-2 border-linea font-semibold text-tinta">
-              <td className="py-2" colSpan={6}>
+              <td className="py-2" colSpan={varias ? 7 : 6}>
                 {filtraPorUnaForma
                   ? `Cobrado en ${etiquetaFormaPagoPos(formaPago ?? "").toLowerCase()} (sin canceladas)`
                   : "Total recaudado (sin canceladas)"}
@@ -196,7 +204,7 @@ export default async function ImprimirCuentasPosPage({
             </tr>
             {canceladasMesa.length > 0 && (
               <tr className="font-medium text-tinta-media">
-                <td className="py-1.5" colSpan={6}>
+                <td className="py-1.5" colSpan={varias ? 7 : 6}>
                   Cuentas canceladas sin cobrar: {canceladasMesa.length} (no suman al total)
                 </td>
                 <td className="cifra py-1.5 text-right">{formatearGuarani(totalCanceladasMesa)}</td>

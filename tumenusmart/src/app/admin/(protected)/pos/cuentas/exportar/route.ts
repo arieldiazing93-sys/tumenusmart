@@ -9,6 +9,7 @@ import { ZONA_NEGOCIO } from "@/lib/timezone";
 import { nuevoLibro, filaTitulo, respuestaXlsx } from "@/lib/excel-reporte";
 import { nombreCompleto } from "@/lib/agenda-personal";
 import { cargarCuentasCanceladas, type CuentaCancelada } from "@/lib/cuentas-canceladas";
+import { cargarEstacionesParaFiltro, filtroPorEstacion } from "@/lib/estacion-filtro";
 
 export const dynamic = "force-dynamic";
 
@@ -23,18 +24,21 @@ export async function GET(request: NextRequest) {
   const desde = searchParams.get("desde") ?? undefined;
   const hasta = searchParams.get("hasta") ?? undefined;
   const formaPago = searchParams.get("formaPago") ?? undefined;
+  const estacionPedida = searchParams.get("estacion") ?? undefined;
 
   const rango = calcularRangoFecha(fecha, desde, hasta) ?? calcularRangoFecha("hoy", undefined, undefined)!;
 
   const storeId = await idLocalActual();
   const db = prismaDelLocal(storeId);
+  // Con más de una caja, cada cuenta dice de cuál estación fue; el filtro de la pantalla (si lo hay) también rige acá.
+  const { elegida: estacionElegida, varias } = await cargarEstacionesParaFiltro(db, estacionPedida);
   const [local, canceladasMesa, ventas] = await Promise.all([
     localActual(),
     // Las cuentas (de mesa y de delivery) que se cerraron sin cobrar también van en el reporte (una cuenta sin cobrar no tiene
     // forma de pago: al filtrar por una, no entran). Es la misma función que usa la pantalla.
-    formaPago ? Promise.resolve<CuentaCancelada[]>([]) : cargarCuentasCanceladas(db, rango),
+    formaPago || estacionElegida ? Promise.resolve<CuentaCancelada[]>([]) : cargarCuentasCanceladas(db, rango),
     db.ventaPos.findMany({
-      where: { creadoEn: { gte: rango.gte, lt: rango.lt }, ...filtroPorFormaPago(formaPago) },
+      where: { creadoEn: { gte: rango.gte, lt: rango.lt }, ...filtroPorFormaPago(formaPago), ...filtroPorEstacion(estacionElegida?.id) },
       orderBy: { creadoEn: "asc" },
       select: {
         numero: true,
@@ -45,6 +49,7 @@ export async function GET(request: NextRequest) {
         creadoEn: true,
         cancelada: true,
         personal: { select: { nombre: true, apellido: true } },
+        turnoPos: { select: { estacion: { select: { nombre: true } } } },
       },
     }),
   ]);
@@ -65,24 +70,24 @@ export async function GET(request: NextRequest) {
     : `${rango.gte.toLocaleDateString("es-PY", opcionesFecha)} - ${new Date(rango.lt.getTime() - 24 * 60 * 60 * 1000).toLocaleDateString("es-PY", opcionesFecha)}`;
 
   const { libro, hoja } = nuevoLibro("Cuentas POS");
-  hoja.columns = [
-    { width: 12 },
-    { width: 14 },
-    { width: 12 },
-    { width: 40 },
-    { width: 20 },
-    { width: 20 },
-    { width: 22 },
-    { width: 16 },
-    { width: 46 },
-  ];
+  const anchos = [12, 14, 12, 40, 20, 20, 22, 16, 46];
+  // Con más de una caja se suma la columna «Estación» después del cajero: lo que sigue se corre un lugar.
+  if (varias) anchos.splice(5, 0, 18);
+  hoja.columns = anchos.map((width) => ({ width }));
+  function conEstacion<T>(fila: T[], estacion: T): T[] {
+    return varias ? [...fila.slice(0, 5), estacion, ...fila.slice(5)] : fila;
+  }
+  /** La columna del total (empezando en 1) y cuántas columnas tiene la planilla. */
+  const columnaTotal = varias ? 9 : 8;
+  const columnas = varias ? 10 : 9;
 
   filaTitulo(hoja, ["Negocio", local.nombre], 2);
   filaTitulo(hoja, ["Reporte", "Historial de cuentas"], 2);
   filaTitulo(hoja, ["Período", periodo], 2);
+  if (estacionElegida) filaTitulo(hoja, ["Estación", estacionElegida.nombre], 2);
   hoja.addRow([]);
 
-  filaTitulo(hoja, ["Cuenta", "Fecha", "Hora", "Forma de pago", "Cajero", "Personal", "Estado", "Total (Gs.)", "Motivo"], 9);
+  filaTitulo(hoja, conEstacion(["Cuenta", "Fecha", "Hora", "Forma de pago", "Cajero", "Personal", "Estado", "Total (Gs.)", "Motivo"], "Estación"), columnas);
   // Las canceladas quedan en la planilla para que no desaparezcan del
   // registro, pero no suman al total: no es plata que haya entrado a la caja.
   // Filtrando por una forma concreta se suma solo lo cobrado CON esa forma (de
@@ -114,7 +119,7 @@ export async function GET(request: NextRequest) {
       ]
         .filter(Boolean)
         .join(" · ");
-      const filaMesa = hoja.addRow([
+      const filaMesa = hoja.addRow(conEstacion<string | number>([
         `${c.titulo} · ${c.etiqueta}`,
         c.cerradaEn ? c.cerradaEn.toLocaleDateString("es-PY", opcionesFecha) : "—",
         c.cerradaEn
@@ -126,14 +131,14 @@ export async function GET(request: NextRequest) {
         "Cancelada sin cobrar",
         Math.round(c.total),
         motivo,
-      ]);
-      filaMesa.getCell(8).numFmt = "#,##0";
+      ], "—"));
+      filaMesa.getCell(columnaTotal).numFmt = "#,##0";
       continue;
     }
     if (!v.cancelada) {
       total += filtraPorUnaForma ? montoCobradoConForma(v.pagos, formaPago ?? "") : Number(v.total);
     }
-    const fila = hoja.addRow([
+    const fila = hoja.addRow(conEstacion<string | number>([
       v.numero,
       v.creadoEn.toLocaleDateString("es-PY", opcionesFecha),
       v.creadoEn.toLocaleTimeString("es-PY", {
@@ -150,14 +155,14 @@ export async function GET(request: NextRequest) {
       v.cancelada ? "Cancelada" : "Activa",
       Math.round(Number(v.total)),
       "",
-    ]);
-    fila.getCell(8).numFmt = "#,##0";
+    ], v.turnoPos.estacion.nombre));
+    fila.getCell(columnaTotal).numFmt = "#,##0";
   }
 
   hoja.addRow([]);
   const filaTotal = filaTitulo(
     hoja,
-    [
+    conEstacion<string | number>([
       "",
       "",
       "",
@@ -169,19 +174,19 @@ export async function GET(request: NextRequest) {
         : "TOTAL GENERAL, sin canceladas (Gs.)",
       Math.round(total),
       "",
-    ],
-    9
+    ], ""),
+    columnas
   );
-  filaTotal.getCell(8).numFmt = "#,##0";
+  filaTotal.getCell(columnaTotal).numFmt = "#,##0";
 
   // Lo que se cerró sin cobrar, aparte y a la vista: no es plata que entró, pero es plata de la que hay que poder dar cuenta.
   if (canceladasMesa.length > 0) {
     const filaSinCobrar = filaTitulo(
       hoja,
-      ["", "", "", "", "", "", `CUENTAS CANCELADAS SIN COBRAR: ${canceladasMesa.length} (Gs.)`, Math.round(totalCanceladasMesa), ""],
-      9
+      conEstacion<string | number>(["", "", "", "", "", "", `CUENTAS CANCELADAS SIN COBRAR: ${canceladasMesa.length} (Gs.)`, Math.round(totalCanceladasMesa), ""], ""),
+      columnas
     );
-    filaSinCobrar.getCell(8).numFmt = "#,##0";
+    filaSinCobrar.getCell(columnaTotal).numFmt = "#,##0";
   }
 
   if (ventas.length === 0 && canceladasMesa.length === 0) {

@@ -38,7 +38,7 @@ export default async function DetalleVentaPosPage({
     where: { id },
     include: {
       items: { orderBy: { id: "asc" } },
-      turnoPos: { select: { estado: true } },
+      turnoPos: { select: { estado: true, estacion: { select: { nombre: true } } } },
       pagos: { orderBy: { orden: "asc" } },
       cobros: { orderBy: [{ fecha: "asc" }, { createdAt: "asc" }] },
       personal: { select: { nombre: true, apellido: true } },
@@ -136,6 +136,10 @@ export default async function DetalleVentaPosPage({
             <div>
               <dt className="text-tinta-suave">Cajero</dt>
               <dd className="font-semibold text-tinta">{venta.registradoPor}</dd>
+            </div>
+            <div>
+              <dt className="text-tinta-suave">Estación</dt>
+              <dd className="font-semibold text-tinta">{venta.turnoPos.estacion.nombre}</dd>
             </div>
             {venta.personal && (
               <div>
