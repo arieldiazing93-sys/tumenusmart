@@ -5,6 +5,7 @@ import { exigirPermiso } from "@/lib/auth";
 import { idLocalActual } from "@/lib/local-actual";
 import { prisma } from "@/lib/prisma";
 import { prismaDelLocal } from "@/lib/prisma-local";
+import { bloqueoPorSuspension } from "@/lib/suspension";
 import { registrarBitacora } from "@/lib/bitacora";
 import { SIN_REGISTRO_FISCAL } from "@/lib/tipo-cliente";
 import { descuentoDeCuenta, lineasDeCobro } from "@/lib/comedor";
@@ -41,6 +42,8 @@ const nombreDe = (sesion: { nombre?: string | null; email: string }): string => 
 export async function aceptarPedido(pedidoId: string, costoEnvio?: number): Promise<ResultadoPedido> {
   const sesion = await exigirPermiso("delivery.gestionar");
   const storeId = await idLocalActual();
+  const suspendida = await bloqueoPorSuspension(storeId);
+  if (suspendida) return suspendida;
   const r = await aceptarPedidoWeb(storeId, String(pedidoId), sesion, { costoEnvio });
   refrescar();
   revalidatePath("/admin/stock/insumos");

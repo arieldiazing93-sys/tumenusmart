@@ -22,6 +22,7 @@ import { aXmlRDE } from "@/lib/sifen/xml";
 import { esDeMesAnterior, nombreDelMes } from "@/lib/mes-fiscal";
 import { registrarBitacora } from "@/lib/bitacora";
 import { cancelarVenta } from "../pos/actions";
+import { bloqueoPorSuspension } from "@/lib/suspension";
 
 /** Desde Vercel hasta la base cada consulta tarda: emitir una factura de remisión (que con factura electrónica firma adentro) necesita más que los 5 s de fábrica. Igual que el POS, el comedor y el delivery. */
 const OPCIONES_TX = { timeout: 15_000, maxWait: 10_000 } as const;
@@ -474,6 +475,10 @@ export async function remitirFactura(
 ): Promise<ResultadoRemitirFactura> {
   const sesion = await exigirPermiso("pos.verHistorico");
   const storeId = await idLocalActual();
+
+  // Emitir una factura nueva es registrar una venta: una cuenta suspendida no puede.
+  const suspendida = await bloqueoPorSuspension(storeId);
+  if (suspendida) return suspendida;
   const db = prismaDelLocal(storeId);
 
   if (!motivo.trim()) {

@@ -15,6 +15,7 @@ import {
 } from "@/lib/sesion-mozo";
 import type { LineaPedida } from "@/lib/precio-pedido";
 import { registrarBitacora } from "@/lib/bitacora";
+import { bloqueoPorSuspension } from "@/lib/suspension";
 import { formatearGuarani } from "@/lib/format";
 import {
   ESTADOS_CUENTA_ABIERTA,
@@ -398,6 +399,9 @@ export async function enviarPedido(token: string, datos: DatosEnvio): Promise<Re
   if (!ctx.ok) return ctx;
   const { local, mozo } = ctx;
   const storeId = local.id;
+
+  const suspendida = await bloqueoPorSuspension(storeId);
+  if (suspendida) return suspendida;
 
   const mesa = normalizarMesa(datos?.mesa);
   if (!mesa) return { ok: false, error: "Escribí el número o nombre de la mesa (hasta 20 letras)." };

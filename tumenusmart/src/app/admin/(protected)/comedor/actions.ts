@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import type { ItemCuentaMesa, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { prismaDelLocal, siguienteNumeroVentaPos, upsertClienteFiscal } from "@/lib/prisma-local";
+import { bloqueoPorSuspension } from "@/lib/suspension";
 import { idLocalActual } from "@/lib/local-actual";
 import { exigirPermiso } from "@/lib/auth";
 import { estacionActual } from "@/lib/estacion-actual";
@@ -722,6 +723,9 @@ export async function cargarProductosCaja(
   const db = prismaDelLocal(storeId);
   const quien = nombreDe(sesion);
 
+  const suspendida = await bloqueoPorSuspension(storeId);
+  if (suspendida) return suspendida;
+
   const cuenta = await db.cuentaMesa.findFirst({
     where: { id: String(cuentaId) },
     select: { id: true, mesa: true, mozoId: true, estado: true },
@@ -793,6 +797,9 @@ export async function abrirCuentaEnCaja(datos: {
   const storeId = await idLocalActual();
   const db = prismaDelLocal(storeId);
   const quien = nombreDe(sesion);
+
+  const suspendida = await bloqueoPorSuspension(storeId);
+  if (suspendida) return suspendida;
 
   const mesa = normalizarMesa(datos?.mesa);
   if (!mesa) return { ok: false, error: "Elegí la mesa (hasta 20 letras)." };
@@ -903,6 +910,9 @@ export async function pagarCuenta(cuentaId: string, datos: DatosCobroCuenta): Pr
   const storeId = await idLocalActual();
   const db = prismaDelLocal(storeId);
   const registradoPor = nombreDe(sesion);
+
+  const suspendida = await bloqueoPorSuspension(storeId);
+  if (suspendida) return suspendida;
 
   // La estación de esta computadora y su turno de caja abierto: la venta entra ahí.
   const estacion = await estacionActual(db);

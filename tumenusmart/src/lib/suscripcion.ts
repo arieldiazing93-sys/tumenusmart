@@ -163,6 +163,25 @@ export function calcularNuevoVencimiento(
   );
 }
 
+/** Cuántos días dura el primer período de un local recién activado: fijos, sin importar el mes. */
+export const DIAS_PRIMER_PERIODO = 31;
+
+/**
+ * Hasta cuándo queda cubierto un local al ACTIVARLO (o en su primer pago, si nunca se activó): `dias` días justos, contando el día de
+ * hoy como el primero. La fecha significa "pagado hasta ese día inclusive", así que es la de hoy más `dias - 1`: activado el 18/10
+ * atiende hasta el 17/11 inclusive (31 días) y se apaga a la medianoche. Las renovaciones siguientes sí son meses de calendario
+ * (ver `calcularNuevoVencimiento`).
+ */
+export function calcularVencimientoDeActivacion(
+  ahora: Date = new Date(),
+  dias: number = DIAS_PRIMER_PERIODO,
+  zona: string = ZONA_NEGOCIO
+): Date {
+  const [a, m, d] = claveDia(ahora, zona).split("-").map(Number);
+  const ultimo = new Date(Date.UTC(a, m - 1, d + dias - 1));
+  return new Date(ultimo.getTime() + desfaseHorario(zona, ahora) * 60000);
+}
+
 /** Texto del recordatorio de vencimiento, listo para mandar por WhatsApp. */
 export function mensajeRecordatorio(
   nombreLocal: string,

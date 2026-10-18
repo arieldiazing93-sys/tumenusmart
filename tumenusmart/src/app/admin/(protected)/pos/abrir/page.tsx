@@ -5,6 +5,8 @@ import { idLocalActual } from "@/lib/local-actual";
 import { estacionActual } from "@/lib/estacion-actual";
 import { RUTA_TRAS_ABRIR_TURNO, rutaDeVueltaSegura } from "@/lib/turno-requerido";
 import { Tarjeta } from "@/components/ui";
+import { bloqueoPorSuspension } from "@/lib/suspension";
+import { CuentaSuspendida } from "../CuentaSuspendida";
 import { turnoAbierto } from "../turno-actual";
 import { AbrirTurnoForm } from "./AbrirTurnoForm";
 import { EstacionNoVinculada } from "../EstacionNoVinculada";
@@ -31,6 +33,10 @@ export default async function AbrirTurnoPage({
   // Un solo turno abierto por ESTA estación: si ya hay uno, no tiene sentido
   // abrir otro — se sigue donde estaba (o vendiendo en el mostrador).
   const turno = await turnoAbierto(db, estacion.id);
+
+  // Una cuenta suspendida no abre turnos (sin turno no se vende): se explica en vez de mostrar el formulario.
+  if (await bloqueoPorSuspension(storeId)) return <CuentaSuspendida hayTurnoAbierto={!!turno} />;
+
   if (turno) redirect(volverA);
 
   return (

@@ -124,8 +124,8 @@ export function AccionesLocal({
           disabled={pendiente}
           onClick={() => {
             const texto = suspendidoAMano
-              ? `¿Reactivar ${nombre}? Su carta vuelve a tomar pedidos.`
-              : `¿Suspender ${nombre}? Su carta deja de tomar pedidos hasta que lo reactives.`;
+              ? `¿Reactivar ${nombre}? Su carta vuelve a tomar pedidos y el local vuelve a poder vender.`
+              : `¿Suspender ${nombre}? Su carta deja de tomar pedidos Y el local ya no podrá registrar ventas (sí podrá ver sus reportes y cerrar el turno) hasta que lo reactives.`;
             if (!confirm(texto)) return;
             correr(() => alternarSuspension(storeId, !suspendidoAMano));
           }}

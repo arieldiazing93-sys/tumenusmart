@@ -160,6 +160,22 @@
   turnoEstado = "cerrado"; r = await vender({}); ok(r.ok === false && r.sinTurno === true && ventas.length === cuantas, "con el turno cerrado no vende y manda a abrir turno");
   turnoEstado = "abierto";
 
+  window.log("== Cuenta suspendida a mano (Super → Suspender)");
+  reiniciar(); tienda.estado = "suspendido";
+  const antesSusp = ventas.length;
+  r = await vender({});
+  ok(r.ok === false && /suspendida/.test(r.error) && ventas.length === antesSusp && movimientos.length === 0 && comprobantes.length === 0, "una cuenta suspendida a mano no registra ventas aunque el turno ya estuviera abierto → " + (r.ok ? "vendió" : r.error));
+  const abrirSusp = await A.abrirTurno("e1", 0);
+  ok(abrirSusp.ok === false && /suspendida/.test(abrirSusp.error), "tampoco abre turnos nuevos (sin turno no se vende) → " + (abrirSusp.ok ? "abrió" : abrirSusp.error));
+  const cierreSusp = await A.cerrarTurno("t1", { efectivo: 0, transferencia: 0, tarjetaDebito: 0, tarjetaCredito: 0 }, "", 0, 0);
+  ok(cierreSusp.ok === true, "pero SÍ puede cerrar el turno que había quedado abierto → " + JSON.stringify(cierreSusp));
+  reiniciar(); tienda.estado = "vencido";
+  r = await vender({});
+  ok(r.ok === true, "un local VENCIDO por fecha no se bloquea: sigue vendiendo mientras se negocia con el dueño → " + (r.ok ? "" : r.error));
+  reiniciar(); tienda.estado = "activo";
+  r = await vender({});
+  ok(r.ok === true, "y uno activo vende normal");
+  cierres = []; // el cierre de arriba no tiene que contarse en la sección «Cerrar el turno»
   window.log("== El turno se cierra justo mientras se cobra");
   reiniciar();
   turnoSeCierraAlGuardar = true;

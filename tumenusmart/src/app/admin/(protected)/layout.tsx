@@ -615,7 +615,7 @@ function AvisoVencimiento({
       break;
     case "suspendido":
       texto = "Cuenta suspendida";
-      completo = "Tu cuenta está suspendida. El menú público no está tomando pedidos.";
+      completo = "Tu cuenta está suspendida. El menú público no está tomando pedidos y no se pueden registrar ventas; los reportes siguen disponibles.";
       break;
     case "por_vencer":
       texto = `Vencimiento: ${fecha} · ${estado.dias === 1 ? "mañana" : `en ${estado.dias} días`}`;

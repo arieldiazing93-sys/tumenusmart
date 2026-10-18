@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import type { ItemCuentaDelivery, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { prismaDelLocal, siguienteNumeroVentaPos, upsertClienteFiscal } from "@/lib/prisma-local";
+import { bloqueoPorSuspension } from "@/lib/suspension";
 import { idLocalActual } from "@/lib/local-actual";
 import { exigirPermiso } from "@/lib/auth";
 import { estacionActual } from "@/lib/estacion-actual";
@@ -309,6 +310,9 @@ export async function abrirCuentaDelivery(datos: DatosCuentaDelivery): Promise<R
   const storeId = await idLocalActual();
   const db = prismaDelLocal(storeId);
 
+  const suspendida = await bloqueoPorSuspension(storeId);
+  if (suspendida) return suspendida;
+
   const r = await validarDatosDeCuenta(db, datos);
   if (!r.ok) return r;
   const v = r.v;
@@ -474,6 +478,9 @@ export async function cargarProductosDelivery(
   const storeId = await idLocalActual();
   const db = prismaDelLocal(storeId);
   const quien = nombreDe(sesion);
+
+  const suspendida = await bloqueoPorSuspension(storeId);
+  if (suspendida) return suspendida;
 
   const cuenta = await db.cuentaDelivery.findFirst({ where: { id: String(cuentaId) }, select: { id: true, numero: true, estado: true } });
   if (!cuenta) return { ok: false, error: "No encontré esa cuenta." };
@@ -1121,6 +1128,9 @@ export async function emitirFacturaDelivery(cuentaId: string, datos: DatosFactur
   const db = prismaDelLocal(storeId);
   const emitidoPor = nombreDe(sesion);
 
+  const suspendida = await bloqueoPorSuspension(storeId);
+  if (suspendida) return suspendida;
+
   // La factura sale del punto de expedición de la estación de esta computadora.
   const estacion = await estacionActual(db);
   if (!estacion) {
@@ -1475,6 +1485,9 @@ export async function pagarCuentaDelivery(cuentaId: string, datos: DatosCobroDel
   const storeId = await idLocalActual();
   const db = prismaDelLocal(storeId);
   const registradoPor = nombreDe(sesion);
+
+  const suspendida = await bloqueoPorSuspension(storeId);
+  if (suspendida) return suspendida;
 
   // La estación de esta computadora y su turno de caja abierto: la venta entra ahí.
   const estacion = await estacionActual(db);

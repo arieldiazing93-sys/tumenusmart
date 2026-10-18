@@ -13,6 +13,8 @@ import { cargarTiposDescuento } from "@/lib/tipos-descuento-servidor";
 import { turnoAbierto } from "./turno-actual";
 import { PantallaVenta } from "./PantallaVenta";
 import { EstacionNoVinculada } from "./EstacionNoVinculada";
+import { CuentaSuspendida } from "./CuentaSuspendida";
+import { bloqueoPorSuspension } from "@/lib/suspension";
 
 export const dynamic = "force-dynamic";
 
@@ -34,6 +36,10 @@ export default async function PosPage() {
   if (!estacion) return <EstacionNoVinculada />;
 
   const turno = await turnoAbierto(db, estacion.id);
+
+  // Cuenta suspendida a mano: no se vende (ver src/lib/suspension.ts); se puede cerrar el turno y ver los reportes.
+  if (await bloqueoPorSuspension(storeId)) return <CuentaSuspendida hayTurnoAbierto={!!turno} />;
+
   if (!turno) redirect("/admin/pos/abrir");
 
   // Si esta estación tiene un punto de expedición vigente, el cajero puede

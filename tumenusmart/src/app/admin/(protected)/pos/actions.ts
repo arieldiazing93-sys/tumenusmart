@@ -19,6 +19,7 @@ import { aplanarReceta } from "@/lib/insumo-elaborado";
 import { cargarElaborados } from "@/lib/cargar-elaborados";
 import { desglosarIva, formatearNumeroFactura } from "@/lib/factura-pos";
 import { anularComprobantes, crearComprobante, descripcionDeItem } from "@/lib/comprobante";
+import { bloqueoPorSuspension, RESPUESTA_VENTAS_SUSPENDIDAS, ventasBloqueadas } from "@/lib/suspension";
 import { esElectronico } from "@/lib/modalidad-punto";
 import { ErrorFacturaElectronica, problemaParaEmitirElectronico } from "@/lib/sifen/servidor";
 import { DURACION_MINIMA_CITA } from "@/lib/agenda-cita";
@@ -55,6 +56,10 @@ export async function abrirTurno(
   const sesion = await exigirPermiso("pos.vender");
   const storeId = await idLocalActual();
   const db = prismaDelLocal(storeId);
+
+  // Una cuenta suspendida no puede abrir turnos: sin turno abierto no se vende (mostrador, comedor, delivery, agenda ni canchas).
+  const suspendida = await bloqueoPorSuspension(storeId);
+  if (suspendida) return suspendida;
 
   const estacion = await db.estacion.findFirst({ where: { id: estacionId, activa: true } });
   if (!estacion) return { ok: false, error: "Esa estación no existe o está desactivada." };
@@ -217,9 +222,11 @@ export async function registrarVenta(turnoId: string, datos: DatosVenta): Promis
     }),
     prisma.store.findUnique({
       where: { id: storeId },
-      select: { facturaObligatoria: true, ventasACredito: true, pedirPersonalEnVenta: true },
+      select: { facturaObligatoria: true, ventasACredito: true, pedirPersonalEnVenta: true, estado: true },
     }),
   ]);
+  // Suspendida a mano: no se registran ventas ni aunque el turno ya estuviera abierto (cerrar el turno y ver reportes sí se puede).
+  if (ventasBloqueadas(store?.estado)) return RESPUESTA_VENTAS_SUSPENDIDAS;
   if (!turno) return { ok: false, error: "Ese turno no existe." };
   if (turno.estado !== "abierto") {
     return { ok: false, error: "Ese turno ya está cerrado. Abrí uno nuevo para seguir vendiendo.", sinTurno: true };

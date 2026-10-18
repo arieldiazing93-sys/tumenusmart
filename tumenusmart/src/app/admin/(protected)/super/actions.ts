@@ -10,7 +10,8 @@ import {
 } from "@/lib/auth";
 import { normalizarSlug, SLUGS_RESERVADOS } from "@/lib/alcance-local";
 import { plantillaPorClave } from "@/lib/plantillas-menu";
-import { calcularNuevoVencimiento } from "@/lib/suscripcion";
+import { calcularNuevoVencimiento, calcularVencimientoDeActivacion } from "@/lib/suscripcion";
+import { registrarBitacora } from "@/lib/bitacora";
 import { esTipoNegocio } from "@/lib/tipo-negocio";
 
 // Todo lo de este archivo es exclusivo del superadmin, y cada acción lo exige
@@ -200,7 +201,12 @@ export async function registrarPago(storeId: string, formData: FormData): Promis
   });
   if (!local) return { ok: false, error: "Ese local no existe" };
 
-  const cubreHasta = calcularNuevoVencimiento(local.vencimiento, meses);
+  // Un local que nunca se activó (sin fecha) arranca con sus 31 días fijos —igual que «Activar»— y los meses pagados de más se suman encima.
+  const cubreHasta = local.vencimiento
+    ? calcularNuevoVencimiento(local.vencimiento, meses)
+    : meses > 1
+      ? calcularNuevoVencimiento(calcularVencimientoDeActivacion(), meses - 1)
+      : calcularVencimientoDeActivacion();
 
   await prisma.$transaction([
     prisma.pago.create({
@@ -229,9 +235,9 @@ export async function registrarPago(storeId: string, formData: FormData): Promis
 export type ResultadoActivacion = { ok: true } | { ok: false; error: string };
 
 /**
- * Activa un local que todavía no tenía fecha de vencimiento: desde hoy corre
- * su primer mes (mismo cálculo que un pago de 1 mes, o sea 30 o 31 días según
- * el calendario) y, al terminarlo, se apaga como cualquier otro.
+ * Activa un local que todavía no tenía fecha de vencimiento: desde hoy corren
+ * sus primeros 31 días FIJOS (hoy cuenta como el primero; los meses siguientes sí son de
+ * calendario) y, al terminarlos, se apaga como cualquier otro.
  *
  * No registra ningún pago: si el cliente paga, se le carga aparte con
  * "Registrar pago" y esos meses se suman a este vencimiento.
@@ -253,7 +259,7 @@ export async function activarLocal(storeId: string): Promise<ResultadoActivacion
   // la segunda no le corre el plazo otra vez.
   const { count } = await prisma.store.updateMany({
     where: { id: storeId, vencimiento: null },
-    data: { vencimiento: calcularNuevoVencimiento(null, 1), estado: "activo" },
+    data: { vencimiento: calcularVencimientoDeActivacion(), estado: "activo" },
   });
   if (count === 0) return { ok: false, error: "Este local ya está activado: su plazo ya corre." };
 
@@ -262,16 +268,28 @@ export async function activarLocal(storeId: string): Promise<ResultadoActivacion
   return { ok: true };
 }
 
-/** Apagar o prender un local a mano, sin tocar su fecha de vencimiento. */
+/**
+ * Suspender o reactivar un local a mano, sin tocar su fecha de vencimiento. Suspendido apaga el menú público Y NO deja registrar
+ * ventas (ver src/lib/suspension.ts); sigue pudiendo ver sus reportes y cerrar el turno. Queda anotado en la bitácora del local.
+ */
 export async function alternarSuspension(
   storeId: string,
   suspender: boolean
 ): Promise<{ ok: true }> {
-  await exigirSuperadmin();
+  const sesion = await exigirSuperadmin();
 
   await prisma.store.update({
     where: { id: storeId },
     data: { estado: suspender ? "suspendido" : "activo" },
+  });
+  await registrarBitacora(storeId, sesion, {
+    modulo: "configuracion",
+    accion: suspender ? "cuenta_suspendida" : "cuenta_reactivada",
+    descripcion: suspender
+      ? "TuMenuSmart suspendió la cuenta: el menú público se apagó y ya no se pueden registrar ventas."
+      : "TuMenuSmart reactivó la cuenta.",
+    entidad: "Store",
+    entidadId: storeId,
   });
 
   revalidatePath("/admin/super");
