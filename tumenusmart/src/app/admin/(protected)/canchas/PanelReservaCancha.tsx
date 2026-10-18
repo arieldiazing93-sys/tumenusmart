@@ -196,7 +196,8 @@ export function PanelReservaCancha({
     iniciar(async () => {
       let resultado: Awaited<ReturnType<typeof guardarReservaCancha>>;
       try {
-        resultado = await guardarReservaCancha(reserva?.id ?? null, datos(forzar));
+        // Si poner un precio menor que la tarifa está protegido en Ajustes → Seguridad, `autorizar` abre el cuadro de la contraseña.
+        resultado = await autorizar((clave) => guardarReservaCancha(reserva?.id ?? null, datos(forzar), clave));
       } catch {
         // Sin internet: la reserva escrita queda en el panel (no se pierde tras un «Algo salió mal») y se puede volver a guardar.
         setError(MENSAJE_DUDOSO);
@@ -250,7 +251,7 @@ export function PanelReservaCancha({
     iniciar(async () => {
       try {
         // Primero se guarda lo que se cambió en el panel, para que lo cobrado sea exactamente lo que se ve.
-        const guardada = await guardarReservaCancha(id, datos(forzar));
+        const guardada = await autorizar((clave) => guardarReservaCancha(id, datos(forzar), clave));
         if (!guardada.ok) {
           setError(guardada.error);
           setFueraDeHorario(guardada.fueraDeHorario === true ? "cobrar" : null);

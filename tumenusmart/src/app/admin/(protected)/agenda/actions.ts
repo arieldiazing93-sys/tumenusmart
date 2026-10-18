@@ -21,6 +21,7 @@ import { idLocalActual } from "@/lib/local-actual";
 import { prisma } from "@/lib/prisma";
 import { prismaDelLocal, type PrismaLocal } from "@/lib/prisma-local";
 import { MAX_SERVICIOS_POR_CITA, codigoDeCita } from "@/lib/reserva-cliente";
+import { exigirAutorizacion } from "@/lib/seguridad-servidor";
 import { instanteAsuncionDesdeTexto } from "@/lib/timezone";
 import { SIN_REGISTRO_FISCAL } from "@/lib/tipo-cliente";
 import { FORMAS_PAGO_POS, etiquetaFormaPagoPos, type FormaPagoPos } from "@/lib/turno-pos";
@@ -31,8 +32,12 @@ import { turnoAbierto } from "../pos/turno-actual";
 export type ResultadoCita = { ok: true; citaId: string } | { ok: false; error: string; conflicto?: boolean };
 export type ResultadoCobroCita =
   | { ok: true; ventaId: string; total: number }
-  /** `sinTurno`: no hay turno de caja abierto; la pantalla manda directo a abrirlo (ver src/lib/turno-requerido.ts). */
-  | { ok: false; error: string; sinTurno?: true };
+  /**
+   * `sinTurno`: no hay turno de caja abierto; la pantalla manda directo a abrirlo (ver src/lib/turno-requerido.ts).
+   * `requiereClave`: se cobra menos que el precio de lista y los descuentos están protegidos (Ajustes → Seguridad): falta la contraseña de
+   * un usuario autorizado, o no es correcta.
+   */
+  | { ok: false; error: string; sinTurno?: true; requiereClave?: true };
 /** `requiereClave`: la acción está protegida (Ajustes → Seguridad) y falta la contraseña de un usuario autorizado, o no es correcta. */
 export type ResultadoSimple = { ok: true } | { ok: false; error: string; requiereClave?: true };
 
@@ -480,7 +485,13 @@ export async function eliminarCita(citaId: string): Promise<ResultadoSimple> {
  * cliente paga por adelantado un turno que todavía no llegó), y desde ese momento
  * aparece en Citas, en el día de su turno.
  */
-export async function cobrarCita(citaId: string, datos: DatosCita, cobro: DatosCobro): Promise<ResultadoCobroCita> {
+export async function cobrarCita(
+  citaId: string,
+  datos: DatosCita,
+  cobro: DatosCobro,
+  /** La contraseña de un usuario autorizado, si cobrar por debajo del precio de lista está protegido en Ajustes → Seguridad. */
+  autorizacion?: string
+): Promise<ResultadoCobroCita> {
   const sesion = await exigirPermiso("pos.vender");
   const storeId = await idLocalActual();
   const db = prismaDelLocal(storeId);
@@ -527,9 +538,20 @@ export async function cobrarCita(citaId: string, datos: DatosCita, cobro: DatosC
   }
   const productos = await db.servicioAgenda.findMany({
     where: { id: { in: p.lineas.map((l) => l.servicioId as string) } },
-    select: { id: true, productId: true },
+    select: { id: true, productId: true, product: { select: { precio: true } } },
   });
   const productoDe = new Map(productos.map((s) => [s.id, s.productId] as const));
+
+  // Seguridad (Ajustes): cobrar MENOS que el precio de lista es un descuento, y el panel permite bajar el precio de cada servicio a mano
+  // además del descuento general. Si el local protegió los descuentos, se pide la contraseña antes de guardar o cobrar nada. Se compara
+  // contra el precio del catálogo (no contra lo que ya traía la cita: bajarlo en un paso y cobrarlo en otro no esquiva el control); un
+  // precio más alto que el de lista no compensa la rebaja de otro servicio.
+  const listaDe = new Map(productos.map((s) => [s.id, Math.round(Number(s.product.precio))] as const));
+  const rebajaDePrecios = p.lineas.reduce((suma, l) => suma + Math.max(0, (listaDe.get(l.servicioId as string) ?? l.precio) - l.precio), 0);
+  if (rebajaDePrecios + p.descuentoMonto > 0) {
+    const clave = await exigirAutorizacion(storeId, sesion, "descuentos", autorizacion);
+    if (!clave.ok) return clave;
+  }
 
   // Se guarda lo que se ve en el panel antes de cobrar, para que lo cobrado sea exactamente eso.
   // Una cita cancelada o sin asistencia que se cobra queda reactivada.

@@ -9,16 +9,18 @@ import {
   codigoDeReserva,
   estadoLiberaHorario,
   sanearReservaPanel,
+  precioDeReserva,
   tramosDeCancha,
   type DatosReservaPanel,
 } from "@/lib/canchas";
-import { cargarHorarioCanchas } from "@/lib/canchas-publicas";
+import { cargarCanchasPublicas, cargarHorarioCanchas } from "@/lib/canchas-publicas";
 import { sincronizarProductoDeCancha } from "@/lib/canchas-producto";
 import { MINUTOS_BLOQUEO_SIN_CONFIRMAR } from "@/lib/disponibilidad";
 import { aMinutos, nombreDeDia } from "@/lib/horario-trabajo";
 import type { DatosCobro } from "@/lib/agenda-cita";
 import { estacionActual } from "@/lib/estacion-actual";
 import { formatearGuarani } from "@/lib/format";
+import { exigirAutorizacion } from "@/lib/seguridad-servidor";
 import { SIN_REGISTRO_FISCAL } from "@/lib/tipo-cliente";
 import { FORMAS_PAGO_POS, etiquetaFormaPagoPos, type FormaPagoPos } from "@/lib/turno-pos";
 import { cancelarVenta, registrarVenta } from "../pos/actions";
@@ -31,10 +33,12 @@ import { instanteAsuncionDesdeTexto } from "@/lib/timezone";
 /**
  * `fueraDeHorario`: la hora queda fuera del horario del complejo; la pantalla puede ofrecer "Guardar igual".
  * (Un choque con otra reserva no se puede forzar: una cancha no juega dos partidos a la vez.)
+ * `requiereClave`: el precio queda por debajo de la tarifa y los descuentos están protegidos (Ajustes → Seguridad): falta la contraseña de
+ * un usuario autorizado, o no es correcta.
  */
 export type ResultadoReservaCancha =
   | { ok: true; id: string }
-  | { ok: false; error: string; fueraDeHorario?: boolean };
+  | { ok: false; error: string; fueraDeHorario?: boolean; requiereClave?: true };
 
 function refrescar() {
   revalidatePath("/admin/canchas");
@@ -77,7 +81,12 @@ function mensajeDeChoque(c: { clienteNombre: string; inicio: Date; fin: Date }):
  * candado por cancha, para que dos personas no tomen el mismo horario a la vez) y, salvo que se pida guardar igual, dentro
  * del horario del complejo.
  */
-export async function guardarReservaCancha(id: string | null, entrada: DatosReservaPanel): Promise<ResultadoReservaCancha> {
+export async function guardarReservaCancha(
+  id: string | null,
+  entrada: DatosReservaPanel,
+  /** La contraseña de un usuario autorizado, si poner un precio menor que la tarifa está protegido en Ajustes → Seguridad. */
+  autorizacion?: string
+): Promise<ResultadoReservaCancha> {
   const sesion = await exigirPermiso("canchas.ver");
   const storeId = await idLocalActual();
   const db = prismaDelLocal(storeId);
@@ -92,7 +101,7 @@ export async function guardarReservaCancha(id: string | null, entrada: DatosRese
   const anterior = id
     ? await db.reservaCancha.findFirst({
         where: { id },
-        select: { id: true, canchaId: true, estado: true, clienteNombre: true, ventaPosId: true },
+        select: { id: true, canchaId: true, estado: true, clienteNombre: true, ventaPosId: true, inicio: true, duracionMin: true, precio: true },
       })
     : null;
   if (id && !anterior) return { ok: false, error: "Esa reserva ya no existe." };
@@ -126,6 +135,26 @@ export async function guardarReservaCancha(id: string | null, entrada: DatosRese
           ? `Ese horario queda fuera de lo que abre el complejo los ${dia} (de ${horario.inicio} a ${horario.fin}).`
           : `El complejo no abre los ${dia}.`,
       };
+    }
+  }
+
+  // Seguridad (Ajustes): el precio de una reserva anotada en el panel se puede escribir a mano, y uno menor que la tarifa es un descuento. Si
+  // el local protegió los descuentos, se pide la contraseña antes de guardar nada. Se compara con la tarifa de AHORA (la misma cuenta que
+  // la reserva por la web); no se pide si el precio, la cancha, la hora y la duración siguen como estaban (si la tarifa subió después, una
+  // reserva vieja no vuelve a pedir clave), pero sí si se cambió la hora o la duración sin tocar el precio (alargar un partido al mismo
+  // precio). Va aunque la reserva esté cancelada: reactivarla después no esquiva el control.
+  const [tarifaDeLaCancha] = await cargarCanchasPublicas(prisma, storeId, [cancha.id]);
+  if (tarifaDeLaCancha) {
+    const tarifa = precioDeReserva(tarifaDeLaCancha, aMinutos(r.hora), r.duracion, r.fecha);
+    const igualQueAntes =
+      !!anterior &&
+      anterior.canchaId === cancha.id &&
+      anterior.duracionMin === r.duracion &&
+      anterior.inicio.getTime() === inicio.getTime() &&
+      Math.round(Number(anterior.precio)) === r.precio;
+    if (r.precio < tarifa && !igualQueAntes) {
+      const clave = await exigirAutorizacion(storeId, sesion, "descuentos", autorizacion);
+      if (!clave.ok) return clave;
     }
   }
 

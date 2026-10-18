@@ -385,11 +385,14 @@ export async function eliminarServicio(servicioId: string): Promise<ResultadoSer
 
   // Un servicio que ya se vendió tiene historial (ventas, facturas): borrarlo
   // lo dejaría sin producto. Se desactiva en vez de borrarse.
-  const [enPedidos, enVentas] = await Promise.all([
+  // Un servicio también se puede vender desde una cuenta del comedor o del delivery: se mira todo donde puede haber quedado vendido.
+  const [enPedidos, enVentas, enMesas, enDelivery] = await Promise.all([
     db.orderItem.count({ where: { productId: servicio.productId } }),
     db.ventaPosItem.count({ where: { productId: servicio.productId } }),
+    db.itemCuentaMesa.count({ where: { productId: servicio.productId } }),
+    db.itemCuentaDelivery.count({ where: { productId: servicio.productId } }),
   ]);
-  if (enPedidos + enVentas > 0) {
+  if (enPedidos + enVentas + enMesas + enDelivery > 0) {
     return {
       ok: false,
       error:

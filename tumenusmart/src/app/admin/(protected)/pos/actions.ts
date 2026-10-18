@@ -624,7 +624,7 @@ export async function registrarVenta(turnoId: string, datos: DatosVenta): Promis
   if (!descuento.ok) return { ok: false, error: descuento.error };
   const total = subtotal - descuento.monto;
   // Seguridad (Ajustes): un descuento en el mostrador pide contraseña si el local lo protegió. Se exige antes de tocar nada. (El cobro de una
-  // cita de la Agenda trae su propio descuento y todavía no lo pide.)
+  // cita de la Agenda trae su propio descuento y baja de precios, y la contraseña la pide `cobrarCita` antes de llegar acá.)
   if (descuento.monto > 0 && !datos.citaId) {
     const clave = await exigirAutorizacion(storeId, sesion, "descuentos", datos.autorizacion);
     if (!clave.ok) return clave;

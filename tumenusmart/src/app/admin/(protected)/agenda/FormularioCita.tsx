@@ -279,7 +279,11 @@ export function FormularioCita({
         }
 
         if (cobrando) {
-          const r = await cobrarCita(cita.id, armarDatos(forzar), { ...datosCobro, comprobanteTipo: comprobanteFinal });
+          const datosDeLaCita = armarDatos(forzar);
+          // Si cobrar por debajo del precio de lista está protegido en Ajustes → Seguridad, `autorizar` abre el cuadro de la contraseña.
+          const r = await autorizar((clave) =>
+            cobrarCita(cita.id, datosDeLaCita, { ...datosCobro, comprobanteTipo: comprobanteFinal }, clave)
+          );
           if (!r.ok) {
             // El turno se cerró mientras tanto: sin turno no se cobra, se va a abrir uno.
             if (r.sinTurno) irAAbrirTurno();

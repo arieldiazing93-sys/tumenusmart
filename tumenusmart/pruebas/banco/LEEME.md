@@ -24,6 +24,9 @@ Corre el código REAL de `src/` en el navegador (Microsoft Edge), con una base d
 | `sesion-logica` | cookie de sesión atada a la contraseña (cambiarla cierra las demás sesiones) y el middleware de Edge |
 | `enlace-personal-logica` | enlace firmado `/personal/<id>-<firma>` y sus acciones públicas |
 | `ajustes-ui` | formularios y botones de Ajustes con React 19 real: error / corte de internet no pierden lo escrito ni dejan botones trabados |
+| `asistencia-logica` | tardanza (turno noche), días/faltas/ausencias, salario ÷ 30 y jornal, turnos: miles de casos al azar que cierran al guaraní |
+| `agenda-cobro-logica` | `cobrarCita`: cobrar menos que el precio de lista (descuento o precio bajado a mano) pide la contraseña de Seguridad |
+| `canchas-guardar-logica` | `guardarReservaCancha`: un precio menor que la tarifa pide la contraseña de Seguridad; las reservas que no se tocan no |
 
 `cripto.js` es un `node:crypto` mínimo y síncrono (SHA-256, HMAC, scrypt lento simulado) comprobado contra vectores oficiales; lo usan las pruebas de
 login, sesión y enlace.

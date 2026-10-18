@@ -204,6 +204,9 @@ function minutosDeHora(hora: string): number {
  * que marcó (las dos "HH:MM"). Dentro de la tolerancia es 0; pasada la tolerancia cuenta TODO el
  * atraso desde la hora de entrada (si entra a las 8:00 con 10 de tolerancia y marca 8:12, llegó
  * 12 minutos tarde). NULL si no se le controla la tardanza.
+ *
+ * La diferencia se mide por el camino corto del reloj de 24 horas, así un turno noche cuenta bien: quien tenía que entrar a las
+ * 22:00 y marca a las 00:05 llegó 125 minutos tarde (no "a tiempo"), y quien entra a las 00:30 y marca a las 23:50 llegó 40 antes.
  */
 export function calcularTardanza(
   horaEntrada: string | null,
@@ -211,7 +214,9 @@ export function calcularTardanza(
   horaMarcada: string
 ): number | null {
   if (!horaEntrada || !horaValida(horaEntrada) || !horaValida(horaMarcada)) return null;
-  const atraso = minutosDeHora(horaMarcada) - minutosDeHora(horaEntrada);
+  const diferencia = minutosDeHora(horaMarcada) - minutosDeHora(horaEntrada);
+  // En el rango (-720, 720]: justo 12 horas de distancia cuenta como tarde.
+  const atraso = 720 - ((((720 - diferencia) % 1440) + 1440) % 1440);
   return atraso > toleranciaMin ? atraso : 0;
 }
 
