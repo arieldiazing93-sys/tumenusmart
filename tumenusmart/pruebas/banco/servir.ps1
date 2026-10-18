@@ -1,6 +1,6 @@
 param($dir, $proyecto)
 # Servidor local de SOLO LECTURA para el banco de pruebas (puerto 8768, solo esta computadora):
-#   /f/<ruta>  → un archivo de src/ (o prisma/schema.prisma, tailwind.config.ts) del proyecto, como texto
+#   /f/<ruta>  → un archivo de src/ (o prisma/schema.prisma, tailwind.config.ts, middleware.ts) del proyecto, como texto
 #   el resto   → los archivos de la carpeta del banco (banco.html, cargador.js, las pruebas)
 # Uso:  powershell -NoProfile -ExecutionPolicy Bypass -File pruebas\banco\servir.ps1 -dir pruebas\banco -proyecto .
 $dir = (Resolve-Path $dir).Path
@@ -14,7 +14,7 @@ while ($l.IsListening) {
   try {
     if ($ruta.StartsWith("/f/") -and -not $ruta.Contains("..")) {
       $rel = [System.Uri]::UnescapeDataString($ruta.Substring(3))
-      if ($rel.StartsWith("src/") -or $rel -eq "prisma/schema.prisma" -or $rel -eq "tailwind.config.ts") {
+      if ($rel.StartsWith("src/") -or $rel -eq "prisma/schema.prisma" -or $rel -eq "tailwind.config.ts" -or $rel -eq "middleware.ts") {
         $p = Join-Path $proyecto $rel.Replace("/", "\")
         if (Test-Path -LiteralPath $p -PathType Leaf) {
           $b = [IO.File]::ReadAllBytes($p)

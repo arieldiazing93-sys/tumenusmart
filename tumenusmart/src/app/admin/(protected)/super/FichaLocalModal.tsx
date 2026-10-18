@@ -4,6 +4,7 @@ import { useId, useState, useTransition, type ReactNode } from "react";
 import { useCapa } from "@/components/capas";
 import { Campo, Entrada, Pastilla, Selector, clasesBoton } from "@/components/ui";
 import { TIPOS_DE_NEGOCIO, etiquetaTipoNegocio } from "@/lib/tipo-negocio";
+import { llamarAlServidor } from "@/lib/llamar-servidor";
 import { actualizarDatosLocal } from "./actions";
 
 /**
@@ -123,7 +124,7 @@ export function FichaLocalModal({
   function guardar(datos: FormData) {
     setError(null);
     iniciar(async () => {
-      const resultado = await actualizarDatosLocal(ficha.id, datos);
+      const resultado = await llamarAlServidor(() => actualizarDatosLocal(ficha.id, datos));
       if (!resultado.ok) {
         setError(resultado.error);
         return;

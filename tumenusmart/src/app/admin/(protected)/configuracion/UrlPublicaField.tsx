@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Boton } from "@/components/ui";
 import { normalizarSlug } from "@/lib/alcance-local";
+import { llamarAlServidor } from "@/lib/llamar-servidor";
 import { cambiarUrlPublica } from "./actions";
 
 /**
@@ -70,10 +71,10 @@ export function UrlPublicaField({ slug }: { slug: string }) {
     setError(null);
     const fd = new FormData();
     fd.set("slug", texto);
-    const r = await cambiarUrlPublica(fd);
+    const r = await llamarAlServidor(() => cambiarUrlPublica(fd));
     setGuardando(false);
     if (!r.ok) {
-      setError(r.error ?? "No se pudo cambiar");
+      setError(("error" in r ? r.error : undefined) ?? "No se pudo cambiar");
       return;
     }
     setAbierto(false);

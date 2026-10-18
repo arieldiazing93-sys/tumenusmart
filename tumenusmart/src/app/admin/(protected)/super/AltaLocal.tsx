@@ -5,6 +5,12 @@ import { useState, useTransition } from "react";
 import { crearLocal, type ResultadoAlta } from "./actions";
 import { PLANTILLAS, contarProductos } from "@/lib/plantillas-menu";
 import { TIPOS_DE_NEGOCIO } from "@/lib/tipo-negocio";
+import { llamarAlServidor } from "@/lib/llamar-servidor";
+import { alEnviar } from "@/lib/formulario";
+
+/** El alta crea el local Y el usuario del dueño, y la contraseña se muestra una sola vez: si se corta la respuesta, puede haberse creado igual. */
+const MENSAJE_ALTA_DUDOSO =
+  "Se cortó la comunicación con el servidor y no sabemos si el local quedó creado. Mirá la lista de locales antes de volver a crearlo (si ya está, restablecé la contraseña de su dueño en Usuarios).";
 
 const CAMPO =
   "w-full rounded-lg border border-linea px-3 py-2 text-sm focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand";
@@ -24,14 +30,7 @@ export function AltaLocal({
     setResultado(null);
     setCopiado(false);
     iniciar(async () => {
-      try {
-        setResultado(await crearLocal(datos));
-      } catch (err) {
-        setResultado({
-          ok: false,
-          error: err instanceof Error ? err.message : "No se pudo crear el local",
-        });
-      }
+      setResultado(await llamarAlServidor(() => crearLocal(datos), MENSAJE_ALTA_DUDOSO));
     });
   }
 
@@ -95,7 +94,7 @@ export function AltaLocal({
   }
 
   return (
-    <form action={enviar} className="grid gap-3 sm:grid-cols-2">
+    <form onSubmit={alEnviar(enviar)} className="grid gap-3 sm:grid-cols-2">
       {resultado?.error && (
         <p className="rounded-lg bg-peligro-luz px-3 py-2 text-sm text-peligro sm:col-span-2">
           {resultado.error}

@@ -61,7 +61,10 @@ export function FormularioPassword() {
           setError(r.error ?? "No se pudo cambiar la contraseña.");
         }
       } catch {
-        setError("No se pudo cambiar la contraseña. Probá de nuevo.");
+        // Cambiar la contraseña cierra las demás sesiones: si se cortó justo al responder, puede haberse cambiado igual.
+        setError(
+          "Se cortó la comunicación con el servidor y no sabemos si la contraseña se cambió. Recargá la página: si te pide entrar de nuevo, usá la contraseña nueva; si no, probá otra vez."
+        );
       }
     });
   }

@@ -2,6 +2,7 @@
 
 import { useRef, useState, useTransition } from "react";
 import { Campo, Entrada, MensajeError, Selector, clasesBoton } from "@/components/ui";
+import { llamarAlServidor } from "@/lib/llamar-servidor";
 import { crearUsuario } from "./actions";
 
 type Local = { id: string; nombre: string; slug: string };
@@ -22,7 +23,7 @@ export function CrearUsuarioForm({ locales }: { locales: Local[] }) {
     const formData = new FormData(e.currentTarget);
     const correo = String(formData.get("email") ?? "");
     iniciar(async () => {
-      const resultado = await crearUsuario(formData);
+      const resultado = await llamarAlServidor(() => crearUsuario(formData));
       if (!resultado.ok) {
         setError(resultado.error);
         return;

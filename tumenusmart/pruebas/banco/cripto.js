@@ -50,14 +50,29 @@
     randomBytes: (n) => { const u = new Uint8Array(n); crypto.getRandomValues(u); u.toString = function (c) { return c === "base64url" ? salida(this, "base64url") : aHex(this); }; return u; },
     timingSafeEqual: (a, b) => { if (a.length !== b.length) throw new RangeError("largos distintos"); let d = 0; for (let i = 0; i < a.length; i++) d |= a[i] ^ b[i]; return d === 0; },
   };
-  // Lo mínimo de Buffer que usa el código del servidor: Buffer.from(texto) → bytes.
-  window.Buffer = window.Buffer || { from: (x) => (typeof x === "string" ? new TextEncoder().encode(x) : Uint8Array.from(x)) };
+  // Lo mínimo de Buffer que usa el código del servidor: Buffer.from(texto[, "hex"]) → bytes, con toString("hex"|"utf8").
+  const aBuffer = (u) => { u.toString = function (c) { return c === "hex" ? aHex(this) : c === "base64url" ? salida(this, "base64url") : new TextDecoder().decode(this); }; return u; };
+  window.Buffer = { from: (x, enc) => aBuffer(enc === "hex" ? Uint8Array.from(String(x).match(/../g) || [], (h) => parseInt(h, 16)) : typeof x === "string" ? new TextEncoder().encode(x) : Uint8Array.from(x)) };
+  cripto.randomBytes = (n) => aBuffer(crypto.getRandomValues(new Uint8Array(n)));
+
+  // scrypt de mentira: determinista (dos sha256 encadenados) y LENTO a propósito (setTimeout) para que los pedidos simultáneos se
+  // crucen como en el servidor real. Cuenta cuántas veces se calculó: es lo que mide cuántas contraseñas se llegaron a probar.
+  const estadoScrypt = { llamadas: 0, demoraMs: 5 };
+  cripto.scrypt = (password, sal, largo, cb) => {
+    estadoScrypt.llamadas++;
+    const base = unir(aBytes(sal), aBytes(password));
+    const parte = (n) => sha256(unir(base, Uint8Array.of(n)));
+    const derivada = aBuffer(unir(parte(0), parte(1)).slice(0, largo));
+    setTimeout(() => cb(null, derivada), estadoScrypt.demoraMs);
+  };
+  const util = { promisify: (f) => (...a) => new Promise((res, rej) => f(...a, (e, v) => (e ? rej(e) : res(v)))) };
 
   window.CriptoBanco = {
     cripto,
+    estadoScrypt,
     /** Instala el simulacro y comprueba contra los vectores oficiales. Devuelve true si la implementación es correcta. */
     instalar(simulacros) {
-      simulacros["node:crypto"] = cripto; simulacros["crypto"] = cripto;
+      simulacros["node:crypto"] = cripto; simulacros["crypto"] = cripto; simulacros["util"] = util; simulacros["node:util"] = util;
       const abc = cripto.createHash("sha256").update("abc").digest("hex") === "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad";
       const clave = new Uint8Array(20).fill(0x0b);
       const rfc = cripto.createHmac("sha256", clave).update("Hi There").digest("hex") === "b0344c61d8db38535ca8afceaf0bf12b881dc200c9833da726e9376c2e32cff7";

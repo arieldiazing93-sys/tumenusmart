@@ -4,6 +4,8 @@ import { useState, useTransition } from "react";
 import { Tarjeta, Campo, Entrada, Pastilla, clasesBoton } from "@/components/ui";
 import { diasParaVencer, DIAS_AVISO_VENCIMIENTO } from "@/lib/factura-pos";
 import { esElectronico } from "@/lib/modalidad-punto";
+import { llamarAlServidor } from "@/lib/llamar-servidor";
+import { alEnviar } from "@/lib/formulario";
 import { actualizarPuntoExpedicion, alternarActivoPuntoExpedicion } from "./actions";
 
 type Props = {
@@ -53,7 +55,7 @@ export function PuntoExpedicionFila({
   function alternarActivo() {
     setError(null);
     startTransition(async () => {
-      const resultado = await alternarActivoPuntoExpedicion(id, !activo);
+      const resultado = await llamarAlServidor(() => alternarActivoPuntoExpedicion(id, !activo));
       if (!resultado.ok) setError(resultado.error);
     });
   }
@@ -61,7 +63,7 @@ export function PuntoExpedicionFila({
   function guardar(formData: FormData) {
     setError(null);
     startTransition(async () => {
-      const resultado = await actualizarPuntoExpedicion(id, formData);
+      const resultado = await llamarAlServidor(() => actualizarPuntoExpedicion(id, formData));
       if (!resultado.ok) {
         setError(resultado.error);
         return;
@@ -73,7 +75,7 @@ export function PuntoExpedicionFila({
   if (editando) {
     return (
       <Tarjeta className="flex flex-col gap-3 !border-2 !border-azul/50">
-        <form action={guardar} className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+        <form onSubmit={alEnviar(guardar)} className="grid grid-cols-2 gap-3 sm:grid-cols-3">
           <div className="col-span-2 sm:col-span-3">
             <Campo etiqueta="Nombre">
               <Entrada name="nombre" required defaultValue={nombre} />

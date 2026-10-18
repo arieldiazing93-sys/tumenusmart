@@ -3,6 +3,8 @@
 import { useRef, useState, useTransition } from "react";
 import { Tarjeta, Campo, Entrada, clasesBoton } from "@/components/ui";
 import { MODALIDADES_PUNTO, type ModalidadPunto } from "@/lib/modalidad-punto";
+import { llamarAlServidor } from "@/lib/llamar-servidor";
+import { alEnviar } from "@/lib/formulario";
 import { crearPuntoExpedicion } from "./actions";
 
 /**
@@ -23,7 +25,7 @@ export function CrearPuntoExpedicionForm({ modalidadDelLocal }: { modalidadDelLo
     setError(null);
     formData.set("modalidad", modalidad);
     iniciar(async () => {
-      const resultado = await crearPuntoExpedicion(formData);
+      const resultado = await llamarAlServidor(() => crearPuntoExpedicion(formData));
       if (!resultado.ok) {
         setError(resultado.error);
         return;
@@ -37,7 +39,7 @@ export function CrearPuntoExpedicionForm({ modalidadDelLocal }: { modalidadDelLo
   return (
     <Tarjeta className="mb-6 flex flex-col gap-3 !border-2 !border-azul/50">
       <p className="rotulo text-[0.8rem] font-bold">Nuevo punto de expedición</p>
-      <form ref={formRef} action={alCrear} className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+      <form ref={formRef} onSubmit={alEnviar(alCrear)} className="grid grid-cols-2 gap-3 sm:grid-cols-3">
         <div className="col-span-2 sm:col-span-3">
           <p className="mb-1.5 text-[0.82rem] font-semibold text-tinta">Tipo de timbrado</p>
           {modalidadDelLocal ? (

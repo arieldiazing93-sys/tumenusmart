@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Campo, Entrada, MensajeError, clasesBoton } from "@/components/ui";
 import { pinDemasiadoFacil } from "@/lib/asistencia";
+import { llamarAlServidor } from "@/lib/llamar-servidor";
 import { actualizarMozo, crearMozo } from "./actions";
 
 export type MozoFila = {
@@ -47,7 +48,7 @@ export function FormularioMozo({ mozo, onCerrar }: { mozo: MozoFila | null; onCe
     const datos = new FormData(e.currentTarget);
     setError(null);
     iniciar(async () => {
-      const resultado = mozo ? await actualizarMozo(mozo.id, datos) : await crearMozo(datos);
+      const resultado = await llamarAlServidor(() => (mozo ? actualizarMozo(mozo.id, datos) : crearMozo(datos)));
       if (!resultado.ok) {
         setError(resultado.error);
         return;

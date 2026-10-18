@@ -2,6 +2,7 @@
 
 import { prisma } from "@/lib/prisma";
 import {
+  abrirSesion,
   cifrarPassword,
   passwordCoincide,
   revisarPasswordNueva,
@@ -63,6 +64,10 @@ export async function cambiarMiPassword(formData: FormData): Promise<ResultadoCa
       debeCambiarPassword: false,
     },
   });
+
+  // Cambiar la contraseña cierra TODAS las sesiones abiertas con la anterior (están atadas a ella, ver abrirSesion): la de esta
+  // computadora se vuelve a abrir acá para que no tenga que entrar de nuevo, y las demás (un celular perdido, una cookie robada) quedan afuera.
+  await abrirSesion(sesion.id);
 
   return { ok: true };
 }

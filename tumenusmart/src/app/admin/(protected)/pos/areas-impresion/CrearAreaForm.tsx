@@ -2,6 +2,8 @@
 
 import { useRef, useState, useTransition } from "react";
 import { Tarjeta, Campo, Entrada, clasesBoton } from "@/components/ui";
+import { llamarAlServidor } from "@/lib/llamar-servidor";
+import { alEnviar } from "@/lib/formulario";
 import { crearArea } from "./actions";
 
 export function CrearAreaForm() {
@@ -11,7 +13,7 @@ export function CrearAreaForm() {
 
   function alCrear(formData: FormData) {
     iniciar(async () => {
-      const resultado = await crearArea(formData);
+      const resultado = await llamarAlServidor(() => crearArea(formData));
       if (!resultado.ok) {
         alert(resultado.error);
         return;
@@ -25,7 +27,7 @@ export function CrearAreaForm() {
   return (
     <Tarjeta className="mb-6 flex flex-col gap-3">
       <p className="rotulo text-[0.8rem] font-bold">Nueva área de impresión</p>
-      <form ref={formRef} action={alCrear} className="flex flex-wrap items-end gap-3">
+      <form ref={formRef} onSubmit={alEnviar(alCrear)} className="flex flex-wrap items-end gap-3">
         <div className="min-w-[14rem] flex-1">
           <Campo etiqueta="Nombre">
             <Entrada name="nombre" required placeholder="Ej: Cocina, Barra, Caja" />

@@ -2,6 +2,8 @@
 
 import { clasesBoton } from "@/components/ui";
 import { useRef, useState, useTransition } from "react";
+import { llamarAlServidor } from "@/lib/llamar-servidor";
+import { alEnviar } from "@/lib/formulario";
 import { crearAsesor, type ResultadoAsesor } from "../actions";
 
 const CAMPO =
@@ -15,14 +17,14 @@ export function AltaAsesor() {
   function enviar(datos: FormData) {
     setResultado(null);
     iniciar(async () => {
-      const r = await crearAsesor(datos);
+      const r = await llamarAlServidor(() => crearAsesor(datos));
       setResultado(r);
       if (r.ok) formRef.current?.reset();
     });
   }
 
   return (
-    <form ref={formRef} action={enviar} className="grid gap-3 sm:grid-cols-2">
+    <form ref={formRef} onSubmit={alEnviar(enviar)} className="grid gap-3 sm:grid-cols-2">
       {resultado && !resultado.ok && (
         <p className="rounded-lg bg-peligro-luz px-3 py-2 text-sm text-peligro sm:col-span-2">
           {resultado.error}

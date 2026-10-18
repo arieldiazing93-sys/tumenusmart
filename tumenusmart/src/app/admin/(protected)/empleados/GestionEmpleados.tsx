@@ -1,14 +1,22 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { Boton, Campo, Entrada, Pastilla, Selector, Tarjeta, Vacio, clasesBoton } from "@/components/ui";
 import { PERFILES_DE_SEGURIDAD, esPerfilDeSeguridad, etiquetaDePerfil, type PerfilDeSeguridad } from "@/lib/seguridad";
+import { llamarAlServidor } from "@/lib/llamar-servidor";
+import { alEnviar } from "@/lib/formulario";
 import {
   alternarActivoEmpleado,
   cambiarPerfilSeguridadEmpleado,
   crearEmpleado,
   restablecerPasswordEmpleado,
 } from "./actions";
+
+/** La contraseña de un usuario nuevo se muestra UNA sola vez: si se corta la comunicación justo al crearlo, puede haber quedado creado sin que la pantalla lo sepa. */
+const MENSAJE_ALTA_DUDOSO =
+  "Se cortó la comunicación con el servidor y no sabemos si el usuario quedó creado. Mirá en la lista de abajo: si ya aparece, tocá «Nueva contraseña» para darle una.";
+const MENSAJE_CLAVE_DUDOSO =
+  "Se cortó la comunicación con el servidor y no sabemos si la contraseña se cambió. Si esa persona no puede entrar, tocá «Nueva contraseña» otra vez.";
 
 export type EmpleadoFila = {
   id: string;
@@ -43,6 +51,7 @@ export function GestionEmpleados({
     password: string;
   } | null>(null);
   const [copiado, setCopiado] = useState(false);
+  const formRef = useRef<HTMLFormElement>(null);
 
   function mensajeWhatsapp(datos: { nombre: string; email: string; password: string }) {
     return (
@@ -60,12 +69,13 @@ export function GestionEmpleados({
     const nombre = String(formData.get("nombre") ?? "").trim();
     const email = String(formData.get("email") ?? "").trim().toLowerCase();
     iniciar(async () => {
-      const resultado = await crearEmpleado(formData);
+      const resultado = await llamarAlServidor(() => crearEmpleado(formData), MENSAJE_ALTA_DUDOSO);
       if (!resultado.ok) {
         setError(resultado.error);
         return;
       }
       setRecienCreado({ nombre, email, password: resultado.password });
+      formRef.current?.reset();
     });
   }
 
@@ -114,7 +124,7 @@ export function GestionEmpleados({
           ni ver la facturación.
         </p>
 
-        <form action={alCrear} className="mt-4 grid gap-3 sm:grid-cols-[1fr_1fr_11rem_auto]">
+        <form ref={formRef} onSubmit={alEnviar(alCrear)} className="mt-4 grid gap-3 sm:grid-cols-[1fr_1fr_11rem_auto]">
           <Campo etiqueta="Nombre">
             <Entrada name="nombre" required placeholder="Ej: Carlos Giménez" autoComplete="off" />
           </Campo>
@@ -180,7 +190,7 @@ function FilaEmpleado({ empleado }: { empleado: EmpleadoFila }) {
     setError(null);
     setPerfil(valor);
     iniciar(async () => {
-      const resultado = await cambiarPerfilSeguridadEmpleado(empleado.id, valor);
+      const resultado = await llamarAlServidor(() => cambiarPerfilSeguridadEmpleado(empleado.id, valor));
       if (!resultado.ok) {
         setPerfil(anterior);
         setError(resultado.error);
@@ -224,7 +234,7 @@ function FilaEmpleado({ empleado }: { empleado: EmpleadoFila }) {
             onClick={() => {
               setError(null);
               iniciar(async () => {
-                const resultado = await restablecerPasswordEmpleado(empleado.id);
+                const resultado = await llamarAlServidor(() => restablecerPasswordEmpleado(empleado.id), MENSAJE_CLAVE_DUDOSO);
                 if (!resultado.ok) {
                   setError(resultado.error);
                   return;
@@ -242,7 +252,7 @@ function FilaEmpleado({ empleado }: { empleado: EmpleadoFila }) {
             onClick={() => {
               setError(null);
               iniciar(async () => {
-                const resultado = await alternarActivoEmpleado(empleado.id, !empleado.activo);
+                const resultado = await llamarAlServidor(() => alternarActivoEmpleado(empleado.id, !empleado.activo));
                 if (!resultado.ok) setError(resultado.error);
               });
             }}

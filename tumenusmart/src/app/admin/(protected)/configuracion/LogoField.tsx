@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { subirFotoLogo, quitarLogoStore } from "./actions";
 import { comprimirImagen, pesoLegible, PARA_LOGO } from "@/lib/comprimir-imagen";
 import { clasesBoton } from "@/components/ui";
+import { llamarAlServidor } from "@/lib/llamar-servidor";
 
 export function LogoField({ initialUrl }: { initialUrl: string | null }) {
   const [url, setUrl] = useState(initialUrl ?? "");
@@ -35,7 +36,7 @@ export function LogoField({ initialUrl }: { initialUrl: string | null }) {
 
       const formData = new FormData();
       formData.set("archivo", resultado.archivo);
-      const subida = await subirFotoLogo(formData);
+      const subida = await llamarAlServidor(() => subirFotoLogo(formData));
       if (!subida.ok) {
         setError(subida.error);
         return;
@@ -52,12 +53,17 @@ export function LogoField({ initialUrl }: { initialUrl: string | null }) {
   }
 
   async function quitar() {
+    const anterior = url;
     setUrl("");
     setError(null);
-    try {
+    const r = await llamarAlServidor(async () => {
       await quitarLogoStore();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "No se pudo quitar el logo");
+      return { ok: true as const };
+    });
+    // Si no se pudo (se cortó internet), el logo vuelve a verse: sigue puesto en la carta.
+    if (!r.ok) {
+      setUrl(anterior);
+      setError(r.error);
     }
   }
 

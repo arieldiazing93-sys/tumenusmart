@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { formatearGuarani } from "@/lib/format";
 import { clasesBoton } from "@/components/ui";
+import { llamarAlServidor } from "@/lib/llamar-servidor";
 import { eliminarZona, alternarActivaZona, actualizarZona } from "./actions";
 
 /** Edición "inline" — un click
@@ -45,7 +46,7 @@ export function ZonaFila({
       datos.set("nombre", nombreEditado);
       datos.set("radioKm", radioEditado);
       datos.set("costoEnvio", costoEditado);
-      const resultado = await actualizarZona(id, datos);
+      const resultado = await llamarAlServidor(() => actualizarZona(id, datos));
       if (!resultado.ok) {
         setError(resultado.error);
         return;
@@ -56,13 +57,24 @@ export function ZonaFila({
     });
   }
 
+  function cambiarActiva() {
+    setError(null);
+    startTransition(async () => {
+      const resultado = await llamarAlServidor(async () => {
+        await alternarActivaZona(id, !activo);
+        return { ok: true as const };
+      });
+      if (!resultado.ok) alert(resultado.error);
+    });
+  }
+
   function borrar() {
     if (!confirm("¿Borrar esta zona? No se puede deshacer.")) return;
     startTransition(async () => {
       // alert() y no un texto en pantalla: el mensaje explica por qué no se
       // pudo borrar y qué hacer en su lugar, y es demasiado largo para un
       // texto chico al lado del botón.
-      const resultado = await eliminarZona(id);
+      const resultado = await llamarAlServidor(() => eliminarZona(id));
       if (!resultado.ok) alert(resultado.error);
     });
   }
@@ -153,7 +165,7 @@ export function ZonaFila({
         <button
           type="button"
           disabled={pending}
-          onClick={() => startTransition(() => alternarActivaZona(id, !activo))}
+          onClick={cambiarActiva}
           className="text-sm text-tinta-media hover:underline disabled:opacity-50"
         >
           {activo ? "Desactivar" : "Activar"}

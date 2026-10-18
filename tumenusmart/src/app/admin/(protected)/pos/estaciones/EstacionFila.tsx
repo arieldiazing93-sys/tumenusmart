@@ -15,6 +15,7 @@ import {
 } from "./actions";
 import { Boton, Entrada, Pastilla, clasesBoton } from "@/components/ui";
 import { listarImpresoras } from "@/lib/qz-tray";
+import { llamarAlServidor } from "@/lib/llamar-servidor";
 import { imprimirPrueba } from "@/lib/impresion-comprobantes";
 
 type PuntoExpedicionOpcion = {
@@ -153,7 +154,7 @@ export function EstacionFila({
   async function cambiarCopias(areaImpresionId: string, copias: number) {
     setCambiandoCopias(areaImpresionId);
     setErrorQz(null);
-    const resultado = await cambiarCopiasDeArea(id, areaImpresionId, copias);
+    const resultado = await llamarAlServidor(() => cambiarCopiasDeArea(id, areaImpresionId, copias));
     setCambiandoCopias(null);
     if (!resultado.ok) setErrorQz(resultado.error);
   }
@@ -161,7 +162,7 @@ export function EstacionFila({
   async function cambiarCopiasDeLaFactura(copias: number) {
     setCambiandoCopias("factura");
     setErrorQz(null);
-    const resultado = await cambiarCopiasFactura(id, copias);
+    const resultado = await llamarAlServidor(() => cambiarCopiasFactura(id, copias));
     setCambiandoCopias(null);
     if (!resultado.ok) setErrorQz(resultado.error);
   }
@@ -193,7 +194,7 @@ export function EstacionFila({
   async function cambiarPuntoExpedicion(valor: string) {
     setAsignando(true);
     setError(null);
-    const resultado = await asignarPuntoExpedicion(id, valor || null);
+    const resultado = await llamarAlServidor(() => asignarPuntoExpedicion(id, valor || null));
     setAsignando(false);
     if (!resultado.ok) setError(resultado.error);
   }
@@ -201,7 +202,7 @@ export function EstacionFila({
   async function cambiarAreaTicket(valor: string) {
     setAsignandoTicket(true);
     setError(null);
-    const resultado = await asignarAreaTicket(id, valor || null);
+    const resultado = await llamarAlServidor(() => asignarAreaTicket(id, valor || null));
     setAsignandoTicket(false);
     if (!resultado.ok) setError(resultado.error);
   }
@@ -209,7 +210,7 @@ export function EstacionFila({
   async function cambiarAreaFactura(valor: string) {
     setAsignandoFactura(true);
     setError(null);
-    const resultado = await asignarAreaFactura(id, valor || null);
+    const resultado = await llamarAlServidor(() => asignarAreaFactura(id, valor || null));
     setAsignandoFactura(false);
     if (!resultado.ok) setError(resultado.error);
   }
@@ -228,7 +229,7 @@ export function EstacionFila({
   async function cambiarImpresoraDeArea(areaImpresionId: string, valor: string) {
     setAsignandoArea(areaImpresionId);
     setErrorQz(null);
-    const resultado = await asignarImpresoraDeArea(id, areaImpresionId, valor || null);
+    const resultado = await llamarAlServidor(() => asignarImpresoraDeArea(id, areaImpresionId, valor || null));
     setAsignandoArea(null);
     if (!resultado.ok) setErrorQz(resultado.error);
   }
@@ -236,7 +237,7 @@ export function EstacionFila({
   function guardarNombre() {
     setError(null);
     startTransition(async () => {
-      const resultado = await renombrarEstacion(id, nombreEditado);
+      const resultado = await llamarAlServidor(() => renombrarEstacion(id, nombreEditado));
       if (!resultado.ok) {
         setError(resultado.error);
         return;
@@ -244,6 +245,17 @@ export function EstacionFila({
       setEditando(false);
       setGuardado(true);
       setTimeout(() => setGuardado(false), 2000);
+    });
+  }
+
+  function cambiarActiva() {
+    setError(null);
+    startTransition(async () => {
+      const resultado = await llamarAlServidor(async () => {
+        await alternarActivaEstacion(id, !activa);
+        return { ok: true as const };
+      });
+      if (!resultado.ok) setError(resultado.error);
     });
   }
 
@@ -257,7 +269,7 @@ export function EstacionFila({
     }
     setVinculando(true);
     setError(null);
-    const resultado = await vincularEstacion(id);
+    const resultado = await llamarAlServidor(() => vincularEstacion(id));
     setVinculando(false);
     if (!resultado.ok) {
       setError(resultado.error);
@@ -382,7 +394,7 @@ export function EstacionFila({
               tono={activa ? "peligro" : "nuevo"}
               tam="sm"
               disabled={pending}
-              onClick={() => startTransition(() => alternarActivaEstacion(id, !activa))}
+              onClick={cambiarActiva}
             >
               {activa ? "Desactivar" : "Reactivar"}
             </Boton>

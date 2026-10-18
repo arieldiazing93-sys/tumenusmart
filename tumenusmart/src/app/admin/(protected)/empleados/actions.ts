@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { idLocalActual } from "@/lib/local-actual";
 import { cifrarPassword, exigirPermiso, generarPassword } from "@/lib/auth";
@@ -61,17 +62,25 @@ export async function crearEmpleado(formData: FormData): Promise<ResultadoCrearE
   // como igual va a viajar por WhatsApp, entra obligado a cambiarla.
   const password = generarPassword();
 
-  await prisma.usuario.create({
-    data: {
-      email,
-      nombre,
-      rol: "empleado", // forzado, nunca del formulario
-      storeId, // forzado al local de quien lo crea
-      perfilSeguridad,
-      passwordHash: await cifrarPassword(password),
-      debeCambiarPassword: true,
-    },
-  });
+  try {
+    await prisma.usuario.create({
+      data: {
+        email,
+        nombre,
+        rol: "empleado", // forzado, nunca del formulario
+        storeId, // forzado al local de quien lo crea
+        perfilSeguridad,
+        passwordHash: await cifrarPassword(password),
+        debeCambiarPassword: true,
+      },
+    });
+  } catch (e) {
+    // Dos altas del mismo correo al mismo tiempo (o un doble toque): la base lo impide, y acá se explica en vez de un error genérico.
+    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
+      return { ok: false, error: "Ya hay un usuario con ese correo" };
+    }
+    throw e;
+  }
 
   // El superadmin puede crear empleados desde el local que esté mirando; se
   // deja registrado quién fue en el log del servidor, que es donde se busca

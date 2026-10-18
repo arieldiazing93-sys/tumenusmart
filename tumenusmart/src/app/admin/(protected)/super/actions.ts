@@ -184,7 +184,9 @@ export type ResultadoPago = { ok: true } | { ok: false; error: string };
 export async function registrarPago(storeId: string, formData: FormData): Promise<ResultadoPago> {
   const sesion = await exigirSuperadmin();
 
-  const meses = Math.max(1, Math.min(24, Number(formData.get("meses") ?? 1)));
+  const mesesPedidos = Number(formData.get("meses") ?? 1);
+  if (!Number.isFinite(mesesPedidos)) return { ok: false, error: "Los meses no son válidos" };
+  const meses = Math.max(1, Math.min(24, Math.round(mesesPedidos)));
   const monto = Number(String(formData.get("monto") ?? "0").replace(/[^\d]/g, ""));
   const nota = String(formData.get("nota") ?? "").trim() || null;
 

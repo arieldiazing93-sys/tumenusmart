@@ -3,6 +3,7 @@
 import { clasesBoton } from "@/components/ui";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { llamarAlServidor } from "@/lib/llamar-servidor";
 import { alternarPausaPedidos, guardarMensajePausa } from "./configuracion/actions";
 
 /**
@@ -38,26 +39,32 @@ export function PausaPedidosToggle({
     setActivo(nuevo);
     setError(null);
     startTransition(async () => {
-      try {
+      const r = await llamarAlServidor(async () => {
         await alternarPausaPedidos(nuevo);
-        router.refresh();
-      } catch (err) {
+        return { ok: true as const };
+      });
+      if (!r.ok) {
         setActivo(!nuevo); // vuelve atrás si no se pudo guardar
-        setError(err instanceof Error ? err.message : "No se pudo cambiar el estado");
+        setError(r.error);
+        return;
       }
+      router.refresh();
     });
   }
 
   async function guardarTexto() {
     setError(null);
-    try {
+    const r = await llamarAlServidor(async () => {
       await guardarMensajePausa(texto);
-      setGuardadoTexto(true);
-      setTimeout(() => setGuardadoTexto(false), 2500);
-      router.refresh();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "No se pudo guardar el mensaje");
+      return { ok: true as const };
+    });
+    if (!r.ok) {
+      setError(r.error);
+      return;
     }
+    setGuardadoTexto(true);
+    setTimeout(() => setGuardadoTexto(false), 2500);
+    router.refresh();
   }
 
   // En la barra de estado de Pedidos solo va el botón: el texto de qué está

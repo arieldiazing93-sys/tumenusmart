@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { clasesBoton } from "@/components/ui";
+import { llamarAlServidor } from "@/lib/llamar-servidor";
 import { alternarFacturaObligatoria } from "./actions";
 
 /**
@@ -22,12 +23,15 @@ export function FacturaObligatoriaToggle({ obligatoria }: { obligatoria: boolean
     setActivo(nuevo);
     setError(null);
     startTransition(async () => {
-      try {
+      const r = await llamarAlServidor(async () => {
         await alternarFacturaObligatoria(nuevo);
+        return { ok: true as const };
+      });
+      if (r.ok) {
         router.refresh();
-      } catch (err) {
+      } else {
         setActivo(!nuevo); // vuelve atrás si no se pudo guardar
-        setError(err instanceof Error ? err.message : "No se pudo cambiar el estado");
+        setError(r.error);
       }
     });
   }

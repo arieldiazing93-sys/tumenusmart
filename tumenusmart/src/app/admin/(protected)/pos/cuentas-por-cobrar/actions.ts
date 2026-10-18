@@ -101,7 +101,25 @@ export async function registrarCobroVenta(ventaId: string, datos: DatosCobro): P
   const registradoPor = sesion.nombre?.trim() || sesion.email;
   const cliente = (venta.facturaRazonSocial ?? venta.clienteNombre ?? "").trim() || "cliente";
 
+  let motivoRechazo: string | null = null;
   await db.$transaction(async (tx) => {
+    // Se bloquea la venta (con la condición adentro) y se vuelve a contar lo cobrado: dos cobros que llegan a la vez —un doble toque,
+    // dos pestañas— se ordenan, y el segundo ve el saldo que dejó el primero en vez de sumarse y pasarse de lo que el cliente debe.
+    const bloqueada = await tx.ventaPos.updateMany({ where: { id: ventaId, cancelada: false }, data: { cancelada: false } });
+    if (bloqueada.count !== 1) {
+      motivoRechazo = "Esa venta está cancelada: no se le pueden registrar cobros.";
+      return;
+    }
+    const yaCobrado = await tx.cobroVenta.aggregate({ where: { ventaPosId: ventaId }, _sum: { monto: true } });
+    const saldoAhora = saldoDeCompra(Number(venta.total), Number(yaCobrado._sum.monto ?? 0));
+    if (monto > saldoAhora + 0.004) {
+      motivoRechazo =
+        saldoAhora <= 0
+          ? "Esa venta ya está cobrada por completo."
+          : `El cobro supera lo que falta cobrar de esta venta (${formatearGuarani(saldoAhora)}).`;
+      return;
+    }
+
     const cobro = await tx.cobroVenta.create({
       data: {
         storeId,
@@ -128,6 +146,7 @@ export async function registrarCobroVenta(ventaId: string, datos: DatosCobro): P
       });
     }
   });
+  if (motivoRechazo) return { ok: false, error: motivoRechazo };
 
   await registrarBitacora(storeId, sesion, {
     modulo: "ventas",

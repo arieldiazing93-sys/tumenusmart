@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { Pastilla, clasesBoton } from "@/components/ui";
+import { llamarAlServidor } from "@/lib/llamar-servidor";
 import { marcarErrorResuelto } from "./actions";
 
 /**
@@ -36,6 +37,18 @@ export function FilaError({
 }) {
   const [pendiente, iniciar] = useTransition();
   const [abierto, setAbierto] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  function marcarResuelto() {
+    setError(null);
+    iniciar(async () => {
+      const r = await llamarAlServidor(async () => {
+        await marcarErrorResuelto(id, true);
+        return { ok: true as const };
+      });
+      if (!r.ok) setError(r.error);
+    });
+  }
 
   return (
     <div className="rounded-xl border border-linea bg-white p-4">
@@ -86,13 +99,19 @@ export function FilaError({
           <button
             type="button"
             disabled={pendiente}
-            onClick={() => iniciar(() => marcarErrorResuelto(id, true))}
+            onClick={marcarResuelto}
             className={clasesBoton("navegar", "sm")}
           >
             Marcar resuelto
           </button>
         </div>
       </div>
+
+      {error && (
+        <p role="alert" className="mt-2 text-[0.8rem] text-peligro">
+          {error}
+        </p>
+      )}
 
       {abierto && detalle && (
         <pre className="cifra mt-3 max-h-80 overflow-auto rounded-lg border border-linea bg-papel-suave p-3 text-[0.72rem] leading-relaxed text-tinta-media">

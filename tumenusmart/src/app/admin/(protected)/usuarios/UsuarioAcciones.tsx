@@ -2,6 +2,7 @@
 
 import { clasesBoton } from "@/components/ui";
 import { useState, useTransition } from "react";
+import { llamarAlServidor } from "@/lib/llamar-servidor";
 import {
   alternarActivoUsuario,
   eliminarUsuario,
@@ -28,7 +29,7 @@ export function UsuarioAcciones({
   function correr(accion: () => Promise<ResultadoAccion>, exito?: string) {
     setAviso(null);
     iniciar(async () => {
-      const resultado = await accion();
+      const resultado = await llamarAlServidor(accion);
       if (!resultado.ok) {
         setAviso(resultado.error);
         return;

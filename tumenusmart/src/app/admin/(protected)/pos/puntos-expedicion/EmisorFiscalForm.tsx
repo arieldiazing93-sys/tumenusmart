@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useTransition } from "react";
 import { Campo, Entrada, Selector, Tarjeta, clasesBoton } from "@/components/ui";
+import { llamarAlServidor } from "@/lib/llamar-servidor";
 import type { OpcionGeografica } from "@/lib/sifen/geografia";
 import {
   DEPARTAMENTOS,
@@ -169,7 +170,7 @@ export function EmisorFiscalForm({ inicial }: { inicial: DatosEmisor }) {
   function guardar() {
     setError(null);
     iniciar(async () => {
-      const resultado = await guardarEmisorFiscal({ ...estado });
+      const resultado = await llamarAlServidor(() => guardarEmisorFiscal({ ...estado }));
       if (!resultado.ok) {
         setError(resultado.error);
         return;

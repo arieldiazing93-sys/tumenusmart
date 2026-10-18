@@ -1,21 +1,31 @@
 "use client";
 
-import { useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { clasesBoton } from "@/components/ui";
+import { llamarAlServidor } from "@/lib/llamar-servidor";
+import { alEnviar } from "@/lib/formulario";
 import { crearZona } from "./actions";
 
 export function CrearZonaForm() {
   const [pendiente, iniciar] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+  const formRef = useRef<HTMLFormElement>(null);
 
   function alCrear(formData: FormData) {
+    setError(null);
     iniciar(async () => {
-      const resultado = await crearZona(formData);
-      if (!resultado.ok) alert(resultado.error);
+      const resultado = await llamarAlServidor(() => crearZona(formData));
+      if (!resultado.ok) {
+        // El error se queda a la vista y lo escrito NO se pierde (con un corte de internet, tampoco).
+        setError(resultado.error);
+        return;
+      }
+      formRef.current?.reset();
     });
   }
 
   return (
-    <form action={alCrear} className="mb-4 flex flex-wrap gap-2">
+    <form ref={formRef} onSubmit={alEnviar(alCrear)} className="mb-4 flex flex-wrap gap-2">
       <input
         name="nombre"
         required
@@ -43,8 +53,13 @@ export function CrearZonaForm() {
         className="w-36 rounded-lg border border-linea px-3 py-2"
       />
       <button type="submit" disabled={pendiente} className={clasesBoton("suave", "md")}>
-        Agregar
+        {pendiente ? "Agregando…" : "Agregar"}
       </button>
+      {error && (
+        <p role="alert" className="basis-full text-sm font-medium text-peligro">
+          {error}
+        </p>
+      )}
     </form>
   );
 }

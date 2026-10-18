@@ -2,6 +2,8 @@
 
 import { clasesBoton } from "@/components/ui";
 import { useState, useTransition } from "react";
+import { llamarAlServidor, MENSAJE_DUDOSO } from "@/lib/llamar-servidor";
+import { alEnviar } from "@/lib/formulario";
 import { activarLocal, alternarSuspension, registrarPago } from "./actions";
 import { FichaLocalModal, type FichaLocal } from "./FichaLocalModal";
 
@@ -39,11 +41,12 @@ export function AccionesLocal({
 
   function correr(
     accion: () => Promise<{ ok: true } | { ok: false; error: string }>,
-    exito?: string
+    exito?: string,
+    mensajeSiSeCorta?: string
   ) {
     setAviso(null);
     iniciar(async () => {
-      const resultado = await accion();
+      const resultado = await llamarAlServidor(accion, mensajeSiSeCorta);
       if (!resultado.ok) {
         setAviso(resultado.error);
         return;
@@ -138,9 +141,10 @@ export function AccionesLocal({
 
       {cobrando && (
         <form
-          action={(datos) =>
-            correr(() => registrarPago(storeId, datos), "Pago registrado.")
-          }
+          onSubmit={alEnviar((datos) =>
+            // Un pago mueve la fecha de vencimiento: si se corta la respuesta, puede haberse registrado igual.
+            correr(() => registrarPago(storeId, datos), "Pago registrado.", MENSAJE_DUDOSO)
+          )}
           className="flex flex-wrap items-end justify-end gap-2 rounded-lg border border-linea bg-papel-suave p-2"
         >
           <label className="flex flex-col gap-0.5 text-xs text-tinta-media">

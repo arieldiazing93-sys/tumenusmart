@@ -10,6 +10,7 @@ import {
   type ResultadoCompresion,
 } from "@/lib/comprimir-imagen";
 import { clasesBoton } from "@/components/ui";
+import { llamarAlServidor } from "@/lib/llamar-servidor";
 
 /**
  * Lo más que puede pesar la portada para subirse: las acciones del servidor aceptan hasta 1 MB por envío y hay que dejar
@@ -72,7 +73,7 @@ export function PortadaField({ initialUrl }: { initialUrl: string | null }) {
 
       const formData = new FormData();
       formData.set("archivo", resultado.archivo);
-      const subida = await subirFotoPortada(formData);
+      const subida = await llamarAlServidor(() => subirFotoPortada(formData));
       if (!subida.ok) {
         setError(subida.error);
         return;
@@ -89,14 +90,19 @@ export function PortadaField({ initialUrl }: { initialUrl: string | null }) {
   }
 
   async function quitar() {
+    const anterior = url;
     setUrl("");
     setError(null);
     setGuardado(false);
     setAhorro(null);
-    try {
+    const r = await llamarAlServidor(async () => {
       await quitarPortadaStore();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "No se pudo quitar la portada");
+      return { ok: true as const };
+    });
+    // Si no se pudo (se cortó internet), la portada vuelve a verse: sigue puesta en la carta.
+    if (!r.ok) {
+      setUrl(anterior);
+      setError(r.error);
     }
   }
 

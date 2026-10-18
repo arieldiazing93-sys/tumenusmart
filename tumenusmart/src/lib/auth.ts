@@ -5,7 +5,9 @@ import { cookies } from "next/headers";
 import { cache } from "react";
 import { createHmac, randomBytes, scrypt as scryptCallback, timingSafeEqual } from "crypto";
 import { promisify } from "util";
+import { Prisma } from "@prisma/client";
 import { prisma } from "./prisma";
+import { registrarBitacora } from "./bitacora";
 
 const COOKIE_NAME = "admin_session";
 const DIAS_DE_SESION = 7;
@@ -78,6 +80,17 @@ function firmar(valor: string): string {
 }
 
 /**
+ * La huella de la contraseña ACTUAL de un usuario. Va dentro de la cookie de sesión (y firmada con ella): mientras la contraseña no
+ * cambie, la huella coincide; en cuanto alguien la cambia o se la restablecen, la huella de la base es otra y TODAS las sesiones
+ * abiertas con la contraseña anterior dejan de valer (una cookie robada, el celular de un empleado que ya no está, una computadora
+ * que quedó abierta). No se guarda nada nuevo en la base: sale del mismo hash de la contraseña que ya está ahí.
+ */
+function huellaDeClave(passwordHash: string): string {
+  const secreto = process.env.SESSION_SECRET ?? "dev-secret-cambiar";
+  return createHmac("sha256", secreto).update(`sesion-clave:${passwordHash}`).digest("hex").slice(0, 32);
+}
+
+/**
  * Sin SESSION_SECRET, la firma de las cookies usa un valor de ejemplo que
  * está escrito en el propio código. Cualquiera que lo conozca podría armarse
  * una cookie de administrador.
@@ -99,6 +112,12 @@ export function exigirSecretoDeSesion(): void {
   }
 }
 
+function huellasIguales(a: string, b: string): boolean {
+  const x = Buffer.from(a);
+  const y = Buffer.from(b);
+  return x.length === y.length && timingSafeEqual(x, y);
+}
+
 function firmaValida(valor: string, firma: string): boolean {
   const esperada = firmar(valor);
   const a = Buffer.from(firma);
@@ -107,10 +126,18 @@ function firmaValida(valor: string, firma: string): boolean {
   return timingSafeEqual(a, b);
 }
 
+/**
+ * Abre la sesión del usuario en este navegador. La cookie es `<id>.<huella de su contraseña>.<firma>`: el middleware (Edge) solo
+ * comprueba la firma de todo lo anterior al último punto; que la huella siga siendo la de la contraseña actual lo comprueba
+ * `sesionActual`, que ya consulta al usuario en cada pedido.
+ */
 export async function abrirSesion(usuarioId: string): Promise<void> {
   exigirSecretoDeSesion();
+  const usuario = await prisma.usuario.findUnique({ where: { id: usuarioId }, select: { passwordHash: true } });
+  if (!usuario) throw new Error("No encontré al usuario para abrirle la sesión");
+  const base = `${usuarioId}.${huellaDeClave(usuario.passwordHash)}`;
   const store = await cookies();
-  store.set(COOKIE_NAME, `${usuarioId}.${firmar(usuarioId)}`, {
+  store.set(COOKIE_NAME, `${base}.${firmar(base)}`, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
@@ -147,9 +174,15 @@ export const sesionActual = cache(async (): Promise<SesionUsuario | null> => {
   const corte = cookie.lastIndexOf(".");
   if (corte <= 0) return null;
 
-  const usuarioId = cookie.slice(0, corte);
+  const base = cookie.slice(0, corte);
   const firma = cookie.slice(corte + 1);
-  if (!firmaValida(usuarioId, firma)) return null;
+  if (!firmaValida(base, firma)) return null;
+
+  // `<id>.<huella>`. Una cookie del formato anterior (solo el id, sin huella) ya no vale: hay que volver a entrar una vez.
+  const separador = base.lastIndexOf(".");
+  if (separador <= 0) return null;
+  const usuarioId = base.slice(0, separador);
+  const huella = base.slice(separador + 1);
 
   const usuario = await prisma.usuario.findUnique({
     where: { id: usuarioId },
@@ -161,10 +194,14 @@ export const sesionActual = cache(async (): Promise<SesionUsuario | null> => {
       storeId: true,
       activo: true,
       debeCambiarPassword: true,
+      passwordHash: true,
     },
   });
 
   if (!usuario || !usuario.activo) return null;
+
+  // La contraseña cambió después de abrir esta sesión: la sesión se cerró.
+  if (!huellasIguales(huella, huellaDeClave(usuario.passwordHash))) return null;
 
   // Un usuario de local sin local asignado no puede administrar nada: sería
   // una sesión sin alcance. Preferimos negarle la entrada a que vea de más.
@@ -270,6 +307,13 @@ export type ResultadoIngreso =
  * Cuando falla nunca dice si el error fue el correo o la contraseña: eso
  * evita que alguien use la pantalla de ingreso para averiguar qué correos
  * están dados de alta.
+ *
+ * El freno por intentos se cuenta ANTES de mirar la contraseña, con un incremento
+ * atómico en la base (mismo diseño que el de los PIN, ver limite-pin.ts). Comprobar la
+ * contraseña tarda (scrypt es lento a propósito): si el intento se anotara DESPUÉS, cien
+ * pedidos simultáneos leerían todos "0 intentos", todos probarían una contraseña y todos
+ * escribirían "1": el freno no frenaría nada. Así, de una ráfaga solo llegan a probar
+ * una contraseña los primeros INTENTOS_ANTES_DE_FRENAR; el resto se rechaza sin tocarla.
  */
 export async function verificarIngreso(
   emailCrudo: string,
@@ -285,7 +329,6 @@ export async function verificarIngreso(
       activo: true,
       rol: true,
       storeId: true,
-      intentosFallidos: true,
       bloqueadoHasta: true,
     },
   });
@@ -297,12 +340,33 @@ export async function verificarIngreso(
     return { ok: false, motivo: "credenciales" };
   }
 
-  if (usuario.bloqueadoHasta && usuario.bloqueadoHasta > new Date()) {
-    const minutos = Math.max(
-      1,
-      Math.ceil((usuario.bloqueadoHasta.getTime() - Date.now()) / 60000)
-    );
-    return { ok: false, motivo: "frenado", minutos };
+  const ahora = new Date();
+  if (usuario.bloqueadoHasta && usuario.bloqueadoHasta > ahora) {
+    return { ok: false, motivo: "frenado", minutos: minutosHasta(usuario.bloqueadoHasta) };
+  }
+
+  // Se cuenta el intento (atómico) y solo si no hay un freno vigente: `update` devuelve el valor ya incrementado, así que cada
+  // pedido recibe un número distinto aunque lleguen todos juntos.
+  let intento: number;
+  try {
+    const fila = await prisma.usuario.update({
+      where: { id: usuario.id, OR: [{ bloqueadoHasta: null }, { bloqueadoHasta: { lte: ahora } }] },
+      data: { intentosFallidos: { increment: 1 } },
+      select: { intentosFallidos: true },
+    });
+    intento = fila.intentosFallidos;
+  } catch (e) {
+    // No encontró al usuario sin freno vigente: otro pedido lo frenó justo antes.
+    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2025") {
+      return { ok: false, motivo: "frenado", minutos: MINUTOS_DE_FRENO };
+    }
+    throw e;
+  }
+
+  // Pasó el tope: se frena y NO se mira la contraseña. En la bitácora queda UNA sola nota por ráfaga (la del primer pedido que se pasó).
+  if (intento > INTENTOS_ANTES_DE_FRENAR) {
+    await frenarUsuario(usuario.id, intento === INTENTOS_ANTES_DE_FRENAR + 1 ? { storeId: usuario.storeId, email } : null);
+    return { ok: false, motivo: "frenado", minutos: MINUTOS_DE_FRENO };
   }
 
   const coincide = await passwordCoincide(password, usuario.passwordHash);
@@ -310,27 +374,47 @@ export async function verificarIngreso(
     coincide && usuario.activo && (usuario.rol === "superadmin" || !!usuario.storeId);
 
   if (!puedeEntrar) {
-    const intentos = usuario.intentosFallidos + 1;
-    const frenar = intentos >= INTENTOS_ANTES_DE_FRENAR;
-    await prisma.usuario.update({
-      where: { id: usuario.id },
-      data: {
-        intentosFallidos: frenar ? 0 : intentos,
-        bloqueadoHasta: frenar
-          ? new Date(Date.now() + MINUTOS_DE_FRENO * 60000)
-          : null,
-      },
-    });
-    if (frenar) return { ok: false, motivo: "frenado", minutos: MINUTOS_DE_FRENO };
+    // El último intento permitido que falló: se frena.
+    if (intento >= INTENTOS_ANTES_DE_FRENAR) {
+      await frenarUsuario(usuario.id, { storeId: usuario.storeId, email });
+      return { ok: false, motivo: "frenado", minutos: MINUTOS_DE_FRENO };
+    }
     return { ok: false, motivo: "credenciales" };
   }
 
+  // Entró: los errores seguidos se olvidan. Un freno que otro pedido haya puesto en este mismo instante NO se toca.
   await prisma.usuario.update({
     where: { id: usuario.id },
-    data: { intentosFallidos: 0, bloqueadoHasta: null, ultimoIngreso: new Date() },
+    data: { intentosFallidos: 0, ultimoIngreso: new Date() },
   });
 
   return { ok: true, usuarioId: usuario.id };
+}
+
+/**
+ * Frena el ingreso de un usuario por unos minutos y vuelve a cero el conteo (el freno ya impide seguir probando). Con `avisar`, deja
+ * una nota en la Bitácora de su local: así el dueño se entera de que alguien estuvo probando contraseñas de esa cuenta.
+ */
+async function frenarUsuario(usuarioId: string, avisar: { storeId: string | null; email: string } | null): Promise<void> {
+  await prisma.usuario.update({
+    where: { id: usuarioId },
+    data: { intentosFallidos: 0, bloqueadoHasta: new Date(Date.now() + MINUTOS_DE_FRENO * 60000) },
+  });
+  if (avisar?.storeId) {
+    await registrarBitacora(avisar.storeId, { nombre: "Sistema", email: "sistema", rol: "sistema" }, {
+      modulo: "seguridad",
+      accion: "ingreso_frenado",
+      descripcion: `Se frenó el ingreso de ${avisar.email} por ${MINUTOS_DE_FRENO} minutos: hubo ${INTENTOS_ANTES_DE_FRENAR} contraseñas incorrectas seguidas. Si no fue esa persona, alguien está probando contraseñas.`,
+      entidad: "Usuario",
+      entidadId: usuarioId,
+      detalle: { correo: avisar.email, minutos: MINUTOS_DE_FRENO },
+    });
+  }
+}
+
+/** Cuántos minutos faltan para esa hora (al menos 1). */
+function minutosHasta(hasta: Date): number {
+  return Math.max(1, Math.ceil((hasta.getTime() - Date.now()) / 60000));
 }
 
 // ---------------------------------------------------------------------------

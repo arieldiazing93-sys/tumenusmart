@@ -1,8 +1,10 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import {
+  abrirSesion,
   cifrarPassword,
   exigirSuperadmin,
   normalizarEmail,
@@ -64,17 +66,24 @@ export async function crearUsuario(formData: FormData): Promise<ResultadoAccion>
   });
   if (yaExiste) return { ok: false, error: "Ya hay un usuario con ese correo" };
 
-  await prisma.usuario.create({
-    data: {
-      email,
-      nombre: nombre || null,
-      rol,
-      storeId,
-      passwordHash: await cifrarPassword(password),
-      // Vos elegiste esta contraseña y se la pasaste: que la cambie.
-      debeCambiarPassword: true,
-    },
-  });
+  try {
+    await prisma.usuario.create({
+      data: {
+        email,
+        nombre: nombre || null,
+        rol,
+        storeId,
+        passwordHash: await cifrarPassword(password),
+        // Vos elegiste esta contraseña y se la pasaste: que la cambie.
+        debeCambiarPassword: true,
+      },
+    });
+  } catch (e) {
+    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
+      return { ok: false, error: "Ya hay un usuario con ese correo" };
+    }
+    throw e;
+  }
 
   revalidatePath("/admin/usuarios");
   return { ok: true };
@@ -84,7 +93,7 @@ export async function restablecerPassword(
   usuarioId: string,
   formData: FormData
 ): Promise<ResultadoAccion> {
-  await exigirSuperadmin();
+  const sesion = await exigirSuperadmin();
 
   const password = String(formData.get("password") ?? "");
   const problema = revisarPasswordNueva(password);
@@ -101,6 +110,10 @@ export async function restablecerPassword(
       bloqueadoHasta: null,
     },
   });
+
+  // Las sesiones abiertas de ese usuario quedan cerradas (están atadas a su contraseña, ver abrirSesion). Si se la cambió a sí mismo,
+  // la de esta computadora se vuelve a abrir para que no quede afuera.
+  if (usuarioId === sesion.id) await abrirSesion(sesion.id);
 
   revalidatePath("/admin/usuarios");
   return { ok: true };

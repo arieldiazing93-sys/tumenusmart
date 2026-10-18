@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { renombrarArea, alternarActivaArea } from "./actions";
 import { Entrada, Pastilla, clasesBoton } from "@/components/ui";
+import { llamarAlServidor } from "@/lib/llamar-servidor";
 
 export function AreaFila({
   id,
@@ -24,7 +25,7 @@ export function AreaFila({
   function guardarNombre() {
     setError(null);
     startTransition(async () => {
-      const resultado = await renombrarArea(id, nombreEditado);
+      const resultado = await llamarAlServidor(() => renombrarArea(id, nombreEditado));
       if (!resultado.ok) {
         setError(resultado.error);
         return;
@@ -32,6 +33,17 @@ export function AreaFila({
       setEditando(false);
       setGuardado(true);
       setTimeout(() => setGuardado(false), 2000);
+    });
+  }
+
+  function cambiarActiva() {
+    setError(null);
+    startTransition(async () => {
+      const resultado = await llamarAlServidor(async () => {
+        await alternarActivaArea(id, !activa);
+        return { ok: true as const };
+      });
+      if (!resultado.ok) setError(resultado.error);
     });
   }
 
@@ -93,7 +105,7 @@ export function AreaFila({
             <button
               type="button"
               disabled={pending}
-              onClick={() => startTransition(() => alternarActivaArea(id, !activa))}
+              onClick={cambiarActiva}
               className={clasesBoton(activa ? "peligro" : "nuevo", "sm")}
             >
               {activa ? "Desactivar" : "Reactivar"}
