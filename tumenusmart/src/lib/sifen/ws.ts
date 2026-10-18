@@ -9,6 +9,7 @@
  * y reintentos en `envio.ts`.
  */
 
+import { instanteAsuncionDesdeTexto } from "../timezone";
 import { ESTADOS_RUC } from "./ruc";
 import { NAMESPACE_SIFEN, buscarElemento, hijosConNombre, leerElementos, textoDeElemento, type ElementoXml } from "./xml";
 
@@ -131,7 +132,14 @@ export function estadoDeTexto(texto: string | null): EstadoProtocolo {
 function fechaDeProceso(texto: string | null): Date | null {
   if (!texto) return null;
   // El manual muestra "AAAA-MM-DD-hh:mm:ss"; el esquema pide fecha y hora con zona. Se acepta cualquiera de las formas.
-  const normal = texto.replace(/^(\d{4}-\d{2}-\d{2})-(\d{2}:\d{2}:\d{2})/, "$1T$2");
+  const normal = texto.trim().replace(/^(\d{4}-\d{2}-\d{2})-(\d{2}:\d{2}:\d{2})/, "$1T$2");
+  // Sin huso (como en el ejemplo del manual) es la hora de Asunción: `new Date` la leería como la del servidor, que en Vercel es UTC,
+  // y el plazo de 48 horas para cancelar quedaría corrido 3 horas.
+  const sinHuso = /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}):(\d{2})$/.exec(normal);
+  if (sinHuso) {
+    const minuto = instanteAsuncionDesdeTexto(sinHuso[1]);
+    return minuto ? new Date(minuto.getTime() + Number(sinHuso[2]) * 1000) : null;
+  }
   const d = new Date(normal);
   return Number.isNaN(d.getTime()) ? null : d;
 }

@@ -54,7 +54,9 @@
   };
   S["src/lib/auth"] = { exigirPermiso: async () => ({ nombre: "Caja", email: "caja@x.com", rol: "caja" }) };
   S["src/lib/local-actual"] = { idLocalActual: async () => "L1" };
-  S["src/lib/prisma"] = { prisma: { store: { findUnique: async () => tienda }, customer: { upsert: async () => ({}) }, $transaction: async (cb) => cb(tx) } };
+  // Las opciones con que se abre cada transacción (el tiempo que se le da): desde Vercel hasta la base las consultas tardan, y con factura electrónica se firma adentro.
+  const opcionesTx = [];
+  S["src/lib/prisma"] = { prisma: { store: { findUnique: async () => tienda }, customer: { upsert: async () => ({}) }, $transaction: async (cb, opciones) => { opcionesTx.push(opciones); return cb(tx); } } };
   S["src/lib/prisma-local"] = { prismaDelLocal: () => db, siguienteNumeroVentaPos: async () => ++numeroVenta, upsertClienteFiscal: async (_t, _s, d) => { fiscales.push(d); } };
   S["@prisma/client"] = { Prisma: {} };
   S["src/lib/bitacora"] = { registrarBitacora: async (_l, _s, d) => { bitacoras.push(d); } };
@@ -81,6 +83,8 @@
   ok(ultima().total === 110000 && ultima().formaPago === "efectivo" && ultima().pagos.create[0].monto === 110000, "queda guardada por 110.000, efectivo, con el pago completo");
   ok(Math.abs(insumos.get("harina").stockActual - (1000 - 0.6)) < 1e-9 && movimientos.length === 1 && movimientos[0].tipo === "venta", "el stock baja 0,6 de harina (2 × 0,3) con su movimiento");
   ok(ultima().items.create[0].precioUnitario === 55000 && ultima().items.create[0].precioAgregados === 5000, "el precio y el de los agregados salen del servidor");
+
+  ok(opcionesTx.length === 1 && opcionesTx[0]?.timeout >= 15000 && opcionesTx[0]?.maxWait >= 10000, "la venta se guarda en una transacción con 15 s de margen (no los 5 s de fábrica) → " + JSON.stringify(opcionesTx));
 
   window.log("== Factura con IVA mixto y descuento");
   reiniciar();

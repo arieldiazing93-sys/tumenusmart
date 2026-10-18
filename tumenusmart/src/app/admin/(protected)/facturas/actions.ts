@@ -23,6 +23,9 @@ import { esDeMesAnterior, nombreDelMes } from "@/lib/mes-fiscal";
 import { registrarBitacora } from "@/lib/bitacora";
 import { cancelarVenta } from "../pos/actions";
 
+/** Desde Vercel hasta la base cada consulta tarda: emitir una factura de remisión (que con factura electrónica firma adentro) necesita más que los 5 s de fábrica. Igual que el POS, el comedor y el delivery. */
+const OPCIONES_TX = { timeout: 15_000, maxWait: 10_000 } as const;
+
 /** `requiereClave`: cancelar la cuenta junto con la factura está protegido (Ajustes → Seguridad) y falta la contraseña de un usuario autorizado, o no es correcta. */
 export type ResultadoCancelarFactura = { ok: true } | { ok: false; error: string; requiereClave?: true };
 
@@ -660,7 +663,7 @@ export async function remitirFactura(
           reemplazaAId: anterior?.id ?? null,
           emitidoPor: identidad,
         });
-      });
+      }, OPCIONES_TX);
     } catch (err) {
       return { ok: false, error: err instanceof Error ? err.message : "No se pudo generar la factura." };
     }
@@ -827,7 +830,7 @@ export async function remitirFactura(
         reemplazaAId: anterior?.id ?? null,
         emitidoPor: identidad,
       });
-    });
+    }, OPCIONES_TX);
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : "No se pudo generar la factura." };
   }

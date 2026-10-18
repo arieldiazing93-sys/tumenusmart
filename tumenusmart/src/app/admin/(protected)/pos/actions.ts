@@ -192,6 +192,8 @@ const RESERVA_NO_COBRABLE = "RESERVA_NO_COBRABLE";
 /** Lo que se lanza dentro de la transacción si el turno se cerró mientras se armaba el cobro. */
 const TURNO_YA_CERRADO = "TURNO_YA_CERRADO";
 const TURNO_CERRADO_AL_CANCELAR = "El turno de esta cuenta ya está cerrado. Una vez cerrado el turno, la cuenta no se puede cancelar.";
+/** Desde Vercel hasta la base cada consulta tarda: la venta (que con factura electrónica firma adentro) y su cancelación necesitan más que los 5 s de fábrica. Igual que el comedor y el delivery. */
+const OPCIONES_TX = { timeout: 15_000, maxWait: 10_000 } as const;
 
 /**
  * Cobra el carrito y cierra la cuenta.
@@ -951,7 +953,7 @@ export async function registrarVenta(turnoId: string, datos: DatosVenta): Promis
     }
 
     return venta.id;
-  })
+  }, OPCIONES_TX)
     .catch((e: unknown) => {
       // El turno se cerró justo antes de guardar: la pantalla manda a abrir uno nuevo.
       if (e instanceof Error && e.message === TURNO_YA_CERRADO) {
@@ -1384,7 +1386,7 @@ export async function cancelarVenta(ventaId: string, motivo: string, autorizacio
       where: { storeId, ventaPosId: ventaId },
       data: { ventaPosId: null, estado: "proxima" },
     });
-  });
+  }, OPCIONES_TX);
   if (turnoCerrado) return { ok: false, error: TURNO_CERRADO_AL_CANCELAR };
   if (yaCancelada) return { ok: false, error: "Esa cuenta ya estaba cancelada." };
 

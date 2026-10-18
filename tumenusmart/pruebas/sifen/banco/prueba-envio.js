@@ -68,6 +68,18 @@
   ok(vRes.valid, "libxml2: la respuesta de ejemplo cumple <rRetEnviDe> del esquema oficial (así sabemos que nuestro modelo de respuesta es el real)" + (vRes.valid ? "" : " -> " + vRes.errors.map((e) => e.message).join(" | ").slice(0, 300)));
   let r = ws.leerRespuestaRecepcion(aprobado);
   igual([r.tipo, r.protocolo.estado, r.protocolo.protocoloAutorizacion, r.protocolo.cdc, r.protocolo.resultados, r.protocolo.procesadoEn.toISOString()], ["protocolo", "aprobado", "1234567890", F.cdc, [{ codigo: "0260", mensaje: "Autorización del DE satisfactoria" }], "2026-10-09T17:31:07.000Z"], "Aprobado: estado, protocolo de autorización, CDC, código y mensaje, y la hora de proceso");
+  // La hora de proceso: con huso (lo que pide el esquema) o sin huso (como el ejemplo del manual) → es hora de Asunción, no del servidor.
+  const conHora = (fecha) => protocolo({ estado: "Aprobado", rs: [["0260", "ok"]] }).replace("2026-10-09T14:31:07-03:00", fecha);
+  // Esta prueba corre en una computadora de Paraguay, donde una hora sin huso se leería bien por casualidad: se imita un servidor en UTC (Vercel),
+  // donde `new Date("2026-10-09T14:31:07")` es la hora de UTC.
+  const DateReal = Date;
+  window.Date = class extends DateReal { constructor(...a) { if (typeof a[0] === "string" && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/.test(a[0])) super(a[0] + "Z"); else super(...a); } };
+  try {
+    for (const [forma, esperado] of [["2026-10-09T14:31:07-03:00", "2026-10-09T17:31:07.000Z"], ["2026-10-09T17:31:07Z", "2026-10-09T17:31:07.000Z"], ["2026-10-09T14:31:07", "2026-10-09T17:31:07.000Z"], ["2026-10-09-14:31:07", "2026-10-09T17:31:07.000Z"]]) {
+      igual(ws.leerRespuestaRecepcion(conHora(forma)).protocolo.procesadoEn?.toISOString(), esperado, "hora de proceso «" + forma + "» (con el servidor en UTC)");
+    }
+  } finally { window.Date = DateReal; }
+  ok(ws.leerRespuestaRecepcion(conHora("ayer a la tarde")).protocolo.procesadoEn === null, "una hora que no se entiende queda en blanco (no inventa una)");
   r = ws.leerRespuestaRecepcion(protocolo({ estado: "Aprobado", prefijo: true, rs: [["0260", "ok"]] }));
   ok(r.tipo === "protocolo" && r.protocolo.estado === "aprobado", "también cuando la respuesta viene con prefijo de espacio de nombres (ns2:)");
   r = ws.leerRespuestaRecepcion(protocolo({ estado: "Aprobado con observación", rs: [["0260", "Autorizado"], ["2001", "Observación X"]] }));

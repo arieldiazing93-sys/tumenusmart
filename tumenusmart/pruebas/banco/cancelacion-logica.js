@@ -48,7 +48,8 @@
   };
   S["src/lib/auth"] = { exigirPermiso: async () => ({ nombre: "Caja", email: "caja@x.com", rol: "caja" }) };
   S["src/lib/local-actual"] = { idLocalActual: async () => "L1" };
-  S["src/lib/prisma"] = { prisma: { $transaction: async (cb) => cb(tx) } };
+  const opcionesTx = [];
+  S["src/lib/prisma"] = { prisma: { $transaction: async (cb, opciones) => { opcionesTx.push(opciones); return cb(tx); } } };
   S["src/lib/prisma-local"] = { prismaDelLocal: () => db, siguienteNumeroVentaPos: async () => 1, upsertClienteFiscal: async () => {} };
   S["@prisma/client"] = { Prisma: {} };
   S["src/lib/bitacora"] = { registrarBitacora: async (_l, _s, d) => { bitacoras.push(d); } };
@@ -79,6 +80,8 @@
   ok(harina() === 1000 && devueltos().length === 1 && devueltos()[0].cantidad === 0.6, "la harina vuelve a 1000 con UN movimiento de cancelación de 0,6 → " + harina());
   ok(bitacoras.length === 1 && bitacoras[0].accion === "venta_cancelada", "queda en la bitácora");
   ok(efectos.propinas === 1, "se revisan las propinas pendientes de esa venta");
+
+  ok(opcionesTx.length === 1 && opcionesTx[0]?.timeout >= 15000 && opcionesTx[0]?.maxWait >= 10000, "la cancelación corre en una transacción con 15 s de margen (no los 5 s de fábrica) → " + JSON.stringify(opcionesTx));
 
   window.log("== Cancelar dos veces");
   r = await A.cancelarVenta("v1", "otra vez");

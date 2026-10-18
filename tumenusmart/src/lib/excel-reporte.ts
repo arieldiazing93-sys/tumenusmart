@@ -39,10 +39,13 @@ export function filaTitulo(
 /** Arma la respuesta HTTP del archivo .xlsx ya generado. */
 export async function respuestaXlsx(libro: ExcelJS.Workbook, nombreArchivo: string) {
   const buffer = await libro.xlsx.writeBuffer();
+  // Varias rutas arman el nombre con un dato de la dirección (el filtro de fechas): solo letras, números, punto, guion y guion bajo, así
+  // una dirección armada a mano no puede meter comillas ni saltos de línea en el encabezado de la descarga.
+  const nombreSeguro = nombreArchivo.replace(/[^A-Za-z0-9._-]+/g, "_").slice(0, 120) || "reporte.xlsx";
   return new NextResponse(buffer, {
     headers: {
       "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      "Content-Disposition": `attachment; filename="${nombreArchivo}"`,
+      "Content-Disposition": `attachment; filename="${nombreSeguro}"`,
     },
   });
 }
