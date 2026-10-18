@@ -1,5 +1,6 @@
 "use server";
 
+import { personalIdDeEnlace } from "@/lib/enlace-personal";
 import { descartarImagenes } from "@/lib/imagenes";
 import { prisma } from "@/lib/prisma";
 import { subirFotoCliente } from "@/lib/supabase-storage";
@@ -8,16 +9,18 @@ import { subirFotoCliente } from "@/lib/supabase-storage";
  * Búsqueda y foto de cliente desde el enlace público del personal
  * (/personal/[id], sin usuario ni contraseña — ver EnlaceTrabajoPersonal.tsx).
  *
- * Como acá no hay sesión, el `personalId` de la URL hace de "llave": cada
- * función vuelve a confirmar que sea de una persona ACTIVA antes de hacer
- * nada, y todo lo que se busca o se sube queda atado al storeId de esa
- * persona — nunca al de otro negocio, aunque alguien arme un id a mano
+ * Como acá no hay sesión, el `enlace` de la URL (`<id>-<firma>`, ver src/lib/enlace-personal.ts) hace de "llave": el id de
+ * la persona solo NO alcanza (la página pública de reservas lo muestra), hace falta la firma que solo calcula el servidor.
+ * Cada función vuelve a comprobar la firma y a confirmar que sea de una persona ACTIVA antes de hacer nada, y todo lo que se
+ * busca o se sube queda atado al storeId de esa persona — nunca al de otro negocio, aunque alguien arme un id a mano
  * (misma regla de aislamiento por negocio que el resto del sistema).
  */
 
 const TOPE_RESULTADOS = 8;
 
-async function miembroActivo(personalId: string) {
+async function miembroActivo(enlace: string) {
+  const personalId = personalIdDeEnlace(enlace);
+  if (!personalId) return null;
   const miembro = await prisma.miembroPersonal.findUnique({
     where: { id: personalId },
     select: { id: true, activo: true, storeId: true },
@@ -44,13 +47,13 @@ export type ResultadoBusquedaCliente =
  * hacen falta al barbero para encontrar el último peinado de alguien.
  */
 export async function buscarClientePorTelefono(
-  personalId: string,
+  enlace: string,
   telefono: string
 ): Promise<ResultadoBusquedaCliente> {
-  const miembro = await miembroActivo(personalId);
+  const miembro = await miembroActivo(enlace);
   if (!miembro) return { ok: false, error: "Este enlace ya no está activo." };
 
-  const busqueda = telefono.replace(/\D/g, "");
+  const busqueda = String(telefono ?? "").replace(/\D/g, "");
   if (busqueda.length < 4) return { ok: false, error: "Escribí al menos 4 números del teléfono." };
 
   const clientes = await prisma.customer.findMany({
@@ -73,14 +76,14 @@ export type ResultadoFotoCliente = { ok: true; url: string } | { ok: false; erro
  * ESE mismo local, nunca de otro.
  */
 export async function subirFotoClienteDesdeEnlace(
-  personalId: string,
+  enlace: string,
   clienteId: string,
   formData: FormData
 ): Promise<ResultadoFotoCliente> {
-  const miembro = await miembroActivo(personalId);
+  const miembro = await miembroActivo(enlace);
   if (!miembro) return { ok: false, error: "Este enlace ya no está activo." };
 
-  const cliente = await prisma.customer.findUnique({ where: { id: clienteId }, select: { storeId: true, fotoUrl: true } });
+  const cliente = await prisma.customer.findUnique({ where: { id: String(clienteId ?? "") }, select: { storeId: true, fotoUrl: true } });
   if (!cliente || cliente.storeId !== miembro.storeId) return { ok: false, error: "Cliente no encontrado." };
 
   const archivo = formData.get("archivo");
@@ -88,7 +91,7 @@ export async function subirFotoClienteDesdeEnlace(
 
   try {
     const url = await subirFotoCliente(archivo);
-    await prisma.customer.update({ where: { id: clienteId }, data: { fotoUrl: url } });
+    await prisma.customer.update({ where: { id: String(clienteId) }, data: { fotoUrl: url } });
     // El último corte anterior ya no se usa: se borra del almacenamiento (queda solo la foto más reciente).
     await descartarImagenes([cliente.fotoUrl]);
     return { ok: true, url };

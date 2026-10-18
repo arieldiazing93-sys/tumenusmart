@@ -17,6 +17,7 @@ import {
   type VistaAgenda,
 } from "@/lib/agenda";
 import { calcularComision, estadoEnElPerfil, montoDelTrabajo } from "@/lib/agenda-personal";
+import { personalIdDeEnlace } from "@/lib/enlace-personal";
 import { textoDelPeriodo } from "@/lib/comision-mozo";
 import { saldosDeComisionPersonal } from "@/lib/comision-personal-servidor";
 import { claveSumarDias } from "@/lib/calendario";
@@ -65,8 +66,12 @@ export default async function TrabajoDelPersonalPage({
   params: Promise<{ id: string }>;
   searchParams: Promise<{ vista?: string; fecha?: string }>;
 }) {
-  const { id } = await params;
+  const { id: enlace } = await params;
   const sp = await searchParams;
+
+  // El enlace es `<id>-<firma>`: el id de la persona es público (lo manda la página de reservas), así que sin la firma no se abre.
+  const id = personalIdDeEnlace(enlace);
+  if (!id) notFound();
 
   const miembro = await prisma.miembroPersonal.findUnique({
     where: { id },
@@ -239,7 +244,7 @@ export default async function TrabajoDelPersonalPage({
     const params = new URLSearchParams();
     params.set("vista", cambios.vista ?? vista);
     params.set("fecha", cambios.fecha ?? fechaPedida);
-    return `/personal/${id}?${params.toString()}`;
+    return `/personal/${enlace}?${params.toString()}`;
   }
 
   const trabajos = confirmadas.flatMap((c) => {
@@ -322,7 +327,7 @@ export default async function TrabajoDelPersonalPage({
       </header>
 
       <div className="px-4">
-        <BuscarClienteFoto personalId={id} />
+        <BuscarClienteFoto enlace={enlace} />
 
         {deHoy.length > 0 && (
           <section className="mt-7">

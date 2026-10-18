@@ -28,6 +28,8 @@ export type MiembroFila = {
   comisionProductoPorcentaje: number | null;
   /** Su horario propio (los siete días); null si no lo tiene y usa el horario general del negocio. */
   horarioPropio: HorarioDia[] | null;
+  /** Lo que va después de /personal/ en su enlace de trabajo (`<id>-<firma>`, ver enlace-personal.ts): lo calcula el servidor. */
+  enlace: string;
 };
 
 /** "Juan" + "Britez" → "Juan Britez". El apellido puede faltar en datos viejos. */

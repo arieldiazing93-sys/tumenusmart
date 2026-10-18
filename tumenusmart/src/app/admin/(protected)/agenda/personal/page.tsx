@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { prismaDelLocal } from "@/lib/prisma-local";
 import { BotonEnlace, Cabecera } from "@/components/ui";
 import type { MiembroFila } from "@/lib/agenda-personal";
+import { enlaceDePersonal } from "@/lib/enlace-personal";
 import { completarHorario, type HorarioDia } from "@/lib/horario-trabajo";
 import { ListaPersonal } from "./ListaPersonal";
 import { PedirPersonalEnVentaToggle } from "./PedirPersonalEnVentaToggle";
@@ -74,6 +75,7 @@ export default async function PersonalPage() {
     comisionProductoPorcentaje:
       f.comisionProductoPorcentaje == null ? null : Number(f.comisionProductoPorcentaje),
     horarioPropio: propioDe.has(f.id) ? completarHorario(propioDe.get(f.id) ?? []) : null,
+    enlace: enlaceDePersonal(f.id),
   }));
 
   return (

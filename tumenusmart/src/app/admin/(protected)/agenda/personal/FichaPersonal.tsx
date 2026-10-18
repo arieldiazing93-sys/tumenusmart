@@ -210,7 +210,7 @@ export function FichaPersonal({
         {/* ---------- sus trabajos y su enlace ---------- */}
         <TrabajosYComision id={miembro.id} />
         <EnlaceTrabajoPersonal
-          id={miembro.id}
+          enlace={miembro.enlace}
           nombre={miembro.nombre}
           telefono={miembro.telefono}
           activo={miembro.activo}

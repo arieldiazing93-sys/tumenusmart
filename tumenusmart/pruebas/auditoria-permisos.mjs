@@ -91,12 +91,15 @@ const EXCEPCIONES = {
     registrarMarcacion:
       "el personal no tiene cuenta: la llave lleva al local, el PIN a la persona, y lo único que crea es su propia marcación",
   },
-  // El enlace público del personal de una agenda (/personal/<id>): sin usuario ni contraseña. El id de la persona hace de
-  // llave: cada acción confirma que sea de alguien ACTIVO y todo queda atado al local de esa persona.
+  // El enlace público del personal de una agenda (/personal/<id>-<firma>): sin usuario ni contraseña. OJO: el id de la persona NO es
+  // secreto (la página pública de reservas lo manda al navegador), así que la llave es la FIRMA que calcula el servidor con
+  // SESSION_SECRET (src/lib/enlace-personal.ts): cada acción la comprueba, confirma que sea de alguien ACTIVO y todo queda atado al
+  // local de esa persona.
   "src/app/personal/[id]/actions.ts": {
-    buscarClientePorTelefono: "solo lee, del MISMO local de esa persona, sin datos sensibles (ni correo ni RUC)",
+    buscarClientePorTelefono:
+      "exige el enlace firmado (id + firma del servidor); solo lee, del MISMO local de esa persona, sin datos sensibles (ni correo ni RUC)",
     subirFotoClienteDesdeEnlace:
-      "sube la foto de un cliente del MISMO local de esa persona; valida tipo y tamaño de la imagen",
+      "exige el enlace firmado; sube la foto de un cliente del MISMO local de esa persona; valida tipo y tamaño de la imagen",
   },
   // El enlace público del mozo (/mozo/<llave>): el mozo no tiene cuenta del panel. El local sale SIEMPRE de la llave de la
   // dirección y el mozo de una cookie firmada que se obtiene con su PIN (con freno a la adivinanza); cada acción vuelve a

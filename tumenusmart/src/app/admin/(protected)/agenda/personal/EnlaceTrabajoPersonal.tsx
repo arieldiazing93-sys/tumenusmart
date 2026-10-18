@@ -4,18 +4,20 @@ import { useEffect, useState } from "react";
 import { clasesBoton } from "@/components/ui";
 
 /**
- * El enlace de trabajo de una persona del personal (/personal/<id>): ahí ve las citas
+ * El enlace de trabajo de una persona del personal (/personal/<id>-<firma>): ahí ve las citas
  * que ya se cobraron a su nombre. No lleva usuario ni contraseña —igual que el enlace
  * del repartidor—, así que el dueño se lo pasa a esa persona (por WhatsApp, si tiene
- * teléfono cargado) y a nadie más.
+ * teléfono cargado) y a nadie más. La firma la calcula el servidor: el id de la persona, solo,
+ * no abre nada (lo muestra la página pública de reservas).
  */
 export function EnlaceTrabajoPersonal({
-  id,
+  enlace,
   nombre,
   telefono,
   activo,
 }: {
-  id: string;
+  /** Lo que va después de /personal/ (viene firmado del servidor). */
+  enlace: string;
   nombre: string;
   /** Internacional, solo dígitos; null si no tiene. */
   telefono: string | null;
@@ -26,8 +28,8 @@ export function EnlaceTrabajoPersonal({
 
   // El origen (https://…) recién se conoce en el navegador.
   useEffect(() => {
-    setUrl(`${window.location.origin}/personal/${id}`);
-  }, [id]);
+    setUrl(`${window.location.origin}/personal/${enlace}`);
+  }, [enlace]);
 
   async function copiar() {
     try {

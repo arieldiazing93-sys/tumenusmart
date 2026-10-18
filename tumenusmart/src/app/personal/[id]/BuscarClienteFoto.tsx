@@ -14,7 +14,7 @@ import {
  * (o subir) su último peinado/corte. Mismo cliente de siempre — Reserva de
  * turnos — pero desde el celular del barbero, sin entrar al panel.
  */
-export function BuscarClienteFoto({ personalId }: { personalId: string }) {
+export function BuscarClienteFoto({ enlace }: { enlace: string }) {
   const [telefono, setTelefono] = useState("");
   const [buscando, setBuscando] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -37,7 +37,7 @@ export function BuscarClienteFoto({ personalId }: { personalId: string }) {
     setElegido(null);
     setBuscando(true);
     try {
-      const r = await buscarClientePorTelefono(personalId, telefono);
+      const r = await buscarClientePorTelefono(enlace, telefono);
       if (!r.ok) {
         setError(r.error);
         setResultados(null);
@@ -108,7 +108,7 @@ export function BuscarClienteFoto({ personalId }: { personalId: string }) {
 
       {elegido && (
         <FichaFotoCliente
-          personalId={personalId}
+          enlace={enlace}
           cliente={elegido}
           onVolver={() => setElegido(null)}
           onCerrar={cerrarTodo}
@@ -123,13 +123,13 @@ export function BuscarClienteFoto({ personalId }: { personalId: string }) {
 }
 
 function FichaFotoCliente({
-  personalId,
+  enlace,
   cliente,
   onVolver,
   onCerrar,
   onActualizado,
 }: {
-  personalId: string;
+  enlace: string;
   cliente: ClienteEncontrado;
   onVolver: () => void;
   /** Cierra del todo (vuelve a la búsqueda vacía), para no tener que usar "atrás" del navegador. */
@@ -149,7 +149,7 @@ function FichaFotoCliente({
       const { archivo: liviano } = await comprimirImagen(archivo, PARA_PRODUCTO);
       const datos = new FormData();
       datos.set("archivo", liviano);
-      const r = await subirFotoClienteDesdeEnlace(personalId, cliente.id, datos);
+      const r = await subirFotoClienteDesdeEnlace(enlace, cliente.id, datos);
       if (!r.ok) {
         setError(r.error);
         return;
