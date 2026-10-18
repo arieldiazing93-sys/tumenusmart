@@ -1,0 +1,263 @@
+<meta name="claude:viewport-fit-sides" content="cover">
+<title>Propuesta Restaurantes y Comidas</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Public+Sans:wght@400;500;600&display=swap">
+<style>
+  /* Concepto: una propuesta impresa en A4 con una cabecera azul y un plato con cubiertos en líneas finas. Azul para lo operativo, verde para lo administrativo. */
+  :root {
+    --bg: #F4F7F6;
+    --card: #FFFFFF;
+    --ink: #0F2430;
+    --ink-2: #485C66;
+    --line: #D3DCD9;
+    --court: #14507D;
+    --court-tint: #E2EDF5;
+    --pitch: #26744A;
+    --pitch-tint: #E1F0E7;
+    --cover: #12476F;
+    --cover-ink: #FFFFFF;
+    --ball: #D8E04B;
+    --field: #FFFFFF;
+    --display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+    --body: "Public Sans", "Segoe UI", system-ui, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0B1820; --card: #11242E; --ink: #E7F0F2; --ink-2: #9DB2BB; --line: #28414D;
+      --court: #6DB4E6; --court-tint: #16303F; --pitch: #65C58B; --pitch-tint: #14302A;
+      --cover: #16547F; --field: #0D1D26; color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0B1820; --card: #11242E; --ink: #E7F0F2; --ink-2: #9DB2BB; --line: #28414D;
+    --court: #6DB4E6; --court-tint: #16303F; --pitch: #65C58B; --pitch-tint: #14302A;
+    --cover: #16547F; --field: #0D1D26; color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 15px; line-height: 1.55;
+    padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+    padding-block: 24px 48px;
+  }
+  .hoja { max-width: 920px; margin: 0 auto; display: flex; flex-direction: column; gap: 28px; }
+  h1, h2, h3 { font-family: var(--display); line-height: 1.12; text-wrap: balance; margin: 0; letter-spacing: -0.01em; }
+  p { margin: 0; }
+  ul { margin: 0; padding: 0; list-style: none; }
+
+  /* ---------- portada ---------- */
+  .portada { background: var(--cover); color: var(--cover-ink); border-radius: 6px; overflow: hidden; position: relative; }
+  .portada-cuerpo { padding: 40px clamp(20px, 5vw, 48px) 28px; display: grid; gap: 24px; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); align-items: center; }
+  .etiqueta { font-size: 12px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; }
+  .portada .etiqueta { color: var(--ball); }
+  .portada h1 { font-size: clamp(1.9rem, 4.6vw, 3rem); font-weight: 700; margin-top: 10px; }
+  .portada .bajada { margin-top: 14px; max-width: 46ch; font-size: 1.05rem; opacity: 0.92; }
+  .motivo { width: 100%; height: auto; color: #fff; opacity: 0.55; }
+  .datos { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 14px 24px; padding: 20px clamp(20px, 5vw, 48px) 26px; border-top: 1px solid rgba(255,255,255,0.22); }
+  .datos label { display: block; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; opacity: 0.75; margin-bottom: 4px; }
+  .datos .valor { font-weight: 600; }
+  .datos input { width: 100%; background: transparent; border: 0; border-bottom: 1px dashed rgba(255,255,255,0.5); color: inherit; font: inherit; font-weight: 600; padding: 2px 0; border-radius: 0; }
+  .datos input::placeholder { color: rgba(255,255,255,0.55); font-weight: 400; }
+
+  /* ---------- secciones ---------- */
+  .seccion { background: var(--card); border: 1px solid var(--line); border-radius: 6px; padding: clamp(20px, 4vw, 36px); }
+  .seccion > header { margin-bottom: 20px; max-width: 64ch; }
+  .seccion h2 { font-size: clamp(1.4rem, 3vw, 1.85rem); margin-top: 8px; }
+  .seccion .intro { margin-top: 10px; color: var(--ink-2); }
+  .operativa .etiqueta { color: var(--court); }
+  .administrativa .etiqueta { color: var(--pitch); }
+  .bloques { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 380px), 1fr)); gap: 14px; }
+  .bloque { border: 1px solid var(--line); border-radius: 6px; padding: 18px 18px 16px; break-inside: avoid; }
+  .operativa .bloque { border-top: 3px solid var(--court); }
+  .administrativa .bloque { border-top: 3px solid var(--pitch); }
+  .bloque h3 { font-size: 1.1rem; margin-bottom: 10px; }
+  .bloque li { position: relative; padding-left: 16px; margin-top: 6px; color: var(--ink); }
+  .bloque li::before { content: ""; position: absolute; left: 0; top: 0.62em; width: 8px; height: 2px; background: var(--ink-2); }
+
+  /* ---------- implementación ---------- */
+  .pasos { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr)); gap: 14px; counter-reset: paso; }
+  .paso { border-left: 2px solid var(--court); padding: 2px 0 2px 14px; break-inside: avoid; }
+  .paso::before { counter-increment: paso; content: "Paso " counter(paso); display: block; font-size: 12px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--court); margin-bottom: 4px; }
+  .paso h3 { font-size: 1.02rem; margin-bottom: 4px; }
+  .paso p { color: var(--ink-2); font-size: 14px; }
+
+  .pie { text-align: center; color: var(--ink-2); font-size: 13px; }
+  .pie strong { color: var(--ink); font-family: var(--display); font-size: 1rem; }
+
+  @media (max-width: 720px) {
+    .portada-cuerpo { grid-template-columns: minmax(0, 1fr); }
+    .motivo { max-width: 340px; }
+    body { padding-block: 12px 32px; }
+  }
+
+  /* ---------- al imprimir o guardar como PDF ---------- */
+  @page { size: A4; margin: 12mm; }
+  @media print {
+    :root { --bg: #fff; }
+    body { padding: 0; font-size: 12.5px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .hoja { max-width: none; gap: 16px; }
+    .seccion { break-inside: avoid-page; padding: 18px; }
+    .seccion.largo { break-inside: auto; }
+    .seccion:not(.resumen) > header { break-after: avoid; break-inside: avoid; }
+    .datos input { border-color: transparent; background: transparent; padding-left: 0; padding-right: 0; }
+  }
+</style>
+
+<main class="hoja">
+
+  <section class="portada" aria-labelledby="titulo">
+    <div class="portada-cuerpo">
+      <div>
+        <p class="etiqueta">Propuesta comercial</p>
+        <h1 id="titulo">Gestión integral para restaurantes y locales de comidas rápidas</h1>
+        <p class="bajada">Punto de venta, mesas con mozos, delivery, menú digital con pedidos, stock con recetas y caja en un solo sistema. La caja se maneja desde una computadora; el celular y la tablet sirven para consultar el sistema, y los mozos toman los pedidos desde su celular.</p>
+      </div>
+      <svg class="motivo" viewBox="-4 -4 208 108" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+        <circle cx="100" cy="50" r="38"/>
+        <circle cx="100" cy="50" r="27"/>
+        <path d="M40 14 V38 Q40 46 46 46 Q52 46 52 38 V14 M46 14 V46 M46 46 V90"/>
+        <path d="M158 14 C176 22 176 56 160 62 V90"/>
+      </svg>
+    </div>
+    <div class="datos">
+      <div><label for="cliente">Preparada para</label><input id="cliente" data-guardar type="text" placeholder="Nombre del local" autocomplete="off"></div>
+      <div><label>Fecha</label><p class="valor">18 de octubre de 2026</p></div>
+      <div><label for="asesor">Preparada por</label><input id="asesor" data-guardar type="text" value="TuMenuSmart" autocomplete="off"></div>
+      <div><label for="contacto">Contacto</label><input id="contacto" data-guardar type="text" placeholder="Teléfono o WhatsApp" autocomplete="off"></div>
+    </div>
+  </section>
+
+  <section class="seccion resumen">
+    <header>
+      <p class="etiqueta">Resumen</p>
+      <h2>Qué resuelve este sistema</h2>
+      <p class="intro">Un restaurante gana con las mesas bien atendidas, la cocina y la barra coordinadas y el costo de cada plato bajo control. El sistema une el mostrador, el salón, el delivery y el stock, y le permite al dueño ver el negocio desde cualquier lugar.</p>
+    </header>
+  </section>
+
+  <section class="seccion operativa largo" aria-labelledby="operativa">
+    <header>
+      <p class="etiqueta">Parte operativa</p>
+      <h2 id="operativa">Lo que se usa todos los días en el mostrador, el salón y la cocina</h2>
+    </header>
+    <div class="bloques">
+      <article class="bloque">
+        <h3>Punto de venta y mostrador</h3>
+        <ul>
+          <li>Venta rápida con categorías por color y búsqueda de productos.</li>
+          <li>Opciones y agregados por producto (queso extra, sin cebolla) y combos mitad y mitad para pizzas.</li>
+          <li>Promociones: descuento en porcentaje, 2x1 y 3x2, y precios especiales por día y horario.</li>
+          <li>Descuentos que pueden pedir la contraseña de una persona autorizada.</li>
+          <li>Ticket o factura, según corresponda.</li>
+        </ul>
+      </article>
+      <article class="bloque">
+        <h3>Salón, mesas y mozos</h3>
+        <ul>
+          <li>Mesas y sectores del salón, cada mesa libre, ocupada o por cobrar.</li>
+          <li>El mozo entra con su PIN desde el celular, abre la mesa y carga el pedido.</li>
+          <li>La comanda sale impresa en la cocina o en la barra, según el producto, desde la computadora de caja.</li>
+          <li>Cada pedido adicional de la mesa se suma a la misma cuenta.</li>
+          <li>Reservas de mesa desde la carta digital, por turno de almuerzo y cena.</li>
+        </ul>
+      </article>
+      <article class="bloque">
+        <h3>Cuentas, propinas y comisiones</h3>
+        <ul>
+          <li>La caja ve todas las cuentas abiertas, cancela productos con motivo, aplica descuentos e imprime la cuenta.</li>
+          <li>División de la cuenta en partes iguales o por producto, cada parte con su cobro.</li>
+          <li>Propinas por mozo, que se acumulan y se pagan desde la caja.</li>
+          <li>Comisión por mozo sobre lo vendido, con pago desde la caja y comprobante.</li>
+        </ul>
+      </article>
+      <article class="bloque">
+        <h3>Delivery</h3>
+        <ul>
+          <li>Cuentas de delivery con los datos del cliente y el costo de envío.</li>
+          <li>Asignación del repartidor, que ve su pedido en su propio celular, sin usuario ni contraseña.</li>
+          <li>Comanda a cocina y barra igual que en el salón.</li>
+          <li>Historial con la forma de pago de cada entrega.</li>
+        </ul>
+      </article>
+      <article class="bloque">
+        <h3>Menú digital y pedidos</h3>
+        <ul>
+          <li>Carta pública con fotos, categorías y código QR para las mesas, el local y las redes.</li>
+          <li>El cliente envía su pedido para retirar o con delivery, y el local lo recibe en una bandeja con aviso sonoro.</li>
+          <li>Aceptar, avisar que está listo y marcar entregado y cobrado, en tres toques.</li>
+          <li>El cobro se hace en caja: la carta no cobra en línea.</li>
+        </ul>
+      </article>
+      <article class="bloque">
+        <h3>Caja y turnos</h3>
+        <ul>
+          <li>Cobro en efectivo, transferencia, tarjeta o pago dividido en varias formas.</li>
+          <li>Apertura y cierre de turno: el cajero declara lo que tiene y el sistema lo compara con lo vendido.</li>
+          <li>Dos o más cajas a la vez (por ejemplo salón y mostrador), cada una con su propio cierre.</li>
+          <li>Retiros e ingresos de efectivo registrados.</li>
+          <li>Cancelaciones que exigen un motivo y pueden pedir contraseña autorizada.</li>
+          <li>El cobro y la impresión del ticket se hacen desde una computadora (PC o notebook).</li>
+        </ul>
+      </article>
+
+    </div>
+
+  </section>
+
+  <section class="seccion administrativa" aria-labelledby="administrativa">
+    <header>
+      <p class="etiqueta">Parte administrativa</p>
+      <h2 id="administrativa">Lo que le da control y tranquilidad al dueño</h2>
+    </header>
+    <div class="bloques">
+      <article class="bloque">
+        <h3>Stock, recetas y costos</h3>
+        <ul>
+          <li>Recetas: cada plato o bebida descuenta sus insumos al venderse.</li>
+          <li>Preparaciones (salsas, masas) como insumos elaborados que se descuentan al vender.</li>
+          <li>Costo de cada producto calculado desde su receta, y reporte de rentabilidad.</li>
+          <li>Proveedores, compras y cuentas por pagar.</li>
+          <li>Varios almacenes (cocina, barra, depósito) y registro de mermas.</li>
+          <li>Los insumos con stock bajo se marcan y se pueden filtrar, y los inventarios quedan registrados.</li>
+        </ul>
+      </article>
+
+    </div>
+  </section>
+
+  <section class="seccion" aria-labelledby="implementacion">
+    <header>
+      <p class="etiqueta">Implementación</p>
+      <h2 id="implementacion">Cómo se pone en marcha</h2>
+    </header>
+    <div class="pasos">
+      <div class="paso"><h3>Relevamiento</h3><p>Carta y recetas, mesas y sectores, áreas de cocina y barra, mozos, cajas e impresoras del local.</p></div>
+      <div class="paso"><h3>Configuración</h3><p>Carga de productos con fotos y recetas, mesas, mozos, impresoras y carta digital.</p></div>
+      <div class="paso"><h3>Capacitación</h3><p>Caja, mozos, cocina y administración, practicando con los datos del propio local.</p></div>
+      <div class="paso"><h3>Puesta en marcha</h3><p>Acompañamiento durante los primeros días de uso oficial.</p></div>
+
+    </div>
+  </section>
+
+  <p class="pie"><strong>TuMenuSmart</strong> · tumenusmart.com</p>
+</main>
+<script>
+  (function () {
+    var CLAVE = "propuesta-restaurantes-v1";
+    var campos = document.querySelectorAll("[data-guardar]");
+    try {
+      var datos = JSON.parse(localStorage.getItem(CLAVE) || "null");
+      if (datos) campos.forEach(function (el) { if (el.id in datos) el.value = datos[el.id]; });
+    } catch (e) { /* sin almacenamiento: la página funciona igual */ }
+    campos.forEach(function (el) {
+      el.addEventListener("input", function () {
+        try {
+          var d = {};
+          campos.forEach(function (c) { d[c.id] = c.value; });
+          localStorage.setItem(CLAVE, JSON.stringify(d));
+        } catch (e) { /* ignorar */ }
+      });
+    });
+  })();
+</script>

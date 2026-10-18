@@ -1,0 +1,260 @@
+<meta name="claude:viewport-fit-sides" content="cover">
+<title>Propuesta Complejos Deportivos</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Public+Sans:wght@400;500;600&display=swap">
+<style>
+  /* Concepto: una propuesta impresa en A4 con una cabecera de cancha de pádel vista desde arriba. Azul de cancha para lo operativo,
+     verde de césped para lo administrativo, líneas finas como las de una cancha. */
+  :root {
+    --bg: #F4F7F6;
+    --card: #FFFFFF;
+    --ink: #0F2430;
+    --ink-2: #485C66;
+    --line: #D3DCD9;
+    --court: #14507D;
+    --court-tint: #E2EDF5;
+    --pitch: #26744A;
+    --pitch-tint: #E1F0E7;
+    --cover: #12476F;
+    --cover-ink: #FFFFFF;
+    --ball: #D8E04B;
+    --field: #FFFFFF;
+    --display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+    --body: "Public Sans", "Segoe UI", system-ui, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0B1820; --card: #11242E; --ink: #E7F0F2; --ink-2: #9DB2BB; --line: #28414D;
+      --court: #6DB4E6; --court-tint: #16303F; --pitch: #65C58B; --pitch-tint: #14302A;
+      --cover: #16547F; --field: #0D1D26; color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0B1820; --card: #11242E; --ink: #E7F0F2; --ink-2: #9DB2BB; --line: #28414D;
+    --court: #6DB4E6; --court-tint: #16303F; --pitch: #65C58B; --pitch-tint: #14302A;
+    --cover: #16547F; --field: #0D1D26; color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 15px; line-height: 1.55;
+    padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+    padding-block: 24px 48px;
+  }
+  .hoja { max-width: 920px; margin: 0 auto; display: flex; flex-direction: column; gap: 28px; }
+  h1, h2, h3 { font-family: var(--display); line-height: 1.12; text-wrap: balance; margin: 0; letter-spacing: -0.01em; }
+  p { margin: 0; }
+  ul { margin: 0; padding: 0; list-style: none; }
+
+  /* ---------- portada ---------- */
+  .portada { background: var(--cover); color: var(--cover-ink); border-radius: 6px; overflow: hidden; position: relative; }
+  .portada-cuerpo { padding: 40px clamp(20px, 5vw, 48px) 28px; display: grid; gap: 24px; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); align-items: center; }
+  .etiqueta { font-size: 12px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; }
+  .portada .etiqueta { color: var(--ball); }
+  .portada h1 { font-size: clamp(1.9rem, 4.6vw, 3rem); font-weight: 700; margin-top: 10px; }
+  .portada .bajada { margin-top: 14px; max-width: 46ch; font-size: 1.05rem; opacity: 0.92; }
+  .cancha { width: 100%; height: auto; color: #fff; opacity: 0.55; }
+  .datos { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 14px 24px; padding: 20px clamp(20px, 5vw, 48px) 26px; border-top: 1px solid rgba(255,255,255,0.22); }
+  .datos label { display: block; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; opacity: 0.75; margin-bottom: 4px; }
+  .datos .valor { font-weight: 600; }
+  .datos input { width: 100%; background: transparent; border: 0; border-bottom: 1px dashed rgba(255,255,255,0.5); color: inherit; font: inherit; font-weight: 600; padding: 2px 0; border-radius: 0; }
+  .datos input::placeholder { color: rgba(255,255,255,0.55); font-weight: 400; }
+
+  /* ---------- secciones ---------- */
+  .seccion { background: var(--card); border: 1px solid var(--line); border-radius: 6px; padding: clamp(20px, 4vw, 36px); }
+  .seccion > header { margin-bottom: 20px; max-width: 64ch; }
+  .seccion h2 { font-size: clamp(1.4rem, 3vw, 1.85rem); margin-top: 8px; }
+  .seccion .intro { margin-top: 10px; color: var(--ink-2); }
+  .operativa .etiqueta { color: var(--court); }
+  .administrativa .etiqueta { color: var(--pitch); }
+  .bloques { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 380px), 1fr)); gap: 14px; }
+  .bloque { border: 1px solid var(--line); border-radius: 6px; padding: 18px 18px 16px; break-inside: avoid; }
+  .operativa .bloque { border-top: 3px solid var(--court); }
+  .administrativa .bloque { border-top: 3px solid var(--pitch); }
+  .bloque h3 { font-size: 1.1rem; margin-bottom: 10px; }
+  .bloque li { position: relative; padding-left: 16px; margin-top: 6px; color: var(--ink); }
+  .bloque li::before { content: ""; position: absolute; left: 0; top: 0.62em; width: 8px; height: 2px; background: var(--ink-2); }
+
+  /* ---------- implementación ---------- */
+  .pasos { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr)); gap: 14px; counter-reset: paso; }
+  .paso { border-left: 2px solid var(--court); padding: 2px 0 2px 14px; break-inside: avoid; }
+  .paso::before { counter-increment: paso; content: "Paso " counter(paso); display: block; font-size: 12px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--court); margin-bottom: 4px; }
+  .paso h3 { font-size: 1.02rem; margin-bottom: 4px; }
+  .paso p { color: var(--ink-2); font-size: 14px; }
+
+  .pie { text-align: center; color: var(--ink-2); font-size: 13px; }
+  .pie strong { color: var(--ink); font-family: var(--display); font-size: 1rem; }
+
+  @media (max-width: 720px) {
+    .portada-cuerpo { grid-template-columns: minmax(0, 1fr); }
+    .cancha { max-width: 340px; }
+    body { padding-block: 12px 32px; }
+  }
+
+  /* ---------- al imprimir o guardar como PDF ---------- */
+  @page { size: A4; margin: 12mm; }
+  @media print {
+    :root { --bg: #fff; }
+    body { padding: 0; font-size: 12.5px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .hoja { max-width: none; gap: 16px; }
+    .seccion { break-inside: avoid-page; padding: 18px; }
+    .seccion.largo { break-inside: auto; }
+    .seccion > header { break-after: avoid; break-inside: avoid; }
+    .datos input { border-color: transparent; background: transparent; padding-left: 0; padding-right: 0; }
+  }
+</style>
+
+<main class="hoja">
+
+  <section class="portada" aria-labelledby="titulo">
+    <div class="portada-cuerpo">
+      <div>
+        <p class="etiqueta">Propuesta comercial</p>
+        <h1 id="titulo">Gestión integral para complejos de pádel y fútbol</h1>
+        <p class="bajada">Reservas de canchas, cobro en caja, cantina y control de stock en un solo sistema. La caja se maneja desde una computadora; el celular y la tablet sirven para consultar el sistema.</p>
+      </div>
+      <svg class="cancha" viewBox="-4 -4 208 108" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true" focusable="false">
+        <rect x="0" y="0" width="200" height="100"/>
+        <line x1="100" y1="0" x2="100" y2="100" stroke-dasharray="4 3"/>
+        <line x1="30.5" y1="0" x2="30.5" y2="100"/>
+        <line x1="169.5" y1="0" x2="169.5" y2="100"/>
+        <line x1="30.5" y1="50" x2="169.5" y2="50"/>
+      </svg>
+    </div>
+    <div class="datos">
+      <div><label for="cliente">Preparada para</label><input id="cliente" data-guardar type="text" placeholder="Nombre del complejo" autocomplete="off"></div>
+      <div><label>Fecha</label><p class="valor">18 de octubre de 2026</p></div>
+      <div><label for="asesor">Preparada por</label><input id="asesor" data-guardar type="text" value="TuMenuSmart" autocomplete="off"></div>
+      <div><label for="contacto">Contacto</label><input id="contacto" data-guardar type="text" placeholder="Teléfono o WhatsApp" autocomplete="off"></div>
+    </div>
+  </section>
+
+  <section class="seccion">
+    <header>
+      <p class="etiqueta">Resumen</p>
+      <h2>Qué resuelve este sistema</h2>
+      <p class="intro">Un complejo gana con las horas de cancha ocupadas, con cada hora bien cobrada y con una cantina bien controlada. El sistema cubre las tres cosas y le permite al dueño verlas desde cualquier lugar.</p>
+    </header>
+  </section>
+
+  <section class="seccion operativa largo" aria-labelledby="operativa">
+    <header>
+      <p class="etiqueta">Parte operativa</p>
+      <h2 id="operativa">Lo que se usa todos los días en el mostrador, la cancha y la cantina</h2>
+    </header>
+    <div class="bloques">
+      <article class="bloque">
+        <h3>Reservas y calendario</h3>
+        <ul>
+          <li>Calendario por día, semana y mes con todas las canchas a la vista.</li>
+          <li>Reservas anotadas en segundos desde el mostrador, con nombre, teléfono y notas.</li>
+          <li>El sistema no deja reservar dos veces la misma hora en la misma cancha.</li>
+          <li>Estado de cada reserva: próxima, finalizada, cancelada o no asistió.</li>
+          <li>Fútbol 5, 7 y 11, pádel, tenis, vóley y básquet, con las duraciones de cada uno.</li>
+          <li>Horarios de apertura y descansos por día de la semana.</li>
+        </ul>
+      </article>
+      <article class="bloque">
+        <h3>Página de reservas online</h3>
+        <ul>
+          <li>Enlace propio con el nombre del complejo, para compartir por WhatsApp, Instagram o en la entrada.</li>
+          <li>El cliente elige día, duración y una cancha libre. Lo ocupado se ve tachado.</li>
+          <li>Mapa de ubicación con "Cómo llegar" y enlaces a las redes sociales.</li>
+          <li>Mensaje de confirmación por WhatsApp listo para enviar y opción de agregar al calendario.</li>
+          <li>Aviso sonoro en el panel cada vez que entra una reserva nueva.</li>
+        </ul>
+      </article>
+      <article class="bloque">
+        <h3>Precios y promociones</h3>
+        <ul>
+          <li>Precio por hora de cada cancha.</li>
+          <li>Precios por día y horario: lunes a viernes, fin de semana o turno nocturno.</li>
+          <li>Los precios se aplican solos en la reserva online y en la caja.</li>
+          <li>Los descuentos piden la contraseña de una persona autorizada.</li>
+        </ul>
+      </article>
+      <article class="bloque">
+        <h3>Cobro en caja</h3>
+        <ul>
+          <li>La reserva se cobra desde su ficha: efectivo, tarjeta, transferencia o pago dividido.</li>
+          <li>Ticket o factura, según corresponda.</li>
+          <li>El cobro y la impresión del ticket se hacen desde una computadora (PC o notebook). Desde el celular o la tablet se consulta el sistema.</li>
+          <li>Cada cobro entra al turno de caja de quien lo hizo.</li>
+          <li>Anular un cobro exige un motivo y una contraseña autorizada.</li>
+        </ul>
+      </article>
+      <article class="bloque">
+        <h3>Cantina, bar y kiosco</h3>
+        <ul>
+          <li>Punto de venta rápido con categorías, colores y búsqueda de productos.</li>
+          <li>Servicio de mesas: el mozo carga el pedido desde su celular y la comanda sale en la cocina o la barra.</li>
+          <li>Menú digital con código QR y pedidos del cliente.</li>
+          <li>Alquiler de paletas, pelotas y otros equipos como productos de venta.</li>
+        </ul>
+      </article>
+      <article class="bloque">
+        <h3>Caja y turnos</h3>
+        <ul>
+          <li>Apertura y cierre de turno: el cajero declara lo que tiene y el sistema lo compara con lo vendido.</li>
+          <li>Dos o más cajas a la vez (por ejemplo recepción y bar), cada una con su propio cierre.</li>
+          <li>Retiros e ingresos de efectivo registrados.</li>
+          <li>Impresión de tickets y de comandas por área.</li>
+        </ul>
+      </article>
+    </div>
+
+  </section>
+
+  <section class="seccion administrativa" aria-labelledby="administrativa">
+    <header>
+      <p class="etiqueta">Parte administrativa</p>
+      <h2 id="administrativa">Lo que le da control y tranquilidad al dueño</h2>
+    </header>
+    <div class="bloques">
+      <article class="bloque">
+        <h3>Stock e inventario</h3>
+        <ul>
+          <li>Insumos con recetas: cada bebida o comida descuenta sus ingredientes al venderse.</li>
+          <li>Proveedores, compras y cuentas por pagar.</li>
+          <li>Varios almacenes (barra, depósito) y registro de mermas.</li>
+          <li>Los insumos con stock bajo se marcan y se pueden filtrar, y los inventarios quedan registrados.</li>
+        </ul>
+      </article>
+    </div>
+  </section>
+
+  <section class="seccion" aria-labelledby="implementacion">
+    <header>
+      <p class="etiqueta">Implementación</p>
+      <h2 id="implementacion">Cómo se pone en marcha</h2>
+    </header>
+    <div class="pasos">
+      <div class="paso"><h3>Relevamiento</h3><p>Canchas, horarios, tarifas, carta de la cantina, cajas e impresoras del complejo.</p></div>
+      <div class="paso"><h3>Configuración</h3><p>Carga de canchas, precios, productos, usuarios y de la página de reservas.</p></div>
+      <div class="paso"><h3>Capacitación</h3><p>Recepción, caja, bar y administración, practicando con los datos del propio complejo.</p></div>
+      <div class="paso"><h3>Puesta en marcha</h3><p>Acompañamiento durante los primeros días de uso oficial.</p></div>
+    </div>
+  </section>
+
+  <p class="pie"><strong>TuMenuSmart</strong> · tumenusmart.com</p>
+</main>
+<script>
+  (function () {
+    var CLAVE = "propuesta-complejos-deportivos-v2";
+    var campos = document.querySelectorAll("[data-guardar]");
+    try {
+      var datos = JSON.parse(localStorage.getItem(CLAVE) || "null");
+      if (datos) campos.forEach(function (el) { if (el.id in datos) el.value = datos[el.id]; });
+    } catch (e) { /* sin almacenamiento: la página funciona igual */ }
+    campos.forEach(function (el) {
+      el.addEventListener("input", function () {
+        try {
+          var d = {};
+          campos.forEach(function (c) { d[c.id] = c.value; });
+          localStorage.setItem(CLAVE, JSON.stringify(d));
+        } catch (e) { /* ignorar */ }
+      });
+    });
+  })();
+</script>

@@ -1,0 +1,273 @@
+<meta name="claude:viewport-fit-sides" content="cover">
+<title>Propuesta Barberías y Salones</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Public+Sans:wght@400;500;600&display=swap">
+<style>
+  /* Concepto: una propuesta impresa en A4 con una cabecera azul y un dibujo de tijeras en líneas finas. Azul para lo operativo, verde para lo administrativo. */
+  :root {
+    --bg: #F4F7F6;
+    --card: #FFFFFF;
+    --ink: #0F2430;
+    --ink-2: #485C66;
+    --line: #D3DCD9;
+    --court: #14507D;
+    --court-tint: #E2EDF5;
+    --pitch: #26744A;
+    --pitch-tint: #E1F0E7;
+    --cover: #12476F;
+    --cover-ink: #FFFFFF;
+    --ball: #D8E04B;
+    --field: #FFFFFF;
+    --display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+    --body: "Public Sans", "Segoe UI", system-ui, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0B1820; --card: #11242E; --ink: #E7F0F2; --ink-2: #9DB2BB; --line: #28414D;
+      --court: #6DB4E6; --court-tint: #16303F; --pitch: #65C58B; --pitch-tint: #14302A;
+      --cover: #16547F; --field: #0D1D26; color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0B1820; --card: #11242E; --ink: #E7F0F2; --ink-2: #9DB2BB; --line: #28414D;
+    --court: #6DB4E6; --court-tint: #16303F; --pitch: #65C58B; --pitch-tint: #14302A;
+    --cover: #16547F; --field: #0D1D26; color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 15px; line-height: 1.55;
+    padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+    padding-block: 24px 48px;
+  }
+  .hoja { max-width: 920px; margin: 0 auto; display: flex; flex-direction: column; gap: 28px; }
+  h1, h2, h3 { font-family: var(--display); line-height: 1.12; text-wrap: balance; margin: 0; letter-spacing: -0.01em; }
+  p { margin: 0; }
+  ul { margin: 0; padding: 0; list-style: none; }
+
+  /* ---------- portada ---------- */
+  .portada { background: var(--cover); color: var(--cover-ink); border-radius: 6px; overflow: hidden; position: relative; }
+  .portada-cuerpo { padding: 40px clamp(20px, 5vw, 48px) 28px; display: grid; gap: 24px; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); align-items: center; }
+  .etiqueta { font-size: 12px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; }
+  .portada .etiqueta { color: var(--ball); }
+  .portada h1 { font-size: clamp(1.9rem, 4.6vw, 3rem); font-weight: 700; margin-top: 10px; }
+  .portada .bajada { margin-top: 14px; max-width: 46ch; font-size: 1.05rem; opacity: 0.92; }
+  .motivo { width: 100%; height: auto; color: #fff; opacity: 0.55; }
+  .datos { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 14px 24px; padding: 20px clamp(20px, 5vw, 48px) 26px; border-top: 1px solid rgba(255,255,255,0.22); }
+  .datos label { display: block; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; opacity: 0.75; margin-bottom: 4px; }
+  .datos .valor { font-weight: 600; }
+  .datos input { width: 100%; background: transparent; border: 0; border-bottom: 1px dashed rgba(255,255,255,0.5); color: inherit; font: inherit; font-weight: 600; padding: 2px 0; border-radius: 0; }
+  .datos input::placeholder { color: rgba(255,255,255,0.55); font-weight: 400; }
+
+  /* ---------- secciones ---------- */
+  .seccion { background: var(--card); border: 1px solid var(--line); border-radius: 6px; padding: clamp(20px, 4vw, 36px); }
+  .seccion > header { margin-bottom: 20px; max-width: 64ch; }
+  .seccion h2 { font-size: clamp(1.4rem, 3vw, 1.85rem); margin-top: 8px; }
+  .seccion .intro { margin-top: 10px; color: var(--ink-2); }
+  .operativa .etiqueta { color: var(--court); }
+  .administrativa .etiqueta { color: var(--pitch); }
+  .bloques { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 380px), 1fr)); gap: 14px; }
+  .bloque { border: 1px solid var(--line); border-radius: 6px; padding: 18px 18px 16px; break-inside: avoid; }
+  .operativa .bloque { border-top: 3px solid var(--court); }
+  .administrativa .bloque { border-top: 3px solid var(--pitch); }
+  .bloque h3 { font-size: 1.1rem; margin-bottom: 10px; }
+  .bloque li { position: relative; padding-left: 16px; margin-top: 6px; color: var(--ink); }
+  .bloque li::before { content: ""; position: absolute; left: 0; top: 0.62em; width: 8px; height: 2px; background: var(--ink-2); }
+
+  /* ---------- implementación ---------- */
+  .pasos { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr)); gap: 14px; counter-reset: paso; }
+  .paso { border-left: 2px solid var(--court); padding: 2px 0 2px 14px; break-inside: avoid; }
+  .paso::before { counter-increment: paso; content: "Paso " counter(paso); display: block; font-size: 12px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--court); margin-bottom: 4px; }
+  .paso h3 { font-size: 1.02rem; margin-bottom: 4px; }
+  .paso p { color: var(--ink-2); font-size: 14px; }
+
+  .pie { text-align: center; color: var(--ink-2); font-size: 13px; }
+  .pie strong { color: var(--ink); font-family: var(--display); font-size: 1rem; }
+
+  @media (max-width: 720px) {
+    .portada-cuerpo { grid-template-columns: minmax(0, 1fr); }
+    .motivo { max-width: 340px; }
+    body { padding-block: 12px 32px; }
+  }
+
+  /* ---------- al imprimir o guardar como PDF ---------- */
+  @page { size: A4; margin: 12mm; }
+  @media print {
+    :root { --bg: #fff; }
+    body { padding: 0; font-size: 12.5px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .hoja { max-width: none; gap: 16px; }
+    .seccion { break-inside: avoid-page; padding: 18px; }
+    .seccion.largo { break-inside: auto; }
+    .seccion:not(.resumen) > header { break-after: avoid; break-inside: avoid; }
+    .datos input { border-color: transparent; background: transparent; padding-left: 0; padding-right: 0; }
+  }
+</style>
+
+<main class="hoja">
+
+  <section class="portada" aria-labelledby="titulo">
+    <div class="portada-cuerpo">
+      <div>
+        <p class="etiqueta">Propuesta comercial</p>
+        <h1 id="titulo">Gestión integral para barberías y salones de belleza</h1>
+        <p class="bajada">Agenda de turnos, reservas online, cobro en caja, comisiones del personal y control de insumos en un solo sistema. La caja se maneja desde una computadora; el celular y la tablet sirven para consultar el sistema.</p>
+      </div>
+      <svg class="motivo" viewBox="-4 -4 208 108" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true" focusable="false">
+        <circle cx="34" cy="30" r="13"/>
+        <circle cx="34" cy="70" r="13"/>
+        <line x1="45" y1="37" x2="176" y2="62"/>
+        <line x1="45" y1="63" x2="176" y2="38"/>
+        <circle cx="110" cy="50" r="2.4" fill="currentColor"/>
+        <line x1="130" y1="14" x2="190" y2="14" stroke-dasharray="3 5"/>
+        <line x1="130" y1="86" x2="190" y2="86" stroke-dasharray="3 5"/>
+      </svg>
+    </div>
+    <div class="datos">
+      <div><label for="cliente">Preparada para</label><input id="cliente" data-guardar type="text" placeholder="Nombre del local" autocomplete="off"></div>
+      <div><label>Fecha</label><p class="valor">18 de octubre de 2026</p></div>
+      <div><label for="asesor">Preparada por</label><input id="asesor" data-guardar type="text" value="TuMenuSmart" autocomplete="off"></div>
+      <div><label for="contacto">Contacto</label><input id="contacto" data-guardar type="text" placeholder="Teléfono o WhatsApp" autocomplete="off"></div>
+    </div>
+  </section>
+
+  <section class="seccion resumen">
+    <header>
+      <p class="etiqueta">Resumen</p>
+      <h2>Qué resuelve este sistema</h2>
+      <p class="intro">Un salón o una barbería gana cuando la agenda está llena, cada profesional sabe qué le toca y cada trabajo queda cobrado y asignado a quien lo hizo. El sistema reúne la agenda, el cobro y las comisiones, y le permite al dueño verlo todo desde cualquier lugar.</p>
+    </header>
+  </section>
+
+  <section class="seccion operativa largo" aria-labelledby="operativa">
+    <header>
+      <p class="etiqueta">Parte operativa</p>
+      <h2 id="operativa">Lo que se usa todos los días en la recepción, en el sillón y en la caja</h2>
+    </header>
+    <div class="bloques">
+      <article class="bloque">
+        <h3>Agenda y calendario</h3>
+        <ul>
+          <li>Calendario por día, semana y mes, con una columna por profesional.</li>
+          <li>Turnos cargados en segundos desde el mostrador, con el cliente y uno o varios servicios.</li>
+          <li>El sistema avisa si un turno se pisa con otro del mismo profesional.</li>
+          <li>Estado de cada turno: pendiente, próximo, finalizado, cancelado o no asistió.</li>
+          <li>Filtros por profesional y por estado.</li>
+          <li>Aviso sonoro en el panel cada vez que entra una reserva nueva.</li>
+        </ul>
+      </article>
+      <article class="bloque">
+        <h3>Reservas online</h3>
+        <ul>
+          <li>Página propia con foto de perfil, descripción, horario, mapa de ubicación, redes sociales y galería de hasta 5 fotos.</li>
+          <li>El cliente elige uno o varios servicios, el profesional, el día y la hora. Los horarios ocupados se ven tachados.</li>
+          <li>La reserva llega al negocio por mensaje de WhatsApp y entra al calendario.</li>
+          <li>Colores y tema claro u oscuro a elección del local, y un formulario con los datos que el local quiera pedir.</li>
+        </ul>
+      </article>
+      <article class="bloque">
+        <h3>Servicios y precios</h3>
+        <ul>
+          <li>Servicios organizados por categorías.</li>
+          <li>Duración de cada servicio y tiempo de preparación entre un cliente y otro.</li>
+          <li>Precio fijo o "desde", y un color propio para cada servicio.</li>
+          <li>Se define qué profesionales realizan cada servicio.</li>
+        </ul>
+      </article>
+      <article class="bloque">
+        <h3>Profesionales</h3>
+        <ul>
+          <li>Ficha de cada profesional con foto, teléfono y especialidad.</li>
+          <li>Horario propio de cada uno, con el descanso a otra hora (turno completo, intermedio o tarde-noche).</li>
+          <li>Enlace personal para el celular del profesional, sin usuario ni contraseña: ve sus turnos de hoy y de los próximos 7 días, cuánto lleva cobrado y cuánto le corresponde de comisión.</li>
+          <li>Desde ese enlace también busca a un cliente por teléfono y guarda la foto de su último corte o peinado.</li>
+        </ul>
+      </article>
+      <article class="bloque">
+        <h3>Cobro en caja</h3>
+        <ul>
+          <li>El turno se cobra desde su ficha: efectivo, transferencia o tarjeta de débito o crédito.</li>
+          <li>Ticket o factura, según corresponda.</li>
+          <li>Precio final editable por servicio, y descuentos que pueden pedir la contraseña de una persona autorizada.</li>
+          <li>Se puede cobrar por adelantado y después cambiar el turno de día u hora sin perder el cobro.</li>
+          <li>Los clientes que llegan sin reserva se cobran en el mostrador y se asigna el profesional que hizo el trabajo.</li>
+          <li>Venta de productos (shampoo, ceras, perfumes) en el mismo cobro.</li>
+          <li>El cobro y la impresión del ticket se hacen desde una computadora (PC o notebook). Desde el celular o la tablet se consulta el sistema.</li>
+        </ul>
+      </article>
+      <article class="bloque">
+        <h3>Caja y turnos</h3>
+        <ul>
+          <li>Apertura y cierre de turno: el cajero declara lo que tiene y el sistema lo compara con lo vendido.</li>
+          <li>Dos o más cajas a la vez, cada una con su propio cierre.</li>
+          <li>Retiros e ingresos de efectivo registrados.</li>
+          <li>Impresión de tickets desde la computadora de caja.</li>
+        </ul>
+      </article>
+
+    </div>
+
+  </section>
+
+  <section class="seccion administrativa" aria-labelledby="administrativa">
+    <header>
+      <p class="etiqueta">Parte administrativa</p>
+      <h2 id="administrativa">Lo que le da control y tranquilidad al dueño</h2>
+    </header>
+    <div class="bloques">
+      <article class="bloque">
+        <h3>Comisiones del personal</h3>
+        <ul>
+          <li>Porcentaje de comisión para cada profesional, calculado sobre los servicios cobrados y ya con el descuento aplicado.</li>
+          <li>Los productos que se vendan en la misma cuenta no suman a la comisión.</li>
+          <li>Reporte del personal por período: trabajos, cobrado y comisión, con el detalle de cada trabajo y descarga a Excel.</li>
+          <li>Pago de comisiones desde la caja, total o parcial, con comprobante.</li>
+        </ul>
+      </article>
+      <article class="bloque">
+        <h3>Insumos y stock</h3>
+        <ul>
+          <li>Proveedores, compras y cuentas por pagar.</li>
+          <li>Insumos del salón (tintes, cremas, descartables) en uno o varios almacenes, con registro de mermas.</li>
+          <li>Los insumos con stock bajo se marcan y se pueden filtrar, y los inventarios quedan registrados.</li>
+        </ul>
+      </article>
+
+    </div>
+  </section>
+
+  <section class="seccion" aria-labelledby="implementacion">
+    <header>
+      <p class="etiqueta">Implementación</p>
+      <h2 id="implementacion">Cómo se pone en marcha</h2>
+    </header>
+    <div class="pasos">
+      <div class="paso"><h3>Relevamiento</h3><p>Servicios y duraciones, profesionales, horarios, comisiones, cajas e impresoras del local.</p></div>
+      <div class="paso"><h3>Configuración</h3><p>Carga de servicios, profesionales, horarios, página de reservas y usuarios.</p></div>
+      <div class="paso"><h3>Capacitación</h3><p>Recepción, caja y profesionales (con su enlace personal), practicando con los datos del propio local.</p></div>
+      <div class="paso"><h3>Puesta en marcha</h3><p>Acompañamiento durante los primeros días de uso oficial.</p></div>
+
+    </div>
+  </section>
+
+  <p class="pie"><strong>TuMenuSmart</strong> · tumenusmart.com</p>
+</main>
+<script>
+  (function () {
+    var CLAVE = "propuesta-salones-v1";
+    var campos = document.querySelectorAll("[data-guardar]");
+    try {
+      var datos = JSON.parse(localStorage.getItem(CLAVE) || "null");
+      if (datos) campos.forEach(function (el) { if (el.id in datos) el.value = datos[el.id]; });
+    } catch (e) { /* sin almacenamiento: la página funciona igual */ }
+    campos.forEach(function (el) {
+      el.addEventListener("input", function () {
+        try {
+          var d = {};
+          campos.forEach(function (c) { d[c.id] = c.value; });
+          localStorage.setItem(CLAVE, JSON.stringify(d));
+        } catch (e) { /* ignorar */ }
+      });
+    });
+  })();
+</script>
