@@ -2,7 +2,6 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { CartBar } from "@/components/CartBar";
 import { FirmaPlataforma } from "@/components/FirmaPlataforma";
-import { PedidosRecientes } from "@/components/PedidosRecientes";
 import { CarruselDestacados } from "@/components/CarruselDestacados";
 import { AvisoTienda } from "@/components/AvisoTienda";
 import { EstadoAperturaBadge } from "@/components/EstadoAperturaBadge";
@@ -283,9 +282,7 @@ export default async function CatalogoPage({
         </header>
 
         <div className="px-4 md:px-6 lg:px-8">
-          {/* Si el cliente ya hizo un pedido desde este navegador: el camino de vuelta a su seguimiento. */}
-          <PedidosRecientes slug={slug} className="mt-5" />
-
+          {/* Sin la lista «Tus pedidos» de este navegador (el dueño pidió quitarla: ensuciaba la carta). */}
           <div className="mt-5">
             <AvisoTienda estado={estadoTienda} />
           </div>

@@ -3,7 +3,6 @@ import { prisma } from "@/lib/prisma";
 import { CheckoutForm } from "./CheckoutForm";
 import { AvisoTienda } from "@/components/AvisoTienda";
 import { FirmaPlataforma } from "@/components/FirmaPlataforma";
-import { PedidosRecientes } from "@/components/PedidosRecientes";
 import { obtenerEstadoTienda, motivoSinPedidos } from "@/lib/estado-tienda";
 import { localPorSlug } from "@/lib/local-por-slug";
 
@@ -41,9 +40,6 @@ export default async function CheckoutPage({
           <h1 className="text-[1.6rem] font-semibold leading-tight tracking-titular text-tinta">Finalizar pedido</h1>
         </div>
       </header>
-
-      {/* Si ya hizo un pedido desde este navegador y volvió para atrás: el camino de vuelta a su seguimiento. */}
-      <PedidosRecientes slug={slug} className="mt-5" />
 
       <div className="mt-5">
         <AvisoTienda estado={estadoTienda} />
