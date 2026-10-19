@@ -89,7 +89,8 @@ export function GestionEmpleados({
           </p>
           <p className="mt-1 text-[0.84rem] text-tinta-media">
             Esta contraseña se muestra <strong>una sola vez</strong>. Copiala ahora: no queda
-            guardada en ningún lado y, si la perdés, hay que generar otra.
+            guardada en ningún lado y, si la perdés, hay que generar otra. Al entrar la primera vez, la persona la cambia por una suya: mínimo 5
+            caracteres, puede ser alfanumérica (solo números, solo letras o mezclados).
           </p>
 
           <p className="cifra mt-3 rounded-lg border border-exito/30 bg-white px-3 py-2.5 text-[1.05rem] font-semibold tracking-wide text-tinta">

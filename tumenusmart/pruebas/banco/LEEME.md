@@ -30,6 +30,7 @@ Corre el código REAL de `src/` en el navegador (Microsoft Edge), con una base d
 | `analista-ventas-logica` | Ideas (analista comercial): lee las ventas de todos los puntos (mostrador, comedor, delivery, turnos y canchas), no cuenta canceladas ni envíos, la leyenda «qué analiza» coincide con las ideas que se pueden emitir, y la ganancia con costos solo en algunos productos (cobertura, ranking, lista de los que faltan costear) |
 | `suscripcion-logica` | Vencimiento y suspensión: activar = 31 días justos (800 activaciones al azar), renovaciones, Registrar pago, Suspender/Reactivar con bitácora, y qué impide vender (solo «suspendido»; «vencido» no) |
 | `historial-estacion-logica` | Historial de cuentas por estación (caja): el filtro y la columna «Estación» del Excel con la ruta real; con una sola caja la planilla queda igual |
+| `clave-simple-logica` | Contraseña del dueño, administrador y cajero (5 caracteres de cualquier tipo; el superadmin sigue con 8 + letras y números) y exigirAutorizacion: si dos personas comparten contraseña no se autoriza a ninguna y la Bitácora avisa quiénes son; y en Mi cuenta / Usuarios, una contraseña que ya existe en el local se rechaza («Esa contraseña ya existe») con un freno de 5 pruebas en 10 minutos |
 
 `cripto.js` es un `node:crypto` mínimo y síncrono (SHA-256, HMAC, scrypt lento simulado) comprobado contra vectores oficiales; lo usan las pruebas de
 login, sesión y enlace.

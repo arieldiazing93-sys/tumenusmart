@@ -16,8 +16,10 @@
   let usuarios = new Map();
   S["src/lib/prisma"] = { prisma: { usuario: {
     findUnique: async ({ where }) => { const u = [...usuarios.values()].find((x) => (where.email ? x.email === where.email : x.id === where.id)); return u ? { ...u } : null; },
+    // Mi cuenta mira si otra persona del local ya tiene esa contraseña (ver clave-unica.ts) y cuenta los cambios recientes en la Bitácora.
+    findMany: async ({ where }) => [...usuarios.values()].filter((x) => x.storeId === where.storeId && (!where.id || x.id !== where.id.not)).map((x) => ({ ...x })),
     update: async ({ where, data }) => { const u = usuarios.get(where.id); Object.assign(u, data); return { ...u }; },
-  } } };
+  }, bitacora: { count: async () => 0, create: async () => ({}) } } };
   const galletas = new Map(); let ultimasOpciones = null;
   S["next/headers"] = { cookies: async () => ({
     get: (n) => (galletas.has(n) ? { value: galletas.get(n) } : undefined),
