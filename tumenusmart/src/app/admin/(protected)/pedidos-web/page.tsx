@@ -6,6 +6,7 @@ import { prismaDelLocal } from "@/lib/prisma-local";
 import { Cabecera, BotonEnlace } from "@/components/ui";
 import { RefrescarCada } from "@/components/RefrescarCada";
 import { normalizarRubro } from "@/lib/pedido-web";
+import { inicioDeHoyEnAsuncion } from "@/lib/timezone";
 import { filaDePedido, sincronizarPedidosConCuentas } from "@/lib/pedido-web-servidor";
 import { BandejaPedidosWeb } from "./BandejaPedidosWeb";
 
@@ -21,7 +22,6 @@ export default async function PedidosWebPage() {
   const storeId = await idLocalActual();
   const db = prismaDelLocal(storeId);
   const puedeGestionar = puede(sesion.rol, "delivery.gestionar");
-  const puedeCobrar = puedeGestionar && puede(sesion.rol, "pos.vender");
 
   // Lo que ya se cobró o canceló desde el Servicio delivery se refleja antes de armar la pantalla.
   await sincronizarPedidosConCuentas(storeId);
@@ -31,8 +31,8 @@ export default async function PedidosWebPage() {
     select: { pedidosWebActivo: true, pedidosWebAutoAceptar: true, pedidosWebRubro: true, slug: true, nombre: true },
   });
 
-  const desde = new Date();
-  desde.setHours(0, 0, 0, 0);
+  // «Hoy» empieza a la medianoche de Asunción. El servidor corre en UTC: con `setHours(0, 0, 0, 0)` la lista se limpiaba a las 21:00 de acá.
+  const desde = inicioDeHoyEnAsuncion();
   const [abiertos, cerrados] = await Promise.all([
     db.pedidoWeb.findMany({ where: { estado: { in: ["nuevo", "aceptado", "listo"] } }, orderBy: { createdAt: "asc" }, take: 100 }),
     db.pedidoWeb.findMany({
@@ -60,7 +60,7 @@ export default async function PedidosWebPage() {
     <div className="flex flex-col gap-5">
       <Cabecera
         titulo="Pedidos del menú"
-        bajada="Lo que tus clientes piden desde el menú digital. Abrí un pedido para verlo y aceptarlo con un toque: sale la comanda y después sigue por el Servicio delivery."
+        bajada="Lo que tus clientes piden desde el menú digital. Abrí un pedido para verlo y aceptarlo o rechazarlo: al aceptarlo sale la comanda y se abre su cuenta en el Servicio delivery, donde se asigna el repartidor y se cobra."
         acciones={
           <span className="flex flex-wrap items-center gap-2">
             <RefrescarCada segundos={10} generadoEn={generadoEn} />
@@ -88,7 +88,6 @@ export default async function PedidosWebPage() {
         cerrados={cerrados.map(aFila)}
         rubro={normalizarRubro(local?.pedidosWebRubro)}
         puedeGestionar={puedeGestionar}
-        puedeCobrar={puedeCobrar}
         aceptaSolo={local?.pedidosWebAutoAceptar ?? false}
         slug={local?.slug ?? ""}
         nombreLocal={local?.nombre ?? ""}

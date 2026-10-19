@@ -20,7 +20,18 @@ import type { ContextoDelivery, CuentaDeliveryFila } from "./tipos-delivery";
  * desaparece de la lista, y el cobro tiene que poder mostrar su comprobante igual.
  */
 /** `barra` va al lado del botón «Abrir cuenta», en la misma fila (igual que en el servicio comedor): la lista y el detalle suben. */
-export function DeliveryCaja({ cuentas, contexto, barra }: { cuentas: CuentaDeliveryFila[]; contexto: ContextoDelivery; barra?: ReactNode }) {
+export function DeliveryCaja({
+  cuentas,
+  contexto,
+  barra,
+  abrirCuentaId,
+}: {
+  cuentas: CuentaDeliveryFila[];
+  contexto: ContextoDelivery;
+  barra?: ReactNode;
+  /** La cuenta que arranca abierta a la derecha (llegando desde «Pedidos del menú»). */
+  abrirCuentaId?: string;
+}) {
   const router = useRouter();
   // Una copia de la cuenta que se está cobrando: sigue ahí aunque la lista se actualice y la cuenta ya no esté.
   const [cobrando, setCobrando] = useState<CuentaDeliveryFila | null>(null);
@@ -54,6 +65,7 @@ export function DeliveryCaja({ cuentas, contexto, barra }: { cuentas: CuentaDeli
         items={cuentas}
         cerrarSiDesaparece
         ocultarTotal
+        abiertoInicialId={abrirCuentaId}
         textoVacio="No hay cuentas de delivery abiertas. Cuando abras una con “Abrir cuenta”, aparece acá."
         textoPlaceholder="Hacé doble clic en una cuenta para ver todo lo que la compone y operarla: cargar productos, dar un descuento, imprimirla, mandarla con el repartidor o cobrarla."
         columnas={[

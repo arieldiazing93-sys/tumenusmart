@@ -29,12 +29,15 @@ export const dynamic = "force-dynamic";
  * vez. A la izquierda la lista; con doble clic en una se abre su detalle a la derecha. Al cobrarse, la cuenta sale de la lista.
  * Se actualiza solo.
  */
-export default async function DeliveryPage() {
+export default async function DeliveryPage({ searchParams }: { searchParams: Promise<{ cuenta?: string | string[] }> }) {
   const sesion = await pantallaConPermiso("delivery.ver");
   const storeId = await idLocalActual();
   const db = prismaDelLocal(storeId);
   const puedeGestionar = puede(sesion.rol, "delivery.gestionar");
   const puedeCobrar = puedeGestionar && puede(sesion.rol, "pos.vender");
+  // Si se llega desde «Pedidos del menú» con `?cuenta=<id>`, esa cuenta arranca abierta a la derecha (solo se abre si está en la lista de este local).
+  const { cuenta: cuentaPedida } = await searchParams;
+  const abrirCuentaId = (Array.isArray(cuentaPedida) ? cuentaPedida[0] : cuentaPedida) || undefined;
 
   // El enlace y el QR de la carta pública, para el acceso directo «Ver mi carta» de la cabecera.
   const local = await prisma.store.findUnique({ where: { id: storeId }, select: { nombre: true, slug: true } });
@@ -295,6 +298,7 @@ export default async function DeliveryPage() {
       <DeliveryCaja
         cuentas={filas}
         contexto={contexto}
+        abrirCuentaId={abrirCuentaId}
         barra={
           <>
             {imprimiendo ? (

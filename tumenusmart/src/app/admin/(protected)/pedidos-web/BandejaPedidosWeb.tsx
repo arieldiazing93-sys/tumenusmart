@@ -14,13 +14,10 @@ import type { PedidoWebFila } from "@/lib/pedido-web-servidor";
 import { pareceRucConDigito } from "@/lib/sifen/ruc";
 import { normalizarTelefonoParaWhatsapp } from "@/lib/whatsapp";
 import { enlaceDeMapa } from "@/lib/ubicacion-mapa";
-import { rutaParaAbrirTurno } from "@/lib/turno-requerido";
 import { AvisoRucDnit, useVerificacionDeCliente, useVerificacionRuc } from "../pos/AvisoRucDnit";
 import {
   aceptarPedido,
   corregirDatosDelPedido,
-  entregarYCobrarPedido,
-  marcarPedidoListo,
   quitarProductoDelPedido,
   rechazarPedido,
 } from "./actions";
@@ -82,7 +79,6 @@ export function BandejaPedidosWeb({
   cerrados,
   rubro,
   puedeGestionar,
-  puedeCobrar,
   aceptaSolo,
   slug = "",
   nombreLocal = "",
@@ -91,7 +87,6 @@ export function BandejaPedidosWeb({
   cerrados: PedidoWebFila[];
   rubro: RubroPedido;
   puedeGestionar: boolean;
-  puedeCobrar: boolean;
   aceptaSolo: boolean;
   /** La dirección del menú y el nombre del local: para armar el WhatsApp que se le manda al cliente con su enlace de seguimiento. */
   slug?: string;
@@ -133,7 +128,7 @@ export function BandejaPedidosWeb({
         items={items}
         cerrarSiDesaparece
         textoVacio="Todavía no entró ningún pedido del menú. Cuando entre uno, suena el aviso y aparece acá."
-        textoPlaceholder="Hacé doble clic en un pedido, o tocá Ver, para ver todo lo que pidió el cliente y atenderlo: aceptarlo, avisar que está listo o cobrarlo."
+        textoPlaceholder="Hacé doble clic en un pedido, o tocá Ver, para ver todo lo que pidió el cliente y atenderlo: aceptarlo o rechazarlo. Lo que aceptes sigue en el Servicio delivery."
         columnas={[
           {
             titulo: "Pedido",
@@ -168,7 +163,6 @@ export function BandejaPedidosWeb({
             rubro={rubro}
             ahora={ahora}
             puedeGestionar={puedeGestionar}
-            puedeCobrar={puedeCobrar}
             slug={slug}
             nombreLocal={nombreLocal}
           />
@@ -187,7 +181,6 @@ function TarjetaPedido({
   rubro,
   ahora,
   puedeGestionar,
-  puedeCobrar,
   slug,
   nombreLocal,
 }: {
@@ -195,7 +188,6 @@ function TarjetaPedido({
   rubro: RubroPedido;
   ahora: number | null;
   puedeGestionar: boolean;
-  puedeCobrar: boolean;
   slug: string;
   nombreLocal: string;
 }) {
@@ -252,28 +244,6 @@ function TarjetaPedido({
   async function rechazar(motivo: string) {
     const ok = await ejecutar(() => rechazarPedido(p.id, motivo));
     if (ok) setRechazando(false);
-  }
-
-  async function entregarYCobrar() {
-    setError(null);
-    setOcupado(true);
-    try {
-      const r = await entregarYCobrarPedido(p.id);
-      if (!r.ok) {
-        // Sin turno de caja abierto: se manda directo a abrirlo y se vuelve acá (regla del sistema: sin turno no se vende).
-        if (r.sinTurno) {
-          router.push(rutaParaAbrirTurno("/admin/pedidos-web"));
-          return;
-        }
-        setError(r.error);
-        return;
-      }
-      router.refresh();
-    } catch {
-      setError("No se pudo cobrar. Revisá la conexión y probá de nuevo.");
-    } finally {
-      setOcupado(false);
-    }
   }
 
   // El WhatsApp que el local le manda al cliente: dice cómo va su pedido y lleva el enlace para seguirlo (si retrocede o cierra la
@@ -485,18 +455,10 @@ function TarjetaPedido({
               </Boton>
             </>
           )}
-          {p.estado === "aceptado" && (
-            <Boton tono="principal" tam="lg" disabled={ocupado} onClick={() => void ejecutar(() => marcarPedidoListo(p.id))}>
-              {etiquetas.accionListo}
-            </Boton>
-          )}
-          {(p.estado === "aceptado" || p.estado === "listo") && puedeCobrar && (
-            <Boton tono={p.estado === "listo" ? "principal" : "navegar"} tam={p.estado === "listo" ? "lg" : "md"} disabled={ocupado} onClick={() => void entregarYCobrar()}>
-              {ocupado ? "Cobrando…" : etiquetas.accionEntregado}
-            </Boton>
-          )}
+          {/* Aceptado el pedido no hay más botones acá: no se marca «listo» ni se cobra desde esta bandeja (eso cerraba la cuenta sin
+              asignar repartidor). Se sigue en el Servicio delivery, con esa cuenta ya abierta a la derecha. */}
           {(p.estado === "aceptado" || p.estado === "listo") && (
-            <Link href="/admin/delivery" className={clasesBoton("navegar", "sm")}>
+            <Link href={p.cuentaDeliveryId ? `/admin/delivery?cuenta=${encodeURIComponent(p.cuentaDeliveryId)}` : "/admin/delivery"} className={clasesBoton("acceso", "md")}>
               Abrir la cuenta en el delivery
             </Link>
           )}

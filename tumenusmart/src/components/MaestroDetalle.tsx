@@ -30,6 +30,7 @@ export function MaestroDetalle<T extends { id: string; activo: boolean }>({
   renderNuevo,
   cerrarSiDesaparece = false,
   ocultarTotal = false,
+  abiertoInicialId,
 }: {
   items: T[];
   columnas: ColumnaMaestro<T>[];
@@ -52,9 +53,14 @@ export function MaestroDetalle<T extends { id: string; activo: boolean }>({
    * que la lista suba: el servicio comedor dice «N mesas abiertas» en su barra.
    */
   ocultarTotal?: boolean;
+  /**
+   * Una fila que arranca abierta (por ejemplo, al llegar desde otra pantalla con un enlace directo a esa cuenta). Si no está en la lista
+   * (otra fecha, ya cerrada, de otro local), no se abre nada.
+   */
+  abiertoInicialId?: string;
 }) {
   const router = useRouter();
-  const [abiertoId, setAbiertoId] = useState<string | null>(null);
+  const [abiertoId, setAbiertoId] = useState<string | null>(abiertoInicialId ?? null);
   const [creando, setCreando] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
 
