@@ -266,30 +266,36 @@ export default async function ComedorPage() {
         }
       />
 
-      <div className="flex flex-wrap items-center gap-2">
-        {imprimiendo ? (
-          <Pastilla color="exito" punto>
-            Impresión conectada
-          </Pastilla>
-        ) : (
-          <Pastilla color="amarillo" punto>
-            Nadie está imprimiendo
-          </Pastilla>
-        )}
-        {enEspera > 0 && (
-          <Pastilla color="amarillo">
-            {enEspera} {enEspera === 1 ? "comanda en espera" : "comandas en espera"}
-          </Pastilla>
-        )}
-        <span className="text-[0.82rem] text-tinta-media">
-          {filas.length} {filas.length === 1 ? "mesa abierta" : "mesas abiertas"} · {formatearGuarani(totalAbierto)} en cuentas
-        </span>
-        {/* Se actualiza sola cada 15 s mientras la pantalla está a la vista, y en el acto al volver a ella. No muestra nada: sin
-            `generadoEn` no dibuja el contador "Actualizado hace N s" (ese se activa pasándole `generadoEn`, si hiciera falta). */}
-        <RefrescarCada segundos={15} />
-      </div>
-
-      <ComedorCaja cuentas={filas} contexto={contexto} />
+      {/* El estado de la impresión y el resumen van en la MISMA fila que «Abrir cuenta» (dentro de ComedorCaja): una línea menos arriba,
+          para que la lista de mesas y el detalle de la cuenta se vean sin bajar la pantalla. */}
+      <ComedorCaja
+        cuentas={filas}
+        contexto={contexto}
+        barra={
+          <>
+            {imprimiendo ? (
+              <Pastilla color="exito" punto>
+                Impresión conectada
+              </Pastilla>
+            ) : (
+              <Pastilla color="amarillo" punto>
+                Nadie está imprimiendo
+              </Pastilla>
+            )}
+            {enEspera > 0 && (
+              <Pastilla color="amarillo">
+                {enEspera} {enEspera === 1 ? "comanda en espera" : "comandas en espera"}
+              </Pastilla>
+            )}
+            <span className="text-[0.82rem] text-tinta-media">
+              {filas.length} {filas.length === 1 ? "mesa abierta" : "mesas abiertas"} · {formatearGuarani(totalAbierto)} en cuentas
+            </span>
+            {/* Se actualiza sola cada 15 s mientras la pantalla está a la vista, y en el acto al volver a ella. No muestra nada: sin
+                `generadoEn` no dibuja el contador "Actualizado hace N s" (ese se activa pasándole `generadoEn`, si hiciera falta). */}
+            <RefrescarCada segundos={15} />
+          </>
+        }
+      />
     </div>
   );
 }

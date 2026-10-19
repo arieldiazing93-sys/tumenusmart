@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { MaestroDetalle } from "@/components/MaestroDetalle";
 import { Boton, Pastilla } from "@/components/ui";
@@ -19,7 +19,8 @@ import type { ContextoDelivery, CuentaDeliveryFila } from "./tipos-delivery";
  * los botones para operarla (ver DetalleCuentaDelivery). El panel de cobro vive acá y no dentro del detalle: al cobrarse, la cuenta
  * desaparece de la lista, y el cobro tiene que poder mostrar su comprobante igual.
  */
-export function DeliveryCaja({ cuentas, contexto }: { cuentas: CuentaDeliveryFila[]; contexto: ContextoDelivery }) {
+/** `barra` va al lado del botón «Abrir cuenta», en la misma fila (igual que en el servicio comedor): la lista y el detalle suben. */
+export function DeliveryCaja({ cuentas, contexto, barra }: { cuentas: CuentaDeliveryFila[]; contexto: ContextoDelivery; barra?: ReactNode }) {
   const router = useRouter();
   // Una copia de la cuenta que se está cobrando: sigue ahí aunque la lista se actualice y la cuenta ya no esté.
   const [cobrando, setCobrando] = useState<CuentaDeliveryFila | null>(null);
@@ -31,14 +32,12 @@ export function DeliveryCaja({ cuentas, contexto }: { cuentas: CuentaDeliveryFil
 
   return (
     <>
-      {contexto.puedeGestionar && (
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <p className="text-[0.8rem] text-tinta-media">
-            ¿Entró un pedido por WhatsApp o por teléfono? Abrí la cuenta desde acá: puede haber varias abiertas a la vez.
-          </p>
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+        {contexto.puedeGestionar && (
           <Boton
             tono="nuevo"
             tam="md"
+            title="¿Entró un pedido por WhatsApp o por teléfono? Abrí la cuenta desde acá: puede haber varias abiertas a la vez."
             onClick={() => {
               setAviso(null);
               setAbriendo(true);
@@ -46,13 +45,15 @@ export function DeliveryCaja({ cuentas, contexto }: { cuentas: CuentaDeliveryFil
           >
             Abrir cuenta
           </Boton>
-        </div>
-      )}
+        )}
+        {barra}
+      </div>
       {aviso && <p className="rounded-lg bg-exito-luz px-3 py-2 text-[0.84rem] font-medium text-exito">{aviso}</p>}
 
       <MaestroDetalle
         items={cuentas}
         cerrarSiDesaparece
+        ocultarTotal
         textoVacio="No hay cuentas de delivery abiertas. Cuando abras una con “Abrir cuenta”, aparece acá."
         textoPlaceholder="Hacé doble clic en una cuenta para ver todo lo que la compone y operarla: cargar productos, dar un descuento, imprimirla, mandarla con el repartidor o cobrarla."
         columnas={[

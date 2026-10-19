@@ -29,6 +29,7 @@ export function MaestroDetalle<T extends { id: string; activo: boolean }>({
   renderPanel,
   renderNuevo,
   cerrarSiDesaparece = false,
+  ocultarTotal = false,
 }: {
   items: T[];
   columnas: ColumnaMaestro<T>[];
@@ -46,6 +47,11 @@ export function MaestroDetalle<T extends { id: string; activo: boolean }>({
    * aparece (recién creada, antes de refrescar) se muestra como "Abriendo…".
    */
   cerrarSiDesaparece?: boolean;
+  /**
+   * Sin la línea «N en total» de arriba (cuando no hay botón de alta). Para las pantallas que ya muestran la cantidad en otro lado y quieren
+   * que la lista suba: el servicio comedor dice «N mesas abiertas» en su barra.
+   */
+  ocultarTotal?: boolean;
 }) {
   const router = useRouter();
   const [abiertoId, setAbiertoId] = useState<string | null>(null);
@@ -74,21 +80,23 @@ export function MaestroDetalle<T extends { id: string; activo: boolean }>({
 
   return (
     <div>
-      <div className="mb-3 flex flex-wrap items-center gap-3">
-        {textoNuevo && renderNuevo && (
-          <button
-            type="button"
-            onClick={() => {
-              setAbiertoId(null);
-              setCreando(true);
-            }}
-            className={clasesBoton("nuevo")}
-          >
-            {textoNuevo}
-          </button>
-        )}
-        <span className="text-xs text-tinta-suave">{items.length} en total</span>
-      </div>
+      {(!ocultarTotal || (textoNuevo && renderNuevo)) && (
+        <div className="mb-3 flex flex-wrap items-center gap-3">
+          {textoNuevo && renderNuevo && (
+            <button
+              type="button"
+              onClick={() => {
+                setAbiertoId(null);
+                setCreando(true);
+              }}
+              className={clasesBoton("nuevo")}
+            >
+              {textoNuevo}
+            </button>
+          )}
+          {!ocultarTotal && <span className="text-xs text-tinta-suave">{items.length} en total</span>}
+        </div>
+      )}
 
       <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[26rem_minmax(0,1fr)]">
         {/* ---------------- izquierda: la lista ---------------- */}

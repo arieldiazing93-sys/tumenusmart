@@ -291,29 +291,34 @@ export default async function DeliveryPage() {
         }
       />
 
-      <div className="flex flex-wrap items-center gap-2">
-        {imprimiendo ? (
-          <Pastilla color="exito" punto>
-            Impresión conectada
-          </Pastilla>
-        ) : (
-          <Pastilla color="amarillo" punto>
-            Nadie está imprimiendo
-          </Pastilla>
-        )}
-        {enEspera > 0 && (
-          <Pastilla color="amarillo">
-            {enEspera} {enEspera === 1 ? "comanda en espera" : "comandas en espera"}
-          </Pastilla>
-        )}
-        <span className="text-[0.82rem] text-tinta-media">
-          {filas.length} {filas.length === 1 ? "cuenta" : "cuentas"} · {formatearGuarani(totalPorCobrar)} por cobrar
-        </span>
-        {/* Se actualiza sola cada 15 s mientras la pantalla está a la vista, y en el acto al volver a ella. */}
-        <RefrescarCada segundos={15} />
-      </div>
-
-      <DeliveryCaja cuentas={filas} contexto={contexto} />
+      {/* El estado de la impresión y el resumen van en la MISMA fila que «Abrir cuenta» (dentro de DeliveryCaja), como en el comedor. */}
+      <DeliveryCaja
+        cuentas={filas}
+        contexto={contexto}
+        barra={
+          <>
+            {imprimiendo ? (
+              <Pastilla color="exito" punto>
+                Impresión conectada
+              </Pastilla>
+            ) : (
+              <Pastilla color="amarillo" punto>
+                Nadie está imprimiendo
+              </Pastilla>
+            )}
+            {enEspera > 0 && (
+              <Pastilla color="amarillo">
+                {enEspera} {enEspera === 1 ? "comanda en espera" : "comandas en espera"}
+              </Pastilla>
+            )}
+            <span className="text-[0.82rem] text-tinta-media">
+              {filas.length} {filas.length === 1 ? "cuenta" : "cuentas"} · {formatearGuarani(totalPorCobrar)} por cobrar
+            </span>
+            {/* Se actualiza sola cada 15 s mientras la pantalla está a la vista, y en el acto al volver a ella. */}
+            <RefrescarCada segundos={15} />
+          </>
+        }
+      />
     </div>
   );
 }

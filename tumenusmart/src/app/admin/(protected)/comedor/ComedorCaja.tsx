@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { MaestroDetalle } from "@/components/MaestroDetalle";
 import { Boton, Pastilla } from "@/components/ui";
@@ -95,7 +95,11 @@ export type ContextoCaja = {
  * botones para operarla (ver DetalleCuenta). El panel de cobro vive acá y no dentro del detalle: cuando la cuenta se paga
  * desaparece de la lista, y el cobro tiene que poder mostrar su comprobante igual.
  */
-export function ComedorCaja({ cuentas, contexto }: { cuentas: CuentaCajaFila[]; contexto: ContextoCaja }) {
+/**
+ * `barra` es lo que va al lado del botón «Abrir cuenta» en la primera línea (el estado de la impresión y cuántas mesas hay abiertas):
+ * todo en UNA fila para que la lista y el detalle de la cuenta suban y se vean sin bajar la pantalla.
+ */
+export function ComedorCaja({ cuentas, contexto, barra }: { cuentas: CuentaCajaFila[]; contexto: ContextoCaja; barra?: ReactNode }) {
   const router = useRouter();
   // Una copia de la cuenta que se está cobrando: sigue ahí aunque la lista se actualice y la cuenta ya no esté.
   const [cobrando, setCobrando] = useState<CuentaCajaFila | null>(null);
@@ -107,14 +111,12 @@ export function ComedorCaja({ cuentas, contexto }: { cuentas: CuentaCajaFila[]; 
 
   return (
     <>
-      {contexto.puedeGestionar && (
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <p className="text-[0.8rem] text-tinta-media">
-            ¿El mozo no está o el cliente pide en la caja? Abrí la cuenta desde acá.
-          </p>
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+        {contexto.puedeGestionar && (
           <Boton
             tono="nuevo"
             tam="md"
+            title="¿El mozo no está o el cliente pide en la caja? Abrí la cuenta desde acá."
             onClick={() => {
               setAviso(null);
               setAbriendo(true);
@@ -122,13 +124,15 @@ export function ComedorCaja({ cuentas, contexto }: { cuentas: CuentaCajaFila[]; 
           >
             Abrir cuenta
           </Boton>
-        </div>
-      )}
+        )}
+        {barra}
+      </div>
       {aviso && <p className="rounded-lg bg-exito-luz px-3 py-2 text-[0.84rem] font-medium text-exito">{aviso}</p>}
 
       <MaestroDetalle
         items={filas}
         cerrarSiDesaparece
+        ocultarTotal
         textoVacio="No hay mesas abiertas. Cuando un mozo abra una mesa y envíe un pedido, o la abras vos con “Abrir cuenta”, la cuenta aparece acá."
         textoPlaceholder="Hacé doble clic en una mesa para ver su cuenta y operarla: cargar productos, dar un descuento, imprimir la cuenta o cobrarla."
         columnas={[
