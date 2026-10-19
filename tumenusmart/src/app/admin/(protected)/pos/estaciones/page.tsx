@@ -56,7 +56,7 @@ export default async function EstacionesPage() {
             comanda) no se puede elegir el área del ticket/factura ni asignar impresoras a una estación. Creala primero
             y volvé acá.
             <div className="mt-3">
-              <BotonEnlace href="/admin/pos/areas-impresion" tono="navegar" tam="md">
+              <BotonEnlace href="/admin/pos/areas-impresion" tono="acceso" tam="md">
                 Ir a Áreas de impresión
               </BotonEnlace>
             </div>

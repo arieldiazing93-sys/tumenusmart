@@ -18,7 +18,7 @@ import type { ReactNode } from "react";
 //  Botón
 // ===========================================================================
 
-export type Tono = "principal" | "suave" | "navegar" | "acceso" | "violeta" | "lila" | "exito" | "nuevo" | "peligro" | "fantasma" | "whatsapp";
+export type Tono = "principal" | "suave" | "navegar" | "acceso" | "violeta" | "lila" | "exito" | "nuevo" | "peligro" | "rojo" | "fantasma" | "whatsapp";
 
 const TONOS: Record<Tono, string> = {
   // Naranja: avanzar y ejecutar (cobrar, continuar, enviar, filtrar). Guardar es azul (navegar) y crear es verde (nuevo).
@@ -50,6 +50,9 @@ const TONOS: Record<Tono, string> = {
   nuevo: "bg-exito text-white hover:opacity-90 focus-visible:outline-exito",
   peligro:
     "border border-peligro/30 bg-peligro-luz text-peligro hover:bg-peligro hover:text-white",
+  // Rojo sólido: desactivar, cancelar o eliminar cuando el botón tiene que leerse sin esfuerzo (fondo fuerte, letra BLANCA). «peligro» es el mismo
+  // rojo pero claro y con la letra roja, que cuesta leer; los botones de las pantallas de configuración de impresión usan este.
+  rojo: "bg-peligro text-white hover:opacity-90 focus-visible:outline-peligro",
   fantasma: "text-tinta-media hover:bg-papel-hundido hover:text-tinta",
   // El verde de WhatsApp (verde limón): TODO botón que abre o manda un WhatsApp lo lleva, con el ícono de WhatsApp adelante, para
   // que se reconozca de un vistazo qué hace. Mismo color que el botón que ve el cliente en el menú.

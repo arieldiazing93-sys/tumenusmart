@@ -46,7 +46,7 @@ function ContadorCopias({
   onCambiar: (nuevo: number) => void;
 }) {
   const boton =
-    "flex h-7 w-7 flex-none items-center justify-center rounded-md border border-azul/40 bg-azul-luz text-[1rem] font-bold leading-none text-azul-oscuro transition-colors hover:bg-azul hover:text-white disabled:opacity-40";
+    "flex h-7 w-7 flex-none items-center justify-center rounded-md border border-azul/40 bg-azul-luz text-[1rem] font-bold leading-none text-tinta transition-colors hover:bg-azul hover:text-white disabled:opacity-40";
   return (
     <span className="inline-flex items-center gap-1.5 text-xs text-tinta-media">
       <span className="font-semibold">{etiqueta}</span>
@@ -90,8 +90,8 @@ function clasesSelectCompacto(asignado: boolean): string {
     "rounded-lg border px-2 py-1.5 text-[0.82rem] font-medium transition-colors duration-150 " +
     "focus:outline-none focus:ring-2 disabled:opacity-50 " +
     (asignado
-      ? "border-exito/30 bg-exito-luz text-exito focus:border-exito focus:ring-exito/15"
-      : "border-aviso/30 bg-aviso-luz text-aviso focus:border-aviso focus:ring-aviso/15")
+      ? "border-exito/30 bg-exito-luz text-tinta focus:border-exito focus:ring-exito/15"
+      : "border-aviso/30 bg-aviso-luz text-tinta focus:border-aviso focus:ring-aviso/15")
   );
 }
 
@@ -295,7 +295,7 @@ export function EstacionFila({
               type="button"
               disabled={pending}
               onClick={guardarNombre}
-              className={clasesBoton("navegar", "sm")}
+              className={clasesBoton("acceso", "sm")}
             >
               Guardar
             </button>
@@ -306,7 +306,7 @@ export function EstacionFila({
                 setEditando(false);
                 setError(null);
               }}
-              className={clasesBoton("peligro", "sm")}
+              className={clasesBoton("rojo", "sm")}
             >
               Cancelar
             </button>
@@ -383,15 +383,15 @@ export function EstacionFila({
               </select>
             </label>
             {activa && !esEstaComputadora && (
-              <Boton tono="navegar" tam="sm" onClick={vincular} disabled={vinculando}>
+              <Boton tono="acceso" tam="sm" onClick={vincular} disabled={vinculando}>
                 {vinculando ? "Vinculando…" : "Vincular esta computadora"}
               </Boton>
             )}
-            <Boton tono="navegar" tam="sm" onClick={() => setEditando(true)}>
+            <Boton tono="acceso" tam="sm" onClick={() => setEditando(true)}>
               Renombrar
             </Boton>
             <Boton
-              tono={activa ? "peligro" : "nuevo"}
+              tono={activa ? "rojo" : "nuevo"}
               tam="sm"
               disabled={pending}
               onClick={cambiarActiva}
@@ -422,7 +422,7 @@ export function EstacionFila({
                   type="button"
                   onClick={buscarImpresoras}
                   disabled={buscandoImpresoras}
-                  className={clasesBoton("navegar", "sm")}
+                  className={clasesBoton("acceso", "sm")}
                 >
                   {buscandoImpresoras ? "Buscando…" : "Buscar impresoras"}
                 </button>
@@ -479,7 +479,7 @@ export function EstacionFila({
                               type="button"
                               disabled={probando !== null}
                               onClick={() => probarImpresion(a.id, p.etiqueta, actual)}
-                              className={clasesBoton("navegar", "sm")}
+                              className={clasesBoton("acceso", "sm")}
                             >
                               {probando === a.id ? "Enviando prueba…" : p.texto}
                             </button>

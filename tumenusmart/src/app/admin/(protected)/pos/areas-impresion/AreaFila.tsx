@@ -64,7 +64,7 @@ export function AreaFila({
               type="button"
               disabled={pending}
               onClick={guardarNombre}
-              className={clasesBoton("navegar", "sm")}
+              className={clasesBoton("acceso", "sm")}
             >
               Guardar
             </button>
@@ -75,7 +75,7 @@ export function AreaFila({
                 setEditando(false);
                 setError(null);
               }}
-              className={clasesBoton("peligro", "sm")}
+              className={clasesBoton("rojo", "sm")}
             >
               Cancelar
             </button>
@@ -99,14 +99,14 @@ export function AreaFila({
         {!editando && (
           <div className="flex flex-wrap items-center gap-2 text-sm">
             <span className="text-tinta-media">{cantidadProductos} producto(s)</span>
-            <button type="button" onClick={() => setEditando(true)} className={clasesBoton("navegar", "sm")}>
+            <button type="button" onClick={() => setEditando(true)} className={clasesBoton("acceso", "sm")}>
               Renombrar
             </button>
             <button
               type="button"
               disabled={pending}
               onClick={cambiarActiva}
-              className={clasesBoton(activa ? "peligro" : "nuevo", "sm")}
+              className={clasesBoton(activa ? "rojo" : "nuevo", "sm")}
             >
               {activa ? "Desactivar" : "Reactivar"}
             </button>
