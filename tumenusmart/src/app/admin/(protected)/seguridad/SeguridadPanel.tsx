@@ -156,7 +156,9 @@ export function SeguridadPanel({
         )}
         <p className="text-[0.78rem] leading-snug text-tinta-suave">
           La contraseña que se pide es la de entrar al panel de quien autoriza. El dueño siempre es Administrador; a cada usuario se le asigna el perfil al
-          crearlo o después, en Usuarios del sistema. Con 5 contraseñas incorrectas seguidas el cuadro se bloquea 3 minutos, y todo queda en la Bitácora (módulo Seguridad).
+          crearlo o después, en Usuarios del sistema. Alcanza con 5 caracteres, del tipo que sea, pero cada persona necesita la suya: el sistema no deja
+          repetir una contraseña ya usada en el local (si igual coincidieran dos, no daría la autorización hasta que una la cambie). Con 5 contraseñas incorrectas seguidas el cuadro se bloquea 3 minutos,
+          y todo queda en la Bitácora (módulo Seguridad).
         </p>
       </Tarjeta>
     </div>

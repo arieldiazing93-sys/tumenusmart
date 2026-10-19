@@ -3,6 +3,7 @@
 import { CampoContrasena } from "@/components/CampoContrasena";
 import { clasesBoton } from "@/components/ui";
 import { useEffect, useRef, useState, useTransition } from "react";
+import { requisitosDeClave } from "@/lib/reglas-clave";
 import { cambiarMiPassword } from "./actions";
 
 const CAMPO =
@@ -24,7 +25,7 @@ const CAMPO =
  *   3. Lo que se envía sale de acá y no de lo que quedó escrito en la casilla,
  *      así que aunque el navegador llegue a completar algo, no viaja.
  */
-export function FormularioPassword() {
+export function FormularioPassword({ rol }: { rol: string }) {
   const [actual, setActual] = useState("");
   const [nueva, setNueva] = useState("");
   const [repetida, setRepetida] = useState("");
@@ -114,7 +115,7 @@ export function FormularioPassword() {
           className={CAMPO}
         />
         <span className="text-xs text-tinta-suave">
-          Al menos 8 caracteres, con letras y números.
+          {requisitosDeClave(rol)}
         </span>
       </label>
 

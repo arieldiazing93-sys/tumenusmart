@@ -3,6 +3,7 @@
 import { useRef, useState, useTransition } from "react";
 import { Campo, Entrada, MensajeError, Selector, clasesBoton } from "@/components/ui";
 import { llamarAlServidor } from "@/lib/llamar-servidor";
+import { requisitosDeClave } from "@/lib/reglas-clave";
 import { crearUsuario } from "./actions";
 
 type Local = { id: string; nombre: string; slug: string };
@@ -70,14 +71,14 @@ export function CrearUsuarioForm({ locales }: { locales: Local[] }) {
       <div className="sm:col-span-2">
         <Campo
           etiqueta="Contraseña"
-          ayuda="Se muestra en claro a propósito, para que puedas copiarla y pasársela. Después de guardar no se puede volver a ver: solo cambiarla."
+          ayuda={`${requisitosDeClave(rol)} Se muestra en claro a propósito, para que puedas copiarla y pasársela. Después de guardar no se puede volver a ver: solo cambiarla.`}
         >
           <Entrada
             type="text"
             name="password"
             required
             autoComplete="off"
-            placeholder="Al menos 8 caracteres, con letras y números"
+            placeholder={requisitosDeClave(rol)}
           />
         </Campo>
       </div>

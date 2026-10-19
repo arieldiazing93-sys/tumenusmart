@@ -8,6 +8,7 @@ import { promisify } from "util";
 import { Prisma } from "@prisma/client";
 import { prisma } from "./prisma";
 import { registrarBitacora } from "./bitacora";
+import { revisarClave } from "./reglas-clave";
 
 const COOKIE_NAME = "admin_session";
 const DIAS_DE_SESION = 7;
@@ -53,13 +54,13 @@ export async function passwordCoincide(plano: string, guardado: string): Promise
   return timingSafeEqual(derivada, esperado);
 }
 
-/** Reglas mínimas para una contraseña nueva. Devuelve el error o null. */
-export function revisarPasswordNueva(plano: string): string | null {
-  if (plano.length < 8) return "La contraseña tiene que tener al menos 8 caracteres";
-  if (plano.length > 200) return "La contraseña es demasiado larga";
-  if (!/[a-zA-Z]/.test(plano)) return "La contraseña tiene que incluir alguna letra";
-  if (!/[0-9]/.test(plano)) return "La contraseña tiene que incluir algún número";
-  return null;
+/**
+ * Reglas mínimas para una contraseña nueva. Devuelve el error o null. Dependen de a quién le toca (ver reglas-clave.ts): el dueño, el
+ * administrador y el cajero pueden tener una de 5 caracteres de cualquier tipo; el superadmin, no. El `rol` es de QUIEN va a usarla,
+ * nunca lo que mande el navegador.
+ */
+export function revisarPasswordNueva(plano: string, rol: string | null | undefined): string | null {
+  return revisarClave(plano, rol);
 }
 
 export function normalizarEmail(valor: string): string {

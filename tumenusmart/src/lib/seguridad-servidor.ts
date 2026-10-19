@@ -4,7 +4,7 @@ import { registrarBitacora } from "./bitacora";
 import { pedirIntentoDePin, resolverIntentoDePin } from "./limite-pin";
 import {
   TEXTOS_AUTORIZACION,
-  buscarAutorizante,
+  buscarAutorizantes,
   etiquetaDeEvento,
   perfilDeUsuario,
   pideClave,
@@ -68,8 +68,21 @@ export async function exigirAutorizacion(
     .filter((u) => puedeAutorizar(perfilDeUsuario(u.rol, u.perfilSeguridad), local.seguridadPermisosCaja, evento))
     .map((u) => ({ id: u.id, nombre: u.nombre?.trim() || u.email, passwordHash: u.passwordHash }));
 
-  const encontrado = clave.length > LARGO_MAXIMO_CLAVE ? null : await buscarAutorizante(clave, autorizantes, passwordCoincide);
-  const resultado = await resolverIntentoDePin("autorizacion", storeId, encontrado !== null, intento.n);
+  const coinciden = clave.length > LARGO_MAXIMO_CLAVE ? [] : await buscarAutorizantes(clave, autorizantes, passwordCoincide);
+  // Si coinciden dos, la contraseña es verdadera (no fue una adivinanza): el intento se devuelve igual que en un acierto.
+  const resultado = await resolverIntentoDePin("autorizacion", storeId, coinciden.length > 0, intento.n);
+
+  // Dos personas con la misma contraseña (fácil con las de 5 caracteres): no se autoriza, porque la Bitácora diría una persona al azar.
+  if (coinciden.length > 1) {
+    await registrarBitacora(storeId, quien, {
+      modulo: "seguridad",
+      accion: "autorizacion_compartida",
+      descripcion: `${nombreDeQuienPide} escribió para “${etiqueta}” una contraseña que usan a la vez ${coinciden.map((c) => c.nombre).join(" y ")}: no se autorizó porque no se sabe quién fue. Una de esas personas tiene que cambiarla en Mi cuenta.`,
+      detalle: { evento, usuarios: coinciden.map((c) => ({ id: c.id, nombre: c.nombre })) },
+    });
+    return { ok: false, error: TEXTOS_AUTORIZACION.compartida, requiereClave: true };
+  }
+  const encontrado = coinciden[0] ?? null;
 
   if (!encontrado) {
     await registrarBitacora(storeId, quien, {

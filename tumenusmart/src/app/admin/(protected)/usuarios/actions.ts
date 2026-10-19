@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { ERROR_CLAVE_REPETIDA, claveYaExiste, debeSerUnica } from "@/lib/clave-unica";
 import {
   abrirSesion,
   cifrarPassword,
@@ -43,13 +44,17 @@ export async function crearUsuario(formData: FormData): Promise<ResultadoAccion>
     return { ok: false, error: "Escribí un correo válido" };
   }
 
-  const problema = revisarPasswordNueva(password);
+  const problema = revisarPasswordNueva(password, rol);
   if (problema) return { ok: false, error: problema };
 
   // El superadmin no pertenece a ningún local; el usuario de local sí, siempre.
   const storeId = rol === "superadmin" ? null : storeIdCrudo || null;
   if (rol !== "superadmin" && !storeId) {
     return { ok: false, error: "Elegí a qué local pertenece este usuario" };
+  }
+  // Un segundo usuario del mismo local no puede repetir la contraseña de otro (con ella se autoriza en la caja).
+  if (storeId && debeSerUnica(rol) && (await claveYaExiste(storeId, password, null))) {
+    return { ok: false, error: ERROR_CLAVE_REPETIDA };
   }
 
   if (storeId) {
@@ -96,8 +101,14 @@ export async function restablecerPassword(
   const sesion = await exigirSuperadmin();
 
   const password = String(formData.get("password") ?? "");
-  const problema = revisarPasswordNueva(password);
+  // La regla es la de a quien se le restablece (no la de quien lo hace): se lee su rol de la base.
+  const destino = await prisma.usuario.findUnique({ where: { id: usuarioId }, select: { rol: true, storeId: true } });
+  if (!destino) return { ok: false, error: "No encontré a ese usuario" };
+  const problema = revisarPasswordNueva(password, destino.rol);
   if (problema) return { ok: false, error: problema };
+  if (destino.storeId && debeSerUnica(destino.rol) && (await claveYaExiste(destino.storeId, password, usuarioId))) {
+    return { ok: false, error: ERROR_CLAVE_REPETIDA };
+  }
 
   await prisma.usuario.update({
     where: { id: usuarioId },

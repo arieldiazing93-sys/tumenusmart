@@ -80,7 +80,8 @@ export async function crearPrimerUsuario(formData: FormData) {
   if (nueva !== repetida) {
     redirect("/admin/login?error=arranque_repetida");
   }
-  if (revisarPasswordNueva(nueva)) {
+  // La primera cuenta es siempre la del superadmin: regla estricta.
+  if (revisarPasswordNueva(nueva, "superadmin")) {
     redirect("/admin/login?error=arranque_debil");
   }
 

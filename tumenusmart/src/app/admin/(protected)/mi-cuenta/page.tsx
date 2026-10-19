@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { sesionActual } from "@/lib/auth";
+import { requisitosDeClave } from "@/lib/reglas-clave";
 import { FormularioPassword } from "./FormularioPassword";
 
 export const dynamic = "force-dynamic";
@@ -33,12 +34,12 @@ export default async function MiCuentaPage() {
         <div className="mb-4 rounded-lg border border-aviso/30 bg-aviso-luz p-3">
           <p className="text-sm text-aviso">
             <strong>Todavía usás la contraseña que te entregamos.</strong> Esa contraseña
-            viajó por WhatsApp, así que la vio más de una persona. Cambiala por una tuya.
+            viajó por WhatsApp, así que la vio más de una persona. Cambiala por una tuya. {requisitosDeClave(sesion.rol)}
           </p>
         </div>
       )}
 
-      <FormularioPassword />
+      <FormularioPassword rol={sesion.rol} />
     </div>
   );
 }

@@ -127,20 +127,23 @@ export function puedeAutorizar(perfil: PerfilDeSeguridad, permisosCaja: readonly
 export type Autorizante = { id: string; nombre: string; passwordHash: string };
 
 /**
- * Busca de quién es la contraseña escrita: prueba con cada usuario autorizado y devuelve el primero que coincide (o null).
+ * Busca de quién es la contraseña escrita: prueba con cada usuario autorizado y devuelve TODOS los que coinciden (ninguno, uno, o más de
+ * uno si dos personas eligieron la misma contraseña, algo fácil de que pase con las de 5 caracteres). Si coinciden varios, no se sabe
+ * quién fue y la autorización no se da: la Bitácora no puede atribuirle la acción a uno cualquiera de ellos.
  * `coincide` es la comparación de contraseñas (scrypt en el servidor); acá se recibe de afuera para poder probarla sin criptografía.
  * Una contraseña vacía nunca coincide con nadie.
  */
-export async function buscarAutorizante(
+export async function buscarAutorizantes(
   clave: unknown,
   autorizantes: Autorizante[],
   coincide: (claveEscrita: string, guardado: string) => Promise<boolean>
-): Promise<Autorizante | null> {
-  if (typeof clave !== "string" || clave.length === 0) return null;
+): Promise<Autorizante[]> {
+  if (typeof clave !== "string" || clave.length === 0) return [];
+  const encontrados: Autorizante[] = [];
   for (const a of autorizantes) {
-    if (await coincide(clave, a.passwordHash)) return a;
+    if (await coincide(clave, a.passwordHash)) encontrados.push(a);
   }
-  return null;
+  return encontrados;
 }
 
 /** Los textos que ve quien pide la autorización, para que sean los mismos en el servidor y en las pruebas. */
@@ -151,4 +154,7 @@ export const TEXTOS_AUTORIZACION = {
     `Demasiados intentos con una contraseña incorrecta. Probá de nuevo en ${minutos} ${minutos === 1 ? "minuto" : "minutos"}.`,
   sinAutorizantes:
     "No hay ningún usuario activo que pueda autorizar esto en este local. Pedile al dueño que revise Ajustes → Seguridad.",
+  /** La contraseña es correcta, pero la usan dos personas que pueden autorizar esto: no se sabe cuál de las dos es. */
+  compartida:
+    "Esa contraseña la usan dos personas del local, así que no se puede saber quién autoriza. Una de las dos tiene que cambiarla en Mi cuenta.",
 } as const;
