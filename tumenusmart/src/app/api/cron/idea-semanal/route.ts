@@ -2,11 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { prismaDelLocal } from "@/lib/prisma-local";
 import { ZONA_NEGOCIO } from "@/lib/timezone";
-import { costoDelProducto } from "@/lib/costo-receta";
-import { aplanarReceta } from "@/lib/insumo-elaborado";
 import { cargarElaborados } from "@/lib/cargar-elaborados";
-import { cargarVentasParaAnalisis } from "@/lib/ventas-para-analisis";
-import { analizar, elegirIdeaDeLaSemana, lunesDeLaSemana, type ProductoAnalisis } from "@/lib/analista";
+import { cargarVentasParaAnalisis, productoParaAnalisis } from "@/lib/ventas-para-analisis";
+import { analizar, elegirIdeaDeLaSemana, lunesDeLaSemana } from "@/lib/analista";
 
 export const dynamic = "force-dynamic";
 /** El recorrido de varios locales no entra en el tiempo por defecto. */
@@ -72,17 +70,7 @@ export async function GET(request: NextRequest) {
 
       // Una receta que lleva una preparación (salsa, masa…) se costea con los insumos con que se hace.
       const elaborados = await cargarElaborados(local.id);
-      const productos: ProductoAnalisis[] = productosCrudos.map((pr) => ({
-        id: pr.id,
-        nombre: pr.nombre,
-        categoriaId: pr.categoryId,
-        categoriaNombre: pr.category.nombre,
-        precio: Number(pr.precio),
-        costo: costoDelProducto(pr.costo, aplanarReceta(pr.receta, elaborados)),
-        iva: pr.iva,
-        disponible: pr.disponible,
-        creado: pr.createdAt,
-      }));
+      const productos = productosCrudos.map((pr) => productoParaAnalisis(pr, elaborados));
 
       const resultado = analizar({ pedidos, productos, ahora, zona: ZONA_NEGOCIO });
 

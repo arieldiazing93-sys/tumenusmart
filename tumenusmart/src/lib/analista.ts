@@ -1,5 +1,5 @@
 /**
- * Analista comercial: mira los pedidos de un local y saca conclusiones útiles.
+ * Analista comercial: mira las ventas de un local (mostrador, comedor, delivery, turnos y canchas: todo lo que se cobra entra por el punto de venta) y saca conclusiones útiles.
  *
  * Este archivo es deliberadamente PURO — no toca la base de datos ni Next.js.
  * Recibe datos y devuelve ideas. Eso permite probarlo de verdad con casos
@@ -7,7 +7,7 @@
  * decir a un negocio dónde poner su plata.
  *
  * La regla de oro de todo lo que hay acá: **callar cuando no alcanza**. Una
- * conclusión sacada de doce pedidos es ruido con forma de consejo, y el dueño
+ * conclusión sacada de doce ventas es ruido con forma de consejo, y el dueño
  * la va a tomar como si fuera cierta. Por eso cada idea declara cuántos datos
  * la respaldan, y las que no llegan al mínimo directamente no se emiten.
  */
@@ -121,6 +121,29 @@ const DIAS_SIN_VOLVER = 45;
 const MS_POR_DIA = 24 * 60 * 60 * 1000;
 
 // ---------------------------------------------------------------------------
+//  Lo que analiza, dicho para el dueño
+// ---------------------------------------------------------------------------
+
+/** De dónde sale lo que se analiza, en palabras (se muestra siempre arriba de Ideas). */
+export const FUENTES_DEL_ANALISIS = "mostrador, comedor, delivery, turnos y reservas de canchas";
+
+/**
+ * Lo que analiza el analista comercial, para mostrarlo siempre arriba de Ideas (también cuando todavía hay pocas ventas y también cuando
+ * ya hay muchas). Cada línea nombra las ideas (`clave`) que produce, así lo que se promete en pantalla no se separa de lo que el código hace:
+ * una prueba (pruebas/banco/analista-ventas-logica.js) comprueba que cada idea que se puede emitir figure acá. «abandono» (carritos que se
+ * arman y no se envían) no está a propósito: las ventas del punto de venta siempre están enviadas, esa idea ya no puede aparecer.
+ */
+export const QUE_ANALIZA: { texto: string; claves: string[] }[] = [
+  { texto: "Cuánto vendés, cuánto facturás y cuál es tu ticket promedio", claves: ["resumen"] },
+  { texto: "En qué horas y en qué días vendés poco", claves: ["franja", "dia"] },
+  { texto: "Qué productos y servicios casi no se venden", claves: ["dormidos"] },
+  { texto: "Qué se compra junto con qué, para armar combos", claves: ["combo"] },
+  { texto: "Qué categoría casi nunca se suma a la venta", claves: ["categoria_ausente"] },
+  { texto: "Clientes habituales que dejaron de volver y los que más compran", claves: ["clientes_perdidos", "clientes_fieles"] },
+  { texto: "Qué producto te deja más ganancia (cuando tus productos tienen costo)", claves: ["margen"] },
+  { texto: "Si se gasta más con delivery o con retiro", claves: ["delivery_retiro"] },
+];
+// ---------------------------------------------------------------------------
 //  Utilidades
 // ---------------------------------------------------------------------------
 
@@ -229,7 +252,7 @@ function ideaResumen(reales: PedidoAnalisis[]): Idea {
     clave: "resumen",
     tipo: "dato",
     titulo: "Tu foto del período",
-    dato: `${reales.length} pedidos, ${guaranies(facturado)} facturados, ticket promedio ${guaranies(ticket)}`,
+    dato: `${reales.length} ventas, ${guaranies(facturado)} facturados, ticket promedio ${guaranies(ticket)}`,
     accion:
       "Es la base de todo lo que sigue. Si subís el ticket promedio un 10%, facturás un 10% más sin conseguir un solo cliente nuevo.",
     confianza: "alta",
@@ -290,12 +313,12 @@ function ideaFranjaFloja(reales: PedidoAnalisis[], zona: string): Idea | null {
     clave: "franja",
     tipo: "oportunidad",
     titulo: "Tenés una franja fuerte y una muy floja",
-    dato: `De ${franjaTexto(mejor[0])} hacés ${mejor[1].pedidos} pedidos; de ${franjaTexto(peor[0])}, solo ${peor[1].pedidos}`,
-    accion: `La cocina y el personal ya están pagos en las dos franjas. Una promoción acotada a ${franjaTexto(peor[0])} no te regala margen: te llena horas que hoy tenés vacías.`,
+    dato: `De ${franjaTexto(mejor[0])} hacés ${mejor[1].pedidos} ventas; de ${franjaTexto(peor[0])}, solo ${peor[1].pedidos}`,
+    accion: `El local y el personal ya están pagos en las dos franjas. Una promoción acotada a ${franjaTexto(peor[0])} no te regala margen: te llena horas que hoy tenés vacías.`,
     confianza: reales.length >= MINIMO_PARA_FRANJAS_ALTA ? "alta" : "media",
     detalle: activas
       .slice(0, 5)
-      .map(([h, v]) => ({ etiqueta: franjaTexto(h), valor: `${v.pedidos} pedidos` })),
+      .map(([h, v]) => ({ etiqueta: franjaTexto(h), valor: `${v.pedidos} ventas` })),
   };
 }
 
@@ -321,12 +344,12 @@ function ideaDiaFlojo(reales: PedidoAnalisis[], zona: string): Idea | null {
     clave: "dia",
     tipo: "oportunidad",
     titulo: `Los ${NOMBRES_DIA[peor[0]]} son tu día más flojo`,
-    dato: `${NOMBRES_DIA[mejor[0]]}: ${mejor[1]} pedidos · ${NOMBRES_DIA[peor[0]]}: ${peor[1]} pedidos`,
+    dato: `${NOMBRES_DIA[mejor[0]]}: ${mejor[1]} ventas · ${NOMBRES_DIA[peor[0]]}: ${peor[1]} ventas`,
     accion: `Probá algo que solo exista los ${NOMBRES_DIA[peor[0]]} y que la gente tenga que esperar a ese día. Un descuento general te baja el margen todos los días; uno atado a un solo día mueve gente sin tocar el resto.`,
     confianza: reales.length >= MINIMO_PARA_FRANJAS_ALTA ? "alta" : "media",
     detalle: activos.map(([d, n]) => ({
       etiqueta: NOMBRES_DIA[d],
-      valor: `${n} pedidos`,
+      valor: `${n} ventas`,
     })),
   };
 }
@@ -367,10 +390,10 @@ function ideaProductosDormidos(
   return {
     clave: "dormidos",
     tipo: "alerta",
-    titulo: "Productos que ocupan carta y no se venden",
-    dato: `${dormidos.length} de ${conAntiguedad.length} productos (${proporcion}%) vendieron una unidad o ninguna`,
+    titulo: "Productos y servicios que casi no se venden",
+    dato: `${dormidos.length} de ${conAntiguedad.length} productos y servicios (${proporcion}%) vendieron una unidad o ninguna`,
     accion:
-      "Una carta larga cansa y esconde lo que sí vendés. Con cada uno decidí: sacarlo, cambiarle la foto y el nombre, o meterlo en un combo. Lo peor es dejarlo ahí sin decidir.",
+      "Una lista larga cansa y esconde lo que sí vendés. Con cada uno decidí: sacarlo, cambiarle la foto y el nombre, o meterlo en un combo. Lo peor es dejarlo ahí sin decidir.",
     confianza: reales.length >= 100 ? "alta" : "media",
     detalle: dormidos.slice(0, 8).map((x) => ({
       etiqueta: x.pr.nombre,
@@ -422,8 +445,8 @@ function ideaCombo(reales: PedidoAnalisis[]): Idea | null {
   return {
     clave: "combo",
     tipo: "oportunidad",
-    titulo: "Dos productos que la gente pide juntos",
-    dato: `${mejor.a} y ${mejor.b} aparecen juntos en ${mejor.veces} pedidos — el ${Math.round(mejor.proporcion * 100)}% de las veces que se pide el menos frecuente de los dos`,
+    titulo: "Dos productos que se compran juntos",
+    dato: `${mejor.a} y ${mejor.b} aparecen juntos en ${mejor.veces} ventas — el ${Math.round(mejor.proporcion * 100)}% de las veces que se compra el menos frecuente de los dos`,
     accion:
       "Armalos como combo con un precio apenas menor que la suma. No perdés margen: le sacás la decisión de encima al cliente y subís el ticket de los que hoy piden uno solo.",
     confianza: reales.length >= 150 ? "alta" : "media",
@@ -475,9 +498,9 @@ function ideaCategoriaAusente(
   return {
     clave: "categoria_ausente",
     tipo: "oportunidad",
-    titulo: `La mayoría de tus pedidos no lleva nada de ${peor.nombre}`,
-    dato: `Solo el ${peor.tasa}% de los pedidos incluye algo de ${peor.nombre}: quedan ${faltantes} pedidos sin`,
-    accion: `Ofrecelo en el momento justo, cuando el cliente ya eligió el plato principal. Sumar ${peor.nombre.toLowerCase()} a una parte de esos ${faltantes} pedidos es la forma más barata de subir el ticket: el envío y la preparación ya están pagos.`,
+    titulo: `La mayoría de tus ventas no lleva nada de ${peor.nombre}`,
+    dato: `Solo el ${peor.tasa}% de las ventas incluye algo de ${peor.nombre}: quedan ${faltantes} ventas sin`,
+    accion: `Ofrecelo en el momento justo, cuando el cliente ya eligió lo principal. Sumar ${peor.nombre.toLowerCase()} a una parte de esas ${faltantes} ventas es la forma más barata de subir el ticket: el cliente ya está ahí.`,
     confianza: reales.length >= 100 ? "alta" : "media",
   };
 }
@@ -518,14 +541,14 @@ function ideaClientesPerdidos(reales: PedidoAnalisis[], ahora: Date): Idea | nul
   return {
     clave: "clientes_perdidos",
     tipo: "alerta",
-    titulo: "Clientes habituales que dejaron de pedir",
+    titulo: "Clientes habituales que dejaron de comprar",
     dato: `${perdidos.length} personas que ya te habían comprado al menos dos veces no vuelven hace ${DIAS_SIN_VOLVER} días o más. Entre todas gastaron ${guaranies(plata)}`,
     accion:
       "Estos son los más baratos de recuperar de todo tu negocio: ya te conocen, ya les gustó y ya tenés su WhatsApp. Un mensaje personal, sin cadena ni promoción masiva, suele alcanzar.",
     confianza: clientes.length >= 40 ? "alta" : "media",
     detalle: perdidos.slice(0, 8).map((c) => ({
       etiqueta: `${c.nombre} · ${c.telefono}`,
-      valor: `${c.pedidos} pedidos · ${guaranies(c.gastado)}`,
+      valor: `${c.pedidos} compras · ${guaranies(c.gastado)}`,
     })),
   };
 }
@@ -557,7 +580,7 @@ function ideaClientesFieles(reales: PedidoAnalisis[]): Idea | null {
     confianza: clientes.length >= 40 ? "alta" : "media",
     detalle: top.slice(0, 6).map((c) => ({
       etiqueta: `${c.nombre} · ${c.telefono}`,
-      valor: `${c.pedidos} pedidos · ${guaranies(c.gastado)}`,
+      valor: `${c.pedidos} compras · ${guaranies(c.gastado)}`,
     })),
   };
 }
@@ -629,7 +652,7 @@ function ideaMargen(
     tipo: "oportunidad",
     titulo: "El que más facturás no es el que más te deja",
     dato: `${reyIngreso.pr.nombre} factura ${guaranies(reyIngreso.ingreso)} y deja ${guaranies(reyIngreso.margenTotal)} (sin IVA, ya descontado el costo). ${reyMargen.pr.nombre} deja ${guaranies(reyMargen.margenTotal)}`,
-    accion: `Poné ${reyMargen.pr.nombre} arriba de la carta y como destacado. Mover clientes de uno al otro te sube la ganancia sin vender un pedido más.`,
+    accion: `Poné ${reyMargen.pr.nombre} arriba de la carta y como destacado. Mover clientes de uno al otro te sube la ganancia sin vender una unidad más.`,
     confianza: reales.length >= 100 ? "alta" : "media",
     detalle: porMargen.slice(0, 6).map((f) => ({
       etiqueta: f.pr.nombre,
@@ -661,12 +684,12 @@ function ideaDeliveryVsRetiro(reales: PedidoAnalisis[]): Idea | null {
     clave: "delivery_retiro",
     tipo: "dato",
     titulo: deliveryGana
-      ? "Los pedidos con envío gastan más en comida"
+      ? "Las ventas con envío gastan más en comida"
       : "Los que retiran gastan más en comida",
     dato: `Sin contar el envío: delivery ${guaranies(ticketDelivery)} contra retiro ${guaranies(ticketRetiro)} — ${diferencia}% de diferencia`,
     accion: deliveryGana
-      ? "El delivery te trae pedidos más grandes. Revisá que el costo de envío no esté espantando a los pedidos chicos: un mínimo bien puesto rinde más que cobrar el envío completo."
-      : "Los que retiran arman pedidos más grandes. Vale la pena hacer más visible la opción de retiro y darle algún beneficio: te ahorrás el reparto y venden más.",
+      ? "El delivery te trae ventas más grandes. Revisá que el costo de envío no esté espantando a las ventas chicas: un mínimo bien puesto rinde más que cobrar el envío completo."
+      : "Los que retiran compran más por vez. Vale la pena hacer más visible la opción de retiro y darle algún beneficio: te ahorrás el reparto y vendés más.",
     confianza: reales.length >= 100 ? "alta" : "media",
   };
 }

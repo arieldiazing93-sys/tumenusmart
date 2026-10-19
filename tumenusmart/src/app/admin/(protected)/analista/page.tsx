@@ -3,13 +3,11 @@ import Link from "next/link";
 import { prismaDelLocal } from "@/lib/prisma-local";
 import { idLocalActual } from "@/lib/local-actual";
 import { ZONA_NEGOCIO } from "@/lib/timezone";
-import { costoDelProducto } from "@/lib/costo-receta";
-import { aplanarReceta } from "@/lib/insumo-elaborado";
 import { cargarElaborados } from "@/lib/cargar-elaborados";
 import { clasesBoton } from "@/components/ui";
 import { ideaDeLaSemana, marcarIdeaVista } from "@/lib/idea-semanal";
-import { cargarVentasParaAnalisis } from "@/lib/ventas-para-analisis";
-import { analizar, type Confianza, type Idea, type ProductoAnalisis } from "@/lib/analista";
+import { cargarVentasParaAnalisis, productoParaAnalisis } from "@/lib/ventas-para-analisis";
+import { analizar, FUENTES_DEL_ANALISIS, MINIMO_PARA_OPINAR, QUE_ANALIZA, type Confianza, type Idea } from "@/lib/analista";
 
 export const dynamic = "force-dynamic";
 
@@ -66,17 +64,7 @@ export default async function AnalistaPage() {
   // Una receta que lleva una preparación (salsa, masa…) se costea con los insumos con que se hace.
   const elaborados = await cargarElaborados(storeId);
 
-  const productos: ProductoAnalisis[] = productosCrudos.map((pr) => ({
-    id: pr.id,
-    nombre: pr.nombre,
-    categoriaId: pr.categoryId,
-    categoriaNombre: pr.category.nombre,
-    precio: Number(pr.precio),
-    costo: costoDelProducto(pr.costo, aplanarReceta(pr.receta, elaborados)),
-    iva: pr.iva,
-    disponible: pr.disponible,
-    creado: pr.createdAt,
-  }));
+  const productos = productosCrudos.map((pr) => productoParaAnalisis(pr, elaborados));
 
   const resultado = analizar({
     pedidos,
@@ -110,8 +98,22 @@ export default async function AnalistaPage() {
       <p className="mb-6 text-sm text-tinta-media">
         {analisisRecortado && desdeReal
           ? `Sale de tus últimas ${TOPE_PEDIDOS.toLocaleString("es-PY")} ventas (desde el ${desdeReal.toLocaleDateString("es-PY", { timeZone: ZONA_NEGOCIO })}): vendés más que eso en ${DIAS_DE_HISTORIA} días, así que se analiza lo más reciente. Se actualiza solo.`
-          : `Sale de tus propios pedidos de los últimos ${DIAS_DE_HISTORIA} días. Se actualiza solo.`}
+          : `Sale de tus propias ventas de los últimos ${DIAS_DE_HISTORIA} días. Se actualiza solo.`}
       </p>
+
+      {/* Lo que analiza, siempre a la vista (con pocas ventas y con muchas): sale de la misma lista que respalda las ideas. */}
+      <section className="mb-6 rounded-lg border-2 border-azul/50 bg-white p-4">
+        <h2 className="text-sm font-semibold text-tinta">Qué analiza tu analista comercial</h2>
+        <p className="mt-1 text-sm text-tinta-media">
+          Mira todas tus ventas ({FUENTES_DEL_ANALISIS}) de los últimos {DIAS_DE_HISTORIA} días. Necesita al menos {MINIMO_PARA_OPINAR} ventas para
+          opinar: con menos prefiere callarse antes que inventar un consejo.
+        </p>
+        <ul className="mt-3 grid gap-1.5 text-sm text-tinta-media sm:grid-cols-2">
+          {QUE_ANALIZA.map((q) => (
+            <li key={q.texto}>· {q.texto}</li>
+          ))}
+        </ul>
+      </section>
 
       {deLaSemana && (
         <section className="mb-6 rounded-lg border-2 border-brand/40 bg-orange-50/50 p-4">
@@ -148,7 +150,7 @@ export default async function AnalistaPage() {
       ) : (
         <>
           <p className="mb-4 text-sm text-tinta-media">
-            Analizados <strong>{resultado.base} pedidos</strong>.{" "}
+            Analizadas <strong>{resultado.base} ventas</strong>.{" "}
             {ideas.length === 1
               ? "Por ahora hay una sola conclusión sólida."
               : deLaSemana
@@ -191,10 +193,10 @@ function FaltanDatos({ actuales, necesarios }: { actuales: number; necesarios: n
   return (
     <div className="rounded-lg border-2 border-azul/50 bg-white p-6">
       <h2 className="text-base font-semibold text-tinta">
-        Todavía no tengo suficientes pedidos
+        Todavía no tengo suficientes ventas
       </h2>
       <p className="mt-2 max-w-xl text-sm text-tinta-media">
-        Llevás <strong>{actuales}</strong> {actuales === 1 ? "pedido" : "pedidos"} y hacen falta
+        Llevás <strong>{actuales}</strong> {actuales === 1 ? "venta" : "ventas"} y hacen falta
         al menos <strong>{necesarios}</strong> para que lo que te diga signifique algo. Con menos
         que eso, cualquier patrón que encuentre sería casualidad, y prefiero no darte un consejo
         antes que darte uno inventado.
@@ -205,28 +207,14 @@ function FaltanDatos({ actuales, necesarios }: { actuales: number; necesarios: n
           <div className="h-full rounded-full bg-brand transition-all" style={{ width: `${avance}%` }} />
         </div>
         <p className="mt-1.5 text-xs text-tinta-media">
-          {actuales} de {necesarios} pedidos
+          {actuales} de {necesarios} ventas
         </p>
       </div>
 
       <p className="mt-5 max-w-xl text-sm text-tinta-media">
-        No tenés que hacer nada: se va llenando solo a medida que entren pedidos. Cuando llegue,
+        No tenés que hacer nada: se va llenando solo a medida que registres ventas. Cuando llegue,
         esta pantalla se enciende sola.
       </p>
-
-      <div className="mt-5 border-t border-linea-fina pt-4">
-        <p className="text-xs font-semibold uppercase tracking-wide text-tinta-suave">
-          Mientras tanto, lo que se va a analizar
-        </p>
-        <ul className="mt-2 grid gap-1.5 text-sm text-tinta-media sm:grid-cols-2">
-          <li>· En qué horas y días vendés poco</li>
-          <li>· Qué productos ocupan carta y no se venden</li>
-          <li>· Qué se pide junto con qué, para armar combos</li>
-          <li>· Clientes habituales que dejaron de pedir</li>
-          <li>· Cuánta gente arma el pedido y no lo envía</li>
-          <li>· Qué producto te deja más ganancia</li>
-        </ul>
-      </div>
     </div>
   );
 }
