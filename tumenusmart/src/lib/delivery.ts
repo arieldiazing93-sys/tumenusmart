@@ -21,6 +21,33 @@ export const LARGO_DELIVERY = { nombre: 80, telefono: 30, direccion: 200, notas:
 /** Tope del envío: más que esto es un número mal tipeado, no un precio. */
 export const ENVIO_MAXIMO = 10_000_000;
 
+/**
+ * Qué se anota en la VENTA al cobrar una cuenta de delivery. Un pedido del menú digital «para retirar» se atiende por la misma cuenta del
+ * Servicio delivery (comanda, cobro, factura), pero es un RETIRO: la venta se guarda como «llevar» (el tipo que las estadísticas cuentan como
+ * «Retiro en el local») y su nota dice «Retiro · Cuenta N», no «Delivery». `tipoDelPedido` es el `tipoEntrega` del pedido web de la cuenta
+ * (null si la cuenta se abrió a mano desde el Servicio delivery: es delivery).
+ */
+export function datosDeVentaDeCuentaDelivery(
+  tipoDelPedido: string | null | undefined,
+  numeroTexto: string
+): { tipoEntrega: "delivery" | "llevar"; nota: string } {
+  const esRetiro = tipoDelPedido === "retiro";
+  return { tipoEntrega: esRetiro ? "llevar" : "delivery", nota: `${esRetiro ? "Retiro" : "Delivery"} · Cuenta ${numeroTexto}` };
+}
+
+/**
+ * El indicador de presencia de la factura de una cuenta de delivery: «domicilio», salvo que el pedido sea un RETIRO (el cliente viene al local):
+ * ahí es «presencial», igual que ya se hace con cualquier venta «para llevar» y con los pedidos de la carta que no son delivery.
+ */
+export function presenciaDeFacturaDeDelivery(tipoDelPedido: string | null | undefined): "domicilio" | "presencial" {
+  return tipoDelPedido === "retiro" ? "presencial" : "domicilio";
+}
+
+/** ¿La nota de una venta dice que salió de una cuenta de delivery (de delivery o de retiro)? Para mostrar de qué cuenta fue en el Historial. */
+export function esNotaDeCuentaDelivery(nota: string | null | undefined): boolean {
+  return !!nota && (nota.startsWith("Delivery · ") || nota.startsWith("Retiro · "));
+}
+
 /** "Delivery 12" — cómo se llama la cuenta en comandas, ticket y listas. */
 export function nombreDeCuentaDelivery(numero: number): string {
   return `Delivery ${numero}`;

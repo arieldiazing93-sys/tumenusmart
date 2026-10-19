@@ -42,7 +42,9 @@ import {
   ESTADOS_DELIVERY_ABIERTA,
   LARGO_DELIVERY,
   NOMBRE_LINEA_ENVIO,
+  datosDeVentaDeCuentaDelivery,
   lineaDeEnvio,
+  presenciaDeFacturaDeDelivery,
   nombreDeCuentaDelivery,
   totalesDeDelivery,
 } from "@/lib/delivery";
@@ -1230,6 +1232,10 @@ export async function emitirFacturaDelivery(cuentaId: string, datos: DatosFactur
   const unidadDelProducto = new Map(datosProductos.map((p) => [p.id, p.unidadMedida]));
   const esServicioElProducto = new Map(datosProductos.map((p) => [p.id, p.esServicio]));
 
+  // Un pedido del menú para RETIRAR no es una venta a domicilio: la factura sale como presencial (ver presenciaDeFacturaDeDelivery).
+  const pedidoRapido = await db.pedidoWeb.findFirst({ where: { cuentaDeliveryId: cuenta.id }, select: { tipoEntrega: true } });
+  const presenciaRapida = presenciaDeFacturaDeDelivery(pedidoRapido?.tipoEntrega);
+
   let numeroFactura = "";
   try {
     numeroFactura = await prisma.$transaction(async (tx) => {
@@ -1280,7 +1286,7 @@ export async function emitirFacturaDelivery(cuentaId: string, datos: DatosFactur
           razonSocial: razonSocialFactura,
           email: emailFactura,
         },
-        presencia: "domicilio",
+        presencia: presenciaRapida,
         // La factura rápida es siempre al contado: el crédito se decide al cobrar y no se combina con una factura ya emitida.
         condicion: "contado",
         fechaVencimientoCredito: null,
@@ -1663,7 +1669,10 @@ export async function pagarCuentaDelivery(cuentaId: string, datos: DatosCobroDel
   const esServicioElProducto = new Map(datosProductos.map((p) => [p.id, p.esServicio]));
 
   const numero = await siguienteNumeroVentaPos(storeId);
-  const notaVenta = `Delivery · Cuenta ${formatearNumero(cuenta.numero)}`;
+  // Un pedido del menú digital para RETIRAR pasa por esta misma cuenta, pero la venta es un retiro (ver datosDeVentaDeCuentaDelivery).
+  const pedidoDeLaCuenta = await db.pedidoWeb.findFirst({ where: { cuentaDeliveryId: cuenta.id }, select: { tipoEntrega: true } });
+  const datosVenta = datosDeVentaDeCuentaDelivery(pedidoDeLaCuenta?.tipoEntrega, formatearNumero(cuenta.numero));
+  const notaVenta = datosVenta.nota;
   // Lo que va en la factura sobre el comprador: "Sin Nombre" (Consumidor Final) o los datos ya revisados.
   const compradorFinal = comprador;
   // Con la factura ya emitida ("factura rápida") no se vuelve a guardar nada del cliente: ya se hizo al emitirla.
@@ -1771,7 +1780,7 @@ export async function pagarCuentaDelivery(cuentaId: string, datos: DatosCobroDel
           clienteNombre: cuenta.clienteNombre,
           clienteTelefono: cuenta.clienteTelefono,
           fechaVencimientoCredito,
-          tipoEntrega: "delivery",
+          tipoEntrega: datosVenta.tipoEntrega,
           nota: notaVenta,
           ...datosFactura,
           items: {
@@ -1818,7 +1827,7 @@ export async function pagarCuentaDelivery(cuentaId: string, datos: DatosCobroDel
             razonSocial: razonSocialFactura,
             email: emailFactura,
           },
-          presencia: "domicilio",
+          presencia: presenciaDeFacturaDeDelivery(pedidoDeLaCuenta?.tipoEntrega),
           condicion: esCredito ? "credito" : "contado",
           fechaVencimientoCredito,
           items: filasVenta.map((f) => ({

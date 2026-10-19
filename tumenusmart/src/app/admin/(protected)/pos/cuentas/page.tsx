@@ -9,6 +9,7 @@ import { nombreCompleto } from "@/lib/agenda-personal";
 import { etiquetaFormaPagoPos, FORMAS_PAGO_POS, FORMA_PAGO_MIXTO } from "@/lib/turno-pos";
 import { detallePagos, filtroPorFormaPago, montoCobradoConForma } from "@/lib/pago-venta";
 import { cargarCuentasCanceladas, type CuentaCancelada } from "@/lib/cuentas-canceladas";
+import { esNotaDeCuentaDelivery } from "@/lib/delivery";
 import { ZONA_NEGOCIO } from "@/lib/timezone";
 import { cargarEstacionesParaFiltro, filtroPorEstacion } from "@/lib/estacion-filtro";
 import { FiltroFechaReporte } from "@/components/FiltroFechaReporte";
@@ -321,9 +322,9 @@ export default async function CuentasPosPage({
                       {v.nota.replace(" · Cuenta #", " · Cuenta de mesa #")}
                     </span>
                   )}
-                  {v.nota?.startsWith("Delivery · ") && (
+                  {esNotaDeCuentaDelivery(v.nota) && v.nota && (
                     <span className="mt-0.5 block text-[10px] font-medium uppercase text-tinta-suave">
-                      {/* "Delivery · Cuenta de delivery #0012": de qué cuenta de delivery salió la venta. */}
+                      {/* "Delivery · Cuenta de delivery #0012" o "Retiro · Cuenta de delivery #0012" (un pedido del menú para retirar): de qué cuenta salió la venta. */}
                       {v.nota.replace(" · Cuenta #", " · Cuenta de delivery #")}
                     </span>
                   )}

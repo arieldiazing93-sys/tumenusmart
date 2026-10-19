@@ -46,11 +46,17 @@ export async function calcularReportePromociones(storeId: string, rango: RangoFe
     ? await db.cuentaMesa.findMany({ where: { ventaPosId: { in: idsDeVentas } }, select: { ventaPosId: true } })
     : [];
   const ventasDeComedor = new Set(cuentasDeMesa.map((c) => c.ventaPosId));
+  // Y las que cobraron una cuenta de delivery son del delivery, aunque la venta sea un RETIRO (un pedido del menú para retirar pasa por esa cuenta).
+  const cuentasDeDelivery = idsDeVentas.length
+    ? await db.cuentaDelivery.findMany({ where: { ventaPosId: { in: idsDeVentas } }, select: { ventaPosId: true } })
+    : [];
+  const ventasDeDelivery = new Set(cuentasDeDelivery.map((c) => c.ventaPosId));
 
   const lineas: LineaVendida[] = items.flatMap((i) => {
     // `promocionId` no es null por el filtro de arriba; se comprueba igual para que el tipo lo sepa.
     if (!i.promocionId) return [];
-    const canal: Canal = i.ventaPos.tipoEntrega === "delivery" ? "delivery" : ventasDeComedor.has(i.ventaPosId) ? "comedor" : "mostrador";
+    const canal: Canal =
+      i.ventaPos.tipoEntrega === "delivery" || ventasDeDelivery.has(i.ventaPosId) ? "delivery" : ventasDeComedor.has(i.ventaPosId) ? "comedor" : "mostrador";
     return [
       {
         ventaId: i.ventaPosId,

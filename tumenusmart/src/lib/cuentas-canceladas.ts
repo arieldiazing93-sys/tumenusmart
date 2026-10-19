@@ -54,7 +54,7 @@ export type CuentaCancelada = {
   /** "mesa" (Servicio comedor) | "delivery" (Servicio delivery). */
   canal: "mesa" | "delivery";
   numero: number;
-  /** Cómo se llama en las listas: "Mesa 5" o "Delivery · Ana". */
+  /** Cómo se llama en las listas: "Mesa 5", "Delivery · Ana" o "Retiro · Ana". */
   titulo: string;
   /** Qué clase de cuenta es, con su número: "Cuenta de mesa #0004" o "Cuenta de delivery #0012". */
   etiqueta: string;
@@ -137,6 +137,17 @@ async function cargarCuentasDeliveryCanceladas(db: PrismaLocal, rango: { gte: Da
       items: { select: { cantidad: true, precioUnitario: true, estado: true, anuladoEn: true } },
     },
   });
+  // Las que eran un pedido del menú digital para RETIRAR en el local: se listan como «Retiro», no como «Delivery».
+  const idsRetiro = new Set(
+    cuentas.length
+      ? (
+          await db.pedidoWeb.findMany({
+            where: { cuentaDeliveryId: { in: cuentas.map((c) => c.id) }, tipoEntrega: "retiro" },
+            select: { cuentaDeliveryId: true },
+          })
+        ).map((p) => p.cuentaDeliveryId)
+      : []
+  );
   return cuentas.map((c) => {
     const productos = itemsAlCancelar(c.items, c.cerradaEn).map((i) => ({ precioUnitario: Number(i.precioUnitario), cantidad: i.cantidad }));
     const valia = totalesDeDelivery(productos, Number(c.costoEnvio), descuentoDeCuenta(c)).total;
@@ -146,7 +157,7 @@ async function cargarCuentasDeliveryCanceladas(db: PrismaLocal, rango: { gte: Da
       id: c.id,
       canal: "delivery" as const,
       numero: c.numero,
-      titulo: `Delivery · ${c.clienteNombre}`,
+      titulo: `${idsRetiro.has(c.id) ? "Retiro" : "Delivery"} · ${c.clienteNombre}`,
       etiqueta: `Cuenta de delivery ${formatearNumero(c.numero)}`,
       cerradaEn: c.cerradaEn,
       cerradaPor: c.cerradaPor,

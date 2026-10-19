@@ -58,6 +58,11 @@ async function cuentasCanceladas(db: PrismaLocal, rango: RangoFecha): Promise<Fi
     ? await db.cuentaMesa.findMany({ where: { ventaPosId: { in: idsDeVentas } }, select: { ventaPosId: true, mesa: true } })
     : [];
   const mesaDeVenta = new Map(cuentasDeVentas.map((c) => [c.ventaPosId, c.mesa]));
+  // Las que cobraron una cuenta de delivery son del delivery aunque la venta sea un RETIRO (un pedido del menú para retirar pasa por esa cuenta).
+  const cuentasDeReparto = idsDeVentas.length
+    ? await db.cuentaDelivery.findMany({ where: { ventaPosId: { in: idsDeVentas } }, select: { ventaPosId: true } })
+    : [];
+  const ventasDeReparto = new Set(cuentasDeReparto.map((c) => c.ventaPosId));
 
   const montoDe = (items: { cantidad: number; precioUnitario: unknown }[]) =>
     gs(items.reduce((s, i) => s + gs(i.cantidad * Number(i.precioUnitario)), 0));
@@ -80,7 +85,7 @@ async function cuentasCanceladas(db: PrismaLocal, rango: RangoFecha): Promise<Fi
   for (const v of ventas) {
     if (!v.canceladaEn) continue;
     const mesa = mesaDeVenta.get(v.id);
-    const canal: Canal = v.tipoEntrega === "delivery" ? "delivery" : mesa !== undefined ? "comedor" : "mostrador";
+    const canal: Canal = v.tipoEntrega === "delivery" || ventasDeReparto.has(v.id) ? "delivery" : mesa !== undefined ? "comedor" : "mostrador";
     filas.push({
       id: `vp-${v.id}`, fecha: v.canceladaEn, canal, referencia: mesa !== undefined ? `Venta ${v.numero} · Mesa ${mesa}` : `Venta ${v.numero}`,
       detalle: "Cobrada y anulada", cantidad: null, monto: gs(Number(v.total)), cobrado: null, motivo: textoOpcional(v.motivoCancelacion),
