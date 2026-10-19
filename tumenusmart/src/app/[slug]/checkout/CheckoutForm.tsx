@@ -140,9 +140,8 @@ export function CheckoutForm({
   const [facturaRazonSocial, setFacturaRazonSocial] = useState("");
   const [facturaRuc, setFacturaRuc] = useState("");
   const [facturaEmail, setFacturaEmail] = useState("");
-  // Solo con los pedidos por el sistema: las aclaraciones, la trampa para robots, el identificador del envío (el mismo si se
+  // Solo con los pedidos por el sistema: la trampa para robots, el identificador del envío (el mismo si se
   // reintenta, para que un doble toque no duplique el pedido) y lo que devuelve el servidor al recibirlo.
-  const [notas, setNotas] = useState("");
   const [sitioWeb, setSitioWeb] = useState("");
   const [enviando, setEnviando] = useState(false);
   const [envioId, setEnvioId] = useState(() => (typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `e${Date.now()}${Math.random().toString(36).slice(2)}`));
@@ -225,7 +224,6 @@ export function CheckoutForm({
         facturaRazonSocial: comprobanteTipo === "factura" ? facturaRazonSocial.trim() : undefined,
         facturaRuc: comprobanteTipo === "factura" ? facturaRuc.trim() : undefined,
         facturaEmail: comprobanteTipo === "factura" ? facturaEmail.trim() || undefined : undefined,
-        notas: notas.trim() || undefined,
         items: items.map((i) => ({
           productId: i.mitadYMitad ? undefined : i.productId,
           mitadYMitad: i.mitadYMitad ? { productIdA: i.mitadYMitad.productIdA, productIdB: i.mitadYMitad.productIdB } : undefined,
@@ -263,7 +261,6 @@ export function CheckoutForm({
           facturaRazonSocial: comprobanteTipo === "factura" ? facturaRazonSocial.trim() : null,
           facturaRuc: comprobanteTipo === "factura" ? facturaRuc.trim() : null,
           facturaEmail: comprobanteTipo === "factura" ? facturaEmail.trim() || null : null,
-          notas: notas.trim() || null,
           items: items.map((i) => ({
             nombreProducto: i.nombreProducto,
             cantidad: i.cantidad,
@@ -801,25 +798,15 @@ export function CheckoutForm({
             </>
           )}
 
+          {/* La trampa para robots: está fuera de la vista y de la tabulación; una persona nunca lo llena. (Antes iba junto a un campo de
+              «Aclaraciones para el local» que el dueño pidió quitar: ocupaba lugar sin hacer falta.) */}
           {pedidosEnSistema && (
-            <>
-              <Campo etiqueta="Aclaraciones para el local" ayuda="Opcional. Por ejemplo: sin cebolla, tocar timbre, traer cambio de 100.000.">
-                <Entrada
-                  value={notas}
-                  onChange={(e) => setNotas(e.target.value)}
-                  maxLength={300}
-                  placeholder="Lo que el local tenga que saber"
-                  className="!h-12 !rounded-xl"
-                />
-              </Campo>
-              {/* La trampa para robots: está fuera de la vista y de la tabulación; una persona nunca lo llena. */}
-              <div aria-hidden="true" className="absolute -left-[9999px] h-0 w-0 overflow-hidden">
-                <label>
-                  No completar
-                  <input type="text" tabIndex={-1} autoComplete="off" value={sitioWeb} onChange={(e) => setSitioWeb(e.target.value)} />
-                </label>
-              </div>
-            </>
+            <div aria-hidden="true" className="absolute -left-[9999px] h-0 w-0 overflow-hidden">
+              <label>
+                No completar
+                <input type="text" tabIndex={-1} autoComplete="off" value={sitioWeb} onChange={(e) => setSitioWeb(e.target.value)} />
+              </label>
+            </div>
           )}
         </section>
 

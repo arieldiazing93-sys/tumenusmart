@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { FirmaPlataforma } from "@/components/FirmaPlataforma";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { cache, type ReactNode } from "react";
@@ -288,17 +289,8 @@ export default async function PaginaPublicaReservas({ params }: { params: Promis
               <IconoCalendario tam={20} />
               Crear cita
             </Link>
-            {/* Tipografía distinta del resto (la monoespaciada del sistema), en mayúsculas y en el grosor más
-                fuerte que se carga. El -mr compensa el espacio que "tracking" agrega después de la última
-                letra, para que el texto quede centrado de verdad. */}
-            <p className="mt-1 text-center">
-              <Link
-                href="/"
-                className="-mr-[0.14em] inline-block py-1.5 font-mono text-[0.78rem] font-semibold uppercase leading-tight tracking-[0.14em] text-tinta-media transition-colors hover:text-tinta hover:underline"
-              >
-                Desarrollado por tumenusmart.com
-              </Link>
-            </p>
+            {/* La firma de la plataforma: todo en negrita y «tumenusmart.com» como enlace subrayado (ver FirmaPlataforma). */}
+            <FirmaPlataforma className="mt-1" tam="medio" />
           </div>
         </div>
       </main>

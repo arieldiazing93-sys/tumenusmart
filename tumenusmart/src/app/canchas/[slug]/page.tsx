@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { FirmaPlataforma } from "@/components/FirmaPlataforma";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { cache, type ReactNode } from "react";
@@ -360,14 +361,7 @@ export default async function PaginaPublicaCanchas({ params }: { params: Promise
                 Sin canchas disponibles por ahora
               </span>
             )}
-            <p className="mt-1 text-center">
-              <Link
-                href="/"
-                className="-mr-[0.14em] inline-block py-1.5 font-mono text-[0.78rem] font-semibold uppercase leading-tight tracking-[0.14em] text-tinta-media transition-colors hover:text-tinta hover:underline"
-              >
-                Desarrollado por tumenusmart.com
-              </Link>
-            </p>
+            <FirmaPlataforma className="mt-1" tam="medio" />
           </div>
         </div>
       </main>

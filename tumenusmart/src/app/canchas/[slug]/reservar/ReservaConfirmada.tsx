@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { FirmaPlataforma } from "@/components/FirmaPlataforma";
 import Link from "next/link";
 import { IconoWhatsapp } from "@/components/iconos";
 import { textoDuracionCancha, type ReservaCreada } from "@/lib/canchas";
@@ -204,12 +205,7 @@ export function ReservaConfirmada({
         Volver a la página
       </Link>
 
-      <Link
-        href="/"
-        className="-mr-[0.14em] mt-7 inline-block py-1.5 text-center font-mono text-[0.82rem] font-semibold uppercase leading-tight tracking-[0.14em] text-tinta-media transition-colors hover:text-tinta hover:underline"
-      >
-        Desarrollado por tumenusmart.com
-      </Link>
+      <FirmaPlataforma className="mt-7" tam="medio" />
     </div>
   );
 }
