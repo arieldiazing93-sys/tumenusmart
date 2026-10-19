@@ -91,6 +91,61 @@
   ok(r.ideas.length >= 4, "este caso de prueba emite varias ideas (" + r.ideas.length + "), no pasa por casualidad");
   ok(A.QUE_ANALIZA.every((q) => q.texto && q.claves.length > 0) && /canchas/.test(A.FUENTES_DEL_ANALISIS) && /turnos/.test(A.FUENTES_DEL_ANALISIS) && /delivery/.test(A.FUENTES_DEL_ANALISIS) && /comedor/.test(A.FUENTES_DEL_ANALISIS), "la leyenda nombra los puntos de venta: mostrador, comedor, delivery, turnos y canchas");
 
+  // ------------------------------------------------------------------------------------------ ganancia con costos solo en algunos productos
+  window.log("== Ganancia cuando solo algunos productos tienen costo");
+  const sinCostoSalvo = (conCosto) => crudos.map((pr) => V.productoParaAnalisis(conCosto.includes(pr.id) ? pr : { ...pr, costo: null }, elaborados));
+  const reales0 = leidas.filter((p) => p.estado !== "cancelado");
+  const porcentajeEsperado = (idsConCosto) => {
+    let total = 0, cubierto = 0;
+    for (const v of reales0) for (const i of v.items) { const l = i.precioUnitario * i.cantidad; total += l; if (idsConCosto.includes(i.productId)) cubierto += l; }
+    return Math.round((cubierto / total) * 100);
+  };
+
+  // Con TODOS los productos con costo: se dice como siempre, sin aclaraciones de «parcial».
+  const completo = A.analizar({ pedidos: leidas, productos, ahora, zona: "America/Asuncion" });
+  const margenCompleto = completo.ideas.find((i) => i.clave === "margen");
+  ok(margenCompleto && !/Calculado con/.test(margenCompleto.dato) && !/De los que tienen costo/.test(margenCompleto.titulo), "con todos los productos con costo la idea de ganancia no lleva aclaración de «parcial» → " + (margenCompleto && margenCompleto.titulo));
+  ok(completo.cobertura.porcentaje === 100 && completo.cobertura.sinCosto.length === 0, "cobertura completa: 100% y ningún producto vendido sin costo → " + completo.cobertura.porcentaje + "%");
+
+  // Solo 4 productos clave con costo (los que más se venden): muestra cuál deja más, aclara con cuántos y qué parte de las ventas cubren.
+  const claves = ["pizza", "cerveza", "corte", "cancha1"];
+  const parcial = A.analizar({ pedidos: leidas, productos: sinCostoSalvo(claves), ahora, zona: "America/Asuncion" });
+  const margenParcial = parcial.ideas.find((i) => i.clave === "margen");
+  const pctEsperado = porcentajeEsperado(claves);
+  ok(margenParcial, "con solo 4 productos costeados igual muestra cuál te deja más ganancia");
+  ok(parcial.cobertura.porcentaje === pctEsperado && pctEsperado > 0 && pctEsperado < 100, "la cobertura dice qué parte de lo vendido está costeada: " + parcial.cobertura.porcentaje + "% (esperado " + pctEsperado + "%)");
+  ok(margenParcial && margenParcial.dato.includes("Calculado con los 4 productos con costo que se vendieron") && margenParcial.dato.includes(pctEsperado + "% de lo que vendés"), "la idea aclara con cuántos productos y qué % de las ventas se calculó → " + (margenParcial && margenParcial.dato.slice(-110)));
+  ok(margenParcial && /^De los que tienen costo cargado/.test(margenParcial.titulo), "el título no afirma «el que más deja» de todo el negocio, sino de los que tienen costo → " + (margenParcial && margenParcial.titulo));
+  ok(margenParcial && margenParcial.detalle && margenParcial.detalle.length === 4 && margenParcial.detalle.every((d) => claves.map((c) => crudos.find((p) => p.id === c).nombre).includes(d.etiqueta)), "el ranking solo lista productos con costo (4) → " + JSON.stringify(margenParcial && (margenParcial.detalle || []).map((d) => d.etiqueta)));
+  const orden = margenParcial.detalle.map((d) => parseInt(d.valor.split("·")[1].replace(/\D/g, ""), 10));
+  ok(orden.every((m, i) => i === 0 || orden[i - 1] >= m), "el ranking viene del que más deja al que menos → " + orden.join(" ≥ "));
+  const nombresSinCosto = parcial.cobertura.sinCosto.map((s) => s.nombre);
+  ok(nombresSinCosto.includes("Arreglo de barba") && nombresSinCosto.includes("Agua") && !nombresSinCosto.includes("Pizza") && !nombresSinCosto.includes("Masaje"), "lista los más vendidos que faltan costear (barba, agua) y no repite los costeados ni los que nadie compró → " + JSON.stringify(nombresSinCosto));
+  const unidadesSinCosto = parcial.cobertura.sinCosto.map((s) => s.unidades);
+  ok(unidadesSinCosto.every((u, i) => i === 0 || unidadesSinCosto[i - 1] >= u), "los que faltan costear vienen del más vendido al menos vendido → " + unidadesSinCosto.join(" ≥ "));
+  ok(parcial.cobertura.conCosto === 4 && parcial.cobertura.ofrecidos === 8, "cuenta los productos con costo (4) sobre los que se ofrecen (8: el de la categoría desactivada no cuenta) → " + parcial.cobertura.conCosto + "/" + parcial.cobertura.ofrecidos);
+
+  // Con solo 2 productos con costo no se arriesga una conclusión (hacen falta 3), pero la cobertura igual lo cuenta para la tarjeta.
+  const dos = A.analizar({ pedidos: leidas, productos: sinCostoSalvo(["pizza", "cerveza"]), ahora, zona: "America/Asuncion" });
+  ok(!dos.ideas.some((i) => i.clave === "margen") && dos.cobertura.conCosto === 2, "con 2 productos costeados no opina de ganancia (hacen falta 3), pero informa que hay 2");
+  // Sin ningún costo: nada de ganancia, cobertura en cero y la lista de los más vendidos para empezar por ellos.
+  const ninguno = A.analizar({ pedidos: leidas, productos: sinCostoSalvo([]), ahora, zona: "America/Asuncion" });
+  ok(!ninguno.ideas.some((i) => i.clave === "margen") && ninguno.cobertura.conCosto === 0 && ninguno.cobertura.porcentaje === 0 && ninguno.cobertura.sinCosto[0].nombre === "Pizza", "sin ningún costo: cobertura 0% y propone empezar por el más vendido (Pizza)");
+  // La lista de «los que más vendés y faltan costear» va ordenada por unidades (aunque el menos vendido aparezca primero en las ventas) y tiene tope 10.
+  const p0 = (id, nombre, costo) => ({ id, nombre, costo, precio: 1000, iva: "gravado10", disponible: true, categoryId: "x", createdAt: new Date(0) });
+  const v0 = (...items) => ({ items: items.map(([productId, cantidad]) => ({ productId, nombre: productId, cantidad, precioUnitario: 1000 })) });
+  const orden0 = A.coberturaDeCosto([v0(["a", 1]), v0(["b", 5]), v0(["c", 2]), v0(["d", 9])], [p0("a", "A", null), p0("b", "B", null), p0("c", "C", 500), p0("d", "D", null)]);
+  ok(orden0.sinCosto.map((s) => s.nombre).join(",") === "D,B,A" && orden0.sinCosto[0].unidades === 9, "los que faltan costear salen del más vendido al menos vendido (D=9, B=5, A=1) y el costeado (C) no figura → " + JSON.stringify(orden0.sinCosto));
+  ok(orden0.porcentaje === Math.round(2 / 17 * 100) && orden0.conCosto === 1 && orden0.ofrecidos === 4, "porcentaje = lo vendido de productos con costo sobre el total (2 de 17 unidades al mismo precio = 12%) → " + orden0.porcentaje + "%");
+  const muchos = Array.from({ length: 12 }, (_, i) => p0("m" + i, "M" + i, null));
+  const topeDiez = A.coberturaDeCosto([v0(...muchos.map((m, i) => [m.id, i + 1]))], muchos);
+  ok(topeDiez.sinCosto.length === 10 && topeDiez.sinCosto[0].nombre === "M11" && topeDiez.sinCosto[9].nombre === "M2", "muestra como máximo 10 de los que faltan, los más vendidos → " + topeDiez.sinCosto.map((s) => s.nombre).join(","));
+  ok(A.coberturaDeCosto([], [p0("a", "A", null)]).porcentaje === 0, "sin ventas la cobertura es 0%, sin dividir por cero");
+
+  // También informa la cobertura cuando todavía no hay ventas suficientes para opinar.
+  const pocasConCobertura = A.analizar({ pedidos: leidas.filter((p) => p.estado !== "cancelado").slice(0, 12), productos: sinCostoSalvo(claves), ahora, zona: "America/Asuncion" });
+  ok(pocasConCobertura.faltaData && pocasConCobertura.cobertura.conCosto === 4, "con pocas ventas igual devuelve la cobertura (la tarjeta de costos no depende de las 30 ventas)");
+
   // ------------------------------------------------------------------------------------------ con pocas ventas
   window.log("== Con pocas ventas");
   const pocas = A.analizar({ pedidos: leidas.filter((p) => p.estado !== "cancelado").slice(0, 12), productos, ahora, zona: "America/Asuncion" });

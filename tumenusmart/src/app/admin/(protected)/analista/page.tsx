@@ -77,7 +77,10 @@ export default async function AnalistaPage() {
     (a, b) => ORDEN_TIPO[a.tipo] - ORDEN_TIPO[b.tipo]
   );
 
-  const sinCosto = productos.filter((p) => p.costo == null).length;
+  // El análisis de ganancia ya vale con costo en unos pocos productos (los que más se venden): la tarjeta de abajo dice cuántos tienen costo,
+  // qué parte de las ventas cubren y cuáles de los más vendidos faltan, en vez de decir que «no se puede» mientras falte alguno.
+  const { cobertura } = resultado;
+  const mostrarCostos = cobertura.ofrecidos > 0 && (cobertura.conCosto < 3 || cobertura.sinCosto.length > 0);
 
   // Si el local vendió más que el tope en estos días, solo entran las ventas más recientes: se dice hasta qué fecha llega lo que se
   // analizó, en vez de afirmar que son los últimos 180 días completos (las ventas vienen de la más nueva a la más vieja).
@@ -166,18 +169,45 @@ export default async function AnalistaPage() {
         </>
       )}
 
-      {sinCosto > 0 && (
+      {mostrarCostos && (
         <div className="mt-8 rounded-lg border-2 border-dashed border-azul/50 bg-white p-4">
           <h2 className="text-sm font-semibold text-tinta">
-            Falta un dato para hablar de ganancia
+            {cobertura.conCosto === 0 ? "Falta un dato para hablar de ganancia" : "Ganancia: qué productos ya tienen costo"}
           </h2>
           <p className="mt-1 text-sm text-tinta-media">
-            {sinCosto} de tus {productos.length} productos no tienen costo. El costo sale de la
-            receta de cada producto (con lo que cuestan sus insumos), así que hace falta armar
-            la receta y haber registrado la compra de esos insumos. Sin eso puedo decirte qué
-            producto <em>factura</em> más, pero no cuál te <em>deja</em> más — y muchas veces no
-            son el mismo.
+            {cobertura.conCosto === 0 ? (
+              <>
+                Ningún producto tiene costo todavía. El costo sale de la receta de cada producto (con lo que cuestan sus insumos), así que hace
+                falta armar la receta y haber registrado la compra de esos insumos. No hace falta hacerlo con todos: con <strong>3 o más</strong>{" "}
+                de los que más vendés ya te puedo decir cuál te <em>deja</em> más, que muchas veces no es el que más <em>factura</em>.
+              </>
+            ) : cobertura.conCosto < 3 ? (
+              <>
+                Solo {cobertura.conCosto === 1 ? "1 producto tiene" : `${cobertura.conCosto} productos tienen`} costo. Con <strong>3 o más</strong>{" "}
+                que se vendan ya te puedo decir cuál te <em>deja</em> más ganancia.
+              </>
+            ) : (
+              <>
+                {cobertura.conCosto} de tus {cobertura.ofrecidos} productos tienen costo y cubren el <strong>{cobertura.porcentaje}%</strong> de lo
+                que vendés. El análisis de ganancia ya funciona con esos; cuantos más sumes, más completo queda.
+              </>
+            )}
           </p>
+
+          {cobertura.sinCosto.length > 0 && (
+            <>
+              <p className="mt-3 text-sm font-medium text-tinta">Los que más vendés y todavía no tienen costo</p>
+              <ul className="mt-1.5 divide-y divide-linea-fina rounded-lg bg-papel-suave px-3">
+                {cobertura.sinCosto.map((p, i) => (
+                  <li key={`${i}-${p.nombre}`}className="flex items-center justify-between gap-3 py-1.5 text-sm">
+                    <span className="truncate text-tinta-media">{p.nombre}</span>
+                    <span className="whitespace-nowrap font-medium text-tinta-media">{p.unidades} u vendidas</span>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+
           <Link href="/admin/productos" className={`mt-3 ${clasesBoton("navegar", "sm")}`}>
             Armar recetas en Productos
           </Link>

@@ -90,7 +90,11 @@ export type ResultadoAnalisis = {
   /** Si todavía no alcanza, esto explica qué falta y no se emite ninguna idea. */
   faltaData: { pedidosActuales: number; pedidosNecesarios: number } | null;
   ideas: Idea[];
+  /** Cuánto de lo vendido tiene costo cargado y cuáles de los que más se venden todavía no (ver coberturaDeCosto). */
+  cobertura: CoberturaDeCosto;
 };
+
+export type CoberturaDeCosto = { ofrecidos: number; conCosto: number; porcentaje: number; sinCosto: { nombre: string; unidades: number }[] };
 
 // ---------------------------------------------------------------------------
 //  Umbrales
@@ -222,6 +226,7 @@ export function analizar(entrada: EntradaAnalisis): ResultadoAnalisis {
         pedidosNecesarios: MINIMO_PARA_OPINAR,
       },
       ideas: [],
+      cobertura: coberturaDeCosto(reales, productos),
     };
   }
 
@@ -239,7 +244,7 @@ export function analizar(entrada: EntradaAnalisis): ResultadoAnalisis {
     ideaDeliveryVsRetiro(reales),
   ].filter((x): x is Idea => x !== null);
 
-  return { base: reales.length, faltaData: null, ideas };
+  return { base: reales.length, faltaData: null, ideas, cobertura: coberturaDeCosto(reales, productos) };
 }
 
 // --- Resumen -----------------------------------------------------------------
@@ -585,8 +590,47 @@ function ideaClientesFieles(reales: PedidoAnalisis[]): Idea | null {
   };
 }
 
-// --- Margen ------------------------------------------------------------------
+// --- Cobertura del costo -----------------------------------------------------
 
+/**
+ * Cuánto de lo vendido está cubierto por productos con costo cargado (el costo sale de la receta) y cuáles de los que más se venden todavía
+ * no lo tienen. Sirve para decir la verdad sobre la ganancia cuando solo se armaron las recetas de ALGUNOS productos (por ejemplo los diez
+ * que más se venden): el análisis de margen vale para esos, y esto dice qué parte de las ventas abarca y por dónde seguir.
+ */
+export function coberturaDeCosto(
+  reales: PedidoAnalisis[],
+  productos: ProductoAnalisis[]
+): CoberturaDeCosto {
+  const ofrecidos = productos.filter((p) => p.disponible);
+  const tieneCosto = (p: ProductoAnalisis) => p.costo != null && p.costo > 0;
+  const conCostoIds = new Set(productos.filter(tieneCosto).map((p) => p.id));
+  const sinCostoPorId = new Map(productos.filter((p) => !tieneCosto(p)).map((p) => [p.id, p]));
+
+  let total = 0;
+  let cubierto = 0;
+  const unidades = new Map<string, number>();
+  for (const v of reales) {
+    for (const i of v.items) {
+      const linea = i.precioUnitario * i.cantidad;
+      total += linea;
+      if (i.productId && conCostoIds.has(i.productId)) cubierto += linea;
+      else if (i.productId && sinCostoPorId.has(i.productId)) unidades.set(i.productId, (unidades.get(i.productId) ?? 0) + i.cantidad);
+    }
+  }
+  const sinCosto = [...unidades.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 10)
+    .map(([id, u]) => ({ nombre: sinCostoPorId.get(id)!.nombre, unidades: u }));
+
+  return {
+    ofrecidos: ofrecidos.length,
+    conCosto: ofrecidos.filter(tieneCosto).length,
+    porcentaje: total > 0 ? Math.round((cubierto / total) * 100) : 0,
+    sinCosto,
+  };
+}
+
+// --- Margen ------------------------------------------------------------------
 function ideaMargen(
   reales: PedidoAnalisis[],
   productos: ProductoAnalisis[]
@@ -634,25 +678,38 @@ function ideaMargen(
   const reyIngreso = porIngreso[0];
   const reyMargen = porMargen[0];
 
+  // Con costo en solo ALGUNOS productos (por ejemplo los diez que más se venden) la comparación vale entre esos: se dice con cuántos y qué
+  // parte de lo vendido cubren, para no hacer pasar «el mejor de los costeados» por «el mejor de todo el negocio».
+  const cobertura = coberturaDeCosto(reales, productos);
+  const parcial = cobertura.porcentaje < 100;
+  const alcance = parcial
+    ? ` Calculado con los ${filas.length} productos con costo que se vendieron, que son el ${cobertura.porcentaje}% de lo que vendés.`
+    : "";
+  const completar = parcial && cobertura.porcentaje < 80 ? " Cuantos más productos tengan costo, más completo es este análisis." : "";
+
   // Lo interesante es cuando NO coinciden: el que más factura no es el que más deja.
   if (reyIngreso.pr.id === reyMargen.pr.id) {
     return {
       clave: "margen",
       tipo: "dato",
-      titulo: "Tu producto más fuerte también es el que más deja",
-      dato: `${reyMargen.pr.nombre}: ${reyMargen.unidades} unidades, ${guaranies(reyMargen.margenTotal)} de margen (sin IVA)`,
+      titulo: parcial ? "De los que tienen costo cargado, el que más vendés también es el que más deja" : "Tu producto más fuerte también es el que más deja",
+      dato: `${reyMargen.pr.nombre}: ${reyMargen.unidades} unidades, ${guaranies(reyMargen.margenTotal)} de margen (sin IVA).${alcance}`,
       accion:
-        "Es la situación cómoda. Cuidá que nunca falte y que la foto sea la mejor de la carta: es el producto que sostiene tu rentabilidad.",
+        "Es la situación cómoda. Cuidá que nunca falte y que la foto sea la mejor de la carta: es el producto que sostiene tu rentabilidad." + completar,
       confianza: "media",
+      detalle: porMargen.slice(0, 6).map((f) => ({
+        etiqueta: f.pr.nombre,
+        valor: `${f.unidades} u · ${guaranies(f.margenTotal)} de margen sin IVA`,
+      })),
     };
   }
 
   return {
     clave: "margen",
     tipo: "oportunidad",
-    titulo: "El que más facturás no es el que más te deja",
-    dato: `${reyIngreso.pr.nombre} factura ${guaranies(reyIngreso.ingreso)} y deja ${guaranies(reyIngreso.margenTotal)} (sin IVA, ya descontado el costo). ${reyMargen.pr.nombre} deja ${guaranies(reyMargen.margenTotal)}`,
-    accion: `Poné ${reyMargen.pr.nombre} arriba de la carta y como destacado. Mover clientes de uno al otro te sube la ganancia sin vender una unidad más.`,
+    titulo: parcial ? "De los que tienen costo cargado, el que más facturás no es el que más te deja" : "El que más facturás no es el que más te deja",
+    dato: `${reyIngreso.pr.nombre} factura ${guaranies(reyIngreso.ingreso)} y deja ${guaranies(reyIngreso.margenTotal)} (sin IVA, ya descontado el costo). ${reyMargen.pr.nombre} deja ${guaranies(reyMargen.margenTotal)}.${alcance}`,
+    accion: `Poné ${reyMargen.pr.nombre} arriba de la carta y como destacado. Mover clientes de uno al otro te sube la ganancia sin vender una unidad más.${completar}`,
     confianza: reales.length >= 100 ? "alta" : "media",
     detalle: porMargen.slice(0, 6).map((f) => ({
       etiqueta: f.pr.nombre,
