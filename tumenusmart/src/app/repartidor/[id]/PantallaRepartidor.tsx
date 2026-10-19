@@ -5,6 +5,8 @@ import Link from "next/link";
 import { formatearGuarani } from "@/lib/format";
 import { RefrescarCada } from "@/components/RefrescarCada";
 import { clasesBoton } from "@/components/ui";
+import { IconoWhatsapp } from "@/components/iconos";
+import { normalizarTelefonoParaWhatsapp } from "@/lib/whatsapp";
 
 /** Un pedido de la ruta, listo para mostrar (todo texto y números: viene del servidor ya armado). */
 export type TarjetaRepartidor = {
@@ -213,9 +215,25 @@ export function PantallaRepartidor({
                 </span>
               </div>
 
-              <a href={`tel:${t.telefono}`} className="mb-2 block text-sm text-brand">
-                📞 {t.telefono}
-              </a>
+              {/* El teléfono que cargó el cliente: tocarlo llama, y el botón verde abre su WhatsApp directo (para escribirle o llamarlo por ahí
+                  cuando el repartidor está en la calle y no encuentra la casa). Sin un número usable, no se muestra el botón. */}
+              <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-2">
+                <a href={`tel:${t.telefono}`} className="text-sm text-brand">
+                  📞 {t.telefono}
+                </a>
+                {normalizarTelefonoParaWhatsapp(t.telefono).length >= 11 && (
+                  <a
+                    href={`https://wa.me/${normalizarTelefonoParaWhatsapp(t.telefono)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={clasesBoton("whatsapp", "md")}
+                    title="Abrir el WhatsApp del cliente"
+                  >
+                    <IconoWhatsapp tam={18} />
+                    WhatsApp
+                  </a>
+                )}
+              </div>
 
               {t.direccion ? (
                 <p className="mb-2 text-sm text-neutral-700">📍 {t.direccion}</p>
